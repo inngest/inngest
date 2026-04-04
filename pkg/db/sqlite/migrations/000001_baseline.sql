@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS apps (
 	status VARCHAR NOT NULL,
 	error TEXT,
 	checksum VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
 	method VARCHAR NOT NULL DEFAULT 'serve',
@@ -37,16 +37,16 @@ CREATE TABLE IF NOT EXISTS functions (
 	name VARCHAR NOT NULL,
 	slug VARCHAR NOT NULL,
 	config VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS function_runs (
 	run_id CHAR(26) NOT NULL,
-	run_started_at TIMESTAMP NOT NULL,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	function_id UUID,
 	function_version INT NOT NULL,
-	trigger_type VARCHAR NOT NULL,
+	trigger_type VARCHAR NOT NULL DEFAULT 'event',
 	event_id CHAR(26) NOT NULL,
 	batch_id CHAR(26),
 	original_run_id CHAR(26),
@@ -59,13 +59,13 @@ CREATE TABLE IF NOT EXISTS function_finishes (
 	status VARCHAR,
 	output VARCHAR DEFAULT '{}',
 	completed_step_count INT DEFAULT 1,
-	created_at TIMESTAMP
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS history (
 	id BLOB,
-	created_at TIMESTAMP NOT NULL,
-	run_started_at TIMESTAMP NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	function_id UUID,
 	function_version INT NOT NULL,
 	run_id BLOB NOT NULL,

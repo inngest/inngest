@@ -100,7 +100,7 @@ func TestAdapterWithTx(t *testing.T) {
 // App CRUD round-trip
 // ---------------------------------------------------------------------------
 
-func TestQuerierAppRoundTrip(t *testing.T) {
+func TestUpsertAppRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
 
@@ -125,12 +125,14 @@ func TestQuerierAppRoundTrip(t *testing.T) {
 	require.NotNil(t, app)
 	assert.Equal(t, appID, app.ID)
 	assert.Equal(t, "test-app", app.Name)
+	assert.False(t, app.CreatedAt.IsZero(), "insert must populate created_at")
 
 	// Read back
 	got, err := q.GetAppByID(ctx, appID)
 	require.NoError(t, err)
 	assert.Equal(t, "test-app", got.Name)
 	assert.Equal(t, "go", got.SdkLanguage)
+	assert.Equal(t, app.CreatedAt.UTC(), got.CreatedAt.UTC(), "created_at must round-trip unchanged")
 
 	// Update via upsert
 	updated, err := q.UpsertApp(ctx, db.UpsertAppParams{
@@ -147,6 +149,7 @@ func TestQuerierAppRoundTrip(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "test-app-v2", updated.Name)
+	assert.Equal(t, app.CreatedAt.UTC(), updated.CreatedAt.UTC(), "created_at must be preserved on update")
 
 	// Delete (soft-delete: sets archived_at)
 	err = q.DeleteApp(ctx, appID)

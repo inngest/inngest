@@ -369,7 +369,7 @@ func (q *Queries) GetEventBatchByRunID(ctx context.Context, dollar_1 string) (*E
 }
 
 const getEventBatchesByEventID = `-- name: GetEventBatchesByEventID :many
-SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE POSITION(CAST($1 AS TEXT) IN CAST(event_ids AS TEXT)) > 0
+SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE POSITION($1 IN convert_from(event_ids, 'UTF8')) > 0
 `
 
 func (q *Queries) GetEventBatchesByEventID(ctx context.Context, dollar_1 string) ([]*EventBatch, error) {
