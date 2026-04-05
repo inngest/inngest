@@ -437,10 +437,13 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			released := make(chan struct{})
 			go func() {
 				for {
 					select {
 					case <-ctx.Done():
+						return
+					case <-released:
 						return
 					case <-time.After(time.Second):
 						// Ensure we tick the extend at least once
@@ -456,6 +459,10 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 			err := ri.CapacityLease.Release()
 			require.NoError(t, err)
+			close(released) // stop clock advances after release
+
+			// Give the extend goroutine time to observe the cancelled context
+			<-time.After(50 * time.Millisecond)
 
 			// And do some more processing before returning
 			<-time.After(3 * time.Second)
