@@ -1910,9 +1910,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				}
 
 				// Can be reached multiple times for parallel discovery steps
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-				}
+				e.runOnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp)
 
 				return nil
 			}
@@ -1969,9 +1967,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		}
 
 		// Can be reached multiple times for parallel discovery steps
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-		}
+		e.runOnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp)
 
 		return nil
 	}
@@ -1999,12 +1995,24 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		}
 
 		// Can be reached multiple times for parallel discovery steps
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-		}
+		e.runOnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp)
 	}
 
 	return nil
+}
+
+// runOnFunctionFinished runs all lifecycle OnFunctionFinished callbacks synchronously,
+// ensuring the function_finishes record is written before returning.
+func (e *executor) runOnFunctionFinished(ctx context.Context, md sv2.Metadata, item queue.Item, events []json.RawMessage, resp state.DriverResponse) {
+	var wg sync.WaitGroup
+	for _, l := range e.lifecycles {
+		wg.Add(1)
+		go func(l execution.LifecycleListener) {
+			defer wg.Done()
+			l.OnFunctionFinished(context.WithoutCancel(ctx), md, item, events, resp)
+		}(l)
+	}
+	wg.Wait()
 }
 
 type functionFinishedData struct {
@@ -3722,15 +3730,7 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 	})
 
 	if resp != nil {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(
-				context.WithoutCancel(ctx),
-				*md,
-				runCtx.LifecycleItem(),
-				evts,
-				*resp,
-			)
-		}
+		e.runOnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp)
 	}
 
 	return err
@@ -3765,15 +3765,7 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 	})
 
 	if resp != nil {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(
-				context.WithoutCancel(ctx),
-				*md,
-				runCtx.LifecycleItem(),
-				evts,
-				*resp,
-			)
-		}
+		e.runOnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp)
 	}
 
 	return err

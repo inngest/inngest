@@ -110,9 +110,7 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 		}
 
 		// Can be reached multiple times for parallel discovery steps
-		for _, e := range r.e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, r.evts, resp)
-		}
+		r.e.runOnFunctionFinished(ctx, r.md, r.item, r.evts, resp)
 
 		// Stop the function from running, but don't return an error as we don't
 		// want the step to retry.
