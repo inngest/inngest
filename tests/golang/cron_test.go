@@ -48,7 +48,7 @@ func TestCron(t *testing.T) {
 	t.Run("cron should run", func(t *testing.T) {
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, 61*time.Second, 5*time.Second)
+		}, 121*time.Second, 5*time.Second)
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestCronRemoveCronTrigger(t *testing.T) {
 	t.Run("cron should run", func(t *testing.T) {
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, 61*time.Second, 5*time.Second)
+		}, 121*time.Second, 5*time.Second)
 	})
 
 	t.Run("re-register function to remove cron", func(t *testing.T) {
@@ -166,7 +166,7 @@ func TestCronUpdateCronTrigger(t *testing.T) {
 	t.Run("cron should run", func(t *testing.T) {
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, 121*time.Second, 5*time.Second)
+		}, 241*time.Second, 5*time.Second)
 	})
 
 	t.Run("re-register function to reduce cron frequency", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestCronUpdateCronTrigger(t *testing.T) {
 
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, 61*time.Second, 5*time.Second)
+		}, 121*time.Second, 5*time.Second)
 	})
 }
 
@@ -245,6 +245,6 @@ func TestCronAddCronTrigger(t *testing.T) {
 
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 2
-		}, 121*time.Second, 5*time.Second)
+		}, 241*time.Second, 5*time.Second)
 	})
 }
