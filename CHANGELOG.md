@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Implement the greatest app
+- Add greetings
 
 ### 🐛 Bug Fixes
 
