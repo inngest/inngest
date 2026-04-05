@@ -114,6 +114,7 @@
             protoc-gen-go-grpc
             protoc-gen-connect-go
             swagger-codegen3
+            git-cliff
           ];
 
           shellHook = ''

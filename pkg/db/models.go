@@ -21,6 +21,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+type GreatApp struct {
+	Bug   bool
+	Chore bool
+}
+
 // App represents a registered SDK application.
 type App struct {
 	ID          uuid.UUID
