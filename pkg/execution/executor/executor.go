@@ -554,6 +554,23 @@ func (e *executor) CloseLifecycleListeners(ctx context.Context) {
 	}
 }
 
+// notifyFunctionFinished calls OnFunctionFinished on all lifecycle listeners
+// concurrently and waits for all of them to complete before returning. This
+// ensures that the function_finishes database write (which records the final
+// COMPLETED/FAILED status) is committed before the caller returns, preventing
+// a race where the run appears stuck in RUNNING state.
+func (e *executor) notifyFunctionFinished(ctx context.Context, md sv2.Metadata, item queue.Item, events []json.RawMessage, resp state.DriverResponse) {
+	var wg sync.WaitGroup
+	for _, l := range e.lifecycles {
+		wg.Add(1)
+		go func(l execution.LifecycleListener) {
+			defer wg.Done()
+			l.OnFunctionFinished(context.WithoutCancel(ctx), md, item, events, resp)
+		}(l)
+	}
+	wg.Wait()
+}
+
 func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 	var key string
 	if req.IdempotencyKey != nil {
@@ -1891,28 +1908,26 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					i.resp.Generator = []*state.GeneratorOpcode{}
 				}
 
-				if err := e.Finalize(ctx, execution.FinalizeOpts{
-					Metadata: i.md,
-					// Always, when called from the executor, as this handles async
-					// finalization.
-					Response: execution.FinalizeResponse{
-						Type:           execution.FinalizeResponseDriver,
-						DriverResponse: *i.resp,
-					},
-					Optional: execution.FinalizeOptional{
-						FnSlug:        i.f.GetSlug(),
-						InputEvents:   i.events,
-						OutputSpanRef: i.execSpan,
-						Reason:        "fail-early",
-					},
-				}); err != nil {
-					l.ReportError(err, "error running finish handler")
-				}
+			if err := e.Finalize(ctx, execution.FinalizeOpts{
+				Metadata: i.md,
+				// Always, when called from the executor, as this handles async
+				// finalization.
+				Response: execution.FinalizeResponse{
+					Type:           execution.FinalizeResponseDriver,
+					DriverResponse: *i.resp,
+				},
+				Optional: execution.FinalizeOptional{
+					FnSlug:        i.f.GetSlug(),
+					InputEvents:   i.events,
+					OutputSpanRef: i.execSpan,
+					Reason:        "fail-early",
+				},
+			}); err != nil {
+				l.ReportError(err, "error running finish handler")
+			}
 
 				// Can be reached multiple times for parallel discovery steps
-				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-				}
+				e.notifyFunctionFinished(ctx, i.md, i.item, i.events, *i.resp)
 
 				return nil
 			}
@@ -1969,9 +1984,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		}
 
 		// Can be reached multiple times for parallel discovery steps
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-		}
+		e.notifyFunctionFinished(ctx, i.md, i.item, i.events, *i.resp)
 
 		return nil
 	}
@@ -1999,9 +2012,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		}
 
 		// Can be reached multiple times for parallel discovery steps
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
-		}
+		e.notifyFunctionFinished(ctx, i.md, i.item, i.events, *i.resp)
 	}
 
 	return nil
@@ -3722,15 +3733,7 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 	})
 
 	if resp != nil {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(
-				context.WithoutCancel(ctx),
-				*md,
-				runCtx.LifecycleItem(),
-				evts,
-				*resp,
-			)
-		}
+		e.notifyFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp)
 	}
 
 	return err
@@ -3765,15 +3768,7 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 	})
 
 	if resp != nil {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(
-				context.WithoutCancel(ctx),
-				*md,
-				runCtx.LifecycleItem(),
-				evts,
-				*resp,
-			)
-		}
+		e.notifyFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp)
 	}
 
 	return err
