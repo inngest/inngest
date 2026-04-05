@@ -22,6 +22,7 @@ import (
 )
 
 type GreatApp struct {
+	Bug bool
 }
 
 // App represents a registered SDK application.
