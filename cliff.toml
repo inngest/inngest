@@ -101,3 +101,22 @@ topo_order_commits = true
 sort_commits = "oldest"
 # Process submodules commits
 recurse_submodules = false
+
+exclude_paths = [
+  # Cloud dashboard & support apps
+  "ui/apps/dashboard/",
+  "ui/apps/support/",
+  # Cloud infrastructure within execution
+  "pkg/execution/queue/shard_lease",
+  # Capacity management (cloud)
+  # "pkg/constraintapi/",
+  # Debug/ops tooling
+  "pkg/debugapi/",
+  "cmd/debug/",
+  "proto/debug/",
+  "proto/gen/debug/",
+  # Shard lease tests
+  "tests/execution/queue/queue_shard_lease",
+  # Dashboard-only shared components
+  "ui/packages/components/src/SQLEditor/"
+]
