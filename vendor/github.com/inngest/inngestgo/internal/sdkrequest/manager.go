@@ -304,7 +304,7 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 				}
 				return
 			}
-			slog.Default().Error("error checkpointing state, falling back to async response", "error", err)
+			slog.Default().Warn("error checkpointing state, falling back to async response", "error", err)
 		})
 	default:
 		// Do nothing else.

@@ -2,6 +2,38 @@ package constraintapi
 
 import "github.com/inngest/inngest/pkg/enums"
 
+// Semaphore represents an evaluated semaphore reference.
+// Used on queue items, backlogs, partition config, and constraint API config.
+type Semaphore struct {
+	// ID is the semaphore identifier, always prefixed:
+	//   app:<uuid>                — worker concurrency
+	//   fn:<uuid>                 — function concurrency (no key)
+	//   fnkey:<xxhash(fnID+expr)> — function concurrency with key expression
+	ID string `json:"id"`
+
+	// UsageValue is the xxhash of the evaluated expression result.
+	// Empty for keyless semaphores (app:, fn:).
+	UsageValue string `json:"uv,omitempty"`
+
+	// Weight is the number of units to acquire (default 1).
+	Weight int64 `json:"w"`
+
+	// Release controls when the semaphore counter is decremented.
+	Release SemaphoreReleaseMode `json:"r"`
+}
+
+// AutoReleaseSemaphores returns only auto-release semaphores from a slice.
+// Used to add worker concurrency semaphores to every queue item (not just start).
+func AutoReleaseSemaphores(sems []Semaphore) []Semaphore {
+	var result []Semaphore
+	for _, s := range sems {
+		if s.Release == SemaphoreReleaseAuto {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
 type ConstraintConfig struct {
 	// FunctionVersion specifies the latest known function version.
 	// If the version on the manager is newer, it will be used.
@@ -15,6 +47,9 @@ type ConstraintConfig struct {
 
 	// Throttle represents 0-n throttle constraints
 	Throttle []ThrottleConfig
+
+	// Semaphores represents 0-n semaphore constraints
+	Semaphores []Semaphore
 }
 
 type RateLimitConfig struct {

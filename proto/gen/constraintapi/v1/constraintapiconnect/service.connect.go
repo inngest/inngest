@@ -42,6 +42,18 @@ const (
 	ConstraintAPIExtendLeaseProcedure = "/constraintapi.v1.ConstraintAPI/ExtendLease"
 	// ConstraintAPIReleaseProcedure is the fully-qualified name of the ConstraintAPI's Release RPC.
 	ConstraintAPIReleaseProcedure = "/constraintapi.v1.ConstraintAPI/Release"
+	// ConstraintAPISetSemaphoreCapacityProcedure is the fully-qualified name of the ConstraintAPI's
+	// SetSemaphoreCapacity RPC.
+	ConstraintAPISetSemaphoreCapacityProcedure = "/constraintapi.v1.ConstraintAPI/SetSemaphoreCapacity"
+	// ConstraintAPIAdjustSemaphoreCapacityProcedure is the fully-qualified name of the ConstraintAPI's
+	// AdjustSemaphoreCapacity RPC.
+	ConstraintAPIAdjustSemaphoreCapacityProcedure = "/constraintapi.v1.ConstraintAPI/AdjustSemaphoreCapacity"
+	// ConstraintAPIGetSemaphoreCapacityProcedure is the fully-qualified name of the ConstraintAPI's
+	// GetSemaphoreCapacity RPC.
+	ConstraintAPIGetSemaphoreCapacityProcedure = "/constraintapi.v1.ConstraintAPI/GetSemaphoreCapacity"
+	// ConstraintAPIReleaseSemaphoreProcedure is the fully-qualified name of the ConstraintAPI's
+	// ReleaseSemaphore RPC.
+	ConstraintAPIReleaseSemaphoreProcedure = "/constraintapi.v1.ConstraintAPI/ReleaseSemaphore"
 )
 
 // ConstraintAPIClient is a client for the constraintapi.v1.ConstraintAPI service.
@@ -50,6 +62,11 @@ type ConstraintAPIClient interface {
 	Acquire(context.Context, *connect.Request[v1.CapacityAcquireRequest]) (*connect.Response[v1.CapacityAcquireResponse], error)
 	ExtendLease(context.Context, *connect.Request[v1.CapacityExtendLeaseRequest]) (*connect.Response[v1.CapacityExtendLeaseResponse], error)
 	Release(context.Context, *connect.Request[v1.CapacityReleaseRequest]) (*connect.Response[v1.CapacityReleaseResponse], error)
+	// Semaphore management
+	SetSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreSetCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error)
+	AdjustSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreAdjustCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error)
+	GetSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreGetCapacityRequest]) (*connect.Response[v1.SemaphoreGetCapacityResponse], error)
+	ReleaseSemaphore(context.Context, *connect.Request[v1.SemaphoreReleaseRequest]) (*connect.Response[v1.SemaphoreResponse], error)
 }
 
 // NewConstraintAPIClient constructs a client for the constraintapi.v1.ConstraintAPI service. By
@@ -87,15 +104,43 @@ func NewConstraintAPIClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(constraintAPIMethods.ByName("Release")),
 			connect.WithClientOptions(opts...),
 		),
+		setSemaphoreCapacity: connect.NewClient[v1.SemaphoreSetCapacityRequest, v1.SemaphoreResponse](
+			httpClient,
+			baseURL+ConstraintAPISetSemaphoreCapacityProcedure,
+			connect.WithSchema(constraintAPIMethods.ByName("SetSemaphoreCapacity")),
+			connect.WithClientOptions(opts...),
+		),
+		adjustSemaphoreCapacity: connect.NewClient[v1.SemaphoreAdjustCapacityRequest, v1.SemaphoreResponse](
+			httpClient,
+			baseURL+ConstraintAPIAdjustSemaphoreCapacityProcedure,
+			connect.WithSchema(constraintAPIMethods.ByName("AdjustSemaphoreCapacity")),
+			connect.WithClientOptions(opts...),
+		),
+		getSemaphoreCapacity: connect.NewClient[v1.SemaphoreGetCapacityRequest, v1.SemaphoreGetCapacityResponse](
+			httpClient,
+			baseURL+ConstraintAPIGetSemaphoreCapacityProcedure,
+			connect.WithSchema(constraintAPIMethods.ByName("GetSemaphoreCapacity")),
+			connect.WithClientOptions(opts...),
+		),
+		releaseSemaphore: connect.NewClient[v1.SemaphoreReleaseRequest, v1.SemaphoreResponse](
+			httpClient,
+			baseURL+ConstraintAPIReleaseSemaphoreProcedure,
+			connect.WithSchema(constraintAPIMethods.ByName("ReleaseSemaphore")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // constraintAPIClient implements ConstraintAPIClient.
 type constraintAPIClient struct {
-	check       *connect.Client[v1.CapacityCheckRequest, v1.CapacityCheckResponse]
-	acquire     *connect.Client[v1.CapacityAcquireRequest, v1.CapacityAcquireResponse]
-	extendLease *connect.Client[v1.CapacityExtendLeaseRequest, v1.CapacityExtendLeaseResponse]
-	release     *connect.Client[v1.CapacityReleaseRequest, v1.CapacityReleaseResponse]
+	check                   *connect.Client[v1.CapacityCheckRequest, v1.CapacityCheckResponse]
+	acquire                 *connect.Client[v1.CapacityAcquireRequest, v1.CapacityAcquireResponse]
+	extendLease             *connect.Client[v1.CapacityExtendLeaseRequest, v1.CapacityExtendLeaseResponse]
+	release                 *connect.Client[v1.CapacityReleaseRequest, v1.CapacityReleaseResponse]
+	setSemaphoreCapacity    *connect.Client[v1.SemaphoreSetCapacityRequest, v1.SemaphoreResponse]
+	adjustSemaphoreCapacity *connect.Client[v1.SemaphoreAdjustCapacityRequest, v1.SemaphoreResponse]
+	getSemaphoreCapacity    *connect.Client[v1.SemaphoreGetCapacityRequest, v1.SemaphoreGetCapacityResponse]
+	releaseSemaphore        *connect.Client[v1.SemaphoreReleaseRequest, v1.SemaphoreResponse]
 }
 
 // Check calls constraintapi.v1.ConstraintAPI.Check.
@@ -118,12 +163,37 @@ func (c *constraintAPIClient) Release(ctx context.Context, req *connect.Request[
 	return c.release.CallUnary(ctx, req)
 }
 
+// SetSemaphoreCapacity calls constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity.
+func (c *constraintAPIClient) SetSemaphoreCapacity(ctx context.Context, req *connect.Request[v1.SemaphoreSetCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error) {
+	return c.setSemaphoreCapacity.CallUnary(ctx, req)
+}
+
+// AdjustSemaphoreCapacity calls constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity.
+func (c *constraintAPIClient) AdjustSemaphoreCapacity(ctx context.Context, req *connect.Request[v1.SemaphoreAdjustCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error) {
+	return c.adjustSemaphoreCapacity.CallUnary(ctx, req)
+}
+
+// GetSemaphoreCapacity calls constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity.
+func (c *constraintAPIClient) GetSemaphoreCapacity(ctx context.Context, req *connect.Request[v1.SemaphoreGetCapacityRequest]) (*connect.Response[v1.SemaphoreGetCapacityResponse], error) {
+	return c.getSemaphoreCapacity.CallUnary(ctx, req)
+}
+
+// ReleaseSemaphore calls constraintapi.v1.ConstraintAPI.ReleaseSemaphore.
+func (c *constraintAPIClient) ReleaseSemaphore(ctx context.Context, req *connect.Request[v1.SemaphoreReleaseRequest]) (*connect.Response[v1.SemaphoreResponse], error) {
+	return c.releaseSemaphore.CallUnary(ctx, req)
+}
+
 // ConstraintAPIHandler is an implementation of the constraintapi.v1.ConstraintAPI service.
 type ConstraintAPIHandler interface {
 	Check(context.Context, *connect.Request[v1.CapacityCheckRequest]) (*connect.Response[v1.CapacityCheckResponse], error)
 	Acquire(context.Context, *connect.Request[v1.CapacityAcquireRequest]) (*connect.Response[v1.CapacityAcquireResponse], error)
 	ExtendLease(context.Context, *connect.Request[v1.CapacityExtendLeaseRequest]) (*connect.Response[v1.CapacityExtendLeaseResponse], error)
 	Release(context.Context, *connect.Request[v1.CapacityReleaseRequest]) (*connect.Response[v1.CapacityReleaseResponse], error)
+	// Semaphore management
+	SetSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreSetCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error)
+	AdjustSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreAdjustCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error)
+	GetSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreGetCapacityRequest]) (*connect.Response[v1.SemaphoreGetCapacityResponse], error)
+	ReleaseSemaphore(context.Context, *connect.Request[v1.SemaphoreReleaseRequest]) (*connect.Response[v1.SemaphoreResponse], error)
 }
 
 // NewConstraintAPIHandler builds an HTTP handler from the service implementation. It returns the
@@ -157,6 +227,30 @@ func NewConstraintAPIHandler(svc ConstraintAPIHandler, opts ...connect.HandlerOp
 		connect.WithSchema(constraintAPIMethods.ByName("Release")),
 		connect.WithHandlerOptions(opts...),
 	)
+	constraintAPISetSemaphoreCapacityHandler := connect.NewUnaryHandler(
+		ConstraintAPISetSemaphoreCapacityProcedure,
+		svc.SetSemaphoreCapacity,
+		connect.WithSchema(constraintAPIMethods.ByName("SetSemaphoreCapacity")),
+		connect.WithHandlerOptions(opts...),
+	)
+	constraintAPIAdjustSemaphoreCapacityHandler := connect.NewUnaryHandler(
+		ConstraintAPIAdjustSemaphoreCapacityProcedure,
+		svc.AdjustSemaphoreCapacity,
+		connect.WithSchema(constraintAPIMethods.ByName("AdjustSemaphoreCapacity")),
+		connect.WithHandlerOptions(opts...),
+	)
+	constraintAPIGetSemaphoreCapacityHandler := connect.NewUnaryHandler(
+		ConstraintAPIGetSemaphoreCapacityProcedure,
+		svc.GetSemaphoreCapacity,
+		connect.WithSchema(constraintAPIMethods.ByName("GetSemaphoreCapacity")),
+		connect.WithHandlerOptions(opts...),
+	)
+	constraintAPIReleaseSemaphoreHandler := connect.NewUnaryHandler(
+		ConstraintAPIReleaseSemaphoreProcedure,
+		svc.ReleaseSemaphore,
+		connect.WithSchema(constraintAPIMethods.ByName("ReleaseSemaphore")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/constraintapi.v1.ConstraintAPI/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ConstraintAPICheckProcedure:
@@ -167,6 +261,14 @@ func NewConstraintAPIHandler(svc ConstraintAPIHandler, opts ...connect.HandlerOp
 			constraintAPIExtendLeaseHandler.ServeHTTP(w, r)
 		case ConstraintAPIReleaseProcedure:
 			constraintAPIReleaseHandler.ServeHTTP(w, r)
+		case ConstraintAPISetSemaphoreCapacityProcedure:
+			constraintAPISetSemaphoreCapacityHandler.ServeHTTP(w, r)
+		case ConstraintAPIAdjustSemaphoreCapacityProcedure:
+			constraintAPIAdjustSemaphoreCapacityHandler.ServeHTTP(w, r)
+		case ConstraintAPIGetSemaphoreCapacityProcedure:
+			constraintAPIGetSemaphoreCapacityHandler.ServeHTTP(w, r)
+		case ConstraintAPIReleaseSemaphoreProcedure:
+			constraintAPIReleaseSemaphoreHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -190,4 +292,20 @@ func (UnimplementedConstraintAPIHandler) ExtendLease(context.Context, *connect.R
 
 func (UnimplementedConstraintAPIHandler) Release(context.Context, *connect.Request[v1.CapacityReleaseRequest]) (*connect.Response[v1.CapacityReleaseResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.Release is not implemented"))
+}
+
+func (UnimplementedConstraintAPIHandler) SetSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreSetCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity is not implemented"))
+}
+
+func (UnimplementedConstraintAPIHandler) AdjustSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreAdjustCapacityRequest]) (*connect.Response[v1.SemaphoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity is not implemented"))
+}
+
+func (UnimplementedConstraintAPIHandler) GetSemaphoreCapacity(context.Context, *connect.Request[v1.SemaphoreGetCapacityRequest]) (*connect.Response[v1.SemaphoreGetCapacityResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity is not implemented"))
+}
+
+func (UnimplementedConstraintAPIHandler) ReleaseSemaphore(context.Context, *connect.Request[v1.SemaphoreReleaseRequest]) (*connect.Response[v1.SemaphoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.ReleaseSemaphore is not implemented"))
 }

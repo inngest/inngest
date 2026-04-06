@@ -51,8 +51,9 @@ type WorkerConnection interface {
 	Close() error
 }
 
+// Connect
 func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker, logger *slog.Logger) (WorkerConnection, error) {
-	apiClient := newWorkerApiClient(opts.APIBaseUrl, opts.Env)
+	apiClient := newWorkerApiClient(opts.APIBaseURL, opts.Env)
 
 	// Once the worker is running, it can only be stopped by calling Close()
 	doneCtx, cancelDone := context.WithCancel(context.Background())
@@ -81,10 +82,6 @@ func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker
 	wp := NewWorkerPool(ctx, workerPoolSize, ch.processExecutorRequest)
 	ch.workerPool = wp
 
-	defer func() {
-		// TODO Push remaining messages to another destination for processing?
-	}()
-
 	conn, err := ch.Connect(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not establish connection: %w", err)
@@ -103,6 +100,8 @@ type ConnectApp struct {
 	AppVersion *string
 }
 
+// Opts represents required options for creating a persistent connection for communicating
+// with an Inngest server.
 type Opts struct {
 	Env  *string
 	Apps []ConnectApp
@@ -120,9 +119,8 @@ type Opts struct {
 	// Set to any positive value to use a custom limit.
 	MessageReadLimit *int64
 
-	APIBaseUrl   string
-	IsDev        bool
-	DevServerUrl string
+	APIBaseURL string
+	IsDev      bool
 
 	InstanceID *string
 
@@ -519,7 +517,6 @@ func (h *connectHandler) instanceId() string {
 
 // maxWorkerConcurrency returns the maximum number of worker concurrency to use.
 func (h *connectHandler) maxWorkerConcurrency() *int64 {
-
 	// user provided max worker concurrency
 	if h.opts.MaxWorkerConcurrency != nil {
 		return h.opts.MaxWorkerConcurrency

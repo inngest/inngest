@@ -329,6 +329,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
 
 	// Instantiate Constraint API
+	semaphores := constraintapi.NewRedisSemaphoreManager(unshardedRc)
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clockwork.NewRealClock()),
 		constraintapi.WithShardName("default"),
@@ -372,6 +373,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		queue.WithConditionalTracer(conditionalQueueTracer),
 		queue.WithCapacityManager(cm),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		queue.WithCapacityManager(cm),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 	}
 
 	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
@@ -383,20 +386,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
-	}
-
-	queueShards := map[string]queue.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
 	}
 
 	rq, err := queue.New(
 		ctx,
 		"queue",
 		queueShard,
-		queueShards,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: queueShard,
+		},
 		shardSelector,
 		queueOpts...,
 	)
@@ -547,8 +547,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-
 		executor.WithCapacityManager(cm),
+		executor.WithSemaphoreManager(semaphores),
 		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return true
 		}),
@@ -599,6 +599,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
+	ds.SemaphoreManager = semaphores
 	ds.CronSyncer = croner
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
@@ -687,6 +688,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{
 				lifecycles.NewHistoryLifecycle(dbcqrs),
+				lifecycles.NewSemaphoreLifecycleListener(semaphores),
 			}),
 	)
 
@@ -1023,6 +1025,11 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 				Period:                    int(fn.Throttle.Period.Seconds()),
 			}
 		}
+
+		// NOTE: Manual-release semaphores (fn concurrency) are NOT added to the partition config.
+		// They are only embedded on the start job's queue item. Subsequent steps don't need them —
+		// the semaphore is already held for the run and released on finalization.
+		// Worker concurrency (auto-release) would go here when implemented.
 
 		return constraints
 	}

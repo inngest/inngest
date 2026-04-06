@@ -260,7 +260,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 			fn: inngest.Function{
 				FunctionVersion: 3,
 				Concurrency: &inngest.ConcurrencyLimits{
-					Limits: []inngest.Concurrency{
+					Limits: []inngest.StepConcurrency{
 						{
 							Limit: 5,
 							Scope: enums.ConcurrencyScopeFn,
@@ -285,7 +285,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 			fn: inngest.Function{
 				FunctionVersion: 4,
 				Concurrency: &inngest.ConcurrencyLimits{
-					Limits: []inngest.Concurrency{
+					Limits: []inngest.StepConcurrency{
 						{
 							Limit: 10,
 							Scope: enums.ConcurrencyScopeFn,
@@ -401,7 +401,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 					Key:    stringPtr("event.api_key"),
 				},
 				Concurrency: &inngest.ConcurrencyLimits{
-					Limits: []inngest.Concurrency{
+					Limits: []inngest.StepConcurrency{
 						{
 							Limit: 20,
 							Scope: enums.ConcurrencyScopeFn,
@@ -460,7 +460,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 			fn: inngest.Function{
 				FunctionVersion: 8,
 				Concurrency: &inngest.ConcurrencyLimits{
-					Limits: []inngest.Concurrency{
+					Limits: []inngest.StepConcurrency{
 						{
 							Limit: 1,
 							Scope: enums.ConcurrencyScopeFn,

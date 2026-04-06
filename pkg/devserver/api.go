@@ -28,6 +28,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -354,17 +355,22 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
 
-	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
-	// signing key and warn if the user has an invalid key.
-	funcs, err := r.Parse(ctx)
+	// Parse, validate, and enrich functions via the shared registration pipeline.
+	processed, err := registration.ProcessFunctions(ctx, r, registration.ProcessOpts{
+		AccountID:           consts.DevServerAccountID,
+		EnvironmentID:       consts.DevServerEnvID,
+		AppID:               appID,
+		UseDeterministicIDs: true,
+	})
 	if err != nil && err != sdk.ErrNoFunctions {
 		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
-	// For each function,
-	for _, fn := range funcs {
-		// Create a new UUID for the function.
-		fn.ID = fn.DeterministicUUID()
+	for _, df := range processed.Functions {
+		fn := &df.Function
+
+		// Ensure function version is at least 1 and incremented on re-sync
+		fn.FunctionVersion = max(fn.FunctionVersion, 1)
 
 		// Mark as seen.
 		seen[fn.ID] = struct{}{}
@@ -380,13 +386,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				return nil, publicerr.Wrap(fmt.Errorf("function config empty"), 500, "Error unmarshalling function config")
 			}
 			fnExists = true
-		}
 
-		// Ensure function version is at least 1 and incremented on re-sync
-		if fnExists {
 			fn.FunctionVersion = currentFn.FunctionVersion + 1
 		}
-		fn.FunctionVersion = max(fn.FunctionVersion, 1)
 
 		config, err := json.Marshal(fn)
 		if err != nil {
@@ -445,7 +447,11 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				Op:              enums.CronOpNew,
 			})
 		}
+
 	}
+
+	// Set semaphore capacity for all fn-scoped concurrency limits after DB storage.
+	processed.SetSemaphoreCapacity(ctx, a.devserver.SemaphoreManager)
 
 	reply := &sync.Reply{
 		OK:       true,

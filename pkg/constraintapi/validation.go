@@ -210,6 +210,16 @@ func (ci ConstraintItem) Valid() error {
 		if ci.RateLimit != nil && ci.RateLimit.EvaluatedKeyHash == "" {
 			return fmt.Errorf("rate limit constraint must include EvaluatedKeyHash")
 		}
+	case ConstraintKindSemaphore:
+		if ci.Semaphore == nil {
+			return fmt.Errorf("semaphore constraint must include semaphore data")
+		}
+		if ci.Semaphore.ID == "" {
+			return fmt.Errorf("semaphore constraint must include ID")
+		}
+		if ci.Semaphore.Weight <= 0 {
+			return fmt.Errorf("semaphore constraint weight must be > 0")
+		}
 	}
 	return nil
 }
@@ -280,6 +290,16 @@ func (cc ConstraintConfig) ValidConstraintUsage(ci ConstraintItem) error {
 			if !found {
 				return fmt.Errorf("unknown rate limit constraint")
 			}
+		}
+
+	case ConstraintKindSemaphore:
+		if ci.Semaphore != nil {
+			for _, s := range cc.Semaphores {
+				if s.ID == ci.Semaphore.ID {
+					return nil
+				}
+			}
+			return fmt.Errorf("unknown semaphore constraint")
 		}
 	}
 	return nil

@@ -110,7 +110,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 // SerializedConstraintItem represents a minimal, Lua-friendly version of ConstraintItem
 // with short JSON field names and integer enums to reduce Redis storage size.
 type SerializedConstraintItem struct {
-	// k = Kind as integer: 1=rate_limit, 2=concurrency, 3=throttle
+	// k = Kind as integer: 1=rate_limit, 2=concurrency, 3=throttle, 4=semaphore
 	Kind int `json:"k"`
 
 	// Concurrency constraint (only populated when Kind=2)
@@ -121,6 +121,24 @@ type SerializedConstraintItem struct {
 
 	// RateLimit constraint (only populated when Kind=1)
 	RateLimit *SerializedRateLimitConstraint `json:"r,omitempty"`
+
+	// Semaphore constraint (only populated when Kind=4)
+	Semaphore *SerializedSemaphoreConstraint `json:"sem,omitempty"`
+}
+
+// SerializedSemaphoreConstraint represents a minimal version of SemaphoreConstraint
+type SerializedSemaphoreConstraint struct {
+	// k = Redis key for current usage counter
+	CounterKey string `json:"k"`
+
+	// ck = Redis key for total capacity
+	CapacityKey string `json:"ck"`
+
+	// w = weight per acquisition (default 1)
+	Weight int `json:"w"`
+
+	// rel = release mode
+	Release SemaphoreReleaseMode `json:"rel"`
 }
 
 // SerializedConcurrencyConstraint represents a minimal version of ConcurrencyConstraint
@@ -295,6 +313,16 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 			}
 
 			serialized.Throttle = throttleConstraint
+		}
+	case ConstraintKindSemaphore:
+		serialized.Kind = 4
+		if ci.Semaphore != nil {
+			serialized.Semaphore = &SerializedSemaphoreConstraint{
+				CounterKey:  ci.Semaphore.UsageKey(accountID),
+				CapacityKey: ci.Semaphore.CapacityKey(accountID),
+				Weight:      int(ci.Semaphore.Weight),
+				Release:     ci.Semaphore.Release,
+			}
 		}
 	}
 

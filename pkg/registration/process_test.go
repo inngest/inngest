@@ -1,4 +1,4 @@
-package sdk
+package registration
 
 import (
 	"context"
@@ -6,26 +6,27 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRegisterRequestValidate(t *testing.T) {
+func TestProcessFunctions(t *testing.T) {
 	tests := []struct {
 		name string
-		r    RegisterRequest
+		r    sdk.RegisterRequest
 		err  error
 	}{
 		{
 			name: "No functions",
-			r: RegisterRequest{
-				Functions: []SDKFunction{},
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{},
 			},
-			err: ErrNoFunctions,
+			err: sdk.ErrNoFunctions,
 		},
 		{
 			name: "no steps",
-			r: RegisterRequest{
-				Functions: []SDKFunction{
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
 					{
 						Name: "lol",
 						Triggers: []inngest.Trigger{
@@ -38,12 +39,12 @@ func TestRegisterRequestValidate(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("Function has no steps: lol"),
+			err: fmt.Errorf("Functions must contain one step"),
 		},
 		{
 			name: "no driver",
-			r: RegisterRequest{
-				Functions: []SDKFunction{
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
 					{
 						Name: "lol",
 						Triggers: []inngest.Trigger{
@@ -53,7 +54,7 @@ func TestRegisterRequestValidate(t *testing.T) {
 								},
 							},
 						},
-						Steps: map[string]SDKStep{
+						Steps: map[string]sdk.SDKStep{
 							"step-id": {
 								ID:   "step-id",
 								Name: "This is my first step.  It's a goodun, but it uses docker",
@@ -66,8 +67,8 @@ func TestRegisterRequestValidate(t *testing.T) {
 		},
 		{
 			name: "docker driver",
-			r: RegisterRequest{
-				Functions: []SDKFunction{
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
 					{
 						Name: "lol",
 						Triggers: []inngest.Trigger{
@@ -77,7 +78,7 @@ func TestRegisterRequestValidate(t *testing.T) {
 								},
 							},
 						},
-						Steps: map[string]SDKStep{
+						Steps: map[string]sdk.SDKStep{
 							"step-id": {
 								ID:   "step-id",
 								Name: "This is my first step.  It's a goodun, but it's not http",
@@ -89,12 +90,12 @@ func TestRegisterRequestValidate(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("Step 'step-id' has an invalid driver. Only HTTP drivers may be used with SDK functions."),
+			err: fmt.Errorf("Non-supported step schema: docker"),
 		},
 		{
 			name: "valid",
-			r: RegisterRequest{
-				Functions: []SDKFunction{
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
 					{
 						Name: "lol",
 						Triggers: []inngest.Trigger{
@@ -104,10 +105,10 @@ func TestRegisterRequestValidate(t *testing.T) {
 								},
 							},
 						},
-						Steps: map[string]SDKStep{
+						Steps: map[string]sdk.SDKStep{
 							"step-id": {
 								ID:   "step-id",
-								Name: "This is my first step.  It's a goodun, but it uses docker",
+								Name: "This is my first step.  It's a goodun",
 								Runtime: map[string]any{
 									"url": "https://www.example.net/lol/what",
 								},
@@ -121,7 +122,7 @@ func TestRegisterRequestValidate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, actual := test.r.Parse(context.Background())
+			_, actual := ProcessFunctions(context.Background(), test.r, ProcessOpts{})
 			if test.err == nil {
 				require.Nil(t, actual)
 			} else {

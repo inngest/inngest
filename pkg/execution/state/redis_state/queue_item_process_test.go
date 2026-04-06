@@ -465,7 +465,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			<-time.After(50 * time.Millisecond)
 
 			// And do some more processing before returning
-			<-time.After(3 * time.Second)
+			<-time.After(500 * time.Millisecond)
 			atomic.AddInt64(&counter, 1)
 			return osqueue.RunResult{}, nil
 		})

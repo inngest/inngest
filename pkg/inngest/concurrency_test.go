@@ -26,7 +26,13 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 		{
 			input: []byte("{}"),
 			expected: ConcurrencyLimits{
-				Limits: []Concurrency{
+				Step: []StepConcurrency{
+					{
+						Limit: 0,
+						Key:   nil,
+					},
+				},
+				Limits: []StepConcurrency{
 					{
 						Limit: 0,
 						Key:   nil,
@@ -37,7 +43,14 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 		{
 			input: []byte(`{"key":"what"}`),
 			expected: ConcurrencyLimits{
-				Limits: []Concurrency{
+				Step: []StepConcurrency{
+					{
+						Limit: 0,
+						Key:   strptr("what"),
+						Hash:  hashConcurrencyKey("what"),
+					},
+				},
+				Limits: []StepConcurrency{
 					{
 						Limit: 0,
 						Key:   strptr("what"),
@@ -49,7 +62,14 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 		{
 			input: []byte(`{"key":"what", "limit": 10}`),
 			expected: ConcurrencyLimits{
-				Limits: []Concurrency{
+				Step: []StepConcurrency{
+					{
+						Limit: 10,
+						Key:   strptr("what"),
+						Hash:  hashConcurrencyKey("what"),
+					},
+				},
+				Limits: []StepConcurrency{
 					{
 						Limit: 10,
 						Key:   strptr("what"),
@@ -61,7 +81,14 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 		{
 			input: []byte(`[{"key":"what", "limit": 10}]`),
 			expected: ConcurrencyLimits{
-				Limits: []Concurrency{
+				Step: []StepConcurrency{
+					{
+						Limit: 10,
+						Key:   strptr("what"),
+						Hash:  hashConcurrencyKey("what"),
+					},
+				},
+				Limits: []StepConcurrency{
 					{
 						Limit: 10,
 						Key:   strptr("what"),
@@ -73,7 +100,15 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 		{
 			input: []byte(`[{"key":"what", "limit": 10, "scope":"account"}]`),
 			expected: ConcurrencyLimits{
-				Limits: []Concurrency{
+				Step: []StepConcurrency{
+					{
+						Limit: 10,
+						Key:   strptr("what"),
+						Scope: enums.ConcurrencyScopeAccount,
+						Hash:  hashConcurrencyKey("what"),
+					},
+				},
+				Limits: []StepConcurrency{
 					{
 						Limit: 10,
 						Key:   strptr("what"),
@@ -86,7 +121,7 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 		{
 			input: []byte(`[{"key":"what", "limit": 25, "scope": "account"}, {"key": "event.data.foo", "limit": 10}]`),
 			expected: ConcurrencyLimits{
-				Limits: []Concurrency{
+				Step: []StepConcurrency{
 					// ordered low to high
 					{
 						Limit: 10,
@@ -98,6 +133,58 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 						Key:   strptr("what"),
 						Scope: enums.ConcurrencyScopeAccount,
 						Hash:  hashConcurrencyKey("what"),
+					},
+				},
+				Limits: []StepConcurrency{
+					// ordered low to high
+					{
+						Limit: 10,
+						Key:   strptr("event.data.foo"),
+						Hash:  hashConcurrencyKey("event.data.foo"),
+					},
+					{
+						Limit: 25,
+						Key:   strptr("what"),
+						Scope: enums.ConcurrencyScopeAccount,
+						Hash:  hashConcurrencyKey("what"),
+					},
+				},
+			},
+		},
+		// New format: {"fn": [...], "step": [...]}
+		{
+			input: []byte(`{"fn": [{"limit": 5}], "step": [{"limit": 10, "key": "event.data.userId", "scope": "fn"}]}`),
+			expected: ConcurrencyLimits{
+				Fn: []FnConcurrency{
+					{
+						Limit: 5,
+					},
+				},
+				Step: []StepConcurrency{
+					{
+						Limit: 10,
+						Key:   strptr("event.data.userId"),
+						Hash:  hashConcurrencyKey("event.data.userId"),
+					},
+				},
+				Limits: []StepConcurrency{
+					{
+						Limit: 10,
+						Key:   strptr("event.data.userId"),
+						Hash:  hashConcurrencyKey("event.data.userId"),
+					},
+				},
+			},
+		},
+		// New format: fn only
+		{
+			input: []byte(`{"fn": [{"limit": 3, "key": "event.data.customerId"}]}`),
+			expected: ConcurrencyLimits{
+				Fn: []FnConcurrency{
+					{
+						Limit: 3,
+						Key:   strptr("event.data.customerId"),
+						ID:    hashConcurrencyKey("event.data.customerId"),
 					},
 				},
 			},
@@ -119,13 +206,13 @@ func TestConcurrencyEvaluate(t *testing.T) {
 	hashA, hashB := strconv.FormatUint(xxhash.Sum64String("1"), 36), strconv.FormatUint(xxhash.Sum64String("99"), 36)
 
 	tests := []struct {
-		limit    Concurrency
+		limit    StepConcurrency
 		scopeID  uuid.UUID
 		input    map[string]any
 		expected string
 	}{
 		{
-			limit: Concurrency{
+			limit: StepConcurrency{
 				Limit: 10,
 				Key:   strptr("event.data.user_id"),
 				Scope: enums.ConcurrencyScopeFn,
@@ -140,7 +227,7 @@ func TestConcurrencyEvaluate(t *testing.T) {
 		},
 		// Change the ID, expect a different output
 		{
-			limit: Concurrency{
+			limit: StepConcurrency{
 				Limit: 10,
 				Key:   strptr("event.data.user_id"),
 				Scope: enums.ConcurrencyScopeFn,
@@ -155,7 +242,7 @@ func TestConcurrencyEvaluate(t *testing.T) {
 		},
 		// Chagne the input
 		{
-			limit: Concurrency{
+			limit: StepConcurrency{
 				Limit: 10,
 				Key:   strptr("event.data.user_id"),
 				Scope: enums.ConcurrencyScopeFn,
@@ -170,7 +257,7 @@ func TestConcurrencyEvaluate(t *testing.T) {
 		},
 		// Chagne the scope
 		{
-			limit: Concurrency{
+			limit: StepConcurrency{
 				Limit: 10,
 				Key:   strptr("event.data.user_id"),
 				Scope: enums.ConcurrencyScopeAccount,

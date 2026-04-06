@@ -31,9 +31,9 @@ func TestParallelSteps(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngestgo.ConfigStepConcurrency{
+		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
-		}},
+		}}},
 		inngestgo.EventTrigger("test/parallel", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -538,9 +538,7 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
 	defer server.Close()
 
-	var (
-		counter int32
-	)
+	var counter int32
 	rid := NewRunID()
 	eventName := randomSuffix("event")
 	_, err := inngestgo.CreateFunction(

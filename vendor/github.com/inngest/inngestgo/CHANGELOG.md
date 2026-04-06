@@ -1,5 +1,11 @@
 # inngestgo
 
+## 0.15.1
+
+### Patch Changes
+
+- ca9db1b: Add checkpointing to function syncs
+
 ## 0.15.0
 
 ### Minor Changes
