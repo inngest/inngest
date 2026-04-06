@@ -606,3 +606,65 @@ func TestSemaphoreSameUsageValueShared(t *testing.T) {
 	val, _ := r.Get(usageKey)
 	require.Equal(t, "1", val, "shared counter should be 1")
 }
+
+func TestSemaphoreGetCapacity(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	sm := NewRedisSemaphoreManager(rc)
+	ctx := context.Background()
+	accountID := uuid.New()
+	name := "app:" + uuid.New().String()
+
+	t.Run("nonexistent returns zero", func(t *testing.T) {
+		cap, usage, err := sm.GetCapacity(ctx, accountID, name, "some-value")
+		require.NoError(t, err)
+		require.Equal(t, int64(0), cap)
+		require.Equal(t, int64(0), usage)
+	})
+
+	t.Run("returns set capacity and usage", func(t *testing.T) {
+		capKey := fmt.Sprintf("{cs}:%s:sem:%s:cap", accountScope(accountID), name)
+		usageKey := fmt.Sprintf("{cs}:%s:sem:%s:usage:%s", accountScope(accountID), name, "run-abc")
+
+		require.NoError(t, r.Set(capKey, "100"))
+		require.NoError(t, r.Set(usageKey, "42"))
+
+		cap, usage, err := sm.GetCapacity(ctx, accountID, name, "run-abc")
+		require.NoError(t, err)
+		require.Equal(t, int64(100), cap)
+		require.Equal(t, int64(42), usage)
+	})
+}
+
+func TestSemaphoreAdjustCapacityClampsToZero(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	sm := NewRedisSemaphoreManager(rc)
+	ctx := context.Background()
+	accountID := uuid.New()
+	name := "app:" + uuid.New().String()
+
+	// Set capacity to 5
+	err = sm.SetCapacity(ctx, accountID, name, "set-1", 5)
+	require.NoError(t, err)
+
+	// Adjust by -10, should clamp to 0
+	err = sm.AdjustCapacity(ctx, accountID, name, "adj-1", -10)
+	require.NoError(t, err)
+
+	cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
+	require.NoError(t, err)
+	require.Equal(t, int64(0), cap, "capacity should clamp to zero, not go negative")
+}
