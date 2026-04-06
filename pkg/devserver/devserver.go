@@ -447,18 +447,19 @@ func start(ctx context.Context, opts StartOpts) error {
 			return []byte(*opts.SigningKey), nil
 		}),
 		executor.WithLifecycleListeners(
-			history.NewLifecycleListener(
-				nil,
-				hd,
-				hmw,
-			),
-			Lifecycle{
-				Cqrs:       dbcqrs,
-				Pb:         pb,
-				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
-			},
-			run.NewTraceLifecycleListener(nil),
-			metrics.NewPrometheusLifecycleListener(),
+			append([]execution.LifecycleListener{
+				history.NewLifecycleListener(
+					nil,
+					hd,
+					hmw,
+				),
+				Lifecycle{
+					Cqrs:       dbcqrs,
+					Pb:         pb,
+					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
+				},
+				run.NewTraceLifecycleListener(nil),
+			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
