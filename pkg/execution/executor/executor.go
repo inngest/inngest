@@ -1246,6 +1246,22 @@ func (e *executor) schedule(
 		if metadata.ID.RunID != stv1ID.RunID {
 			id := sv2.IDFromV1(stv1ID)
 			metadata, err = e.smv2.LoadMetadata(ctx, id)
+			// The run was already completed and GC'd, or was deleted.
+			// The idempotency key was used, so skip this run.
+			if err != nil && errors.Is(err, state.ErrRunNotFound) {
+				// Log with delta to help identify short deltas (like 5ms)
+				originalRunCreatedAt := time.UnixMilli(int64(id.RunID.Time()))
+				deltaMs := time.Since(originalRunCreatedAt).Milliseconds()
+				// This sanitization is not needed but CodeQL complains about it
+				sanitizedRunID := util.SanitizeLogField(id.RunID.String())
+				l.Warn("idempotency key exists but run state not found",
+					"original_run_id", sanitizedRunID,
+					"original_run_created_at", originalRunCreatedAt,
+					"delta_ms", deltaMs,
+				)
+				return &stv1ID.RunID, nil, ErrFunctionSkippedIdempotency
+			}
+			// usually other failures (logged by caller)
 			if err != nil {
 				return nil, nil, err
 			}
