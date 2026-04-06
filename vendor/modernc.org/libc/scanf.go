@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !(linux && (amd64 || arm64 || loong64 || ppc64le || s390x || riscv64 || 386 || arm))
+
 package libc // import "modernc.org/libc"
 
 import (
+	"io"
+	"strconv"
 	"strings"
 	"unsafe"
 )
@@ -15,7 +19,7 @@ import (
 // be either of the following: input failure, meaning that input characters
 // were unavailable, or matching failure, meaning that the input was
 // inappropriate.
-func scanf(r *strings.Reader, format, args uintptr) (nvalues int32) {
+func scanf(r io.ByteScanner, format, args uintptr) (nvalues int32) {
 	// var src []byte //TODO-
 	var ok bool
 out:
@@ -75,7 +79,7 @@ out:
 	return -1 // stdio.EOF but not defined for windows
 }
 
-func scanfConversion(r *strings.Reader, format uintptr, args *uintptr) (_ uintptr, nvalues int, match bool) {
+func scanfConversion(r io.ByteScanner, format uintptr, args *uintptr) (_ uintptr, nvalues int, match bool) {
 	format++ // '%'
 
 	// Each conversion specification in format begins with either the character '%'
@@ -83,6 +87,7 @@ func scanfConversion(r *strings.Reader, format uintptr, args *uintptr) (_ uintpt
 
 	mod := 0
 	width := -1
+	discard := false
 flags:
 	for {
 		switch c := *(*byte)(unsafe.Pointer(format)); c {
@@ -92,7 +97,7 @@ flags:
 			// corresponding pointer argument is re‐ quired, and this specification is not
 			// included in the count of successful assignments returned by scanf().
 			format++
-			panic(todo(""))
+			discard = true
 		case '\'':
 			// For decimal conversions, an optional quote character (').  This specifies
 			// that the input number may include thousands' separators as defined by the
@@ -140,7 +145,18 @@ flags:
 		// input '%' character.  No conversion is done (but initial white space
 		// characters are discarded), and assign‐ ment does not occur.
 		format++
-		panic(todo(""))
+		skipReaderWhiteSpace(r)
+		c, err := r.ReadByte()
+		if err != nil {
+			return format, -1, false
+		}
+
+		if c == '%' {
+			return format, 1, true
+		}
+
+		r.UnreadByte()
+		return format, 0, false
 	case 'd':
 		// Matches an optionally signed decimal integer; the next pointer must be a
 		// pointer to int.
@@ -157,7 +173,7 @@ flags:
 					break dec
 				}
 
-				panic(todo("", err))
+				return 0, 0, false
 			}
 
 			if allowSign {
@@ -190,22 +206,26 @@ flags:
 			break
 		}
 
-		arg := VaUintptr(args)
-		v := int64(n)
-		if neg {
-			v = -v
-		}
-		switch mod {
-		case modNone:
-			*(*int32)(unsafe.Pointer(arg)) = int32(v)
-		case modH:
-			*(*int16)(unsafe.Pointer(arg)) = int16(v)
-		case modHH:
-			*(*int8)(unsafe.Pointer(arg)) = int8(v)
-		case modL:
-			*(*long)(unsafe.Pointer(arg)) = long(n)
-		default:
-			panic(todo(""))
+		if !discard {
+			arg := VaUintptr(args)
+			v := int64(n)
+			if neg {
+				v = -v
+			}
+			switch mod {
+			case modNone:
+				*(*int32)(unsafe.Pointer(arg)) = int32(v)
+			case modH:
+				*(*int16)(unsafe.Pointer(arg)) = int16(v)
+			case modHH:
+				*(*int8)(unsafe.Pointer(arg)) = int8(v)
+			case modL:
+				*(*long)(unsafe.Pointer(arg)) = long(v)
+			case modLL:
+				*(*int64)(unsafe.Pointer(arg)) = int64(v)
+			default:
+				panic(todo("", mod))
+			}
 		}
 		nvalues = 1
 	case 'D':
@@ -243,7 +263,7 @@ flags:
 		for ; width != 0; width-- {
 			c, err := r.ReadByte()
 			if err != nil {
-				if match {
+				if match || err == io.EOF {
 					break hex
 				}
 
@@ -283,33 +303,104 @@ flags:
 			break
 		}
 
-		arg := VaUintptr(args)
-		switch mod {
-		case modNone:
-			*(*uint32)(unsafe.Pointer(arg)) = uint32(n)
-		case modH:
-			*(*uint16)(unsafe.Pointer(arg)) = uint16(n)
-		case modHH:
-			*(*byte)(unsafe.Pointer(arg)) = byte(n)
-		case modL:
-			*(*ulong)(unsafe.Pointer(arg)) = ulong(n)
-		default:
-			panic(todo(""))
+		if !discard {
+			arg := VaUintptr(args)
+			switch mod {
+			case modNone:
+				*(*uint32)(unsafe.Pointer(arg)) = uint32(n)
+			case modH:
+				*(*uint16)(unsafe.Pointer(arg)) = uint16(n)
+			case modHH:
+				*(*byte)(unsafe.Pointer(arg)) = byte(n)
+			case modL:
+				*(*ulong)(unsafe.Pointer(arg)) = ulong(n)
+			default:
+				panic(todo(""))
+			}
 		}
 		nvalues = 1
 	case 'f', 'e', 'g', 'E', 'a':
 		// Matches an optionally signed floating-point number; the next pointer must be
 		// a pointer to float.
 		format++
-		panic(todo(""))
+		skipReaderWhiteSpace(r)
+		seq := fpLiteral(r)
+		if len(seq) == 0 {
+			return 0, 0, false
+		}
+
+		var neg bool
+		switch seq[0] {
+		case '+':
+			seq = seq[1:]
+		case '-':
+			neg = true
+			seq = seq[1:]
+		}
+		n, err := strconv.ParseFloat(string(seq), 64)
+		if err != nil {
+			panic(todo("", err))
+		}
+
+		if !discard {
+			arg := VaUintptr(args)
+			if neg {
+				n = -n
+			}
+			switch mod {
+			case modNone:
+				*(*float32)(unsafe.Pointer(arg)) = float32(n)
+			case modL:
+				*(*float64)(unsafe.Pointer(arg)) = n
+			default:
+				panic(todo("", mod, neg, n))
+			}
+		}
+		return format, 1, true
 	case 's':
 		// Matches  a  sequence of non-white-space characters; the next pointer must be
 		// a pointer to the initial element of a character array that is long enough to
 		// hold the input sequence and the terminating null byte ('\0'), which is added
 		// automatically.  The input string stops at white space or at the maximum
 		// field width, whichever occurs first.
-		format++
-		panic(todo(""))
+		var c byte
+		var err error
+		var arg uintptr
+		if !discard {
+			arg = VaUintptr(args)
+		}
+	scans:
+		for ; width != 0; width-- {
+			if c, err = r.ReadByte(); err != nil {
+				if err != io.EOF {
+					nvalues = -1
+				}
+				break scans
+			}
+
+			switch c {
+			case ' ', '\t', '\n', '\r', '\v', '\f':
+				break scans
+			}
+
+			nvalues = 1
+			match = true
+			if !discard {
+				*(*byte)(unsafe.Pointer(arg)) = c
+				arg++
+			}
+		}
+		if match {
+			switch {
+			case width == 0:
+				r.UnreadByte()
+				fallthrough
+			default:
+				if !discard {
+					*(*byte)(unsafe.Pointer(arg)) = 0
+				}
+			}
+		}
 	case 'c':
 		// Matches a sequence of characters whose length is specified by the maximum
 		// field width (default 1); the next pointer must be a pointer to char, and
@@ -336,7 +427,69 @@ flags:
 		// hyphen".  The string ends with the appearance of a  character not in the
 		// (or, with a circumflex, in) set or when the field width runs out.
 		format++
-		panic(todo(""))
+		var re0 []byte
+	bracket:
+		for i := 0; ; i++ {
+			c := *(*byte)(unsafe.Pointer(format))
+			format++
+			if c == ']' && i != 0 {
+				break bracket
+			}
+
+			re0 = append(re0, c)
+		}
+		set := map[byte]struct{}{}
+		re := string(re0)
+		neg := strings.HasPrefix(re, "^")
+		if neg {
+			re = re[1:]
+		}
+		for len(re) != 0 {
+			switch {
+			case len(re) >= 3 && re[1] == '-':
+				for c := re[0]; c <= re[2]; c++ {
+					set[c] = struct{}{}
+				}
+				re = re[3:]
+			default:
+				set[c] = struct{}{}
+				re = re[1:]
+			}
+		}
+		var arg uintptr
+		if !discard {
+			arg = VaUintptr(args)
+		}
+		for ; width != 0; width-- {
+			c, err := r.ReadByte()
+			if err != nil {
+				if err == io.EOF {
+					return format, nvalues, match
+				}
+
+				return format, -1, match
+			}
+
+			if _, ok := set[c]; ok == !neg {
+				match = true
+				nvalues = 1
+				if !discard {
+					*(*byte)(unsafe.Pointer(arg)) = c
+					arg++
+				}
+			}
+		}
+		if match {
+			switch {
+			case width == 0:
+				r.UnreadByte()
+				fallthrough
+			default:
+				if !discard {
+					*(*byte)(unsafe.Pointer(arg)) = 0
+				}
+			}
+		}
 	case 'p':
 		// Matches a pointer value (as printed by %p in printf(3); the next pointer
 		// must be a pointer to a pointer to void.
@@ -344,21 +497,17 @@ flags:
 		skipReaderWhiteSpace(r)
 		c, err := r.ReadByte()
 		if err != nil {
-			panic(todo(""))
+			panic(todo("", err))
 		}
 
-		if c != '0' {
-			r.UnreadByte()
-			panic(todo(""))
-		}
+		if c == '0' {
+			if c, err = r.ReadByte(); err != nil {
+				panic(todo("", err))
+			}
 
-		if c, err = r.ReadByte(); err != nil {
-			panic(todo(""))
-		}
-
-		if c != 'x' && c != 'X' {
-			r.UnreadByte()
-			panic(todo(""))
+			if c != 'x' && c != 'X' {
+				r.UnreadByte()
+			}
 		}
 
 		var digit, n uint64
@@ -395,8 +544,10 @@ flags:
 			break
 		}
 
-		arg := VaUintptr(args)
-		*(*uintptr)(unsafe.Pointer(arg)) = uintptr(n)
+		if !discard {
+			arg := VaUintptr(args)
+			*(*uintptr)(unsafe.Pointer(arg)) = uintptr(n)
+		}
 		nvalues = 1
 	case 'n':
 		// Nothing is expected; instead, the number of characters consumed thus far
@@ -414,7 +565,7 @@ flags:
 	return format, nvalues, match
 }
 
-func skipReaderWhiteSpace(r *strings.Reader) error {
+func skipReaderWhiteSpace(r io.ByteScanner) error {
 	for {
 		c, err := r.ReadByte()
 		if err != nil {
@@ -440,4 +591,158 @@ func skipWhiteSpace(s uintptr) uintptr {
 			return s
 		}
 	}
+}
+
+// [-+]?([0-9]*[.])?[0-9]+([eE][-+]?\d+)?
+func fpLiteral(rd io.ByteScanner) (seq []byte) {
+	const endOfText = 0x110000
+	var pos, width, length int
+
+	defer func() {
+		if len(seq) > length {
+			rd.UnreadByte()
+			seq = seq[:len(seq)-1]
+		}
+	}()
+
+	var r rune
+	step := func(pos int) (rune, int) {
+		b, err := rd.ReadByte()
+		if err != nil {
+			return endOfText, 0
+		}
+
+		seq = append(seq, b)
+		return rune(b), 1
+	}
+	move := func() {
+		pos += width
+		if r != endOfText {
+			r, width = step(pos + width)
+		}
+	}
+	accept := func(x rune) bool {
+		if r == x {
+			move()
+			return true
+		}
+		return false
+	}
+	accept2 := func(x rune) bool {
+		if r <= x {
+			move()
+			return true
+		}
+		return false
+	}
+	r = endOfText
+	width = 0
+	r, width = step(pos)
+	if accept('.') {
+		goto l7
+	}
+	if accept('+') {
+		goto l30
+	}
+	if accept('-') {
+		goto l30
+	}
+	if r < '0' {
+		goto l4out
+	}
+	if accept2('9') {
+		goto l35
+	}
+l4out:
+	return seq
+l7:
+	if r < '0' {
+		goto l7out
+	}
+	if accept2('9') {
+		goto l10
+	}
+l7out:
+	return seq
+l10:
+	length = pos
+	if accept('E') {
+		goto l18
+	}
+	if accept('e') {
+		goto l18
+	}
+	if r < '0' {
+		goto l15out
+	}
+	if accept2('9') {
+		goto l10
+	}
+l15out:
+	return seq
+l18:
+	if accept('+') {
+		goto l23
+	}
+	if accept('-') {
+		goto l23
+	}
+	if r < '0' {
+		goto l20out
+	}
+	if accept2('9') {
+		goto l26
+	}
+l20out:
+	return seq
+l23:
+	if r < '0' {
+		goto l23out
+	}
+	if accept2('9') {
+		goto l26
+	}
+l23out:
+	return seq
+l26:
+	length = pos
+	if r < '0' {
+		goto l27out
+	}
+	if accept2('9') {
+		goto l26
+	}
+l27out:
+	return seq
+l30:
+	if accept('.') {
+		goto l7
+	}
+	if r < '0' {
+		goto l32out
+	}
+	if accept2('9') {
+		goto l35
+	}
+l32out:
+	return seq
+l35:
+	length = pos
+	if accept('.') {
+		goto l7
+	}
+	if accept('E') {
+		goto l18
+	}
+	if accept('e') {
+		goto l18
+	}
+	if r < '0' {
+		goto l42out
+	}
+	if accept2('9') {
+		goto l35
+	}
+l42out:
+	return seq
 }
