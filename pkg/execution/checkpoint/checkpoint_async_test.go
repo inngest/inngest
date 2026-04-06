@@ -217,19 +217,20 @@ func TestAsyncStepWithMetadataCreatesMetadataSpans(t *testing.T) {
 	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 	require.NoError(err)
 
-	// Assert that both step and metadata spans were created
-	require.Len(mocks.tracer.createdSpans, 2, "Expected 1 step span + 1 metadata span")
-	var hasStep, hasMetadata bool
+	// Assert that step, userland metadata, and timing metadata spans were created
+	require.Len(mocks.tracer.createdSpans, 3, "Expected 1 step span + 1 userland metadata span + 1 timing metadata span")
+	var hasStep bool
+	metadataCount := 0
 	for _, s := range mocks.tracer.createdSpans {
 		if s.name == meta.SpanNameStep {
 			hasStep = true
 		}
 		if s.name == meta.SpanNameMetadata {
-			hasMetadata = true
+			metadataCount++
 		}
 	}
 	require.True(hasStep, "Expected a step span")
-	require.True(hasMetadata, "Expected a metadata span")
+	require.Equal(2, metadataCount, "Expected 2 metadata spans (userland + timing)")
 }
 
 //

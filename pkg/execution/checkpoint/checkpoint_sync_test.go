@@ -298,19 +298,20 @@ func TestSyncStepWithMetadataCreatesMetadataSpans(t *testing.T) {
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err)
 
-	// Assert that both step and metadata spans were created
-	require.Len(mocks.tracer.createdSpans, 2, "Expected 1 step span + 1 metadata span")
-	var hasStep, hasMetadata bool
+	// Assert that step, userland metadata, and timing metadata spans were created
+	require.Len(mocks.tracer.createdSpans, 3, "Expected 1 step span + 1 userland metadata span + 1 timing metadata span")
+	var hasStep bool
+	metadataCount := 0
 	for _, s := range mocks.tracer.createdSpans {
 		if s.name == meta.SpanNameStep {
 			hasStep = true
 		}
 		if s.name == meta.SpanNameMetadata {
-			hasMetadata = true
+			metadataCount++
 		}
 	}
 	require.True(hasStep, "Expected a step span")
-	require.True(hasMetadata, "Expected a metadata span")
+	require.Equal(2, metadataCount, "Expected 2 metadata spans (userland + timing)")
 }
 
 // TestSyncStepErrorWithMetadataCreatesMetadataSpans asserts that a sync step error with metadata
@@ -376,19 +377,20 @@ func TestSyncStepErrorWithMetadataCreatesMetadataSpans(t *testing.T) {
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err)
 
-	// Assert step + metadata spans were created
-	require.Len(mocks.tracer.createdSpans, 2, "Expected 1 step span + 1 metadata span")
-	var hasStep, hasMetadata bool
+	// Assert step, userland metadata, and timing metadata spans were created
+	require.Len(mocks.tracer.createdSpans, 3, "Expected 1 step span + 1 userland metadata span + 1 timing metadata span")
+	var hasStep bool
+	metadataCount := 0
 	for _, s := range mocks.tracer.createdSpans {
 		if s.name == meta.SpanNameStep {
 			hasStep = true
 		}
 		if s.name == meta.SpanNameMetadata {
-			hasMetadata = true
+			metadataCount++
 		}
 	}
 	require.True(hasStep, "Expected a step span")
-	require.True(hasMetadata, "Expected a metadata span")
+	require.Equal(2, metadataCount, "Expected 2 metadata spans (userland + timing)")
 }
 
 // TestSyncStepNoMetadataWhenFlagDisabled asserts that no metadata spans are created
@@ -519,9 +521,19 @@ func TestSyncStepInvalidMetadataSkipped(t *testing.T) {
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err, "Invalid metadata should not cause an error")
 
-	// Assert only the step span was created, invalid metadata was skipped
-	require.Len(mocks.tracer.createdSpans, 1, "Expected only 1 step span, invalid metadata skipped")
-	require.Equal(meta.SpanNameStep, mocks.tracer.createdSpans[0].name)
+	// Assert the step span and timing metadata span were created; invalid userland metadata was skipped
+	require.Len(mocks.tracer.createdSpans, 2, "Expected 1 step span + 1 timing metadata span, invalid userland metadata skipped")
+	var hasStep, hasTiming bool
+	for _, s := range mocks.tracer.createdSpans {
+		if s.name == meta.SpanNameStep {
+			hasStep = true
+		}
+		if s.name == meta.SpanNameMetadata {
+			hasTiming = true
+		}
+	}
+	require.True(hasStep, "Expected a step span")
+	require.True(hasTiming, "Expected a timing metadata span")
 }
 
 //

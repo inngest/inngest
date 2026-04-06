@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 )
 
 type Checkpointer interface {
@@ -196,6 +197,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncStep.metadata")
+			c.processTimingMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, "checkpoint.SyncStep.timing")
 
 			go c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
 				AccountID: input.AccountID,
@@ -234,6 +236,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncErr.metadata")
+			c.processTimingMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, "checkpoint.SyncErr.timing")
 
 			err = c.Executor.HandleGenerator(ctx, runCtx, op)
 			if errors.Is(err, executor.ErrHandledStepError) {
@@ -432,6 +435,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
+			c.processTimingMetadata(ctx, l, input.AccountID, &md, stepSpanRef, "checkpoint.AsyncStep.timing")
 
 		default:
 			// Return an error
@@ -512,6 +516,55 @@ func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function
 		return nil, fmt.Errorf("error loading function: %w", err)
 	}
 	return cfn.InngestFunction()
+}
+
+// processTimingMetadata generates inngest.timing metadata for checkpointed steps.
+//
+// In the standard executor path, timing metadata is derived from queue RunInfo
+// (queue delay, system latency) and httpstat (network timing). Checkpointed steps
+// bypass the queue and don't have individual HTTP round-trips, so these values
+// are all zero — reflecting the reduced overhead that checkpointing provides.
+func (c checkpointer) processTimingMetadata(
+	ctx context.Context,
+	l logger.Logger,
+	accountID uuid.UUID,
+	md *state.Metadata,
+	stepSpanRef *meta.SpanReference,
+	location string,
+) {
+	if !c.AllowStepMetadata.Enabled(ctx, accountID) {
+		return
+	}
+
+	// Checkpointed steps have zero platform overhead: no queue wait, no system
+	// latency between queue lease and execution, and no individual HTTP call.
+	zero := int64(0)
+	timingMd := &extractors.TimingMetadata{
+		QueueDelayMs:    &zero,
+		SystemLatencyMs: &zero,
+		TotalInngestMs:  &zero,
+	}
+
+	parent := stepSpanRef
+	if parent == nil {
+		parent = tracing.RunSpanRefFromMetadata(md)
+	}
+
+	if _, err := tracing.CreateMetadataSpan(
+		ctx,
+		c.TracerProvider,
+		parent,
+		location,
+		"checkpoint",
+		md,
+		timingMd,
+		enums.MetadataScopeStepAttempt,
+	); err != nil {
+		l.Warn("error creating timing metadata span in checkpoint",
+			"error", err,
+			"run_id", md.ID.RunID,
+		)
+	}
 }
 
 func (c checkpointer) processMetadata(
