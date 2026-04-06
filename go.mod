@@ -106,7 +106,7 @@ require (
 	golang.org/x/sync v0.20.0
 	gonum.org/v1/gonum v0.17.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260406154035-8fb7ec149431
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406154035-8fb7ec149431
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	lukechampine.com/frand v1.5.1
