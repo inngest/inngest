@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
@@ -89,6 +91,18 @@ type QueueManager interface {
 type Opts struct {
 	AuthMiddleware func(http.Handler) http.Handler
 	QueueManager   QueueManager
+}
+
+// ExperimentalPromMetricsEnabled reports whether the experimental Prometheus
+// lifecycle metrics are enabled via the INNGEST_EXPERIMENTAL_PROM_METRICS
+// environment variable. The feature is off by default; set to "1", "true",
+// "yes", or any truthy value to enable. "0" always disables.
+func ExperimentalPromMetricsEnabled() bool {
+	v := strings.TrimSpace(os.Getenv("INNGEST_EXPERIMENTAL_PROM_METRICS"))
+	if v == "" || v == "0" || strings.EqualFold(v, "false") || strings.EqualFold(v, "no") {
+		return false
+	}
+	return true
 }
 
 // registry is a package-level private Prometheus registry used for all

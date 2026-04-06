@@ -66,6 +66,15 @@ func NewPrometheusLifecycleListener() *PrometheusLifecycleListener {
 	return &PrometheusLifecycleListener{}
 }
 
+// NewLifecycleListeners returns the Prometheus lifecycle listener if the
+// experimental metrics feature is enabled, or an empty slice otherwise.
+func NewLifecycleListeners() []execution.LifecycleListener {
+	if !ExperimentalPromMetricsEnabled() {
+		return nil
+	}
+	return []execution.LifecycleListener{NewPrometheusLifecycleListener()}
+}
+
 func fnLabel(md statev2.Metadata) string {
 	if slug := md.Config.FunctionSlug(); slug != "" {
 		return slug
