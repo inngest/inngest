@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newSemaphoreTestEnv(t *testing.T) (*redisCapacityManager, *miniredis.Miniredis, rueidis.Client, clockwork.FakeClock) {
+func newSemaphoreTestEnv(t *testing.T) (*redisCapacityManager, *miniredis.Miniredis, rueidis.Client, *clockwork.FakeClock) {
 	t.Helper()
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -43,7 +43,7 @@ func newSemaphoreTestEnv(t *testing.T) (*redisCapacityManager, *miniredis.Minire
 func acquireWithSemaphore(
 	t *testing.T,
 	cm *redisCapacityManager,
-	clock clockwork.FakeClock,
+	clock *clockwork.FakeClock,
 	accountID, envID, fnID uuid.UUID,
 	config ConstraintConfig,
 	constraints []ConstraintItem,
