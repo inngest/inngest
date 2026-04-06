@@ -93,7 +93,7 @@
     "@graphql-codegen/cli": "6.2.1",
     "@graphql-codegen/client-preset": "5.2.4",
     "@types/mustache": "4.2.6",
-    "@types/node": "24.12.1",
+    "@types/node": "24.12.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/react-syntax-highlighter": "15.5.13",
