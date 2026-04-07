@@ -177,17 +177,20 @@ func main() {
 	}
 
 	if len(additive) > 0 {
-		fmt.Printf("ADDITIVE CHANGES (%d):\n", len(additive))
-		for _, c := range additive {
-			fmt.Printf("  %s %s: %s\n", c.Change.Type, c.Symbol.Name, c.Reason)
-			fmt.Printf("    defined in: %s:%d\n", c.Symbol.File, c.Symbol.Line)
+		if ciMode {
+			fmt.Printf("ADDITIVE CHANGES: %d (not listed individually)\n\n", len(additive))
+		} else {
+			fmt.Printf("ADDITIVE CHANGES (%d):\n", len(additive))
+			for _, c := range additive {
+				fmt.Printf("  %s %s: %s\n", c.Change.Type, c.Symbol.Name, c.Reason)
+				fmt.Printf("    defined in: %s:%d\n", c.Symbol.File, c.Symbol.Line)
+			}
+			fmt.Println()
 		}
-		fmt.Println()
 	}
 
 	if len(safe) > 0 {
 		if ciMode {
-			// In CI mode, just show the count — listing every safe change is noise
 			fmt.Printf("SAFE CHANGES: %d (not listed individually)\n\n", len(safe))
 		} else {
 			fmt.Printf("SAFE CHANGES (%d):\n", len(safe))
