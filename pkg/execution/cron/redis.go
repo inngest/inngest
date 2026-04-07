@@ -3,9 +3,11 @@ package cron
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -272,12 +274,12 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 }
 
 // ScheduleNext schedules the next "cron" job w.r.t the CronItem provided.
-// While CronItem.ID and CronItem.JobID encode the _actual_ timestamp of the next schedule, the CronItem is scheduled for a few milliseconds (jitterOpts) before the schedule to allow for some processing time to create the function run.
+// Cron item identity stays anchored to the canonical cron boundary while queue dispatch may be delayed by jitter.
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
 	kind := queue.KindCron
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op)
 
-	from := ci.ID.Timestamp()
+	from := ci.ScheduledTime()
 
 	// Parse the cron expression and get the next execution time
 	next, err := Next(ci.Expression, from)
@@ -295,10 +297,17 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	// We want only one cron loop to exist for a {FnID, FnVersion, CronExpr} combination. This jobID helps achieve that idempotency.
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion))
 
-	// Add jitter to schedule execution slightly earlier
-	// This ensures execution starts around the desired time
-	jitter := generateJitter(c.opt.jitterMin, c.opt.jitterMax)
-	enqueueAt := next.Add(-jitter)
+	fireAt := next
+	enqueueAt := next
+	internalLeadTime := time.Duration(0)
+	if ci.Jitter > 0 {
+		fireAt = next.Add(deterministicJitter(jobID, ci.Jitter))
+		enqueueAt = fireAt
+	} else {
+		// Preserve existing near-boundary behavior when user-visible jitter is unset.
+		internalLeadTime = generateJitter(c.opt.jitterMin, c.opt.jitterMax)
+		enqueueAt = next.Add(-internalLeadTime)
+	}
 
 	nextItem := CronItem{
 		ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
@@ -308,6 +317,9 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		FunctionID:      ci.FunctionID,
 		FunctionVersion: ci.FunctionVersion,
 		Expression:      ci.Expression,
+		ScheduledAt:     next.UnixMilli(),
+		FireAt:          fireAt.UnixMilli(),
+		Jitter:          ci.Jitter,
 		JobID:           jobID,
 		Op:              enums.CronOpProcess,
 	}
@@ -332,7 +344,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		Payload:     nextItem,
 	}, enqueueAt, queue.EnqueueOpts{PassthroughJobId: true})
 
-	l = l.With("from", from, "next", next, "JobID", jobID, "enqueueAt", enqueueAt, "jitter", jitter)
+	l = l.With("from", from, "scheduledAt", next, "fireAt", fireAt, "JobID", jobID, "enqueueAt", enqueueAt, "jitter", ci.Jitter, "internalLeadTime", internalLeadTime)
 
 	switch err {
 	case nil:
@@ -345,6 +357,15 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	}
 
 	return &nextItem, nil
+}
+
+func deterministicJitter(seed string, max time.Duration) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+
+	rangeNs := uint64(max/time.Nanosecond) + 1
+	return time.Duration(xxhash.Sum64String(seed) % rangeNs)
 }
 
 // generateJitter generates a random jitter duration between min and max (inclusive)
@@ -361,9 +382,7 @@ func generateJitter(min, max time.Duration) time.Duration {
 		return 0
 	}
 
-	// Convert bytes to uint64 and get value in range
-	randomValue := uint64(randomBytes[0])<<56 | uint64(randomBytes[1])<<48 | uint64(randomBytes[2])<<40 | uint64(randomBytes[3])<<32 |
-		uint64(randomBytes[4])<<24 | uint64(randomBytes[5])<<16 | uint64(randomBytes[6])<<8 | uint64(randomBytes[7])
+	randomValue := binary.BigEndian.Uint64(randomBytes)
 	jitterNs := int64(randomValue%uint64(rangeNs)) + int64(min)
 
 	return time.Duration(jitterNs)

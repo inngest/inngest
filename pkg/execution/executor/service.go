@@ -1020,7 +1020,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
 	}
 
-	l = l.With("functionID", ci.FunctionID, "cronExpr", ci.Expression, "fnVersion", ci.FunctionVersion, "scheduleTime", ci.ID.Timestamp())
+	l = l.With("functionID", ci.FunctionID, "cronExpr", ci.Expression, "fnVersion", ci.FunctionVersion, "scheduleTime", ci.ScheduledTime(), "fireTime", ci.FireTime())
 	l.Trace("handling cron")
 
 	// JIT check to verify function exists and is not archived
@@ -1056,9 +1056,9 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 
 	// now actually schedule the cron run
-	at := ci.ID.Timestamp()
+	at := ci.ScheduledTime()
 
-	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
+	idempotencyKey := ci.ScheduledTime().UTC().Format(time.RFC3339)
 
 	evt := event.NewBaseTrackedEvent(event.Event{
 		ID:   idempotencyKey,

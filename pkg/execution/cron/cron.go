@@ -69,6 +69,11 @@ type CronItem struct {
 	FunctionVersion int       `json:"fnV"`
 	// Expression is the actual cron expression being used
 	Expression string `json:"expr"`
+	// ScheduledAt stores the canonical cron boundary for this occurrence in Unix milliseconds.
+	// This remains the stable identity of the cron occurrence.
+	ScheduledAt int64 `json:"scheduledAt,omitempty"`
+	// FireAt stores the actual randomized dispatch time for this occurrence in Unix milliseconds.
+	FireAt int64 `json:"fireAt,omitempty"`
 	// Jitter is the parsed, user-configured post-boundary delay window for this cron expression.
 	Jitter time.Duration `json:"jitter,omitempty"`
 	// JobID stores queue item ID that's supposed to be handling this cron item.
@@ -84,6 +89,20 @@ type CronItem struct {
 // SyncID is used for the jobID when enqueueing non processing types
 func (i CronItem) SyncID() string {
 	return fmt.Sprintf("%s:sync", i.ID)
+}
+
+func (i CronItem) ScheduledTime() time.Time {
+	if i.ScheduledAt != 0 {
+		return time.UnixMilli(i.ScheduledAt)
+	}
+	return i.ID.Timestamp()
+}
+
+func (i CronItem) FireTime() time.Time {
+	if i.FireAt != 0 {
+		return time.UnixMilli(i.FireAt)
+	}
+	return i.ScheduledTime()
 }
 
 type CronHealthCheckStatus struct {

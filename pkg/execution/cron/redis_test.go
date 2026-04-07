@@ -88,6 +88,21 @@ func TestGenerateJitter(t *testing.T) {
 	}
 }
 
+func TestDeterministicJitter(t *testing.T) {
+	t.Run("returns zero for non-positive max", func(t *testing.T) {
+		assert.Zero(t, deterministicJitter("seed", 0))
+	})
+
+	t.Run("is stable for the same seed and bounded by max", func(t *testing.T) {
+		j1 := deterministicJitter("same-seed", 5*time.Minute)
+		j2 := deterministicJitter("same-seed", 5*time.Minute)
+
+		assert.Equal(t, j1, j2)
+		assert.GreaterOrEqual(t, j1, time.Duration(0))
+		assert.LessOrEqual(t, j1, 5*time.Minute)
+	})
+}
+
 func TestOptions(t *testing.T) {
 	t.Run("WithJitterRange sets jitter correctly", func(t *testing.T) {
 		opt := redisCronManagerOpt{}
@@ -631,6 +646,7 @@ func CronItemEqualsIgnoreIDAndOp(t *testing.T, expected, actual CronItem) {
 	assert.Equal(t, expected.FunctionID, actual.FunctionID)
 	assert.Equal(t, expected.FunctionVersion, actual.FunctionVersion)
 	assert.Equal(t, expected.Expression, actual.Expression)
+	assert.Equal(t, expected.Jitter, actual.Jitter)
 }
 
 // CronItemEquals compares two CronItems for complete equality, including ID and JobID fields.
@@ -712,6 +728,8 @@ func TestRedisCronManager(t *testing.T) {
 			nextItem, err := cm.ScheduleNext(ctx, cronItem)
 			require.NoError(t, err)
 			require.NotNil(t, nextItem)
+			expectedBoundary, err := Next(cronItem.Expression, cronItem.ID.Timestamp())
+			require.NoError(t, err)
 
 			// Verify core fields match but ID and JobID are different
 			CronItemEqualsIgnoreIDAndOp(t, cronItem, *nextItem)
@@ -721,6 +739,8 @@ func TestRedisCronManager(t *testing.T) {
 			assert.NotEqual(t, cronItem.JobID, nextItem.JobID)
 			assert.NotEmpty(t, nextItem.JobID)
 			assert.Equal(t, cronItem.Op, nextItem.Op)
+			assert.True(t, nextItem.ScheduledTime().Equal(expectedBoundary))
+			assert.True(t, nextItem.FireTime().Equal(nextItem.ScheduledTime()))
 		})
 
 		t.Run("multiple schedulenext calls should be idempotent for same op", func(t *testing.T) {
@@ -745,6 +765,28 @@ func TestRedisCronManager(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, nextItem2)
 			CronItemEquals(t, *nextItem1, *nextItem2)
+		})
+
+		t.Run("user jitter delays firing within bounds and stays deterministic per occurrence", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpProcess)
+			cronItem.Expression = "0 * * * *"
+			cronItem.Jitter = 5 * time.Minute
+			cronItem.ID = ulid.MustNew(ulid.Timestamp(time.Date(2024, 1, 1, 0, 10, 0, 0, time.UTC)), ulid.DefaultEntropy())
+
+			nextItem1, err := cm.ScheduleNext(ctx, cronItem)
+			require.NoError(t, err)
+			require.NotNil(t, nextItem1)
+
+			expectedBoundary := time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC)
+			assert.True(t, nextItem1.ScheduledTime().Equal(expectedBoundary))
+			assert.GreaterOrEqual(t, nextItem1.FireTime(), expectedBoundary)
+			assert.LessOrEqual(t, nextItem1.FireTime(), expectedBoundary.Add(5*time.Minute))
+
+			nextItem2, err := cm.ScheduleNext(ctx, cronItem)
+			require.NoError(t, err)
+			require.NotNil(t, nextItem2)
+			CronItemEquals(t, *nextItem1, *nextItem2)
+			assert.True(t, nextItem1.FireTime().Equal(nextItem2.FireTime()))
 		})
 
 		t.Run("multiple schedulenext calls should be idempotent for different ops", func(t *testing.T) {
@@ -822,6 +864,7 @@ func TestRedisCronManager(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, nextItem)
 					assert.Equal(t, tc.expression, nextItem.Expression)
+					assert.True(t, nextItem.FireTime().Equal(nextItem.ScheduledTime()))
 
 					assert.NotEqual(t, cronItem.ID, nextItem.ID)
 					assert.NotEqual(t, cronItem.JobID, nextItem.JobID)
