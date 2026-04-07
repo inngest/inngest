@@ -57,7 +57,7 @@ require (
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/v2 v2.3.4
 	github.com/lib/pq v1.12.3
-	github.com/liushuangls/go-anthropic/v2 v2.17.3
+	github.com/liushuangls/go-anthropic/v2 v2.18.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0

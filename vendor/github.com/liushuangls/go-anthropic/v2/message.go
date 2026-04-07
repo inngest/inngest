@@ -70,6 +70,15 @@ const (
 	OutputFormatJsonSchema OutputFormatType = "json_schema"
 )
 
+type OutputEffortType string
+
+const (
+	OutputEffortTypeLow    OutputEffortType = "low"
+	OutputEffortTypeMedium OutputEffortType = "medium"
+	OutputEffortTypeHigh   OutputEffortType = "high"
+	OutputEffortTypeMax    OutputEffortType = "max"
+)
+
 type DocumentCitations struct {
 	Enabled bool `json:"enabled"`
 }
@@ -91,7 +100,9 @@ type MessagesRequest struct {
 	Tools         []ToolDefinition    `json:"tools,omitempty"`
 	ToolChoice    *ToolChoice         `json:"tool_choice,omitempty"`
 	Thinking      *Thinking           `json:"thinking,omitempty"`
-	OutputFormat  *OutputFormat       `json:"output_format,omitempty"`
+	// Deprecated: Use output_config.format instead.
+	OutputFormat *OutputFormat `json:"output_format,omitempty"`
+	OutputConfig *OutputConfig `json:"output_config,omitempty"`
 }
 
 func (m MessagesRequest) MarshalJSON() ([]byte, error) {
@@ -645,4 +656,9 @@ func (c *Client) CreateMessages(
 
 	err = c.sendRequest(req, &response)
 	return
+}
+
+type OutputConfig struct {
+	Effort OutputEffortType `json:"effort,omitempty"`
+	Format *OutputFormat    `json:"format,omitempty"`
 }
