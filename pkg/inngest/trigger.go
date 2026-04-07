@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/hashicorp/go-multierror"
@@ -13,11 +14,13 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
 	cron "github.com/robfig/cron/v3"
+	str2duration "github.com/xhit/go-str2duration/v2"
 )
 
 const (
 	MaxCronLength      = 255
 	MaxEventNameLength = 255
+	MaxCronJitter      = 24 * time.Hour
 )
 
 // Triggerable represents a single or multiple triggers for a function.
@@ -176,7 +179,21 @@ func (e EventTrigger) Validate(ctx context.Context) error {
 
 // CronTrigger is a trigger which invokes the function on a CRON schedule.
 type CronTrigger struct {
-	Cron string `json:"cron"`
+	Cron   string  `json:"cron"`
+	Jitter *string `json:"jitter,omitempty"`
+}
+
+func (c CronTrigger) JitterDuration() (time.Duration, error) {
+	if c.Jitter == nil || strings.TrimSpace(*c.Jitter) == "" {
+		return 0, nil
+	}
+
+	jitter, err := str2duration.ParseDuration(*c.Jitter)
+	if err != nil {
+		return 0, err
+	}
+
+	return jitter, nil
 }
 
 func (c CronTrigger) Validate(ctx context.Context) error {
@@ -186,5 +203,17 @@ func (c CronTrigger) Validate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("'%s' isn't a valid cron schedule", c.Cron)
 	}
+
+	jitter, err := c.JitterDuration()
+	if err != nil {
+		return fmt.Errorf("'%s' isn't a valid jitter duration", *c.Jitter)
+	}
+	if jitter < 0 {
+		return fmt.Errorf("cron jitter must be greater than or equal to zero")
+	}
+	if jitter > MaxCronJitter {
+		return fmt.Errorf("cron jitter must be less than or equal to %s", MaxCronJitter)
+	}
+
 	return nil
 }

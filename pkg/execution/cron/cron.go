@@ -69,6 +69,8 @@ type CronItem struct {
 	FunctionVersion int       `json:"fnV"`
 	// Expression is the actual cron expression being used
 	Expression string `json:"expr"`
+	// Jitter is the parsed, user-configured post-boundary delay window for this cron expression.
+	Jitter time.Duration `json:"jitter,omitempty"`
 	// JobID stores queue item ID that's supposed to be handling this cron item.
 	// This is only available if it's a process type.
 	//

@@ -261,12 +261,15 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 		}
 		appID := cqrsFn.AppID
 
-		cronExprs := f.ScheduleExpressions()
-		for _, cronExpr := range cronExprs {
+		cronTriggers, err := f.ScheduleTriggers()
+		if err != nil {
+			return fmt.Errorf("error reading cron triggers for fn %s: %w", fn.ID, err)
+		}
+		for _, cronTrigger := range cronTriggers {
 			// Launch each cron initialization in a separate goroutine to avoid
 			// blocking the startup process. This allows multiple functions to be
 			// initialized concurrently.
-			go func(ctx context.Context, fn inngest.Function) {
+			go func(ctx context.Context, fn inngest.Function, cronTrigger inngest.ScheduledCronTrigger) {
 				// Configure queue item parameters for the cron sync job
 				//
 				// This will trigger the cron manager's UpdateSchedule method with the
@@ -278,12 +281,13 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 					FunctionID:      fn.ID,
 					AppID:           appID,
 					FunctionVersion: fn.FunctionVersion,
-					Expression:      cronExpr,
+					Expression:      cronTrigger.Expression,
+					Jitter:          cronTrigger.Jitter,
 					Op:              enums.CronInit, // Initialize operation
 				}); err != nil {
 					l.Error("error initializing cron sync job", "error", err)
 				}
-			}(ctx, fn)
+			}(ctx, fn, cronTrigger)
 		}
 	}
 

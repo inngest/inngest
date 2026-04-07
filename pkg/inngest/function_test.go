@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/stretchr/testify/require"
@@ -400,6 +401,82 @@ func TestScheduleExpressions(t *testing.T) {
 				require.Equal(t, cronExpr, cronExprs[0])
 			})
 		}
+	})
+}
+
+func TestScheduleTriggers(t *testing.T) {
+	t.Run("returns parsed cron trigger metadata", func(t *testing.T) {
+		jitter := "5m"
+		f := Function{
+			Triggers: []Trigger{
+				{
+					EventTrigger: &EventTrigger{
+						Event: "user.created",
+					},
+				},
+				{
+					CronTrigger: &CronTrigger{
+						Cron:   "0 9 * * *",
+						Jitter: &jitter,
+					},
+				},
+			},
+		}
+
+		triggers, err := f.ScheduleTriggers()
+		require.NoError(t, err)
+		require.Len(t, triggers, 1)
+		require.Equal(t, "0 9 * * *", triggers[0].Expression)
+		require.Equal(t, 5*time.Minute, triggers[0].Jitter)
+	})
+
+	t.Run("returns parse errors for invalid jitter", func(t *testing.T) {
+		jitter := "not-a-duration"
+		f := Function{
+			Triggers: []Trigger{
+				{
+					CronTrigger: &CronTrigger{
+						Cron:   "0 9 * * *",
+						Jitter: &jitter,
+					},
+				},
+			},
+		}
+
+		_, err := f.ScheduleTriggers()
+		require.Error(t, err)
+		require.ErrorContains(t, err, "invalid cron jitter")
+	})
+}
+
+func TestCronTriggerValidate(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("accepts valid jitter", func(t *testing.T) {
+		jitter := "5m"
+		err := (CronTrigger{Cron: "0 9 * * *", Jitter: &jitter}).Validate(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects invalid jitter", func(t *testing.T) {
+		jitter := "oops"
+		err := (CronTrigger{Cron: "0 9 * * *", Jitter: &jitter}).Validate(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "isn't a valid jitter duration")
+	})
+
+	t.Run("rejects negative jitter", func(t *testing.T) {
+		jitter := "-1m"
+		err := (CronTrigger{Cron: "0 9 * * *", Jitter: &jitter}).Validate(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "greater than or equal to zero")
+	})
+
+	t.Run("rejects jitter above hard cap", func(t *testing.T) {
+		jitter := "25h"
+		err := (CronTrigger{Cron: "0 9 * * *", Jitter: &jitter}).Validate(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "less than or equal to")
 	})
 }
 

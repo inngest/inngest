@@ -52,6 +52,11 @@ type DeployedFunction struct {
 	DrainedAt time.Time
 }
 
+type ScheduledCronTrigger struct {
+	Expression string
+	Jitter     time.Duration
+}
+
 // Function represents a step function which is triggered whenever an event
 // is received or on a schedule.  In essence, it contains:
 //
@@ -355,13 +360,37 @@ func (f Function) IsScheduled() bool {
 
 // ScheduleExpression returns all the cron expression strings for the function
 func (f Function) ScheduleExpressions() []string {
+	cronTriggers, err := f.ScheduleTriggers()
+	if err != nil {
+		return nil
+	}
+
 	var cronExpressions []string
-	for _, t := range f.Triggers {
-		if t.CronTrigger != nil {
-			cronExpressions = append(cronExpressions, t.CronTrigger.Cron)
-		}
+	for _, t := range cronTriggers {
+		cronExpressions = append(cronExpressions, t.Expression)
 	}
 	return cronExpressions
+}
+
+// ScheduleTriggers returns all cron trigger expressions together with their parsed jitter.
+func (f Function) ScheduleTriggers() ([]ScheduledCronTrigger, error) {
+	var cronTriggers []ScheduledCronTrigger
+	for _, t := range f.Triggers {
+		if t.CronTrigger == nil {
+			continue
+		}
+
+		jitter, err := t.CronTrigger.JitterDuration()
+		if err != nil {
+			return nil, fmt.Errorf("invalid cron jitter for expression %q: %w", t.CronTrigger.Cron, err)
+		}
+
+		cronTriggers = append(cronTriggers, ScheduledCronTrigger{
+			Expression: t.CronTrigger.Cron,
+			Jitter:     jitter,
+		})
+	}
+	return cronTriggers, nil
 }
 
 func (f Function) IsBatchEnabled() bool {

@@ -929,19 +929,23 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		// Get AppID
 		appID := cqrsFn.AppID
 
-		for _, cronExpr := range fn.ScheduleExpressions() {
+		cronTriggers, err := fn.ScheduleTriggers()
+		if err != nil {
+			return fmt.Errorf("error reading cron triggers for fn %s: %w", fn.ID, err)
+		}
+		for _, cronTrigger := range cronTriggers {
 			fn := fn
 			appID := appID
-			cronExpr := cronExpr
+			cronTrigger := cronTrigger
 
 			eg.Go(func() error {
-				l := s.log.With("fnID", fn.ID, "cronExpr", cronExpr, "fnVersion", fn.FunctionVersion)
+				l := s.log.With("fnID", fn.ID, "cronExpr", cronTrigger.Expression, "fnVersion", fn.FunctionVersion)
 
-				status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
+				status, err := s.croner.HealthCheck(ctx, fn.ID, cronTrigger.Expression, fn.FunctionVersion)
 				if err != nil {
 					atomic.AddInt64(&errored, 1)
 					l.Error("health check failed", "err", err)
-					return fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err)
+					return fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronTrigger.Expression, err)
 				}
 
 				if !status.Scheduled {
@@ -953,7 +957,8 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 						AppID:           appID,
 						FunctionID:      fn.ID,
 						FunctionVersion: fn.FunctionVersion,
-						Expression:      cronExpr,
+						Expression:      cronTrigger.Expression,
+						Jitter:          cronTrigger.Jitter,
 						Op:              enums.CronInit,
 					})
 					if err != nil {
