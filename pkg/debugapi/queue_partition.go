@@ -99,11 +99,9 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		Paused:  pt.Paused,
 		Migrate: pt.Migrate,
 
-		AccountActive:     int64(pt.AccountActive),
 		AccountInProgress: int64(pt.AccountInProgress),
 		Ready:             int64(pt.Ready),
 		InProgress:        int64(pt.InProgress),
-		Active:            int64(pt.Active),
 		Future:            int64(pt.Future),
 		Backlogs:          int64(pt.Backlogs),
 	}, nil

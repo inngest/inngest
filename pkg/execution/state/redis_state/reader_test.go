@@ -906,10 +906,7 @@ func TestItemsByBacklog(t *testing.T) {
 	defer rc.Close()
 
 	ctx := context.Background()
-	// Use a deterministic clock time with a sub-second offset so that
-	// Truncate(time.Second) always rounds down, avoiding off-by-one
-	// boundary issues when the clock happens to start at an exact second.
-	clock := clockwork.NewFakeClockAt(time.Date(2024, 1, 1, 0, 0, 0, 500_000_000, time.UTC))
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -952,7 +949,9 @@ func TestItemsByBacklog(t *testing.T) {
 			from:          clock.Now(),
 			until:         clock.Now().Add(7 * time.Second).Truncate(time.Second),
 			interval:      time.Second,
-			expectedItems: 7,
+			// 10 items enqueued at 0s–9s; the inclusive [from, until] window
+			// covers 0s–7s, so 8 items (at offsets 0–7) are returned.
+			expectedItems: 8,
 		},
 		{
 			name:          "with batch size",

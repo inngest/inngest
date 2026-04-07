@@ -216,8 +216,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	stateSizeLimitOverrides := make(map[string]int)
 	pauseOverrides := make(map[uuid.UUID]bool)
 
-	var shardedRc, unshardedRc, connectRc rueidis.Client
-	var shardedCluster, unshardedCluster, connectCluster *miniredis.Miniredis
+	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
+	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
 
 	azureRedisAuth := azure.IsAzureRedisAuthEnabled()
 
@@ -259,6 +259,14 @@ func start(ctx context.Context, opts StartOpts) error {
 				return err
 			}
 		}
+		realtimePubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		realtimeSubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
 	} else {
 		// Use in-memory Redis
 		shardedRc, shardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
@@ -270,6 +278,21 @@ func start(ctx context.Context, opts StartOpts) error {
 			return err
 		}
 		connectRc, connectCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+
+		// Realtime MUST use separate Redis clients for publishing and
+		// subscribing. This is because a Redis client cannot publish once it
+		// enters subscribe mode.
+		realtimePubRc, realtimeCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+		realtimeSubRc, err = rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{realtimeCluster.Addr()},
+			DisableCache: true,
+		})
 		if err != nil {
 			return err
 		}
@@ -294,8 +317,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	// Create a new broadcaster which lets us broadcast realtime messages.
-	broadcaster := realtime.NewInProcessBroadcaster()
+	broadcaster := realtime.NewRedisBroadcaster(realtimePubRc, realtimeSubRc)
+	defer func() {
+		realtimePubRc.Close()
+		realtimeSubRc.Close()
+		if realtimeCluster != nil {
+			realtimeCluster.Close()
+		}
+	}()
 
 	runMode := queue.QueueRunMode{
 		Sequential:    true,
@@ -316,6 +345,19 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
+
+	// Instantiate Constraint API
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clockwork.NewRealClock()),
+		constraintapi.WithShardName("default"),
+		constraintapi.WithClient(unshardedRc),
+		constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return false
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("could not create constraint API: %w", err)
+	}
 
 	queueOpts := []queue.QueueOpt{
 		queue.WithRunMode(runMode),
@@ -346,42 +388,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			return queue.PartitionPausedInfo{}
 		}),
 		queue.WithConditionalTracer(conditionalQueueTracer),
+		queue.WithCapacityManager(cm),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 	}
 
-	const rateLimitPrefix = "ratelimit"
-
-	// Instantiate Constraint API
-	var capacityManager constraintapi.CapacityManager
-	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
-	if enableConstraintAPI {
-		cm, err := constraintapi.NewRedisCapacityManager(
-			constraintapi.WithClock(clockwork.NewRealClock()),
-			constraintapi.WithShardName("default"),
-			constraintapi.WithClient(unshardedRc),
-			constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-				return false
-			}),
-		)
-		if err != nil {
-			return fmt.Errorf("could not create contraint API: %w", err)
-		}
-
-		queueOpts = append(
-			queueOpts,
-			queue.WithCapacityManager(cm),
-			// Always use Constraint API
-			queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
-			queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-		)
-
-		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
-
-		capacityManager = cm
-
-		l.Warn("EXPERIMENTAL: Enabling Constraint API")
-	}
+	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
 
 	var retryBackoff backoff.BackoffFunc
 	if opts.RetryInterval > 0 {
@@ -411,7 +422,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
 
-	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
+	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
 	// Create the batch manager. In production, a second BatchClient can be provided
 	// to enable zero-downtime migration between Redis clusters via
@@ -559,17 +570,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-	}
 
-	if capacityManager != nil {
-		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
-		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+		executor.WithCapacityManager(cm),
+		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return true
-		}))
+		}),
+		executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
+			return false
+		}),
 	}
-	executorOpts = append(executorOpts, executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
-		return false
-	}))
 
 	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
@@ -763,6 +772,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				if connectCluster != nil {
 					connectCluster.FlushAll()
 				}
+				if realtimeCluster != nil {
+					realtimeCluster.FlushAll()
+				}
 			},
 			PauseFunction: func(id uuid.UUID) {
 				pauseOverrides[id] = true
@@ -792,7 +804,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			ShardSelector:   shardSelector,
 			Port:            ds.Opts.DebugAPIPort,
 			PauseManager:    pauseMgr,
-			CapacityManager: capacityManager,
+			CapacityManager: cm,
 			// Dependencies for batching, singleton, and debounce insights
 			BatchManager:   batcher,
 			SingletonStore: sn,
@@ -1058,6 +1070,20 @@ func createRedisClients(opt rueidis.ClientOption) (sharded, unsharded, connect r
 		return nil, nil, nil, fmt.Errorf("error creating connect redis client: %w", err)
 	}
 	return sharded, unsharded, connect, nil
+}
+
+func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
+	opt, err := connectToOrCreateRedisOption(redisURI)
+	if err != nil {
+		return nil, fmt.Errorf("could not create redis options: %w", err)
+	}
+
+	rc, err := rueidis.NewClient(opt)
+	if err != nil {
+		return nil, fmt.Errorf("error creating redis client: %w", err)
+	}
+
+	return rc, nil
 }
 
 func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error) {

@@ -62,11 +62,9 @@ func (q *queue) PartitionByID(ctx context.Context, partitionID string) (*osqueue
 
 	{
 		keys := []string{
-			kg.ActiveSet("account", qp.AccountID.String()),
 			kg.Concurrency("account", qp.AccountID.String()),
 			kg.PartitionQueueSet(enums.PartitionTypeDefault, qp.ID, ""),
 			kg.PartitionScavengerIndex(qp.ID),
-			kg.ActiveSet("p", qp.ID),
 			kg.ShadowPartitionSet(sqp.PartitionID),
 		}
 		args, err := StrSlice([]any{

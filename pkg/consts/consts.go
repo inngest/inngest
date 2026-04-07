@@ -151,7 +151,7 @@ const (
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
 	ConnectGCThreshold              = 5 * time.Minute
 
-	ConnectWorkerRequestLeaseDuration = 20 * time.Second
+	ConnectWorkerRequestLeaseDuration = 2 * time.Minute
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
 	ConnectWorkerStatusInterval       = 0 * time.Second // disabled by default
 

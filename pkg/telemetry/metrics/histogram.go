@@ -138,16 +138,6 @@ func HistogramQueueOperationDelay(ctx context.Context, delay time.Duration, opts
 	})
 }
 
-func HistogramQueueActiveCheckDuration(ctx context.Context, delay time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_duration",
-		Description: "Distribution of active check durations",
-		Tags:        opts.Tags,
-		Boundaries:  DefaultBoundaries,
-	})
-}
-
 func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, value, HistogramOpt{
 		PkgName:     opts.PkgName,
@@ -189,6 +179,17 @@ func HistogramConnectProxyAckTime(ctx context.Context, dur int64, opts Histogram
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConnectGatewayDrainDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.drain_duration",
+		Description: "Duration from sending GATEWAY_CLOSING to the worker until the WebSocket is closed.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
 	})
 }
 
