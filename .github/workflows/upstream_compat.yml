@@ -1,0 +1,45 @@
+name: Upstream compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+
+jobs:
+  upstream-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: inngest
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: inngest/monorepo
+          ref: develop
+          token: ${{ secrets.AUTOMATED_UPSTREAM_TOKEN }}
+          path: monorepo
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: inngest/go.mod
+
+      - name: Run upstream compatibility checks
+        id: check
+        continue-on-error: true
+        env:
+          INNGEST_DIR: ${{ github.workspace }}/inngest
+          MONOREPO_DIR: ${{ github.workspace }}/monorepo
+        working-directory: inngest/.github/upstream-compat
+        run: bash check.sh
+
+      - name: Comment on PR
+        if: always() && steps.check.outcome != 'skipped'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: upstream-compat
+          path: inngest/.github/upstream-compat/upstream-report.md
