@@ -1211,11 +1211,27 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		// remaining items are still in partition
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
-		// expect 1 successful and 1 failed calls to constraintapi
-		require.Len(t, cmLifecycles.AcquireCalls, 2)
+		// The constraint API may respond with 1 or 2 acquire calls depending on timing:
+		//  - 1 call:  the pre-leased item skips acquire; the second call both grants a
+		//             lease and reports the concurrency limit in a single response.
+		//  - 2 calls: each item triggers a separate acquire; the first grants a lease,
+		//             the second is denied with a concurrency limit.
+		require.True(t, len(cmLifecycles.AcquireCalls) == 1 || len(cmLifecycles.AcquireCalls) == 2,
+			"expected 1 or 2 acquire calls, got %d", len(cmLifecycles.AcquireCalls))
+
+		// The first call always grants exactly one lease.
 		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
-		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
-		require.Equal(t, cmLifecycles.AcquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+
+		// The last call always reports the concurrency limit (it may be the same
+		// call as the first when only 1 acquire is made).
+		lastCall := cmLifecycles.AcquireCalls[len(cmLifecycles.AcquireCalls)-1]
+		require.NotEmpty(t, lastCall.LimitingConstraints)
+		require.Equal(t, lastCall.LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
+
+		// When there are 2 calls, the second grants no leases.
+		if len(cmLifecycles.AcquireCalls) == 2 {
+			require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
+		}
 
 		// partition was requeued
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
