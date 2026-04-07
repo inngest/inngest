@@ -200,9 +200,8 @@ func TestStreamResponseTooLarge(t *testing.T) {
 
 		// Indicate a streaming response.
 		w.WriteHeader(201)
-		// The client may close the connection early when it detects the
-		// response is too large, causing a broken pipe here. That is
-		// expected behaviour, so we intentionally ignore the write error.
+		// The client will close the connection after reading MaxSDKResponseBodySize bytes,
+		// so this write is expected to fail with broken pipe / connection reset.
 		_ = json.NewEncoder(w).Encode(data)
 	}))
 

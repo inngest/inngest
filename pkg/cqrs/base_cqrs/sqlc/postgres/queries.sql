@@ -459,6 +459,7 @@ SELECT
   MAX(end_time) AS end_time,
   parent_span_id,
   json_agg(json_build_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -481,6 +482,7 @@ SELECT
   MAX(end_time) AS end_time,
   parent_span_id,
   json_agg(json_build_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -512,6 +514,7 @@ SELECT
   MAX(end_time) AS end_time,
   parent_span_id,
   json_agg(json_build_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -537,6 +540,7 @@ SELECT
   MAX(end_time) AS end_time,
   parent_span_id,
   json_agg(json_build_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -564,6 +568,7 @@ SELECT
   MAX(end_time) AS end_time,
   parent_span_id,
   json_agg(json_build_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -589,6 +594,7 @@ SELECT
   MAX(end_time) AS end_time,
   parent_span_id,
   json_agg(json_build_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,

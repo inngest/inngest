@@ -503,21 +503,29 @@ func TestSyncDriverTypeDetection(t *testing.T) {
 	d := &httpv2{Client: client}
 
 	tests := []struct {
-		name         string
-		driverType   string
-		expectsAsync bool
+		name              string
+		driverType        string
+		expectUserErr     bool
+		expectInternalErr bool
 	}{
 		{
-			name:       "sync type",
-			driverType: "sync",
+			// sync hits example.com which responds without SDK headers,
+			// so the driver returns a user error.
+			name:          "sync type",
+			driverType:    "sync",
+			expectUserErr: true,
 		},
 		{
-			name:       "async type",
-			driverType: "async",
+			// async path is not implemented and returns an internal error.
+			name:              "async type",
+			driverType:        "async",
+			expectInternalErr: true,
 		},
 		{
-			name:       "no type defaults to async",
-			driverType: "",
+			// empty type defaults to async.
+			name:              "no type defaults to async",
+			driverType:        "",
+			expectInternalErr: true,
 		},
 	}
 
@@ -547,15 +555,14 @@ func TestSyncDriverTypeDetection(t *testing.T) {
 				URL: "http://example.com",
 			}
 
-			resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
+			_, userErr, internalErr := d.Do(context.Background(), nil, opts)
 
-			if tt.driverType == "sync" {
-				require.Nil(t, resp)
+			if tt.expectUserErr {
+				require.NotNil(t, userErr)
 				require.Nil(t, internalErr)
-			} else {
-				// For sync functions that can't connect, we should get an internal error
-				require.Nil(t, resp)
-				require.NoError(t, userErr)
+			}
+			if tt.expectInternalErr {
+				require.Nil(t, userErr)
 				require.NotNil(t, internalErr)
 			}
 		})

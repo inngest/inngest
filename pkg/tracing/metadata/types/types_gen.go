@@ -79,3 +79,26 @@ const (
 // From response_headers.go
 type ResponseHeaderMetadata map[string]string
 
+// From timing.go
+const (
+	KindInngestTiming = "inngest.timing"
+)
+
+// From timing.go
+// TimingMetadata contains high-level timing categories for a step execution:
+// queue delay, system processing overhead, and network total.
+//
+type TimingMetadata struct {
+	// QueueDelayMs is the sojourn delay caused by concurrency limits, throttle,
+	// or other user-defined concurrency constraints.
+	QueueDelayMs	*int64	`json:"queue_delay_ms,omitempty"`
+	// SystemLatencyMs is the processing delay excluding sojourn latency
+	// (time from queue lease to execution start).
+	SystemLatencyMs	*int64	`json:"system_latency_ms,omitempty"`
+	// NetworkTotalMs is the total HTTP request duration from httpstat,
+	// covering the full SDK call lifecycle.
+	NetworkTotalMs	*int64	`json:"network_total_ms,omitempty"`
+	// TotalInngestMs is the sum of Inngest-side overhead (queue delay + system latency).
+	TotalInngestMs	*int64	`json:"total_inngest_ms,omitempty"`
+}
+

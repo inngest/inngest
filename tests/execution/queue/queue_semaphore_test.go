@@ -58,9 +58,6 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 		// Use Constraint API
 		queue.WithCapacityManager(cm),
-		queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 
 		// Simulate a limit of 1
@@ -116,7 +113,6 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 		Partition:  &partition,
 		Items:      []*queue.QueueItem{&qi1, &qi2},
 		Queue:      q,
-		Denies:     queue.NewLeaseDenyList(),
 		StaticTime: clock.Now(),
 	}
 
@@ -166,7 +162,6 @@ func TestQueueSemaphore(t *testing.T) {
 	type testCase struct {
 		name                      string
 		run                       func(t *testing.T, deps deps)
-		enableConstraintAPI       constraintapi.UseConstraintAPIFn
 		useFailingCapacityManager bool
 		config                    queue.PartitionConstraintConfig
 		numWorkers                int32
@@ -207,7 +202,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -262,7 +256,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -304,7 +297,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -325,11 +317,7 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 
 		{
-			name: "when Constraint API call fails, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				// Constraint API enabled with fail-hard behavior
-				return true
-			},
+			name:                      "when Constraint API call fails, should release semaphore",
 			useFailingCapacityManager: true,
 			config: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
@@ -362,7 +350,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -378,9 +365,6 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when limited by Constraint API, should release semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			},
 			config: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
 				Concurrency: queue.PartitionConcurrency{
@@ -428,7 +412,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi, &qi2},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -486,7 +469,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -501,9 +483,6 @@ func TestQueueSemaphore(t *testing.T) {
 		},
 		{
 			name: "when lease encounters concurrency limits, should free semaphore",
-			enableConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return false
-			},
 			config: queue.PartitionConstraintConfig{
 				FunctionVersion: 1,
 				Concurrency: queue.PartitionConcurrency{
@@ -551,7 +530,6 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi, &qi2},
 					Queue:      deps.qp,
-					Denies:     queue.NewLeaseDenyList(),
 					StaticTime: clock.Now(),
 				}
 
@@ -621,7 +599,6 @@ func TestQueueSemaphore(t *testing.T) {
 
 				// Use Constraint API
 				queue.WithCapacityManager(cm),
-				queue.WithUseConstraintAPI(tc.enableConstraintAPI),
 				queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 
 				// Simulate a limit of 1

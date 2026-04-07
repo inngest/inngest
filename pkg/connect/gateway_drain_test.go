@@ -200,6 +200,7 @@ func TestHeartbeatDuringGatewayDrain_StatusRemainsDraining(t *testing.T) {
 	res := createTestingGateway(t, testingParameters{
 		consecutiveMissesBeforeClose: 10,
 		heartbeatInterval:            1 * time.Second,
+		drainAckTimeout:              500 * time.Millisecond,
 		silent:                       true,
 	})
 	handshake(t, res)
@@ -419,7 +420,7 @@ func TestWorkerAckDuringGatewayDrain_IsProcessed(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
+		messageChan.(*connectionHandler).messageChan <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Worker receives GATEWAY_EXECUTOR_REQUEST
@@ -496,7 +497,7 @@ func TestLeaseExtensionDuringGatewayDrain_IsProcessed(t *testing.T) {
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
 	go func() {
-		messageChan.(chan forwardMessage) <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
+		messageChan.(*connectionHandler).messageChan <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
 	}()
 
 	// Worker receives GATEWAY_EXECUTOR_REQUEST

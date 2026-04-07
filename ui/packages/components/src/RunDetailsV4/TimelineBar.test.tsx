@@ -231,10 +231,10 @@ describe('TimelineBar', () => {
       expect(bar.style.opacity).toBe('0');
     });
 
-    it('renders collapsed row with no opacity override', () => {
+    it('renders collapsed row with full opacity', () => {
       render(<TimelineBar {...defaultProps} expandable expanded={false} />, { wrapper: Wrapper });
       const bar = screen.getByTestId('timeline-bar-visual');
-      expect(bar.style.opacity).toBe('');
+      expect(bar.style.opacity).toBe('1');
     });
   });
 
