@@ -186,11 +186,16 @@ func main() {
 	}
 
 	if len(safe) > 0 {
-		fmt.Printf("SAFE CHANGES (%d):\n", len(safe))
-		for _, c := range safe {
-			fmt.Printf("  %s %s\n", c.Change.Type, c.Symbol.Name)
+		if ciMode {
+			// In CI mode, just show the count — listing every safe change is noise
+			fmt.Printf("SAFE CHANGES: %d (not listed individually)\n\n", len(safe))
+		} else {
+			fmt.Printf("SAFE CHANGES (%d):\n", len(safe))
+			for _, c := range safe {
+				fmt.Printf("  %s %s\n", c.Change.Type, c.Symbol.Name)
+			}
+			fmt.Println()
 		}
-		fmt.Println()
 	}
 
 	// Summary

@@ -25,6 +25,26 @@ trap cleanup EXIT
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
+# MAX_SECTION_LINES caps how many lines from each tool appear in the report.
+# GitHub comment body limit is 65536 chars — stay well under.
+MAX_SECTION_LINES=150
+
+# truncate_section outputs at most MAX_SECTION_LINES from a file.
+# If truncated, appends a note with the omitted line count.
+truncate_section() {
+    local file="$1"
+    local total
+    total=$(wc -l < "$file")
+    if [ "$total" -le "$MAX_SECTION_LINES" ]; then
+        cat "$file"
+    else
+        head -n "$MAX_SECTION_LINES" "$file"
+        local omitted=$((total - MAX_SECTION_LINES))
+        echo ""
+        echo "... ($omitted more lines omitted)"
+    fi
+}
+
 # sanitize_line strips monorepo paths and replaces them with [redacted].
 sanitize_line() {
     local line="$1"
@@ -160,12 +180,12 @@ cat > "$REPORT" <<EOF
 
 ### Symbol Changes
 \`\`\`
-$(cat "$TMPDIR_CHECK/classify-raw.txt")
+$(truncate_section "$TMPDIR_CHECK/classify-raw.txt")
 \`\`\`
 
 ### Interface Changes
 \`\`\`
-$(cat "$TMPDIR_CHECK/iface-raw.txt")
+$(truncate_section "$TMPDIR_CHECK/iface-raw.txt")
 \`\`\`
 
 ### Compile Check
@@ -194,6 +214,25 @@ EOF
 sed -i.bak "s|${REDACT_PREFIX}|[redacted]|g" "$REPORT" 2>/dev/null || true
 sed -i.bak 's|monorepo/[^ ]*|[redacted]|g' "$REPORT" 2>/dev/null || true
 rm -f "$REPORT.bak"
+
+# ── Step 7: Final size guard ─────────────────────────────────────────
+
+# GitHub comment limit is 65536 chars. If the report is still too large,
+# truncate and append a note.
+MAX_REPORT_CHARS=60000
+REPORT_SIZE=$(wc -c < "$REPORT")
+if [ "$REPORT_SIZE" -gt "$MAX_REPORT_CHARS" ]; then
+    # Keep the first MAX_REPORT_CHARS bytes, then append a truncation note
+    head -c "$MAX_REPORT_CHARS" "$REPORT" > "$REPORT.tmp"
+    cat >> "$REPORT.tmp" <<'TRUNC'
+
+```
+
+> **Report truncated** — full output exceeded GitHub comment size limit.
+> Check the workflow run logs for complete details.
+TRUNC
+    mv "$REPORT.tmp" "$REPORT"
+fi
 
 echo "Report written to $REPORT"
 echo "Overall: $OVERALL_LABEL"
