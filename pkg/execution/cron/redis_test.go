@@ -841,6 +841,34 @@ func TestRedisCronManager(t *testing.T) {
 			assert.Greater(t, nextItem2.FunctionVersion, nextItem1.FunctionVersion)
 		})
 
+		t.Run("jitter updates only affect future scheduled items", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpNew)
+			cronItem.Expression = "0 * * * *"
+			cronItem.Jitter = 5 * time.Minute
+			cronItem.ID = ulid.MustNew(ulid.Timestamp(time.Date(2024, 1, 1, 0, 10, 0, 0, time.UTC)), ulid.DefaultEntropy())
+
+			nextItem1, err := cm.ScheduleNext(ctx, cronItem)
+			require.NoError(t, err)
+			require.NotNil(t, nextItem1)
+
+			originalFireAt := nextItem1.FireTime()
+
+			cronItemUpdate := cronItem
+			cronItemUpdate.FunctionVersion++
+			cronItemUpdate.Op = enums.CronOpUpdate
+			cronItemUpdate.Jitter = time.Minute
+
+			nextItem2, err := cm.ScheduleNext(ctx, cronItemUpdate)
+			require.NoError(t, err)
+			require.NotNil(t, nextItem2)
+
+			assert.True(t, nextItem1.FireTime().Equal(originalFireAt))
+			assert.True(t, nextItem1.ScheduledTime().Equal(nextItem2.ScheduledTime()))
+			assert.NotEqual(t, nextItem1.FunctionVersion, nextItem2.FunctionVersion)
+			assert.GreaterOrEqual(t, nextItem2.FireTime(), nextItem2.ScheduledTime())
+			assert.LessOrEqual(t, nextItem2.FireTime(), nextItem2.ScheduledTime().Add(time.Minute))
+		})
+
 		t.Run("different valid cron expressions", func(t *testing.T) {
 			testCases := []struct {
 				name       string
