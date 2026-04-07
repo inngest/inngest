@@ -240,8 +240,10 @@ for index, value in ipairs(constraints) do
 		-- semaphore
 		local usage = tonumber(call("GET", value.sem.k)) or 0
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
-		local weight = value.sem.w
-		if not weight or weight <= 0 then weight = 1 end
+		local weight = toInteger(value.sem.w)
+		if not weight or weight <= 0 then
+			weight = 1
+		end
 		local remaining = capacity - usage
 		if remaining < weight then
 			constraintCapacity = 0
@@ -266,10 +268,8 @@ for index, value in ipairs(constraints) do
 		if cacheEnabled then
 			local ck = constraintCacheKeys[index]
 			if ck ~= nil and ck ~= "" and constraintRetryAt > nowMS then
-				local cacheTTLSec = math.max(
-					math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
-					cacheMinTTL
-				)
+				local cacheTTLSec =
+					math.max(math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL), cacheMinTTL)
 				if cacheTTLSec > 0 then
 					call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
 				end
@@ -361,8 +361,10 @@ for i, value in ipairs(constraints) do
 	elseif value.k == 4 then
 		-- semaphore: increment usage counter
 		local weight = value.sem.w
-		if not weight or weight <= 0 then weight = 1 end
-		local newUsage = call("INCRBY", value.sem.k, weight * granted)
+		if not weight or weight <= 0 then
+			weight = 1
+		end
+		local newUsage = call("INCRBY", value.sem.k, toInteger(weight * granted))
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
 		local remaining = capacity - newUsage
 		if remaining < weight then
@@ -390,10 +392,8 @@ for i, value in ipairs(constraints) do
 		if cacheEnabled then
 			local ck = constraintCacheKeys[i]
 			if ck ~= nil and ck ~= "" and constraintRetryAt > nowMS then
-				local cacheTTLSec = math.max(
-					math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL),
-					cacheMinTTL
-				)
+				local cacheTTLSec =
+					math.max(math.min(math.ceil((constraintRetryAt - nowMS) / 1000), cacheMaxTTL), cacheMinTTL)
 				if cacheTTLSec > 0 then
 					call("SET", ck, tostring(constraintRetryAt), "EX", tostring(cacheTTLSec))
 				end
