@@ -1057,6 +1057,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 
 	// now actually schedule the cron run
 	at := ci.ScheduledTime()
+	fireAt := ci.FireTime()
 
 	idempotencyKey := ci.ScheduledTime().UTC().Format(time.RFC3339)
 
@@ -1064,9 +1065,11 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		ID:   idempotencyKey,
 		Name: consts.FnCronName,
 		Data: map[string]any{
-			"cron": ci.Expression,
+			"cron":        ci.Expression,
+			"scheduledAt": at.UTC().Format(time.RFC3339),
+			"fireAt":      fireAt.UTC().Format(time.RFC3339),
 		},
-		Timestamp: time.Now().UnixMilli(),
+		Timestamp: fireAt.UnixMilli(),
 	}, nil)
 
 	// publish cron event to pubsub
@@ -1100,6 +1103,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
 			attribute.String(consts.OtelSysCronExpr, ci.Expression),
 			attribute.Int64(consts.OtelSysCronTimestamp, at.UnixMilli()),
+			attribute.Int64(consts.OtelSysCronFireAt, fireAt.UnixMilli()),
 		),
 	)
 	defer span.End()
