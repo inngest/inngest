@@ -1745,7 +1745,7 @@ google.golang.org/api/transport/http
 # google.golang.org/genproto v0.0.0-20251124214823-79d6a2a48846
 ## explicit; go 1.24.0
 google.golang.org/genproto/googleapis/type/expr
-# google.golang.org/genproto/googleapis/api v0.0.0-20260406154035-8fb7ec149431
+# google.golang.org/genproto/googleapis/api v0.0.0-20260406210006-6f92a3bedf2d
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
