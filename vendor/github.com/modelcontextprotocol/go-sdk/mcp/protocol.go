@@ -4,12 +4,6 @@
 
 package mcp
 
-// Protocol types for version 2025-06-18.
-// To see the schema changes from the previous version, run:
-//
-//   prefix=https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/refs/heads/main/schema
-//   sdiff -l <(curl $prefix/2025-03-26/schema.ts) <(curl $prefix/2025/06-18/schema.ts)
-
 import (
 	"encoding/json"
 	"fmt"
@@ -1226,7 +1220,7 @@ type ToolChoice struct {
 
 // ElicitationCapabilities describes the capabilities for elicitation.
 //
-// If neither Form nor URL is set, the 'Form' capabilitiy is assumed.
+// If neither Form nor URL is set, the 'Form' capability is assumed.
 type ElicitationCapabilities struct {
 	Form *FormElicitationCapabilities `json:"form,omitempty"`
 	URL  *URLElicitationCapabilities  `json:"url,omitempty"`
@@ -1558,7 +1552,7 @@ type ServerCapabilities struct {
 	Logging *LoggingCapabilities `json:"logging,omitempty"`
 	// Prompts is present if the server supports prompts.
 	Prompts *PromptCapabilities `json:"prompts,omitempty"`
-	// Resources is present if the server supports resourcs.
+	// Resources is present if the server supports resources.
 	Resources *ResourceCapabilities `json:"resources,omitempty"`
 	// Tools is present if the supports tools.
 	Tools *ToolCapabilities `json:"tools,omitempty"`

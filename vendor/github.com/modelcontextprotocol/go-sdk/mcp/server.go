@@ -321,15 +321,18 @@ func toolForErr[In, Out any](t *Tool, h ToolHandlerFor[In, Out], cache *SchemaCa
 		var err error
 		input, err = applySchema(input, inputResolved)
 		if err != nil {
-			// TODO(#450): should this be considered a tool error? (and similar below)
-			return nil, fmt.Errorf("%w: validating \"arguments\": %v", jsonrpc2.ErrInvalidParams, err)
+			var errRes CallToolResult
+			errRes.SetError(fmt.Errorf("validating \"arguments\": %v", err))
+			return &errRes, nil
 		}
 
 		// Unmarshal and validate args.
 		var in In
 		if input != nil {
 			if err := internaljson.Unmarshal(input, &in); err != nil {
-				return nil, fmt.Errorf("%w: %v", jsonrpc2.ErrInvalidParams, err)
+				var errRes CallToolResult
+				errRes.SetError(err)
+				return &errRes, nil
 			}
 		}
 
@@ -628,6 +631,14 @@ func (s *Server) changeAndNotify(notification string, change func() bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if change() && s.shouldSendListChangedNotification(notification) {
+		if len(s.sessions) == 0 {
+			if t := s.pendingNotifications[notification]; t != nil {
+				t.Stop()
+				s.pendingNotifications[notification] = nil
+			}
+			return
+		}
+
 		// Reset the outstanding delayed call, if any.
 		if t := s.pendingNotifications[notification]; t == nil {
 			s.pendingNotifications[notification] = time.AfterFunc(notificationDelay, func() { s.notifySessions(notification) })
@@ -834,7 +845,7 @@ func (s *Server) lookupResourceHandler(uri string) (ResourceHandler, string, boo
 // and the current working directory is unavailable, fileResourceHandler panics.
 //
 // Lexical path traversal attacks, where the path has ".." elements that escape dir,
-// are always caught. Go 1.24 and above also protects against symlink-based attacks,
+// are always caught. The SDK also protects against symlink-based attacks,
 // where symlinks under dir lead out of the tree.
 func fileResourceHandler(dir string) ResourceHandler {
 	// Convert dir to an absolute path.
@@ -1285,7 +1296,7 @@ func (ss *ServerSession) Elicit(ctx context.Context, params *ElicitParams) (*Eli
 	}
 	err = resolved.ApplyDefaults(&res.Content)
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply schema defalts to elicitation result: %v", err)
+		return nil, fmt.Errorf("failed to apply schema defaults to elicitation result: %v", err)
 	}
 
 	return res, nil

@@ -34,8 +34,8 @@ const (
 	//
 	// It is the version that the client sends in the initialization request, and
 	// the default version used by the server.
-	latestProtocolVersion   = protocolVersion20250618
-	protocolVersion20251125 = "2025-11-25" // not yet released
+	latestProtocolVersion   = protocolVersion20251125
+	protocolVersion20251125 = "2025-11-25"
 	protocolVersion20250618 = "2025-06-18"
 	protocolVersion20250326 = "2025-03-26"
 	protocolVersion20241105 = "2024-11-05"
@@ -447,6 +447,7 @@ func setProgressToken(p Params, pt any) {
 	m := p.GetMeta()
 	if m == nil {
 		m = map[string]any{}
+		p.SetMeta(m)
 	}
 	m[progressTokenKey] = pt
 }

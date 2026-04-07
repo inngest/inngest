@@ -41,7 +41,7 @@ func (e Event) Empty() bool {
 }
 
 // writeEvent writes the event to w, and flushes.
-func writeEvent(w io.Writer, evt Event) (int, error) {
+func writeEvent(w http.ResponseWriter, evt Event) (int, error) {
 	var b bytes.Buffer
 	if evt.Name != "" {
 		fmt.Fprintf(&b, "event: %s\n", evt.Name)
@@ -54,9 +54,9 @@ func writeEvent(w io.Writer, evt Event) (int, error) {
 	}
 	fmt.Fprintf(&b, "data: %s\n\n", string(evt.Data))
 	n, err := w.Write(b.Bytes())
-	if f, ok := w.(http.Flusher); ok {
-		f.Flush()
-	}
+	rc := http.NewResponseController(w)
+	// Ignore returned error as flushing is best-effort.
+	_ = rc.Flush()
 	return n, err
 }
 
@@ -376,10 +376,11 @@ func (s *MemoryEventStore) purge() {
 			for _, dl := range sm {
 				if dl.size > 0 {
 					r := dl.removeFirst()
-					if r > 0 {
-						changed = true
-						s.nBytes -= r
-					}
+					// Even if we remove an empty chunk, that's
+					// still progress. There may be non-empty
+					// chunks after it.
+					changed = true
+					s.nBytes -= r
 				}
 			}
 		}

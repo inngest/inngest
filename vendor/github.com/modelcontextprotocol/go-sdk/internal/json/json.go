@@ -8,12 +8,25 @@ package json
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/segmentio/encoding/json"
 )
 
-func Unmarshal(data []byte, v any) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
+type Decoder struct {
+	dec *json.Decoder
+}
+
+func NewDecoder(r io.Reader) *Decoder {
+	dec := json.NewDecoder(r)
 	dec.DontMatchCaseInsensitiveStructFields()
-	return dec.Decode(v)
+	return &Decoder{dec: dec}
+}
+
+func (d *Decoder) Decode(v any) error {
+	return d.dec.Decode(v)
+}
+
+func Unmarshal(data []byte, v any) error {
+	return NewDecoder(bytes.NewReader(data)).Decode(v)
 }

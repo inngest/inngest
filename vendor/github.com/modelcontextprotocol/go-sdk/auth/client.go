@@ -22,8 +22,6 @@ import (
 // [github.com/modelcontextprotocol/go-sdk/mcp.StreamableClientTransport]
 // for an example.
 type OAuthHandler interface {
-	isOAuthHandler()
-
 	// TokenSource returns a token source to be used for outgoing requests.
 	// Returned token source might be nil. In that case, the transport will not
 	// add any authorization headers to the request.

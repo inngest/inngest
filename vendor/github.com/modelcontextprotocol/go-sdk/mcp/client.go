@@ -641,7 +641,7 @@ func (c *Client) elicit(ctx context.Context, req *ElicitRequest) (*ElicitResult,
 			}
 			err = resolved.ApplyDefaults(&res.Content)
 			if err != nil {
-				return nil, &jsonrpc.Error{Code: jsonrpc.CodeInvalidParams, Message: fmt.Sprintf("failed to apply schema defalts to elicitation result: %v", err)}
+				return nil, &jsonrpc.Error{Code: jsonrpc.CodeInvalidParams, Message: fmt.Sprintf("failed to apply schema defaults to elicitation result: %v", err)}
 			}
 		}
 		return res, nil

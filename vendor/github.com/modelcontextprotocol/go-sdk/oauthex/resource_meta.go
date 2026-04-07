@@ -5,8 +5,6 @@
 // This file implements Protected Resource Metadata.
 // See https://www.rfc-editor.org/rfc/rfc9728.html.
 
-//go:build mcp_go_client_oauth
-
 package oauthex
 
 import (
@@ -14,81 +12,108 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
-	"path"
 	"strings"
 	"unicode"
 
 	"github.com/modelcontextprotocol/go-sdk/internal/util"
 )
 
-const defaultProtectedResourceMetadataURI = "/.well-known/oauth-protected-resource"
+// ProtectedResourceMetadata is the metadata for an OAuth 2.0 protected resource,
+// as defined in section 2 of https://www.rfc-editor.org/rfc/rfc9728.html.
+//
+// The following features are not supported:
+// - additional keys (§2, last sentence)
+// - human-readable metadata (§2.1)
+// - signed metadata (§2.2)
+type ProtectedResourceMetadata struct {
+	// Resource (resource) is the protected resource's resource identifier.
+	// Required.
+	Resource string `json:"resource"`
 
-// GetProtectedResourceMetadataFromID issues a GET request to retrieve protected resource
-// metadata from a resource server by its ID.
-// The resource ID is an HTTPS URL, typically with a host:port and possibly a path.
-// For example:
-//
-//	https://example.com/server
-//
-// This function, following the spec (§3), inserts the default well-known path into the
-// URL. In our example, the result would be
-//
-//	https://example.com/.well-known/oauth-protected-resource/server
-//
-// It then retrieves the metadata at that location using the given client (or the
-// default client if nil) and validates its resource field against resourceID.
-//
-// Deprecated: Use [GetProtectedResourceMetadata] instead. This function will be removed in v1.5.0.
-func GetProtectedResourceMetadataFromID(ctx context.Context, resourceID string, c *http.Client) (_ *ProtectedResourceMetadata, err error) {
-	defer util.Wrapf(&err, "GetProtectedResourceMetadataFromID(%q)", resourceID)
+	// AuthorizationServers (authorization_servers) is an optional slice containing a list of
+	// OAuth authorization server issuer identifiers (as defined in RFC 8414) that can be
+	// used with this protected resource.
+	AuthorizationServers []string `json:"authorization_servers,omitempty"`
 
-	u, err := url.Parse(resourceID)
-	if err != nil {
-		return nil, err
-	}
-	// Insert well-known URI into URL.
-	u.Path = path.Join(defaultProtectedResourceMetadataURI, u.Path)
-	return GetProtectedResourceMetadata(ctx, u.String(), resourceID, c)
+	// JWKSURI (jwks_uri) is an optional URL of the protected resource's JSON Web Key (JWK) Set
+	// document. This contains public keys belonging to the protected resource, such as
+	// signing key(s) that the resource server uses to sign resource responses.
+	JWKSURI string `json:"jwks_uri,omitempty"`
+
+	// ScopesSupported (scopes_supported) is a recommended slice containing a list of scope
+	// values (as defined in RFC 6749) used in authorization requests to request access
+	// to this protected resource.
+	ScopesSupported []string `json:"scopes_supported,omitempty"`
+
+	// BearerMethodsSupported (bearer_methods_supported) is an optional slice containing
+	// a list of the supported methods of sending an OAuth 2.0 bearer token to the
+	// protected resource. Defined values are "header", "body", and "query".
+	BearerMethodsSupported []string `json:"bearer_methods_supported,omitempty"`
+
+	// ResourceSigningAlgValuesSupported (resource_signing_alg_values_supported) is an optional
+	// slice of JWS signing algorithms (alg values) supported by the protected
+	// resource for signing resource responses.
+	ResourceSigningAlgValuesSupported []string `json:"resource_signing_alg_values_supported,omitempty"`
+
+	// ResourceName (resource_name) is a human-readable name of the protected resource
+	// intended for display to the end user. It is RECOMMENDED that this field be included.
+	// This value may be internationalized.
+	ResourceName string `json:"resource_name,omitempty"`
+
+	// ResourceDocumentation (resource_documentation) is an optional URL of a page containing
+	// human-readable information for developers using the protected resource.
+	// This value may be internationalized.
+	ResourceDocumentation string `json:"resource_documentation,omitempty"`
+
+	// ResourcePolicyURI (resource_policy_uri) is an optional URL of a page containing
+	// human-readable policy information on how a client can use the data provided.
+	// This value may be internationalized.
+	ResourcePolicyURI string `json:"resource_policy_uri,omitempty"`
+
+	// ResourceTOSURI (resource_tos_uri) is an optional URL of a page containing the protected
+	// resource's human-readable terms of service. This value may be internationalized.
+	ResourceTOSURI string `json:"resource_tos_uri,omitempty"`
+
+	// TLSClientCertificateBoundAccessTokens (tls_client_certificate_bound_access_tokens) is an
+	// optional boolean indicating support for mutual-TLS client certificate-bound
+	// access tokens (RFC 8705). Defaults to false if omitted.
+	TLSClientCertificateBoundAccessTokens bool `json:"tls_client_certificate_bound_access_tokens,omitempty"`
+
+	// AuthorizationDetailsTypesSupported (authorization_details_types_supported) is an optional
+	// slice of 'type' values supported by the resource server for the
+	// 'authorization_details' parameter (RFC 9396).
+	AuthorizationDetailsTypesSupported []string `json:"authorization_details_types_supported,omitempty"`
+
+	// DPOPSigningAlgValuesSupported (dpop_signing_alg_values_supported) is an optional
+	// slice of JWS signing algorithms supported by the resource server for validating
+	// DPoP proof JWTs (RFC 9449).
+	DPOPSigningAlgValuesSupported []string `json:"dpop_signing_alg_values_supported,omitempty"`
+
+	// DPOPBoundAccessTokensRequired (dpop_bound_access_tokens_required) is an optional boolean
+	// specifying whether the protected resource always requires the use of DPoP-bound
+	// access tokens (RFC 9449). Defaults to false if omitted.
+	DPOPBoundAccessTokensRequired bool `json:"dpop_bound_access_tokens_required,omitempty"`
+
+	// SignedMetadata (signed_metadata) is an optional JWT containing metadata parameters
+	// about the protected resource as claims. If present, these values take precedence
+	// over values conveyed in plain JSON.
+	// TODO:implement.
+	// Note that §2.2 says it's okay to ignore this.
+	// SignedMetadata string `json:"signed_metadata,omitempty"`
 }
 
-// GetProtectedResourceMetadataFromHeader retrieves protected resource metadata
-// using information in the given header, using the given client (or the default
-// client if nil).
-// It issues a GET request to a URL discovered by parsing the WWW-Authenticate headers in the given request.
-// Per RFC 9728 section 3.3, it validates that the resource field of the resulting metadata
-// matches the serverURL (the URL that the client used to make the original request to the resource server).
-// If there is no metadata URL in the header, it returns nil, nil.
-//
-// Deprecated: Use [GetProtectedResourceMetadata] instead. This function will be removed in v1.5.0.
-func GetProtectedResourceMetadataFromHeader(ctx context.Context, serverURL string, header http.Header, c *http.Client) (_ *ProtectedResourceMetadata, err error) {
-	headers := header[http.CanonicalHeaderKey("WWW-Authenticate")]
-	if len(headers) == 0 {
-		return nil, nil
-	}
-	cs, err := ParseWWWAuthenticate(headers)
-	if err != nil {
-		return nil, err
-	}
-	metadataURL := resourceMetadataURL(cs)
-	if metadataURL == "" {
-		return nil, nil
-	}
-	return GetProtectedResourceMetadata(ctx, metadataURL, serverURL, c)
+// Challenge represents a single authentication challenge from a WWW-Authenticate header.
+// As per RFC 9110, Section 11.6.1, a challenge consists of a scheme and optional parameters.
+type Challenge struct {
+	// Scheme is the authentication scheme (e.g., "Bearer", "Basic").
+	// It is case-insensitive. A parsed value will always be lower-case.
+	Scheme string
+	// Params is a map of authentication parameters.
+	// Keys are case-insensitive. Parsed keys are always lower-case.
+	Params map[string]string
 }
 
-// resourceMetadataURL returns a resource metadata URL from the given "WWW-Authenticate" header challenges,
-// or the empty string if there is none.
-func resourceMetadataURL(cs []Challenge) string {
-	for _, c := range cs {
-		if u := c.Params["resource_metadata"]; u != "" {
-			return u
-		}
-	}
-	return ""
-}
-
-// GetProtectedResourceMetadataFromID issues a GET request to retrieve protected resource
+// GetProtectedResourceMetadata issues a GET request to retrieve protected resource
 // metadata from a resource server.
 // The metadataURL is typically a URL with a host:port and possibly a path.
 // The resourceURL is the resource URI the metadataURL is for.

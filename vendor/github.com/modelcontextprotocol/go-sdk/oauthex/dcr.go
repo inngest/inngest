@@ -5,8 +5,6 @@
 // This file implements Authorization Server Metadata.
 // See https://www.rfc-editor.org/rfc/rfc8414.html.
 
-//go:build mcp_go_client_oauth
-
 package oauthex
 
 import (

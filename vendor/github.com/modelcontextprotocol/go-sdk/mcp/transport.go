@@ -344,7 +344,11 @@ func (r rwc) Close() error {
 //
 // See [msgBatch] for more discussion of message batching.
 type ioConn struct {
-	protocolVersion string // negotiated version, set during session initialization.
+	// protocolVersion is the negotiated version of the protocol,
+	// set during session initialization.
+	// Since writes may be concurrent to reads, we need to guard this with a mutex.
+	sessionMu       sync.Mutex
+	protocolVersion string
 
 	writeMu sync.Mutex         // guards Write, which must be concurrency safe.
 	rwc     io.ReadWriteCloser // the underlying stream
@@ -430,9 +434,15 @@ func (c *ioConn) sessionUpdated(state ServerSessionState) {
 		protocolVersion = state.InitializeParams.ProtocolVersion
 	}
 	if protocolVersion == "" {
+		// 2025-03-26 is used, because it's the last spec version
+		// where specifying the protocol version in the HTTP header
+		// was not required.
 		protocolVersion = protocolVersion20250326
 	}
-	c.protocolVersion = negotiatedVersion(protocolVersion)
+	protocolVersion = negotiatedVersion(protocolVersion)
+	c.sessionMu.Lock()
+	c.protocolVersion = protocolVersion
+	c.sessionMu.Unlock()
 }
 
 // addBatch records a msgBatch for an incoming batch payload.
@@ -533,8 +543,12 @@ func (t *ioConn) Read(ctx context.Context) (jsonrpc.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	if batch && t.protocolVersion >= protocolVersion20250618 {
-		return nil, fmt.Errorf("JSON-RPC batching is not supported in %s and later (request version: %s)", protocolVersion20250618, t.protocolVersion)
+	var protocolVersion string
+	t.sessionMu.Lock()
+	protocolVersion = t.protocolVersion
+	t.sessionMu.Unlock()
+	if batch && protocolVersion >= protocolVersion20250618 {
+		return nil, fmt.Errorf("JSON-RPC batching is not supported in %s and later (request version: %s)", protocolVersion20250618, protocolVersion)
 	}
 
 	t.queue = msgs[1:]
