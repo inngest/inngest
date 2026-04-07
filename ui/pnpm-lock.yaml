@@ -63,6 +63,7 @@ overrides:
   '@urql/core': 6.0.1
   h3@>=2.0.0-beta.0 <2.0.1-rc.18: '>=2.0.1-rc.18 <3'
   h3-v2: npm:h3@2.0.1-rc.20
+  dompurify@<=3.3.2: 3.3.2
 
 importers:
 
@@ -6824,8 +6825,9 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dompurify@3.2.7:
-    resolution: {integrity: sha512-WhL/YuveyGXJaerVlMYGWhvQswa7myDG17P7Vu65EWC05o8vfeNbvNf4d/BOvH99+ZW+LlQsc1GDKMa1vNK6dw==}
+  dompurify@3.3.2:
+    resolution: {integrity: sha512-6obghkliLdmKa56xdbLOpUZ43pAR6xFy1uOrxBaIDjT+yaRuuybLjGS9eVBoSR/UPU5fq3OXClEHLJNGvbxKpQ==}
+    engines: {node: '>=20'}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -18064,7 +18066,7 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dompurify@3.2.7:
+  dompurify@3.3.2:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -20498,7 +20500,7 @@ snapshots:
 
   monaco-editor@0.55.1:
     dependencies:
-      dompurify: 3.2.7
+      dompurify: 3.3.2
       marked: 14.0.0
 
   moo@0.5.3: {}
