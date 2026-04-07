@@ -36,6 +36,13 @@ local function debug(...)
 	end
 end
 
+--- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
+---@param value number
+---@return integer
+local function toInteger(value)
+	return math.floor(value + 0.5) -- Round to nearest integer
+end
+
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
@@ -93,8 +100,10 @@ for _, c in ipairs(constraints) do
 		-- semaphore: decrement for auto-release, or when force-released by the scavenger
 		if c.sem.rel == 0 or forceReleaseSemaphores then
 			local weight = c.sem.w
-			if not weight or weight <= 0 then weight = 1 end
-			local newVal = call("DECRBY", c.sem.k, weight)
+			if not weight or weight <= 0 then
+				weight = 1
+			end
+			local newVal = call("DECRBY", c.sem.k, toInteger(weight))
 			if tonumber(newVal) < 0 then
 				call("SET", c.sem.k, "0")
 			end
