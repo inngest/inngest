@@ -210,6 +210,11 @@ Function alternatives are also available if preferred:
 
 Columns marked JSONString contain JSON as strings that can be accessed with special dot syntax.
 
+```sql
+data.property
+data.nested.property
+```
+
 We perform type inference for dot accessors, so that `data.property` transpiles into `JSONExtract(data, 'property', 'Dynamic')` by default, but may be able to infer a tighter type bound.
 Explicit casts like `data.property::Int64` allow for precise type inference.
 
