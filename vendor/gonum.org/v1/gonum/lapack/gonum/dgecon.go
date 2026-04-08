@@ -12,17 +12,23 @@ import (
 	"gonum.org/v1/gonum/lapack"
 )
 
-// Dgecon estimates the reciprocal of the condition number of the n×n matrix A
-// given the LU decomposition of the matrix. The condition number computed may
-// be based on the 1-norm or the ∞-norm.
+// Dgecon estimates and returns the reciprocal of the condition number of the
+// n×n matrix A, in either the 1-norm or the ∞-norm, using the LU factorization
+// computed by Dgetrf.
 //
-// The slice a contains the result of the LU decomposition of A as computed by Dgetrf.
+// An estimate is obtained for norm(A⁻¹), and the reciprocal of the condition
+// number rcond is computed as
 //
-// anorm is the corresponding 1-norm or ∞-norm of the original matrix A.
+//	rcond 1 / ( norm(A) * norm(A⁻¹) ).
 //
-// work is a temporary data slice of length at least 4*n and Dgecon will panic otherwise.
+// If n is zero, rcond is always 1.
 //
-// iwork is a temporary data slice of length at least n and Dgecon will panic otherwise.
+// anorm is the 1-norm or the ∞-norm of the original matrix A. anorm must be
+// non-negative, otherwise Dgecon will panic. If anorm is 0 or infinity, Dgecon
+// returns 0. If anorm is NaN, Dgecon returns NaN.
+//
+// work must have length at least 4*n and iwork must have length at least n,
+// otherwise Dgecon will panic.
 func (impl Implementation) Dgecon(norm lapack.MatrixNorm, n int, a []float64, lda int, anorm float64, work []float64, iwork []int) float64 {
 	switch {
 	case norm != lapack.MaxColumnSum && norm != lapack.MaxRowSum:
@@ -31,6 +37,8 @@ func (impl Implementation) Dgecon(norm lapack.MatrixNorm, n int, a []float64, ld
 		panic(nLT0)
 	case lda < max(1, n):
 		panic(badLdA)
+	case anorm < 0:
+		panic(negANorm)
 	}
 
 	// Quick return if possible.
@@ -48,7 +56,13 @@ func (impl Implementation) Dgecon(norm lapack.MatrixNorm, n int, a []float64, ld
 	}
 
 	// Quick return if possible.
-	if anorm == 0 {
+	switch {
+	case anorm == 0:
+		return 0
+	case math.IsNaN(anorm):
+		// Propagate NaN.
+		return anorm
+	case math.IsInf(anorm, 1):
 		return 0
 	}
 
