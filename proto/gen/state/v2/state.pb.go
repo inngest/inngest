@@ -169,8 +169,12 @@ type Config struct {
 	ForceStepPlan   bool                   `protobuf:"varint,14,opt,name=force_step_plan,json=forceStepPlan,proto3" json:"force_step_plan,omitempty"`
 	Context         *structpb.Struct       `protobuf:"bytes,15,opt,name=context,proto3" json:"context,omitempty"`
 	HasAi           bool                   `protobuf:"varint,16,opt,name=has_ai,json=hasAi,proto3" json:"has_ai,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// semaphores_json stores semaphore constraints as a JSON-encoded string.
+	// This avoids a proto schema change while ensuring semaphores survive
+	// the state proxy round-trip.
+	SemaphoresJson string `protobuf:"bytes,17,opt,name=semaphores_json,json=semaphoresJson,proto3" json:"semaphores_json,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Config) Reset() {
@@ -306,6 +310,13 @@ func (x *Config) GetHasAi() bool {
 		return x.HasAi
 	}
 	return false
+}
+
+func (x *Config) GetSemaphoresJson() string {
+	if x != nil {
+		return x.SemaphoresJson
+	}
+	return ""
 }
 
 type ConcurrencyKey struct {
@@ -1808,7 +1819,7 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
 	"functionId\x12(\n" +
-	"\x06tenant\x18\x03 \x01(\v2\x10.state.v2.TenantR\x06tenant\"\x99\x05\n" +
+	"\x06tenant\x18\x03 \x01(\v2\x10.state.v2.TenantR\x06tenant\"\xc2\x05\n" +
 	"\x06Config\x12)\n" +
 	"\x10function_version\x18\x02 \x01(\x03R\x0ffunctionVersion\x12#\n" +
 	"\rcron_schedule\x18\x03 \x01(\tR\fcronSchedule\x12\x17\n" +
@@ -1826,7 +1837,8 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x10concurrency_keys\x18\r \x03(\v2\x18.state.v2.ConcurrencyKeyR\x0fconcurrencyKeys\x12&\n" +
 	"\x0fforce_step_plan\x18\x0e \x01(\bR\rforceStepPlan\x121\n" +
 	"\acontext\x18\x0f \x01(\v2\x17.google.protobuf.StructR\acontext\x12\x15\n" +
-	"\x06has_ai\x18\x10 \x01(\bR\x05hasAiB\f\n" +
+	"\x06has_ai\x18\x10 \x01(\bR\x05hasAi\x12'\n" +
+	"\x0fsemaphores_json\x18\x11 \x01(\tR\x0esemaphoresJsonB\f\n" +
 	"\n" +
 	"_replay_idB\x12\n" +
 	"\x10_original_run_idB\x12\n" +

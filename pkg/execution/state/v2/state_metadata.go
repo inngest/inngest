@@ -63,6 +63,7 @@ func V1FromMetadata(md Metadata) statev1.Identifier {
 		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
 		PriorityFactor:        md.Config.PriorityFactor,
 		OriginalRunID:         md.Config.OriginalRunID,
+		Semaphores:            md.Config.Semaphores,
 	}
 }
 
