@@ -386,6 +386,71 @@ func TestStandardErrorSerialize(t *testing.T) {
 	}
 }
 
+// TestOpcodeNone_IsFunctionResult verifies the fix for EXE-1545: when the SDK
+// returns HTTP 206 with an empty array body `[]`, the response is normalized to
+// a single OpcodeNone. This must be recognized as a function result so that the
+// executor finalizes the run instead of leaving it stuck in "Running".
+func TestOpcodeNone_IsFunctionResult(t *testing.T) {
+	t.Parallel()
+
+	t.Run("single OpcodeNone should be treated as function result", func(t *testing.T) {
+		resp := &DriverResponse{
+			Generator: []*GeneratorOpcode{
+				{Op: enums.OpcodeNone},
+			},
+			Output:     nil,
+			Err:        nil,
+			StatusCode: 206,
+		}
+
+		require.True(t, resp.IsFunctionResult(),
+			"a response with only OpcodeNone should be treated as a function result, "+
+				"otherwise the run will never be finalized and will stay in Running state")
+	})
+
+	t.Run("OpcodeNone mixed with other opcodes is not a function result", func(t *testing.T) {
+		resp := &DriverResponse{
+			Generator: []*GeneratorOpcode{
+				{Op: enums.OpcodeNone},
+				{Op: enums.OpcodeStep},
+			},
+		}
+
+		require.False(t, resp.IsFunctionResult(),
+			"OpcodeNone alongside other opcodes is a parallel fan-in, not a function result")
+	})
+
+	t.Run("nil generator is a function result", func(t *testing.T) {
+		resp := &DriverResponse{
+			Output: nil, Err: nil, Generator: nil, StatusCode: 200,
+		}
+		require.True(t, resp.IsFunctionResult())
+	})
+
+	t.Run("empty generator is a function result", func(t *testing.T) {
+		resp := &DriverResponse{
+			Output: nil, Err: nil, Generator: []*GeneratorOpcode{}, StatusCode: 200,
+		}
+		require.True(t, resp.IsFunctionResult())
+	})
+}
+
+// TestNoOutputFunctionResult verifies behavior for the "function result has no
+// output" error path — SDK returns HTTP 200 with empty body.
+func TestNoOutputFunctionResult(t *testing.T) {
+	t.Parallel()
+
+	t.Run("GetTraceFunctionOutput returns error for nil output", func(t *testing.T) {
+		resp := &DriverResponse{
+			Output: nil, Err: nil, Generator: nil, StatusCode: 200,
+		}
+		output, err := resp.GetTraceFunctionOutput()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "function result has no output")
+		require.Empty(t, output)
+	})
+}
+
 func strptr(s string) *string {
 	return &s
 }
