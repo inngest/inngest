@@ -54,7 +54,7 @@ cuelabs.dev/go/oci/ociregistry/internal/ocirequest
 cuelabs.dev/go/oci/ociregistry/ociauth
 cuelabs.dev/go/oci/ociregistry/ociclient
 cuelabs.dev/go/oci/ociregistry/ociref
-# cuelang.org/go v0.16.0
+# cuelang.org/go v0.16.1
 ## explicit; go 1.25.0
 cuelang.org/go/cue
 cuelang.org/go/cue/ast
@@ -1625,8 +1625,8 @@ golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/httpsfv
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.35.0
-## explicit; go 1.24.0
+# golang.org/x/oauth2 v0.36.0
+## explicit; go 1.25.0
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler
 golang.org/x/oauth2/google
@@ -1672,8 +1672,8 @@ golang.org/x/text/width
 # golang.org/x/time v0.14.0
 ## explicit; go 1.24.0
 golang.org/x/time/rate
-# golang.org/x/tools v0.42.0
-## explicit; go 1.24.0
+# golang.org/x/tools v0.43.0
+## explicit; go 1.25.0
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/ast/edge
 golang.org/x/tools/go/ast/inspector
