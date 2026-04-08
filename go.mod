@@ -59,7 +59,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/liushuangls/go-anthropic/v2 v2.18.0
 	github.com/lmittmann/tint v1.1.3
-	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-isatty v0.0.21
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/nats-io/nats.go v1.50.0
