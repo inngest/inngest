@@ -218,7 +218,7 @@ data.nested.property
 We perform type inference for dot accessors, so that `data.property` transpiles into `JSONExtract(data, 'property', 'Dynamic')` by default, but may be able to infer a tighter type bound.
 Explicit casts like `data.property::Int64` allow for precise type inference.
 
-We also support dot syntax access for Map,Tuple, and Dynamic types including the `inngest` and `metadata` columns like `inngest.timing.values.some_property`.
+We also support dot syntax access for Map, Tuple, and Dynamic types including the `inngest` and `metadata` columns like `inngest.timing.values.some_property`.
 
 JSON access is valid in `SELECT`, `WHERE`, `GROUP BY`, `ORDER BY`, `HAVING`, and `WITH` expressions.
 
