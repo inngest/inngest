@@ -52,7 +52,11 @@ function Page() {
   const data = useFumadocsLoader(Route.useLoaderData());
 
   return (
-    <DocsLayout {...baseOptions()} tree={data.pageTree}>
+    <DocsLayout
+      {...baseOptions()}
+      tree={data.pageTree}
+      githubUrl="https://github.com/inngest/inngest"
+    >
       <Suspense>{clientLoader.useContent(data.path)}</Suspense>
     </DocsLayout>
   );
