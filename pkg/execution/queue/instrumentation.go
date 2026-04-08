@@ -21,11 +21,15 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 	setLease := func(lease *ulid.ULID) {
 		q.instrumentationLeaseLock.Lock()
 		defer q.instrumentationLeaseLock.Unlock()
-		q.instrumentationLeaseID = lease
 
 		if lease != nil && q.instrumentationLeaseID == nil {
+			logger.StdlibLogger(ctx).Debug("claimed instrumentation lease")
 			metrics.IncrInstrumentationLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		}
+		if lease == nil && q.instrumentationLeaseID != nil {
+			logger.StdlibLogger(ctx).Debug("lost instrumentation lease")
+		}
+		q.instrumentationLeaseID = lease
 	}
 
 	setLease(leaseID)
@@ -54,10 +58,6 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 			metrics.GaugeShardLeaseCapacity(ctx, int64(shardAssignmentConfig.NumExecutors), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": shardAssignmentConfig.ShardGroup, "queue_shard": q.primaryQueueShard.Name(), "segment": q.ShardLeaseKeySuffix}})
 
 			leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "instrument", ConfigLeaseMax, q.instrumentationLease())
-			if err == ErrConfigAlreadyLeased {
-				setLease(nil)
-				continue
-			}
 
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error claiming instrumentation lease", "error", err)
