@@ -2,6 +2,7 @@ package registration
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -17,6 +18,10 @@ type ProcessOpts struct {
 	EnvironmentID uuid.UUID
 	AppID         uuid.UUID
 
+	// IdempotencyKey is an optional string (eg. request ID) that is used
+	// for accessing the semaphore manager when setting semaphore capacity.
+	IdempotencyKey string
+
 	// UseDeterministicIDs determines whether we use determinisctic IDs for
 	// fn IDs during processing.  This is required for OSS versions.
 	UseDeterministicIDs bool
@@ -24,6 +29,9 @@ type ProcessOpts struct {
 
 // ProcessResult contains the output of ProcessFunctions.
 type ProcessResult struct {
+	// opts captures the opts used during processing
+	opts ProcessOpts
+
 	// Functions contains validated, enriched functions ready for DB storage.
 	Functions []inngest.DeployedFunction
 }
@@ -47,11 +55,15 @@ func (r *ProcessResult) SetSemaphoreCapacity(ctx context.Context, sm constrainta
 			}
 			var semID string
 			if fc.Key != nil {
-				semID = constraintapi.SemaphoreIDFnKey(fn.ID, *fc.Key)
+				semID = constraintapi.SemaphoreIDFnKey(df.ID, *fc.Key)
 			} else {
-				semID = constraintapi.SemaphoreIDFn(fn.ID)
+				semID = constraintapi.SemaphoreIDFn(df.ID)
 			}
-			_ = sm.SetCapacity(ctx, df.AccountID, semID, fn.ID.String(), int64(fc.Limit))
+
+			// add the idempotency key to the fn ID.  this resets after the semaphore idempotency period,
+			// eg 20 seconds, but ensures simultaneous deploys still update the sem.
+			ik := fmt.Sprintf("%s-%s", r.opts.IdempotencyKey, df.ID.String())
+			_ = sm.SetCapacity(ctx, df.AccountID, semID, ik, int64(fc.Limit))
 		}
 	}
 }
@@ -68,6 +80,7 @@ func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts Process
 	var errs error
 
 	result := &ProcessResult{
+		opts:      opts,
 		Functions: make([]inngest.DeployedFunction, 0, len(req.Functions)),
 	}
 

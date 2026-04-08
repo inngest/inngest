@@ -36,6 +36,10 @@ message Config {
   bool                              force_step_plan  = 14;
   google.protobuf.Struct            context          = 15;
   bool                              has_ai           = 16;
+  // semaphores_json stores semaphore constraints as a JSON-encoded string.
+  // This avoids a proto schema change while ensuring semaphores survive
+  // the state proxy round-trip.
+  string                            semaphores_json  = 17;
 }
 
 message ConcurrencyKey {
