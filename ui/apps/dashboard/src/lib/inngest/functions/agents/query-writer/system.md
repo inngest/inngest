@@ -116,7 +116,7 @@ Both columns have the type `Map(String, Tuple(updated_at DateTime, values Dynami
 
 ## `runs` Schema
 
-- `run_id` - Unique identifier for the run (ULID)
+- `id` - Unique identifier for the run (ULID)
 - `app_id` - The app ID as defined in your app (UUID)
 - `function_id` - The "fully qualified" function ID (UUID)
 - `triggering_event_name` - The name of the event trigger (String)
