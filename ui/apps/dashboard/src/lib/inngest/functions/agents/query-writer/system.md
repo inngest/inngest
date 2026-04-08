@@ -84,7 +84,26 @@ Here is what the user is asking for:
 
 # Database Schema and Allowed Columns
 
-You may **only** query the `events` table with these columns:
+You may **only** query the following tables:
+
+- `events`,
+- `runs`
+- `steps`
+- `step_attempts`
+- `extended_trace_spans`
+
+## Common columns
+
+- `app_id` - The app ID as defined in your app
+- `function_id` - The "fully qualified" function ID. This is the app ID concatenated to the function ID as defined in your app with a `-` (e.g., `my-app-my-function`)
+
+## Metadata columns
+
+Metadata can be accessed in the `inngest` and `metadata` columns.
+`inngest` contains system-defined/created metadata while `metadata` contains user-defined metadata.
+Both columns have the type `Map(String, Tuple(updated_at DateTime, values Dynamic))`.
+
+## `events` Schema
 
 - `id` - Unique identifier (string)
 - `name` - Event name/type (string)
@@ -93,7 +112,65 @@ You may **only** query the `events` table with these columns:
 - `ts_dt` - Event timestamp as DateTime
 - `received_at` - Ingestion timestamp in **milliseconds since epoch** (int64)
 - `received_at_dt` - Ingestion timestamp as DateTime
-- `data` - JSON payload containing event-specific properties
+- `data` - JSON payload containing event-specific properties (JSON String)
+
+## `runs` Schema
+
+- `run_id` - Unique identifier for the run (ULID)
+- `app_id` - The app ID as defined in your app (UUID)
+- `function_id` - The "fully qualified" function ID (UUID)
+- `triggering_event_name` - The name of the event trigger (String)
+- `status` - Run status: `Queued`, `Running`, `Failed`, `Cancelled`, `Completed` (String)
+- `queued_at` - When the run was queued (DateTime)
+- `started_at` - When the run started executing (NULL if it hasn't started yet) (DateTime)
+- `ended_at` - When the run ended (NULL if still running) (DateTime)
+- `inputs` - Array of input events (for batch functions or functions triggered by multiple events) (Array(JSON Strings))
+- `input` - Equivalent to `inputs[1]` (JSON String)
+- `output` - The output/return value from the function (NULL if not completed or no output) (JSONString)
+- `error` - Error details if the run failed (NULL if successful) (JSONString)
+
+## `steps`/`step_attempts` Schema
+
+`steps` and `step_attempts` have identical schemas, but `steps` only contains the latest step attempt.
+
+- `run_id` - Unique identifier for the run (ULID)
+- `app_id` - The app ID as defined in your app (UUID)
+- `function_id` - The "fully qualified" function ID (UUID)
+- `type` - Step type: StepRun, StepPlanned, StepFailed, InvokeFunction, Sleep, AIGateway, StepError (String)
+- `name` - The name of the step which is the same as id unless an explicit display name is provided (String)
+- `id` - The id used when creating the step like `step.run('<id>', ...)` (String)
+- `loop_index` - The index for repeated steps (Int)
+- `attempt` - The attempt number for retried steps (Int)
+- `status` - Step status: `Queued`, `Running`, `Failed`, `Errored`, `Completed` (String)
+- `queued_at` - When the step was queued (DateTime)
+- `started_at` - When the step started executing (NULL if it hasn't started yet) (DateTime)
+- `ended_at` - When the step ended (NULL if still running) (DateTime)
+- `output` - The output/return value from the step (NULL if not completed or no output) (JSONString)
+- `error` - Error details if the step failed (NULL if successful) (JSONString)
+- `attributes` - Raw attributes from the step span (Map(String, String))
+- `inngest` - System-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
+- `metadata` - User-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
+
+## `extended_trace_spans` Schema
+
+- `run_id` - Unique identifier for the run (ULID)
+- `app_id` - The app ID as defined in your app (UUID)
+- `function_id` - The "fully qualified" function ID (UUID)
+- `step_id` - The id used when creating the step like `step.run('<id>', ...)` (String)
+- `step_index` - The index for repeated steps (Int)
+- `step_attempt` - The attempt number for retried steps (Int)
+- `span_id` - The OpenTelemetry span ID (String)
+- `parent_span_id` - The id of this span's parent (String)
+- `start_time` - The start of the span (DateTime)
+- `end_time` - The end of the span (DateTime)
+- `name` - The name of the span (String)
+- `kind` - The OpenTelemetry span kind of the span (String)
+- `scope_name` - The OpenTelemetry instrument scope name of the span (String)
+- `scope_version` - The OpenTelemetry instrument scope version of the span (String)
+- `service_name` - The OpenTelemetry service name of the span (String)
+- `attributes` - Raw attributes of the span (Map(String, String))
+- `inngest` - System-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
+- `metadata` - User-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
 
 **Forbidden columns**: Never reference `account_id` or `workspace_id` (these are injected automatically by the system).
 
@@ -131,28 +208,12 @@ Function alternatives are also available if preferred:
 
 ### JSON Data Handling
 
-The `data` column contains JSON. Accessing properties requires careful type handling:
+Columns marked JSONString contain JSON as strings that can be accessed with special dot syntax.
 
-**String Access**: Use dot notation
+We perform type inference for dot accessors, so that `data.property` transpiles into `JSONExtract(data, 'property', 'Dynamic')` by default, but may be able to infer a tighter type bound.
+Explicit casts like `data.property::Int64` allow for precise type inference.
 
-```sql
-data.property
-data.nested.property
-```
-
-This always returns a **string** (transpiles to `JSONExtractString`).
-
-**Numeric Access**: Use extraction functions
-
-```sql
-JSONExtractInt(data, 'property')
-JSONExtractFloat(data, 'property')
-```
-
-**Critical**: String comparisons vs numeric comparisons:
-
-- ❌ WRONG: `WHERE data.price > 10` (compares string to number)
-- ✅ CORRECT: `WHERE JSONExtractInt(data, 'price') > 10`
+We also support dot syntax access for Map,Tuple, and Dynamic types including the `inngest` and `metadata` columns like `inngest.timing.values.some_property`.
 
 JSON access is valid in `SELECT`, `WHERE`, `GROUP BY`, `ORDER BY`, `HAVING`, and `WITH` expressions.
 
