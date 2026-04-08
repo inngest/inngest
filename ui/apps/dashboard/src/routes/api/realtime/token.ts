@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
-import { getSubscriptionToken } from '@inngest/realtime';
+import { getClientSubscriptionToken } from 'inngest/react';
 import { inngest } from '@/lib/inngest/client';
-import { createChannel } from '@/lib/inngest/realtime';
+import { insightsChannel } from '@/lib/inngest/realtime';
 
 export type RequestBody = {
   userId?: string;
@@ -42,9 +42,8 @@ export const Route = createFileRoute('/api/realtime/token')({
 
           //
           // Create a subscription token for the resolved channel
-          // Match publisher semantics: when channelKey is provided, we publish to that key directly.
-          const token = await getSubscriptionToken(inngest, {
-            channel: createChannel(channelKey),
+          const token = await getClientSubscriptionToken(inngest, {
+            channel: insightsChannel(channelKey),
             topics: ['agent_stream'],
           });
 

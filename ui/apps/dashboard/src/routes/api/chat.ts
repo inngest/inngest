@@ -84,8 +84,7 @@ export const Route = createFileRoute('/api/chat')({
 
           //
           // If the client didn't provide a threadId, omit generation here.
-          // AgentKit will create one during initializeThread; the canonical ID will
-          // be returned in the response from this route.
+          // The Inngest function will generate one if not provided.
           const threadId = providedThreadId || undefined;
 
           //

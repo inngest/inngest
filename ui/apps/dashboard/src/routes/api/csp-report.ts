@@ -66,7 +66,6 @@ export const Route = createFileRoute('/api/csp-report')({
         await inngest.send({
           name: 'app/csp-violation.reported',
           data: normalizedBody,
-          v: '2025-01-08.1',
         });
         return new Response(null, { status: 200 });
       },
