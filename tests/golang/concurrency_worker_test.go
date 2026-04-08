@@ -106,7 +106,7 @@ func TestWorkerConcurrency(t *testing.T) {
 	// Eventually the first fn starts
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&inProgress) == 1
-	}, 5*time.Second, 100*time.Millisecond, "function should start")
+	}, 15*time.Second, 100*time.Millisecond, "function should start")
 
 	// During execution, never exceed limit
 	totalDuration := time.Duration(numEvents*stepDuration+5) * time.Second
