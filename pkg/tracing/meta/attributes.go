@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var Attrs = struct {
@@ -223,4 +224,9 @@ var Attrs = struct {
 	MetadataKind:  StringishAttr[metadata.Kind]("metadata.kind"),
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
+}
+
+// AttachInternalError is a util function for attaching an internal error toa  span.
+func AttachInternalError(span trace.Span, error string) {
+	span.SetAttributes(StringAttr(InternalError).serialize(&error))
 }
