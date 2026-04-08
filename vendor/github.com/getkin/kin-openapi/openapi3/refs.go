@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/go-openapi/jsonpointer"
@@ -79,7 +79,7 @@ func (x *CallbackRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -217,7 +217,7 @@ func (x *ExampleRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -355,7 +355,7 @@ func (x *HeaderRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -493,7 +493,7 @@ func (x *LinkRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -631,7 +631,7 @@ func (x *ParameterRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -769,7 +769,7 @@ func (x *RequestBodyRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -907,7 +907,7 @@ func (x *ResponseRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -1045,7 +1045,7 @@ func (x *SchemaRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)
@@ -1183,7 +1183,7 @@ func (x *SecuritySchemeRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)

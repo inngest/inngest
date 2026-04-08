@@ -9,7 +9,7 @@ import (
 	"math"
 	"math/big"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -413,7 +413,6 @@ func (schema *Schema) UnmarshalJSON(data []byte) error {
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
 
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "oneOf")
 	delete(x.Extensions, "anyOf")
 	delete(x.Extensions, "allOf")
@@ -468,12 +467,6 @@ func (schema *Schema) UnmarshalJSON(data []byte) error {
 	}
 
 	*schema = Schema(x)
-
-	for i, v := range schema.Enum {
-		schema.Enum[i] = stripOriginFromAny(v)
-	}
-	schema.Default = stripOriginFromAny(schema.Default)
-	schema.Example = stripOriginFromAny(schema.Example)
 
 	if schema.Format == "date" {
 		// This is a fix for: https://github.com/getkin/kin-openapi/issues/697
@@ -1057,7 +1050,7 @@ func (schema *Schema) validate(ctx context.Context, stack []*Schema) ([]*Schema,
 	for name := range schema.Properties {
 		properties = append(properties, name)
 	}
-	sort.Strings(properties)
+	slices.Sort(properties)
 	for _, name := range properties {
 		ref := schema.Properties[name]
 		v := ref.Value
@@ -1941,7 +1934,7 @@ func (schema *Schema) visitJSONObject(settings *schemaValidationSettings, value 
 		for propName := range schema.Properties {
 			properties = append(properties, propName)
 		}
-		sort.Strings(properties)
+		slices.Sort(properties)
 		for _, propName := range properties {
 			propSchema := schema.Properties[propName]
 			reqRO := settings.asreq && propSchema.Value.ReadOnly && !settings.readOnlyValidationDisabled
@@ -2013,7 +2006,7 @@ func (schema *Schema) visitJSONObject(settings *schemaValidationSettings, value 
 	for k := range value {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, k := range keys {
 		v := value[k]
 		if properties != nil {
@@ -2281,6 +2274,6 @@ func unsupportedFormat(format string) error {
 
 // UnmarshalJSON sets Schemas to a copy of data.
 func (schemas *Schemas) UnmarshalJSON(data []byte) (err error) {
-	*schemas, _, err = unmarshalStringMapP[SchemaRef](data)
+	*schemas, err = unmarshalStringMapP[SchemaRef](data)
 	return
 }

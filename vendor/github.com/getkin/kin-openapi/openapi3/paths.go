@@ -1,9 +1,10 @@
 package openapi3
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 	for key := range paths.Map() {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, path := range keys {
 		pathItem := paths.Value(path)
 		if path == "" || path[0] != '/' {
@@ -78,7 +79,7 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 		for method := range operations {
 			methods = append(methods, method)
 		}
-		sort.Strings(methods)
+		slices.Sort(methods)
 		for _, method := range methods {
 			operation := operations[method]
 			var setParams []string
@@ -159,7 +160,7 @@ func (paths *Paths) InMatchingOrder() []string {
 	ordered := make([]string, 0, paths.Len())
 	for c := 0; c <= max; c++ {
 		if ps, ok := vars[c]; ok {
-			sort.Sort(sort.Reverse(sort.StringSlice(ps)))
+			slices.SortFunc(ps, func(a, b string) int { return cmp.Compare(b, a) })
 			ordered = append(ordered, ps...)
 		}
 	}

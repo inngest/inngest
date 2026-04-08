@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/go-openapi/jsonpointer"
 )
@@ -16,10 +16,10 @@ type MediaType struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
 	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
 
-	Schema   *SchemaRef           `json:"schema,omitempty" yaml:"schema,omitempty"`
-	Example  any                  `json:"example,omitempty" yaml:"example,omitempty"`
-	Examples Examples             `json:"examples,omitempty" yaml:"examples,omitempty"`
-	Encoding map[string]*Encoding `json:"encoding,omitempty" yaml:"encoding,omitempty"`
+	Schema   *SchemaRef `json:"schema,omitempty" yaml:"schema,omitempty"`
+	Example  any        `json:"example,omitempty" yaml:"example,omitempty"`
+	Examples Examples   `json:"examples,omitempty" yaml:"examples,omitempty"`
+	Encoding Encodings  `json:"encoding,omitempty" yaml:"encoding,omitempty"`
 }
 
 var _ jsonpointer.JSONPointable = (*MediaType)(nil)
@@ -57,7 +57,7 @@ func (mediaType *MediaType) WithExample(name string, value any) *MediaType {
 func (mediaType *MediaType) WithEncoding(name string, enc *Encoding) *MediaType {
 	encoding := mediaType.Encoding
 	if encoding == nil {
-		encoding = make(map[string]*Encoding)
+		encoding = make(Encodings)
 		mediaType.Encoding = encoding
 	}
 	encoding[name] = enc
@@ -102,7 +102,6 @@ func (mediaType *MediaType) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "schema")
 	delete(x.Extensions, "example")
 	delete(x.Extensions, "examples")
@@ -111,7 +110,6 @@ func (mediaType *MediaType) UnmarshalJSON(data []byte) error {
 		x.Extensions = nil
 	}
 	*mediaType = MediaType(x)
-	mediaType.Example = stripOriginFromAny(mediaType.Example)
 	return nil
 }
 
@@ -143,7 +141,7 @@ func (mediaType *MediaType) Validate(ctx context.Context, opts ...ValidationOpti
 				for name := range examples {
 					names = append(names, name)
 				}
-				sort.Strings(names)
+				slices.Sort(names)
 				for _, k := range names {
 					v := examples[k]
 					if err := v.Validate(ctx); err != nil {

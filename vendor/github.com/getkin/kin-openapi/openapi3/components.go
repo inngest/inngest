@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/go-openapi/jsonpointer"
 )
@@ -95,7 +95,6 @@ func (components *Components) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "schemas")
 	delete(x.Extensions, "parameters")
 	delete(x.Extensions, "headers")
@@ -120,7 +119,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.Schemas {
 		schemas = append(schemas, name)
 	}
-	sort.Strings(schemas)
+	slices.Sort(schemas)
 	for _, k := range schemas {
 		v := components.Schemas[k]
 		if err = ValidateIdentifier(k); err != nil {
@@ -135,7 +134,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.Parameters {
 		parameters = append(parameters, name)
 	}
-	sort.Strings(parameters)
+	slices.Sort(parameters)
 	for _, k := range parameters {
 		v := components.Parameters[k]
 		if err = ValidateIdentifier(k); err != nil {
@@ -150,7 +149,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.RequestBodies {
 		requestBodies = append(requestBodies, name)
 	}
-	sort.Strings(requestBodies)
+	slices.Sort(requestBodies)
 	for _, k := range requestBodies {
 		v := components.RequestBodies[k]
 		if err = ValidateIdentifier(k); err != nil {
@@ -165,7 +164,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.Responses {
 		responses = append(responses, name)
 	}
-	sort.Strings(responses)
+	slices.Sort(responses)
 	for _, k := range responses {
 		if err = ValidateIdentifier(k); err != nil {
 			return fmt.Errorf("response %q: %w", k, err)
@@ -180,7 +179,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.Headers {
 		headers = append(headers, name)
 	}
-	sort.Strings(headers)
+	slices.Sort(headers)
 	for _, k := range headers {
 		v := components.Headers[k]
 		if err = ValidateIdentifier(k); err != nil {
@@ -195,7 +194,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.SecuritySchemes {
 		securitySchemes = append(securitySchemes, name)
 	}
-	sort.Strings(securitySchemes)
+	slices.Sort(securitySchemes)
 	for _, k := range securitySchemes {
 		v := components.SecuritySchemes[k]
 		if err = ValidateIdentifier(k); err != nil {
@@ -210,7 +209,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.Examples {
 		examples = append(examples, name)
 	}
-	sort.Strings(examples)
+	slices.Sort(examples)
 	for _, k := range examples {
 		v := components.Examples[k]
 		if err = ValidateIdentifier(k); err != nil {
@@ -225,7 +224,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.Links {
 		links = append(links, name)
 	}
-	sort.Strings(links)
+	slices.Sort(links)
 	for _, k := range links {
 		v := components.Links[k]
 		if err = ValidateIdentifier(k); err != nil {
@@ -240,7 +239,7 @@ func (components *Components) Validate(ctx context.Context, opts ...ValidationOp
 	for name := range components.Callbacks {
 		callbacks = append(callbacks, name)
 	}
-	sort.Strings(callbacks)
+	slices.Sort(callbacks)
 	for _, k := range callbacks {
 		v := components.Callbacks[k]
 		if err = ValidateIdentifier(k); err != nil {

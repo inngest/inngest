@@ -6,9 +6,19 @@
 ![Latest Tag](https://img.shields.io/github/v/tag/invopop/yaml)
 
 ## Fork
-This fork is an improved version of the invopop/yaml package, designed to include line and column location information for YAML elements during unmarshalling.  
-To include location information use ```UnmarshalWithOrigin``` instead of ```Unmarshal```.  
-The heavy lifting is done by the underlying [oasdiff/yaml3](https://github.com/oasdiff/yaml3) package.
+This fork is an improved version of the invopop/yaml package, designed to include line and column location information for YAML elements during unmarshalling.
+
+Origin tracking uses a two-pass approach:
+1. `UnmarshalWithOriginTree` decodes the YAML and extracts `__origin__` metadata injected by the underlying [oasdiff/yaml3](https://github.com/oasdiff/yaml3) decoder, returning an `*OriginTree` alongside the decoded struct.
+2. The caller walks the `OriginTree` to apply file/line/column information to the decoded Go structs.
+
+To decode without origin tracking, use `Unmarshal` as usual. To decode with origin tracking:
+
+```go
+tree, err := yaml.UnmarshalWithOriginTree(data, &v, yaml.OriginOpt{Enabled: true, File: "myfile.yaml"})
+```
+
+The returned `*OriginTree` mirrors the YAML document structure. Each node holds a compact `[]any` sequence with the file, key name, line, column, and locations of scalar fields and sequence items within that mapping. When `Enabled` is false, `nil` is returned for the tree with no overhead.
 
 ## Introduction
 

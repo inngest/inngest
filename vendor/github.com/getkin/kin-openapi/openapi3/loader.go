@@ -15,9 +15,9 @@ import (
 	"strings"
 )
 
-// IncludeOrigin specifies whether to include the origin of the OpenAPI elements
-// Set this to true before loading a spec to include the origin of the OpenAPI elements
-// Note it is global and affects all loaders
+// IncludeOrigin specifies whether to include the origin of the OpenAPI elements.
+// Deprecated: set Loader.IncludeOrigin instead. This global is read by NewLoader
+// for backward compatibility but is not safe for concurrent use.
 var IncludeOrigin = false
 
 func foundUnresolvedRef(ref string) error {
@@ -32,6 +32,11 @@ func failedToResolveRefFragmentPart(value, what string) error {
 type Loader struct {
 	// IsExternalRefsAllowed enables visiting other files
 	IsExternalRefsAllowed bool
+
+	// IncludeOrigin enables recording the file/line/column of each OpenAPI element.
+	// Prefer this over the package-level IncludeOrigin global, which is not safe for
+	// concurrent use.
+	IncludeOrigin bool
 
 	// ReadFromURIFunc allows overriding the any file/URL reading func
 	ReadFromURIFunc ReadFromURIFunc
@@ -53,7 +58,8 @@ type Loader struct {
 // NewLoader returns an empty Loader
 func NewLoader() *Loader {
 	return &Loader{
-		Context: context.Background(),
+		Context:       context.Background(),
+		IncludeOrigin: IncludeOrigin,
 	}
 }
 
@@ -92,8 +98,13 @@ func (loader *Loader) allowsExternalRefs(ref string) (err error) {
 }
 
 func (loader *Loader) loadSingleElementFromURI(ref string, rootPath *url.URL, element any) (*url.URL, error) {
-	if err := loader.allowsExternalRefs(ref); err != nil {
-		return nil, err
+	// When a custom ReadFromURIFunc is installed, defer the external-ref decision to it;
+	// the function itself is responsible for enforcing any access policy.
+	// Otherwise enforce IsExternalRefsAllowed here before attempting any I/O.
+	if loader.ReadFromURIFunc == nil {
+		if err := loader.allowsExternalRefs(ref); err != nil {
+			return nil, err
+		}
 	}
 
 	resolvedPath, err := resolvePathWithRef(ref, rootPath)
@@ -108,7 +119,7 @@ func (loader *Loader) loadSingleElementFromURI(ref string, rootPath *url.URL, el
 	if err != nil {
 		return nil, err
 	}
-	if err := unmarshal(data, element, IncludeOrigin, resolvedPath); err != nil {
+	if err := unmarshal(data, element, loader.IncludeOrigin, resolvedPath); err != nil {
 		return nil, err
 	}
 
@@ -144,7 +155,7 @@ func (loader *Loader) LoadFromIoReader(reader io.Reader) (*T, error) {
 func (loader *Loader) LoadFromData(data []byte) (*T, error) {
 	loader.resetVisitedPathItemRefs()
 	doc := &T{}
-	if err := unmarshal(data, doc, IncludeOrigin, nil); err != nil {
+	if err := unmarshal(data, doc, loader.IncludeOrigin, nil); err != nil {
 		return nil, err
 	}
 	if err := loader.ResolveRefsIn(doc, nil); err != nil {
@@ -173,7 +184,7 @@ func (loader *Loader) loadFromDataWithPathInternal(data []byte, location *url.UR
 	doc := &T{}
 	loader.visitedDocuments[uri] = doc
 
-	if err := unmarshal(data, doc, IncludeOrigin, location); err != nil {
+	if err := unmarshal(data, doc, loader.IncludeOrigin, location); err != nil {
 		return nil, err
 	}
 
@@ -306,8 +317,11 @@ func (loader *Loader) resolveRefPath(ref string, path *url.URL) (*url.URL, error
 		return path, nil
 	}
 
-	if err := loader.allowsExternalRefs(ref); err != nil {
-		return nil, err
+	// When a custom ReadFromURIFunc is installed, defer the external-ref decision to it.
+	if loader.ReadFromURIFunc == nil {
+		if err := loader.allowsExternalRefs(ref); err != nil {
+			return nil, err
+		}
 	}
 
 	resolvedPath, err := resolvePathWithRef(ref, path)
@@ -427,7 +441,7 @@ func (loader *Loader) resolveComponent(doc *T, ref string, path *url.URL, resolv
 		if err2 != nil {
 			return nil, nil, err
 		}
-		if err2 = unmarshal(data, &cursor, IncludeOrigin, path); err2 != nil {
+		if err2 = unmarshal(data, &cursor, loader.IncludeOrigin, path); err2 != nil {
 			return nil, nil, err
 		}
 		if cursor, err2 = drill(cursor); err2 != nil || cursor == nil {

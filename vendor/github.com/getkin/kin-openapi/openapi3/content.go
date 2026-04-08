@@ -2,7 +2,7 @@ package openapi3
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -113,7 +113,7 @@ func (content Content) Validate(ctx context.Context, opts ...ValidationOption) e
 	for key := range content {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, k := range keys {
 		v := content[k]
 		if err := v.Validate(ctx); err != nil {
@@ -125,6 +125,6 @@ func (content Content) Validate(ctx context.Context, opts ...ValidationOption) e
 
 // UnmarshalJSON sets Content to a copy of data.
 func (content *Content) UnmarshalJSON(data []byte) (err error) {
-	*content, _, err = unmarshalStringMapP[MediaType](data)
+	*content, err = unmarshalStringMapP[MediaType](data)
 	return
 }

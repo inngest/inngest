@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 )
 
 // Encoding is specified by OpenAPI/Swagger 3.0 standard.
@@ -22,6 +22,15 @@ type Encoding struct {
 
 func NewEncoding() *Encoding {
 	return &Encoding{}
+}
+
+// Encodings is a map of encoding objects keyed by field name.
+type Encodings map[string]*Encoding
+
+// UnmarshalJSON sets Encodings to a copy of data.
+func (encodings *Encodings) UnmarshalJSON(data []byte) (err error) {
+	*encodings, err = unmarshalStringMapP[Encoding](data)
+	return
 }
 
 func (encoding *Encoding) WithHeader(name string, header *Header) *Encoding {
@@ -82,7 +91,6 @@ func (encoding *Encoding) UnmarshalJSON(data []byte) error {
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
 
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "contentType")
 	delete(x.Extensions, "headers")
 	delete(x.Extensions, "style")
@@ -122,7 +130,7 @@ func (encoding *Encoding) Validate(ctx context.Context, opts ...ValidationOption
 	for k := range encoding.Headers {
 		headers = append(headers, k)
 	}
-	sort.Strings(headers)
+	slices.Sort(headers)
 	for _, k := range headers {
 		v := encoding.Headers[k]
 		if err := ValidateIdentifier(k); err != nil {

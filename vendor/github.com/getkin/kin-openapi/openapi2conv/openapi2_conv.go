@@ -1,10 +1,11 @@
 package openapi2conv
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi2"
@@ -350,7 +351,7 @@ func formDataBody(bodies map[string]*openapi3.SchemaRef, reqs map[string]bool, c
 			bodies[s] = ref
 		}
 	}
-	sort.Strings(requireds)
+	slices.Sort(requireds)
 	schema := &openapi3.Schema{
 		Type:       &openapi3.Types{"object"},
 		Properties: bodies,
@@ -733,7 +734,7 @@ func FromV3(doc3 *openapi3.T) (*openapi2.T, error) {
 			}
 			params = append(params, p)
 		}
-		sort.Sort(params)
+		slices.SortFunc(params, compareParameters)
 		doc2.Paths[path].Parameters = params
 	}
 
@@ -784,7 +785,7 @@ func consumesToArray(consumes map[string]struct{}) []string {
 	for key := range consumes {
 		consumesArr = append(consumesArr, key)
 	}
-	sort.Strings(consumesArr)
+	slices.Sort(consumesArr)
 	return consumesArr
 }
 
@@ -942,7 +943,7 @@ func FromV3SchemaRef(schema *openapi3.SchemaRef, components *openapi3.Components
 	for k := range schema.Value.Properties {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, key := range keys {
 		property, _ := FromV3SchemaRef(schema.Value.Properties[key], components)
 		if property != nil {
@@ -1117,7 +1118,7 @@ func FromV3Operation(doc3 *openapi3.T, operation *openapi3.Operation) (*openapi2
 			result.Consumes = consumesToArray(consumes)
 		}
 	}
-	sort.Sort(result.Parameters)
+	slices.SortFunc(result.Parameters, compareParameters)
 
 	if responses := operation.Responses; responses != nil {
 		resultResponses, err := FromV3Responses(responses.Map(), doc3.Components)
@@ -1340,4 +1341,14 @@ func addPathExtensions(doc2 *openapi2.T, path string, extensions map[string]any)
 		doc2.Paths[path] = pathItem
 	}
 	pathItem.Extensions = extensions
+}
+
+func compareParameters(a, b *openapi2.Parameter) int {
+	if c := cmp.Compare(a.Name, b.Name); c != 0 {
+		return c
+	}
+	if c := cmp.Compare(a.In, b.In); c != 0 {
+		return c
+	}
+	return cmp.Compare(a.Ref, b.Ref)
 }

@@ -101,7 +101,6 @@ func (ss *SecurityScheme) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "type")
 	delete(x.Extensions, "description")
 	delete(x.Extensions, "name")
@@ -273,7 +272,6 @@ func (flows *OAuthFlows) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "implicit")
 	delete(x.Extensions, "password")
 	delete(x.Extensions, "clientCredentials")
@@ -365,7 +363,6 @@ func (flow *OAuthFlow) UnmarshalJSON(data []byte) error {
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
 
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "authorizationUrl")
 	delete(x.Extensions, "tokenUrl")
 	delete(x.Extensions, "refreshUrl")
@@ -437,6 +434,6 @@ func (flow *OAuthFlow) validate(ctx context.Context, typ oAuthFlowType, opts ...
 
 // UnmarshalJSON sets SecuritySchemes to a copy of data.
 func (securitySchemes *SecuritySchemes) UnmarshalJSON(data []byte) (err error) {
-	*securitySchemes, _, err = unmarshalStringMapP[SecuritySchemeRef](data)
+	*securitySchemes, err = unmarshalStringMapP[SecuritySchemeRef](data)
 	return
 }

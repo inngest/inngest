@@ -6,7 +6,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/go-openapi/jsonpointer"
@@ -70,7 +70,7 @@ func componentNames[E any](s map[string]E) []string {
 	for i := range s {
 		out = append(out, i)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 

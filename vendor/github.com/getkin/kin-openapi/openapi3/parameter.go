@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 
 	"github.com/go-openapi/jsonpointer"
@@ -217,7 +217,6 @@ func (parameter *Parameter) UnmarshalJSON(data []byte) error {
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
 
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "name")
 	delete(x.Extensions, "in")
 	delete(x.Extensions, "description")
@@ -236,7 +235,6 @@ func (parameter *Parameter) UnmarshalJSON(data []byte) error {
 	}
 
 	*parameter = Parameter(x)
-	parameter.Example = stripOriginFromAny(parameter.Example)
 	return nil
 }
 
@@ -402,7 +400,7 @@ func (parameter *Parameter) Validate(ctx context.Context, opts ...ValidationOpti
 			for name := range examples {
 				names = append(names, name)
 			}
-			sort.Strings(names)
+			slices.Sort(names)
 			for _, k := range names {
 				v := examples[k]
 				if err := v.Validate(ctx); err != nil {
@@ -420,6 +418,6 @@ func (parameter *Parameter) Validate(ctx context.Context, opts ...ValidationOpti
 
 // UnmarshalJSON sets ParametersMap to a copy of data.
 func (parametersMap *ParametersMap) UnmarshalJSON(data []byte) (err error) {
-	*parametersMap, _, err = unmarshalStringMapP[ParameterRef](data)
+	*parametersMap, err = unmarshalStringMapP[ParameterRef](data)
 	return
 }

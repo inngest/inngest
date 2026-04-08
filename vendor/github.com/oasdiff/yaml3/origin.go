@@ -13,169 +13,112 @@ func isSequence(n *Node) bool {
 }
 
 func addOriginInSeq(n *Node, file string) *Node {
-
-	if n.Kind != MappingNode {
+	if n.Kind != MappingNode || len(n.Content) == 0 {
 		return n
 	}
-
 	// in case of a sequence, we use the first element as the key
 	return addOrigin(n.Content[0], n, file)
 }
 
 func addOriginInMap(key, n *Node, file string) *Node {
-
 	if n.Kind != MappingNode {
 		return n
 	}
-
 	return addOrigin(key, n, file)
 }
 
+// addOrigin injects a compact __origin__ sequence into the mapping node n.
+//
+// Format: [file, key_name, key_line, key_col, nf, f1_name, f1_delta, f1_col, ..., ns, s1_name, s1_count, s1_l0_delta, s1_c0, ...]
+//
+//   - file: source file path
+//   - key_name:  the YAML key whose value is this mapping
+//   - key_line, key_col: location of that key
+//   - nf: number of scalar+sequence fields recorded
+//   - per field: name (string), line delta from key_line (int), column (int)
+//   - ns: number of sequence fields that have item locations
+//   - per sequence: name (string), item count (int), then count × (line delta, col)
 func addOrigin(key, n *Node, file string) *Node {
 	if isOrigin(key) {
 		return n
 	}
 
-	content := getKeyLocation(key, file)
-	content = append(content, getNamedMap("fields", getFieldLocations(n, file))...)
-	content = append(content, getNamedMap("sequences", getSequenceLocations(n, file))...)
-	n.Content = append(n.Content, getNamedMap(originTag, content)...)
+	seq := buildOriginSeq(key, n, file)
+	n.Content = append(n.Content,
+		&Node{Kind: ScalarNode, Tag: "!!str", Value: originTag}, // Line==0 → isOrigin
+		&Node{Kind: SequenceNode, Tag: "!!seq", Content: seq},
+	)
 	return n
 }
 
-func getFieldLocations(n *Node, file string) []*Node {
+func buildOriginSeq(key, n *Node, file string) []*Node {
+	// Header: file, key_name, key_line, key_col
+	nodes := []*Node{
+		strNode(file),
+		strNode(key.Value),
+		intNode(key.Line),
+		intNode(key.Column),
+	}
+
+	// Collect field and sequence data.
+	var fieldNodes []*Node // nf × (name, delta, col)
+	var seqNodes []*Node   // ns × (name, count, (delta, col)…)
+	nf, ns := 0, 0
 
 	l := len(n.Content)
-	size := 0
 	for i := 0; i < l; i += 2 {
-		if isScalar(n.Content[i+1]) || isSequence(n.Content[i+1]) {
-			size += 2
+		k := n.Content[i]
+		v := n.Content[i+1]
+		if isOrigin(k) {
+			continue
+		}
+		if isScalar(v) || isSequence(v) {
+			// Record the location of this field's key.
+			nf++
+			fieldNodes = append(fieldNodes,
+				strNode(k.Value),
+				intNode(k.Line-key.Line),
+				intNode(k.Column),
+			)
+		}
+		if isSequence(v) {
+			// Record locations of scalar items within the sequence.
+			// Format per item: value_str, line_delta, col
+			var itemNodes []*Node
+			for _, item := range v.Content {
+				if item.Kind == ScalarNode {
+					itemNodes = append(itemNodes,
+						strNode(item.Value),
+						intNode(item.Line-key.Line),
+						intNode(item.Column),
+					)
+				}
+			}
+			if len(itemNodes) > 0 {
+				ns++
+				seqNodes = append(seqNodes, strNode(k.Value), intNode(len(itemNodes)/3))
+				seqNodes = append(seqNodes, itemNodes...)
+			}
 		}
 	}
 
-	nodes := make([]*Node, 0, size)
-	for i := 0; i < l; i += 2 {
-		if isScalar(n.Content[i+1]) || isSequence(n.Content[i+1]) {
-			nodes = append(nodes, getNodeLocation(n.Content[i], file)...)
-		}
-	}
+	nodes = append(nodes, intNode(nf))
+	nodes = append(nodes, fieldNodes...)
+	nodes = append(nodes, intNode(ns))
+	nodes = append(nodes, seqNodes...)
 	return nodes
 }
 
-func getSequenceLocations(n *Node, file string) []*Node {
-	l := len(n.Content)
-	var nodes []*Node
-	for i := 0; i < l; i += 2 {
-		if isSequence(n.Content[i+1]) {
-			nodes = append(nodes, getNamedSeq(n.Content[i].Value, n.Content[i+1], file)...)
-		}
-	}
-	return nodes
-}
-
-func getNamedSeq(title string, seq *Node, file string) []*Node {
-	var items []*Node
-	for _, item := range seq.Content {
-		if item.Kind == ScalarNode {
-			items = append(items, getMap(getLocationObject(item, file)))
-		}
-	}
-	if len(items) == 0 {
-		return nil
-	}
-	return []*Node{
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!str",
-			Value: title,
-		},
-		{
-			Kind:    SequenceNode,
-			Tag:     "!!seq",
-			Content: items,
-		},
-	}
-}
-
-// isOrigin returns true if the key is an "origin" element
-// the current implementation is not optimal, as it relies on the key's line number
-// a better design would be to use a dedicated field in the Node struct
+// isOrigin returns true if the key is a synthetic origin node.
+// Synthetic nodes have Line==0 (real YAML lines are 1-based).
 func isOrigin(key *Node) bool {
 	return key.Line == 0
 }
 
-func getNodeLocation(n *Node, file string) []*Node {
-	return getNamedMap(n.Value, getLocationObject(n, file))
+func strNode(v string) *Node {
+	return &Node{Kind: ScalarNode, Tag: "!!str", Value: v}
 }
 
-func getKeyLocation(n *Node, file string) []*Node {
-	return getNamedMap("key", getLocationObject(n, file))
-}
-
-func getNamedMap(title string, content []*Node) []*Node {
-	if len(content) == 0 {
-		return nil
-	}
-
-	return []*Node{
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!str",
-			Value: title,
-		},
-		getMap(content),
-	}
-}
-
-func getMap(content []*Node) *Node {
-	return &Node{
-		Kind:    MappingNode,
-		Tag:     "!!map",
-		Content: content,
-	}
-}
-
-func getLocationObject(key *Node, file string) []*Node {
-	return []*Node{
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!str",
-			Value: "file",
-		},
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!str",
-			Value: file,
-		},
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!str",
-			Value: "line",
-		},
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!int",
-			Value: fmt.Sprintf("%d", key.Line),
-		},
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!str",
-			Value: "column",
-		},
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!int",
-			Value: fmt.Sprintf("%d", key.Column),
-		},
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!str",
-			Value: "name",
-		},
-		{
-			Kind:  ScalarNode,
-			Tag:   "!!string",
-			Value: key.Value,
-		},
-	}
+func intNode(v int) *Node {
+	return &Node{Kind: ScalarNode, Tag: "!!int", Value: fmt.Sprintf("%d", v)}
 }

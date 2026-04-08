@@ -3,7 +3,7 @@ package openapi2
 import (
 	"encoding/json"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/go-openapi/jsonpointer"
@@ -74,7 +74,7 @@ func (x *SchemaRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			sort.Strings(x.extra)
+			slices.Sort(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)

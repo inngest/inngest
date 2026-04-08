@@ -3,7 +3,7 @@ package openapi3
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -24,7 +24,7 @@ func validateExtensions(ctx context.Context, extensions map[string]any) error { 
 	}
 
 	if len(unknowns) != 0 {
-		sort.Strings(unknowns)
+		slices.Sort(unknowns)
 		return fmt.Errorf("extra sibling fields: %+v", unknowns)
 	}
 

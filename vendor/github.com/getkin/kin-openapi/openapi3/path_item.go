@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
+	"slices"
 )
 
 // PathItem is specified by OpenAPI/Swagger standard version 3.
@@ -99,7 +99,6 @@ func (pathItem *PathItem) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "$ref")
 	delete(x.Extensions, "summary")
 	delete(x.Extensions, "description")
@@ -213,7 +212,7 @@ func (pathItem *PathItem) Validate(ctx context.Context, opts ...ValidationOption
 	for method := range operations {
 		methods = append(methods, method)
 	}
-	sort.Strings(methods)
+	slices.Sort(methods)
 	for _, method := range methods {
 		operation := operations[method]
 		if err := operation.Validate(ctx); err != nil {

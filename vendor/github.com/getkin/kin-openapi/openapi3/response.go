@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sort"
+	"slices"
 	"strconv"
 )
 
@@ -88,7 +88,7 @@ func (responses *Responses) Validate(ctx context.Context, opts ...ValidationOpti
 	for key := range responses.Map() {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, key := range keys {
 		v := responses.Value(key)
 		if err := v.Validate(ctx); err != nil {
@@ -173,7 +173,6 @@ func (response *Response) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "description")
 	delete(x.Extensions, "headers")
 	delete(x.Extensions, "content")
@@ -206,7 +205,7 @@ func (response *Response) Validate(ctx context.Context, opts ...ValidationOption
 	for name := range response.Headers {
 		headers = append(headers, name)
 	}
-	sort.Strings(headers)
+	slices.Sort(headers)
 	for _, name := range headers {
 		header := response.Headers[name]
 		if err := header.Validate(ctx); err != nil {
@@ -218,7 +217,7 @@ func (response *Response) Validate(ctx context.Context, opts ...ValidationOption
 	for name := range response.Links {
 		links = append(links, name)
 	}
-	sort.Strings(links)
+	slices.Sort(links)
 	for _, name := range links {
 		link := response.Links[name]
 		if err := link.Validate(ctx); err != nil {
@@ -231,6 +230,6 @@ func (response *Response) Validate(ctx context.Context, opts ...ValidationOption
 
 // UnmarshalJSON sets ResponseBodies to a copy of data.
 func (responseBodies *ResponseBodies) UnmarshalJSON(data []byte) (err error) {
-	*responseBodies, _, err = unmarshalStringMapP[ResponseRef](data)
+	*responseBodies, err = unmarshalStringMapP[ResponseRef](data)
 	return
 }
