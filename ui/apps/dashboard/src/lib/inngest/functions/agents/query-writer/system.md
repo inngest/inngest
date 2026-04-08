@@ -86,7 +86,7 @@ Here is what the user is asking for:
 
 You may **only** query the following tables:
 
-- `events`,
+- `events`
 - `runs`
 - `steps`
 - `step_attempts`
