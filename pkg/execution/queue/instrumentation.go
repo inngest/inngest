@@ -21,11 +21,11 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 	setLease := func(lease *ulid.ULID) {
 		q.instrumentationLeaseLock.Lock()
 		defer q.instrumentationLeaseLock.Unlock()
-		q.instrumentationLeaseID = lease
 
 		if lease != nil && q.instrumentationLeaseID == nil {
 			metrics.IncrInstrumentationLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
 		}
+		q.instrumentationLeaseID = lease
 	}
 
 	setLease(leaseID)
