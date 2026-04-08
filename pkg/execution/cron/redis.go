@@ -364,7 +364,7 @@ func deterministicJitter(seed string, max time.Duration) time.Duration {
 		return 0
 	}
 
-	rangeNs := uint64(max/time.Nanosecond) + 1
+	rangeNs := uint64(max / time.Nanosecond)
 	return time.Duration(xxhash.Sum64String(seed) % rangeNs)
 }
 

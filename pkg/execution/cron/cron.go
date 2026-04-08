@@ -57,9 +57,12 @@ type CronManager interface {
 
 // CronItem represent an item that can be scheduled via the cron expression
 type CronItem struct {
-	// ID embeds the time this job needs to run if it's a process type
-	// ULID was chosen as a convinent way to provide a unique identifier with a timestamp
-	// embedded in it
+	// ID remains the stable identity for the cron occurrence.
+	//
+	// Historically, the ULID timestamp implicitly represented the cron boundary. New code
+	// should prefer ScheduledTime() for the canonical cron boundary and FireTime() for the
+	// actual dispatch time. ScheduledTime() intentionally falls back to ID.Timestamp() for
+	// older payloads that predate explicit ScheduledAt/FireAt fields.
 	ID ulid.ULID `json:"id"`
 	// Tenant
 	AccountID       uuid.UUID `json:"acctID"`

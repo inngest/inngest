@@ -124,7 +124,7 @@ func TestDeterministicJitter(t *testing.T) {
 
 		assert.Equal(t, j1, j2)
 		assert.GreaterOrEqual(t, j1, time.Duration(0))
-		assert.LessOrEqual(t, j1, 5*time.Minute)
+		assert.Less(t, j1, 5*time.Minute)
 	})
 }
 
@@ -805,7 +805,7 @@ func TestRedisCronManager(t *testing.T) {
 			expectedBoundary := time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC)
 			assert.True(t, nextItem1.ScheduledTime().Equal(expectedBoundary))
 			assert.GreaterOrEqual(t, nextItem1.FireTime(), expectedBoundary)
-			assert.LessOrEqual(t, nextItem1.FireTime(), expectedBoundary.Add(5*time.Minute))
+			assert.True(t, nextItem1.FireTime().Before(expectedBoundary.Add(5*time.Minute)))
 
 			nextItem2, err := cm.ScheduleNext(ctx, cronItem)
 			require.NoError(t, err)
@@ -891,7 +891,7 @@ func TestRedisCronManager(t *testing.T) {
 			assert.True(t, nextItem1.ScheduledTime().Equal(nextItem2.ScheduledTime()))
 			assert.NotEqual(t, nextItem1.FunctionVersion, nextItem2.FunctionVersion)
 			assert.GreaterOrEqual(t, nextItem2.FireTime(), nextItem2.ScheduledTime())
-			assert.LessOrEqual(t, nextItem2.FireTime(), nextItem2.ScheduledTime().Add(time.Minute))
+			assert.True(t, nextItem2.FireTime().Before(nextItem2.ScheduledTime().Add(time.Minute)))
 		})
 
 		t.Run("different valid cron expressions", func(t *testing.T) {

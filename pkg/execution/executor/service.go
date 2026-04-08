@@ -908,7 +908,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		return queue.NeverRetryError(fmt.Errorf("rejecting cron-health-check, invalid CronItem.Op: %s", ci.Op))
 	}
 
-	hcTime := ci.ID.Timestamp()
+	hcTime := ci.ScheduledTime()
 	l.Trace("starting cron health check", "scheduled_health_check_time", hcTime)
 
 	cqrsFns, err := s.data.GetFunctions(ctx)
