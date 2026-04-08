@@ -285,6 +285,10 @@ type ScheduleRequest struct {
 	// if we're queuing a function as a result of a sync run going async, as
 	// the SDK has already been run at that point.
 	RequestVersion *int
+	// CopyStateFrom, if set, specifies a run ID whose step state (outputs)
+	// should be copied into the new run. This is used by deferred.start to
+	// initialize a new run with the state of a previous run.
+	CopyStateFrom *ulid.ULID
 }
 
 // NewScheduleRequest creates an initial ScheduleRequest given a deployed

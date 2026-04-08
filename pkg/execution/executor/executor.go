@@ -1213,6 +1213,12 @@ func (e *executor) schedule(
 		}
 	}
 
+	if req.CopyStateFrom != nil {
+		if err := copyRunState(ctx, e.smv2, req, &newState); err != nil {
+			return nil, nil, fmt.Errorf("error copying state from run: %w", err)
+		}
+	}
+
 	stv1ID := sv2.V1FromMetadata(metadata)
 
 	// Check if the function should be skipped (paused, draining, backlog limit)

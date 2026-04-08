@@ -10,4 +10,6 @@ const (
 	FnInvokeName    = InternalNamePrefix + "function.invoked"
 	FnCronName      = InternalNamePrefix + "scheduled.timer"
 	HttpRequestName = InternalNamePrefix + "http.request"
+
+	DeferredStartName = "deferred.start"
 )

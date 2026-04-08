@@ -21,7 +21,8 @@ const (
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
 	InvokeFnName = consts.FnInvokeName
-	FnCronName   = consts.FnCronName
+	FnCronName         = consts.FnCronName
+	DeferredStartName  = consts.DeferredStartName
 )
 
 var (
@@ -176,6 +177,10 @@ func (e Event) IsFinishedEvent() bool {
 
 func (e Event) IsInvokeEvent() bool {
 	return e.Name == InvokeFnName
+}
+
+func (e Event) IsDeferredStart() bool {
+	return e.Name == DeferredStartName
 }
 
 func (e Event) IsCron() bool {

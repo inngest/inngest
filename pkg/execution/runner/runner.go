@@ -418,6 +418,56 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 	return nil, fmt.Errorf("could not find function with ID: %s", fnID)
 }
 
+// DeferredFunctionResult holds the function and optional source run ID
+// parsed from a deferred.start event.
+type DeferredFunctionResult struct {
+	Function      *inngest.Function
+	CopyStateFrom *ulid.ULID
+}
+
+// FindDeferredFunction looks up a function by the fnSlug field in a deferred.start event
+// and parses the optional runId field for state copying.
+func FindDeferredFunction(ctx context.Context, tracked event.TrackedEvent, fl cqrs.ExecutionLoader) (*DeferredFunctionResult, error) {
+	evt := tracked.GetEvent()
+
+	if !evt.IsDeferredStart() {
+		return nil, nil
+	}
+
+	fnSlug, _ := evt.Data["fnSlug"].(string)
+	if fnSlug == "" {
+		return nil, fmt.Errorf("deferred.start event missing fnSlug in data")
+	}
+
+	fns, err := fl.Functions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var matched *inngest.Function
+	for _, fn := range fns {
+		if fn.GetSlug() == fnSlug {
+			matched = &fn
+			break
+		}
+	}
+	if matched == nil {
+		return nil, fmt.Errorf("could not find function with slug: %s", fnSlug)
+	}
+
+	result := &DeferredFunctionResult{Function: matched}
+
+	if runIDStr, _ := evt.Data["runId"].(string); runIDStr != "" {
+		parsed, err := ulid.Parse(runIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid runId in deferred.start event: %w", err)
+		}
+		result.CopyStateFrom = &parsed
+	}
+
+	return result, nil
+}
+
 // functions triggers all functions from the given event.
 func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	evt := tracked.GetEvent()
@@ -466,16 +516,33 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		}
 	}()
 
+	// Handle deferred.start events synchronously before trigger matching.
+	// This must run first so the deferred run (with copied state) wins the
+	// idempotency race against any trigger-matched initialization of the
+	// same function.
+	result, err := FindDeferredFunction(ctx, tracked, s.data)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	if result != nil {
+		if err := s.initializeDeferred(ctx, *result.Function, tracked, result.CopyStateFrom); err != nil {
+			s.log.Error("error initializing deferred fn",
+				"error", err,
+				"function", result.Function.Name,
+			)
+			errs = multierror.Append(errs, err)
+		}
+	}
+
 	// Look up all functions have a trigger that matches the event name, including wildcards.
 	fns, err := s.data.FunctionsByTrigger(ctx, evt.Name)
 	if err != nil {
 		return fmt.Errorf("error loading functions by trigger: %w", err)
 	}
-	if len(fns) == 0 {
-		return nil
-	}
 
-	s.log.Debug("scheduling functions", "len", len(fns))
+	if len(fns) > 0 {
+		s.log.Debug("scheduling functions", "len", len(fns))
+	}
 
 	// Do this once instead of many times when evaluating expressions.
 	evtMap := evt.Map()
@@ -587,6 +654,42 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	return err
 }
 
+func (s *svc) initializeDeferred(ctx context.Context, fn inngest.Function, evt event.TrackedEvent, copyStateFrom *ulid.ULID) error {
+	l := logger.StdlibLogger(ctx).With(
+		"function", fn.Name,
+		"function_id", fn.ID.String(),
+	)
+
+	var appID uuid.UUID
+	{
+		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, fn.ID)
+		if err != nil {
+			return err
+		}
+		appID = fn.AppID
+	}
+
+	if fn.FunctionVersion <= 0 {
+		fn.FunctionVersion = 1
+	}
+
+	l.Info("initializing deferred fn")
+	_, err := Initialize(ctx, InitOpts{
+		appID:         appID,
+		fn:            fn,
+		evt:           evt,
+		exec:          s.executor,
+		copyStateFrom: copyStateFrom,
+	})
+	if err == state.ErrIdentifierExists {
+		return nil
+	}
+	if err == executor.ErrFunctionDebounced {
+		return nil
+	}
+	return err
+}
+
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {
 	l := logger.StdlibLogger(ctx).With(
 		"function", fn.Name,
@@ -657,10 +760,11 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 }
 
 type InitOpts struct {
-	appID uuid.UUID
-	fn    inngest.Function
-	evt   event.TrackedEvent
-	exec  execution.Executor
+	appID         uuid.UUID
+	fn            inngest.Function
+	evt           event.TrackedEvent
+	exec          execution.Executor
+	copyStateFrom *ulid.ULID
 }
 
 // Initialize creates a new funciton run identifier for the given workflow and
@@ -706,6 +810,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		AccountID:      consts.DevServerAccountID,
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
+		CopyStateFrom:  opts.copyStateFrom,
 	})
 
 	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
