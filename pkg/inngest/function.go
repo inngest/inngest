@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/strduration"
@@ -360,10 +361,7 @@ func (f Function) IsScheduled() bool {
 
 // ScheduleExpression returns all the cron expression strings for the function
 func (f Function) ScheduleExpressions() []string {
-	cronTriggers, err := f.ScheduleTriggers()
-	if err != nil {
-		return nil
-	}
+	cronTriggers := f.ScheduleTriggers()
 
 	var cronExpressions []string
 	for _, t := range cronTriggers {
@@ -373,7 +371,9 @@ func (f Function) ScheduleExpressions() []string {
 }
 
 // ScheduleTriggers returns all cron trigger expressions together with their parsed jitter.
-func (f Function) ScheduleTriggers() ([]ScheduledCronTrigger, error) {
+// Jitter validation is expected to have already occurred at the registration boundary
+// via CronTrigger.Validate(). If parsing fails here, jitter defaults to zero.
+func (f Function) ScheduleTriggers() []ScheduledCronTrigger {
 	var cronTriggers []ScheduledCronTrigger
 	for _, t := range f.Triggers {
 		if t.CronTrigger == nil {
@@ -382,7 +382,9 @@ func (f Function) ScheduleTriggers() ([]ScheduledCronTrigger, error) {
 
 		jitter, err := t.CronTrigger.JitterDuration()
 		if err != nil {
-			return nil, fmt.Errorf("invalid cron jitter for expression %q: %w", t.CronTrigger.Cron, err)
+			logger.StdlibLogger(context.Background()).Warn("unparseable cron jitter, defaulting to zero",
+				"error", err,
+			)
 		}
 
 		cronTriggers = append(cronTriggers, ScheduledCronTrigger{
@@ -390,7 +392,7 @@ func (f Function) ScheduleTriggers() ([]ScheduledCronTrigger, error) {
 			Jitter:     jitter,
 		})
 	}
-	return cronTriggers, nil
+	return cronTriggers
 }
 
 func (f Function) IsBatchEnabled() bool {

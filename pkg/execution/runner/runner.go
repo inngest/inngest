@@ -261,10 +261,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 		}
 		appID := cqrsFn.AppID
 
-		cronTriggers, err := f.ScheduleTriggers()
-		if err != nil {
-			return fmt.Errorf("error reading cron triggers for fn %s: %w", fn.ID, err)
-		}
+		cronTriggers := f.ScheduleTriggers()
 		for _, cronTrigger := range cronTriggers {
 			// Launch each cron initialization in a separate goroutine to avoid
 			// blocking the startup process. This allows multiple functions to be

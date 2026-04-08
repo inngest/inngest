@@ -408,10 +408,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			if err != nil {
 				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
-			cronTriggers, err := fn.ScheduleTriggers()
-			if err != nil {
-				return nil, publicerr.Wrap(err, 500, "Error reading cron trigger config")
-			}
+			cronTriggers := fn.ScheduleTriggers()
 			for _, cronTrigger := range cronTriggers {
 				crons = append(crons, cron.CronItem{
 					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
@@ -442,10 +439,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
 
-		cronTriggers, err := fn.ScheduleTriggers()
-		if err != nil {
-			return nil, publicerr.Wrap(err, 500, "Error reading cron trigger config")
-		}
+		cronTriggers := fn.ScheduleTriggers()
 		for _, cronTrigger := range cronTriggers {
 			crons = append(crons, cron.CronItem{
 				ID:              ulid.MustNew(ulid.Now(), rand.Reader),

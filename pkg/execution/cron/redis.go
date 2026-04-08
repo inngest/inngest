@@ -298,7 +298,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion))
 
 	fireAt := next
-	enqueueAt := next
+	var enqueueAt time.Time
 	internalLeadTime := time.Duration(0)
 	if ci.Jitter > 0 {
 		fireAt = next.Add(deterministicJitter(jobID, ci.Jitter))

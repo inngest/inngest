@@ -929,10 +929,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		// Get AppID
 		appID := cqrsFn.AppID
 
-		cronTriggers, err := fn.ScheduleTriggers()
-		if err != nil {
-			return fmt.Errorf("error reading cron triggers for fn %s: %w", fn.ID, err)
-		}
+		cronTriggers := fn.ScheduleTriggers()
 		for _, cronTrigger := range cronTriggers {
 			fn := fn
 			appID := appID

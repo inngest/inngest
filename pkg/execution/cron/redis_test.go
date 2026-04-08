@@ -88,6 +88,31 @@ func TestGenerateJitter(t *testing.T) {
 	}
 }
 
+func TestCronItemAccessors(t *testing.T) {
+	now := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
+	later := now.Add(3 * time.Minute)
+
+	t.Run("ScheduledTime returns ScheduledAt when set", func(t *testing.T) {
+		ci := CronItem{ScheduledAt: now.UnixMilli()}
+		assert.True(t, ci.ScheduledTime().Equal(now))
+	})
+
+	t.Run("ScheduledTime falls back to ULID timestamp when ScheduledAt is zero", func(t *testing.T) {
+		ci := CronItem{ID: ulid.MustNew(uint64(now.UnixMilli()), ulid.DefaultEntropy())}
+		assert.True(t, ci.ScheduledTime().Equal(now))
+	})
+
+	t.Run("FireTime returns FireAt when set", func(t *testing.T) {
+		ci := CronItem{ScheduledAt: now.UnixMilli(), FireAt: later.UnixMilli()}
+		assert.True(t, ci.FireTime().Equal(later))
+	})
+
+	t.Run("FireTime falls back to ScheduledTime when FireAt is zero", func(t *testing.T) {
+		ci := CronItem{ScheduledAt: now.UnixMilli()}
+		assert.True(t, ci.FireTime().Equal(now))
+	})
+}
+
 func TestDeterministicJitter(t *testing.T) {
 	t.Run("returns zero for non-positive max", func(t *testing.T) {
 		assert.Zero(t, deterministicJitter("seed", 0))

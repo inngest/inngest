@@ -423,14 +423,13 @@ func TestScheduleTriggers(t *testing.T) {
 			},
 		}
 
-		triggers, err := f.ScheduleTriggers()
-		require.NoError(t, err)
+		triggers := f.ScheduleTriggers()
 		require.Len(t, triggers, 1)
 		require.Equal(t, "0 9 * * *", triggers[0].Expression)
 		require.Equal(t, 5*time.Minute, triggers[0].Jitter)
 	})
 
-	t.Run("returns parse errors for invalid jitter", func(t *testing.T) {
+	t.Run("defaults jitter to zero for unparseable value", func(t *testing.T) {
 		jitter := "not-a-duration"
 		f := Function{
 			Triggers: []Trigger{
@@ -443,9 +442,9 @@ func TestScheduleTriggers(t *testing.T) {
 			},
 		}
 
-		_, err := f.ScheduleTriggers()
-		require.Error(t, err)
-		require.ErrorContains(t, err, "invalid cron jitter")
+		triggers := f.ScheduleTriggers()
+		require.Len(t, triggers, 1)
+		require.Equal(t, time.Duration(0), triggers[0].Jitter)
 	})
 }
 
