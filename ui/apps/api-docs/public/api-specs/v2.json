@@ -1,0 +1,2073 @@
+{
+  "components": {
+    "schemas": {
+      "V2InvokeFunctionBody": {
+        "properties": {
+          "data": {
+            "description": "JSON object containing the input data for the function",
+            "example": {
+              "message": "Hello, World!"
+            },
+            "type": "object"
+          },
+          "idempotency_key": {
+            "description": "Optional idempotency key to handle duplicate requests within a given idempotency period.",
+            "example": "user-action-123",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "V2PatchEnvBody": {
+        "properties": {
+          "isArchived": {
+            "description": "Updates the archived status of the environment. Set to true to archive the environment or false to unarchive it.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "protobufAny": {
+        "additionalProperties": {},
+        "properties": {
+          "@type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "protobufNullValue": {
+        "default": "NULL_VALUE",
+        "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\nThe JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value.",
+        "enum": ["NULL_VALUE"],
+        "type": "string"
+      },
+      "rpcStatus": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/protobufAny"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2Account": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateAccountData": {
+        "properties": {
+          "apiKey": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateAccountRequest": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateAccountResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2CreateAccountData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateEnvRequest": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateEnvResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Env"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateWebhookRequest": {
+        "properties": {
+          "event_filter": {
+            "$ref": "#/components/schemas/v2EventFilter"
+          },
+          "name": {
+            "description": "Descriptive name for the webhook",
+            "example": "Payment Processing Webhook",
+            "type": "string"
+          },
+          "response": {
+            "description": "Optional inline JS function which is called to respond to GET requests",
+            "example": "function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };",
+            "type": "string"
+          },
+          "transform": {
+            "description": "The inline JS transform function for incoming events",
+            "example": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateWebhookResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Webhook"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2Env": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/v2EnvType"
+          }
+        },
+        "type": "object"
+      },
+      "v2EnvType": {
+        "default": "PRODUCTION",
+        "enum": ["PRODUCTION", "TEST", "BRANCH"],
+        "type": "string"
+      },
+      "v2Error": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2ErrorResponse": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/v2Error"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2EventFilter": {
+        "properties": {
+          "events": {
+            "description": "Allow or deny specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied.",
+            "example": ["orders/payment.created", "orders/*"],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/v2FilterType"
+          }
+        },
+        "type": "object"
+      },
+      "v2EventKey": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountEnvsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2Env"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountEventKeysResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2EventKey"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Account"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountSigningKeysResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2SigningKey"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2Account"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FilterType": {
+        "default": "ALLOW",
+        "enum": ["ALLOW", "DENY"],
+        "type": "string"
+      },
+      "v2HealthData": {
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2HealthResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2HealthData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2InvokeFunctionData": {
+        "properties": {
+          "completed_at": {
+            "description": "Timestamp when the function execution completed (if finished)",
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "description": "Error message if the function execution failed",
+            "type": "string"
+          },
+          "queued_at": {
+            "description": "Timestamp when the function execution was enqueued",
+            "format": "date-time",
+            "type": "string"
+          },
+          "result": {
+            "description": "JSON string containing the function result (only available for completed synchronous invocations)",
+            "example": "{\"success\": true, \"data\": \"Hello, World!\"}",
+            "type": "string"
+          },
+          "run_id": {
+            "description": "Unique identifier for this function execution",
+            "example": "01hp1zx8m3ng9vp6qn0xk7j4cy",
+            "type": "string"
+          },
+          "started_at": {
+            "description": "Timestamp when the function execution started (if started)",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2InvokeFunctionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2InvokeFunctionData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2ListWebhooksResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2Webhook"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2Page": {
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "limit": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "v2PatchEnvsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Env"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2ResponseMetadata": {
+        "properties": {
+          "cached_until": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fetched_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2SigningKey": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2Webhook": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "event_filter": {
+            "$ref": "#/components/schemas/v2EventFilter"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "response": {
+            "type": "string"
+          },
+          "transform": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "description": "Bearer token authentication. Format: `Bearer {key}`",
+        "in": "header",
+        "name": "Authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.",
+    "title": "Inngest REST API v2",
+    "version": "2.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/account": {
+      "get": {
+        "description": "Returns the account for the authenticated user",
+        "operationId": "V2_FetchAccount",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": {
+                        "createdAt": "2024-01-10T09:15:00Z",
+                        "email": "user@company.com",
+                        "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                        "name": "Current User",
+                        "updatedAt": "2024-01-20T12:00:00Z"
+                      },
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2FetchAccountResponse"
+                }
+              }
+            },
+            "description": "Account"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": "Authentication failed"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - Insufficient permissions"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get account",
+        "tags": ["V2"]
+      }
+    },
+    "/apps/{app_id}/functions/{function_id}/invoke": {
+      "post": {
+        "description": "Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request body",
+        "operationId": "V2_InvokeFunction",
+        "parameters": [
+          {
+            "description": "The ID of the app containing the function",
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The ID of the function to invoke",
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2InvokeFunctionBody"
+              }
+            }
+          },
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2InvokeFunctionResponse"
+                }
+              }
+            },
+            "description": "Function invoked asynchronously"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2InvokeFunctionResponse"
+                }
+              }
+            },
+            "description": "Function invoked synchronously but has not yet finished executing"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid input data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found - function not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2InvokeFunctionResponse"
+                }
+              }
+            },
+            "description": "Conflict - this function has already been invoked using the given idempotency key.  Note that this returns the previously invoked run's data."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity - function was rate limited, debounced, skipped, or otherwise could not be invoked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests - API rate limit exceeded.  The request was entirely rejected, and no function was invoked."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Invoke function",
+        "tags": ["V2"]
+      }
+    },
+    "/env/webhooks": {
+      "get": {
+        "description": "Lists all webhooks in the specified environment",
+        "operationId": "V2_ListWebhooks",
+        "parameters": [
+          {
+            "description": "Pagination cursor from previous response",
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Number of webhooks to return per page (min: 1, max: 100)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": "20",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Target environment for the webhooks (e.g., 'production', 'staging', 'development')",
+            "in": "header",
+            "name": "X-Inngest-Env",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ListWebhooksResponse"
+                }
+              }
+            },
+            "description": "List of webhooks"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid query parameters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List webhooks",
+        "tags": ["V2"]
+      },
+      "post": {
+        "description": "Creates a new webhook for receiving events",
+        "operationId": "V2_CreateWebhook",
+        "parameters": [
+          {
+            "description": "Target environment for the webhook (e.g., 'production', 'staging', 'development')",
+            "in": "header",
+            "name": "X-Inngest-Env",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/v2CreateWebhookRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2CreateWebhookResponse"
+                }
+              }
+            },
+            "description": "Webhook successfully created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid input data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict - webhook with same URL already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity - business logic validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create webhook",
+        "tags": ["V2"]
+      }
+    },
+    "/envs": {
+      "get": {
+        "description": "List of all custom environments.",
+        "operationId": "V2_FetchAccountEnvs",
+        "parameters": [
+          {
+            "description": "Pagination cursor from previous response",
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Number of environments to return per page (min: 1, max: 250)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": "50",
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": [
+                        {
+                          "createdAt": "2024-01-10T09:15:00Z",
+                          "id": "a1b2c3d4-e5f6-4789-abc1-234567890def",
+                          "name": "production",
+                          "type": "PRODUCTION"
+                        },
+                        {
+                          "createdAt": "2024-01-12T11:30:00Z",
+                          "id": "b2c3d4e5-f6a7-4890-bcd2-34567890abef",
+                          "name": "staging",
+                          "type": "TEST"
+                        }
+                      ],
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      },
+                      "page": {
+                        "hasMore": false,
+                        "limit": 50
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2FetchAccountEnvsResponse"
+                }
+              }
+            },
+            "description": "List of account environments"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "missing_field",
+                          "message": "Environment name is required"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid query parameters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": "Authentication failed"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found - account not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List environments",
+        "tags": ["V2"]
+      },
+      "post": {
+        "description": "Create custom environment",
+        "operationId": "V2_CreateEnv",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/v2CreateEnvRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": {
+                        "createdAt": "2024-01-20T14:22:33Z",
+                        "id": "c3d4e5f6-a7b8-4901-cde3-4567890bcfa0",
+                        "name": "development",
+                        "type": "BRANCH"
+                      },
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2CreateEnvResponse"
+                }
+              }
+            },
+            "description": "Env successfully created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid input data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": "Authentication failed"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - Insufficient permissions"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict - account already exists"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create environment",
+        "tags": ["V2"]
+      }
+    },
+    "/envs/{id}": {
+      "patch": {
+        "description": "Partially updates an environment. Only the provided fields will be modified.",
+        "operationId": "V2_PatchEnv",
+        "parameters": [
+          {
+            "description": "The ID of the environment to update",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2PatchEnvBody"
+              }
+            }
+          },
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2PatchEnvsResponse"
+                }
+              }
+            },
+            "description": "Environment successfully updated"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid input data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found - environment not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity - business logic validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update environment",
+        "tags": ["V2"]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Returns the health status of the API service",
+        "operationId": "V2_Health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": {
+                        "status": "ok"
+                      },
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2HealthResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": "Authentication failed"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Health check",
+        "tags": ["V2"]
+      }
+    },
+    "/keys/events": {
+      "get": {
+        "description": "Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys.",
+        "operationId": "V2_FetchAccountEventKeys",
+        "parameters": [
+          {
+            "description": "Pagination cursor from previous response",
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Number of event keys to return per page (min: 1, max: 100)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": "20",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter event keys by environment (e.g., 'production', 'staging', 'development')",
+            "in": "header",
+            "name": "X-Inngest-Env",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": [
+                        {
+                          "createdAt": "2024-01-15T10:30:00Z",
+                          "environment": "production",
+                          "id": "d4e5f6a7-b8c9-4012-def4-567890cdab12",
+                          "key": "inngest-event-key-prod-abc123",
+                          "name": "Production Event Key"
+                        },
+                        {
+                          "createdAt": "2024-01-18T14:22:33Z",
+                          "environment": "staging",
+                          "id": "e5f6a7b8-c9d0-4123-efa5-67890dbc1234",
+                          "key": "inngest-event-key-stage-def456",
+                          "name": "Staging Event Key"
+                        }
+                      ],
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      },
+                      "page": {
+                        "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
+                        "hasMore": true,
+                        "limit": 20
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2FetchAccountEventKeysResponse"
+                }
+              }
+            },
+            "description": "List of account event keys"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "invalid_field_format",
+                          "message": "Limit must be at least 1"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid query parameters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": "Authentication failed"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found - account not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List account event keys",
+        "tags": ["V2"]
+      }
+    },
+    "/keys/signing": {
+      "get": {
+        "description": "Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys.",
+        "operationId": "V2_FetchAccountSigningKeys",
+        "parameters": [
+          {
+            "description": "Pagination cursor from previous response",
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Number of signing keys to return per page (min: 1, max: 100)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": "20",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter signing keys by environment (e.g., 'production', 'staging', 'development')",
+            "in": "header",
+            "name": "X-Inngest-Env",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": [
+                        {
+                          "createdAt": "2024-01-15T10:30:00Z",
+                          "environment": "production",
+                          "id": "f6a7b8c9-d0e1-4234-fab6-7890ecd23456",
+                          "key": "signkey-prod-abc123def456",
+                          "name": ""
+                        }
+                      ],
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      },
+                      "page": {
+                        "cursor": null,
+                        "hasMore": false,
+                        "limit": 20
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2FetchAccountSigningKeysResponse"
+                }
+              }
+            },
+            "description": "List of account signing keys"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "invalid_field_format",
+                          "message": "Limit must be at least 1"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid query parameters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": "Authentication failed"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found - account not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List account signing keys",
+        "tags": ["V2"]
+      }
+    },
+    "/partner/accounts": {
+      "get": {
+        "description": "Lists sub-accounts (if you have partner access)",
+        "operationId": "V2_FetchPartnerAccounts",
+        "parameters": [
+          {
+            "description": "Pagination cursor from previous response",
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Number of accounts to return per page (min: 1, max: 1000)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": "20",
+              "format": "int32",
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": [
+                        {
+                          "createdAt": "2024-01-15T10:30:00Z",
+                          "email": "partner1@company.com",
+                          "id": "a7b8c9d0-e1f2-4345-abc7-890fed345678",
+                          "name": "Partner Account 1",
+                          "updatedAt": "2024-01-15T10:30:00Z"
+                        },
+                        {
+                          "createdAt": "2024-01-18T14:22:33Z",
+                          "email": "partner2@company.com",
+                          "id": "b8c9d0e1-f2a3-4456-bcd8-90aef4567890",
+                          "name": "Partner Account 2",
+                          "updatedAt": "2024-01-18T14:22:33Z"
+                        }
+                      ],
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      },
+                      "page": {
+                        "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
+                        "hasMore": true,
+                        "limit": 2
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2FetchAccountsResponse"
+                }
+              }
+            },
+            "description": "List of accounts"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid query parameters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "access_denied",
+                          "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "access_denied",
+                          "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List partner accounts",
+        "tags": ["V2"]
+      },
+      "post": {
+        "description": "Creates a sub-account (if you have partner access)",
+        "operationId": "V2_CreatePartnerAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/v2CreateAccountRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "data": {
+                        "apiKey": "api-abcdef1234567890",
+                        "createdAt": "2024-01-20T14:22:33Z",
+                        "email": "user@example.com",
+                        "id": "c9d0e1f2-a3b4-4567-cde9-01bfa5678901",
+                        "name": "Jane Smith",
+                        "updatedAt": "2024-01-20T14:22:33Z"
+                      },
+                      "metadata": {
+                        "cachedUntil": null,
+                        "fetched_at": "2024-01-20T14:22:33Z"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2CreateAccountResponse"
+                }
+              }
+            },
+            "description": "Account successfully created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "validation_error",
+                          "message": "Email is required"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid input data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "access_denied",
+                          "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "access_denied",
+                          "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - Insufficient permissions"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict - account already exists"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "default": {
+                    "value": {
+                      "errors": [
+                        {
+                          "code": "internal_error",
+                          "message": "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create partner account",
+        "tags": ["V2"]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "Production server",
+      "url": "https://api.inngest.com/v2"
+    },
+    {
+      "description": "Development server",
+      "url": "http://localhost:8288/api/v2"
+    }
+  ],
+  "tags": [
+    {
+      "name": "V2"
+    }
+  ]
+}

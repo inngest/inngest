@@ -1,0 +1,72 @@
+---
+title: Authentication
+description: How to authenticate with the Inngest REST API.
+---
+
+# Authentication
+
+The Inngest API uses **Bearer token authentication** via your environment's signing key.
+
+## Getting Your Signing Key
+
+You can find your signing key in the Inngest dashboard under your environment's settings. The signing key begins with `signkey-`.
+
+## Making Authenticated Requests
+
+Include the signing key as a `Bearer` token in the `Authorization` header of every request.
+
+```http
+Authorization: Bearer signkey-prod-xxxxxxxxxxxxxxxxxxxx
+```
+
+### Examples
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+<Tab value="curl">
+```bash
+curl https://api.inngest.com/v1/events \
+  -H "Authorization: Bearer signkey-prod-xxxxxxxxxxxxxxxxxxxx"
+```
+</Tab>
+<Tab value="TypeScript">
+```ts
+const response = await fetch('https://api.inngest.com/v1/events', {
+  headers: {
+    Authorization: `Bearer ${process.env.INNGEST_SIGNING_KEY}`,
+  },
+});
+const data = await response.json();
+```
+</Tab>
+<Tab value="Python">
+```python
+import os
+import requests
+
+response = requests.get(
+    "https://api.inngest.com/v1/events",
+    headers={"Authorization": f"Bearer {os.environ['INNGEST_SIGNING_KEY']}"},
+)
+data = response.json()
+```
+</Tab>
+</Tabs>
+
+## Environments
+
+Each Inngest environment (production, branch, etc.) has its own signing key. Ensure you use the signing key that corresponds to the environment you want to interact with.
+
+## Error Responses
+
+If authentication fails, the API returns a `401 Unauthorized` response:
+
+```json
+{
+  "error": "unauthorized"
+}
+```
+
+## Notes
+
+- Trailing slashes on URLs are not supported — omit them from all requests.
+- All requests should use HTTPS in production.
