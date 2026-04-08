@@ -28,6 +28,40 @@
       }
     }
   },
+  "/apps/{app_id}/functions/{function_id}/invoke": {
+    "post": {
+      "201": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 201"
+      },
+      "202": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 202"
+      },
+      "400": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 403"
+      },
+      "404": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 404"
+      },
+      "409": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 409"
+      },
+      "422": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 422"
+      },
+      "429": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 429"
+      },
+      "500": {
+        "// TODO": "Add example data for post /apps/{app_id}/functions/{function_id}/invoke 500"
+      }
+    }
+  },
   "/env/webhooks": {
     "get": {
       "200": {
