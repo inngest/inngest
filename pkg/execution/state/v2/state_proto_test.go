@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
-	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -222,7 +221,4 @@ func TestV1FromMetadata_NilSemaphores(t *testing.T) {
 
 	v1 := V1FromMetadata(md)
 	assert.Nil(t, v1.Semaphores)
-
-	// Also verify the identifier is of the right type
-	var _ statev1.Identifier = v1
 }
