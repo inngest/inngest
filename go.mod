@@ -102,7 +102,7 @@ require (
 	go.uber.org/goleak v1.3.0
 	gocloud.dev v0.45.0
 	gocloud.dev/pubsub/natspubsub v0.45.0
-	golang.org/x/mod v0.34.0
+	golang.org/x/mod v0.35.0
 	golang.org/x/sync v0.20.0
 	gonum.org/v1/gonum v0.17.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260406210006-6f92a3bedf2d
