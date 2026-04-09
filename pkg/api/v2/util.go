@@ -9,10 +9,6 @@ import (
 )
 
 func validateInvokeRequest(ctx context.Context, req *apiv2.InvokeFunctionRequest) error {
-	if req.AppId == "" {
-		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID is required")
-	}
-
 	if req.FunctionId == "" {
 		return apiv2base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Function ID is required")
 	}

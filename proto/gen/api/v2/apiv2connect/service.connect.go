@@ -59,8 +59,14 @@ const (
 	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
 	// V2PatchEnvProcedure is the fully-qualified name of the V2's PatchEnv RPC.
 	V2PatchEnvProcedure = "/api.v2.V2/PatchEnv"
+	// V2GetFunctionRunProcedure is the fully-qualified name of the V2's GetFunctionRun RPC.
+	V2GetFunctionRunProcedure = "/api.v2.V2/GetFunctionRun"
+	// V2GetFunctionTraceProcedure is the fully-qualified name of the V2's GetFunctionTrace RPC.
+	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
 	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
+	// V2InvokeFunctionBySlugProcedure is the fully-qualified name of the V2's InvokeFunctionBySlug RPC.
+	V2InvokeFunctionBySlugProcedure = "/api.v2.V2/InvokeFunctionBySlug"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -78,7 +84,10 @@ type V2Client interface {
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
+	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	InvokeFunctionBySlug(context.Context, *connect.Request[v2.InvokeFunctionBySlugRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -164,10 +173,28 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("PatchEnv")),
 			connect.WithClientOptions(opts...),
 		),
+		getFunctionRun: connect.NewClient[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse](
+			httpClient,
+			baseURL+V2GetFunctionRunProcedure,
+			connect.WithSchema(v2Methods.ByName("GetFunctionRun")),
+			connect.WithClientOptions(opts...),
+		),
+		getFunctionTrace: connect.NewClient[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse](
+			httpClient,
+			baseURL+V2GetFunctionTraceProcedure,
+			connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
+			connect.WithClientOptions(opts...),
+		),
 		invokeFunction: connect.NewClient[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse](
 			httpClient,
 			baseURL+V2InvokeFunctionProcedure,
 			connect.WithSchema(v2Methods.ByName("InvokeFunction")),
+			connect.WithClientOptions(opts...),
+		),
+		invokeFunctionBySlug: connect.NewClient[v2.InvokeFunctionBySlugRequest, v2.InvokeFunctionResponse](
+			httpClient,
+			baseURL+V2InvokeFunctionBySlugProcedure,
+			connect.WithSchema(v2Methods.ByName("InvokeFunctionBySlug")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -187,7 +214,10 @@ type v2Client struct {
 	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
 	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
 	patchEnv                *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
+	getFunctionRun          *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
+	getFunctionTrace        *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	invokeFunction          *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
+	invokeFunctionBySlug    *connect.Client[v2.InvokeFunctionBySlugRequest, v2.InvokeFunctionResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -250,9 +280,24 @@ func (c *v2Client) PatchEnv(ctx context.Context, req *connect.Request[v2.PatchEn
 	return c.patchEnv.CallUnary(ctx, req)
 }
 
+// GetFunctionRun calls api.v2.V2.GetFunctionRun.
+func (c *v2Client) GetFunctionRun(ctx context.Context, req *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error) {
+	return c.getFunctionRun.CallUnary(ctx, req)
+}
+
+// GetFunctionTrace calls api.v2.V2.GetFunctionTrace.
+func (c *v2Client) GetFunctionTrace(ctx context.Context, req *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
+	return c.getFunctionTrace.CallUnary(ctx, req)
+}
+
 // InvokeFunction calls api.v2.V2.InvokeFunction.
 func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
 	return c.invokeFunction.CallUnary(ctx, req)
+}
+
+// InvokeFunctionBySlug calls api.v2.V2.InvokeFunctionBySlug.
+func (c *v2Client) InvokeFunctionBySlug(ctx context.Context, req *connect.Request[v2.InvokeFunctionBySlugRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
+	return c.invokeFunctionBySlug.CallUnary(ctx, req)
 }
 
 // V2Handler is an implementation of the api.v2.V2 service.
@@ -270,7 +315,10 @@ type V2Handler interface {
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
+	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	InvokeFunctionBySlug(context.Context, *connect.Request[v2.InvokeFunctionBySlugRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -352,10 +400,28 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("PatchEnv")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2GetFunctionRunHandler := connect.NewUnaryHandler(
+		V2GetFunctionRunProcedure,
+		svc.GetFunctionRun,
+		connect.WithSchema(v2Methods.ByName("GetFunctionRun")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetFunctionTraceHandler := connect.NewUnaryHandler(
+		V2GetFunctionTraceProcedure,
+		svc.GetFunctionTrace,
+		connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2InvokeFunctionHandler := connect.NewUnaryHandler(
 		V2InvokeFunctionProcedure,
 		svc.InvokeFunction,
 		connect.WithSchema(v2Methods.ByName("InvokeFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2InvokeFunctionBySlugHandler := connect.NewUnaryHandler(
+		V2InvokeFunctionBySlugProcedure,
+		svc.InvokeFunctionBySlug,
+		connect.WithSchema(v2Methods.ByName("InvokeFunctionBySlug")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -384,8 +450,14 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListWebhooksHandler.ServeHTTP(w, r)
 		case V2PatchEnvProcedure:
 			v2PatchEnvHandler.ServeHTTP(w, r)
+		case V2GetFunctionRunProcedure:
+			v2GetFunctionRunHandler.ServeHTTP(w, r)
+		case V2GetFunctionTraceProcedure:
+			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2InvokeFunctionProcedure:
 			v2InvokeFunctionHandler.ServeHTTP(w, r)
+		case V2InvokeFunctionBySlugProcedure:
+			v2InvokeFunctionBySlugHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -443,6 +515,18 @@ func (UnimplementedV2Handler) PatchEnv(context.Context, *connect.Request[v2.Patc
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PatchEnv is not implemented"))
 }
 
+func (UnimplementedV2Handler) GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionRun is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionTrace is not implemented"))
+}
+
 func (UnimplementedV2Handler) InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.InvokeFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) InvokeFunctionBySlug(context.Context, *connect.Request[v2.InvokeFunctionBySlugRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.InvokeFunctionBySlug is not implemented"))
 }

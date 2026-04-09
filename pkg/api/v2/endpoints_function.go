@@ -169,6 +169,18 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 	return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "There was an error invoking your function")
 }
 
+func (s *Service) InvokeFunctionBySlug(ctx context.Context, req *apiv2.InvokeFunctionBySlugRequest) (*apiv2.InvokeFunctionResponse, error) {
+	if req.FunctionSlug == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Function slug is required")
+	}
+
+	return s.InvokeFunction(ctx, &apiv2.InvokeFunctionRequest{
+		FunctionId:     req.FunctionSlug,
+		Data:           req.Data,
+		IdempotencyKey: req.IdempotencyKey,
+	})
+}
+
 // isIdempotencyError checks whether the given error represents an idempotency
 // conflict. It first checks via errors.Is for the standard sentinel errors,
 // then falls back to string matching for cases where the sentinel identity is

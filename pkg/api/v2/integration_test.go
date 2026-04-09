@@ -253,6 +253,74 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.Contains(t, err.Error(), "Input data is required")
 	})
 
+	t.Run("invoke function by slug with valid request returns not implemented", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		data, err := structpb.NewStruct(map[string]interface{}{
+			"message": "Hello, World!",
+		})
+		require.NoError(t, err)
+
+		req := &apiv2.InvokeFunctionBySlugRequest{
+			FunctionSlug:   "my-app-hello-world",
+			Data:           data,
+			IdempotencyKey: stringPtr("test-key-123"),
+		}
+
+		resp, err := client.InvokeFunctionBySlug(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+
+	t.Run("invoke function by slug with missing slug", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		data, err := structpb.NewStruct(map[string]interface{}{
+			"message": "Hello, World!",
+		})
+		require.NoError(t, err)
+
+		req := &apiv2.InvokeFunctionBySlugRequest{
+			Data: data,
+		}
+
+		resp, err := client.InvokeFunctionBySlug(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "Function slug is required")
+	})
+
+	t.Run("get function run returns not implemented", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		resp, err := client.GetFunctionRun(ctx, &apiv2.GetFunctionRunRequest{
+			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
+		})
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+
+	t.Run("get function trace returns not implemented", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		resp, err := client.GetFunctionTrace(ctx, &apiv2.GetFunctionTraceRequest{
+			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
+		})
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+
 }
 
 // Helper function to create string pointer for optional fields
