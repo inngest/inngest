@@ -1553,6 +1553,12 @@ func (c *connectionHandler) updateConnStatus(status connectpb.ConnectionStatus) 
 	c.updateLock.Lock()
 	defer c.updateLock.Unlock()
 
+	// If the connection has already been deleted from state (e.g. by the
+	// draining goroutine), skip the upsert to avoid re-inserting it.
+	if c.deletedFromState.Load() {
+		return nil
+	}
+
 	// Always update the connection status, do not use context cancellation
 	return c.svc.stateManager.UpsertConnection(context.Background(), c.conn, status, time.Now())
 }
