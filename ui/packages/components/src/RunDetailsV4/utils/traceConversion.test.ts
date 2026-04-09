@@ -400,6 +400,114 @@ describe('traceConversion', () => {
       expect(childBar?.inngestBreakdown).toBeUndefined();
     });
 
+    it('computes discoveryMs as inter-step gap, not total elapsed time', () => {
+      // Reproduces bug: without the fix, late-step would
+      // get discoveryMs = 5000 (entire run elapsed time), making the
+      // Inngest bar (5s+) vastly exceed the step bar (~40ms).
+      // With the fix, discoveryMs is the gap between the previous sibling
+      // ending and this step being queued (~5ms).
+      const trace = createTrace({
+        isRoot: true,
+        startedAt: '2024-01-01T00:00:00Z',
+        endedAt: '2024-01-01T00:00:05.100Z',
+        childrenSpans: [
+          createTrace({
+            spanID: 'slow-step-1',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00.001Z', // 1ms after run start
+            startedAt: '2024-01-01T00:00:00.010Z',
+            endedAt: '2024-01-01T00:00:03Z', // 3s execution
+          }),
+          createTrace({
+            spanID: 'slow-step-2',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:03.002Z', // 2ms after slow-step-1 ended
+            startedAt: '2024-01-01T00:00:03.010Z',
+            endedAt: '2024-01-01T00:00:05Z', // 2s execution
+          }),
+          createTrace({
+            spanID: 'late-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:05.005Z', // 5ms after slow-step-2 ended
+            startedAt: '2024-01-01T00:00:05.040Z', // 35ms queue wait
+            endedAt: '2024-01-01T00:00:05.046Z', // 6ms execution
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const step1 = result.bars[0]?.children?.[0];
+      const step2 = result.bars[0]?.children?.[1];
+      const step3 = result.bars[0]?.children?.[2];
+
+      // First step: discoveryMs = gap from runStartedAt to step queued = 1ms
+      expect(step1?.inngestBreakdown?.discoveryMs).toBe(1);
+
+      // Second step: discoveryMs = gap from slow-step-1 end to step queued = 2ms
+      expect(step2?.inngestBreakdown?.discoveryMs).toBe(2);
+
+      // Late step: discoveryMs = gap from slow-step-2 end to step queued = 5ms
+      // NOT 5005ms (which would be the old runStartedAt-based calculation)
+      expect(step3?.inngestBreakdown?.discoveryMs).toBe(5);
+
+      // late-step bar duration is small (~41ms), and the Inngest bar
+      // should fit within it since discoveryMs is only 5ms
+      // inngestMs = startedAt - queuedAt = 5.040 - 5.005 = 35ms
+      expect(step3?.timingBreakdown?.inngestMs).toBe(35);
+      expect(step3?.timingBreakdown?.executionMs).toBe(6);
+      expect(step3?.timingBreakdown?.totalMs).toBe(41);
+    });
+
+    it('widens timingBreakdown.inngestMs to include discovery when inngestBreakdown exceeds it', () => {
+      const trace = createTrace({
+        isRoot: true,
+        startedAt: '2024-01-01T00:00:00Z',
+        endedAt: '2024-01-01T00:00:10Z',
+        childrenSpans: [
+          createTrace({
+            spanID: 'prev-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00Z',
+            startedAt: '2024-01-01T00:00:00.010Z',
+            endedAt: '2024-01-01T00:00:03Z', // ends at T+3s
+          }),
+          createTrace({
+            spanID: 'run-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:03.100Z', // 100ms gap after prev-step
+            startedAt: '2024-01-01T00:00:05Z',
+            endedAt: '2024-01-01T00:00:10Z',
+            metadata: [
+              {
+                scope: 'step_attempt',
+                kind: 'inngest.timing',
+                updatedAt: '2024-01-01T00:00:10Z',
+                values: {
+                  queue_delay_ms: 800,
+                  system_latency_ms: 200,
+                  total_inngest_ms: 1000,
+                },
+              },
+            ],
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+      const bar = result.bars[0]?.children?.[1]; // second child
+
+      // discoveryMs = gap from prev-step end (T+3) to this step queued (T+3.1) = 100ms
+      expect(bar?.inngestBreakdown?.discoveryMs).toBe(100);
+      expect(bar?.inngestBreakdown?.queueDelayMs).toBe(800);
+      expect(bar?.inngestBreakdown?.systemLatencyMs).toBe(200);
+      expect(bar?.inngestBreakdown?.totalMs).toBe(1100);
+
+      // timingBreakdown.inngestMs (1000 from metadata) < inngestBreakdown.totalMs (1100)
+      // so it gets widened to include discovery
+      expect(bar?.timingBreakdown?.inngestMs).toBe(1100);
+      expect(bar?.timingBreakdown?.executionMs).toBe(5000);
+      expect(bar?.timingBreakdown?.totalMs).toBe(6100);
+    });
+
     it('handles zero queue time', () => {
       const trace = createTrace({
         isRoot: true,

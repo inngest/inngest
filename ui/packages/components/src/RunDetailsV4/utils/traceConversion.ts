@@ -119,16 +119,24 @@ function getTimingFromMetadata(
  * Extract per-step Inngest overhead breakdown from metadata + timestamps.
  * Combines discovery time (from timestamps) with concurrency delay and
  * system latency (from inngest.timing metadata).
+ *
+ * @param previousStepEndMs - End time of the previous sibling step. Discovery
+ *   time is measured as the gap between the previous step completing and this
+ *   step being queued — i.e. the actual Inngest processing overhead between
+ *   steps, not total elapsed time since the run started.
  */
 function getInngestBreakdown(
   trace: Trace,
-  runStartedAtMs: number | null
+  previousStepEndMs: number | null
 ): InngestBreakdownData | null {
   if (!trace.queuedAt) return null;
 
-  // Discovery: time from when the run started executing to when this step was queued
+  // Discovery: time between the previous step completing and this step being
+  // queued. This captures actual Inngest processing overhead (executor work,
+  // span creation, queue enqueue) rather than total run elapsed time.
   const stepQueuedAt = new Date(trace.queuedAt).getTime();
-  const discoveryMs = runStartedAtMs !== null ? Math.max(0, stepQueuedAt - runStartedAtMs) : 0;
+  const discoveryMs =
+    previousStepEndMs !== null ? Math.max(0, stepQueuedAt - previousStepEndMs) : 0;
 
   // Concurrency delay + system latency from metadata
   let queueDelayMs = 0;
@@ -178,7 +186,7 @@ function traceToBarData(
   trace: Trace,
   orgName?: string,
   rootStatus?: string,
-  runStartedAtMs?: number | null
+  previousStepEndMs?: number | null
 ): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
   // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
@@ -200,10 +208,40 @@ function traceToBarData(
     ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
     : undefined;
 
-  // Per-step Inngest overhead breakdown (discovery + metadata timing)
+  // Per-step Inngest overhead breakdown (discovery + metadata timing).
+  // Discovery is the gap between the previous step ending and this step
+  // being queued — actual Inngest processing overhead between steps.
   const inngestBreakdown = isStepRun
-    ? getInngestBreakdown(trace, runStartedAtMs ?? null) ?? undefined
+    ? getInngestBreakdown(trace, previousStepEndMs ?? null) ?? undefined
     : undefined;
+
+  // The Inngest bar should encompass all non-customer time: discovery +
+  // concurrency delay + system latency. timingBreakdown.inngestMs only
+  // captures queue + system overhead, so widen it to include discovery
+  // so the sub-phases fit inside the Inngest bar.
+  if (timingBreakdown && inngestBreakdown && inngestBreakdown.totalMs > timingBreakdown.inngestMs) {
+    timingBreakdown = {
+      ...timingBreakdown,
+      inngestMs: inngestBreakdown.totalMs,
+      totalMs: inngestBreakdown.totalMs + timingBreakdown.executionMs,
+    };
+  }
+
+  // Convert children while tracking each sibling's end time so the next
+  // sibling's discoveryMs measures the actual inter-step gap, not total
+  // elapsed time since the run started.
+  let childBars: TimelineBarData[] | undefined;
+  if (trace.childrenSpans && trace.childrenSpans.length > 0) {
+    childBars = [];
+    let prevEndMs = previousStepEndMs ?? null;
+    for (const child of trace.childrenSpans) {
+      const bar = traceToBarData(child, orgName, rootStatus, prevEndMs);
+      childBars.push(bar);
+      if (bar.endTime) {
+        prevEndMs = bar.endTime.getTime();
+      }
+    }
+  }
 
   return {
     id: trace.spanID,
@@ -211,9 +249,7 @@ function traceToBarData(
     startTime: new Date(trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
-    children: trace.childrenSpans?.map((child) =>
-      traceToBarData(child, orgName, rootStatus, runStartedAtMs)
-    ),
+    children: childBars,
     timingBreakdown,
     httpTimingBreakdown,
     inngestBreakdown,
@@ -248,7 +284,10 @@ export function traceToTimelineData(
     }
   });
 
-  // Run startedAt timestamp for computing per-step discovery time
+  // Run startedAt is used as the initial "previous step end" for the first
+  // child. Each subsequent child uses the prior sibling's endTime, so
+  // discoveryMs measures the actual inter-step gap (Inngest processing
+  // overhead) rather than total elapsed time since the run started.
   const runStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
 
   // Convert root trace (rename to "Run")
