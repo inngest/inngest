@@ -423,6 +423,10 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 type DeferredFunctionResult struct {
 	Function      *inngest.Function
 	CopyStateFrom *ulid.ULID
+	// EmbeddedSteps contains pre-serialized step data from the parent run,
+	// embedded directly in the deferred.start event so the deferred run can
+	// be initialized without loading from the state store.
+	EmbeddedSteps []state.MemoizedStep
 }
 
 // FindDeferredFunction looks up a function by the fnSlug field in a deferred.start event
@@ -463,6 +467,24 @@ func FindDeferredFunction(ctx context.Context, tracked event.TrackedEvent, fl cq
 			return nil, fmt.Errorf("invalid runId in deferred.start event: %w", err)
 		}
 		result.CopyStateFrom = &parsed
+	}
+
+	// Extract embedded steps from the event data if present.
+	if rawSteps, ok := evt.Data["steps"].([]any); ok {
+		for _, raw := range rawSteps {
+			stepMap, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := stepMap["id"].(string)
+			if id == "" {
+				continue
+			}
+			result.EmbeddedSteps = append(result.EmbeddedSteps, state.MemoizedStep{
+				ID:   id,
+				Data: stepMap["data"],
+			})
+		}
 	}
 
 	return result, nil
@@ -525,7 +547,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		errs = multierror.Append(errs, err)
 	}
 	if result != nil {
-		if err := s.initializeDeferred(ctx, *result.Function, tracked, result.CopyStateFrom); err != nil {
+		if err := s.initializeDeferred(ctx, *result.Function, tracked, result.CopyStateFrom, result.EmbeddedSteps); err != nil {
 			s.log.Error("error initializing deferred fn",
 				"error", err,
 				"function", result.Function.Name,
@@ -654,7 +676,7 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	return err
 }
 
-func (s *svc) initializeDeferred(ctx context.Context, fn inngest.Function, evt event.TrackedEvent, copyStateFrom *ulid.ULID) error {
+func (s *svc) initializeDeferred(ctx context.Context, fn inngest.Function, evt event.TrackedEvent, copyStateFrom *ulid.ULID, embeddedSteps []state.MemoizedStep) error {
 	l := logger.StdlibLogger(ctx).With(
 		"function", fn.Name,
 		"function_id", fn.ID.String(),
@@ -680,6 +702,7 @@ func (s *svc) initializeDeferred(ctx context.Context, fn inngest.Function, evt e
 		evt:           evt,
 		exec:          s.executor,
 		copyStateFrom: copyStateFrom,
+		embeddedSteps: embeddedSteps,
 	})
 	if err == state.ErrIdentifierExists {
 		return nil
@@ -765,6 +788,7 @@ type InitOpts struct {
 	evt           event.TrackedEvent
 	exec          execution.Executor
 	copyStateFrom *ulid.ULID
+	embeddedSteps []state.MemoizedStep
 }
 
 // Initialize creates a new funciton run identifier for the given workflow and
@@ -811,6 +835,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
 		CopyStateFrom:  opts.copyStateFrom,
+		EmbeddedSteps:  opts.embeddedSteps,
 	})
 
 	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{

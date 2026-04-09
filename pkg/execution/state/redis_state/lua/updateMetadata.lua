@@ -2,10 +2,11 @@
 
 local keyMetadata = KEYS[1]
 
-local die      = ARGV[1] -- disable immediate execution
-local rv       = ARGV[2] -- request version
-local sat      = ARGV[3] -- started at
-local hasAI    = ARGV[4] -- has AI
+local die           = ARGV[1] -- disable immediate execution
+local rv            = ARGV[2] -- request version
+local sat           = ARGV[3] -- started at
+local hasAI         = ARGV[4] -- has AI
+local deferFnSlug   = ARGV[5] -- defer group function slug
 
 local function is_field_empty(field, emptyval)
   local val = redis.call("HGET", keyMetadata, field)
@@ -22,6 +23,10 @@ end
 
 if hasAI == "1" then
   redis.call("HSET", keyMetadata, "hasAI", hasAI)
+end
+
+if deferFnSlug ~= "" then
+  redis.call("HSET", keyMetadata, "deferFnSlug", deferFnSlug)
 end
 
 return 0

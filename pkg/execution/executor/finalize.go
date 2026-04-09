@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -60,6 +61,11 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 	}
 
+	// finalizeEvents creates function finished events, and also attempts to
+	// fast-resume any parent function that invoked this run.  This MUST run
+	// before Delete so that deferred runs can copy state from this run.
+	finalizeErr := e.finalizeEvents(ctx, opts)
+
 	// Delete the function state in every case.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
@@ -79,9 +85,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	e.finalizeRemoveJobs(ctx, opts)
 
-	// finalizeEvents creates function finished events, and also attempts to fast-resume
-	// any parent function that invoked this run.
-	return e.finalizeEvents(ctx, opts)
+	return finalizeErr
 }
 
 // finalizeRemoveJobs removes any other jobs for a finalized run, as the function is
@@ -261,6 +265,60 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 				}
 			})
 		}
+	}
+
+	// If this run had a DeferGroup step, emit deferred.start so the runner
+	// can start a new run with the parent's step state copied in.
+	if slug := opts.Metadata.Config.DeferGroupFnSlug; slug != "" {
+		deferData := map[string]any{
+			"fnSlug": slug,
+			"runId":  opts.Metadata.ID.RunID.String(),
+		}
+
+		// Embed original events so the SDK can reconstruct the parent's
+		// trigger context without relying on state store lookups.
+		// Strip the deprecated `user` field so the event matches what
+		// the SDK sees after its own stripping.
+		if len(inputEvents) > 0 {
+			evtMaps := make([]map[string]any, len(inputEvents))
+			for i, evt := range inputEvents {
+				m := evt.Map()
+				delete(m, "user")
+				evtMaps[i] = m
+			}
+			deferData["event"] = evtMaps[0]
+			deferData["events"] = evtMaps
+		}
+
+		// Embed step state so the deferred run can be initialized with
+		// memoized steps without relying on the state store (which may
+		// be deleted by the time the runner processes this event).
+		stack, stackErr := e.smv2.LoadStack(ctx, opts.Metadata.ID)
+		stepData, stepsErr := e.smv2.LoadSteps(ctx, opts.Metadata.ID)
+		if stackErr == nil && stepsErr == nil {
+			embeddedSteps := make([]map[string]any, 0, len(stack))
+			for _, stepID := range stack {
+				raw, ok := stepData[stepID]
+				if !ok {
+					continue
+				}
+				var data any
+				if err := json.Unmarshal(raw, &data); err == nil {
+					embeddedSteps = append(embeddedSteps, map[string]any{
+						"id":   stepID,
+						"data": data,
+					})
+				}
+			}
+			deferData["steps"] = embeddedSteps
+		}
+
+		freshEvents = append(freshEvents, event.Event{
+			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+			Name:      consts.DeferredStartName,
+			Timestamp: now.UnixMilli(),
+			Data:      deferData,
+		})
 	}
 
 	return e.finishHandler(ctx, opts.Metadata.ID, freshEvents)

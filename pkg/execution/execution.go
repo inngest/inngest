@@ -289,6 +289,10 @@ type ScheduleRequest struct {
 	// should be copied into the new run. This is used by deferred.start to
 	// initialize a new run with the state of a previous run.
 	CopyStateFrom *ulid.ULID
+	// EmbeddedSteps contains pre-serialized step data from the parent run,
+	// embedded in the deferred.start event. Used as a fallback when the
+	// state store no longer has the parent run's data.
+	EmbeddedSteps []state.MemoizedStep
 }
 
 // NewScheduleRequest creates an initial ScheduleRequest given a deployed

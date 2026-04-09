@@ -25,6 +25,10 @@ const (
 	// OpcodeDiscoveryRequest indicates that an SDK wants another discovery
 	// request to be sent to resume execution.
 	OpcodeDiscoveryRequest
+	// OpcodeDeferGroup indicates the function has a group.defer() call.
+	// The executor should schedule a deferred.start event after the parent
+	// run completes, carrying fnSlug from the opcode opts.
+	OpcodeDeferGroup
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
@@ -35,6 +39,7 @@ var opcodeSyncMap = map[Opcode]struct{}{
 	OpcodeRunComplete:     {},
 	OpcodeSyncRunComplete: {},
 	OpcodeStepFailed:      {},
+	OpcodeDeferGroup:      {},
 }
 
 // OpcodeIsSync returns whether the given opcode is synchronous.  This

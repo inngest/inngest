@@ -292,6 +292,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
 			HasAI:                 md.HasAI,
+			DeferGroupFnSlug:      md.DeferGroupFnSlug,
 		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
@@ -333,6 +334,7 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 				RequestVersion:            mutation.RequestVersion,
 				StartedAt:                 mutation.StartedAt,
 				HasAI:                     mutation.HasAI,
+				DeferGroupFnSlug:          mutation.DeferGroupFnSlug,
 			})
 
 			return false, err

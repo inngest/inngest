@@ -33,7 +33,8 @@ func copyRunState(ctx context.Context, sm sv2.RunService, req execution.Schedule
 
 	sourceMeta, err := sm.LoadMetadata(ctx, sourceID)
 	if err != nil {
-		return fmt.Errorf("error loading source run metadata: %w", err)
+		return fmt.Errorf("error loading source run metadata (runID=%s, accountID=%s, envID=%s): %w",
+			sourceID.RunID, sourceID.Tenant.AccountID, sourceID.Tenant.EnvID, err)
 	}
 	sourceID = sourceMeta.ID
 

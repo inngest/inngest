@@ -345,6 +345,32 @@ func (i InvokeFunctionOpts) Expires() (time.Time, error) {
 	return time.Now().Add(dur), nil
 }
 
+// DeferGroupOpts represents the options for the DeferGroup opcode, which
+// signals the executor to schedule a deferred.start event after the parent
+// run completes.
+type DeferGroupOpts struct {
+	FnSlug string `json:"fnSlug"`
+}
+
+func (g GeneratorOpcode) DeferGroupOpts() (*DeferGroupOpts, error) {
+	opts := &DeferGroupOpts{}
+	var mappedByt []byte
+	switch typ := g.Opts.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(g.Opts)
+		if err != nil {
+			return nil, err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, opts); err != nil {
+		return nil, err
+	}
+	return opts, nil
+}
+
 type SleepOpts struct {
 	Duration string `json:"duration"`
 }

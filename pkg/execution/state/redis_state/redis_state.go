@@ -442,6 +442,7 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 		strconv.Itoa(consts.RequestVersionUnknown), // Request version
 		"0", // start time default value
 		"0", // has AI default value
+		"",  // defer group fn slug
 	}
 	if md.DisableImmediateExecution {
 		input[0] = "1"
@@ -454,6 +455,9 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	}
 	if md.HasAI {
 		input[3] = "1"
+	}
+	if md.DeferGroupFnSlug != "" {
+		input[4] = md.DeferGroupFnSlug
 	}
 
 	fnRunState := m.s.FunctionRunState()
@@ -1295,6 +1299,10 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		m.SpanID = val
 	}
 
+	if val, ok := data["deferFnSlug"]; ok && val != "" {
+		m.DeferGroupFnSlug = val
+	}
+
 	return m, nil
 }
 
@@ -1448,6 +1456,7 @@ type runMetadata struct {
 	SpanID                    string         `json:"sid"`
 	StartedAt                 int64          `json:"sat,omitempty"`
 	HasAI                     bool           `json:"hasAI,omitempty"`
+	DeferGroupFnSlug          string         `json:"deferFnSlug,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {

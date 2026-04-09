@@ -180,6 +180,10 @@ type Config struct {
 	// ForceStepPlan forces SDKs, where supported, to submit step plan opcodes prior
 	// to running steps.
 	ForceStepPlan bool
+	// DeferGroupFnSlug is set when a DeferGroup opcode is processed. The
+	// finalize handler reads this to emit deferred.start after the run
+	// completes.
+	DeferGroupFnSlug string
 	// Context allows storing arbitrary context for a run.
 	Context map[string]any
 
@@ -588,10 +592,11 @@ func (rm *RunMetrics) MetadataSizeDelta() int {
 
 // MutableConfig represents mutable config options.
 type MutableConfig struct {
-	StartedAt      time.Time
-	RequestVersion int
-	ForceStepPlan  bool
-	HasAI          bool
+	StartedAt        time.Time
+	RequestVersion   int
+	ForceStepPlan    bool
+	HasAI            bool
+	DeferGroupFnSlug string
 }
 
 type CustomConcurrency = statev1.CustomConcurrency

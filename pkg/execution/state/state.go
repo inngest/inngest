@@ -268,6 +268,9 @@ type MetadataUpdate struct {
 	RequestVersion            int       `json:"rv"`
 	StartedAt                 time.Time `json:"sat"`
 	HasAI                     bool      `json:"hasAI,omitempty"`
+	// DeferGroupFnSlug is set when a DeferGroup opcode is processed,
+	// storing the function slug so finalization can emit deferred.start.
+	DeferGroupFnSlug string `json:"deferFnSlug,omitempty"`
 }
 
 // State represents the current state of a fn run.  It is data-structure

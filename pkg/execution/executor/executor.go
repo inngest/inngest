@@ -1215,7 +1215,20 @@ func (e *executor) schedule(
 
 	if req.CopyStateFrom != nil {
 		if err := copyRunState(ctx, e.smv2, req, &newState); err != nil {
-			return nil, nil, fmt.Errorf("error copying state from run: %w", err)
+			// State store lookup failed — use embedded steps from the event
+			// data as a fallback.
+			if len(req.EmbeddedSteps) > 0 {
+				newState.Steps = req.EmbeddedSteps
+				e.log.Info("using embedded steps for deferred run",
+					"source_run_id", req.CopyStateFrom.String(),
+					"steps", len(req.EmbeddedSteps),
+				)
+			} else {
+				e.log.Warn("could not copy state from parent run; deferred run will re-execute steps",
+					"error", err,
+					"source_run_id", req.CopyStateFrom.String(),
+				)
+			}
 		}
 	}
 
@@ -3327,6 +3340,8 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferGroup:
+		return e.handleDeferGroup(ctx, runCtx, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -3559,6 +3574,51 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// 		RunID:      i.md.ID.RunID,
 	// 	})
 	// }
+}
+
+// handleDeferGroup handles the DeferGroup opcode emitted by the SDK's
+// group.defer() call. It saves the step and persists the fnSlug in run
+// metadata so that finalizeEvents can emit deferred.start after the
+// parent run completes.
+func (e *executor) handleDeferGroup(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	opts, err := gen.DeferGroupOpts()
+	if err != nil {
+		return fmt.Errorf("unable to parse defer group opts: %w", err)
+	}
+
+	// Save the step output (null data) like a regular sync step so it is
+	// memoized on subsequent re-entries.
+	output, err := gen.Output()
+	if err != nil {
+		return err
+	}
+
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// Persist the fnSlug in run metadata so finalizeEvents can read it
+	// and emit deferred.start after the parent run completes.
+	if err := e.smv2.UpdateMetadata(ctx, runCtx.Metadata().ID, sv2.MutableConfig{
+		DeferGroupFnSlug: opts.FnSlug,
+	}); err != nil {
+		return fmt.Errorf("error persisting defer group metadata: %w", err)
+	}
+
+	// Enqueue the next discovery step so the parent run continues.
+	groupID := uuid.New().String()
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		hasPendingSteps,
+	)
 }
 
 func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
