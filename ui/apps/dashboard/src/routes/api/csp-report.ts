@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { inngest } from '@/lib/inngest/client';
 import { isRecord } from '@inngest/components/utils/object';
+import { eventType } from 'inngest';
+
+const cspViolationEvent = eventType('app/csp-violation.reported', {
+  version: '2025-01-08.1',
+});
 
 /**
  * Normalizes CSP report request bodies from two potential structures:
@@ -63,10 +68,7 @@ export const Route = createFileRoute('/api/csp-report')({
       POST: async ({ request }) => {
         const body = await request.json();
         const normalizedBody = normalizeCspReport(body);
-        await inngest.send({
-          name: 'app/csp-violation.reported',
-          data: normalizedBody,
-        });
+        await inngest.send(cspViolationEvent.create(normalizedBody));
         return new Response(null, { status: 200 });
       },
     },
