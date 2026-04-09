@@ -12,6 +12,8 @@ import (
 )
 
 // Driver implements database/sql/driver.Driver.
+//
+// Registration functions and methods must be called before the first call to Open.
 type Driver struct {
 	// user defined functions that are added to every new connection on Open
 	udfs map[string]*userDefinedFunction

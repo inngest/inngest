@@ -1923,7 +1923,7 @@ modernc.org/mathutil
 # modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.48.1
+# modernc.org/sqlite v1.48.2
 ## explicit; go 1.25.0
 modernc.org/sqlite
 modernc.org/sqlite/lib
