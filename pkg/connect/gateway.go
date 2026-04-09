@@ -91,6 +91,11 @@ type connectionHandler struct {
 	// Once set, heartbeats must not reset the connection status to READY.
 	draining atomic.Bool
 
+	// deletedFromState is set to true after the draining goroutine has
+	// called DeleteConnection. The main handler's defer block checks this
+	// flag to avoid a duplicate (and racy) DeleteConnection call.
+	deletedFromState atomic.Bool
+
 	// messageChan receives forwarded requests from the router.
 	messageChan chan forwardMessage
 
@@ -324,6 +329,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
 					ch.log.ReportError(statusErr, "could not update connection status after context done")
 				}
+				// Delete connection AFTER upsert completes to prevent re-insertion race
+				if delErr := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId); delErr != nil {
+					ch.log.ReportError(delErr, "error deleting connection from state during drain")
+				}
+				ch.deletedFromState.Store(true)
 				ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
 				for _, l := range c.lifecycles {
 					go l.OnStartDraining(context.Background(), conn)
@@ -343,6 +353,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
 				ch.log.ReportError(statusErr, "could not update connection status after drain ack")
 			}
+			// Delete connection AFTER upsert completes to prevent re-insertion race
+			if delErr := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId); delErr != nil {
+				ch.log.ReportError(delErr, "error deleting connection from state during drain")
+			}
+			ch.deletedFromState.Store(true)
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
 
 			for _, l := range c.lifecycles {
@@ -365,10 +380,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// Ensure receiveRouterMessagesFromGRPC exits on any disconnect.
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
 
-			// This is a transactional operation, it should always complete regardless of context cancellation
-			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
-			if err != nil {
-				ch.log.ReportError(err, "error deleting connection from state")
+			// Only delete if the draining goroutine hasn't already done so.
+			// This prevents a race where UpsertConnection(DRAINING) completes
+			// after DeleteConnection, re-inserting the connection into Redis.
+			if !ch.deletedFromState.Load() {
+				err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
+				if err != nil {
+					ch.log.ReportError(err, "error deleting connection from state")
+				}
 			}
 
 			for _, lifecycle := range c.lifecycles {
