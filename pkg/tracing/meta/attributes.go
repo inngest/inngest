@@ -177,6 +177,7 @@ var Attrs = struct {
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
 	ResponseStatusCode:                 IntAttr("response.status_code"),
+	ResponseSteps:                      JsonAttr[ResponseOps]("response.step.ops"),
 	RunID:                              ULIDAttr("run.id"),
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
