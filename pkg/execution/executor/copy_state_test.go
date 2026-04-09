@@ -108,9 +108,11 @@ func TestCopyRunState(t *testing.T) {
 	// ----------------------------------------------------------------
 	// Step 2: Call copyRunState and inspect the result
 	// ----------------------------------------------------------------
-	t.Run("copyRunState populates newState.Steps", func(t *testing.T) {
+	t.Run("copyRunState populates steps and embeds original events", func(t *testing.T) {
+		deferredEvt := `{"name":"deferred.start","data":{"fnSlug":"my-fn","runId":"abc"}}`
 		newState := sv2.CreateState{
-			Steps: []state.MemoizedStep{},
+			Steps:  []state.MemoizedStep{},
+			Events: []json.RawMessage{json.RawMessage(deferredEvt)},
 		}
 
 		req := execution.ScheduleRequest{
@@ -123,20 +125,36 @@ func TestCopyRunState(t *testing.T) {
 		err := copyRunState(ctx, smv2, req, &newState)
 		require.NoError(t, err)
 
+		// Verify steps were copied.
 		require.NotEmpty(t, newState.Steps, "copyRunState should populate Steps")
-		t.Logf("copied %d steps", len(newState.Steps))
-
-		for _, step := range newState.Steps {
-			t.Logf("  step ID=%s Data=%v", step.ID, step.Data)
-		}
-
-		// Verify each source step is present.
 		stepsByID := map[string]state.MemoizedStep{}
 		for _, s := range newState.Steps {
 			stepsByID[s.ID] = s
 		}
 		require.Contains(t, stepsByID, "step-a")
 		require.Contains(t, stepsByID, "step-b")
+
+		// Verify original events are embedded in the deferred.start event's data.
+		var updatedEvt map[string]any
+		err = json.Unmarshal(newState.Events[0], &updatedEvt)
+		require.NoError(t, err)
+
+		data := updatedEvt["data"].(map[string]any)
+		require.Equal(t, "my-fn", data["fnSlug"], "original data fields preserved")
+		require.Equal(t, "abc", data["runId"], "original data fields preserved")
+
+		// data.event should be the source run's first event
+		origEvt, ok := data["event"].(map[string]any)
+		require.True(t, ok, "data.event should be present")
+		require.Equal(t, "test/source.event", origEvt["name"])
+		t.Logf("embedded event: %v", origEvt)
+
+		// data.events should be an array of all source events
+		origEvents, ok := data["events"].([]any)
+		require.True(t, ok, "data.events should be present")
+		require.Len(t, origEvents, 1)
+		first := origEvents[0].(map[string]any)
+		require.Equal(t, "test/source.event", first["name"])
 	})
 
 	// ----------------------------------------------------------------
@@ -144,8 +162,10 @@ func TestCopyRunState(t *testing.T) {
 	//         survive the full Create → LoadMetadata → LoadSteps round-trip
 	// ----------------------------------------------------------------
 	t.Run("new run has memoized steps after Create", func(t *testing.T) {
+		deferredEvt := `{"name":"deferred.start","data":{"fnSlug":"my-fn","runId":"abc"}}`
 		newState := sv2.CreateState{
-			Steps: []state.MemoizedStep{},
+			Steps:  []state.MemoizedStep{},
+			Events: []json.RawMessage{json.RawMessage(deferredEvt)},
 		}
 
 		req := execution.ScheduleRequest{
@@ -172,9 +192,6 @@ func TestCopyRunState(t *testing.T) {
 				FunctionVersion: 1,
 				EventIDs:        []ulid.ULID{ulid.MustNew(ulid.Now(), rand.Reader)},
 			}),
-		}
-		newState.Events = []json.RawMessage{
-			json.RawMessage(`{"name":"deferred.start","data":{}}`),
 		}
 
 		created, err := smv2.Create(ctx, newState)
@@ -208,6 +225,23 @@ func TestCopyRunState(t *testing.T) {
 			require.NoError(t, err)
 			t.Logf("  step %s = %v", stepID, data)
 		}
+
+		// Verify stored events contain the embedded original events.
+		storedEvents, err := smv2.LoadEvents(ctx, newID)
+		require.NoError(t, err)
+		require.Len(t, storedEvents, 1)
+
+		var storedEvt map[string]any
+		err = json.Unmarshal(storedEvents[0], &storedEvt)
+		require.NoError(t, err)
+		require.Equal(t, "deferred.start", storedEvt["name"])
+
+		evtData := storedEvt["data"].(map[string]any)
+		origEvt := evtData["event"].(map[string]any)
+		require.Equal(t, "test/source.event", origEvt["name"],
+			"stored event should contain embedded original event")
+		origEvents := evtData["events"].([]any)
+		require.Len(t, origEvents, 1)
 
 		_ = created
 	})
