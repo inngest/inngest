@@ -3,6 +3,7 @@ package apiv2
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -29,4 +30,8 @@ type FunctionScheduler interface {
 
 type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
+}
+
+type FunctionRunReader interface {
+	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*cqrs.FunctionRun, error)
 }

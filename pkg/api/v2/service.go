@@ -22,6 +22,7 @@ type Service struct {
 	signingKeys    SigningKeysProvider
 	eventKeys      EventKeysProvider
 	functions      FunctionProvider
+	runs           FunctionRunReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
 	rateLimiter    RateLimitProvider
@@ -33,6 +34,7 @@ type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
 	Functions           FunctionProvider
+	FunctionRuns        FunctionRunReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
 	RateLimitProvider   RateLimitProvider
@@ -47,6 +49,7 @@ func NewService(opts ServiceOptions) *Service {
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
 		functions:      opts.Functions,
+		runs:           opts.FunctionRuns,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
 		rateLimiter:    rateLimiter,

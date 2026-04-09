@@ -2,16 +2,21 @@ package apiv2
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
 
 func TestService_Health(t *testing.T) {
 	service := NewService(ServiceOptions{})
@@ -219,4 +224,90 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 		require.Equal(t, timestamp.Seconds, fromTime.Seconds)
 		require.Equal(t, timestamp.Nanos, fromTime.Nanos)
 	})
+}
+
+type stubFunctionProvider struct {
+	fn inngest.DeployedFunction
+}
+
+func (s stubFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {
+	return s.fn, nil
+}
+
+type stubFunctionRunReader struct {
+	run *cqrs.FunctionRun
+}
+
+func (s stubFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*cqrs.FunctionRun, error) {
+	return s.run, nil
+}
+
+func TestService_GetFunctionRun(t *testing.T) {
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+	endedAt := startedAt.Add(2 * time.Second)
+	output, err := json.Marshal(map[string]any{"ok": true})
+	require.NoError(t, err)
+
+	service := NewService(ServiceOptions{
+		Functions: stubFunctionProvider{
+			fn: inngest.DeployedFunction{
+				ID:    functionID,
+				Slug:  "my-app-test-fn",
+				AppID: appID,
+				Function: inngest.Function{
+					Name: "Test function",
+				},
+			},
+		},
+		FunctionRuns: stubFunctionRunReader{
+			run: &cqrs.FunctionRun{
+				RunID:        runID,
+				RunStartedAt: startedAt,
+				FunctionID:   functionID,
+				EventID:      runID,
+				Status:       enums.RunStatusCompleted,
+				EndedAt:      &endedAt,
+				Output:       output,
+			},
+		},
+	})
+
+	t.Run("returns mapped run data", func(t *testing.T) {
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+		require.NoError(t, err)
+		require.Equal(t, runID.String(), resp.Data.Id)
+		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data.Status)
+		require.Equal(t, "my-app-test-fn", resp.Data.Function.Slug)
+		require.Equal(t, "Test function", resp.Data.Function.Name)
+		require.Equal(t, appID.String(), resp.Data.App.Id)
+		require.NotNil(t, resp.Data.Output)
+		require.Equal(t, true, resp.Data.Output.Fields["ok"].GetBoolValue())
+		require.Equal(t, uint64(2000), resp.Data.DurationMs)
+	})
+
+	t.Run("requires run id", func(t *testing.T) {
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "Run ID is required")
+	})
+
+	t.Run("validates run id format", func(t *testing.T) {
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId: "not-a-ulid",
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "Run ID must be a valid ULID")
+	})
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
