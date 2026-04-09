@@ -111,3 +111,15 @@ clean: ## Remove build artifacts
 	rm -f __debug_bin*
 	rm -rf docs/openapi/v2/*
 	rm -rf docs/openapi/v3/*
+
+## NCX
+docker-build: ## Build docker image
+	docker build -t ncx/inngest:latest .
+
+down: ## Run docker compose down
+	docker-compose down --remove-orphans
+
+up: ## Run docker compose down then up
+	docker-compose down --remove-orphans || true
+	docker-compose --env-file .env up --build -d
+

@@ -6,7 +6,7 @@ COPY . .
 ARG TARGETARCH
 ARG TARGETOS
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    GOFLAGS=-mod=vendor GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /go/bin/inngest cmd/main.go
+    GOFLAGS=-mod=vendor GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /go/bin/inngest ./cmd
 
 FROM alpine:3.16 AS inngest
 RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
