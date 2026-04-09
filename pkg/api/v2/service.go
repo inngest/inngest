@@ -23,6 +23,7 @@ type Service struct {
 	eventKeys      EventKeysProvider
 	functions      FunctionProvider
 	runs           FunctionRunReader
+	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
 	rateLimiter    RateLimitProvider
@@ -35,6 +36,7 @@ type ServiceOptions struct {
 	EventKeysProvider   EventKeysProvider
 	Functions           FunctionProvider
 	FunctionRuns        FunctionRunReader
+	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
 	RateLimitProvider   RateLimitProvider
@@ -50,6 +52,7 @@ func NewService(opts ServiceOptions) *Service {
 		eventKeys:      opts.EventKeysProvider,
 		functions:      opts.Functions,
 		runs:           opts.FunctionRuns,
+		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
 		rateLimiter:    rateLimiter,

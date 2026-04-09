@@ -35,3 +35,8 @@ type EventPublisher interface {
 type FunctionRunReader interface {
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*cqrs.FunctionRun, error)
 }
+
+type FunctionTraceReader interface {
+	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error)
+	GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error)
+}

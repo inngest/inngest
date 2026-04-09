@@ -2,6 +2,7 @@ package apiv2
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -242,6 +245,27 @@ func (s stubFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.UL
 	return s.run, nil
 }
 
+type stubFunctionTraceReader struct {
+	root   *cqrs.OtelSpan
+	output *cqrs.SpanOutput
+}
+
+func (s stubFunctionTraceReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
+	return s.root, nil
+}
+
+func (s stubFunctionTraceReader) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
+	return s.output, nil
+}
+
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func strPtr(value string) *string {
+	return &value
+}
+
 func TestService_GetFunctionRun(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -308,6 +332,134 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 }
 
-func boolPtr(value bool) *bool {
-	return &value
+func TestService_GetFunctionTrace(t *testing.T) {
+	runID := ulid.MustParse("01jpq5jcxm8qhg2x61v61bh8p0")
+	queuedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+	startedAt := queuedAt.Add(time.Second)
+	endedAt := startedAt.Add(2 * time.Second)
+	stepName := "Fetch data"
+	stepID := "step-1"
+	stepStatus := enums.StepStatusCompleted
+	stepOp := enums.OpcodeStepRun
+	statusCode := 200
+	responseHeaders := headers.Compact{"content-type": {"application/json"}}
+	outputID := mustEncodeSpanIdentifier(t, cqrs.SpanIdentifier{
+		SpanID:      "span-output",
+		InputSpanID: strPtr("span-input"),
+		Preview:     boolPtr(true),
+	})
+
+	service := NewService(ServiceOptions{
+		FunctionTraces: stubFunctionTraceReader{
+			root: &cqrs.OtelSpan{
+				RawOtelSpan: cqrs.RawOtelSpan{
+					Name:      meta.SpanNameRun,
+					SpanID:    "run-span",
+					TraceID:   "trace-123",
+					StartTime: queuedAt,
+					EndTime:   endedAt,
+				},
+				RunID: runID,
+				Attributes: &meta.ExtractedValues{
+					QueuedAt:      &queuedAt,
+					StartedAt:     &startedAt,
+					EndedAt:       &endedAt,
+					DynamicStatus: &stepStatus,
+				},
+				Children: []*cqrs.OtelSpan{
+					{
+						RawOtelSpan: cqrs.RawOtelSpan{
+							Name:      meta.SpanNameStep,
+							SpanID:    "step-span",
+							TraceID:   "trace-123",
+							StartTime: startedAt,
+							EndTime:   endedAt,
+						},
+						OutputID: &outputID,
+						Attributes: &meta.ExtractedValues{
+							QueuedAt:           &startedAt,
+							StartedAt:          &startedAt,
+							EndedAt:            &endedAt,
+							StepName:           &stepName,
+							StepID:             &stepID,
+							StepOp:             &stepOp,
+							DynamicStatus:      &stepStatus,
+							ResponseStatusCode: &statusCode,
+							ResponseHeaders:    &responseHeaders,
+						},
+					},
+				},
+			},
+			output: &cqrs.SpanOutput{
+				Input: []byte(`{"message":"hello"}`),
+				Data:  []byte(`{"ok":true}`),
+			},
+		},
+	})
+
+	t.Run("returns a nested trace response", func(t *testing.T) {
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.NotNil(t, resp.Data)
+		require.Equal(t, runID.String(), resp.Data.RunId)
+		require.Equal(t, "trace-123", resp.Data.TraceId)
+		require.NotNil(t, resp.Data.RootSpan)
+		require.Equal(t, "Run", resp.Data.RootSpan.Name)
+		require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, resp.Data.RootSpan.Status)
+		require.Len(t, resp.Data.RootSpan.Children, 1)
+
+		child := resp.Data.RootSpan.Children[0]
+		require.Equal(t, "Fetch data", child.Name)
+		require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, child.Status)
+		require.NotNil(t, child.StepOp)
+		require.Equal(t, apiv2.TraceStepOp_TRACE_STEP_OP_RUN, *child.StepOp)
+		require.NotNil(t, child.StepId)
+		require.Equal(t, "step-1", *child.StepId)
+		require.Equal(t, uint64(2000), child.DurationMs)
+		require.NotNil(t, child.Response)
+		require.Equal(t, int32(200), child.Response.StatusCode)
+		require.Equal(t, "application/json", child.Response.Headers["content-type"])
+		require.NotNil(t, child.Input)
+		require.Equal(t, "hello", child.Input.Fields["message"].GetStringValue())
+		require.NotNil(t, child.Output)
+		require.True(t, child.Output.Fields["ok"].GetBoolValue())
+	})
+
+	t.Run("validates missing run ID", func(t *testing.T) {
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Run ID is required")
+	})
+
+	t.Run("validates run ID format", func(t *testing.T) {
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{RunId: "not-a-ulid"})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Run ID must be a valid ULID")
+	})
+
+	t.Run("omits output when not requested", func(t *testing.T) {
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(false),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Nil(t, resp.Data.RootSpan.Children[0].Input)
+		require.Nil(t, resp.Data.RootSpan.Children[0].Output)
+	})
+}
+
+func mustEncodeSpanIdentifier(t *testing.T, id cqrs.SpanIdentifier) string {
+	t.Helper()
+
+	payload, err := json.Marshal(id)
+	require.NoError(t, err)
+
+	return base64.StdEncoding.EncodeToString(payload)
 }
