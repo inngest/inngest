@@ -1,17 +1,10 @@
-import {
-  anthropic,
-  createAgent,
-  createTool,
-  type AnyZodType,
-} from '@inngest/agent-kit';
 import Mustache from 'mustache';
 import { z } from 'zod';
 
-import { setObservability, OBSERVABILITY_LIMITS } from '../observability';
-import type { InsightsAgentState } from '../types';
 import systemPrompt from './system.md?raw';
 
-const SelectEventsParams = z.object({
+// Zod schema for the select_events tool (structured output extraction)
+export const SelectEventsParams = z.object({
   events: z
     .array(
       z.object({
@@ -26,118 +19,81 @@ const SelectEventsParams = z.object({
     ),
 });
 
-export const selectEventsTool = createTool({
-  name: 'select_events',
+// Anthropic tool definition for step.ai.infer()
+export const selectEventsTool = {
+  name: 'select_events' as const,
   description:
     "Select 0-6 event names from the provided list that are most relevant to the user's query. Return an empty array when no specific events should be filtered.",
-  parameters: SelectEventsParams as unknown as AnyZodType, // (ted): need to align zod version; version 3.25 does not support same types as 3.22
-  handler: (args: unknown, { network }) => {
-    const { events } = args as z.infer<typeof SelectEventsParams>;
-
-    // This should never happen - Zod validates it's an array
-    // If this check fails, it indicates a serious type system failure
-    if (!Array.isArray(events)) {
-      throw new Error('Invalid events parameter: expected array');
-    }
-
-    // Empty array is valid - indicates query should not filter by event name
-    if (events.length === 0) {
-      const reason =
-        'No specific events selected - query will include all events.';
-
-      // Persist empty selection on network state for downstream agents
-      network.state.data.selectedEvents = [];
-      network.state.data.selectionReason = reason;
-
-      // Store output in observability format
-      setObservability(network, 'eventMatcher', {
-        output: {
-          selectedEvents: [],
-          selectionReason: reason,
-        },
-      });
-
-      return {
-        selected: [],
-        reason,
-        totalCandidates: network.state.data.eventTypes?.length || 0,
-      };
-    }
-
-    const selected = events.map((event) => {
-      return {
-        event_name: event.event_name,
-        reason: event.reason,
-      };
-    });
-
-    const reason = "Selected by the LLM based on the user's query.";
-
-    // Persist selection on network state for downstream agents
-    network.state.data.selectedEvents = events;
-    network.state.data.selectionReason = reason;
-
-    // Store output in observability format
-    setObservability(network, 'eventMatcher', {
-      output: {
-        selectedEvents: selected,
-        selectionReason: reason,
-      },
-    });
-
-    const result = {
-      selected,
-      reason,
-      totalCandidates: network.state.data.eventTypes?.length || 0,
-    };
-    return result;
+  input_schema: z.toJSONSchema(SelectEventsParams) as {
+    type: 'object';
+    [k: string]: unknown;
   },
-});
+};
 
-export const eventMatcherAgent = createAgent<InsightsAgentState>({
-  name: 'Insights Event Matcher',
-  description:
-    "Analyzes available events and selects 1-5 that best match the user's intent.",
-  system: async ({ network }): Promise<string> => {
-    const events = network?.state.data.eventTypes || [];
-    const sample = events.slice(0, 500); // avoid overly long prompts
-    const currentQuery = network?.state.data.currentQuery;
+/**
+ * Build the event matcher system prompt by hydrating the Mustache template
+ * with the available event types and optional current query.
+ */
+export function buildSystemPrompt(params: {
+  eventTypes: string[];
+  currentQuery?: string;
+}): string {
+  const events = params.eventTypes || [];
+  const sample = events.slice(0, 500);
 
-    // Prepare context for system prompt hydration
-    const promptContext = {
-      totalEvents: events.length,
-      hasEvents: sample.length > 0,
-      eventsList: sample.join('\n'),
-      maxEvents: 500,
-      hasCurrentQuery: !!currentQuery,
-      currentQuery: currentQuery || '',
-    };
+  const promptContext = {
+    totalEvents: events.length,
+    hasEvents: sample.length > 0,
+    eventsList: sample.join('\n'),
+    maxEvents: 500,
+    hasCurrentQuery: !!params.currentQuery,
+    currentQuery: params.currentQuery || '',
+  };
 
-    // Store prompt context in observability format
-    if (network?.state.data) {
-      setObservability(network, 'eventMatcher', {
-        promptContext: {
-          ...promptContext,
-          // Truncate current query for observability
-          currentQuery: currentQuery
-            ? currentQuery.substring(
-                0,
-                OBSERVABILITY_LIMITS.CURRENT_QUERY_LENGTH,
-              )
-            : '',
-          currentQueryLength: currentQuery?.length || 0,
-        },
-      });
-    }
+  return Mustache.render(systemPrompt, promptContext);
+}
 
-    return Mustache.render(systemPrompt, promptContext);
+export type SelectEventsResult = {
+  selectedEvents: { event_name: string; reason: string }[];
+  selectionReason: string;
+  totalCandidates: number;
+};
+
+/**
+ * Parse the Anthropic Messages API response to extract the select_events
+ * tool call result.
+ */
+export function parseToolResult(
+  result: {
+    content: Array<{
+      type: string;
+      name?: string;
+      input?: unknown;
+    }>;
   },
-  model: anthropic({
-    model: 'claude-haiku-4-5',
-    defaultParameters: {
-      max_tokens: 4096,
-    },
-  }),
-  tools: [selectEventsTool],
-  tool_choice: 'select_events',
-});
+  totalCandidates: number,
+): SelectEventsResult {
+  const toolUse = result.content.find(
+    (block) => block.type === 'tool_use' && block.name === 'select_events',
+  );
+
+  if (!toolUse || !('input' in toolUse)) {
+    return {
+      selectedEvents: [],
+      selectionReason: 'No tool call found in response.',
+      totalCandidates,
+    };
+  }
+
+  const input = toolUse.input as z.infer<typeof SelectEventsParams>;
+  const events = input.events || [];
+
+  return {
+    selectedEvents: events,
+    selectionReason:
+      events.length === 0
+        ? 'No specific events selected - query will include all events.'
+        : "Selected by the LLM based on the user's query.",
+    totalCandidates,
+  };
+}

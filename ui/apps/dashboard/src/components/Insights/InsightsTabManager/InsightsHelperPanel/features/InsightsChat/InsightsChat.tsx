@@ -13,27 +13,27 @@ import { UserMessage } from './messages/UserMessage';
 
 // Fun technical phrases that rotate while the agent is working
 const LOADING_PHRASES = [
-  'Analyzing schema…',
-  'Indexing events…',
-  'Parsing metadata…',
-  'Optimizing joins…',
-  'Compiling filters…',
-  'Validating syntax…',
-  'Mapping relations…',
-  'Resolving types…',
-  'Scanning indexes…',
-  'Building AST…',
-  'Inferring constraints…',
-  'Normalizing data…',
-  'Evaluating predicates…',
-  'Projecting columns…',
-  'Aggregating results…',
-  'Planning execution…',
-  'Allocating buffers…',
-  'Streaming rows…',
-  'Caching metadata…',
-  'Rewriting queries…',
-  'Reticulating splines…',
+  'Analyzing schema\u2026',
+  'Indexing events\u2026',
+  'Parsing metadata\u2026',
+  'Optimizing joins\u2026',
+  'Compiling filters\u2026',
+  'Validating syntax\u2026',
+  'Mapping relations\u2026',
+  'Resolving types\u2026',
+  'Scanning indexes\u2026',
+  'Building AST\u2026',
+  'Inferring constraints\u2026',
+  'Normalizing data\u2026',
+  'Evaluating predicates\u2026',
+  'Projecting columns\u2026',
+  'Aggregating results\u2026',
+  'Planning execution\u2026',
+  'Allocating buffers\u2026',
+  'Streaming rows\u2026',
+  'Caching metadata\u2026',
+  'Rewriting queries\u2026',
+  'Reticulating splines\u2026',
 ];
 
 // Hook to rotate through loading phrases every 3 seconds
@@ -42,17 +42,14 @@ function useRotatingLoadingMessage(isLoading: boolean): string {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Always clear any existing interval first to prevent race conditions
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
 
     if (isLoading) {
-      // Pick a random starting index
       setCurrentIndex(Math.floor(Math.random() * LOADING_PHRASES.length));
 
-      // Rotate every 2.5 seconds
       intervalRef.current = setInterval(() => {
         setCurrentIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
       }, 2500);
@@ -75,17 +72,13 @@ type InsightsChatProps = {
 };
 
 export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
-  // Read required data from the Insights state context
   const { query: currentSql, queryName: tabTitle } =
     useInsightsStateMachineContext();
 
-  // Get SQL editor actions service (may be null if not in query tab context)
   const editorActions = useSQLEditorActions();
 
-  // State for the chat's input value
   const [inputValue, setInputValue] = useState('');
 
-  // Provider-backed agent state and actions
   const {
     messages,
     status,
@@ -99,47 +92,31 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     schemas,
   } = useInsightsChatProvider();
 
-  // Derive loading flags for this thread from provider
-  const { networkActive, textStreaming } = useMemo(
+  const { networkActive } = useMemo(
     () => getThreadFlags(agentThreadId),
     [getThreadFlags, agentThreadId],
   );
 
-  // Determine if agent is actively working
-  const isLoading = status !== 'ready' && (networkActive || textStreaming);
+  const isLoading = status !== 'ready' || networkActive;
 
-  // Get rotating loading message
   const rotatingMessage = useRotatingLoadingMessage(isLoading);
-
-  // Thread switching is handled by ActiveThreadBridge at the TabManager level
-
-  // Client state is captured at send-time; avoid continuous effects here
 
   // When active, auto-apply latest generated SQL whenever version changes
   useEffect(() => {
     if (currentThreadId !== agentThreadId) return;
-    if (!editorActions) return; // Not in query tab context
+    if (!editorActions) return;
     const latest = getLatestGeneratedSql(agentThreadId);
     if (!latest) return;
 
-    // Use the SQL editor service to set query and run it
     editorActions.setQueryAndRun(latest);
-  }, [
-    currentThreadId,
-    agentThreadId,
-    // getLatestGeneratedSql is stable, don't include it
-    latestSqlVersion,
-    // editorActions is stable, don't include it
-  ]);
+  }, [currentThreadId, agentThreadId, latestSqlVersion]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       const message = inputValue.trim();
-      if (!message || status !== 'ready') return;
-      // Clear input immediately for snappier UX
+      if (!message || isLoading) return;
       setInputValue('');
-      // Capture client state snapshot at send-time
       try {
         setThreadClientState(agentThreadId, {
           sqlQuery: currentSql,
@@ -155,7 +132,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     },
     [
       inputValue,
-      status,
+      isLoading,
       sendMessageToThread,
       agentThreadId,
       setThreadClientState,
@@ -166,7 +143,6 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     ],
   );
 
-  // Show rotating message when loading, hide when done
   const loadingText = isLoading ? rotatingMessage : null;
 
   return (
@@ -204,7 +180,6 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
                             if (part.toolName === 'generate_sql') {
                               return <ToolMessage key={i} part={part} />;
                             }
-                            // Ignore other tool-call parts here
                             return null;
                           }
                           return null;
@@ -222,7 +197,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
             value={inputValue}
             onChange={setInputValue}
             onSubmit={handleSubmit}
-            disabled={status !== 'ready'}
+            disabled={isLoading}
           />
         </div>
       </div>

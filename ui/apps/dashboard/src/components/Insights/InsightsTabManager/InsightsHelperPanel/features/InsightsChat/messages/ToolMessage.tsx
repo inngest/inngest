@@ -2,25 +2,20 @@ import { Disclosure } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import { type ToolPartFor } from '@inngest/use-agent';
 import { RiCheckLine, RiCloseLine, RiPlayLine } from '@remixicon/react';
 
 import { useSQLEditorActions } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
 import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
-import type { InsightsAgentConfig } from '../useInsightsAgent';
+import type { ToolCallPart } from '../types';
 
-type GenerateSqlPart = ToolPartFor<InsightsAgentConfig, 'generate_sql'>;
-
-function GenerateSqlToolUI({ part }: { part: GenerateSqlPart }) {
+function GenerateSqlToolUI({ part }: { part: ToolCallPart }) {
   const editorActions = useSQLEditorActions();
 
-  const data = part.output?.data;
-  const title = data?.title;
-  const sql = data?.sql;
-  // TODO: (ted): update ToolPartFor to include proper errorMessage type; casting here for now...
-  const errorMessage = part.error ? (part.error as Error).message : null;
+  const title = part.data?.title;
+  const sql = part.data?.sql;
+  const errorMessage = part.error || null;
 
-  if (data === undefined || sql === undefined) {
+  if (sql === undefined) {
     return null;
   }
 
@@ -78,6 +73,6 @@ function GenerateSqlToolUI({ part }: { part: GenerateSqlPart }) {
   );
 }
 
-export const ToolMessage = ({ part }: { part: GenerateSqlPart }) => {
+export const ToolMessage = ({ part }: { part: ToolCallPart }) => {
   return <GenerateSqlToolUI part={part} />;
 };
