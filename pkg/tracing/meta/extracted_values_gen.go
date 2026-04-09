@@ -76,6 +76,7 @@ type ExtractedValues struct {
 	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	ResponseSteps *ResponseOps
 	IsCheckpoint *bool
 	IsUserland *bool
 	UserlandSpanID *string
