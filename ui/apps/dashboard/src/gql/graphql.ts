@@ -921,6 +921,7 @@ export type Experiment = {
   selectionStrategy: Scalars['String']['output'];
   totalRuns: Scalars['Int']['output'];
   variantCount: Scalars['Int']['output'];
+  variants: Array<Scalars['String']['output']>;
 };
 
 export type ExperimentDetail = {
