@@ -1,0 +1,5296 @@
+# Tag Diff Report (Last 10 Tags)
+
+Generated: 2026-04-09
+
+Tags covered: v1.17.5 → v1.52.2-test.5
+
+| From | To | Date Range | Commits | Files Changed | Insertions | Deletions |
+|------|-----|------------|---------|---------------|------------|-----------|
+| v1.17.5 | v1.17.6 | 2026-03-10 → 2026-03-30 | 7 | 219 | +15058 | -2076 |
+| v1.17.6 | v1.17.7 | 2026-03-30 → 2026-03-31 | 9 | 76 | +4175 | -1870 |
+| v1.17.7 | v1.17.8 | 2026-03-31 → 2026-04-02 | 6 | 112 | +3382 | -9331 |
+| v1.17.8 | v1.17.9 | 2026-04-02 → 2026-04-03 | 6 | 7 | +37 | -30 |
+| v1.17.9 | v1.52.2-test.1 | 2026-04-03 → 2025-12-19 | 5337 | 1967 | +112914 | -251639 |
+| v1.52.2-test.1 | v1.52.2-test.2 | 2025-12-19 → 2025-12-19 | 1 | 1 | +2 | -0 |
+| v1.52.2-test.2 | v1.52.2-test.3 | 2025-12-19 → 2025-12-19 | 1 | 1 | +0 | -4 |
+| v1.52.2-test.3 | v1.52.2-test.4 | 2025-12-19 → 2025-12-19 | 1 | 1 | +2 | -2 |
+| v1.52.2-test.4 | v1.52.2-test.5 | 2025-12-19 → 2025-12-19 | 1 | 2 | +2 | -0 |
+
+---
+
+## v1.17.5 → v1.17.6
+
+**Date range:** 2026-03-10 → 2026-03-30  
+**Commits:** 7  
+**Changes:**  219 files changed, 15058 insertions(+), 2076 deletions(-)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 1130 | `tests/execution/state_store/state_migration_test.go` |
+| 926 | `pkg/constraintapi/acquire_test.go` |
+| 908 | `pkg/execution/state/redis_state/reader_test.go` |
+| 680 | `pkg/db/postgres/querier.go` |
+| 659 | `pkg/execution/batch/migrating_test.go` |
+| 635 | `pkg/db/sqlite/querier.go` |
+| 628 | `ui/apps/support/src/data/plain.ts` |
+| 581 | `pkg/execution/realtime/broadcaster.go` |
+| 554 | `pkg/connect/gateway_drain_test.go` |
+| 397 | `ui/apps/support/src/routes/_authed/case.$ticketId.tsx` |
+| 344 | `ui/apps/support/src/components/Support/AttachmentUploadField.tsx` |
+| 303 | `pkg/db/params.go` |
+| 299 | `pkg/execution/realtime/broadcaster_redis.go` |
+| 272 | `ui/apps/support/src/routeTree.gen.ts` |
+| 267 | `pkg/db/models.go` |
+
+### Commits
+
+- bd1f81d28 Pause processing considers event receive time (#3856)
+- 5c2290bcd Add Durable Endpoints streaming support (#3863)
+- b3b4ce49c Add expand/contract all buttons (#3741)
+- 4c9302460 Always enable Constraint API for devserver tests (#3903)
+- 682d7118d Add warn log when cancel finds metadata but events are missing (#3906)
+- 6e28fd613 Fix connect graceful shutdown draining (#3893)
+- 22c6056f2 Allow releasing capacity lease early (#3857)
+
+---
+
+## v1.17.6 → v1.17.7
+
+**Date range:** 2026-03-30 → 2026-03-31  
+**Commits:** 9  
+**Changes:**  76 files changed, 4175 insertions(+), 1870 deletions(-)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 660 | `ui/packages/components/src/RunDetailsV4/Timeline.tsx` |
+| 581 | `pkg/execution/realtime/broadcaster.go` |
+| 299 | `pkg/execution/realtime/broadcaster_redis.go` |
+| 289 | `pkg/execution/checkpoint/checkpoint_sync_test.go` |
+| 286 | `pkg/execution/executor/create_metadata_span_test.go` |
+| 225 | `pkg/execution/realtime/broadcaster_test.go` |
+| 223 | `proto/gen/connect/v1/connect.pb.go` |
+| 209 | `pkg/coreapi/graph/loaders/trace_test.go` |
+| 205 | `pkg/execution/realtime/broadcaster_redis_test.go` |
+| 179 | `ui/packages/components/src/RunDetailsV4/TimelineBar.tsx` |
+| 179 | `pkg/tracing/metadata_test.go` |
+| 174 | `pkg/execution/realtime/api_publish_test.go` |
+| 163 | `ui/packages/components/src/RunDetailsV4/utils/traceConversion.test.ts` |
+| 156 | `ui/packages/components/src/RunDetailsV4/utils/traceConversion.ts` |
+| 128 | `pkg/tracing/metadata/extractors/timing_test.go` |
+
+### Commits
+
+- b63b20d9e Timings Delays - Add Timing Metadata (#3897)
+- aa93fde8a Insights: fix editor diagnostic severity (#3908)
+- 8c740e63b Revert "Add Durable Endpoints streaming support (#3863)" (#3916)
+- c0eff85b1 Remove shard for now, this might be nil (#3915)
+- a9d1817de Add missing pkgName (#3914)
+- f611ade74 Track handled opcodes (#3913)
+- 1b565fac4 Add worker status messages (#3904)
+- ba6c383b1 Fix state proxy not terminating fast enough (#3910)
+- a4a9dea99 Add metadata span size limits and enable step metadata by default (#3840)
+
+---
+
+## v1.17.7 → v1.17.8
+
+**Date range:** 2026-03-31 → 2026-04-02  
+**Commits:** 6  
+**Changes:**  112 files changed, 3382 insertions(+), 9331 deletions(-)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 1107 | `pkg/execution/state/redis_state/shadow_queue_test.go` |
+| 1097 | `pkg/execution/state/redis_state/queue_scavenge_test.go` |
+| 1092 | `pkg/execution/state/redis_state/lua_test.go` |
+| 861 | `pkg/execution/state/redis_state/queue_test.go` |
+| 771 | `pkg/execution/state/redis_state/active_checker.go` |
+| 581 | `pkg/execution/realtime/broadcaster.go` |
+| 525 | `pkg/execution/state/redis_state/queue_dequeue_test.go` |
+| 323 | `pkg/execution/state/redis_state/lua/queue/backlogRefill.lua` |
+| 317 | `pkg/execution/state/redis_state/queue_lease_test.go` |
+| 299 | `pkg/execution/realtime/broadcaster_redis.go` |
+| 265 | `pkg/execution/state/redis_state/queue.go` |
+| 225 | `pkg/execution/realtime/broadcaster_test.go` |
+| 222 | `tests/execution/queue/queue_operation_test.go` |
+| 205 | `pkg/execution/realtime/broadcaster_redis_test.go` |
+| 204 | `pkg/execution/state/redis_state/backlog.go` |
+
+### Commits
+
+- 3bca99f16 Add Durable Endpoints streaming support (#3926)
+- c9d9aa28b Remove constraint enforcement logic in queue (#3765)
+- aa71e1b3c Fix connect workers at capacity does not retry if at max attempts for other errors (#3927)
+- d965b6e93 Fix Connect Gateway dropping requests on termination (#3923)
+- 353e293ac Extend lease lifetime to 2 minutes and track counter if expired (#3922)
+- 11be11e56 Fix finalization bar rendering (#3921)
+
+---
+
+## v1.17.8 → v1.17.9
+
+**Date range:** 2026-04-02 → 2026-04-03  
+**Commits:** 6  
+**Changes:**  7 files changed, 37 insertions(+), 30 deletions(-)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 26 | `ui/apps/dashboard/src/routes/(auth)/agent-deep-link.tsx` |
+| 19 | `pkg/connect/gateway.go` |
+| 6 | `ui/apps/dashboard/src/components/Support/Status.tsx` |
+| 5 | `ui/apps/dashboard/src/components/Billing/Plans/CheckoutModal.tsx` |
+| 5 | `pkg/execution/driver/httpdriver/httpdriver_test.go` |
+| 4 | `ui/apps/dashboard/src/components/Billing/Plans/ConfirmPlanChangeModal.tsx` |
+| 2 | `ui/apps/dashboard/package.json` |
+
+### Commits
+
+- ce0021b68 Fix Connect ack race (#3934)
+- 2fd431578 fix: tolerate expected write errors in TestStreamResponseTooLarge (#3924)
+- 1f4a3f1c9 Add undocumented status to enum (#3931)
+- 373f86575 prevent duplicate token consumption everywhere and strip all auth params on redirect (#3930)
+- c8750f66f Hotfix update to node 22
+- 4560a5861 Adjust billing copy to reflect billing accurately (#3928)
+
+---
+
+## v1.17.9 → v1.52.2-test.1
+
+**Date range:** 2026-04-03 → 2025-12-19  
+**Commits:** 5337  
+**Changes:**  1967 files changed, 112914 insertions(+), 251639 deletions(-)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 20791 | `vendor/github.com/minio/minlz/asm_amd64.s` |
+| 7230 | `vendor/github.com/DataDog/zstd/xxhash.h` |
+| 6307 | `vendor/github.com/DataDog/zstd/zstd_compress.c` |
+| 3942 | `vendor/github.com/cockroachdb/pebble/compaction.go` |
+| 3676 | `vendor/github.com/cockroachdb/pebble/v2/compaction.go` |
+| 3541 | `pkg/constraintapi/constraints_test.go` |
+| 3040 | `ui/pnpm-lock.yaml` |
+| 2624 | `vendor/github.com/RoaringBitmap/roaring/runcontainer.go` |
+| 2618 | `ui/apps/dev-server-ui/src/store/generated-types.ts` |
+| 2568 | `pkg/execution/state/redis_state/queue.go` |
+| 2383 | `vendor/github.com/google/cel-go/parser/gen/cel_parser.go` |
+| 2381 | `vendor/github.com/cockroachdb/pebble/ingest.go` |
+| 2328 | `vendor/github.com/cockroachdb/pebble/v2/ingest.go` |
+| 2278 | `ui/apps/dashboard/src/routeTree.gen.ts` |
+| 2223 | `vendor/github.com/cockroachdb/pebble/v2/compaction_picker.go` |
+
+### Commits
+
+- dc5b70a7b Try using homebrew_casks with goreleaser
+- 4c8c132c0 Add partition processing concurrency limit tests (#3449)
+- bb1cd40a6 try async import of auth, we seem to have stale tokens (#3448)
+- ebfdadb66 create new request (#3445)
+- 8261696e7 debug log for rest api call (#3444)
+- 576a4accf * favicons (#3443)
+- 80dd5986a add missing redirects (#3442)
+- 81097691f tanstack dashboard (#3313)
+- 1a6ce3e79 Enroll individual functions or environments to Constraint API (#3441)
+- 951a70872 fixed mcp tool schema for newer clients (#3434)
+- b75b20f41 Enable key queues for individual function (#3437)
+- 196512c9b Allow 206 as success for legacy tracing (#3438)
+- 0ac63125e Explicitly check for opcode responses (#3436)
+- 1e929ab1f Fix checkpoint lifecycles (#3435)
+- 57c3913dd Implement pause block cleaning to use in Inngest debug function (#3431)
+- 4817b45ce Update dnscache dial (#3433)
+- 5609de222 update next (#3428)
+- aa83290ea Add package name to metrics (#3426)
+- 92d562e40 update stdlib loggging (#3423)
+- 77e945096 add additional histograms (#3425)
+- 9fac54c9d Instantiate clock by default (#3422)
+- 8a2f9ad06 Track cancellation check durations and async calls (#3424)
+- 18a4ec06f Async cancel validation (#3421)
+- 774cec02e Add new GCRA implementation (#3412)
+- 16d070700 don't show loader when doing impersonation (#3420)
+- f391cdb64 Track cancellation redis reads (#3419)
+- 709751514 unbreak clerk impersonation (#3418)
+- feaf4b91a unbork clerk sign-in redirects (#3417)
+- 63b3c82cc use correct input too large error (#3415)
+- b51d7afba Added correct execution count to custom/enterprise plans (#3312)
+- da480074d added updated next invoice amount (#3303)
+- 08021213e uncomments problematic usage queries and adds feature flag to cached queries (#3382)
+- 988f9e4f0 Commit extended trace spans without using TraceReader (#3399)
+- b8ef1adbd feat: send multiple events on the dev server (#3410)
+- 3bf5af6bc Improve Connect Logging And Bugfix For Missing Connection Information (#3411)
+- b5d8aeec8 Only update global scavenger pointer based on partition scavenger index (#3404)
+- c9df35e70 Prevent infinite iterator looping because index gets reset scan is done (#3407)
+- 860640585 Revert "Add basic metadata tab to trace view" (#3408)
+- b5bebc484 Pass struct for capacity lease to add additional state (#3406)
+- 442ceafd9 Explicitly scope prefix for all Constraint API keys (a:<accountID>) (#3405)
+- 5ef2c0a4b Support deleting pauses by id in blockstore (#3385)
+- e61fbea16 Parse AI Gateway Metadata (#3397)
+- 47377131f make gen
+- 064ab1d41 [NO-TKT] Add Env ID To Connection Unmarshall Logging (#3403)
+- 971000cef [NO-TKT] Minor Refactor For Connect Errors (#3400)
+- fe9c872d7 [NO-TKT] Add Logging For Connect Metadata Errors (#3401)
+- b5915c7b9 Add flag to enable throttle fix (#3396)
+- a0217922a Add 'persist' dev server flag. Refactor CLI arg help info. (#3381)
+- e67360486 updated_at -> updatedAt
+- 1ecea2756 Restore gcra tests (#3389)
+- 7c57971c7 add updated_at
+- 6bc1773b1 Add Step Metadata updatedAt field (#3393)
+- 280beed6d fix: Extended trace span IDs (#3392)
+- 4a617d86c fix: move dev-server Toaster from _dashboard to __root (#3394)
+- 30fccfd55 Sort span metadata by scope and then kind (#3387)
+- 03d110764 Revert "Use emission interval to compute variance instead of original period_…" (#3390)
+- 92cb67e8c Skip constraint checks during Lease, BacklogRefill with valid Capacity Lease, introduce new Scavenge index (#3337)
+- dd71a8653 tanstack compatible versions of our shared components (#3384)
+- 73ef72f16 use determinstic app id to prevent panic on app sync (#3386)
+- 40bf27fc5 Fix build for support app (#3374)
+- 26a0eed2b Use emission interval to compute variance instead of original period_ms (#3356)
+- 7a8954c95 Delete duplicate capacity calculation (#3357)
+- 9d5ac87e4 update API endpoint
+- 4eff7063e Pass request into limiter (#3378)
+- 6d3fc22af Update RL call
+- 788a92562 Clean up old RL
+- 1cd811183 Update ratelimit package (#3377)
+- f32e32de0 Add SpanMetadata fields to GraphQL config (#3376)
+- a2876c4e9 Andy/exe 454 integrate useagent query conversation ux (#3370)
+- af7c71655 Update metrics internally for tracking (#3375)
+- f9bd424fd Fix step metadata span addressing (#3372)
+- 981d3770d fix step metadata rollup in devserver (#3371)
+- 2fb57d101  Add `DiscoveryRequest` handling in Executor (#3363)
+- 7237338c5 Add basic metadata tab to trace view
+- 44e1a41dc Fix step metadata span addressing
+- a8c74e34d fix step metadata rollup in devserver
+- 18fabb320 support skeleton (#3331)
+- 236cdcd82 Fix metadata span attributes (#3367)
+- ad512dd52 Fix app URL change creating new app (#3361)
+- 160543c83 Add From method to logger (#3369)
+- c7da44a85 run metrics before all (#3368)
+- 453d2693b Add optional rate limiting V1 middleware (#3366)
+- 6a5f5ed82 fix: Plumb missing metadata scope in GQL (#3364)
+- 9725a270a Add step metadata GQL plumbing (#3345)
+- 5e131c3f3 Add step metadata scope attribute (#3347)
+- 0cd770502 Span metadata extractors (#3346)
+- 8c4419c6c Add ts_dt, received_at and received_at_dt cols to scheme explorer and (#3360)
+- dd2a27e17 Add metadata spans, REST API, and opcode plumbing (#3330)
+- 77a26708f Insights tab management improvements (#3359)
+- 92298ec2b [SYS-370] Adding UI Graphs For Connect Worker Concurrency (#3341)
+- a67cc6341 Fix compaction ignoring blocks when less than threshold (#3354)
+- 1c6b030e0 Add Int64 Data Type As Alias For Number (#3353)
+- cc6031359  [SYS-370] - Total Worker Capacity - Connect Workers Concurrency (#3352)
+- cc9b21186 andy/insights fix and tweak bundle (#3351)
+- dd4d1d7b5 Revert "[SYS-370] - Total Capacity For Connect Workers Concurrency (#3304)" (#3350)
+- 490ef719e [SYS-370] - Total Capacity For Connect Workers Concurrency (#3304)
+- 277bf0804 Add seed to checkpoint traces (#3327)
+- 347f28bad Get pauses by id from block store (#3348)
+- 176559e32 distinguish between self hosted and dev mode (#3344)
+- e6f70cb5b Add CSV and JSON download functionality to Insights SQL Editor (#3343)
+- 4b43626cc added banner showing support availibility during thanksgiving (#3334)
+- 9924ca406 SYS-411: Improve logging for crons (#3339)
+- 7ff96d78b Disable entire executions query
+- e83d584a7 More type issues
+- 3e637f699 Hotfix, fix linting issues for prev deploy
+- 69e32cca1 EXE-1011: Remove usage from overview - HOTFIX (#3340)
+- 16227465c Hotfix lint
+- e35f2a024 Remove billing banner hotfix
+- 65d5ef58d Disable banner hotfix
+- 70ff764e9 Bump golang.org/x/crypto in the go_modules group across 1 directory (#3332)
+- f8a9e4454 Persist Insights query state (#3338)
+- 5971cc484 retry pause creation on invokes (#3336)
+- 25f5c0bfd Insights query formatting and autocomplete (#3328)
+- 59912d52e bandaid: temporarily remove synced functions count, synced functions and removed functions from App All syncs history until an actual solution can be implemented (#3335)
+- 72210e8ca Implement Redis Capacity Manager (#3246)
+- ef6058209 Remove legacy rate limit implementation (#3287)
+- e2be529d6 INN-5509: Implement new telemetry (#3329)
+- 77d1225d3 Release CLI using OIDC (#3326)
+- fb23def3b Fix schema explorer drawer CTA overlap by adjusting visibility based on available space (#3320)
+- 681dc22fd Add support for deep linking in Insights page (#3319)
+- 8c3779c1f Update save button label and icon in Insights SQL Editor (#3321)
+- 67ad569e2 Add nits for logging, crits, and so on (#3325)
+- f158d6af4 [NO-TKT] Use Hash Of Instance ID For Connect Keys (#3324)
+- 166cfa5f8 Revert "Add Validation For Connect Instance ID (#3314)" (#3323)
+- 8eb190db3 Add retryable attr to tracing (#3322)
+- 1fa1ea01a Truncate step IDs & display names in span attributes (#3301)
+- 4bf1464db Bump rueidis version (#3316)
+- c837528a5 EXE-964: Fallback to Github for binary (#3318)
+- cacd4c939 [Insights]: Add Right-Click Menu on Saved Queries List Items (#3296)
+- 4ef409b1f Expose idempotency status from rate limit (#3317)
+- 2b2232fb3 [Insights]: Add shortcuts for saving queries and opening tabs (#3151)
+- 3c2788302 Add Validation For Connect Instance ID (#3314)
+- 0a2f314b0 Use TraceReader instead of FunctionRunReader for Extended Trace spans (#3311)
+- 27829ee62 [SYS-370] Make Connect Worker Concurrency Errors User Friendly (#3309)
+- ce315331f EXE-894: Show executions usage and limit for Hobby plan (#3279)
+- 42161d98a Debug API commands for pauses (#3308)
+- d09608bff [Insights]: Add Ability to Share Queries (#3294)
+- 1a726d00a [Insights]: Show Query Authorship History (#3286)
+- fd765e712 [SYS-370] Connect - Don't Log Worker Capacity Error (#3307)
+- 5fa8d6aab [Insights]: Display Shared Queries Separately from Saved Queries (#3283)
+- c5986d4b3 Fix tags for rate limit counter (#3306)
+- a2123f29b Block Compaction (#3302)
+- 824b8b07e Fix span durations for spans with parallel children (#3229)
+- 8a63a3ce4 Track pause deletion per block (#3278)
+- 22b2547e5 Ignore singletons during normalization (#3299)
+- 8c579a388 Fix rate limit incompatibility (#3290)
+- 6c082ce48 Always return a token when checkpointing a new run (#3293)
+- 13fe6e046 john/pdes 33 fix ux issues with click to copy timestamps in clickable (#3285)
+- a5eca35ba unmarshal raw span inputs/outputs in postgresql normalization (#3291)
+- 3aca05fd8 [Insights]: Remove select-none in SchemaViewer ValueRow (#3292)
+- f889bfd06 refactor: store AppID and FunctionID on userland traces (#3270)
+- 147c8e104 Use correct key (#3288)
+- 0ad33ad9e fix: Plumb App ID in state (#3273)
+- f14977076 [SYS-370] Connect Worker Concurrency - Change UI Errors (#3271)
+- 67610c472 Add some cron utils (#3284)
+- 652daa1b1 [Insights]: Remove Key Count Pill from Schema Objects (#3274)
+- 498c2b9f6 Export rate limit options fn (#3281)
+- a121185d1 SYS-375: Implement rate limiting in pure Lua (#3265)
+- 2c89f68f2 Add helper functions to perform targetted cron health checks (#3272)
+- 92018d6a8 fix new trace sql for postgresql (#3275)
+- 304105726 retry state deletion if pause deletion fails instead of a partial delete (#3276)
+- d16f18a5a Clean up state deletion (#3277)
+- 184df7234 [Insights]: Add Schemas in Use Section (#3269)
+- d16ad406a Add a ctx timeout for db reads within partition_peek (#3268)
+- 0305414f1 [SYS-370] Add Connect Worker Concurrency (#3196)
+- 88e3e46bf [Insights]: Various Schema Widget Improvements (#3267)
+- b9e3c3e3f Fxi new default level (#3266)
+- 304bfa6f0 Only use attribute time for start/end (#3263)
+- 54b6d6936 Ensure P1, P2 are not disabled for enterprise (#3261)
+- bfcef4465 [Insights]: Count schemas toward cap even if they are not valid JSONSchema (#3262)
+- b450838e7 [Insights]: Fetch Real Event Schemas in Schemas Explorer Widget (#3256)
+- 711d08aed Remove latestSchema from event types query (#3260)
+- 07e11eb6f Log slow queue operations (#3258)
+- 9874e2fba [Insights]: Improve UI Rendering of Custom Event Schemas (#3251)
+- a616f39a4 [Pauses] Log on skipping block flushes (#3259)
+- abfa221ab checkpointing updates
+- 0a1a1a158 Explicitness re. how and what happens on fn completion (#3255)
+- 474ffb8de fix nil connect gateway IP on self-hosted (#3257)
+- f3f5f7b5f [Insights]: Update transformJSONSchema for Arbitrary Schemas (#3249)
+- dfa5bf7d5 only emit status updates when they change (#3254)
+- f09b684a9 removed execution capacity (#3245)
+- e034508fe fallback to different partition keys when main one is empty (#3253)
+- 15c0e810b Add a test for ItemsByPartition requesting non-existant partition (#3252)
+- 5f0efc90f Ignore technically-valid crontab expressions that never tick (#3248)
+- 7d50929ba EXE-849: event emitter for dynamic run list status and endedAt (#3250)
+- 8c82d9241 [Insights]: Fix Schema Widget Resizable Overlap Issue (#3240)
+- 0ca4edbfc [Insights]: Render Common Event Schema in Schema Explorer (#3228)
+- d68af6415 allow block store struct creation without a bucket setup (#3247)
+- dd4921d1e Pause block flushing in a system job (#3213)
+- e3057cc57 fix: less comples GraphQL query for nested spans (#3243)
+- 2e9e89c55 refactor: improve userland trace view (#3241)
+- d5337ea8a fixes plan unit display (#3209)
+- 12cedf145 Changed overlay time format.Enabled copy ISO in table (#3242)
+- d6706fe26 tanstack for dev server (#3162)
+- 63308ac12 fix: don't zero-out userland trace span EndedAt (#3232)
+- 887a63ac0 tests: add error/retry tests for Go SDK (#3225)
+- c02773feb Constraint API execution changes (#3142)
+- 1cd15de48 Add 60s timeout to connect syncs (#3236)
+- d81570221 Allow setting override idempotency TTL on queue items (#3234)
+- c22a67d90 [Insights]: Introduce transformJSONSchema to Simplify UI Schema Rendering (#3226)
+- 9944e2280 EXE-798: Enhance VercelIntegrationError component with reconnect option and user guidance (#3235)
+- 7c7600497 Dev Server MCP (#3194)
+- 0cd08f056 capture output directly if unmarshallable (#3230)
+- 3607fa5f3 [Insights]: Introduce Insights Helper Panel on Right Side (#3220)
+- c705dc2d7 Ensure we set the dynamic status on checkpoint traces (#3227)
+- f57905ba0 [EXE-758] Instrument scheduled run types (#3195)
+- 51ed41873 Allow setting list of accounts in queue to peek exclusively (#3224)
+- 06e9ed761 Remove unused timeDecorator from cel expressions evaluation (#3223)
+- a679bda90 Disable project zero from `/v1/events/{eventID}/runs` temporarily (#3222)
+- 4bed3deea Make connect ports configurable through CLI arguments (#3204)
+- 00ff12f58 Fix function runs showing "Running" instead of "Queued" status in Dev Server UI (#3187)
+- f4e11de1c Check score on backlogRefill (#3221)
+- 59440a790 Update ended_at timestamps in dev server traces (#3218)
+- 41b68d196 project zero: tracing and upsert updates (#3217)
+- abcd2160f Make logs less noisy (#3215)
+- b118065b7 Fix flaky test: TestPauseCancelFunction (#3212)
+- dd362337f Update serializers, tracing, and various utilities (#3200)
+- 324afcd52 Add base deterministic trace/span ID generation logic (#3210)
+- 7815ddae5 SYS-409: Cron Health Checks (#3201)
+- ab1f716bd fix: remove singleton tracer to prevent stale metadata (#3208)
+- 210da3d18 Update Inngest Go SDK (#3207)
+- 7c65ce4a6 still run gorelease and build binary, only skip the upload to docker on beta (#3205)
+- c8a21b3ef Fix run span idempotency race condition (#3183)
+- ccf3ff9b3 add goreleaser dep back to npm release action (#3203)
+- 6543c8f13 fix: correct CreateSpan call args (#3202)
+- 8bab1daaa Add userland trace support to incoming tracing (#3090)
+- e008beff9 Add new capacity manager interface (#3126)
+- d9cd2e72b EXE-746: skip docker hub release for beta tag (#3182)
+- 83dc03e6f Delete copy-pasted Execute comment over Schedule (#3198)
+- b5e8560a7 Fix missing non JSON output (#3171)
+- eb0fe80e9 [cron] Remove unused redis client (#3192)
+- ccd203c5b ✨ Set up Copilot instructions for the repository (#3189)
+- d8abfc2b5 Backlog refill items peeked ahead of time (#3181)
+- 515bccab9 squash commit of all debugAPI changes from #2847 (#3132)
+- cb85933ed SYS-76: Redo cron using queues (#2847)
+- e14ab7cf0 Added Churn Survey (#3123)
+- 5f7dc451e use a blank context for parent traces (#3180)
+- 66434ca81 temporarily use simple processor (#3179)
+- 08fb95923 use conc for global wg (#3178)
+- d48acf615 use batch timeout in tracer (#3177)
+- 7523b56a7 span ctx (#3176)
+- aec43fad0 Add histogram for span committing (#3174)
+- 1c14ab568 Update issue templates (#3173)
+- 88dbb04c4 fix: Unwrap extra StandardError wrapping (#3120)
+- f5b451fd4 Add Connect Worker Addon (#3131)
+- 8b4b1ece9 Add GH workflow to run make gen protobuf (#3170)
+- 78962863a [Security]: Confirm pnpm 10 install behavior (#3169)
+- 1b219b72c Add StepUserlandID and StepUserlandIndex attributes (#3163)
+- 7728a8515 [Security]: Bump pnpm 8 to pnpm 10 and add minimumReleaseAge setting (#3122)
+- dad579788 Delete dropSpans (#3167)
+- 248673600 Fix Schedule missing some necessary span drop spots (#3128)
+- 9f87a7c6c Replace Add with Set for content-type (#3166)
+- b03795722 Drop span if enqueue rejects an item because of singleton config (#3157)
+- c6f2cefbb Add feature flags controlling block store rollout (#3150)
+- e76a50b65 Return error when pauses block boundaries have the same value (#3137)
+- 87d6cb4ed Add interface for arbitrary checkpoint metrics (#3158)
+- dd62ffb4a add compression preferences for producer (#3153)
+- 4b8868536 Don't send spans for events dropped due to singleton config (#3152)
+- 42c4ebfc4 Delete some console.error calls that caused CPU throttling (#3147)
+- 63666c873 extract the list of IDs before attempting to iterate over them to (#3139)
+- dd13a1b43 fixed status link to navigate to status page (#3148)
+- 2b84838ee [Insights]: Fix suggestions widget overflow (#3135)
+- db7184e7f Fix runs page filter logic (#3145)
+- 51681b184 add new unknown status to frontend run status const (#3146)
+- c7c215c24 EXE-695: default trace preview feature flag call to true (#3143)
+- cb7e6e153 [rest-v1]: update event runs API endpoint (#3144)
+- 564331d1a Move rate limit enforcement into Schedule (#3124)
+- 5b89a8e02 Update Executor IP on LeaseRequest (#3141)
+- 6ecf90bf0 nit: always add a status when enqueueing root spans (#3140)
+- 0c2668c19 SYS-395: Increment function version on syncs. (#3114)
+- 42a320d0c Fix run popout status different than run list (#3136)
+- f426fd849 Fix skipped runs have queued status (#3134)
+- 80cf6b098 Feature: Insights SQL Agent (#3007)
+- bf1413a08 Drop spans on blocking batch processor (#3133)
+- 1c274032e Add optional root element to InfiniteScrollTrigger component to allow rootMargin to work (#3130)
+- 7b229c3b9 Set cancelled status on cancel (#3103)
+- 06775c9ff fix: Collapse steps with a single attempt (#3111)
+- c21edc1a4 fix: Clarify ErrDenied to include timeout as a cause (#3105)
+- cddf61a5f EXE-608: global feature flag toggle (#3121)
+- c7182d04d [Insights]: Remove FE feature flag check (#3116)
+- 7c059dd02 Do not drop all run spans!!! (#3119)
+- c3db45bc5 [Insights]: Reduce width allotted to resources section (#3118)
+- 98fff8826 Fix ghost spans 👻 (#3115)
+- 46df8f945 fix broken global precommit hook check (#3117)
+- 657db2cf6 [Insights]: Highlight template variables in query editor (#3092)
+- 22e4ef099 also run any global precommit hooks before running our husky ones (#3109)
+- 3bdb9176e Use Milli functions directly (#3046)
+- 8588f321b Add workflow to close inactive issues (#3101)
+- b513b1534 [Insights]: Sync autocomplete function suggestions with BE (#3079)
+- 2bbd7f051 [Insights]: Modify editorSuggestWidget background color (#3086)
+- 3fb2cc010 add GetEvent in executor to help build an inngest fn for resuming pauses (#3108)
+- 8f4bacadc changed width, fixed resposiveness and account concurrency series0 (#3089)
+- 0adb6cea8 fix: show error on function runs page instead of no results on error (#3106)
+- 7810c9ef5 reducing sample rate (#3104)
+- 076c833c8 Move StepStatusToRunStatus to enums so we don't have to depend on base_cqrs package (#3102)
+- d13791b49 Accept trace_preview query param on event runs v1 API to use trace preview run status (#3097)
+- ebe713543 Delete preDeleteStateSizeReporter (#3091)
+- 0eef60871 Fix missing GROUP BY in Postgres queries (#3098)
+- ff03c50fd backout debug run id step selection stuff to fix step selection (#3093)
+- 4dcaa1317 Track invoke and signals (#3087)
+- cb2a1d05d Fix mixed SQL dialect (#3088)
+- 7d5c2a0ca enable trace preview on standalone run page (#3085)
+- 09ce99b8d Create Patch Envs endpoint (#2955)
+- 42442605d Don't close channel to avoid "send on closed channel" panic (#3084)
+- 2e9e41898 Check Errors For Singletons Before Logging (#3083)
+- edddb2939 make zero apps look not-archived (#3082)
+- ad900f62a [Insights]: Make Insights panels resizable, introduce Resizable (#3060)
+- 1a1bdba10 Hide Metrics feedback widget and some styling updates (#3077)
+- 70c147529 don't sync project zero apps, fix run duration logic  and panic (#3080)
+- 277fa4b38 Implement eager cancellation for start and finish timeouts. (#3059)
+- 95aa077f7 typo (#3076)
+- 5e8722de3 Add CreateEnvRequest.id (#2954)
+- 9188e5110 Upgrade garnet version in tests (#3074)
+- fac6e05c3 If batch item already exists, treat it as a no-op (#3075)
+- 9b42a1d7b Track EventID idempotence across batches (#3066)
+- bf6a81013 Remove launch week banner (#3073)
+- 442cfbdf9 EXE-259 Fix some odd queue times in incoming tracing (#3072)
+- 0324b310d Deprecate old events key from state store (#2976)
+- 52c911e90 Connects the trace preview feature flag to run listing (#3071)
+- 5e7906489 prevent infinite loop in scan edge case (#3070)
+- 10c49d3ef Switching sample rate to 100% while we are on a trial still (#3068)
+- 65c6d2f9a Minor refactor to breakdown large functions (#3057)
+- e77435aba use supported data star (#3067)
+- 7a60b676f feat: add OpcodeStepFailed support (#2992)
+- 6e0e84e52 Implement idempotence for appending events to a batch (#3052)
+- fafd4b09f Add condition (#3064)
+- c84c5ed6f changing sample rate for all sessions from 0 to .5 while we use the trial (#3065)
+- 6b2dc6b02 wip on debug run and debug session ui (#2986)
+- b569d2749 Update to handle missing workflow version (#2995)
+- 89c17065f a unique identifier on code search for sentry (#3061)
+- 3a3ed4401 Allow marketplace accounts to see usage page (#3054)
+- 20342228e retry steps on system errors after receiving a successful SDK response (#3056)
+- 035814142 fix hanging invoke runs when retrying from i/o timeouts (#3055)
+- cd6677d82 Capture step inputs in incoming tracing (#3043)
+- 5d1b3585f Refactor to remove calls to workflows.current and access triggers directly from workflow (#3021)
+- fc41d7d0e Add Valkey/Garnet compatibility tests (#3045)
+- 04c71de35 Remove card (#3051)
+- d9f7261bf Add ?ref to insights link from launch modal too (#3048)
+- ece5e7bc6 Do not disable bypass protection form (#3047)
+- ac43eadc5 [Insights]: Update docs links (#3034)
+- c49cd050f Tuesday in app launch banner (#3044)
+- 96e186047 [Insights]: Revise query templates (#3038)
+- 21a4444bb Capture AI output in tracing (#3042)
+- 61bddd26e added ?ref to links in banner (#3040)
+- c541d06f3 Devserver: publish on localhost via realtime forwarding (#3023)
+- b424de73a [Insights]: Remove GQL prefix from visible error messages (#3037)
+- c1a1cf57b Remove event_ from columns in insights templates (#3025)
+- 08f24955c [Insights]: Display results history limit (#3036)
+- 143ced45b Persist the trigger name through as an attr in tracing (#3035)
+- 987ae0f40 [Insights]: Add link to collect feedback (#3016)
+- 21b6ad44d [Insights]: Add select * from events query template (#3033)
+- dbfaab914 [Insights]: Move query management from LS to BE (#3002)
+- 6424d89e7 Adding launch week announcement to the sidebar (#3027)
+- d598e06a5 Launch week day 1 in-app announcement (#3029)
+- 6f2a1c2b9 Fetch trace event IDs when listing in Dev Server (#3032)
+- b95c5fb19 CON-327: Refactor GraphQL queries to use latestSyncedConfig (#3017)
+- 77dfbfaa0 Fix span processing order for new tracing (#3031)
+- 36275724c Add run claim JWTs for sync APIs (#3030)
+- a552ce57c Turn off tanstack useQuery retries for insights (#3026)
+- 26b6dd66b App method API UI tweaks (#3022)
+- 8b1395197 Disable trace preview run listing in Dev Server by default (#3019)
+- ed3e3e7de Fix output erroneously being two values (#3018)
+- 1d6e18121 Improve Vercel integration UI (#3013)
+- 87ef4d641 Fix time serialization being values CH struggles with (#3014)
+- e4f2af993 Return response along with err from CritT (#3009)
+- 9fad81f36 step types in run traces (#2938)
+- 925ec1bf7 [Insights]: Mark Insights as a beta feature (#3010)
+- b0a2ffac0 [Insights]: Prevent results table overscroll issue (#3008)
+- f38aac2aa [Insights]: Extend query template list (#3005)
+- df72203ea [Insights]: Change new insight verbiage to new query (#3006)
+- f649e58b2 fix: problem with multiple event trigger expressions (#2951)
+- 5482fe63f [Insights]: Render prettified JSON data in results table (#2996)
+- 10df3ebc8 CON-317 Remove fe validation from cel expressions (#3003)
+- e6f6ca11c [Insights]: Move query history to ephemeral react state (#3000)
+- b1fea2e48 Remove the right arrow on hover for text links at the component level (#2999)
+- 3da0bc329 [Insights:Tabs]: Prevent active tab switch when closing a tab (#2997)
+- 7fb128522 Persist function output on run span (#2998)
+- 5ea5131c3 Persist event input data in run traces (#2993)
+- fe8c96f48 Checkpoint nits (#2988)
+- 86c784696 Fix infinite scroll when search is open (#2994)
+- 2895f7c19 fixing the height of the datadog integration card by adding a min-height-full to take on the height of the parent (#2981)
+- 7ae6567f8 Hide internal events by default on events page (#2990)
+- d3c276ead fix invoke retries hanging when pause is already created (#2991)
+- e3939e27a Explicitly set run span to "Running" on first step (#2989)
+- c622e55fa better handle long errorss in run trace outputs (#2987)
+- 84afe1e58 CON-196 Remove pin from Clerk (#2982)
+- 902e23fcc [Insights]: Point Insights feedback link to support page (#2985)
+- 21bd01105 change it back to trace logs (#2984)
+- d967fc9bf allow adding a new input in code block when output is too large (#2983)
+- 87169adc0 Fix infinite scroll when list is too short to fill page (#2979)
+- e730f3e32 CON-139 Fix nesting issue in replay event data field (#2980)
+- 03d307913 Fix state store bytes-written metric to capture size of entire state (#2978)
+- 44bc5d2d1 updated navigation sidebar and environment dropdown styling (#2977)
+- ef4203b5f Reduce sidebar menu spacing (#2975)
+- 113816a4c Update insights template to use calculated 3 days ago (#2974)
+- 6ea1db961 [Insights]: Prevent query editor perf issue via memoization (#2973)
+- db391bc94 Hide Concurrency CTA for Marketplace Accounts (#2972)
+- 3356d912b Bump nodejs in .tool-versions to 22.16.0 (#2967)
+- 1bfe6b3ef Test different throttle constraint/item combinations (#2969)
+- b79cf7e82 Add account ID to EnvironmentReader.GetEnvironmentBySlug (#2960)
+- 3479acff6 Make sure to check constraint also has throttle set (#2968)
+- b650ac605 Use throttle constraint config (#2966)
+- 23a841173 Reduce partition paused requeue extension (#2965)
+- efd48360a [Insights]: Move insights below events in monitor nav section (#2962)
+- 1eb681d00 fix: only trigger 1 onFailure call on parallel step failure (#2907)
+- bb528a001 [Insights]: Add keyword-based autocomplete (#2867)
+- 5f68bfb67 Fix `Finalize()` trace IDs being incorrect (#2961)
+- e2a8c59dd fix ci name (#2959)
+- 9faebf659 Linter tweaks (#2956)
+- 8a4873239 List runs using new trace data (#2948)
+- 4ece2f946 Connect log improvements (#2957)
+- 9a93dc0b3 [Insights]: Remove account_id from templates (#2936)
+- c0594961d Query by archived (#2953)
+- 832548c48 [Insights]: Remove workspace_id from templates (#2933)
+- 734857ccd [Insights]: Check loading state before error state (#2952)
+- 491c91905 update deps (#2949)
+- b8538edff [Insights]: Add missing border between query editor and results section (#2950)
+- 2eaccafdb Add support for multiple prod envs in UI (#2946)
+- ce697cebe Add delete manager (#2917)
+- 7f7fa5ad5 Add maintainable examples to OpenAPI docs (#2919)
+- be27bed8a Prevent billing page rendering for marketplace accounts (#2945)
+- 85e384e90 Refactor Error handling, interceptor helpers, validators and utils for REST API v2 into an injectable base package that can be reused in cloud. (#2944)
+- c6ecb7e8d Bump github.com/go-viper/mapstructure/v2 (#2858)
+- 613677da5 debugger resolvers, loaders and fetch/map implementation (#2908)
+- 16fe4d111 [Insights]: Temporarily hide .csv download button (#2941)
+- 484550195 Add iterator option to force next page (#2943)
+- 47d843138 add flag support for disabling polling everywhere in dev server (#2940)
+- 3ed545a49 add some more logging when kafka span export fails (#2931)
+- d2e514fe0 [Insights]: Indicate row limit on results (#2937)
+- 1661d34b6 add support for AllExceptCustomDomains Vercel deployment option (#2939)
+- 53bb3fa82 Introduce system queue for pausing/unpausing functions (#2850)
+- 3005ebd16 Temporarily remove concurrency banner (#2906)
+- 9a570b236 Add methods to state store manager to support partial cache hits (#2932)
+- 198a89d02 [Insights]: Add permanent home (icon) tab (#2934)
+- 057961a6a [Insights]: Temporarily hide query example links (#2935)
+- c3be9c4c8 Execution driver update scaffolding (#2837)
+- 27eab8208 Add a Cached bool field to LoadEventsResponse (#2923)
+- 0f911d60b [Insights]: Copy template name to tab name (#2930)
+- 4ce603725 [Insights]: Update templates (#2862)
+- acca4dd24 [Fix]: Clean up Insights lint (#2929)
+- 1110e8fda better support api error log (#2928)
+- 619b49006 [Insights]: Temporarily hide docs side panel (#2926)
+- af3890148 [Fix]: Improve function configuration table tooltip (#2903)
+- 1dde2b95a [Insights]: Templates tab pane refresh (#2921)
+- 7a88e1e66 turn new traces back on after recent fixes (#2925)
+- 5de69a5fe CON-159 Expose replay fields in UI (#2874)
+- d87867ab2 Fix spans when using (AI) gateways (#2918)
+- 6e4543cb7 initial trace context properly on gateway step discovery (#2902)
+- 9648541ef Fix finalize span having a bad trace ID (#2915)
+- 8ff37f336 Add V2 endpoints for webhooks (#2922)
+- 7e1d24be6 temparily pinning clerkjs for styles (#2920)
+- 67d07ca0f Fix retry not returning unwrapped error when max retries is 1 (#2913)
+- b23edac4c Iterate over system partitions (#2914)
+- 976881af5 [Insights]: Support cmd+enter shortcut to issue an insights query (#2909)
+- 2f99596d1 temporarily remove banner render tracking (#2910)
+- 2f82c0d27 [Insights]: Pass workspaceID (env) to BE when issuing SQL query (#2901)
+- 839ab3944 disable new traces in dev server for now (#2905)
+- 2eb19bae6 Distinguish between Dev Server and Prod Server in CLI startup output. (#2904)
+- 6ce4e32de Implement event keys endpoint (#2894)
+- 4ec58868a REST API v2 - Fetch Signing Key (#2891)
+- a363abb5a REST API v2 - Fetch Envs (#2889)
+- 8e3be2f17 CON-190 Increase page size for functions and events (#2900)
+- a891e0ca5 Update FetchAccount to return default dev server account (#2887)
+- a3b61b03e upstreamed expr to include roaring bitmaps (#2897)
+- ab2b01b43 added use client to data.ts (#2898)
+- 6154fb0ff Fixed execution banner to only show free plan (#2896)
+- 66698cbc1 [Insights]: Integrate query fetching with BE (#2854)
+- 84953a51e Fix flashing traces (#2895)
+- efc62b5e7 Added execution overage banner (#2811)
+- 955ff8c28 Add custom JSON proto request validation (#2886)
+- b4942b9d9 [Insights]: Support templates, saved queries, and query history (#2839)
+- 3346cfeee Remove options from datepicker (#2893)
+- 016329d95 Added new tracking to user seat overage widget render (#2846)
+- 56f7d74e0 Add option to state store mgr to disable built-in retries (#2888)
+- dffcb7ef2 reduce run trace polling noise (#2890)
+- 8be8ff35c Log body when stream isn't valid JSON (#2885)
+- 3ff1f279d Simplify url structure by removing accountId from url (#2884)
+- 7f4410ed9 api v2 nits (#2883)
+- 3ecdb39c6 API util for fetching envs (#2882)
+- 4bf0822af Update V2 partner prefixes (#2881)
+- 682e64d89 Fix Redis Sentinel authentication by copying main credentials when creds are present and masterset is present. (#2823)
+- 29d85da52 Add event key listing (#2880)
+- 77f6e0339 V2 Scaffold: listing of signing keys / x-inngest-env header (#2879)
+- c1ef2ad74 Implement env listing API scaffold (#2878)
+- 28f2c3667 Remove `copier` usage in cqrs (#2870)
+- 98ecd5212 Add create env endpoint spec (#2877)
+- ee09ad45c Add fetch single account endpoint (#2876)
+- c7c4738e5 [Insights]: Support reusable Tabs component dynamic variant (#2825)
+- 12f115aea Add missing protobuf fields for state proxy service (#2873)
+- d508afa16 fix CQRS conversion issue with `copier` (#2868)
+- 2fab53df0 Revert "Add protovalidate-go library and wire up as default validator for gRP…" (#2869)
+- e30320b86 Add protovalidate-go library and wire up as default validator for gRPC and REST calls to v2 endpoints (#2866)
+- 838cb7114 chore: sort OtelSpans deterministically in GraphQL (#2859)
+- f7ed85a22 Implement custom error handling and error response format to meet REST API v2 spec (#2865)
+- b16e3dab1 docs: remove `--yes` from `vercel link` (#2853)
+- 864de543c Add additional debug command for queue item (#2864)
+- fe7f25551 REST endpoints not being generated (#2861)
+- 3ee92dd4a Connect gateway ip should default to 127.0.0.1 for devserver (#2863)
+- 15d44040c back out new polling interval (#2860)
+- f9d3bfd3b Tracing `"Finalization"` span (#2857)
+- 13b195e1b Make create in state store manager return a v2 state (#2848)
+- 71a24401b Allow toggling preview traces in Dev Server (#2851)
+- e5b68e6fd Revert "Revert "added dedicated slack channel addon (#2831)" (#2855)" (#2856)
+- 2651f8c46 Implement OpenAPI v3 Doc Gen (#2852)
+- c8e26b226 Revert "added dedicated slack channel addon (#2831)" (#2855)
+- bce03cb48 added dedicated slack channel addon (#2831)
+- b3c427c44 Add more CQRS data types to share (#2849)
+- 3e9d8795b rerun from step everywhere (#2816)
+- c57922897 Implement gRPC authentication and authorization middleware with interceptors (#2842)
+- 185454d2d Add proto annotation to allow authorization middleware to be applied to specified REST API v2 endpoints (#2840)
+- 50ebc371e Remove redis and postgres connection string details from logs (#2828)
+- 97dc3b889 Sample refill logs (#2845)
+- 2ebb02e8b Generate state proto service with protoc (#2834)
+- 00519f3d4 CON-131 replace old table in replays cancellations and payments (#2826)
+- 3ea255ad2 Update `go run ./cmd/main.go` to `go run ./cmd` for using dev server local build (#2843)
+- da86503ad fixed cli cmd telemetry (#2841)
+- 68bbc0e5d Set overscroll-none on body to prevent accidentally going back while scrolling horizontally (#2838)
+- 896abf839 Initial implementation of grpc-gateway for REST API v2 (#2835)
+- a1136d744 Sync -> async conversion and re-entry (#2836)
+- f1c43c145 Add account concurrency chart (#2829)
+- 9672fcd01 Introduce new hobby plans (#2812)
+- 730e464e3 SYS-285: Add conditional expression for batching eligibility (#2818)
+- 24b0aac6d Spit out span size when message is too large for kafka (#2824)
+- 9baea82fd Move new Event API content types to fallback (#2796)
+- 7aecddc0a SYS-253: Source paused status from new getter, migration from lock key (#2806)
+- 82d97f039 Remove unnecessary IDs for queries using UUIDs (#2822)
+- 89f8078d7 improve aggregator logging (#2821)
+- 2853965d8 [Insights]: Refactor Insights ahead of multi-tab support (#2807)
+- e3a7b8cdc Cleanup connect pubsub code (#2752)
+- e312e5ef9 SYS-211: Add tests for batching events + if triggers (#2817)
+- ccd0e6621 CON-119 Fix storybook (#2815)
+- fd05e7f32 Add Concurrency CTA (#2804)
+- 129a88bb6 Add propagation fix (#2814)
+- 53be48bb8 Improve UX of functions list (#2803)
+- 25e1c89a9 remove unused deps
+- 51c04dfca Add debug API (#2764)
+- 946cc4657 Do not save event payload in `Span.triggers` (#2810)
+- 00fb4aa91 check new error state for no run span error as well (#2808)
+- 4244a587f Revert "INN-2664 Fix `step.invoke()` hanging indefinitely if debounced (#2518)" (#2805)
+- 3101519cf Enhance signing-key validation: update error messages and enforce even character length for hex strings (#2802)
+- f04b019e8 Add executions usage chart (#2801)
+- 2fc8bdd08 Insights: Add (mocked) results table (#2773)
+- 787e12d86 Insights: Introduce state context (#2780)
+- 8a085a583 Maybe fix flaky test (#2781)
+- 2947ad6d2 CON-106 Clean old time filter from dashboard (#2789)
+- ec28fcbb9 INN-2664 Fix `step.invoke()` hanging indefinitely if debounced (#2518)
+- 709445491 Move /dev endpoint into AuthMiddleware protected group (#2799)
+- 23f9c9149 Add Postgres connection params for self-hosting (#2782)
+- f4ff04af6 Make error cause type unknown (#2798)
+- 01805c4f1 Warn on expected errors & report failed gRPC client error (#2793)
+- e7c4eb1b9 Revert application/x-www-url-formencoded (#2797)
+- ec6ee26a5 fix user seat limit handling (#2795)
+- f337dc4f4 Optionally use preview traces in the dashboard (#2749)
+- c928363ec Insights: Add (basic) query editor (#2761)
+- a4d029aa0 fix CLI not respecting env vars and config file (#2792)
+- 8f4ca91a1 Add a tag for some tracing-related metrics (#2786)
+- a243ad9ba run trace result fetch optimizations (#2788)
+- 9506a3fa9 Fix gocache bug not caching properly with redis (#2794)
+- 32a02339a Fix Connect closing ws connection when lease is deleted (#2778)
+- a120246fa Sync checkpointing APIs (#2769)
+- 471c9fe65 Loosen the pnpm constraint (#2785)
+- cf133bb67 Add application/x-www-form-urlencoded support to Event API (#2770)
+- 4582dead1 Allow incoming tracing to fail; log only (#2783)
+- 03068a47a sample logs (#2776)
+- a446a272a CON-58 update design of select component and filters (#2763)
+- 1740036d6 CLI refactor (#2771)
+- c967ce663 Fix duplicate step.run (#2775)
+- 9139ba10d Added `Advanced Observability` Addon (#2735)
+- 46f482a8f Fix wrong err being reported to Sentry (#2772)
+- f06a49829 Fix deadlock when executor is waiting for queue to quit (#2767)
+- b867d17d8 minor run trace error design feedback (#2759)
+- c49794adf Roll up single-attempt steps (#2766)
+- 80608ec4c Add Sentry reporting to Connect (#2762)
+- c3606887c Upstream latest expr package (#2760)
+- 6f88677f3 Insights: Introduce nav item and route (#2757)
+- 5b46d3603 Upgrade Go version in Dockerfile (#2754)
+- c73c743d4 Add curl installation to Dockerfile to enable docker and k8s health checks (#2753)
+- 41b71274a Introduce `SeatOverageWidget` Component (#2692)
+- 20adba842 Andy/inn 5302 create backlog size/queue depth api endpoint (#2732)
+- cda399bc2 Events cleanup (#2751)
+- 273f853ea Fix nil pointer for trace intermediate state (#2750)
+- 0db644efe embed some inngest status info in run trace errors (#2741)
+- ff0cfba69 Support multipart/form-data in ParseStream (#2681)
+- acff62183 Environments: Fix table row browser inconsistency (#2747)
+- 6aeb5f88e Incoming tracing - `has_output` attribute (#2745)
+- e82fd3f35 Environments: Various design updates (#2740)
+- 794e0c65f Environments: Update actions UX (#2731)
+- 1a66edc47 Add error reporting interface to logger (#2718)
+- b4a66c093 CON-33 Delete event search experimental page (#2744)
+- 88756d4ce CON-77 Enable cel query for events (#2737)
+- 1582c356b Environments: Add branch key disclaimer (#2742)
+- 46b222b62 CON-92 Update key menu icon (#2743)
+- 573cb2cce Allow setting an end time for fresh spans (#2739)
+- ce4e82eb4 Bubble GetExecutorIP error to ignore deleted leases (#2738)
+- 537555844 Environments: increase branch environments table page size 5 -> 10 (#2734)
+- b2d64dbb4 Make using tests.sh for JS SDK and Golang SDK tests easier (#2667)
+- a0f8fa837 Ignore order for TotalCount queries (#2736)
+- 2e40704aa Fix trace timing, order, and (de)serialization (#2733)
+- 5f7d0dfee Add condition (#2730)
+- 14a5a7720 CON-74 Delete stream page (#2716)
+- 065133fd9 EXE-116: add debug run and session ids to scheduler and rerun from step resolver (#2722)
+- 328a8ec8f Environments: Allow filtering by status (#2717)
+- c3b220684 share feature flags between cloud and dev server (#2723)
+- 86c424abe In environments tables use env.id as react key instead of index (#2725)
+- eaa581cb2 Fix bug that kills the ws connection when polling happens fast (#2726)
+- cf5c2f5da Parallelize normalization, fix inconsistencies (#2720)
+- ce489fe6c Remove tracker and so on (#2724)
+- a6ad6bd52 Use gRPC for Connect flushing API (#2699)
+- e9021e047 Add step-level parallelism optimization disabling (#2690)
+- 88342bbb5 Update ulid dependency and use Zero and IsZero (#2694)
+- 0d00f2635 Remove custom concurrency getter (#2701)
+- f1f57d9a6 vendor missing (#2715)
+- c535c58b0 Fix accidental override outer scope logger variables. (#2719)
+- c935a24a9 CON-67 Wire events dev server data (#2705)
+- 508a10dba Add validation for signing key format in start command and export HashedSigningKey function (#2714)
+- 77e67f679 Support search in environments page (#2708)
+- c1961f5d4 Place Custom Environments in Paginated Table (#2696)
+- a096c0fa4 Add event_cel package (#2710)
+- 8e8249e16 Create Reusable Pagination Component (#2676)
+- b3cc7c41d remove ready queue instrumentation for key queue since it can cause confusion (#2713)
+- 559938231 Add authentication middleware and signing key validation to dev server (#2706)
+- d06d88baf Add test coverage reporting (#2709)
+- 0a4f80cf0 simplify the tenantInstrumentor interface (#2711)
+- 019d954e8 Remove hashed signing key from error logs (#2712)
+- 73625fc6b Create ParallelMode enum; update OptKey enum (#2707)
+- c2e389447 Revert "Enroll future queue items to backlogs (#2683)" (#2704)
+- ab7676406 Fix viper data race by not mutating with `SetDefault` (#2702)
+- 48a7a5a7b Add Kafka log exporter (#2695)
+- 5bf50175d Enroll future queue items to backlogs (#2683)
+- 48519b9b5 Add OptKey enum (#2698)
+- c78ceb270 Fix regression caused by a bad merge (#2697)
+- d82733ca5 Force goqu to use prepared statements by default (#2686)
+- f6c9da8a6 Delete unused sqlc events queries (#2693)
+- 04ea2a792 Send connect replies gateway -> executor through gRPC (#2691)
+- 8c3f85dc7 Set `norefill` when pausing or starting migration (#2689)
+- 34cf2b95b Add tenant instrumentor (#2640)
+- 41dc6daff Implement EventV2.Runs to return FunctionRunV2 (#2685)
+- fb8f7d6ae Add CLI Flag to disable UI and GQL endpoint (#2688)
+- a6ac6e7cd Filter internal events in EventsV2 resolver (#2684)
+- 0f51690e3 Increase shared telemetry channel buffer size to 50K (#2687)
+- 73afe8622 INN-5205 Add events pages to dev server (#2630)
+- 6a6c790c7 Clean up of attribute setting for incoming tracing + protobuf for Cloud (#2655)
+- 791f6997b INN-5325: Fix webhook intent url (#2677)
+- 1a604c235 Show Custom Environments Above Branch Environments (#2663)
+- 75718ff58 Remove experimental label from PostgreSQL URI flag in start command help (#2675)
+- 5953a03c4 Fix gap for environment dropdown (#2674)
+- 2e8d3042f Instrument shadow partition requeue duration (#2666)
+- 725735c31 Handle different body types in SerializableRequest (#2671)
+- 3a02e1700 Implement single EventV2 resolver with EventV2 data loader (#2670)
+- 15d1a7ccf Add a hidden in-memory flag for the dev server (#2672)
+- fe6f25002 added json method to serializable request (#2669)
+- 62a3360c7 Added cta to concurrency tooltip for upgrading (#2638)
+- 9a9b0ee82 Handle IPv6 URL format breaking gRPC connection (#2664)
+- 1876fa802 First pass at EventsV2 dev server resolver (#2656)
+- af5bb5158 Forward connect executor -> gateway through gRPC (#2646)
+- ef997a974 Clean up source backlog pointers while normalizing (#2662)
+- a4ad7dcc3 Prevent duplicate and success status pills from displaying on Apps cards (#2659)
+- 9cb7bfd79 Multi-session (#2619)
+- 969c8e8cd fixed `cli/onboarding.action` (#2644)
+- c95a4d898 Use InlineCode in Prometheus Integration Flow (#2661)
+- 4195dbbb1 Emphasize Connect CTAs in Integrations (#2660)
+- 234315b06 Garbage-collect empty outdated backlogs, always clean up backlog/partition meta (#2658)
+- 5e8b554b8 Peek entire backlog during normalization (#2657)
+- 8a391d6fb Improve latency (#2652)
+- 71ee0c91e Better backlog normalize metrics (#2654)
+- 555114401 Prevent duplicate connect apps in devserver (#2653)
+- 901dd14f6 Fix connect pubsub proxy deadlock (#2651)
+- 323cafb33 Always log account ID for metrics (#2650)
+- cba9cffca Allow user to manage VerM projects (#2643)
+- 32ab27816 Ignore queue item not found on requeue (#2648)
+- b3a6ddee1 Active check improvements (#2647)
+- 3243a40fd Separate poll ticks for shadow + normalization processing (#2645)
+- 2a525b545 Add resync button to dropdown menu (#2421)
+- 97918fa8b Show human readable cron schedule using cronstrue (#2616)
+- 7829376aa Constrain GQL list test to function IDs (#2642)
+- 8b9ae5468 Make isDraining an atomic bool (#2641)
+- e51284737 improve handling of expired pauses (#2639)
+- 3c2cd1c7f Fix self-hosted syncs and request signing (#2636)
+- af574a481 add draining to skip skip reasons (#2633)
+- 752142490 Bump github.com/go-chi/chi/v5 in the go_modules group across 1 directory (#2598)
+- 9a3ba6704 ignore redis nil message for queue migration (#2632)
+- 829b4362d Update Go SDK reference (#2507)
+- d301a6343 Delete old FunctionConfiguration UI (#2623)
+- fbc8b7a93 Suppress missing accountID logs for system queues (#2628)
+- 7bb1f8e65 add tenenat info in exporter error logs (#2629)
+- f0d424632 Add debug APIs for accessing partition information (#2593)
+- 340ecda80 Split HTTP and driver (#2473)
+- ec9e9eb58 Split up e2e tests (#2626)
+- 0cd69135d Fix singletons checking for locks in the wrong shard (#2625)
+- 2deaa8138 Bump the npm_and_yarn group across 5 directories with 1 update (#2624)
+- d232ed49e Configure active check probability using feature flag (#2620)
+- f9bf701bc debugger with parsed/interactive payload viewer/editor (#2615)
+- bcf64bbfe Move `lite` to use `devserver` (#2612)
+- d2cfeecba Fix nil ref if we can't find function output (#2618)
+- 115ab3e9c Use new FunctionConfiguration component in cloud dashboard (#2592)
+- e2207a22c Make Active checker transactional (#2614)
+- 079533e3a Ignore singleton key evaluation error instead of retrying (#2613)
+- a575fb59e Use org profile for picture (#2603)
+- d605e6417 Fix signing key rotation link (#2610)
+- ad5aca82f INN-4964 Add loading state to code blocks (#2576)
+- 1ef375de4 Adjust button label (#2611)
+- e0d2d5357 Fix Dev Server persisting to disk (#2607)
+- 2eaba5039 Always log on missing accountID (#2600)
+- aae0466e5 Migrate back to `triggers` field, now with FunctionTrigger type (#2586)
+- 93a6514f4 improved impersonation (#2601)
+- 0626d15c6 Fix onboarding invoke function (#2602)
+- 1d29baf97 Add more instrumentation to active checks (#2599)
+- 9778b3283 Update branding
+- 63eef823b Added new plan description in dashboard (#2552)
+- 74934d961 Replace favicons and logos (#2595)
+- eab0d958b Explicit tracing refactor (#2563)
+- 69a49bfce Reapply "Swap Bigquery with Clickhouse in /v1/events (#2583)" (#2588) (#2596)
+- 8bd4b16c5 Fix active checker issues (#2594)
+- 55154d002 Use temporary new field fnTriggers (returning shared FunctionTrigger type) (#2585)
+- 169215311 Improve queue logging with job IDs for better debugging (#2591)
+- 26c058c45 Improve lease extension error handling in queue processor (#2590)
+- 7454010ea Log refills and Dequeues (#2589)
+- b8e9460b2 Check active sets on backlogs (#2587)
+- e512f810b Revert "Swap Bigquery with Clickhouse in /v1/events (#2583)" (#2588)
+- a178cba6b Update queue migration to work with key queues (#2580)
+- f420438cc Swap Bigquery with Clickhouse in /v1/events (#2583)
+- 08e01f1c6 Added support impersonation route (#2554)
+- ffe4fd49d unomit isfree (#2582)
+- 4f399609e add type checking for dashboard ui ci (#2577)
+- 9981c141b Expose error `cause`s in UI (#2567)
+- 8a88f94e1 Update gql codegen for isFree (#2581)
+- acaa12f50 Initialize active lease lock (#2578)
+- 69006f56c Rever account queue changes (#2575)
+- a1742dea5 debugger components (#2558)
+- 449afc4c2 Implement eager cancellation (#2474)
+- d9adcecf8 remove account ID from system partitions (#2574)
+- 707bf6dc2 Flip job promotion boolean (#2573)
+- 1ecd0a7dd Fix sleeps (#2572)
+- ef6615e68 remove quit channel from worker so it doesn't stop (#2570)
+- 2da423b14 Add SingletonModeCancel to graphql mapper (#2571)
+- 25d96826c Log on missing identifier (#2569)
+- 95bbc21ff Sleep scavenge (#2550)
+- ae0cc0efe Active checker (#2565)
+- a3b76a0be Modify graphql query to get function.app.name instead of function.appName (#2559)
+- 0d6ac4563 Add singletons cancel mode (#2530)
+- 9d823431e Add metrics for v1 endpoints (#2561)
+- e20930cad Don't log expected errors (#2564)
+- 114b3503b INN-4810: Show FunctionConfiguration in dev server (#2546)
+- 60ff1fdd1 Add row href behavior to tables (#2562)
+- 34c7aeab8 Use BillingPlan.isLegacy (#2553)
+- 3642b7ff0 Update frontend graphql types for FunctionConfiguration not nullable changes (#2560)
+- 8a2e44cbd Handle Dequeue item not found (#2557)
+- 0095e6a93 Remove high-cardinality metrics (#2556)
+- d39b91e0e Always count shadow processing (#2555)
+- cfb90ee00 Add metric, add step check in V2 adapter (#2549)
+- c56a008a3 Extend saveResponse backoff (#2547)
+- 34c76478c events survey (#2538)
+- f75cb7286 Ignore queue item not found error (#2545)
+- 250c443f7 Test and add metrics for finalize (#2539)
+- a4de9d59f Track sojourn delay & job latency with key queues (#2540)
+- a49bf4da9 Update text on "take me to…" buttons (#2391)
+- ed950b338 Update script call (#2542)
+- c8ac36fef Fix requeue backoff error (#2541)
+- 36b6a77a6 Add assertion to TestQueueRequeueToBacklog (#2534)
+- 5083de289 Report function concurrency limit hit on custom concurrency hits (#2535)
+- fcc7f66bf Make sure execution loop returns an error properly (#2536)
+- 941224c73 Remove item from ready queue on Requeue (#2533)
+- 746118f15 Add log for when failing to enqueue invoke timeout (#2532)
+- 97cbc3db9 Backfill throttle key expression hash on requeue (#2528)
+- 8227a6551 Dual blob and buffer pause implementations (#2399)
+- fc5392003 Log constraints (#2527)
+- 7ca0864c9 debug normalize (#2526)
+- 87b33c080 Fix key queue throttle: Fetch partition constraints (#2517)
+- 61ef71f7c Initialize singleton manager in self hosted inngest (#2525)
+- 7a9caa259 Decrease animation duration for SlideOver from 500ms to 250ms (#2524)
+- 9cb1f27c3 trace step child group ux (#2509)
+- fcd1951db Swap to using CH for get fn run & jobs & cancel fn run (#2521)
+- 0c10302d5 Expose FailureHandler and add FunctionTrigger.condition in GraphQL (#2520)
+- b3c287f0b omit billing plan slug to unblock deploys (#2519)
+- 4bfb1905d some defense against issues with support ticket api (#2471)
+- 1e31487e7 INN-4896 Replace old event routes by new event routes (#2487)
+- 6f7e19707 Add normalize metrics (#2516)
+- 2d6b41157 Update existing lifecycle hooks when hitting constraints during refills (#2513)
+- ac1831d6d Remove lease checks on requeue, always clear out lease (#2512)
+- 187be8ecf Handle shadow partition lease contention properly (#2511)
+- be186ed7b Optimize step timeouts (#2508)
+- 468f250df ignore already lease error for backlog normalization (#2510)
+- ebd613ad4 Fix throttle test failures (#2506)
+- 10c66d23e Add data to pause timeout jobs (#2505)
+- 92b4f4252 Get REST API event runs from CH (#2504)
+- aa031ccff Switch to sets (#2501)
+- 60b49827c Add new requeue to backlog migration metric (#2502)
+- 7f360eeba Key queue related tweaks (#2499)
+- 34b54b3a3 Port FunctionConfiguration.Singleton changes from monorepo to inngest/inngest (#2500)
+- 21806788e userland trace step info updates (#2497)
+- 17006a248 Forgot to run pnpm dev:codegen in dev server after not null changes (#2498)
+- 4c664a135 change how shadow partition continuation processes (#2492)
+- cc6e029c0 Add FunctionConfiguration to coreapi (#2488)
+- 2d4fd3908 Allow creating logger from slog (#2494)
+- 2b4ca7e0e Remove skipped runs history from singletons (#2489)
+- 49e24112e Remove cancel mode from singletons (#2490)
+- 990d66ebb Reset Miniredis before wait test (#2496)
+- 439176403 Always return if subscribe doesn't happen within time (#2463)
+- 294d872f1 Add singleton to function configuration UI (#2486)
+- cd23e6465 Key queue improvements (#2485)
+- 9b27357ff make sure to handle shadow partition lease errors properly (#2484)
+- b92853784 Add more tests for active counters (#2477)
+- ffb33561f poll step output (#2483)
+- 7dd16714f add more data to error logs (#2482)
+- 0e73f4dfd make sure to return error (#2481)
+- fd05d0e56 Prefix active keys with v2 (#2480)
+- acdeef15d Fix key queues (#2479)
+- 62180b4c3 Allow custom peek size (#2476)
+- a99881695 Hide 'Waiting' in run status filter (#2475)
+- 103f9f10b Make Vercel integration card handle marketplace (#2468)
+- 62d473323 Create backlog for `start` items, prepare structs for function run concurrency (#2470)
+- 86af39527 Add singletons support (#2459)
+- 913daa26e clean up unused timeline components (#2466)
+- bf0763f9e INN-4846 UI tweaks to events page (#2457)
+- cac1f4726 Add histogram metrics for queue item operation delays (#2467)
+- 86625110d unhide y axis overflow all the way down to the datadog env dropdown (#2462)
+- 496d1ea7c Disable app health check for connect (#2464)
+- d54a160c8 Remove zerolog usage entirely (#2461)
+- 3f9833075 Key queue perf (#2452)
+- 561017fa8 Correct Datadog setup link (#2458)
+- 504e91eac Wrap slog to provide additional capabilities (#2456)
+- a1d05c828 Update documentation & integration links for Datadog (#2453)
+- 3fad61b70 Update expr package (#2451)
+- 5558dbf52 get userland traces working with connect (#2454)
+- 1a559727e INN-4847 Add single event page (#2448)
+- 4b48cd565 Add ability to supersede existing signal waits (#2449)
+- bc816f1bd Fix idempotency trace issue (#2450)
+- b0398efbf Update some setup docs (#2447)
+- 704d12fbe Key queues testing (#2444)
+- d00c9e5e2 Key queue instrumentation (#2445)
+- c308dc7ef Make handleGeneratorWaitForEvent idempotent (#2446)
+- 1bcd72a7c Add idempotency key to ReceiveSignal (#2443)
+- 3997b041a Idempotent pause resume (#2439)
+- ff6a80a48 Fix runs page crashing on invalid CEL expression (#2441)
+- d9a9c6e34 Fix key queues (#2442)
+- f27252c57 cleanup the runs (#2440)
+- 344eeb505 Backlog normalization (#2412)
+- e4a54997c Add Signals and `step.waitForSignal()` support (#2419)
+- 14c821025 Clean up expired connection state, track reply received via polling (#2435)
+- 7b4856ac6 keep the TTL (#2438)
+- bd19dd51e Idempotency key tombstone (#2436)
+- a96da1364 INN-4777 Populate events stream (#2411)
+- 234aab76a Function run scheduling updates (#2424)
+- 50b397b84 restore userland gql stuff to use for after monorepo merge (#2417)
+- 8f0ff047f Add GQL introspection auth header (#2434)
+- daf98db8d Clean up active counter (#2433)
+- 1d9aecb04 Update btn type (#2432)
+- 122dc3547 Remove duplicate context timeout (#2431)
+- 675202d7f Track sent message counter (#2428)
+- 548a0d6f2 Connect: Return syscode error when request > 2h (#2430)
+- 5d04aa58d Update queue.go (#2429)
+- 880afedd0 fixed broken links (#2420)
+- fd579e229 add replay consts for otel (#2425)
+- 1c57e4480 restore contents from dropped commits (#2422)
+- bb1c8bb22 bump vite for CVE-2025-46565 (#2418)
+- 6386c830f Sever parent context timeout in CritT (#2416)
+- 11be793df userland trace ingestion (#2415)
+- c18e6356e Fix the order of keys passed to dequeue.lua (#2414)
+- 75dac3742 Update expr (#2413)
+- 0b7d3f955 feat: Add some indexes to increase performance of self hosted dashboard using postgres (#2318)
+- 44d358166 Heartbeat on long-running jobs (#2403)
+- 6ab959108 Coalesce Key Queue Backlogs (#2394)
+- 3965adb7f Fix param (#2410)
+- 8034fb97f Allow timeout option for critical execution to force cancel and not run indefinitely (#2408)
+- 2847c5fe5 INN-4795 Replace table headers designs (#2404)
+- 3778c63cf Fix duplicate waitForEvent steps in UI (#2409)
+- 7786645a1 Update lifecycle hooks in Resume (#2407)
+- 2ba1006cb executor: log a warning if waitForEvent.If CEL expression fails validation (#2405)
+- b593e3fb5 Revert "otel trace ingestion (#2340)" (#2402)
+- dbeba345b Allow callers to distinguish CEL validation errors from other errors (#2401)
+- c2062a667 Cleanups (#2396)
+- 97cf600ef Block flushing either via queue or in-memory (#2398)
+- 44d2750c5 otel trace ingestion (#2340)
+- 64cacebdd Block storage for pauses (#2325)
+- 6f1fbf0d0 add max attempts for debounce queue item (#2397)
+- bef809b90 INN-4778 Replace events list by event types page (#2395)
+- 2ff6848b4 INN-4638 Wire event types data and add infinite scrolling (#2372)
+- 1c08fe425 Remove deprecated/unused Datadog-related generated GQL code (#2392)
+- 231b3ddcd Fix Redis failing to load with `inngest start` if Gateway connections existed on close (#2390)
+- dd1b875ff Add batch size limit internally to make sure batches don't exceed a certain size (#2393)
+- 6d4595e8f Implement scanner with blanket refill (#2387)
+- 0e353f8eb Propagate sync errors to client (#2361)
+- 9a6d15b37 Add item to initializer
+- fb26577e3 Expose option via dependency injection (#2389)
+- 882847c2f Update inngest/expr (#2388)
+- 5fe24472e Account shadow partitions (#2386)
+- fe4845755 Add CEL validation policy (#2376)
+- 13b83311a Swallow ErrDuplicateResponse on SaveResponse retry (#2385)
+- 11c87e918 add debug command
+- a1c31aa2c add go debugging tools (#2383)
+- 06a1312d9 Cleanup guaranteed capacacity (#2382)
+- 38d7d617a New data structures + scanner (#2369)
+- 351fae0ec clean up dequeue (#2381)
+- 8e8f9d524 Simplify queue (#2380)
+- eace8bfee add accountID attr into httpdriver request (#2378)
+- 70a8ec77c wrap run io in portal to sidestep all z-index issues (#2377)
+- 161159ef5 Add metrics definition and blanket shadow scanner loop (#2375)
+- 3532363b0 INN-4680 create expanded row view (#2365)
+- 8384f315c Make sure to assign run_id in a couple other areas for root spans (#2370)
+- ead06e4b5 fix deprecated args (#2371)
+- 07c4796f2 update error message (#2366)
+- 181e83e2b Allow disabling lease enforcement in dev server + lite (#2368)
+- ffd68c704 Update to golangci-lint 2.x; fix lint issues (#2356)
+- 01ee2cbf9 Tweak display of checkout error messages (#2364)
+- 9ba47dfcc Add passthrough flags to control key queue enablement (#2367)
+- 875686a60 Simplify dnscache (#2359)
+- 6cc709357 Fix local IPs not working with Lite (#2363)
+- e2c807085 Final fix for apps dropdown actions (#2360)
+- daa662cd3 fix button (#2357)
+- 9cb0ab510 Fix local IPs not working with Dev Server (#2358)
+- f250ab10a Fix tooltip (#2355)
+- 0bed59b5d Connect leases (#2327)
+- b757c92ea Show 30d worker history (#2353)
+- f56f6519c Always use instantiated httpdriver (#2352)
+- 29812c516 Redo Datadog integration UI to support Marketplace setup flow (#2288)
+- f2dff65ef Bump golang.org/x/net in the go_modules group across 1 directory (#2350)
+- eb9d3649b add CritT with refactors (#2349)
+- 8f3b4747e warn
+- 22a2deaf8 Fix panics in Executor (#2348)
+- 28ec255e9 Include run ID in finalize error logs (#2347)
+- 0c1f8ce8a Fix streaming headers (#2346)
+- 6658dc69b Add time tooltip (#2341)
+- 4dbb91e55 INN-4664 create new stream page (#2333)
+- 8405875f4 Check step ops
+- 4e488e79c Clean up timeouts (#2345)
+- 443d62d01 Update ctx for finalizer (#2344)
+- 1ef0ad2b3 refactor usage of http.Doer (#2343)
+- 5879fd819 Add a DNS cache to httpdriver.DefaultClient (#2338)
+- f671c691d Fix CVE-2025-32395 (#2339)
+- 84e4fce45 Fix pill icons (#2337)
+- d1eb97b8b Change exporter key to run_id, and use fn_id as backup (#2336)
+- 2daae2e67 add check before attempting to set attribute (#2335)
+- 4165d2cc9 check validity of response
+- ba485ed6a Backoff around deadlines (#2334)
+- 4c3511b1f bump vitest to v2 (#2330)
+- 003e63904 Prevent source name wrapping in event logs list (#2332)
+- c3ccd5181 Allow `cause` to be anything in step-level user errors (#2326)
+- 4bd57aea0 Replace overflow scroll (#2329)
+- a5c00f1b7 Fix event key filter (#2331)
+- daf6bc80f fix CVE-2025-31486 (#2328)
+- 49387a387 Fix cross-env quick search (#2322)
+- ce4eceb36 Add crit to util fn (#2323)
+- e037a521e scroll the env dropdown (#2324)
+- 0fc29d198 Backport secondary check (#2321)
+- 452e45eed undo previous attempt for idempotent scheduling (#2320)
+- 2d461c3e1 INN-4644 lazy load the volume data (#2313)
+- ff403b176 Revert pause cancellation (#2319)
+- 9bcc2104d Make function run scheduling entirely idempotent (#2317)
+- 3a84816b3 annotate and don't break loop (#2316)
+- e2e6340c5 update log message for retry function (#2314)
+- 284abb13a Filter error that doesn't need to be retried (#2312)
+- ada607ce3 json tags
+- 665fbe3b5 Add utility for retrying functions (#2311)
+- d460ab937 Make sure we allow local connections during `dev` and `start` (#2310)
+- 6092efb0b INN-4639 Add new behavior to lists of pills (#2309)
+- 2244d79e7 Add `Gateway` opcode (#2254)
+- 64ad3ed06 Bump next in /ui in the npm_and_yarn group across 1 directory (#2308)
+- eaf3f921d Bump next from 14.2.10 to 14.2.21 in /ui/apps/dev-server-ui (#2059)
+- 273ea5590 Fix debounce execution from secondary during migration (#2302)
+- 18aa05fd6 Bump next from 14.2.25 to 14.2.26 in /tests/js (#2300)
+- cebe4484e Add logs for span retrieval error (#2301)
+- 6a79a3b72 pin radix dialog version to fix regression (#2305)
+- 7610e5984 Fix realtime publishing using req ctx (#2303)
+- 386616d64 restrict jose override version to <= 6.0 as 6 is esm and an intermediate dep is importing using cjs (#2304)
+- d7d132744 Migrate debounces by account (#2298)
+- 64c3830b1 Redact creds when logging the Redis URL in `inngest start` (#2299)
+- 6b3941427 Update vulnerable npm packages (#2296)
+- ec51b2654 Change versions to be compatible range instead of full lockdown (#2295)
+- 4a489d6c9 INN-4636 Create shared columns and event types page (#2283)
+- a1a8eed07 Bump github.com/golang-jwt/jwt/v5 from 5.2.1 to 5.2.2 (#2269)
+- b369ea0fe Add support for `x-inngest-event-seed-id` header (#2287)
+- aca939bc6 Apply regular auth middleware to each group indiviudally (#2292)
+- c97c7ced1 Remove unused connection type (#2290)
+- 28940f6f5 Track http stats (#2289)
+- 26fdd03c9 sticky steps (#2264)
+- 7f6fdd5e8 Revert "Add support for x-inngest-idempotency-key header"
+- 00f0e4a3e Add support for x-inngest-idempotency-key header
+- acdea8c81 Limit connect to 24h (#2286)
+- c36814570 Routerless connect design (#2284)
+- 985a44c47 Store invoke payload (#2281)
+- 8aaadd57e Display unlimited history (#2280)
+- f8683d670 Fix max retries (#2278)
+- bebcef299 Check if execution response came from SDK (#880)
+- 5d0692588 Ensure `cause` if captured in `inngest/function.failed` (#2088)
+- f7e2142e1 poll open traces in dev server (#2260)
+- cc7dc2159 Replace modal background colors (#2279)
+- 74159f60e Ignore empty close error (#2277)
+- 992b262b7 INN-4616 New background overlay colors (#2276)
+- 84d5a0d34 Increase visibility into connect acks (#2274)
+- c5ee6c2c4 historgram buckets
+- 2bb849ee4 Bump next from 13.5.9 to 14.2.25 in /tests/js (#2272)
+- 1475f3ff2 Update dep for security alert (#2273)
+- 8e7bd349c Upgrade Next.js to latest patch release (#2271)
+- 21ebf46fe Bump next from 14.2.10 to 14.2.25 in /ui (#2266)
+- f921e982c updates to error messages (#2270)
+- 967fe8e44 Fix typo
+- 7fcdd0f06 tls handshake human error
+- 5253ea4de update http error messages
+- ef425bb4f Ensure next handler is called when auth middleware is used. (#2268)
+- c06c03a71 Track TCP conn time in metrics (#2267)
+- f979b3d3d Add request stats to header
+- 90f16dcde Add unit tests to HTTPStat (#2265)
+- 082ee84c8 Add dialer (#2262)
+- df1fbf460 Allow migrating large partitions in parallel (#2261)
+- 8813d1fc8 Retry hanging and failing syncs with backoff during connect (#2258)
+- 58f10b5df call to feedback (#2256)
+- 3b595c9a3 Fix app health Event API URL check (#2259)
+- 6701cb1da Fix panic when both cron and event trigger (#2257)
+- 856f8492a Stop window closing on rerun success (#2255)
+- 64aee4fde Fix fake AWS APIGateway request event for local dev (#2253)
+- 5f423b0d7 CMD+K menu improvements (#2252)
+- e1eca0554 Fix connect syncing issue (#2250)
+- c108e39e0 handle waiting for spans while queued (#2247)
+- 2cef0cf0d Fix no event in quick search (#2249)
+- b3921babf Make UI work for DigitalOcean Marketplace (#2248)
+- f7e846032 Remove dark mode (#2246)
+- 838f25c7f Fix colors (#2245)
+- dc23bd6d6 INN-4579: break out cancel run button (#2244)
+- d8d67a61d Bump golang.org/x/net from 0.33.0 to 0.36.0 (#2243)
+- 35bf965a6 INN 4591 Implement new cmdk designs (#2235)
+- cf9aee4c8 INN-4610: trace run start/first step alignment fix & finalization (#2242)
+- 25d4208a7 Bump github.com/golang/glog from 1.2.2 to 1.2.4 (#2122)
+- 71c70a813 Update exporter to default to 30MB limit for producing messages (#2241)
+- 00b455b1d Index pauses globally (#2240)
+- 88a2cd413 Dynamically set trace endpoint based on configured port (#2239)
+- 7ca84b375 Allow realtime to subscribe from browsers (#2238)
+- 01958ff42 add rerun confirmation modal (#2237)
+- 90405d8e5 Migrate debounce to new system cluster (#2217)
+- 897593914 Connect for inngest lite (#2233)
+- 66fff62f9 Surface Vercel error on integrations page (#2234)
+- 13e181bd0 enable ai traces for dev server (#2231)
+- 70b2558bb Add case for connect apps (#2229)
+- e67cc5f07 Add search (#2230)
+- c096cd02f INN-4535 Add json information to onboarding (#2214)
+- fe409e27e INN 4504 UI improvements to apps (#2224)
+- 10279ab91 INN-4579: swap in split button, input fixes (#2225)
+- 8c2282ff1 Topic name singular (#2227)
+- d06d7fc41 Update Go SDK to ddde6dd (#2228)
+- bb43cddaa Use publshing in Go SDK for E2E tests (#2223)
+- 88a44de0c Update README.md
+- 2f80c604d another round of layout and ux fixes (#2222)
+- 245772ff2 Fix server-side error on billing overview page (#2221)
+- 8656c7cc2 Fix error on billing overview page (#2220)
+- b3a7e943f Fix stripe theme colors (#2219)
+- 07bb954a6 Channel APIs (#2212)
+- 3727fd432 Add `RunService` RPC for pending steps (#2218)
+- 33bea2def sundry fixes for traces timeline view (#2203)
+- 02f0b8eb5 bump main node version as well
+- f629f4d37 Update node version due to pnpm issue
+- c353a31e5 Fix empty response when run output not JSON (#2215)
+- 50b91ad03 duration tracking (#2211)
+- 1d1129ab7 INN-4477 Dev Server onboarding (#2198)
+- 54f9b1c09 fix command k search on collapsed side nav (#2210)
+- e46f14d66 Ensure trace IDs are passed over the wire when running finalizers (#2091)
+- 730a9f177 Add startTime (#2204)
+- d6e306d72 Parallelism optimization; pending step tracking (#2200)
+- 5b5ac92e4 INN-4521 Release dark mode (#2208)
+- 93c4242ec Track item partitions time (#2209)
+- c706e1a09 Prefer newest connected version by default (#2207)
+- 0451db211 Add httptrace (#2205)
+- fdc9ee342 Enforce max. apps per connection entitlement during connect (#2202)
+- 07a7e6965 fix traces for ungraceful errors like output_too_large (#2179)
+- 519afc979 INN-4520 Add theme switcher to Dev Server (#2201)
+- 183e31ef0 Simplify unwrapping of RetryAt (#2199)
+- edbfb6a56 Display Datadog integration errors on the integration page (#2197)
+- a39ea91a2 Allow multi-app connections (#2195)
+- a63b8ac91 logging changes
+- 1f5eb2e73 Allow removing Datadog integrations (#2192)
+- 56422e055 Fix nil map assignment when handling cooldowns (#2196)
+- a98fcc2cc Apps improvements (#2194)
+- 2b0f25579 add ability to toggle back to legacy trace view from new trace view (#2191)
+- 681952c59 Add missing color tokens to metrics (#2189)
+- 00fa29b9f copy: refer to metrics' "delay" instead of "freshness" (#2193)
+- f19001708 Design tweaks for metrics export entitlements & integration pages (#2190)
+- 428198a2d Surface no available workers to user (#2188)
+- 9c58ddf9b Continuations (#1675)
+- 1f071e3b8 MVP Datadog integration management UI (#2172)
+- a922c8ed2 Add distributed tracing (#2185)
+- 9e8e3d59d Add logic to switch themes (#2187)
+- f00a5b8e0 Fix modals (#2186)
+- 11394f147 INN 4462 expose app version in the UI (#2180)
+- 4566153a2 fix bug in failure_test, wrong param order (#2177)
+- 78dda6ec1 Improve connect logs (#2181)
+- e02ad4887 Replace connection type by method (#2169)
+- 351cc2e4c Update changelog URL (#2178)
+- ed18aaf86 Add Prometheus integration UI (#2147)
+- c3bd09b67 rename duplicated key to event key (#2176)
+- e902b3321 Display better message when in-band sync response is unsigned (#2174)
+- b3d8da5f4 Fix sqlite migration (#2168)
+- 69c0173c5 Fix migration (#2167)
+- 56d30be80 Store version on app (#2166)
+- 254e819e4 Add SASL auth for Kafka exporter (#2161)
+- 2630f8138 INN-4368 implement connect features in cloud (#2150)
+- d3806e506 Rename buildID -> appVersion + app connection type -> method (#2165)
+- 8a80ce03e Omit error code if unset (#2163)
+- b0cf25d04 better name for the new shared data provider (#2164)
+- 2de133931 Remove GraphQL parent access (#2162)
+- b1ad0f20e Deduplicate connect worker syncs (#2153)
+- f0a13b505 INN-4424: new run AI traces (#2151)
+- d7c7caf55 Lazy load latest unattached sync (#2160)
+- dfa1e0f30 Fix quick search v2 empty space (#2157)
+- d35153763 Introduce observability in workerapi (#2159)
+- 18ebbe19b Show runs to all plans (#2158)
+- dddfba5bd Fix Cmd+K not working in new quick search (#2156)
+- 8967e72e1 Fix missing account and workspace IDs (#2155)
+- c1fcf4fce Add new quick search (#2149)
+- d7f8d8ce3 syscode / publicerr additions to support Prometheus integration (#2148)
+- 1b507567b Add kafka exporter for spans (#2116)
+- 7245f2b64 Track no healthy connections (#2152)
+- ab8cac643 Remove fn logs page (#2146)
+- 3ce8dcc62 ux tweak when clicking on signing keys from a branch (#2121)
+- 3f5a3e22b Support dev server auto-discovery for Astro projects (#2055)
+- 1659e260e Fix conflict (#2144)
+- dda340697 INN-4384 apps design ux tweaks (#2133)
+- 209c587a6 Add .tool-versions file, specifying node and pnpm versions (#2143)
+- f3c872dd9 Connect history improvements + Postgres support (#2137)
+- c6b81cbd0 Automatically use same hostname for gateway in dev server (#2142)
+- b75b155ed Measure sync + app load duration (#2141)
+- d48e1e5f0 Fix flaky Redis broadcaster test (#2140)
+- 321b6cd7e Update connect proxy broadcasting (#2135)
+- c50704c7f Add app health check to apps page (#2134)
+- 987c6a380 Fix workerapi auth (#2132)
+- 395230815 Cleanup entitlements page (#2130)
+- 96b22a3a5 Passthrough full slug to fix JS SDK w/ connect (#2131)
+- 6403686f3 INN-4190 Implement new apps designs in Cloud (#2124)
+- 023c912bb Stub metrics scrape endpoint in dev server REST API (#2129)
+- a9fdf3ce5 Fix status page error (#2128)
+- 347fb6fb2 switch metrics steps throughput from bytes to running count (#2127)
+- 8bab2b503 Update status indicator to fetch incident.io API (#2070)
+- aeb19f608 Fix executor for connect (#2126)
+- a1a9e90cb Add interface for enforcing connection limits in handshake (#2118)
+- 7177b542b Fix Vercel integration error on onboarding (#2125)
+- 5e324b0b5 use email alone as identifier (#2123)
+- 307637f82 Refactor addon/entitlement component on billing entitlements/addons page (#2102)
+- 555e9912f Ana/clerk colors (#2114)
+- 2917a4294 INN-524: add ability to archive events (#1940)
+- 0e573a91a Fix invalid export. Only export page default export
+- 550edbc8f Organize dev --help command (#2120)
+- f09da33c8 Bump golang.org/x/net from 0.30.0 to 0.33.0 (#2106)
+- 57b64cbb1 Dev Server UI for Connect (#2109)
+- d8a95b35c Make integration pages work with Vercel Marketplace (#2115)
+- a89cd1383 Add Vercel Marketplace user auth (#2113)
+- c72311cc7 Webhook edit UI improvements (#2119)
+- 2c4152b85 Enable user to configure the number of queue workers (#2107)
+- 9fb9f53ea INN-4361: Ensure wildcards are matched during execution (#2117)
+- 654b042e4 Revert "Vercel Marketplace user auth"
+- b70466164 Vercel Marketplace user auth
+- 835ab7589 INN-3515 create toggle for dark mode in user settings (#2110)
+- 6c4893e50 Fix org name wrapping issue (#2111)
+- c76607d17 Fix connect worker API (#2108)
+- a83f72ca3 Add gateway heartbeat, worker reply ack for connect reliability (#2099)
+- 9887fabd0 wip on new traces: feature flag, new layout and skeleton components (#2103)
+- b4cbab968 Fix rerunning from step (#2101)
+- fc18a5b50 fix rest api get events/runs (#2098)
+- 01d70d336 Fix connect router using wrong channel name (#2096)
+- ac25a602b INN-3465: Improve auto discovery to reduce noise and excessive polling (#2094)
+- fce57b3e9 Fix bad Windows paths in virtual FS (#2095)
+- 0f59e36a4 Self-service addon UI [INN-4209] (#2086)
+- 6c1b07d05 Fix PG query failing for ULID `IN` (#2090)
+- 5882a4ce8 fix support ticket submission bug (#2089)
+- 82a7317a3 fix cancel run result message bug (#2085)
+- 452e0d548 Track connection history in SQLite, expose in GraphQL API (#2068)
+- 366080a99 Track connection preparation time in gateway (#2072)
+- 9061700ea Bump github.com/jackc/pgx/v5 from 5.3.1 to 5.5.4 (#2087)
+- a241c143d Experimental Postgres support in `inngest start` (#1899)
+- 6c68e2d4f fix a variety of vercel integration update state bugs (#2083)
+- 8c979e95b INN-4221 Add counter component (#2069)
+- eda9666b1 restore link to run detail standalone view (#2084)
+- d39a5d7f2 INN-4222 workers table (#2082)
+- 7977fc419 Fix history for v2 SDK parallel steps (#2081)
+- 0a8eec4ca some defense on echart tooltip toggling (#2080)
+- 111b8828c Enable channels + RT on dependency injection (#2078)
+- 08b0dd25c Mark all spans with their source lifecycle (#2077)
+- 9d36224d4 Fix successful gateway requests permanently running (#2076)
+- ae4ba8c05 Improve queued bar color in dark mode (#2075)
+- 0f051a560 Fix gateway errors not displaying (#2074)
+- 70dadea39 INN-4164: support ai indicators and rerun from step in cloud (#2038)
+- a61ab15d5 Channels (#2057)
+- d9a8e1147 Design tweaks (#2073)
+- f6fde9ecc Introduce Connect Gateway Metrics (#2063)
+- 835413552 Fix propagation (#2071)
+- 52880175e Fix invalid waitForEvent expression not failing run (#2018)
+- 09643a9d1 Remove alert (#2062)
+- 647b16d7f INN-4223 shared app information cards (#2066)
+- 9367180db Fix query for `GetTraceRun()` needing more IDs (#2067)
+- 2a8a5d75d INN-4218 - Add addons (#2065)
+- 861304ad3 Always display custom env (#2064)
+- 1ac2f1078 Remove feature flags (#2058)
+- 87f62b61a Fix tooltip (#2061)
+- 64793c46d Fix step stack leak (#2056)
+- b1de95e39 Fix flaky tests (#2049)
+- 55d434db6 Minor UI tweaks (#2053)
+- b4c1d6c04 Updated loading shimmer (#2054)
+- 027049dd6 Lazy load event volume (#2052)
+- 1b00f5565 UI cleanup (#2051)
+- 555573998 Escape quotes (#2050)
+- 5f437148b INN-4191 implement new apps design in dev server (#2041)
+- 62bdad77e Woridng tweaks in onboarding (#2046)
+- 1cb5804f1 some layoyut and ssr gymnastics to make next happy (#2042)
+- c01008fc0 Docs: add release documentation (#2040)
+- a3ebd3c09 Implement Connect API Handshake (#2039)
+- 9af0f37ee INN-4138 Add runs usage chart (#2028)
+- a6ca79e14 Allow deletion of CDC conns from UI (#2034)
+- ddae3b79a Fix `RunJobs` not selecting the correct queue shard (#2036)
+- 408def1e4 INN-4164: also set has ai in span attributes on function finished (#2037)
+- b84a0e5fe INN-4158 fix dynamic data error (#2035)
+- 2dc9cb995 Fix external Redis issues when running in single node mode (self-hosting) (#2029)
+- a6943c1e3 Fix outstanding connect bugs (app sync, deregister, etc.) (#2031)
+- 9394fc10c Update gateway to parse inputs, outputs, and tools (#2021)
+- 890d8fc71 INN-4176 Billing UI improvements (#2026)
+- 303a81fc4 Fail connect gateway readiness checks on boot with env var (#2023)
+- c90236d2a Add function search feature flip (#2020)
+- 403116ecc fix function failed rate calculation (#2014)
+- 3d977fcd2 INN-4095 Add addons list (#2017)
+- bec17125d UI tweaks and fixes (#2022)
+- d3d15e5e0 fix: Update url for useFeatureFlags hook to support non default port (#2015)
+- d113e10d8 INN-4110 Use history entitlement instead of features.log_retention (#2012)
+- c64239480 Fix invalid expressions causing missed valid expressions (#2011)
+- 07e770d51 Usage charts tweaks (#2008)
+- 742c7e6b6 Fix max SDK request body size (#2009)
+- 3c3db438e INN-4113 step usage chart (#2005)
+- eef48fef0 INN-4135: add ai indicator for runs and add decoration to runs ui (#2001)
+- 9ffae0ba6 generate an trace output id when processing ai gateway steps, the ui requires it (#2006)
+- 4a1ff8108 Fix event duplication (#2004)
+- b66c6dc25 INN-4101: pass ai gateway step op code up to ui (#1998)
+- a1c4a124f Change metadata structure (#2003)
+- 793edeb89 Change skeleton (#2002)
+- c71b9809b Fix mismatch (#2000)
+- 2123c38a5 INN-3939 Onboarding tweaks (#1997)
+- 1fa55f53a Add new Node quick start link (#1995)
+- d25632f74 Up SDK response max from 4MB to shared 8MB for I/O (#1996)
+- 32c8ce76c metrics dashboard uses entitlements to determine account concurrency limit (#1993)
+- 3d9f3422b Update API ignoring `StepPlanned` opcodes (#1994)
+- d3d52e7fb Implement connection draining for connect gateway (#1983)
+- 2e389c927 Add tweaks (#1992)
+- ff5538517 INN-4093 Plans frontend tweaks (#1991)
+- d42c77dd0 INN-4041 add plans page (#1978)
+- b92cccb63 Add cancel event when function is cancelled (#1989)
+- 50fe2e4aa replace with the actual environment variables in use (#1988)
+- f3928b494 More tweaks to make interfaces work with Cloud (#1984)
+- edc1650ab a little better loading and error handling on rerun from step (#1987)
+- 0d4d584ea step ai wrap/infer UI (#1980)
+- 08b655838 Update inngestgo commit hash in vendor (#1986)
+- 917224cba Fix app shows as archived when it has 0 functions (#1985)
+- 14fe7441b Hide billing banner for enterprise customers (#1981)
+- a3fec5027 Introduce basic routing, multi-level acks (#1979)
+- 7158c237c Tag account concurrency metric with workspace ID (#1974)
+- 8dfcf6881 Gateways (#1962)
+- fa6a8dd6f Tweaks to build it for Cloud (#1976)
+- 500621a68 Add step count to billing banner (#1975)
+- de49c5a3a Dev Server UX improvements (#1972)
+- 09f37c0c4 Maintain an accurate state size considering inputs (#1977)
+- 91792dce2 INN-4042 Extract payments to its own tab (#1973)
+- 5092a1f11 fix: check for nil persistence interval in single node mode (#1965)
+- 559841eee Use runCount.overageAllowed in BillingBanner (#1964)
+- 6ddc7c7ac INN-4038 Create plan limit bars (#1960)
+- faac39562 add endpoint for retriving worker group data and update tests
+- 0ba54b70f move connection related logic to separate file
+- 880a7cdff change dev server register to return SyncReply
+- df28235f2 move run loop out of goroutine, or it'll keep spinning without exiting
+- ea35f6001 implement connection deletion
+- a5b055778 `RunStepInfo` for `step.run()` subtypes (#1970)
+- bf15ddacf Avoid input state mutation (#1971)
+- f08078254 INN-4047: Fix timeouts duration parsing (#1968)
+- 0dcfe260a Tweak concurrency limit banner (#1966)
+- 2bb6089d3 Add run input tracking and editing (#1959)
+- 37c5f1bd1 Connect error handling, create worker group, include sync data in initial request (#1963)
+- bcaa110d4 Add account concurrency hits to billing banner (#1947)
+- ef7d45127 Create connection state (#1961)
+- b44c87ebc remove beta tag from metrics (#1955)
+- c0d3449ac Set connection metadata skeleton (#1958)
+- 2f7ef16a0 INN-4032 Move billing outside settings (#1957)
+- 1b25f645d Remove cancel suffix in Pause interface (#1956)
+- c0494f048 Should not attempt to retry if a debounce is not found (#1892)
+- 969ec4bf3 INN-4010 display widget and onboarding in apps by default when no prod apps (#1948)
+- c4977d6ce INN-3937 Wire vercel onboarding (#1951)
+- b7078ba83 INN-3627 Send new users to onboarding by default (#1950)
+- 80b16040a Prevent nil panic by checking GetBody (#1954)
+- 57a8e4073 Separate connect router and gateway (#1952)
+- 602927f8f Bump github.com/vektah/gqlparser/v2 from 2.5.1 to 2.5.15 (#1481)
+- 17165d5f6 WebSocket connections (#1928)
+- c2c38a2e8 Remove invisible cancel expr suffix (#1949)
+- ae15c9366 Add BillingBanner (#1930)
+- 0148fc749 INN-4004 Add onboarding click tracking (#1939)
+- cdfdc4140 vendor expr (#1946)
+- b2dc24181 Fix runs search disappearing on scroll (#1937)
+- ce4e26168 Add pauses iterator metrics for first load (#1944)
+- 65d2aeceb Add metrics to measure efficiency of aggregate pause load (#1943)
+- f8321ef1c update expr to 774832e (#1941)
+- 8d6a0c00e INN-3938 Add actions to invoke step (#1922)
+- 8fbe5c7de Update expr to 01208c9 (#1938)
+- 2cf9b6125 Add modes to SDK spec (#1935)
+- 064a30718 Add keyboard shortcut for run search (#1933)
+- 2b3028b85 Lints
+- 20aa58f31 Add Supabase CDC integration (#1925)
+- f96729d30 Always dequeue pause timeout from account shard, log missing item as warning, not error (#1927)
+- 5a996b792 Improve random peek (#1923)
+- f27c88104 Add timeouts tests (#1921)
+- 00956960c Upstream log more details (#1919)
+- 82b3caf44 Add search runs tweaks (#1918)
+- 4ae6ef79f INN-3871: use skippable queries in metrics (#1901)
+- 2d777052e Add PeekRandom (#1917)
+- ffa0fb7a9 Resume within lambda (#1915)
+- 909e6c7bb Fix streaming status code 0 and missing trace output (#1913)
+- 712ee71cf Improve scavenger (#1908)
+- 90a1042c2 upstream inngest/expr (#1914)
+- 0dc16657d add index for showing how far the pauses has progressed (#1912)
+- 039aaaced Interpolate nulls within .Interpolate (#1909)
+- 3aef2641d fix: race condition in LoadEventEvaluator (#1911)
+- 38f38f9d7 fix: set concurrency in expressions.NewAggregator (#1910)
+- b8b034441 Update expression library for partial aggregates (#1907)
+- 3e1da9d7f Dequeue pause item from correct shard (#1906)
+- ce4849530 Refactor naive and aggregated pauses to share logic (#1905)
+- 0b9e7e285 make metrics filter lookup fetches non-blocking (#1904)
+- d9bff09a5 Allow uuids in metrics tags (#1903)
+- 53f13f26a Add internal queue kind to handle migration between queues (#1881)
+- b46fa815d Report name on guaranteed capacity (#1902)
+- fd978e402 Improved queued run run details pending state (#1895)
+- 5a22b45ac INN-3625 Add SyncApp step onboarding page (#1889)
+- 17f6738e0 Remove concept of legacy test environment (#1900)
+- d20dee8b2 Require queue shard in Requeue, Dequeue (#1897)
+- 65e96bdc5 revert to axis based tooltip (#1888)
+- c31a396d2 Add import (#1894)
+- 8367daa55 remove 0.0.0.0 binding, it was for test purposes only (#1893)
+- d9c75fa10 Fix status code 0 log (#1891)
+- bcc8a71ea Fix SetFnPaused: Re-assign variable in loop (#1890)
+- 9dc307c86 Fix primaryQueueShard (#1887)
+- afd400ead Add raw argument to webhook transform (#1884)
+- d2c6d370a Make queue shard clients expect all clients (#1885)
+- 72f1a69ce Set function paused on all shards (#1883)
+- aecd1571d Mapreduce job queue reader (#1880)
+- 81cf39bf8 Refactor shard selection to remove hard queue dependencies (#1879)
+- fedb29f39 Fix tokens on app card items (#1878)
+- 3ccf2d384 Fix events still being ingested with no key with `inngest start` (#1870)
+- d4d11ad4f update broken GolangCI-Lint link in CONTRIBUTING.md (#1804)
+- 1784912c3 Make peeking via EWMA configurable (#1876)
+- 804ac055a Stop dropping empty account pointers (#1877)
+- dbc07d49c Provide queue shard name to gcf (#1875)
+- 9ca07b433 Report queue shard name in metrics (#1874)
+- ebadda43d Guaranteed capacity improvements (#1869)
+- 40c137d6e Refactor queue to use Enqueuer interface + add shard selector (#1873)
+- 15618146c INN-3892: Lift QueueItem into common queue struct and interface (#1872)
+- 79732b0e0 Add CreateApp step onboarding page (#1847)
+- 02cd520aa INN-3875 Store search in url params (#1867)
+- c74dd986e Log when status code is 0 (#1857)
+- a32a16825 Track number of actually scanned partitions (#1868)
+- e4f0b45f3 change to use buffer for span exports (#1864)
+- 43559a838 Add mutex to state metadata reads/writes (#1859)
+- 75f0a4856 Update .Resume to use new util code (#1866)
+- ec848b260 Hide queue item not found (#1856)
+- ec152b2d0 Allow account priority (#1863)
+- f81b5d445 Fix placeholder to be accurate equality operator (#1862)
+- f89fd07d5 Fix function unpause sometimes not working (#1861)
+- 35aac839c Initialize trace carrier eagerly (#1860)
+- 546cb849e add and style the new metrics chart tooltip (#1853)
+- a6c627d53 Update config to use idx for subject name (#1841)
+- 6b2e8ed97 Restore deleted file (#1858)
+- c6ae5ca32 Ignore skipped fn errors on RetrieveAndScheduleBatch (#1855)
+- 143578d8a Ignore transient partitionRequeue errors (#1854)
+- b3a6bdd89 Push back paused fn partitions by a minute (#1850)
+- 70d1a2b3d Fix guaranteed capacity (#1851)
+- 2d2bb4fcb Add account priority finder (#1852)
+- 75724c38f Switch run finalization logs to stdlib (#1826)
+- 269ea0a8c System concurrency limits (#1849)
+- d82aa680b enable chart grouping for metrics dashboard (#1848)
+- 0e581f471 Don't conditionally call OnFunctionFinished or OnFunctionCancelled (#1845)
+- c261b6b7e Add event proto (#1844)
+- 338c18af9 Upstream changes (#1842)
+- 88ed0dcce Redo logic (#1846)
+- b53d94060 INN-3843: metrics latest charts (#1838)
+- 670b2188b disable billing nested scrollbar (#1832)
+- 98e27e5a9 Fixes on CEL search (#1843)
+- 2f92007bb INN-3839 Add suggestions to query (#1840)
+- 2acaefb2e Key & Account Queues (#1518)
+- 19e3f6527 Only show search when flag is enabled (#1839)
+- d0ae6a9ba Log more details for requeue errors (#1837)
+- bcb810983 Update onSearch (#1836)
+- 837367c1a INN-3838 Hide/display code search (#1835)
+- 3eed114e7 CEL filter for runs (#1608)
+- a0162795b fix 404 flash on signout (#1834)
+- 20505c8b9 INN-3832: upgrade next-clerk (#1829)
+- cb561ef6f remove new user survey (#1828)
+- 47ece5b2e fix auto-collapse (#1831)
+- 66d293d9c Add old runs Alert (#1824)
+- 85e72918e Provide some wiggle room in "end time is before now" check when creating a cancellation (#1746)
+- c7e519ca8 INN-2936 Add Code Search component (#1830)
+- 73d48dae7 Close Selects on apply (#1825)
+- 744d8a485 try revalidating path in server component (#1822)
+- 1d9bf8fea INN-3816: Always set inner queue name (i.Data.QueueName) during Enqueue() (#1817)
+- 2d7e2ef75 Always delete batches (#1821)
+- da2bddfff Fix link (#1823)
+- c48f8b58b Fix Dev Server ping body (#1820)
+- 59ddd8e28 Log when run ends but isn't finalized (#1818)
+- d002f1516 restore automatic tooltip positioning and slow tooltip transitions (#1819)
+- e8efe788b Release runs as primary resource (#1777)
+- d6901d9e6 limit failed list (#1813)
+- df7c5d79f nats exporter tweaks (#1815)
+- 4f7217386 Fix runs issue in Cloud where old results were being displayed again (#1816)
+- 588e3c574 Attempt 1 (#1812)
+- 1e03a0deb bugfix for paginated lookup merging (#1811)
+- 8abc7db43 INN-3805: tooltip fixes (#1810)
+- c39bced63 INN-3805: rounding, function list fetching, etc (#1809)
+- 71148ed71 Hide skipped from run filter (#1808)
+- 17c0d703a INN 3421 Optimization on filters (#1806)
+- 0cc96add0 INN-3802: wire up function run and step throughput charts (#1792)
+- f34e57cef Fix index (#1803)
+- 0faac6005 Fix missing content-type header in ping (#1802)
+- 1a707db0c Fix width issue (#1801)
+- 15a35ed21 Drop batch keys immediately after Schedule() (#1800)
+- 3f49bda85 Support sending multiple events in modal (#1798)
+- afb008ec8 Make neon adjustments (#1799)
+- cd710a04a Fix connection string username parsing (#1794)
+- 5599f9af1 Update Neon copy and docs links (#1797)
+- 5122d9115 bump next version for vulnerabilty fix (#1796)
+- fa590a430 bump next for security vulnerability (#1795)
+- e74c3215f Add verify authentication (#1791)
+- df2e10f89 Fix empty x-inngest-server-kind header (#1793)
+- 923860df5 Update README for 1.0 (#1790)
+- 15dc91bce `start --event-key` must be a slice (#1789)
+- 99e6cb704 Support signing key in Dev Server (#1699)
+- a47cb89d3 Future license (#1787)
+- def8c1f46 Fix redirect method (#1767)
+- 17bde661f Add bulk cancel name description; fix submit disable bug (#1751)
+- a5acd8621 Maybe fix flaky TestWaitGroup (#1786)
+- c44d4e04f Update CODEOWNERS (#1785)
+- 81a89c033 Maybe fix flaky TestThrottle (#1782)
+- f15154d70 Add neon interactions (#1775)
+- 83fc3d3e5 Fix `INNGEST_SDK_URL` not matching the same flag as `--sdk-url` (#1783)
+- 535a0ddb8 Fix output_too_large error when streaming (#1780)
+- 40bdb1afc Fix z-index in runs table (#1781)
+- 8fb20b496 INN-3785: metrics dashboard failed function chart and failed function rate list (#1763)
+- 94c8fb37e Fix collapsed bug (#1779)
+- 5afb34bb6 bump version to fix vulnerability (#1778)
+- 2e8e37045 Fix runs scrolling behaviour (#1772)
+- 10a5013d9 INN-3722 CLI Refactor (#1761)
+- 3f509f025 Fix UI when multi-error during sync (#1776)
+- cbd347b03 Update inngestgo to dccf7b2 (#1774)
+- b13a1a561 bump node version in CI to 20 (#1765)
+- ec3b2c676 Add missing status (#1768)
+- 47be656e1 Add accordion (#1748)
+- 0bc86a888 Update inngestgo to 546b1d2 (#1766)
+- cbc45003a INN-3760: Track started batches (#1762)
+- 68bae8ffa Minor improvements to archive UX (#1764)
+- 3bd7957d7 Handle skipped runs (#1758)
+- 5f87a6e44 Update state new idempotency setting (#1760)
+- b59a1182a New favicons (#1753)
+- 44e6c7a74 Update inngestgo to 6d204d (#1757)
+- d481931db Remove deprecated hosting stacks (#1754)
+- 9a5db379f Allow bulk cancel when archived (#1756)
+- ad5f07fac Add SyncKind enum (#1755)
+- cc285760a Add text color to traces (#1750)
+- 49704c85c Fix function page shows 'not found' on error (#1749)
+- e101b8392 INN 3726 add neon integration page and installation overview (#1739)
+- 7fe81ed3b Add ability to provide a `--redis-url` for queue/state in `inngest lite` (#1705)
+- 5fb58202d Add click to copy for table info (#1745)
+- d06362a52 INN 3720 Create step page header (#1738)
+- a6e4d4b63 Fix improperly handling JSON arrays (#1741)
+- ff071d627 INN-3719: metrics dashboard added, function status chart wired up (#1709)
+- 5db8b3fc6 INN-3727: add a new user survey link (#1740)
+- 2c1171926 Add `--poll-interval` to `inngest lite` (#1718)
+- 36a738c30 Re-add `--sdk-url` flag (#1706)
+- 3f0b9cb28 Update types (#1743)
+- c692be694 Runs page fixes (#1735)
+- 4c207d8fb Add in-band sync capability (#1736)
+- c3509bbde Fix hanging runs when response body isn't JSON (#1729)
+- 3617629dc concurrent batch exporting for spans (#1737)
+- 4b3e72d73 Improve flakiness checks (#1734)
+- e8464d4bb INN-3630: Skip non-default partitions in Scavenge (#1717)
+- 055ee8948 Replace token names (#1733)
+- c1d29ed11 Extract StepMenu component (#1725)
+- a22901212 Replace go-batcher lib with in house implementation (#1731)
+- 0ac11f2c3 Fix buttons in run details and dark mode scrollbar colors (#1728)
+- 6218d6b7d Fix button flicker when polling (#1727)
+- 4eed9615a Align runs header with new IA nav (#1726)
+- bc8fe73de Reduce batch processor timeout for dev server (#1724)
+- 91149a1a5 Fix flaky trace run tests (#1723)
+- defd38f8f INN 3619 create steps pages layout and steps menu (#1721)
+- 6594ccb69 INN 3618 create sidebar widget and initial page (#1716)
+- c5ed746da Add user object support to UI invoke (#1708)
+- 7a24765de attempt to export spans directly on certain errors to minimize data loss (#1714)
+- 8cd8f4f7e Create custom batch processor for span exporting (#1713)
+- 4df2bfd0d Clean up deps in pkg/inngest (#1711)
+- 042f68247 Change msg publishing to be handle async (#1710)
+- 1577d8e35 Add creds file option for authentication with NATS (#1707)
+- 5f6595559 INN-3567: persist payload customizations through tab changes (#1697)
+- a12012029 clean up all old IA nav and remove feature flag (#1691)
+- dfa7a9ed5 `inngest lite` in-memory Redis snapshots (#1676)
+- 85066f671 Soft delete apps and functions (#1689)
+- a96cb0f49 remove errant semicolon (#1703)
+- 27e7ed7d4 Update license (#1702)
+- b06806da2 Simplify fudge factor (#1674)
+- 7d06b42cf Fix redirect following (#1688)
+- 2e911abc6 INN-3534 Fix reruns in Runs (beta) tab hanging (#1692)
+- c9097631e downstream HTTPDoer interface from Cloud (#1695)
+- 1663dc678 disable invoke while paused and z-index issue (#1694)
+- dd42ea904 found a couple missed pages with old ia (#1693)
+- 2b31f2cd4 adad overflow-x-scroll to dev server (#1690)
+- 5c7a27264 INN 3550 - Implement new pill designs (#1687)
+- 99fbdeed6 Switch non-SDK 200 check to log only (#1686)
+- 44814110f Change apps tokens (#1685)
+- 5809dcc37 NATS span exporter (#1667)
+- ad35e6bfc runs refresh ux improvements (#1684)
+- 13e40a6d0 Fail non-200 SDK responses (#1682)
+- e6d9b7931 Fix typo (#1681)
+- 93f49ee81 Change archved colors (#1683)
+- 7a4a0aeaa Ensure defaults for Dev Server polling interval are sensible (#1679)
+- 541c04eac INN-3386: dev server ia nav (#1642)
+- 34482ca5f Disallow parallel plans that exceed the step limit (#1678)
+- 58fb71d3e Use `lite` as service name for `inngest lite` (#1677)
+- decbcaede INN-3434: Graceful pause deletion (#1617)
+- f71d3f6a2 Only process default (function) partitions for backwards compatibility (#1671)
+- 5f368c9c5 Handle new sig_verification_failed error code (#1673)
+- d1a591b77 Add queue kind pause (#1672)
+- 3831a5e0f Split out telemetry to separate pkgs (#1670)
+- 4e160ede0 Disable password manager by default in Input (#1625)
+- 5446394d6 Move custom span to run pkg (#1668)
+- 856747337 fix env header (#1665)
+- a436468a1 Consume pause timeout jobs on resume (#1669)
+- b334d1b92 fix: worker capacity should be run regularly outside of the lease (#1666)
+- b954b7d12 Bump google.golang.org/grpc from 1.64.0 to 1.64.1 (#1655)
+- f0c829134 function status zindex (#1664)
+- 0464631ac Do not attempt to import data in non-`lite` mode (#1659)
+- 069844495 Fix misaligned stack/state when marshalling for an SDK request (#1663)
+- f1ea6043d Queue instrumentation (#1658)
+- 59717b7a4 INN-3476: a handful of ui/ux fixes (#1662)
+- 650c63215 Add `cause` to `UserError` (#1643)
+- 8becdac68 restore callback forwarding for vercel (#1661)
+- 2239f3751 fix event toast (#1660)
+- c466cbd76 Add switch for parallel and sequental processing (#1656)
+- c30c3f9bc Batch improvements (#1653)
+- 1c41e11e8 try to fix function invoke modal (#1654)
+- fc233a742 higher zindex on key manage menu (#1651)
+- 42204fb08 archive/unarchive button fix (#1650)
+- ebb7c7976 fix switch org bug (#1649)
+- ac7b375a5 don't send empty origin override string to api (#1648)
+- 02d0e997a restore feature flags on function detail page (#1647)
+- 711f792b7 pare back prefetching to side-step rate limiting (#1646)
+- de084cce6 exclude archved envs from env selector (#1645)
+- bfd025bb3 * keep search in dom so it works when nav is collapse (#1644)
+- d69dccbd0 update link to new ia nav blog post (#1641)
+- 636bd33c3 Dont dequeue job ID in context (#1640)
+- ded9ef2c3 variety of ux fixes (#1638)
+- fbf47c569 Dequeue finalized jobs (#1635)
+- 03fd229fd minor style cleanup (#1637)
+- 081707636 INN-3135: ia nav functions (#1627)
+- 19776306f Fix trigger column (#1636)
+- 1fd373418 Move trace instrumentations into lifecycle hooks (#1628)
+- 3e8925376 `inngest lite` (#1619)
+- 9a1f19728 Make app filter work (#1595)
+- 405da37eb Add type check to Dev Server UI CI (#1632)
+- 4e0f2e8b6 Wire new runs refresh button (#1631)
+- 8f453de62 DRY out the 2 runs pages (#1630)
+- f16590e3b Add linting to shared UI (#1629)
+- 503e8f974 Add trigger column; update column order (#1626)
+- 9666e2bea Add runs to Dev Server nav (#1606)
+- e3fb352b4 Replace Code Block colors by tokens (#1598)
+- 0d92c0e9b Add env-level runs page (#1624)
+- ab5a2073b INN-3035: new ia top nav (#1620)
+- 165e8d5f6 prevent future dates by default (#1622)
+- 6747274bf Version trust probe (#1623)
+- c6f7e5127 placeholder env not found message until we have a good ux for it (#1621)
+- e7d59307f Fix typo causing syntax error in monospace font css attribute. (#1616)
+- c45622fc5 Fix a couple loading issues with new runs (#1609)
+- d2a95145f Don't set end time if the wait is not done yet (#1615)
+- b87a6a6b6 INN-3429: Truncate when more than 2 function triggers (#1613)
+- 7724ee344 Ignore history limit for cancellation (#1612)
+- 9a0f79c9a Prevent long error messages without spaces from breaking layout (#1610)
+- f1fc5b294 INN-3361: design qa fixes (#1607)
+- 5b0aa27f6 INN-3271: the rest of the side navigation widgets (#1605)
+- 9c898c811 Add total count to runs list (#1600)
+- 0207156aa Update batch config validation (#1601)
+- 6b26ad286 Add trust probe (#1599)
+- 42c5185b0 Queue uses a mock-able replacement for time package (#1590)
+- 8c0529d35 Hide archived envs in env dropdown (#1602)
+- 33ee76bb6 Make sure appID is propagated to execution scheduling (#1596)
+- b89ec9bcf restore function icon (#1597)
+- 0aff9459b Add function bulk cancellation list (#1593)
+- c23869704 INN-3315: new ia nav wip (#1584)
+- 695fe02da Add `totalCount` and event name for runs view (#1591)
+- fbae5a306 properly check if vercel deployment protection is disabled (#1594)
+- 027493e4e INN 3340 Add test event button to runs in Dev Server (#1592)
+- 8e952c45e INN-3285 Add absolute time filter to runs (#1571)
+- 2bebafd15 force circular mono on the other "code editor" (#1589)
+- 8fd073573 Update expression parsing module (#1578)
+- 33090e19e Fix SSR error (#1588)
+- 8e08dba87 Fix missing signing key in GraphQL query (#1587)
+- a00d39cbe Fetch fewer environments when navigating through the UI (#1567)
+- efeb8394d Instrument Redis client (#1579)
+- 7149f0581 Expose events batch key (#1583)
+- 1222a7902 fix org member list bug (#1586)
+- a853b4874 Fix saving batches to DB (#1582)
+- ee31b8e98 Add bulk cancellation creation modal (#1577)
+- 0cf3c4cea fix fonts in storybook (#1575)
+- ed2dbea79 Add skipped function runs to the individual event page (#1576)
+- 2406dddc7 Clarify Pause modal copy & buttons (#1581)
+- 2babc5ad8 Add function link to RunDetails (#1580)
+- 8fabebb86 [WIP] Add GetSkippedRunsByEventID to history_reader.Reader interface (#1572)
+- d4c7a0b8f import font css locally to make nextjs happy (#1570)
+- d350d3ce7 Update expr (#1574)
+- 3341e5cd0 Add app and function columns to runs list (#1569)
+- 63212b7dc INN-3283: some vercel fixups (#1561)
+- 216d74ae9 INN-3136: add circular font to the dashboard (#1544)
+- 8a28f85fd Clean up batch keys post release (#1541)
+- 97a83588c CancelRequest.ForceLifecycleHook (#1558)
+- c5c7bf155 Shard batch keys (#1536)
+- d52eb8b8a INN 3298 Add color tokens to date picker (#1565)
+- 319d95114 Do not run go routine or log if discovery is disabled (#1466)
+- 2bf015296 Fix env slug in nav (#1566)
+- bd4c52b84 fix status page link regression (#1564)
+- dc48354b0 New IA Nav pre-requisite (#1555)
+- ec3a30a0d Disallow future dates in cancellations (#1563)
+- 088085e28 Update code (#1562)
+- d20a6ef5f INN 2938 Visibility dropdown menu in runs table (#1559)
+- ed3fc70fe Add Event.IsInternal (#1550)
+- 16a67664b Remove unnecessary function count from query (#1560)
+- f9d9ff029 Add FunctionRunV2.app to GraphQL (#1556)
+- 3e0d70624 INN-3247 Add Select with search component (#1528)
+- 0bcf4c717 Fix missing transform when creating a webhook (#1557)
+- 591395899 Add GetActiveRunIDs and CountActiveRuns (#1554)
+- 5e1a088f4 prefetch a couple vercel integration pages avoid post rendering data fetching (#1538)
+- e99ef72ed Validate cancellation expression (#1542)
+- 2c3834048 Fix internal metadata not disallowed for user events (#1540)
+- fbc4f0234 Fix Windows looping forever looking for config files (#1549)
+- ed5bcc328 Send a dispatch event to automate some upstreaming (#1548)
+- 3a2ea1b4c Add polling to RunDetails popout (#1547)
+- 9d52bd216 Add polling to RunDetails (#1546)
+- af16688d1 Add fetch retry to RunDetails (#1515)
+- 578567e5e Adding polling to runs list (#1539)
+- aee90b863 detect installs from the vercel marketplace and redirect them there on success so they finish (#1545)
+- 5447d4d5d INN-3262: Implement state size limit (#1543)
+- bb1167c4f Add 'paused' function run status (#1537)
+- 079364651 INN-3257: some more vercel design cleanup (#1534)
+- a9868f9f0 Allow cancelling current runs on pause (#1505)
+- a4d3350d0 Fix Vercel project enablement (#1535)
+- ebe92014e disable turbopack until we can figure out: (#1533)
+- 78d6f910b Nits and changes to state initialization (#1532)
+- 0b8168550 INN-3250: move to proper alert (#1523)
+- ff0d7c72b Update key_generator.go (#1531)
+- c49190415 Fix missing error result when no stack (#1527)
+- 5a131c200 Fix tests (#1529)
+- 7adfde713 Sharding (#1511)
+- fbc6c30a8 Do not double report `waitForEvent` during parallelism (#1525)
+- 12d9c2e7a detect an empty vercel project list and consider that as disconnected (#1526)
+- 2ac277cfd Experiment with Turbo (#1418)
+- 1f6cdeaed Make event page's Triggered Functions view more consistent with the event dashboard's (#1512)
+- 9e3047e47 INN-3248: fix up design tokens (#1522)
+- 62c782c2a Fix: Maze survey cannot be clicked when overlay is shown (#1521)
+- 187758ae1 use inline vercel connect flow, not popout (#1520)
+- 5ab0acd29 Add tweaks (#1519)
+- f2e81fd81 Add run popout to Dev Server UI (#1513)
+- be0af7826 INN-3134: new integrations (#1421)
+- 04382ab67 Check partition backlog as part of deciding peek size (#1516)
+- 90878b52e INN-3204 Fix status filter (#1514)
+- e8cc3d1dd Fix fetch result error (#1510)
+- 17cf63fd9 Fix missing result when invoked function not found (#1506)
+- 588eb6fc2 Add queue spans (#1396)
+- 19ca699cf type convert the list to float by hand instead of relying on redis (#1509)
+- 2dda25260 Fix run tree bugs - regression (#1507)
+- c58e1b263 fix RPUSH missing element and log error on setting new value (#1508)
+- 89aa42418 Parallelise queue item decoding (#1500)
+- 7bbb1a3a8 EWMA backed dynamic partition peek (#1499)
+- d71e055f9 Add run list to Dev Server (#1502)
+- 34740fc4d Correct copy in the pause modal (#1504)
+- 9c4402a89 Bust Workflow cache on resync (#1503)
+- 9f987ad6e Allow replaying skipped runs, part 2/2 (#1490)
+- beefa9a39 Better handle server kind mismatch during sync (#1501)
+- 956a0e217 minor fixes for run tree (#1498)
+- db9f3ddeb Update status colors (#1496)
+- 59c3ff9f6 Increase lease duration (#1495)
+- 9f7c9b990 Handle nil lease ID (#1494)
+- 4fd013d67 Run tree tweaks (#1477)
+- 402dfca23 Handle other occurrence of redis nil error (#1492)
+- dfcb4be90 Add color tokens to traces (#1493)
+- 758b788ae Move new runs page into shared lib (#1489)
+- 35bb95053 Allow replaying skipped runs, part 1/2 [INN-3001] (#1408)
+- 5041d1dc9 Remove delayDuration from tooltips (#1491)
+- d0bed73a0 Enable expand and collapse trigger details (#1487)
+- 733861509 Add histogram for queue peek size (#1483)
+- c6d834ecc Validate POST /cancellations input (#1488)
+- 2695fd7b4 Move RunsTable to shared folder (#1485)
+- b3723b2c0 Fix CodeBlock does not narrow (#1482)
+- bed561b5e Track individual queue operation durations (#1480)
+- 3939e5b2f Adjust cloud apps cards hover and tokens (#1479)
+- 52fb37bd8 Update error pages (#1474)
+- 04b8aeb24 new buttons (#1447)
+- 42711b390 add json annotation for span identifier (#1476)
+- 0bef9d209 INN-3150 Add All to Status Filter (#1473)
+- 45b8566a9 Add Maze snippet to in-app layout (#1475)
+- 8ef473c17 Add GQL API for retrieving span output and trigger (#1472)
+- 0413fd1a8 Add tokens to runs top components (#1470)
+- abb55ea2d Walk up to find config (#1471)
+- e68044362 Add trace resolver / data loader (#1449)
+- 2eaa5d2ce Fix removeSyncIDFromUrl when no protocol (#1468)
+- cc88f45b2 Update OnFunctionCancelled lifecycle hook to accept fn events (#1469)
+- b2f1d808d Add accent colors (#1467)
+- 257a1249f Add 'Send to Dev Server' button (#1462)
+- 75a3877e8 INN 3182 Replace link color tokens (#1465)
+- 640124b41 Set min height of invoke modal editor (#1453)
+- 9c1f5bde3 Make design changes to app inspect (#1443)
+- ae2375ae6 INN 3179 Implement checkbox component (#1461)
+- 3769e825a Fix run hangs when negative waitForEvent timeout (#1457)
+- 93ae593c8 INN-3163 Pretty print json outputs (#1458)
+- 4ce0d6370 INN 3174 Replace status colors by new token colors (#1456)
+- d369def25 INN 3173 make code blocks match design (#1454)
+- e1009c73a Add Dev Server config file support (#1414)
+- 460e28480 Force stack to be sent as slice, even if we receive nil (#1455)
+- 153b2e319 Use known error for missing events (#1451)
+- 07b9f87c7 Add color tokens (#1452)
+- ad342a52d tailwind consolidation and design tokens (#1446)
+- 1964bf19f Add API for retrieving v2 runs (#1441)
+- 04445309d INN-3168 Fix colSpan on Function Runs table (#1448)
+- 023787275 Do not attempt to store span if it's marked as cancelled (#1439)
+- e41b757e2 Fix delay tooltip visibility (#1445)
+- 5fcb7d8bd Report state size before deleting (#1442)
+- f5401650c Run details design (#1444)
+- 8d55d9f00 Update introspection spec (#1393)
+- 89f28e79c Allow pausing queue partitions (#1437)
+- 367fda5dc Surface expression compilation errors for waitForEvent expressions (#1435)
+- 898a42093 Add gql query and cqrs interface for trace runs (#1440)
+- be67193ac Update post-spans
+- 4a3b5c3c8 Span lines
+- eb657f903 Add deleted flag to gRPC's DeleteStateResponse (#1438)
+- b32061954 Fix parallel steps resulting in multiple finished events (#1429)
+- 1e586ccb3 Test timeout option for invoke on Go SDK (#1432)
+- bca7f4621 some more fixes with relative date picker (#1424)
+- b2bf71096 Add app validation (#1431)
+- 88056f339 Ensure v1 driver marshalling always includes the first event (#1427)
+- be48d7448 Fix a deadlock when a pause resumes with a non-default retry count (#1430)
+- d9c31f42f Separate out span lifecycle operations (#1422)
+- 69e23bc53 Add RunInfo skeleton (#1423)
+- 7d345e2af INN 3139 Use single globals.css and AppRoot (#1426)
+- 29f27709d Fix missing event in SDK request (#1425)
+- 929572f2d Runs UI tweaks (#1419)
+- 6af9d2caa IINN-2932:  date range picker (#1391)
+- d4ddc47b5 Fix crash when changing runs filter (#1417)
+- 798ecbc19 Get real trace result (#1415)
+- ec7146606 INN 3044 Trigger details panel (#1413)
+- 38f7733f5 Add invoke scope to consts (#1416)
+- 1b583de3e Make sure spans are annotated correctly when there's a retry (#1412)
+- 5be97d893 INN-3106: fix event stream pagination by using ulid as cursor (#1409)
+- 9fac38d43 Track pauses for each run (#1411)
+- fd6212bfe disable system dark theme detection until our designs support it (#1410)
+- 6cada0655 Include error message in history item output (#1402)
+- d70ab0f29 Fix runs not failing when output too large (#1405)
+- dceccb685 INN-3103: Add helper method in Span to store SDK resp (#1403)
+- f898ae529 Trace -> debug level for stdlib logger
+- 1666d4027 Chore/xxhash keys (#1406)
+- d32ca8ab9 Fix pending steps with auto state deletion (#1401)
+- e15e4604e Ignore rate limit settings if the result is `false` (#1379)
+- 2b00b0b20 Add test for hanging run on invalid wait expression (#1400)
+- b3c8c87ec INN 3004 infinite scrolling pagination (#1384)
+- 4c6a4d49a Improve error handling when runs complete (#1399)
+- 9853d9ed6 Fix missing opcode pills (#1395)
+- f06181f5b Fix hanging run when invoking a rate-limited function (#1397)
+- c6dfe6119 Update expr package and wait handling (#1398)
+- 1eafb24e5 Remove graceful handling from batch keys (#1392)
+- a4181b9a5 Add step kind specific info to run details (#1382)
+- acb21dbcd Use getter for event ID, and ignore dupe responses for sleeps (#1394)
+- 59c381e71 Fix/empty event id access (#1390)
+- d0ed1756c Add run not found handling to pauses (#1389)
+- 51a4209c2 Improve metadata test
+- cf8c57020 Return state not found errors when loading metadata and state. (#1388)
+- 2cbccd89b Implement OnFunctionSkipped lifecycle method (#1377)
+- 945bf74fc Ana/inn 3094 run details style tweaks (#1386)
+- 9243f658b Fix wrong groupID for sleep (#1385)
+- d136deaf9 Remove cancel button icon; remove Dev Server button (#1378)
+- a9aa940d0 Add additional data to support wait and invoke visualization (#1380)
+- 0d2e0914f Add middleware to SDK spec (#1374)
+- b5ccf34d5 Add a missing app ID to our state identifier when scheduling (#1383)
+- b52b7a5ac Stop stringifying primitives when parsing function resolution results (#1381)
+- 5274c209f Implement batch keys in OSS (#1344)
+- 16f8e28dd Make rerun button work in new run details (#1375)
+- 4daff83bf INN-3061: swap in new date picker for function replay range (#1367)
+- 930e431da Updated state interfaces (#1325)
+- 75a71e0dc INN-3037: trace tweaks (#1371)
+- 524ac2391 OrderBy with the same field as timefield selected (#1376)
+- 99ee61fe5 Make cancel run button work in new run details (#1363)
+- be3c09f90 Update README to clarify project name (#1355)
+- e6b185dc1 INN 3054 add filter by function slug (#1370)
+- b168766ae Fix cron event time (#1373)
+- e51e6fd2a Fix pause button not working (#1372)
+- c9ecb2830 [Security] Upgrade next to 14.2.3 (#1369)
+- 2b7288d07 Add tweaks to Incident Banner (#1368)
+- 9ae81d6aa add a guard in case the property is nil (#1366)
+- 64734a68a Make Incident Banner (#1365)
+- 89b902aa3 Add banner (#1364)
+- b86647663 INN-3033: make code editor support tailwind/system color schema and overrides (#1357)
+- 854631630 Add `runID` to `step.invoke()` when the run is scheduled (#1360)
+- e156e4915 Add Cloudflare Workers to default ports (#1348)
+- 1e9c9f2d0 Support `step.waitForEvent` in trace runs (#1358)
+- af9c9fb66 Add API for runs v2 list (#1345)
+- c54810917 Complete pause support in batch handling (#1356)
+- 3fb08b27e Add time filtering to partition peeks (#1359)
+- ca0c5409b Archive app (#1338)
+- 04e72bd32 Consolidate options and make instrumentation methods public (#1354)
+- 9ea844bf0 Add support for function.paused_at in ScheduleBatchPayload/RetrieveAndScheduleBatch (#1353)
+- 3af47ce1f Make debounced functions respect the paused_at field (#1351)
+- bda340064 Move async gauge instrumentation as part of initialization (#1352)
+- 2f4146d85 Render RunDetails inside row (#1349)
+- 16c29e906 Fix new run details can't scroll (#1346)
+- 7a4de9f77 Add run details pop out page (#1335)
+- 6565f876e Downstream some tracing changes to span reconstruction (#1343)
+- 6907e72d1 Store trace spans into sqlite (#1328)
+- 58dddd6ca fix: executor.Schedule returns ErrFunctionSkipped when a function is paused (#1337)
+- 8ba70a58a Replace hero icons (#1333)
+- 4f34586e0 Annotate the fn span if it's the first time (#1331)
+- 554224176 Add lease denylists (#1334)
+- b92259f60 Remove data race in shard instrumentation (#1332)
+- 1530a306c Executor: support function pausing (#1330)
+- 931c4af8b Add refetch to useGraphQLQuery (#1326)
+- 6f251e3bb Add @BrunoScheufler to codeowners (#1329)
+- 5540d01bc Reuse batching logic in executor (#1321)
+- 9b938851b Add queue peek size control and additional metrics (#1327)
+- 4be9b446d INN 2988 add relative time filter to runs (#1320)
+- 314687662 explicitly specify enum values for RunStatus (#1322)
+- e572083f5 INN-3003: Fix consistent sort order for apps (#1324)
+- 340205755 add trigger event data and output to fn span (#1319)
+- ade79fefe Add poll interval flag to CLI dev command (#1318)
+- 19dc23506 Fix Dev Server polling and discovery (#1274)
+- 7e2c1a420 Fix payments table overflow (#1317)
+- ca22f00ac checkpoint (#1314)
+- 213c2b9df Fix queue item score (#1316)
+- f57d0bb25 Add time field filter (#1313)
+- c954b7cbc Add Trace component (#1312)
+- 3b3e685ac INN 2940 create select shared component (#1311)
+- 3c0fb1a4c Delete CodeKey component (#1310)
+- f56bd7937 Dev server trace skeleton (#1307)
+- 937b889a5 INN 2967 Create expanded rows layout (#1305)
+- 6a97f2a63 Fix nil value returned by Redis in cancellation (#1308)
+- 228387401 Upstream expression and logging changes (#1309)
+- d1de08ebc the order of this error message should be reversed (#1306)
+- 993f11d75 Add flat side support for Badge (#1301)
+- ea1adb151 Add throttle config to UI (#1303)
+- 312da2e06 Allow for increased steps based off of identifiers (#1304)
+- 2f1109504 Rename column to Queued At (#1302)
+- 8cbf295af Move Time component to shared (#1300)
+- ae3883428 Signing key rotation UI (#1297)
+- 1900c1df1 Remove css (#1299)
+- 6c37b6abf INN 2962 Add status filter to runs (#1295)
+- 61d71516d INN 2942 icon implementation (#1296)
+- 8f152d103 Fix function active/archived tab switching (#1284)
+- cbe8654c4 delete state when run is cancelled (#1293)
+- 0eafe3138 Dependency updates (#1294)
+- e78b572b5 Ensure that modals and dialogs are at highest z-index (#1292)
+- 4b4147a63 make sure batching and debounce are recorded correctly (#1285)
+- fb29ea0e0 Invalidate too large batch sizes (#1289)
+- 12c6cf0ff Add new runs page (#1288)
+- 128499465 Dev Server rerun UI (#1272)
+- dbb714cda add back batch size ceiling (#1287)
+- 9651747a6 Start using coded_err in function config validation (#1197)
+- 0b7326da3 INN-2912: Minor tweaks for span annotations (#1280)
+- 39c54a734 follow similar test pattern for normal invoke test (#1281)
+- cd532107d Fix overflow scroll on event config panel (#1283)
+- 09428e7d7 Remove new banners for Apps, Replay (#1282)
+- c302c5c74 Update changelog
+- e5e81de0e Add rerun mutation to Dev Server GQL (#1271)
+- b746767eb Add unmarhsalling for TS SDK of throttle (#1279)
+- 66da47251 Add throttle counter
+- b5d83041a Rename signing_key_fallback_hash in introspection (#1278)
+- 383e408e1 Ana/inn 2921 Update storybook (#1273)
+- cad588619 Fix Dev Server crons (#1277)
+- 2abd4555d Create our own data structure for otel spans to workaround otel spec limitations (#1248)
+- c4ace2afc Implement throttling / concurrency over time (#1270)
+- 71c7cbbd9 Ana/apps UI friction (#1266)
+- dbf97938d Bump tar from 6.1.11 to 6.2.1 in /npm (#1268)
+- 6b9bf9e39 Add initial function timeouts (#1269)
+- 9f48b6711 tweak message to make it easier to differentiate (#1267)
+- a6d3272bb Base for moving invokes away from pauses (#1265)
+- 333ac1bbe Update cnacellation deletion API
+- ab2f458a0 Add GCRA to leasing queue items directly (#1263)
+- 1ad9a974c Use pause and unpause mutations (#1254)
+- c5849251b Update SDK spec for signing key rotation (#1262)
+- 8df29ddcc Transition state store run status to running (#1218)
+- 4bbb8c2b7 Validate events in Dev Server (#1264)
+- a1085fc13 Split API handlers from HTTP implementation (#1230)
+- 683e3a229 Add VS Code launch config for debugging (#1259)
+- 533409bc3 Ana/inn 2719 Create new date picker (#1253)
+- ab9b4fefc Fix missing timeline output for errored attempts (#1261)
+- 8ef7d65dc Add support for more error codes (#1252)
+- 51ec78b6f INN-2911: Fix empty event payloads in UI due to resolver bug (#1258)
+- 89b974f4c backfill API response type change to OSS (#1255)
+- 0df4f729d INN-2888 INN-2876 INN-2887 Trace fan-out, invoke, propagation (#1249)
+- 1e0bff86e Remove RSC on environments page (#1250)
+- edc9918df Add CreatedBy and Name to Cancellation (#1240)
+- 4591f2b6a Display event keys created via integration (#1247)
+- 61717ce99 Fix Vercel integration empty state (#1246)
+- a7125338f Fix backward archived check (#1245)
+- 0b602a028 Add button for archiving custom envs (#1229)
+- b95f4ed95 Remove inaccurate error return (#1244)
+- 46865477d Change duplicate sync status text and icon (#1243)
+- fc9dcf39a INN-2874: Incorporate tracer into codebase for user traces (#1237)
+- 07d141df1 Fix data fetching issue on Vercel integration page (#1241)
+- 753c5304c Move Vercel integration page to client (#1236)
+- 678d85ef2 Fix GTM tag (#1239)
+- 62fb9d6e9 INN-2879 Fix Dev Server ingestion returning external IDs (#1238)
+- 4c519699d Add run cancel button (#1235)
+- 8a683cab0 Add cancelRun mutation (#1233)
+- d2183f36b Convert run page to client-side (#1231)
+- fd1d78ee3 Fix swallowed error on apps page (#1228)
+- 7d0beec6b Funnel telemetry for marketing site (#1232)
+- 545f9833f INN-2806 Add "Invoke" button to triggers in Dev Server (#1226)
+- 0ff1855e1 Hide replay buttons for internal events (#1224)
+- 2624e577a Fix cron initialization loop; `data.cron` was the same for overlaps (#1222)
+- 9610e9ba0 Fix ULID custom IDs showing duplicate runs in UI (#1213)
+- 2b9a81570 INN-2858 INN-2859 Add sync validation rules for multiple triggers (#1223)
+- e701a7d49 Move `<Alert>` to the shared component library (#1225)
+- 6f4f64559 Redirect to stream on event/run fetch error (#1217)
+- 5a648aafd chore: remove IGassmann from CODEOWNERS (#1227)
+- b1e31b38e Add toast to Replay (#1215)
+- 3cf08714d Fix UI crash due to spare events array (#1214)
+- 05b44cef5 Fix missing run status in event details (#1212)
+- 6945e0214 Remove FuncCardFooter (#1211)
+- 1199d96a4 Fix UI crash when event ID is custom (#1201)
+- 8ad32296f Clarify some points about the signing key and signature (#1209)
+- a78762513 Duplicate syncs (#1205)
+- 9baeb66bc Add `Triggerable` concept to OSS to help `inngestgo` with multi-trigger (#1203)
+- 8829942be Fix missing running state in Dev Server UI (#1207)
+- c758f2123 Track screen details (#1204)
+- dfc3e8187 devserver: fix custom event IDs are not idempotent (#1202)
+- 7cec70616 executor:  ensure `cancelOn` works with `event.ts` in the future (#1206)
+- 071e2fcbe Sync mutation (#1200)
+- 8300946b1 Add HorizontalPillList to table Pills (#1199)
+- bcf9fdba6 Consistent Apps in Dev Server (#1198)
+- 9990064cf INN 2804 Refactor pill component (#1196)
+- fec68ad5e Fix a few typos in SDK_SPEC (#1183)
+- 20dfb8256 chore(dashboard): don't hide source maps in production (#1195)
+- dee89b30f chore(dashboard): enable source maps in production (#1194)
+- 86f7295de Rate limit chart (#1188)
+- d452ac561 fix(dashboard): invite members form is skipped (#1192)
+- e3d97add4 revert "hotfix(dashboard): cache revalidate conflicts with clerk" (#1193)
+- 2e5fe2a8f hotfix(dashboard): infinite user reload on set-up pages (#1191)
+- d775e233c hotfix(dashboard): cache revalidate conflicts with clerk (#1190)
+- 1a3fd83a0 feat(dashboard): switch to synchronous onboarding flow (#1173)
+- d343969e6 Default protocol to http in Dev Server (#1189)
+- 2c258dcd0 change name to queued instead of scheduled (#1187)
+- 1978b7ca8 Use sdk.FromReadCloser in Dev Server sync (#1186)
+- e1d9e1df5 INN-2745: Add additional charts to the UI for showing backlog and the number of steps currently running (#1170)
+- 3ed0e5d11 Consolidate useGraphQLQuery (#1171)
+- 3488f4db3 Update debounce buffer timing and logging (#1185)
+- 931033df4 refactor(dashboard): remove legacy password-reset pages (#1181)
+- 31d93bd46 revert: "Remove buttons for removing org memberships and user accounts tempora…" (#1184)
+- 881eff1a4 Fix can't invoke cron (#1182)
+- 80289cf1a fix(dashboard): hover state outline on org and user dropdown (#1180)
+- 658dfc8d2 fix(dashboard): cache isn't invalidated when switching organizations (#1174)
+- 163b1a17c Add queued status to Dev Server (#1179)
+- ccddc25d7 Omit `correlation_id` from invocation events if empty (#1165)
+- f7ba18c9c Implement V0 apis used for large payloads (#1176)
+- c7955ec06 INN 2832 make timeline header more responsive (#1177)
+- 02b3cefa8 Fix timeline node fetching output when node hasn't ended (#1175)
+- 6572373cb Make Modal component compositional (#1169)
+- 4dbaf5c72 Add nil check alongside redis nil
+- f54c3d8fc Only show invoke payload editor when function has event trigger (#1172)
+- c60f09fb0 Separate RegisterRequest normalization (#1167)
+- 379844c1e Add changelog
+- 484def3df Remove dupe pause log;  this is expected
+- edc591e0a add logging to debounce error responses (#1168)
+- 574f8c546 Add Invoke button (#1156)
+- 420090c7c Fix failing to load non-batch runs (#1166)
+- 76f5d248e Fix incorrect class (#1163)
+- 2661be8a9 Fix NonRetriableError not working with streaming (#1159)
+- 4091d273a Fix the bottom of the page from being chopped off (#1162)
+- 8a25de7fe Fix scroll for integrations page (#1161)
+- 4aac081c4 Show all events related to a batch run (#1123)
+- deef1a5d2 Log unexpected EOF errors and handle independently (#1155)
+- 2098422a7 Add tooltip provider to dev server (#1157)
+- 0dce094af INN-2769 On `step.invoke()` timeouts, set an error in state stores (#1129)
+- 917b41ad5 Add canonical links to auth pages for SEO purposes (#1148)
+- f7dad03f7 fix(dashboard): can't invite members during second organization creation (#1149)
+- 0d742423a chore: remove website app (#1151)
+- 7f7581ca6 Hot fix: Remove team settings (#1154)
+- 0a3008c6b INN 2787 Use shared AlertModal component in function pause and archive modals (#1152)
+- a4dc75257 Change error icon to be circle (#1153)
+- c7baa997c Add DELETE to cancellation API (#1150)
+- 2c7e63c0c Update CODEOWNERS (#1142)
+- 3dbd2d7ba Fix color (#1143)
+- 8469f9677 Fix layout shift when rendering placeholders (#1132)
+- 375b3daca hotfix: fix account setup redirection (#1147)
+- fe4e1b7de hotfix(dashboard): account setup redirect url (#1146)
+- e044d4e2f Only use TooltipProvider in 1 place in Cloud (#1141)
+- 1cc83987a Remove buttons for removing org memberships and user accounts temporarily (#1144)
+- 7150fee22 INN 2775 Replace status icons (#1131)
+- 749a456f4 Add a small example to the middleware docs overview (#1140)
+- 553a7aa2d Re-add `CODEOWNERS` file for docs (#1139)
+- 06b568c46 feat(website): add Algolia variables and secrets
+- 0a5872d99 chore(ui): align zod version
+- 4cd63ecb7 chore(website): align postcss version
+- 919687142 chore: format files
+- 8ddaf3691 fix(website): on deployment workflow
+- 9b349db9a fix(website): next-mdx-remote types
+- 0e82a8b9a Revert "chore(website): update next-mdx-remote to latest"
+- 52c79dfed chore(website): update next-mdx-remote to latest
+- 3e9ab2ae4 fix(website): Website - On Deployment workflow
+- 4d556f01f feat(website): enable website workflow file
+- db8d9d7dd refactor(website): remove duplicated shell.nix
+- 3a7a58373 refactor(website): align .gitignore
+- 62ddd998e refactor: align package.json metadata
+- a3d568446 chore: run pnpm install
+- aaf351dee refactor(website): remove pnpm-lock.yaml
+- 782c108c3 refactor(website): move files to ui/apps/website/
+- b00f89043 make sure the run time is recorded, and also mapped correctly when retrieved (#1130)
+- 1cc85c0fc Add indicator if stream item is in batch or not (#1127)
+- e206a708b Add queued status to Cloud run list (#1128)
+- 59b11b206 fix(dashboard): using LD before its initialization completed (#1126)
+- 37a7f451f Add manual resync Vercel docs
+- 65140d215 Add docs notes for retrieving internal events from `GetEvents<>` (#671)
+- 658e7a6e0 INN 2638 Remove apps feature flag and deploys tab (#1121)
+- b0214e797 fix(dashboard): launchdarkly server-side context
+- d31e7407c fix(dashboard): invite members form style
+- 271e0dd98 refactor(dashboard): remove unused import
+- d8efc86e3 fix(dashboard): user not redirected after creating org
+- 7057430e7 refactir(dashboard): move /support into (organization-active)
+- 34732ca98 feat(dashboard): OrganizationActiveLayout
+- 74ddb5b8d fix(dashboard): don't query GetAccountSupportInfoDocument when signed out
+- c002b1a50 refactor(dashboard): move into (organization-active)/
+- ad946ff89 refactor(dashboard): move SplitView into (auth)/
+- 57711bd99 Remove static version from state.Identifier (#1020)
+- 9a0ba485c Fix missing resync button when no platform (#1124)
+- 65ebc4683 Add batching support to OSS (#967)
+- 9406616e7 INN 2704 Vercel manual resync (#1115)
+- e716b8e50 Inn 2706 Deploy button in custom environments should send to apps (#1111)
+- 80b7f7c37 Add helpers to instrument metrics (#1114)
+- 3cecd907d Several updates to shard partitions (#1118)
+- 589efdffa Make FunctionRunStatusIcon support unexpected statuses (#1119)
+- 49b39e723 Add SDK language icon to docs search (#674)
+- dca98dfa7 feat(dashboard): UserDropdown (#1117)
+- e684a2bc0 feat(dashboard): OrganizationDropdown (#1116)
+- c9a9c2b58 Fix wrong retries default (#673)
+- fe437a5f4 Add shard partition peeking (#1112)
+- 0ce7b332a Update pull_request_template.md (#1085)
+- 6c9d64f98 Add ErrEventCount (#1104)
+- 6d75e0a70 Add RunStatusScheduled (#1110)
+- bc87fe99b Shard leasing and claiming (#1106)
+- 3bb31dd48 Fix history not extracting and using invocation outputs for timeline (#1083)
+- a79f44c54 Add partition sharding within queue operations (#1102)
+- 2b87e796d fix: cron with trailing space fail to parse (#1108)
+- f46d4c903 Show apps (#1107)
+- ac297c26b Always render error if it's unparsable (#1101)
+- 4aa36f3d8 INN 2480 Use cmdk for jump to menu (#1103)
+- 168a03e77 Simplify TS error reference and improve guide (#672)
+- 91e9a2492 Update README with new SDKs (#1075)
+- 1efdb0518 Adjust apps styles (#1105)
+- c2e2e752e Use pathCreator in app pages (#1036)
+- c9fd2ade2 feat(dashboard): redirect to sign-in with an error after retries of unauthenticated errors (#1096)
+- f82eb2c9b feat(dashboard): use accountID of organization (#1088)
+- 4d95a9fbc feat(dashboard): force users to have an active organization (#1087)
+- db1d3ee98 Change env page View buttons to Apps (#1100)
+- 4b8a19940 Fix slideover (#1098)
+- bf28bc01b Fix some `waitForEvent` snagging (#872)
+- 0453ff768 fix(api): FunctionRun.events returning array with null item for non-event run (#1097)
+- 8009fb443 feat(dashboard): "Organization Settings" page (#1090)
+- 2917508d3 Improve fetching when toggling internal event visibility (#927)
+- 485c69bde Refresh billing data after plan update (#1095)
+- ccbd80968 feat(dashboard): "Create Organization" page (#1089)
+- 01d108d5c Add small limit before using aggregator
+- a1dc2e674 Fix event batch not displaying in run details (#1093)
+- 97f966ca1 Add basic branch env pagination (#1094)
+- bde616e90 Update aggregate expression matcher (#1091)
+- 6251ff944 Add `Bun.serve()` repo and serve examples (#666)
+- 6f93a8c3d feat(dashboard): organization list page (#1081)
+- 657381d5d INN-2674: Add AppID as a field for state identifier (#1082)
+- 7e9c2f98d Enable invoke with batched functions (#1086)
+- 450f14a24 Update expression package (#1084)
+- af690bae1 Add links to all SDK spec references (#1080)
+- 7d70f5d74 feat(dashboard): retry unauthenticated requests (#1079)
+- 39d00525c Unhide post (#669)
+- df3314980 INN-2516: Add a16z funding blog post (#668)
+- 8c9a2cb82 Add in-progress counts to queue JobReader (#1078)
+- c6d979e91 Update retries docs
+- 77d31db36 Fixes `inngest/function.failed` events carrying incorrect error schema (#1077)
+- c696ef252 changes banner and Launch Week page (#667)
+- 4c955b0cd feat(dashboard): improve auth for URQL (#1076)
+- 6d5b59fe5 Fix typo
+- 85e9b2a05 Alter SDK spec following `StepRun` refactors (#1071)
+- ff8e14509 Fix typos
+- cbfc21f69 Add response time chart (#664)
+- d45e499f6 Add title to Time (#1074)
+- 2dedc5d81 Hotfix: fix broken links on blog (#663)
+- df7af3edf Remove "Soon™️" from `step.run()` docs (#662)
+- 3f98bb124 Friday Posts (#661)
+- 61ec2ff06 Add tick, allowing the dev server to respond faster (#1069)
+- 20c55e4f9 Clamp concurrency (#1070)
+- 3f0264a68 Adjust link icons (#1073)
+- 3b00f6ffd Make syncs more responsive (#1068)
+- e47298718 Make apps list responsive (#1061)
+- dc0122cce INN 2639 Fix alignment issues in descriptions (#1059)
+- 58199b78f typo from discord (#658)
+- 6b8c571af Increase debounce delay
+- ba90155f5 Do not lint generated code directory (#1067)
+- df98325b1 Hotfix: Remove limit line that may be rendered as 1 (#1065)
+- ba7695c89 Delete unused imports (#1066)
+- 9b4630ea0 Disallow unused vars (#1044)
+- 58cd0a662 Notes on retries vs steps etc (#660)
+- cd1ac077b fix(dashboard): account setup race condition (#1064)
+- 3d107f5eb Clean up Go example
+- f9d227894 Fix missing fn error output in timeline UI (#1063)
+- 97b27e653 Launch Week Thursday (#659)
+- d8a8a6cc5 Documentation for per-step errors (#655)
+- 13ef7bf9b fix(dashboard): check for accountID on account setup (#1062)
+- c6e7cab6a Changelog
+- d920c3995 Per-step error handling (#1058)
+- abd674320 Fix wrapping very long URLs redact params (#1060)
+- e2655d665 Clerk guide (#657)
+- 27f5d3bd0 Launch week Wednesday (#656)
+- b21e8a832 typo (#654)
+- 02b91c17c cosmetic changes (#653)
+- e833630a8 Add svix + clerk posts (#652)
+- 5196edcc5 Add inline ToC to SDK spec and fix some small errors (#1057)
+- 678ba6f5c Fix links
+- 6ee75631a Update screenshots for unattached syncs
+- fdb4ca52f Add unattached syncs explanation (#1055)
+- bd486bf84 Add explanation
+- 88e0ec91b OS spec (#1053)
+- 1ebfb9f91 Tuesday posts (#647)
+- 5c56ef230 Fix missing error on unattached syncs page (#1054)
+- cda447ee4 Change default route to apps (#1047)
+- 17b5a9e55 Conditionally show deploys nav item (#1049)
+- a2714b30e Add case of url change
+- ec1b3341c fixes a typo (#649)
+- 01f6df8d3 Fix tag contrast in nav (#648)
+- 9e47517f6 Replace app name by ID
+- 27b247673 Add override sync url (#1050)
+- ec3656093 Fix run details close double encoding URL (#1051)
+- 5a7e435f9 Change PartitionLease to return last lease time (#1052)
+- 5a5b0d8df Don't crash apps pages on polling errors (#1043)
+- 96b1525d4 Add duplicated apps case
+- d2ecab012 Add error page for when env context errors (#1022)
+- b40dde261 Update pages/docs/deploy/cloudflare.mdx
+- 2b64e891a Update pages/docs/apps/index.mdx
+- 6ebace876 Add launch week banner to blog pages (#646)
+- a4b56a626 INN-1316: Move event api info to send events guide (#635)
+- c4782109c Skip apps page cache after new app wizard (#1014)
+- 52d49f199 Improve rate limit config validation (#1048)
+- e07dd1df9 Update docs app links and copy (#1045)
+- 7f989ef35 Remove goreleaser-pro
+- 6f2ed75a1 Update graphic to v2
+- ddbfc3823 Update title and image
+- f836a739f Change header
+- 2b59553a5 INN-2625: Updated fan-out guide (#637)
+- 25e2d47dc Increase vertical gap
+- dbbf0ae54 updates the banner
+- 2e0424739 smaller padding
+- e593c5bcc Add how to cancel in bulk via REST API (#644)
+- 8959526a3 Update pages/docs/functions/cancellation.mdx
+- 401331dc3 Update pages/docs/functions/cancellation.mdx
+- aca263309 Update pages/docs/guides/cancel-running-functions.mdx
+- 98d15e84c Update pages/docs/guides/cancel-running-functions.mdx
+- eb010c073 Update pages/docs/guides/cancel-running-functions.mdx
+- 2963fd7ba Update pages/docs/guides/cancel-running-functions.mdx
+- 6718fcb94 Update pages/docs/guides/cancel-running-functions.mdx
+- cb85f37ed Update pages/docs/reference/functions/create.mdx
+- 772e8ff23 Update pages/docs/reference/functions/create.mdx
+- d6ce7164b INN-2628: Create new cancelation guide
+- f765f2c45 Add bulk cancel blog post
+- e505f67ac Delete deploy guide
+- a220223a7 small tweaks
+- be55f90f2 Update pages/docs/apps/index.mdx
+- 7c2faae69 Fix potential CLI state issue
+- 8484d1e51 Instant mass backlog cancellation (#990)
+- beb48e7ea Update pages/docs/apps/cloud.mdx
+- d4ad9a47c Update pages/docs/apps/cloud.mdx
+- fbafda513 Update pages/docs/apps/cloud.mdx
+- f6925f035 Update pages/docs/apps/cloud.mdx
+- b40e548be Update pages/docs/apps/cloud.mdx
+- 3433e17b3 Update pages/docs/apps/cloud.mdx
+- b85cccc8a Fix URL + title
+- 2706625a1 Link up related HN threads
+- e9d2e2c03 Improve clarity of legacy comparison to workers
+- 6b2078c03 Fix link
+- 057974c88 Apply suggestions from code review
+- fcc601eee Fix URL. Add link to pending guide
+- 0a0d4ef79 Add building queue pt i post
+- 5a70af095 Add replay blog post
+- 9bf9cea31 Publish designer role (#642)
+- d881e6cb4 Replace register with sync apps
+- 38bece6dd Change deploy guides
+- bdb8b3a71 Move apps docs in side nav
+- 57704a3c5 Add link to footer
+- 5f562c375 Add /newsletter signup page (#640)
+- cc8b9ce5e Update screenshots
+- 04e595780 Add launch week release items list (blurred for now) (#639)
+- 5e6f62108 Update graphic for Replay docs (#638)
+- 3d609bb93 Add apps docs
+- 515fdd973 Normalize walltime to now if AtMS is prior to now (#1042)
+- 897c0749e Store unadjusted wall time (#1041)
+- 562c3db40 Keep last partition lease time when enqueueing (#1040)
+- 105858153 Sojourn latency tracking (#1038)
+- e519fe8d9 Skip replay query when no time input (#1039)
+- 611cc2d45 Support domain param and editing prefix for create webhook intent (#1037)
+- 4fdae7a04 Add sync error messages to UI (#1035)
+- 5312f03b5 Fix not using UTC everwhere in the Dev Server backend (#1034)
+- a084053cb Make app icons monochromatic (#1031)
+- 376f0d73b Add pathCreator (#962)
+- 2fe6e60db Add app link to function dashboard (#1023)
+- 2e74fc772 Add app link to function list (#1024)
+- a42981adc Requeue all concurrency jobs
+- dee2904e9 Change job not found errors (#1032)
+- b9593c0b5 Update changelog
+- 034223832 Remove icons (#1029)
+- 0eb0cd512 chore(postinstall.ts): Use `package.json` version instead of an env variable (#1013)
+- 0fa529c0e Change styles (#1030)
+- 8e567d256 Remove eg.Go within processing partitions (#1028)
+- dfc69c49d Add Leap logo to website (#634)
+- cc069a7a1 Change jump to button design (#1025)
+- 0fbca4333 Add middleware to set response content type to JSON (#1003)
+- 14a32f4f7 INN-2570: Add function to retrieve total number of items in the function (#1027)
+- 1ca182dcf INN-2582 Add app hover card (#1012)
+- 3ffbff444 Link to Apps (#1019)
+- 2df3094ab Use Deploy.lastSyncedAt (#1018)
+- f5bcc4513 INN 2583 Add links to Apps in empty states (#1017)
+- 7bd6ae569 Add resync button (#1011)
+- fc74b9f6f Hotfix: Replay time range input issues (#1016)
+- f6115d780 Rollout Send to Dev Server button everywhere (#953)
+- ff52cef91 Disable GraphQL generation on preview branches due to staging env issue (#1015)
+- 811d2dbc3 Use high rest blog image. Fix typo. (#633)
+- d32b6ab24 Add `NON_DETERMINISTIC_FUNCTION` error to FAQ (#632)
+- ba7e1ca3a Astro blog post (#629)
+- 650db10e9 Fix concurrency typos (#631)
+- 90d097752 INN 2582 Add banners for apps launch (#1009)
+- 33b774ee1 Add new badge to apps nav (#1008)
+- 1adafd59a Upgrade clerk (#1010)
+- 76d91b326 Fix flashing when polling (#1007)
+- 4e7721ddd Remove extraneous character (#630)
+- fb14e0afb Add docs for `referenceFunction()` (#624)
+- 62ee18c94 Add docs for `Inngest.Any` and `InngestFunction.Any` (#627)
+- c043637e1 New case study. Refreshed /customers page (#628)
+- 5ebb366a7 Add unattached syncs page (#1002)
+- 28a36ca90 Fix incorrectly small page size (#1004)
+- 5c776b894 Option to disable table virtualizer (#1000)
+- 1db4fddb0 Fix newsletter form for existing subs (#626)
+- f5c93acae Fix replay modal closing due to polling (#1005)
+- af6c2fd8f Simplify function list page data fetching (#994)
+- 223bbe786 Add custom og image (#625)
+- e86e4a3b6 Update account docs, add bullet points on ordering
+- 3f02dfc09 Concurrency guides and references (#620)
+- 6d4d26308 Add handler to check idempotent pause creations (#999)
+- c86ab7c78 Add logo to launch week
+- 440edc19f INN-2542: Add launch week landing page and banner (#622)
+- 6592e6b29 Document new `reqArgs` argument in middleware (#623)
+- a18a5eb97 Add improved function loader interface (#998)
+- a84a21b56 Fix apps scrolls (#997)
+- d8056afe1 INN-2532 Apps loading states & other fixes (#988)
+- 10d8580b8 Use App.functions in GraphQL (#993)
+- 419d65e4e Add new queue kind to indicate a function to be ran. (#980)
+- 08a1b4bac Clone data before adding lifted vars (#996)
+- 3cc583583 Fix quick search infinite loop (#995)
+- 89122058a Remove CEL Compile() in favor of manual non-caching Validate call (#992)
+- 84514874c Fix broken event type query in Dashboard (#991)
+- a59cbbada Disallow unnecessary conditionals in Dashboard UI (#987)
+- 0c7182a78 Rmove test
+- f11b182eb Upstream and expose Compile (alongside Parse) in expressions
+- ad7a0b0c9 Add singleton parsing
+- 7c0789ceb Implement async aggregate evaluator for pauses for a ~238x speedup (#983)
+- 5424b5936 Implement new cached parsing using lifted vars (#978)
+- 48d35a5b6 INN 2539 Implement high fidelity designs for apps (#981)
+- 580206c13 feat(dashboard): send trace headers to API (#970)
+- 78b730621 Debounce timeouts (max lifetimes) (#976)
+- 1774966d3 Preselect ticket type via URL query string (#979)
+- ba4d459f0 Fix broken link (#618)
+- 466045bed Display unpaid invoices with new icon and CTA link (#974)
+- 7dd5e0b98 fixes localhost link (#617)
+- da58b4825 Quick Start Guide (#615)
+- ce6753809 INN 2508 Create new app page (#973)
+- 6164f9f62 feat(dashboard): sentry user identification (#959)
+- b5d478544 fix(dashboard): don't initialize launchdarkly client multiple times (#966)
+- dc151797c feat(dashboard): don't sample replays when not erroring (#960)
+- 0c9b99c68 Add separate pages for active and archive apps (#977)
+- 0b7624e57 Add strict ordering to debounces (#975)
+- 5106acdc3 Update Python docs for SDK version 0.3 (#608)
+- 1898945f6 Add context about how a function is cancelled between steps (#616)
+- bf28588b7 Create app syncs page (#972)
+- 5a48cfc16 Add Astro serve handler and example docs (#614)
+- a2fd71a71 feat(dashboard): retry when unauthenticated (#954)
+- 7dba1d837 INN-2481: Add handling idempotency guide (#610)
+- 8d1b80d7c Fix crons not loading in stream (#915)
+- 80f5cce34 INN-1959: Write guide on expressions (#613)
+- d565e2b0e Hotfix: Previous period use previous year if Dec (#971)
+- 308259020 Add better logging to pause handling (#926)
+- b31747f16 Revert "feat(dashboard): send trace headers to API" (#969)
+- f7237bd3a feat(dashboard): send trace headers to API (#950)
+- 3f5c95ee6 Add app page (#951)
+- c7f1c06de INN 2417 Move edit and delete webhook to a dropdown (#957)
+- db0b7d2db Add docs for creating separate clients for multiple environments (#607)
+- 454b486e8 Improve debounce contention by waiting to re-attempt debounce (#968)
+- 4b6317bf3 Add docs for Python client send method (#612)
+- 8fca12fad Store headers in driver response and history (#965)
+- df53b88f9 Delete old useEnvironment hook (#964)
+- c7ad4dab3 OSS changes to httpdriver and priorities (#958)
+- 82fc7f68c refactor(dashboard): encapsulate environment context (#961)
+- 6f1e605a5 Add env context and some usage (#943)
+- 0b6b934be Blog post: 2023 wrapped (#609)
+- 2f069ae7f Update dev package versions (#956)
+- fcabd1591 Add preventDefault (#955)
+- 86a1a9602 Fix: User cannot scroll when payload is large. (#952)
+- 3bb90daf5 Persist time range selected in URL state (#947)
+- 74c51fb4d Bump golang.org/x/crypto from 0.16.0 to 0.17.0 (#948)
+- 2d459926b Hotfix: Show free plan has Discord support (#606)
+- 2729b72b1 feat(dashboard): rename View All Logs button to View All Runs (#945)
+- c02195f74 Use useSkippableGraphQLQuery (#946)
+- 98a01becf INN 2416 Open modal to create keys and webhooks (#935)
+- 734189fcd Replace AppCard labels with dl/dt/dd (#944)
+- f713f69b2 Create apps page (#936)
+- 6f2397345 hotfix(dashboard): TimeInput's suggestion isn't clickable (#942)
+- 9205f86fc hotfix(dashboard): occasional 500 errors (#940)
+- bf3e6a54b Add useSkippableGraphQLQuery (#937)
+- f9f9a97d8 Add "Send to Dev Server" button to forward events (#938)
+- faeb08bd6 Force quit the dev server whenever signals are received (#939)
+- eab825878 Change idempotency docs to make fn idempotency vs eevent duplication clearer (#605)
+- 1dd09b3c2 Add icons for platforms, languages, and frameworks (#934)
+- 3450f45e3 Fix legacy privacy page design (#604)
+- 2ed22c36b Remove filename that is not consistent for app/pages routers (#602)
+- 2e671767a Use Time component (#933)
+- 6b9904b1b Display output on failed runs (#932)
+- 843c4ea9a Fix double URL encoded function ID (#931)
+- f986d6192 fix: docs page open graph image for homepage
+- 603983f5a Make expression env creation a singleton (#907)
+- b6f71ed6d Fix Clerk code example in webhook guide (#601)
+- 9cbf3c7a6 Add TS docs for new packages, community libraries (#591)
+- 098ada6c8 Improve Python quick start (#600)
+- 174cf44ed fix(dashboard): report errors to Sentry (#917)
+- d9abbf43d Fix invoke typo (#599)
+- 1b16148ea fix(dashboard): webhooks don't save (#928)
+- 6a104d4a3 Search UI tweaks (#924)
+- 3d2f696a2 Link to Replay guide from homepage (#597)
+- e0c26e951 INN-2351 Add guide for composing workflows (#576)
+- 461d0c449 INN-2349 Add a reference for `step.invoke()` in the TS SDK (#575)
+- 2a1847f67 feat(dashboard): poll replays (#920)
+- 0afde78b3 feat(dashboard): add links to replay docs (#921)
+- 42d19fbf1 feat(docs): replay functions guide (#596)
+- cce3b7f02 Turn the internal events toggle into a GraphQL filter (#922)
+- 0c234b3d3 Fix app error not clearing on registration (#923)
+- eb5ebf4f6 Add `invokeFunction` and `invokeFunctionResult` to `history` GQL query (#919)
+- 9df3cb35c Add CEL expression support to event search (#918)
+- b6122022a INN 2408 Address dev server UI friction (#911)
+- bc564ee75 Refactor pause iterations (#916)
+- 5bc2da466 Ignore SDK version when it's an empty string (#914)
+- 29d806228 Fix parser (#913)
+- b70e36d3f Add metrics to HandePause result (#912)
+- a95289ab5 refactor(dashboard): disable launchdarkly streaming
+- d3cfd1669 feat(dashboard): set up server-side LaunchDarkly
+- 3b39cbaa4 chore: add @launchdarkly/node-server-sdk
+- 5414dc184 Fix 'no functions found' instead of error (#909)
+- 7d1565315 Fix loading glitch when runs take longer to load (#910)
+- 93d4a7d3c Display warning when deployment protection is enabled (#908)
+- e2e0860bb INN 2204 replace the function run list by a table (#852)
+- 8eca413e2 Fix duplicate pause creation (#906)
+- a233d83f6 Add more context about deployment protection with new changes to UI (#595)
+- 0b28d5635 fix broken self host links (#594)
+- 55c83527f Fix run cancellations emitting failure event (#904)
+- 36e8aa231 Fix extra waitForEvent step in timeline UI (#901)
+- ee35f3f86 Fix waitForEvent missing start time in timeline UI (#902)
+- 78c02c7ba remove self-hosting docs (#593)
+- aa8e1f686 chore: update Next.js to latest
+- 45f78a588 chore: update @sentry/nextjs to latest
+- 99095fd84 chore: update @clerk/nextjs to latest
+- d2437fa66 fix(dashboard): sentry doesn't send logs when unauthenticated (#900)
+- 24f453f35 Disable Launchdarkly (#899)
+- ccdecb173 fix: revert Node.js and pnpm version upgrade (#898)
+- 95d440ddf Add cancellation summary to function run details (#893)
+- e4d0a7acb Update cel-go to v0.18.1 (#877)
+- 37ba861d4 Hotfix: Use client-side queries to decouple requests (#897)
+- 749d54ffd Fix sometimes seeing too many history items when parallel steps are re-reported (#894)
+- f381bfde3 Ignore partition GC when scanning (#896)
+- 0846ca86b Catch LD errors in attempt to find unhandled promised rejection (#895)
+- 043c36b08 Set SDK language and version in history (#884)
+- bd33d2e53 feat(dashboard): improve TimeRangeInput (#892)
+- 9a0ade678 update otel pkg (#885)
+- cddeca956 Update inngestgo to v0.5.2 (#883)
+- e04be96c2 Fix finish handler panicking if state is missing (#891)
+- 345429f36 Add missing return to registration error logic (#888)
+- 125a832b7 feat(dashboard): make selected status option more explicit (#890)
+- c8ba2d8a5 fix(dashboard): replay's Total Runs column (#889)
+- b72a8e1d7 Add FAQ for npx killed issue (#588)
+- 27dc28232 Create app in Dev Server on registration error (#882)
+- 08f1924b8 Fix spread (#887)
+- d7a0bb608 Add Next.js 13 case
+- 91d7e2c96 feat(dashboard): function replay (#767)
+- d107cfd6e chore(dashboard): run GraphQL Codegen during build (#879)
+- c17a0c805 Improve service to clean code and add run timeouts (#886)
+- 8fc1a99df Remove history from state store (#847)
+- 108dbe45a add space to distinct quote and sentence
+- b33d62cc1 remove line that's no longer valid (#590)
+- c8bbd541d update timestamp and filename (#589)
+- 417126308 INN-2302: Building metrics with TimescaleDB (#584)
+- 87d5cf0b9 Handle returning step errors inside ops (#843)
+- b8fc9cc1c Fix step names for history appearing as `""` instead of `null` (#881)
+- f09fef3ac refactor(dashboard): remove unused GraphQL fields (#876)
+- 53e48e833 Remove Cloud UI invoke queries until shipped in Cloud (#878)
+- 7d332aa0e Dedup priority reference (#586)
+- 84cc8c736 Add `step.invoke()` support for SDKs (#782)
+- 14baa56e6 Fix function return parsing when a serialized JSON string is returned (#865)
+- 9873b91cb Fix function selection click (#871)
+- f5640255f Move status icon (#873)
+- ae851b82d refactor(dashboard): remove feature flag (#870)
+- f7c48f034 INN-2268: Create new webhooks platform guide (#580)
+- b8e9b0c14 feat(docs): add FAQ for endpoint authentication (#585)
+- a09bca7fe Enforce `X-Inngest-Expected-Server-Kind` during registration (#868)
+- 832fe28e1 Enable idle conns
+- 860e27f8b Improve httpdriver client
+- 9f8a6a17f Fix `TZ=`-prefixed cron schedules failing to parse on the UI (#869)
+- fba7875a6 fix(dashboard): don't query nextRun field (#867)
+- 5cb329768 feat(dashboard): hook up function config (#857)
+- 1b0643508 Components for run list (#866)
+- cf7b718d5 Add fields to history reader
+- 27839f371 Add GQL gen to run_status enum
+- aca60983f Refactor HTTP driver to split logic from dev server executor (#862)
+- 99ec82a87 Create setup intent page for AWS Marketplace billing (#861)
+- 0b08febdb Update about.tsx
+- ec1578f33 fix(dashboard): support form not working (#863)
+- 30b376286 Add `--log-level` CLI flag (#860)
+- ccad4ff8c Fix use of `waitForEvent` maybe causing duplicate calls with parallelism (#859)
+- 39b926c4c Add a note to avoid caching issues during the Next.js quick-start (#583)
+- d120303fb Add event details slide out to event search (#846)
+- 593af0611 Update Python docs for SDK version 0.2 (#581)
+- 94502536d Fix github actions with outdated yarn (#858)
+- 79f450018 Add Vercel timeout to FAQs (#577)
+- 77b5ecd48 Fix add app button (#856)
+- 79f914797 Fix stream empty when function deleted (#854)
+- 14b067a0e feat(docs): add [object, object] type to concurrency (#582)
+- 10e29280a Add `--retry-interval` flag to customize the time in between retries (#850)
+- f19520dd8 Fix invoke broken when function ID contains a slash (#853)
+- 3705e8cf7 Ignore unexpected history types in HistoryParser (#845)
+- 2ebd652a5 Fix flaky debounce test (#851)
+- 419a32586 Change scrollbar options (#849)
+- 71c76c5d6 Fix hang on event ingestion if at least 1 event fails parsing (#844)
+- 63ff35323 feat(dashboard): function config (#835)
+- bff207820 fix(dashboard): empty page on sign-out (#848)
+- 9a4c3b614 Event search time filter (#838)
+- 2e210b280 INN-2361: Add query param as 3rd argument for webhook transform (#839)
+- 77ffa056b Move TimeRangeInput to components folder (#837)
+- 44f40f223 Add Python quick start guide (#578)
+- 602573803 Update to the latest Go SDK (#819)
+- 70039d21f Mobile fixes for homepage (#579)
+- 6bbbf983c Don't return empty if lock failed when fetching `/dev` from Dev Server (#840)
+- 81434ee52 fix(dashboard): function slugs aren't URL friendly (#841)
+- cf14361fe Add event search nav item (#836)
+- 466187e97 Make history parser store all attempts (#833)
+- 2e109e9c4 Remove old run details (#832)
+- e41c942f8 Normalize casing in metadata response (#815)
+- daeaabedd Add replay ID to internal state (#818)
+- 286869124 Remove deprecated code (#831)
+- 336ac475c Add individual retries to timeline (#829)
+- 92ddf2052 feat(dashboard): display error message on user creation (#830)
+- 4e59a1bab Add Sentry example. Fix outdated error object (#568)
+- 37589b688 Add Koa to serve docs (#574)
+- 9ea482a1e fix(components): don't render multiple html and body tags
+- 2655dcdb0 chore: remove deprecated viewport option
+- b225d1e73 chore: remove deprecated experimental.appDir config
+- 1d0fa0f9a chore: update @clerk/nextjs to latest
+- cbc5e91d2 chore: update @sentry/nextjs to latest
+- dec32dfec chore: update storybook to latest
+- e276b9cad chore: update Next.js to latest
+- af515f712 Update about page
+- 6834f665d Check debounce job lease when rescheduling debounce (#827)
+- 52e677dcf feat(dashboard): remove versions tab (#824)
+- 2f56c093e Homepage updated - November 2023 (#519)
+- bb85d8f64 Update Python post title (#573)
+- 1f0f5f3ac Add "Python errors as values" blog post (#569)
+- cc54df9b9 Fix broken link for SvelteKit docs (#572)
+- 44a129f62 Add SvelteKit to serve docs (#571)
+- 9dec7c730 Add durable workflows use case page (#570)
+- b1e9a2f75 Add some stuff to the Python docs (#565)
+- 6d4b2dfac Add workflow engine use case page to nav (#567)
+- c52fcd1a8 fix(dashboard): environment links don't work from a function page (#823)
+- 7dd3ac364 Fix run details error when viewing cron (#820)
+- ec3e27d11 docs(basics): replace serve landing page with dev server (#566)
+- 3b1d47018 fix(dashboard): chart is empty if `queued` is empty list (#816)
+- 10a782766 Update Dashboard to work with https://github.com/inngest/monorepo/pull/1995 (#822)
+- 0b44048bb Add attempts support to HistoryParser (#814)
+- 68c22a190 Update README.md (#801)
+- de4eac022 Add FAQ
+- 70f08f715 Fix RetryAfterError time units (#561)
+- fee55af8f Add Go to SDK reference in docs (#562)
+- 7fa25e6b4 INN-2212: Add actions for syncing main with next branch (#807)
+- bb97914fc Add app to function list (#812)
+- b4e87ad83 fix(dashboard): "Send Event" doesn't display created event
+- d0014be7b INN-1975: Display recent tickets. Switch to Plain threads. (#781)
+- 779b0ff5a Add question mark
+- 3a7537240 Fix missing keys in navbar
+- 276994659 Add faq page
+- 81be378fa INN-1985: Add custom environments to the docs (#559)
+- 362a803fa INN-2322: Add create environment button to /env (#806)
+- 45051cdb0 INC 2 Replace code editors by code blocks (#800)
+- fb99e76d7 Add deleteAppByName mutation (#799)
+- 2617a9250 Make overflow auto (#805)
+- e3c4ab8bc Add RetryAfterError to docs (#556)
+- e89419e39 Drop concurrency back down to pre  pricing to drive convos
+- fb2dd7a57 Fix nested section display in docs nav (#558)
+- 6683e09fd Add API docs link to nav (#557)
+- ce8c81db5 Fix and update additional usage billing (#804)
+- 943cf06f6 Change default event `received_before` to 1h (#802)
+- 257eac5d5 Fix wrong event returned for functionRuns (#803)
+- 80c9011ad Set X-Inngest-Server-Kind header during registration (#798)
+- 59831fc19 Typos (#554)
+- ea651bfed Fix docs nav icon hover in dark mode
+- 3c997fc6a Create new docs navigation (#552)
+- 245ae8e23 Update vercel deployment docs to the latest syntax (#553)
+- cdcb95e64 INN 2301 Add full height ability in code blocks (#788)
+- b182f4303 INN 2206 Move codekey and codeline to shared components (#796)
+- e81691604 Fix state color on archived environments (#797)
+- c0a73336e Create UI for event search (#779)
+- e630d9c7d chore(deps): bump google.golang.org/grpc from 1.57.0 to 1.57.1 (#794)
+- 1142c7403 change to trigger on PR changes (#795)
+- a968103b9 Add several public API endpoints (#778)
+- 42393cc27 Fix quote
+- b2bc294e7 Fix issue with not displaying enterprise trial plan (#789)
+- ab02ce713 Fix case study twitter image
+- a77a3289e INN 2294 improve button sizing within code block header (#787)
+- 5f78cd641 Add case study og images (#551)
+- 7fc984d1a INN 2283 vertically align timeline items to the middle (#786)
+- f4ac4552c Fix timeline node order (#785)
+- c26a660bd Replace Started by Scheduled (#784)
+- 9b579d79d Create customers page (#513)
+- ecbee03d3 INN-2179: Add blog post for fn metrics release (#550)
+- 54a338d38 Create new case study template. Add Resend case study (#549)
+- 18e901a28 INN-2261: Create webhook intent page (#780)
+- 41ba9f7f9 Add History.cron and set it in all function lifecycle hooks (#751)
+- 451a3dd87 Add Function.app GraphQL field (#679)
+- 2aa735f6a Add support for queue indexes (#618)
+- c213a52bb Add history_reader.Run.Output (#773)
+- b7653bc57 AI page (#545)
+- d170c8274 When streaming, access the request version from embedded headers (#755)
+- 35fbaa4a4 Fix in-memory history writer race condition (#771)
+- b569a5172 Fix getHistoryItemOutput erroring when null (#770)
+- 80864c479 Fix GraphQL default values not working (#772)
+- 6e704b7fc Fix Sentry middleware example docs typing for v3 (#547)
+- 682b603f0 Set X-Inngest-Server-Kind header (#769)
+- e0e33c1c7 Add missing ID to `step.sendEvent()` (#546)
+- 30fb1d28c Add version to priority docs. Update function options (#544)
+- 18d2247ee Add migration note
+- a55c4a1a2 Add disable branch environments section
+- 23106898a Fix status icons (#768)
+- 14cc01579 Re-add ConcurrencyLimit function as member of inngest.Function
+- e029c8fbd INN-2187: Add security scan for golang (#760)
+- deda0d75b Bundle timezone data for all builds, used for Windows without Go (#765)
+- 6b1263247 Allow multiple concurrency keys per function with scopes (#761)
+- 9acd5420b Add App column to function list in Cloud (#766)
+- 7818259cb feat(dashboard): function replay modal (#763)
+- 1fb2b2c99 Ui tweaks (#764)
+- 4c26e181c Add docs that mention `attempt `count in error handling sections (#542)
+- 0e1acb726 Add URL and version to RunDetails (#758)
+- 8ebccba76 Add rerun button to new RunDetails (#756)
+- c89eb861f INN 2205 Add light modal variant to shared components (#759)
+- ed98a56ef Put new run details behind a feature flag (#757)
+- d38daf387 INN 2190 add light variant to buttons and replace them in the cloud (#753)
+- 72a7fca95 Add reference docs for helper types in TS SDK v3.3.0 (#540)
+- 8404e57c4 Add new stream details to Cloud UI (#749)
+- 8442ae927 Enable avoidOptionals and strictScalars in Cloud UI codegen (#752)
+- 0f36c1ca3 INN 2189 move tag to shared components and create light variant (#750)
+- b446462a7 Reorg run details in shared UI (#748)
+- 6ecc69a29 INN 2182 Extract table to shared components and create light variant (#746)
+- 5640494ff Fix function run crons changing when function cron changes (#747)
+- 0a840f64f Move RunSection to shared UI (#743)
+- 345530a6b feat(dashboard): display concurrency limit in chart (#744)
+- 935a18f92 fix(patterns): incomplete sentence (#541)
+- 0c22fa6fa fix(components): ambiguous root paths (#742)
+- 59c45ab33 Add EventSection to shared components (#720)
+- 3df359ed6 Enable avoidOptionals for GraphQL TypeScript codegen (#738)
+- f5c737052 fix(dashboard): function runs chart when selected 60 minutes (#739)
+- 00d97dd70 fix(dashboard): tooltip icon (#740)
+- 60755415f feat(dashboard): add beta badge to function dashboard (#741)
+- f67659b59 Fix storybook stories (#723)
+- 216f006ac chore(deps-dev): bump @babel/traverse from 7.22.5 to 7.23.2 in /ui (#734)
+- 9852dbfe0 Update the metrics name for sdk requests (#737)
+- 80d925ece Move RunSection sub components to shared UI (#736)
+- 222f397e5 Add function run priority docs (#539)
+- c9beecd2a Move Timeline to shared UI (#735)
+- 7871eb461 Move usePrettyJson, date utils, and 2 icons to shared UI (#733)
+- 632ebe4c8 Move historyParser to shared UI (#732)
+- 7ae010bea Add BlankSlate and Link to shared UI (#731)
+- 2723d75fc feat(dashboard): function dashboard chart legends (#730)
+- 59d341ef2 feat(dashboard): make chart legend colors consistent (#729)
+- edee23f60 feat(dashboard): display end states in function runs chart (#728)
+- 95c9b3088 feat(dashboard): display chart's loading state when switching time (#727)
+- 27244b520 Add Storybook to shared UI (#725)
+- fb99fbc10 Add queue lifecycle listener (#726)
+- 86d28814e INN-2123: Add chart for the number of sdk requests being made from the executor (#724)
+- 83c597bc7 Call onStepScheduled lifecycle entry when retrying a step (#722)
+- bf9b6c204 Fix encryption example not working for event encryption (#538)
+- 1099d9867 Add FuncCard and FuncCardFooter to shared components (#719)
+- 79d48e5eb Add MetadataGrid and MetadataItem to shared components (#718)
+- 9f8701f54 Add FunctionRunStatusIcon to shared components (#717)
+- a47fd4786 Add dynamic run priorities (#709)
+- 936e53dd9 feat(dashboard): use short number format for metrics (#713)
+- b12f86edc feat(dashboard): move metrics to the top (#712)
+- 55778cabe Add CodeBlock and ContentCard to shared components (#716)
+- 759f84eb1 feat(dashboard): move time selector within main area (#711)
+- 147ce07fd Add CopyButton to shared components (#715)
+- a66270941 Add Tooltip to shared components (#714)
+- 7b168d3f4 Add Badge to shared components (#708)
+- 62b87a4c1 feat(dashboard): rename function dashboard charts (#710)
+- ac67cffc1 Add Button to shared components (#707)
+- 781a5cb6f feat: add base.json file (#706)
+- 2ec09c4a1 Fix extraneous dolla sign
+- 371521ba6 Fix extraneous dolla sign
+- b396b8668 Add warning about missing event.user during reruns (#536)
+- 487a7d71d Change debounce error handling (#683)
+- 02efacdf9 refactor: set up shared tsconfig (#704)
+- 313d8c401 Bump golang.org/x/net from 0.12.0 to 0.17.0 (#697)
+- 5673ea024 Allow accessing slugs with naughty characters in (#705)
+- 11c14c4f4 Add message for when batch size is too large (#703)
+- f6f3ecfdf chore: align TypeScript configurations (#702)
+- f68f89b7d fix(dev-server-ui): GraphQL codegen (#701)
+- 02b4c0303 refactor: align Tailwind CSS configuration (#700)
+- 7289543ce chore: clean up .gitignore
+- a836a56e8 chore: clean up package.json
+- 426bfbeb0 chore: hoist prettier
+- 29702c91b chore: update pnpm lock file
+- 1aff4e3f4 refactor: change paths for runners
+- b14aef994 refactor: clean up package.json files
+- 75e6bb9f0 refactor: move dev-server-ui/ to ui/apps/
+- f74f87f28 chore: set up env vars with Vercel (#695)
+- 919966c7e Use same dependency versions between UIs (#698)
+- c4ac89b42 refactor: remove custom plugin for icon sizes
+- 5300d7453 refactor: use complete class names
+- 1b8daa8af config: type check Tailwind config file
+- 64c067916 feat: add fallback mono fonts
+- 5d8080ed3 refactor: remove unused font
+- 831244e81 refactor: use camelCase for variable
+- 38e346b2c refactor: remove unneeded display config
+- e23b53272 config(tailwind): remove unused grid templates
+- 26db34922 config(tailwind): remove unneeded custom grid templates
+- 650df4507 config(tailwind): don't override existing colors
+- 799f26851 config(tailwind): align content lookup
+- 72c851ad1 feat: use Tailwind CSS default border radius
+- 9ca2f8221 feat: use Tailwind CSS default font sizes
+- 7db616cb7 Fix typo
+- 08c6baf64 Add History.StepType (#688)
+- 80a3ff920 refactor: remove unused ui/.github/ dir (#693)
+- 4594448b7 feat(functions): remove icon next to chart titles (#694)
+- f394c2813 Fix husky (#692)
+- dbe46ff88 Fix Cloud UI build (#690)
+- b360e496f Copy Cloud UI into ui folder (#689)
+- 2e18f5baa Ignore ui folder changes in CI (#687)
+- fae19b39c Rename button
+- 0455e7019 Rename ui directory to dev-server-ui (#684)
+- 1231275de Update screenshots in local development
+- 567ae175a Update screenshots quick start
+- 5c273fd9d Update overview screenshots
+- 334b578fd INN-2110: Add granularity to usage opts and deprecate period (#682)
+- c410a87f4 Fix UI error when no step output (#686)
+- db2f96446 Remove dollar sign from custom
+- dea1adc1f INN 2101 Replace timeline (#685)
+- 9af0a8f06 enterprise -> 975, add $ in additional
+- 106d5cf93 Add pricing page slider calculator (#526)
+- 3fb63e5bb Re-order middleware examples and add E2E encryption (#516)
+- 1b741245c Docs sweep to make sure references are compatible with v3 (#532)
+- 4e533db69 INN 2124 Design tweaks to the new timeline (#680)
+- bf0474ef4 Fix spelling. Link to other relevant docs. (#534)
+- 283341b3d Use consistent case of version V3 -> v3 (#533)
+- 2f06c63a4 Update the client options for v3 (#530)
+- 65cd56f48 Fix sentence fragment. Update to reflect current state. (#531)
+- 0018c89cb Change path/host
+- 1a8fd72be Close designer role opening (#528)
+- d6acb05a4 Use step ids in docs homepage (#527)
+- 2fdf36d91 Fix inconsistent error output (#678)
+- d4deb61d9 Use lifecycle listener to record runs (#681)
+- cb7fd8325 Add version badge to debounce docs (#525)
+- 2aeeec8e2 remove verbose log
+- 0535acbaa update the article image
+- 7c61159a3 change the type back to string for easier use (#677)
+- fe4ee088a feedback: use time.Duration instead of string for granularity (#676)
+- 2f19358cf Update concurrency
+- 401f1d4ae K -> k
+- a3c64b8a8 Update additional pricing
+- 784de592d Update pricing
+- ee6691c68 Debounce docs (#517)
+- 47797ebc6 just link the video i guess
+- b830c83af try to make youtube appear in mdx
+- 8afead938 user defined workflow article
+- 3ffe130b3 str->strptr
+- 90d728e57 Update inngestgo
+- 2fb3e0648 Document express.json limit option (#522)
+- a4ef036ca INN-2023: Document idempotency key (#521)
+- 1fa85b80a INN-1438: Add if option to event trigger docs (#518)
+- 0fb0e3410 Fix output parser (#675)
+- db53643b2 Cover second place for slugify() in docs (#520)
+- cc1313ef8 INN 2118 Toggle ability to wordwrap in monaco code block (#674)
+- cbcf34525 INN-2110: Add API structure for timeseries related data for metrics (#668)
+- e0756d250 INN 2117 Adjust run slideover for cron jobs (#672)
+- af95d06aa Parse SDK errors on response (#673)
+- 69578a872 Add debounce support (#612)
+- baa5f38d7 Fix GetEventsTimebound before arg is inclusive instead of exclusive (#669)
+- f650658d3 Add new timeline behind boolean (#666)
+- 617b7bda0 Add function started node to HistoryParser (#671)
+- 34a376803 Fix missing cron schedule in stream (#670)
+- 452556113 Move `serve() as any` callout to be higher, outside of "Advanced" bit (#515)
+- 26bb6beba Fix syntax in v3 migration guide example (#514)
+- 741663f54 INN 2107 Replace redux state by page search params (#664)
+- a03435268 Only create new group ID on parallel steps (#665)
+- 97a4120f8 Remove Windows pin for v0.14.6; Windows builds now seem to work as intended (#663)
+- 243f57e1a INN-2090: Replace MaxBatchSize with DefaultBatchSize to make it more configurable (#651)
+- 82c98bb85 Improve handling of malformed generator responses (#667)
+- e3359a51a SDK V3 blog post date
+- 6d1a19c48 V3 release (#507)
+- eb23332b1 Add sleeping and waiting summary cards (#659)
+- e32da95f7 Bump zod from 3.22.1 to 3.22.3 in /tests/js (#660)
+- 62b9ea2ff Bump postcss from 8.4.18 to 8.4.31 in /ui (#661)
+- 62e07e351 Bump graphql from 16.6.0 to 16.8.1 in /ui (#632)
+- 276912e7a Default to Next.js app router in serve docs (#512)
+- e228eb642 Fix non-unique group IDs in parallel steps (#658)
+- 9e784cf69 INN 2082 Add output run section and more metadata (#657)
+- 63f5f7a2c Update HistoryParser for StepWaiting change (#652)
+- 1c47a5745 Stop nesting function output in "body" field (#656)
+- fc6c60a74 INN 2065 Revamp function cards on events stream details (#653)
+- 9046fb372 Use getContentHeight (#655)
+- f022ef833 Update homepage company logos (#510)
+- f9794e9a9 INN 2085 Handle large payloads in code blocks (#650)
+- 660e42246 Rate limit, 24h max
+- e92cc35d7 How durable workflow engines work (#506)
+- 42bdac287 Add note regarding how long dedup is valid for (#505)
+- 243324326 Fix completed step count not set (#649)
+- 510cf233a Fix `x-inngest-req-version` not being passed from driver to executor (#648)
+- b2172ca8c INN-1859: Create rateLimit reference (#509)
+- a8c8f92e4 Add Fly.io service limits (#508)
+- d1a23d622 Use AccordionTimeline (#643)
+- 7012192ea Add output item ID to history parser (#646)
+- 399584dd3 Fix completed sleep nodes not marked as completed (#644)
+- 68321ca8e Add history parser tests (#641)
+- 485e11c8f Fix alignment stream row (#647)
+- 3d50cdac4 Update goreleaser
+- 4a7676251 Update goreleaser
+- 893ebfeeb Update goreleaser
+- e3119dc9b Update vendor
+- b6a2be6bd Update changelog
+- 23f254968 Re-enable windows builds by removing CGO (#645)
+- 7f54f2659 Add request version to metadata (#623)
+- bcf5e8935 INN-2075: Add tests and additional check for invalid URIs (#642)
+- 9e3e14b9e Add more timeline stories (#636)
+- c9f30f2d1 INN 2067 Add accordion timeline component (#638)
+- 0c9cc960b Expand on docs for middleware and TS to explain some common use cases (#503)
+- 8add76ee0 s/StepSleeping/StepWaiting
+- 1bc953eea Add different file name for Remix 2 serving (#504)
+- 7909080fd Fix missing step name in scheduled parallel steps (#635)
+- b4bfbff09 More timeline stories (#634)
+- e8ed6dcd1 Add history parser (#631)
+- 9f0128335 Add the `H3` framework to serve handler docs (#501)
+- dcc9754ec INN 2066 Revamp section titles and metadata (#633)
+- 0455b6e66 INN 2030 Adjust code blocks (#627)
+- 43a5114ca INN 2063 Replace stream details routes by search params (#630)
+- 8db9ec844 Add new history to GraphQL (#626)
+- 8ffc43e78 Add memory history reader and writer (#625)
+- 006b458fd feat(auth): link to new sign-in and sign-up URLs (#499)
+- 3d5ae0f0f INN 2061 Replace buttons by new button component (#624)
+- 745a01c44 INN 2031 Add new button variations (#605)
+- 268c7ec84 Add gqlgen tag to HistoryType (#622)
+- f10b7e909 Fix history_reader package name (#621)
+- bed40f50e INN-2059: Add concurrency key to docs (#500)
+- a19a2d91f Document `ts`
+- 357a92c52 Disable immediate execution of SDK steps once they have gone parallel (#583)
+- 63d842fd6 Add history_reader package (#619)
+- ac4ba0cb1 Improve OSS stack overflow handling (#620)
+- 5d8b5a401 Typo
+- ba1336b7b Save response on error, regardless of retriability (#611)
+- f98840638 INN-2009 release new stream and remove old one (#598)
+- 607b11f8b Improve function validation, add URI method (#617)
+- 960e9c15f Improve 502s so that we show actual error messages (#614)
+- 421a8f6a4 INN-1818 Implement fetching with infinite scrolling (#584)
+- bb626fb9d Remove button
+- 422f40dcd Fix gradient
+- ee84e0264 Remove background
+- 5d5dfdab0 Replace white background section
+- fe024ff7a remove ai docs links
+- 5751fcf8d Fix mobile layout
+- cb0403f94 Add customer love section to homepage (#496)
+- d197ef738 Fix deploy page link (#495)
+- 2e390cf2a Remove user journey link from footer
+- 48fdabb7b s/sorry/apologize
+- b68b49809 typo
+- acdf3b238 typo
+- eb615b784 Add incident post mortem blog post (#493)
+- a7652dec7 Fix typos and remove front-end description (#492)
+- 0b038b963 Product Designer JD, add Joel to about page (#490)
+- 32dfd9d17 Ignore partition not found errors (#610)
+- 139cf6f22 Always use 0 attempt count for new sleeps (#609)
+- 390bcb727 Ignore cancellation signals attempting to cancel already finished functions (#608)
+- aa629c5fa Fix docs tabs names (#489)
+- 8d95cafc2 Fix applyResponse not returning nil (#607)
+- 77d3e90e6 Add logging to redis_state.Enqueue (#606)
+- 4f19be410 Execution lifecycle fixes (#601)
+- 61ec78a5b Update changelog
+- 09726cb78 INN 2029 Create metadata shared component (#602)
+- 768c7ab46 Increase payload size dev server can handle (#604)
+- c653aefaa Show how to disable autoscanning/discovery (#603)
+- 446f9f8be Never re-execute parallel steps if output already exists
+- c64698a80 Add docs (#600)
+- 7b7aeac2e Add check for triggering events
+- a3a68e7d9 Change indentation
+- 26b9fb1e4 Changes ported from cloud (#599)
+- 324e67c87 Update local-development.mdx
+- de8dc114a Update local-development.mdx
+- fc2962df8 feat: move anonymous ID to cookies (#488)
+- 4ff3e12c9 fix build for rehype
+- f223b2445 Add job IDs when handling generator responses (#596)
+- d6775582e Fail on expression errors in waitForEvent (#595)
+- 4652eeaf3 Add IsSource to edge
+- f34102ca4 add paths to source blocks
+- 839aecb1d fix another link issue
+- 11065bc92 minor issues
+- cf5ed5852 fix card mispelling
+- adfa8a226 add agents article
+- 4155b22c3 WithoutCancel all lifecycles
+- 8969c3047 Don't cancel context when writing history (#594)
+- 32f2db849 INN-1984: Docs: Add Vercel bypass protection docs (#486)
+- 83c684332 Fix multiple reruns not working (#593)
+- 216e57daf Move onStepFinished lifecycle call into HandleResponse (#592)
+- 910550f03 Add lifecycle struct attributes
+- acb5df7ec Add Identifier.OriginalRunID (#591)
+- 995205c6b Ensure noop lifecycle conforms to interface
+- 3411d0cba Implement close for nooplifecyclelistener
+- 89d75f6d2 typo/cleanup
+- f81f7608a Add items to history lifecycle
+- f7ff3eda3 Add extra IDs to state.Identifier, alphabeticalize history (#590)
+- efafdfff1 Fix 1s timeouts causing hanging runs (#589)
+- 644861f00 Update inngestgo
+- 8da95ece8 Expose queue items to drivers (#588)
+- d47e3017c Fix broken link to example custom handler (#485)
+- 1a028b401 Link to new support center from contact page and footer (#484)
+- 49538dac2 Add executor.HandleResponse to separate execution from resp handling  (#587)
+- c2ad53028 Add Fastify serve handler docs (#482)
+- 050d2117b Add Zod literal schemas to event payload docs (#479)
+- 6472fa614 explain createFunction a bit more
+- 7014cef59 default quickstart to app router
+- 724f20335 Add latency in MS to step started (#585)
+- f8babb7f5 eidt word out
+- 6ea5fe250 expand the description
+- 8ef4316b2 resize kcd epic web image to be correct
+- e0d2558e0 add the image
+- 8d6ad633d INN-1936 Normalize code editors (#574)
+- 045ae14da Add integration tests for step.waitForEvent (#582)
+- 76ed220c5 Executor lifecycles (#580)
+- 631c6524f inline the code
+- b2c224c00 add the article
+- 741658242 INN-1937 Remove docs from dev server and open them in a new tab (#581)
+- e5b1cf8b0 Update changelog
+- 4ca68cb9e Improved OSS function run tracking, history (#573)
+- 8d0871011 Mark functions as complete after fixing (#576)
+- d16bc1da2 fix typos
+- a9e1fdd9b Fix CLI streaming issue and pin Windows to 0.14.6 (#575)
+- 6b5794261 INN-1920 Normalize icons (#571)
+- a20765c30 Extract atomic components (#569)
+- 7b21bddfc INN-1524 Add storybook (#561)
+- 7d1f3fb5b Add cancellation, event resuming to executor interface (#570)
+- e9f8e64c8 Add `attempt` to function creation reference (#477)
+- cf9e26b79 Fix custom handler link after monorepo shift for `inngest/inngest-js` (#478)
+- ad3e40a99 Check for nil response when handling dev server responses (#568)
+- 1fa7f80bb Add test improvements for integration tests (#566)
+- 8c7e9959e Quote ifs
+- 4108ccc65 Add indexes to event stream parsing (#460)
+- 090488fe2 NonRetriableError fixes (#563)
+- 091f8c8d9 Normalize app URLs (localhost<>127.0.0.1) at parse time (#564)
+- 19aa5136a Remove stdout tracing in devserver (#565)
+- 8cace27a5 Integration test improvements (#542)
+- 5fa7c4f68 Pin GoReleaser to `~> 1.19`
+- 08aa4dc8b Pin GoReleaser to v0.19.2
+- 1bbc1d81b Pin GoReleaser version to 0.19
+- f297abe60 Update redis client (#560)
+- f39c1af5d INN-1759 Add Trigger button for cron jobs (#554)
+- 1b0fa3b55 Return the duration until keys are not rate limited (#559)
+- 0b46300ba tweak subtitle
+- 3e5c58d04 update the image
+- 5dfd37216 add the epic web trpc inngest tip post
+- a62800b24 INN-1860 Use react table in function list (#549)
+- ee5530001 fix: broken links (#475)
+- c7e083cf3 docs(package): clean up package.json (#473)
+- af127bfa1 build: pin dependencies (#472)
+- a3d1a7ed4 build: switch to pnpm (#471)
+- 2812aa1f9 Limit max cancellation signals (#555)
+- e67ec14ae Hotfix: discord link due to expired link (#474)
+- ebb9d7395 Validate rate limit expr (#551)
+- 1cea1c50c INN-1858 Add Prettier (#547)
+- b38d1bfeb Bump semver from 5.7.1 to 5.7.2 in /ui (#546)
+- e38177e8c INN-1814 Add trigger details SlideOver (#541)
+- 26d3341b9 Add concurrency keys to SDK function registrations (#545)
+- 7aeb88624 Minor Improvements to Quick Start (#470)
+- 34de55540 Improve stream parsing and decoding (#544)
+- a43fc42d4 Update changelog
+- 310dfacb2 Remove err interface from driver response (#543)
+- af44b990e Custom retries (#455)
+- f05122b11 Validate cancellation expressions during fn validation (#539)
+- d5d756791 Apply `ts` checks to cancellation pauses (#538)
+- 7d2dd5a46 INN-1808: Add back tracing (#537)
+- 5a475b9de fmt error
+- 518da2c88 Add specific function invocation via events (#525)
+- e2927285d Add ability to pin running functions to specific version (#532)
+- b6ec63da1 Support local lambda docker testing (#536)
+- 0cf80ed59 INN-1808: Add telemetry setup (#530)
+- 40b9d47c5 INN-1834 Add circle version of status icons (#533)
+- c85d87725 INN-1816 Add new Stream UI table (#531)
+- c692a6750 Add comment about setting GOBIN in the case where this fails (#514)
+- 1a772fad4 Hide additional steps for enterprise (#469)
+- 06f4f441a Add enterprise plan roadmap features for testing (#468)
+- a37ddef32 Remove parens
+- ff90792a4 content(blog): set `moduleResolution` to `bundler` (#467)
+- d67b9e3a0 Allow `event.ts` times in the future to schedule functions at the future TS (#522)
+- 4fdc6f559 Remove starting price for enterprise (#465)
+- 9c3e30967 Remove windows builds until PR lands
+- ea69fc8d5 content(blog): style callout (#464)
+- 3e4babec5 INN-1485: Blog: Migrating from Vite to Next.js (#463)
+- 5aae2c7d5 INN-1777 Apps UI adjustments (#527)
+- 52d200ea5 INN-1523 Use next js for routing and local state for modals (#516)
+- 0c16f507a INN-1775: Remove tracer for now (#528)
+- ed53bd21d Add top-level service waitgroup (#529)
+- bf8b24fcc Update idempotency key comment (#519)
+- f36f58fe9 Close dev rel role (#462)
+- a5b9e5284 Add connecting apps section
+- ef6657c7f Add apps demo gif
+- 095a06156 Normalize localhost within CQRS (#524)
+- 200e12657 Remove CC
+- 67457171f Add mingw CC/GCC vars
+- deb99a3f8 Use mingw
+- dbc26a070 Add windows to goreleaser
+- 1250b129b use ref name on windows
+- 8d2a32dad Update windows build
+- d6a7a8ac6 Ensure we copy binaries and use glibc inside containers (#520)
+- bee5ef1b1 Allow registration of apps with zero functions (#515)
+- f4b0d4368 Add docs for streaming with Remix (#460)
+- efc3e3437 Update changelog
+- c75c0d517 Ensure that new functions update in the dev server (#513)
+- 0e046cc3b INN-1527 Add list of functions to the second step of the app card (#511)
+- df2855ddb INN-1526 Revamp function list as a table (#504)
+- bade857b3 Only allow sequential procesisng if queues have no allowlist (#509)
+- d77984bef Ensure we auto-add URLs with the `-u` flag (#506)
+- a2cf84ca8 INN-1761 Add framework and language to app card (#510)
+- c23031da4 Allow using separate redis clients for managing pauses (#508)
+- a8fc3d9a8 Ana/app ux fixes (#502)
+- bb5275ef8 Update homepage open graph image (#459)
+- cb0b30531 Add callout to clarify batching doesn't work on the dev server (#458)
+- 4d9573292 INN-1405: Add blog post for event batching feature (#446)
+- cf1431a17 Update goreleaser with microarchitectures for arm64
+- f99001452 Fix grammer in sentence (#457)
+- 55d86b722 Inject binary into docker
+- e87d9c67b Ensure that the financing post is featured for now (#456)
+- e96a40ead INN-1404: Add guide for batching and update references (#435)
+- d0d3b5601 Add index.html to build
+- c9d34446d Update gitignore
+- 8cc0e66a1 Update archives in goreleaser
+- 279c1ef64 Use amd64 instead of x86_64
+- a590cda35 Update goreleaser
+- bee36c202 Update version linking command
+- c3125c7a2 Update CI flow name
+- fdc65552d Add xgo script (#503)
+- 359881cad Unhide seed financing news (#453)
+- 7122df451 Make contact form more sales driven (#455)
+- b02d766e5 Pricing page additions & minor tweaks (#450)
+- d8aabb0e7 INN-1469: Blog: Seed fundraising announcement (#437)
+- 88a915ea7 Visual snags (#452)
+- 0ddc3125a Update README terminology (#501)
+- 11246bf8b INN-1521: Add Apps Page (#490)
+- 16e687749 Fix logo wrap on homepage (#451)
+- d3fe98e74 Use autodiscover from flag
+- 50a91f6ff Always enable autodiscovery, and only add app if not present
+- 0f2d5e7f9 Add "do not count to concurrency limit" to sleeps (#449)
+- f53df849f Fix npx command (#499)
+- a16285590 Add Tripadvisor logo (#448)
+- 2d1613681 Minor website updates. Quotes + a new metric. (#447)
+- 59a800230 Add blurb about branch env archiving (#444)
+- 193da679c Start apps as unreachable
+- 09f4139fd INN-1476: Allow batching to work (#477)
+- 3efcd40a3 Add DeleteApp mutation, change autodetection & app creation logic (#498)
+- ca0b43c70 Add triggering event ID to pauses
+- 08d301504 Attempt to clean up pauses from hmap even if not found
+- d46a21bbe Add event pause exists check
+- 58c406728 Improve test
+- 1be4639b0 Change pause loading to use HMKeys and buffered HMGet
+- dc9086b27 Remove processing item log (#495)
+- 7418212a8 Fix breakpoints
+- 3d0ae4bbf Update dev server homepage image
+- cad0d6cff Add app mutations for updating URLs and creating new apps (#494)
+- 49e00b54b Add attempts to driver requests (#492)
+- de7785e9f Use stack index from previous state save
+- 1f0070560 Ana/dev server improvements (#483)
+- 39e6732d0 Refactor coredata into CQRS (#489)
+- 27b10c336 CQRS layer (#485)
+- fbfb2947d Create pull_request_template (#486)
+- 055331477 Create PULL_REQUEST_GUIDELINES.md (#487)
+- dfb9d04f7 build(ui): pin dependencies (#480)
+- 0512c4ce5 build(ui): migrate from Vite to Next.js (#479)
+- f3eb0cdec Add map and list to concat expr test (#482)
+- 0a1c3c231 Allow concatenation of distinct types in expressions (#481)
+- 492de336e fix(docs): deploy link breaks Dev Server (#442)
+- a601f3da9 content(docs): typo (#441)
+- 23bb03b81 content(docs): add comment to indicate placement of previous code (#440)
+- 236c11822 content(docs): add missing types for req and res (#439)
+- e852f98f8 content(docs): make http://localhost:8288 string a link (#438)
+- 086a36942 Add free tier to pricing table (#436)
+- 48c7a0a9e build(ui): switch to pnpm (#478)
+- 7c32c2432 Add smooth scrolling
+- e34b979ac Fix Usage Limits links hover in pricing
+- 4ced2579e Fix typos
+- 85bb63dd7 INN-1402: Add actions to be truncated and comment it out for now to (#475)
+- 1fb0b8ce8 INN-1401: Add batch related configs (#465)
+- 9f05e100b Quieten logs
+- f746cea08 Update changelog
+- 2d5958b83 Ensure we can add unknown fields, add tests
+- 329352ad7 Namespace events with "event" in rate limit key
+- 096527644 Fix pricing page copy issues (#433)
+- 99fc80c19 Update rate limit error messages (#472)
+- bd5a5d3ce Add upper bound for error processing (#470)
+- 53bf58a9d Add missing await (#432)
+- 7e9d3711a await on logging
+- 5f3dc7bee content: improvements in Quick Start Tutorial (#430)
+- 94cedab05 INN-1318: Create user-defined workflows guide (#406)
+- 5f3d8b2e1 Adjust website styles (#431)
+- 2bb76cb1d cel should use ==
+- d02338516 Add "one or millions of" to functions
+- 59b0c1d0f Dont output null everywhere
+- f2b0fc83a Fix pricing layout (#428)
+- 79dc9f472 Switch to stdlib json
+- d83f32561 Sentence casing, and s/hours/weeks
+- d641a0fdf sentence casing, plus grammar fixes and tweaks
+- b8e6fa03a Tidy output
+- d7c61a0a2 Fix waitForEvent UI issue
+- 783827920 Update metadata for homepage (#427)
+- 7f6ef7788 New homepage June 2023 (#426)
+- 97a6b65db Fix gorelease version replacement (#467)
+- 88fff08da Add allowlist to ensure we can subscribe to specific queues (#466)
+- abcb63c1a Hide roadmap from the sales site (#423)
+- aba6c2ed1 Docs: Clarify event key security further (#425)
+- 159f7f805 Remove incorrect statement. (#424)
+- c9d6de828 INN-1400: Allow `Event` list in state input for batching (#450)
+- d4fb4ae3c Add starting at to enterprise plan (#422)
+- 0614fdd2d More concurrency changes
+- b22e71677 Concurrency limit changes in docs
+- 9b2075a73 s/15 minutes/2 hours
+- b4c989d32 INN-1432: Pricing Page Updates (#412)
+- 680d2f649 fix other migration link
+- b003d2001 Update migrate link
+- 0dd41c410 Update properties of error event
+- a2d0a698a Add TS SDK 2.0 release blog (#418)
+- 1eaf7311b Set create-next-app options in the command (#409)
+- 6c2299268 Update changelog
+- 89ddca1d3 Add throttling to OSS dev server
+- 51cfa92ec v2 upgrade guide updates (#421)
+- 1acf84479 Add How Inngest Works marketing page (#417)
+- cd47aefba Use function slug in error
+- db9a9fdc0 Fix `onFailure` handlers receiving badly-formatted events (#462)
+- eb7e4bb74 grammar
+- 8e446ed77 Prioritise v2 examples and remove `inngest@next` prompts (#415)
+- 2f385d579 Add docs for reusing event types with `GetEvents<>` (#416)
+- 233485fed decrease size of code
+- 771a76339 Add border between before/after
+- b3f0f8b4b simplify copy
+- 0daed1931 s/months/weeks
+- de2d4f025 tweak copy
+- b5006881f Mobile fixes
+- 3be7c6413 spacing
+- 4f9c879d5 Shopw code
+- 7de1aef12 INN-1344: Add docs related for logging (#411)
+- 6798a79a2 Copy changes
+- 84eacb8f8 mobile spacing
+- 832e35458 pointer events and spacing
+- 1b687626f Improve mobile
+- 4af55d67d pointer events none on background blurs
+- cc0fa4ac6 Homepage updates (#414)
+- 47b925ba7 Fix broken links (#413)
+- 484f1d110 INN-1269 Create v2 migration docs (#390)
+- 9f14c27f5 Document step.run json serialization (#410)
+- bd767e0b6 Docs fixes
+- e0514d25e Add slug to cancellation test
+- fae6b4a1a Fix tests by adding slug to definition
+- dd9bbd665 s/count/limit
+- b75154767 Ensure backcompat with older versions of the SDK
+- f4ab6ed80 Refactor function configuration (#434)
+- fd0b6f044 Remove unused reference `RunFunc` (#454)
+- 516b42c0b Unlimited functions on all tiers (#408)
+- 9b4e6c3cd Fix header timeouts (#452)
+- b62191ca2 Fix branch graphics (#407)
+- 4fba697a7 Use max function timeouts as per docs for dev server (#451)
+- adeb8b8e2 Make quick start docs dynamic for Next pages/appdir (#405)
+- 0e42969a5 Fix typo
+- 6cc7af39f Bring AI-Personalized Docs to navigation (#404)
+- 5a233b956 fix(sign-up): input text is invisible (#403)
+- 8b98c323b Remove table from docs
+- 248621113 Update serve.mdx (#402)
+- 1aae34cb0 INN-1387: Add docs regarding our current limitations (#400)
+- 4282e1ee4 Add callout for exporting client in App Router API route (#399)
+- ec062387e INN-1144: Add handling failures reference (#401)
+- 4c4381bd2 Add env to ctx (#448)
+- fe15932d0 Update changelog
+- ad6c5aa12 Local dev server concurrency (#447)
+- f0f7c7cc7 s/in to/into
+- a07e44569 Tidy wording of step side effect best practices
+- a0aa6007b Update patterns links for webhooks
+- 22d25c9f6 Add rss feed (#398)
+- ea9406334 Document sending events to branch env (#397)
+- 5cf8b6eb1 Dev server perf improvements (#445)
+- ebd35672c Add branch envs page banner (#396)
+- aa68b53d0 Unhide blog post (#395)
+- 7b66a78e3 INN-1194: Blog: Branch Environments (#364)
+- 08d3d9d96 Update docs w/ more context for ids (#394)
+- 4168f9939 Link badges to related resource (#444)
+- 9c2221b58 Update featured blog post to chained LLMs (#393)
+- 4847ecfa2 Add external_id to docs (#392)
+- e0436e865 Remove other platforms
+- 912941bc0 Fix link
+- 26e6d4d96 Call out vercel
+- 2eebf1985 Fix: meta tags: description & use case pages (#391)
+- a6e2d4c04 Create LLM + AI use case page (#382)
+- c64b693b9 LLM blogpost
+- 4c3fa28e5 Add examples to wait for event (#388)
+- f0ac13ab8 Improve internal links w/ new reference docs (#387)
+- cca96df52 Docs: Create reference section (#386)
+- 1684752c4 Add output size and request duration to driver response (#443)
+- c4fb68f04 Update link to new public roadmap (#441)
+- 78a73c81f Add pprof (#442)
+- 4175694c5 fix typo
+- bcd6fe2af INN-1217: Docs: Working With Environments (#385)
+- 57f7a04cc s/user-defined-workflows/wehooks
+- f17fab066 s/to any platform/anywhere
+- 00795774e Fix layout issue on xl screens (#384)
+- c019f2c53 Update tone for Next.js App Router post (#383)
+- 193d8bb18 Fix main nav breakpoints
+- 934e4eca7 s/name/event in fn definition
+- 54272ae0f Fix typo
+- 4f91a21bf Update comments
+- 6ad88ab73 Design fixes for updated copy (#381)
+- 509507afc Fix run on sentence
+- 161f13ecd Make events read better
+- 2f636afe7 Improve comment
+- 4277ca257 s/for/of
+- c51cfa503 Update TypeScript
+- c3652612f Update weight of copy
+- 54535803d Change function name
+- 342232608 Change initial homepage example
+- 393892e31 weights
+- 5266248ac Update hero copy with suggested bullet points
+- db3322a87 Fix background flash on slow connections (#379)
+- 7ac5a3bfa Replace webp w/ featured image for Twitter card preview support (#378)
+- 9842ef6bb Queue change: prioritization of older function run jobs (#438)
+- 2b3cf075a Docs: Cloud Functions, more consistent serve docs (#377)
+- 77b090158 Fix header to show nav links on smaller screens
+- c32b7783d content(blog): adapt Next.js blog post (#376)
+- 267e2756a Fix formatting for code. Spelling.
+- b36da3179 Hide backend role (#375)
+- ede2f2df9 Update background job use case page (#374)
+- d807449bb Update cron use case base with new design, ctas (#372)
+- 594b9da9a Update scheduled-functions.mdx
+- a9b230ab2 Add page header CTA to use cases (#371)
+- c8a3547c4 content(blog): Is the Next.js 13 App Router Stable Enough for Production? (#367)
+- 608507a52 Add roadmap and changelog to footer
+- 884e757c6 Exclude twitter.com from broken link checker. (#370)
+- d3cb818f0 Small fixes
+- 8b8caad8d Tweak customer quote visuals
+- ba8fd7ffd Add changelog to header
+- ac38ead85 Rename sign in as log in
+- 57a11104f Adjust style sign up page
+- d5ec42442 Remove exponential
+- 68ad40617 Update retry docs
+- 492dbf77c Add roadmap link to nav
+- f8c961b3b Remove roadmap from homepage
+- 8dbde5b01 Allow parsing of 10k events in a single batch (#437)
+- c75b0e555 INN-1255: Refactored the UserError function to handle arbitrary response (#435)
+- ab7976180 Add V0 cancellation API (#436)
+- 766e03ae5 Add streaming page and prompt to Next.js serving (#366)
+- 331e00780 Change executor's http error handling (#432)
+- 01b36c9aa Refactor use redis in dev server (#431)
+- 2e6df8a04 Change client library for Redis (#430)
+- 49802cea5 Update event key and deploy docs w/ new design (#365)
+- c1ada071a INN-1098 Allow the executor to check status inside streamed responses (#429)
+- fbcc95920 Fix cancellation pattern
+- 3585c3c6d INN-1182 Add "Instrumenting GraphQL" guide (#361)
+- c59a455bc Update redis state history
+- 797ac8d06 INN-1193: Blog: April announcement blog post (#363)
+- d729c7d14 Label IDs in dev server (#428)
+- 51dca0f50 Change backoff
+- 1f3d317cf Change backoff strategy (#427)
+- b115d88e2 Add basic function list view (#423)
+- ace24ec55 Add customizable step limits to the executor (#426)
+- 0aa519bcf Hotfix: Hide AI code generator banner
+- a2c1f619a Fix event name typo (#360)
+- 08ec4f8a3 Hotfix: customer quote on mobile
+- d96834a40 Quick roadmap refresh
+- 53b88fd3d Add customer quote component for homepage
+- 7ef336ea2 Copy images to repo
+- 0ec0750af Add quote to case study
+- 5e763c08d Add case study to blog feed
+- 63e5f71e1 Improve layout and make design more consistent
+- 1aa1a0b96 Ocoya case study.  I am bad at design.
+- fb6fdf69e Update design for contact page. Add ref tracking.
+- 582ab4465 INN-996 Add AWS Lambda serve handler to docs (#352)
+- e74db0596 Upgrade go to 1.20 (#421)
+- 1bf66688a Fix the title
+- ffddab71b Make function steps graphic larger
+- 402fc8f37 INN-1027: Blog: Long running background functions on Vercel
+- 1ad8283e4 Ensure we always remove from the concurrency service on contention (#420)
+- 729382242 Fix indents
+- ea0d38ffb Add step args to functions regardless of usage
+- de5c7f3a4 Fix: docs search cannot re-focus search
+- 7c436a867 Fix search overflow issue on close
+- 82ce1b58c Set crawler name via secret
+- 271d79c3f Algolia action - attempt override config
+- 63f7a6338 Add Algolia crawler to workflow
+- b3c08039c Add Algolia-powered search to to docs
+- 520acbc6d Add docs for concurrency and cancellation (#348)
+- b4c3fcbb7 Add `inngest/function.failed` internal event for fn failures (#410)
+- a39e9770f Add prompt for custom framework example (#351)
+- 8d1648a21 Reserve `inngest/*` event names for internal use only (#415)
+- da1c79101 Fix path
+- 6146da5b1 Update serve path
+- a39c0d44d Increase redwood ports used during autodiscovery (#407)
+- b4f1d7bdd Add saving history to state store (#417)
+- 569dbde28 Ensure we check if At is nil
+- 5fc60ba36 Don't store scheduled at dates in history if it's in past
+- c89936d14 fix(docs): remove plural form for event trigger (#350)
+- ee18ec305 Ensure `step.waitForEvent` mutates history correctly (#413)
+- a7317c5e6 Fix removing valid comments
+- dd899f962 Fix blog post code formatting
+- 464af7635 INN-856: Blog post: E-commerce API imports
+- 70d0e32fa Bump undici from 5.12.0 to 5.19.1 in /ui (#389)
+- 085cbbe9a Add support for external concurrency services (#409)
+- 5b17a36df Update default dev port to 3001 to avoid conflicts with ui
+- e308573b0 Fix broken links. Svelte blocks bots
+- bce5cc82a INN-899: Remove outdated framework docs. Redirect to serve framework docs
+- 9dce4203a Fix concurrency unit tests (#408)
+- 03a741ded Fix Inngest capitalization
+- 62c19c64a Ensure concurrency is set when creating workflows from functions
+- 07e930ed9 Add concurrency to function defintion
+- faddd2f89 docs(contributing): add contributing guide (#404)
+- da4a6c616 feat: automatically display newly created events (#386)
+- 2ae0cf754 Update tests with new config item
+- 1634c5356 Update workflows.cue concurrency toggles
+- 8e5fbeef0 Add concurrency to workflow.go and workflows.cue definitions
+- 81bb34535 Adjust tests to push one into the future
+- c583d1e6f Update package docs
+- 3e10d6dac Ensure that partitions aren't GC'd if there are active items
+- 7501ccfa5 Add job scavenging, ensuring that expired leases in concurrency partitions are scavenged and requeued to be worked on in the future.
+- a0cf9655f Add Requeue support for concurrency
+- c585a9b16 Fix partition requeue tests with concurrency
+- 9603c2344 Add queue concurrency with in-progress partitions
+- 4c7882113 Proxy testing (#387)
+- 9560a841b docs(readme): correct typos (#403)
+- 08277c634 Update old blog post code and links
+- 298963bdf Add utility function to get the time a queue item function starts (#397)
+- df15ee17d Peek partitions 1s ahead of time (#396)
+- 72a2cc673 Hide Front-end eng role on careers page
+- 959409a5b Ensure we update AtMS in jobs on retry
+- a761114d0 Allow custom logger to be imported within queue (#395)
+- 1c9509509 Add SvelteKit + Vite ports to autodiscovery (#391)
+- 6cb365fdd Use `gowebpki/jcs` to reliably serialize driver data (#392)
+- b9f22ebc7 Update README w/ SDK v1 API
+- 751178ebc Update page metadata
+- 7e0021b8b Tidy migration example
+- d2bca7cec Update featured image on blog post
+- aba1cb13f Hide confusing Inngest CTA on this blog post
+- fae8ce206 Update CTAs
+- 98acf178f Copy updates for OpenAI blog incl. MDX tweak for `<Button>` component
+- 0ee072c22 PR notes and copy changes for OpenAI blog
+- b9ea9861b More blog images for OpenAI blog
+- 109418fd7 Add message-sending gif to OpenAI blog
+- c75446821 Apply suggestions from code review
+- 37c805196 Add draft OpenAI post
+- 93f41db2a Update old bg job blog post
+- cd68d1cfc Other changes
+- 9c1d6376b Finalize docs and patterns for v1
+- 067e082c9 Move CTA buttons to header
+- c79e33674 Update page URL. Update heading
+- a6866171d move history below result on mobile
+- bbc95b60e Add copy to twitter button
+- 8c1894f1d Add scrolling when results are generated
+- 9c4b3b222 UI fixes
+- e24aed494 Add banner to docs
+- 43118f797 Update page banner
+- a070d317d Format markdown reply
+- f9cbfcaf3 Add spinner to generating button state
+- 3e9b5b2ad Add design to GPT page
+- a6f3a8322 Remove meta img
+- f0640a495 reverse prompts
+- 321cd8e06 f
+- 0ca4e1d42 Set latest history item by default
+- f12686fa7 Only show tags if present
+- 75b558f08 Only conditional title
+- 753e6cf26 Select and merge w/ prompt
+- 9dd85b7b8 Save prompt, send in API... LOL
+- 739b8a185 Prettier
+- 733ba284e Fixes
+- 845e994f6 Implement API
+- 11f5d478b Add selections, examples, code display, etc
+- fe6819679 Add GPT left prompts
+- f227e79fa Add parallel and fan-out guides
+- 2c90aca07 Improve and highlight fan-out patterns
+- aad49fdce V1 Async functions docs/site content changes (#332)
+- 01d5441f2 Update security page to include list of invalid reports
+- a5c787c6f Fix windows mime-type errors when self-serving JS (#385)
+- e29e726f5 Remove "process" tracing
+- bdabf71ba Ensure we write JSON to history (#384)
+- 22c5c9194 fix: Generator SDK returning 200 fails to save final step data (#383)
+- 20ac79ef0 Fix test race condition (#382)
+- beeb3e818 Add ability for release workflow to publish to other npm tags (#380)
+- 2e2f55517 Add tests asserting ConsumePause impacts stack
+- 0139ec330 Update state store tests for parallelism
+- 6d5bc16df fix: `waitForEvent` op erroneously setting stack before returning
+- c69d2a7c3 fix: Executor re-queuing edges as sleeps after a sleep is found
+- e87bfea6e fix: Skip saving response if generator res is empty
+- 252cfea0f Move parsing opcodes to its own function
+- 56860cb19 Ensure execution service works with parallel generator opcodes.
+- 37f55201b Adjust executor to fetch index from state store
+- 3e47f0f64 Don't defer deleting pauses for inmemory state store
+- 3a90f3d71 Ensure sleeps re-enqueue with the correct target step ID
+- 59eb2f894 Save response at the end of a sleep
+- aa256645e Avoid immediately saving sleep ops
+- 14434e8b7 Add support for N opcodes, stack, and parallelism
+- 77ec1b48e Add waitForEvent to ts docs
+- 6939a02e2 Move to React from Preact (#379)
+- 48646c53b Add workflow function to load function definition from state store (#378)
+- 62f01f82d Update comment
+- ba02d6a9c Ensure we write the correct history when finalizing (#381)
+- 86da88141 Fix indentation
+- c154683a7 Update code snippet tool to match designs
+- 9e715acea Update the scheduled function docs for accuracy
+- ed1613692 Docs: Add deduplication id info
+- c9223d60e Fix markdown link
+- 31aecb87a Add Nuxt framework serving docs (#326)
+- 72ece0a00 Use request body on redirect (#373)
+- a778e02da Fix pricing FAQ page jump scroll margin
+- 7bd924a35 Move CheckRedirect to its own function
+- 6ab2be04e Preserve HTTP methods on redirect (#371)
+- 9e3f0b6e0 Add some warnings and gotcha docs around `sleepUntil` anti-patterns (#297)
+- 93d45844f Update pricing copy and FAQs for function steps/month
+- 811febf1f Improve dev server diagram with arrows, sizing.
+- 3cfb456ae Remove quick starts as examples are removed
+- b4b91ae94 Docs: New local development doc page with dev server
+- a9f93a9ee Use named client. Fix for step functions.
+- 41d9346e5 Remove pre-SDK examples that are no longer relevant
+- 50165e2e3 Add more detail to errors within steps
+- ea67219e7 Fix `inngest dev` scheduling of cron functions (#352)
+- 75a6bab5f Fix latest 404s
+- 2b17166d3 Update docs with new SDK error handling
+- 442333f5f Prefix for CI envs
+- e53cc8c31 Fix some discovered 404s
+- 7f7fe76f0 Fix docs 404 title
+- 7c287bb1b Change prop to path to match nested context
+- b9b644a77 Track 404s. Create custom 404 page.
+- 8767a1bba Add quick start tutorial to nav
+- ba80a7c06 Add sending multiple events to docs
+- 35868ae44 Fix docs to patterns navigation bug
+- 145b6bdd2 Add `b64decode` to expression engine (#350)
+- 819e5e446 Remove larger jump to link text
+- 1c1c2c9f0 Fixjump to links overflow
+- 3041a30ba Handle text responses in HTTP driver (#349)
+- 6f91f9b82 Fix Jump to links scroll position
+- fbcae0d90 Add breakpoint debug component
+- 8bcb449e4 Add patterns single page design
+- 4e5a41bfb Add fn comment
+- 160cf4e71 Remove "read more ab"
+- 4e8b80f37 Add scheduled functions guide
+- 134e9e139 Add enqueueing future jobs guide
+- 566853bdb Add background job guide
+- 4b38e5cfa Base pattern single page layout
+- 594567e2a Add pattern overview page
+- ae3cc01d6 Update page meta descriptions
+- f226eeffe Fix image width resize on mobile screens
+- a116714e3 Fix missing button styles
+- 902087355 Bring back webhooks docs w/ a refresh
+- 203fec029 Fix todo left in docs
+- b64118d6d Fix docs meta tags and open graph images
+- bb9af39e1 Use a single port for the devserver (#347)
+- 1d061b234 Shift to custom events and remove generated types
+- f36fd99f9 Update client for step functions and retries
+- acbad49d1 Switch docs to use Inngest client
+- 7892306bb Add `inngest-cli` alias for `inngest-cli` package (#345)
+- a6bb0143b Fix docs light mode
+- 7182a1aae remove frameworks from sidebar
+- ce7a0f816 Highlight frameworks in docs nav
+- 58dda4d79 Fix hashtags in docs
+- 828004242 Make logo return to homepage (consistent with rest of site)
+- cfa3b8e4a Add SDK overview and serve docs for all supported frameworks.
+- acf0bd588 Skip Youtube links in link checker
+- 5198cd821 Remove legacy SDK
+- 73903dfb6 Add hover state to page banner
+- 8a4e6eaa0 Fix font size and padding on v1 pages
+- 4726a3835 Remove circle gradient element in favour of linear gradient to prevent banner clipping
+- ffbf94e5f Fix shadow creating horizontal scroll on homepage
+- 85679a643 Update FAQ spacing
+- bc3153fdc visual tweaks to Plan Card
+- 09edfd5ae Capitalising Unlimited in Plan card
+- c10085d16 Add concurrent table item and faq
+- 2ab408d3e Add pricing copy fix
+- 6198914c3 Fix unique key bug
+- c52e45133 Add comparison table to pricing page
+- d270ca1c6 Fix broken links
+- db8d8d87b Direct key links to new quick start guide
+- 79b158493 Update product description
+- 8f599f265 Removing fragment from plan description
+- cd5242c63 Plan card feature list didn't have unique key
+- f4f64f5ef fixing button export bug
+- 20bacc6e6 Commenting out button import
+- e9db737f8 Update pricing page design
+- f6b5cb02a Fix video overflow
+- 337b102b5 Re-order sidebar to get closer to planned structure
+- c5b7e0087 Fix broken links
+- 47ae11dba Replace docs with new docs design and files
+- 0be08398a Add meta tags for new docs
+- 659d090f8 Fix type
+- 1cf229ed8 Fix light mode nav hover
+- f8b2970b4 Remove sitemap from git as it's generated on build
+- ccd155956 Hide docs root guide/resources. Fix bug
+- 24386ca28 Prevent video elements from breaking mobile width
+- 31a66dcbd Fix mobile nav hiding when link is clicked
+- f0030d163 Fix mask not being removed on mobile nav close
+- deda9a45a Fix sidebar highlighting with no trailing slash
+- ab46df79a Hide feedback widget for now
+- 9745deab8 Add deep links/page anchors for h3, h4 tags
+- 7f8a9a1d7 Fix TypeScript types for React 18
+- 59a1039a9 Convert new docs to TypeScript
+- a21965c18 Update docs nav links
+- b0fdb1021 Fix syntax highlighting on docs index
+- d040fa750 Remove deprecated docs pages
+- 2d7f089cf Update mdx button styling
+- c3dd96cc0 Updating mdx components for new docs
+- b632085b8 Social badges
+- a0ca474a6 Update button to have left and right arrows
+- d9d2da79f Update inline and block code visual design
+- 8c4671c59 Fix docs navigation highlighting
+- 56d2c190e Porting over original docs content into the new docs layout
+- 46c18f250 Create mdx structure
+- 9625da310 tweaking theme
+- 75f53f29c Integrating tailwind protocol styles
+- 538dd6049 Move MDX provider to layout
+- 4c3b8a203 Add new docs layout. Fix styling issues.
+- a0f2baebe Stripped back and broken example
+- 536abe9c8 Upgrade to Next.js 13.x
+- 4f1b215d4 Fix deps for new docs
+- 4009280ff Update and remove dependencies in prep for new docs design
+- 5bd7aabb1 Update .gitignore
+- 6c04912e8 Store error and output in history
+- ee3a3abfe Serve UI assets wholly, including JS files + sourcemaps
+- 529358346 Fix typo
+- 7b7ad54a7 Fix lints
+- c94c8fd09 Record metrics
+- db4e70e9c Add improved logging
+- db64dd578 Add more counters
+- e4cb9d8d5 Directly import colors only from the tailwind to save ~30kb gzipped
+- 58ee8c0e3 Update header and footer links
+- a867913d1 Remove highlighting in hero for now
+- fe62059de Add alt tag for Image
+- 26eac1fe1 Add user quote
+- eb2c7fc78 Make page a draft to not conflict with existing
+- 08b80635c Update use case page learn more links
+- 140c163b7 visual tweaks
+- 653836bb6 Changes based on Vercel preview feedback
+- d7ab5a50b Add serverless node background page test
+- 4cb86dffd Relocate legacy pages until replaced
+- b5e84ac24 Relocate page data to fix Next.js build
+- cd7994fae Create icon lookup. Add types.
+- a2fa7c40e Add images to use cases
+- 34896045f learning card icons
+- a1f813f88 Update duotone icon locations and sizes
+- a3312b497 add optional to section header lede prop
+- c797b16d9 Add duotone icons with color support
+- 317ca8a75 Basic use case page layout
+- 71fe958e0 Add version to bust network caches
+- f0ab6d743 Fix docs og images
+- 0c680c5ba Add full image URL for OG/Twitter card image
+- c3862509b Fix broken URLs. Hide quick starts.
+- e25c274a4 Remove duplicate Inngest prefix for og
+- d4872740d Add Twitter cards for every page
+- a1a5ee350 Fix broken links
+- de74cc735 Bring back self-hosting docs
+- af838247e Add dynamic open graph image generation
+- 1ce576590 Remove logging
+- 37128db12 Dynamically remove all twoslash annotations
+- 03b1b6857 Fix sitemap to hide all mdx pages now generated
+- c8f14f184 Fix more nonsense
+- 03e8b284a Add new MDX plugin. Fix shiki after Twoslash
+- 89bc9bde6 Upgrade to Next.js 13.x
+- 0bc2ef597 Fix deps for new docs
+- 4bd9c7e9f Update and remove dependencies in prep for new docs design
+- 8850f5792 Improve logging for broken link checker
+- 7265c5875 Remove PartitionPeek verbose tracing span
+- 7b250b0ba Use consts for metrics
+- 062237120 Add tracing to core queue functions
+- 652fcef37 Fix typo
+- 02c8370d2 Record ewma as milliseconds
+- dbf4694b0 Add tally metrics to queue
+- a4b9c6187 Make RNG race-free
+- d04ba3fb2 Implement history deleter interface for Redis state store
+- ab1390d09 Add history IDs when generating historical entries
+- 1068ed7bb Add history ID fields, plus tests for JSON & gzip binary encoding
+- 55a0393b6 Remove duplicate copy from about page
+- 7cff92e15 Do not log for SDK routes
+- 6067b2adf Only set idempotency key if idempotency TTL > 0
+- f70862bbf Add Metadata() fetch call to state.Loader interface
+- e96bc71fa Add unit test covering custom queue names
+- a7531a8cf Make tests on windows less flaky by increasing scope
+- 0c9f7ade2 Allow queue kind -> queue name mapping
+- 295add7b7 Transition to queue names, and add denylist for queue runners
+- 569568ccc Replace callback context with background
+- abcec51a8 Add version to website/page.viewed
+- f33997884 Allow custom idempotency TTLs based off of individual queue items
+- 392e632d6 Fix tests badge in readme from badges/shields#8671
+- cd4201382 Specify Go in backend eng job title
+- 2961e8761 Add page jump link for roles
+- dd553e585 Add experience section to JDs
+- a7198ae92 Fix falsy broken discord link.
+- 703f30f6f Create basic careers page with new job postings.
+- cec86e327 Use state.ErrFunctionCancelled in executor
+- ed1c99d60 Add `make dev` command for command local dev build (#314)
+- c7f4d80d9 Use current hostname for GraphQL requests (#322)
+- a73304768 Order generated event IDs during catch-all type generation for TS
+- 9a48fe706 Log error appropriately
+- f41de3a33 Fix tests
+- 9e6dcfd27 Ensure we respect retries > maximum when enqueuing children
+- e501582a9 Improve telemetry
+- 9be36ba96 Fix link
+- 7830fb916 Update new docs homepage with example
+- bba21986a Add new quick start tutorial w/ dev server
+- 8204eb501 Ensure category index page is first in order
+- 28fe2f90b Fix docs design for index
+- 6a13c66dd Ignore partition not found errors during processing
+- 1f3542e77 Move SavePause state command into lua script
+- 40448ae6b Remove information about architecture from README
+- 283d325e3 Increase free plan to 10k fn runs/mo.
+- 864bcdd38 Fix bad link to old vercel deployment
+- 994e483ba Mobile layout fix for bg tasks page
+- b07c5ac30 Fix string in workflow
+- c5d83d442 Use timers vs cancellable contexts in service
+- f28efec2f Ensure state callbacks have their own ctx with timeout
+- 9b6159974 SDK tooling pass (#310)
+- 66060f1d1 Fix `WaitForEventOpts()` parsing incorrect `GeneratorOpCode` field (#308)
+- eaee10320 Add Job ID to queue item for idempotency in interface
+- 91ff775d7 Add idempotency to queues
+- c3ffd0d9a Add consumePause lua script
+- 1766d4a02 Move ConsumePause into lua script
+- d3f0f5538 Prevent goroutine leak when renewing leases
+- 20384e19b Ensure tests for priorities pass
+- 8d44367d6 Use entire QueueItem pointer when finding queue priorities
+- 0d13ea533 Ensure workspaceID is stored within queue items
+- 5d94addb8 Scope pauses by workspace ID
+- 0be3b8f3d Use RunID vs Identifier for key ops in open-source state interface
+- 919957883 Make extending lease timing test more accurate
+- b9d0e31d6 Fix retry tests
+- 50ba02e4d Fix async tests
+- 9264cffeb Fix queue testts
+- 8a29690a9 Refactor default retry count into its own consts package
+- e8aa90bf9 Increase buffer for race checker
+- 4333e985e Windows test cleanup
+- 9c4884af4 Implement in-memory queue using redis, plus normalized queue retries
+- 169f36c7e Decrease latency of job items via prefetch
+- dad1caccb Enqueue jobs using MS precision for ordering purposes
+- 5ded72013 Ensure we requeue partitions atomically
+- 2547fe541 Increase duration for race condition checking
+- 7cea8e5c6 Fix lease check time by storing time.Now prior to redis call
+- a8ab277e0 Add lock to CSPRNG Uint64n method, don't extend lease on termination
+- 397b2479f Change CSPRNG lock to be pointer
+- 373274bc8 Handle empty interim payloads when unmarshalling queue item
+- e45616624 Fix race conditions
+- d94c142e4 Fix lints
+- 1cb696a10 Use scripts.Run, minor changes to consts
+- 7e5433b8c Check for cjson.null when modifying in-progress counts
+- a7b63d647 use miniredis in test, vs real redis
+- 8ce2f9cac Swap enconding/json for go-json
+- c29894013 Only create checksums for scripts once during initalization
+- 30f373245 Add semaphores for tracking counts
+- 60162a4bb f
+- 186de09e5 Fix userdata null JSON decoding within ulids
+- 8263435b1 Improve error handling when attempting to lease complete jobs
+- a1450c954 Add tests to processing of job items
+- f345589dc Add tally for metrics
+- 1455da45c Implement sequential lease
+- 12a25b8cd Implement queue constructor and options
+- c7b3468e7 Add queue key generator to standardize key names
+- 923cf50c9 WIP (rebase this)
+- dfa2e4edf Add partition reprioritize and requeue
+- 95c480cf8 Add leasing of partition items
+- 333a15b9b Add test for partition peek
+- ef418db2a Add coverage to corner cases for queue item primitives
+- db10995f9 Add dequeue, requeue, extend lease
+- bde1ecff2 Add extending lease with tests
+- 41b3f7c4b Add tests to assert Peek() works as expected
+- 365c7691f go mod
+- 873ad6cfc Update queue to use partitioning across functions
+- 308b89f24 Basic non-partitioned redis queue implementation
+- 374a193d1 Use new wait for vercel action
+- de9512899 Remove unneeded redirects
+- bf1c445a3 Use relative paths for Discord shortcut URL
+- 66a185c0a Add legacy docs redirects
+- 79b70118c Set up post-deploy workflow for Vercel
+- 3510e5507 Use Next/Vercel image optimization on blog
+- 1dfad7026 Remove Cloudflare insights
+- b763be6ba Update build command for production
+- 058915518 Fix mobile views
+- 4f136caf1 Fix icon collapse on mobile
+- 150b6d50e Fix SVG errors
+- 3471a96a0 Updated Header Nav
+- ad9ad19c6 Upgrade Tailwind
+- d2077f4ac Fix empty fs loader
+- 18b09b5a1 Hide old commands
+- 91a21ec23 Tweak page title
+- 891116fd3 Fix footer CTA link
+- 192b1aa65 Overriding default twoslash styles
+- c71206102 Add correct npx command
+- 2e124ed96 Add secondary button to footer cta
+- 6df0086c0 Updated discord callout
+- 5923f1654 Updating title position on mobile
+- 225c4ae5d Centering blog content
+- e44baaf0f Fixing code-block floating comments
+- 23d304c1f Updating several blog post featured images for consistency
+- 117bfbd6a Code block theme
+- b58a845ce Squash timelines to hide noisy logs
+- d47229977 Add event time to stream, plus change "replay" wording
+- 9b623b952 Remvoe Support page
+- 87748c924 Add UI for sending events (#290)
+- 736e403f8 Metadata component
+- 50514b178 Update footer to include basic callout
+- b7b3f7285 Fixing broken link
+- dd796d35e Update footer design
+- b067e7f85 Blog design
+- d5ddaeff2 Fix react warnings
+- 67ced41b2 Add status page widget
+- 89d5fff61 Update README.md
+- de9c53cfa Exclude often failing Stripe API objects
+- 0806c76bd Fix broken link
+- a80cebcab Use correct function
+- c4b931727 Fix z-index issue on get things shipped
+- c22bbfa72 Docs fixes post-redesign
+- a03eba342 Basic blog homepage layout
+- adb2ed34b Add new design props to blog page
+- d8d4a2be3 Refactor Header
+- 657785ee7 Refactor footer
+- a0a0f75ac Remove stray comment
+- b74ebf7a9 Reorganise shared directory for legacy components
+- 779a832c7 Update Github button copy to ensure wrapping on mobile
+- 4bfda3bf1 Fix view and star button on mobile
+- 60797b5e8 Rename `nord.min.css` to `highlight.min.css`; it will shift and change
+- 5a364fc81 Use `<SyntaxHighlight>` in `<CodeBlock>` for JSON payload highlighting
+- 4b1a5cd6f Add `<SyntaxHighlight>` component to highlight given code
+- 83d2e1b9b Add `react-refractor@^2.1.7` and `refractor@^4.8.0` for highlighting
+- d29d08e44 Update next logo
+- dde9bea47 Add basic blank slates to UI  (#296)
+- 479ae0912 Update README.md
+- e671374bd Update CLI readme
+- 964780891 Further update roadmap
+- 96709fb94 Fix bad Docker error link going to old docs URL (#295)
+- 279fb0dda Update roadmap
+- 6483f72fa Remove Inngest logo from deployments
+- 64aea7019 Add copy button to code snippets
+- d64dcf77f Event stream animations (#294)
+- 0dc4a33d4 Add view github project link to dev UI
+- 4c9f248b1 Add open source to DevUI copy
+- e8d7d631a Update FitsYourWorkflow copy
+- b969ec08d Fix memory access error in `inmemory` execution layer (#293)
+- 3347e03c1 Fix dev ui button collapse
+- ecbd8d929 Add bottom cta
+- bcd31f40e Move new homepage design to index
+- 2f4a6c82e Fix patterns page font styling
+- 3db9721cf Add cta to fully managed
+- 495da4121 Update webhook payload
+- becf060af Update footer link
+- 4ae519c59 Update hero copy
+- b2f55b503 Add patterns links
+- 6787dbb17 Add OutTheBox links and cta
+- 6ae9107c9 Add DevUI CTA
+- 935292e6a Add links to framework and deployment logos
+- dcbda6e9b Fix clipRule casing in close menu svg
+- 2829f1b48 When an event is selected, deselect a run if it's no longer relevant (#291)
+- 071941d53 Clean up few fixes
+- a02bc1c13 Reducing hero mobile height
+- a2236c2ec Fix horizontal scrolling bug
+- 9602f416e Fix bug where headings were breaking in subpages
+- 2ee001b7c Fix event driven images
+- ac5a4b4e7 Clean up SendEvents
+- 72cb1a443 Fix header mobile menu
+- 84aa4a587 Add spacing to get things shipped tab buttons
+- 1f6b4ef3d Add word all to Browse Patterns button
+- d8fddbbff Fix rogue circle clipping Dev UI text
+- 714677698 Fix home hero button stacking
+- 231324e06 Fix syntax highlighter not picking up certain strings
+- 46a721ac9 Fix missing key on component loop
+- 731859b38 Add syntax highlighting
+- d9941bbfb Fixing homepage links
+- 0416a57da Add Out The Box images
+- ce62a4f1f Responsive Event Driven card
+- 9ad9d9a37 Fix Header Nav
+- e04f839a3 Lots of homepage visual tweaks
+- af4bece9a Add Get things shipped section
+- 1673cefaa Styling cleanup and roadmap base
+- 0e4542484 Fix typo
+- 6861c0ef9 Show output when dev server is online if is a tty
+- 2b6fb8b3a Change build path
+- 0850dba14 Add bundled, single-file UI base (#280)
+- 49d9a168a Adding card design
+- d77b009e7 Add content structure
+- b526fba29 Await on inngest.send
+- 4d075b422 Home hero responsive first pass
+- 147777cf9 Assertions that execution service handles generator opcodes
+- 0fa76b925 Add Redwood handler blog post (#243)
+- 39bc785f7 Change error checking for opcodes in httpdriver
+- 15ac4c6e5 Add hero section to new homepage
+- 588b239d5 Create design versions to set base styles
+- 9722641c3 Comment out tag selectors
+- 265ea8dce New homepage Nov 2022
+- 4d7bf732d Use yellow favicon to distinguish local dev tabs
+- 7bcd3f4fa Improve autodiscovery for redwood
+- e937e5d7c Add structured data markup to blog posts
+- d6099c5ee Fix broken link in schedule pattern
+- 66e054f25 Add cancel to inngest/workflow
+- 312e16c6a Use monospace. Fix react warning.
+- a1a63d05e Update changelog for v0.7.0
+- 9cbeb1fe6 Add patterns link to docs
+- 3848c17d2 Add Patterns to nav, hide quick starts
+- e8e7aee3c Improve inline code snippets and make consistent
+- defe16468 Add featured image and image credits
+- 5f2f7b347 Add use case to blog post. Add shadows for code snippets
+- a6c5992dc INN-744: Blog: Build more reliable workflows with events
+- a1a1a21e8 Fix syntax
+- 57666eb12 Add imports to multi-step docs
+- 03e079d98 Add benefits section to multi-step docs
+- bf9252518 Add more detail to available step tools in multi-step guide
+- 26c8a65ea Add multi-step function page hints on "Writing functions" guide
+- d7a94ba2e Add separate "Multi-step functions" page
+- 3d5eca2d5 Add multi-step functions section to "Writing functions" docs
+- 199471879 Add cancellation via pauses to runner
+- 132c1bc62 Fix args, add text about benefits
+- 1099092d6 Remove TODO - switch to batching
+- 20e3f90a0 INN-741: Patterns: Reliable scheduling systems
+- 67947ec9a One -> You
+- e608942fb INN-737: Patterns: Reliably run critical workflows
+- dd2229eef Nits of parallel stuff
+- 3d0a32c35 Add fn name
+- 5fa716dc6 Nits
+- 4402d8cd9 Add function cancellations
+- dabfd4694 Add running functions at a specific time
+- cac719b54 Add running functions in parallel pattern
+- 4bcbf3edb Hide resources in event coordination
+- e8e80622f Hide data recovery pattern - skipping for launch
+- bc8adb5fe Patterns: Build reliable webhooks
+- 83c952567 Update subtitle
+- 37568468b Replace idempotency with cancellation
+- 3fcef67b0 remove a set of parenthesis
+- 7f29f5eb7 Add event coordination lost customers pattern
+- 91ae463f6 INN-735: Patterns: Run code on a schedule
+- c4d67ff06 Fix pattern lib header on mobile. Add og:image
+- 3245d0d1e Allow users to specify date strings within sleeps
+- 5ecb39bf6 Hide nav and footer links to release
+- 1559a80fc Add jump links for each pattern page
+- 0d5d31746 Use Next Link element for smoother transitions
+- e0dee350e Convert pages to TypeScript
+- ae528dae1 Create Patterns library
+- 65da330fd Ensure we finalize generated steps
+- 7636138aa Add name to generator op
+- cf0d2d60c Update the Redis client with OnComplete/OnError callbacks
+- cc8378a22 Test fixes for TS type collisions
+- 0511f28cc Require that custom events require a `name` to match SDK types
+- e13c19353 Use custom slugging method for TS type names
+- 4893110fd Replace generated TS types `{}` with `Record<string, never>`
+- 9bb58b4e7 Add ESLint exception to generated TS types file
+- 5327250a9 Update Step Functions landing page with latest API
+- ba783eec2 Assert generator steps store state in output
+- cad6b56a4 Store the output of generator steps in state
+- 9cc1720c6 Add support for scheduling generator functions based off of opcodes
+- 003d1019d Allow storing arbitary data in steps, vs maps
+- eac8e245b Add code snippet tool for quick mockups
+- a6826e142 Make test less time-y
+- e013dda69 Add status to function run state metadata
+- a0b0f6113 Add benchmarks to new
+- 1283a4797 Remove LeasedUntil from pause struct;  this should be in state only
+- 6ed541f6c Move to inmemory-redis for testing redis impl
+- f023a1eb4 Ensure that leasing a pause is atomic via a lua script.
+- 931b1e704 Allow data to be saved to fn state when consuming pauses
+- 44d0229b4 Add express.json() to express docs
+- d16f8aa5d Add optional caching of expression data per pause
+- 94332c25a Add WithKeyPrefix and WithRedisClient to redis state store
+- 4a41ac9d3 Update blog posts, add featured posts to /about
+- bf032675a Blog: Completing the Jamstack in 2022
+- 9cf64ca39 Remove works with logo orphans
+- 0f39b5ee7 Update Step Functions beta page to match current code
+- 9bb7e90a5 Add the timestamp to the hmac to prevent stale replays
+- d9b93b96a Use ampersands as url.Values
+- d44467d21 Encode sig to hex
+- 126b133b6 Add signing key to HTTP driver parameters
+- 010386114 Add signature headers to HTTP requests
+- b0864aa27 Ensure that we re-initialize crons in development runner
+- 17b85a207 Add RedwoodJS docs and logo (#240)
+- dda95716f Assert saving predetermined step data works via test harness
+- 653a94b45 Update initialization of state
+- b8e84a6c4 Add formatting
+- 98a24cfe7 Link to dev server docs from Vercel post
+- a4a53ad8c Fix grammar
+- 136718716 grammar
+- 3536972fc Add dev server / testing functions docs
+- 13fdce236 Update banner. Link to Step Functions page.
+- c89e4ad09 Vercel Integration Announcement
+- e9d75c253 Add Step Functions beta landing page
+- fe81d93a8 Update metadata and open graph image
+- 6b88c34c6 Only ignore docker driver if there are no steps with that runtime
+- 1acf7d042 Fix loading Docker driver even if no functions are found
+- 94eac0a17 Fix API throwing nil pointer error when being told to stop > once
+- ee8e91afd Change status checks
+- 1443bed6f Change log fields for tests
+- ce40a6695 remove log line
+- a1dc2cef4 Improve logs and add full SDK integration for sending events
+- 301bca1ac About page refresh
+- 3c25d6155 Prevent "functions registered" log spam
+- a9ab3fa15 Add CORS headers to the event API
+- 9fc8ad7f1 Document setting of event key for Vercel integration
+- f65f8e25a Remove logo link in nav on sign up page
+- 89d1b2d87 Re-add site URL for FE redirects after PW signup
+- 8b0654182 Optimize layout for pop up window logins
+- 5fe8bacf6 Redirect to b64 search
+- e79991cbb ts-ignore atob
+- 995636973 Ensure redirects work on login
+- b518c66de Add search and to query params to signup oauth links
+- b6930a079 Improve errors when parsing front-matter
+- 19cea57db Update serve documentation. Add reference docs
+- 0721137c1 Change button href to match copy
+- ea321cdbd Re-order framework guides
+- 967a77dd2 Link to manual register docs instead of duplicate
+- f3f9fafbb Add links to Vercel & Netlify deploy docs to Next guide
+- d5cb808d0 Add docs headline anchor link hovers
+- 69a4fed99 Update event docs with new constructor and UI changes
+- 01b46a401 Update SDK code snippets with recent changes
+- a2d70b25e Add Vercel to automatic register docs. Use buttons.
+- 6b41e4371 Fix dark mode issues in docs, blog, nav
+- 9876e392f Enable app redirect URLs during signup
+- 4f4fc1c6f Update Vercel docs for new integration
+- 6671a1527 Add deploy guide links. Add Cloudflare.
+- 51bbb69f5 Mobile improvements. Add deploy docs links
+- 3abc81ee4 Make previous posts wider and easier to read
+- 68da9b82f Use shorter copy for 1-line on mobile
+- 7b8439268 Remove overflow scroll
+- 2afc5f3c4 Slightly improve cron job page on mobile
+- 5fe194b3c s/functions/jobs
+- 0a1e002e8 Update code snippet
+- 21baa9aef CHange bg jobs header
+- 072386ce9 Fix types
+- 35176b0e2 Update background tasks
+- 201c8e8fe Update title and meta
+- 76b77017e Update nav
+- e488f39a6 Mobile styling
+- eea108d1a Add icons and such
+- 997dc98bd Add full content
+- 636e3ed0a WIP: Cron page
+- f78c39a8a Fix blog post twoslash b/c breaking change to serve
+- 01930c415 Docs updates for SDK v0.6.0 (#219)
+- 2105c549f Set canonical URL for search engine indexing
+- a0bc61087 Move dependency to fix CF build
+- 8df1c4cbb Update Next.js blog post
+- a92252cd8 Write ok: true after registration
+- 6b09000b0 Add `Content-Type` header for dev res
+- 119851f58 Add cors to dev server APIs
+- 58cfc374c Add SigningKey to workspace query
+- adc8013ac Add workspaces to dev API response
+- 3b69d34a7 Remount dev API
+- ac0a58d43 Add PORT env variable support
+- cc8f5b3dd Lock workspaces
+- 667dbe367 Upgrade to Chi v5
+- 1b1a23b82 Fix lints
+- 055980aba Add TypeScript docs and site content (#214)
+- 4f5d6500e Add dev API showing registered functions
+- 75a94006a Add function upserting via SDK POST
+- 7ac2e1420 Add Inngest, Cloudflare, Lambda platform placeholders
+- 5307a1c76 Add chi-router
+- 13fbd8e3f Embed devserver API within events API when running `inngest dev`
+- 4d249db32 Add basic registration handshake
+- cde9d1253 Add SDK auto-discovery to the dev server
+- a6e39272c Blog: No workers necessary Node/Express
+- 011747f53 Update tagline
+- 1f79c8f98 Fix JS
+- 8e03ed45e Add serverless job scheduler img
+- 084b1deba Add welcome email
+- f42f16d21 Add modern job scheduler post
+- fc1c3732d Fix Inngest import for sending events doc
+- a0d903234 Add TS tooling blog post (#209)
+- 63787cffd Remove next up
+- 5be5a1f10 Remove automatic registration
+- c9c7eeeba change links
+- 611c55151 Add redirect
+- a6c3d771e Move express => frameworks
+- 925ea8ca3 Vercel platform docs
+- a5ef0d26f Add product callout aside to the top of every blog post
+- 64442efb3 Update footer Github repo link
+- d8e641f2b Update SDK page. Nav Github link.
+- 5c95d5c54 Rename nav item to mention ts/js
+- fd4eb4f25 Update page banner to link to SDK page
+- 79a6a13af Re-order use cases to match value props
+- 1c1c28a73 Fix hero cutoff issue for homepage
+- e2d6a1b71 SDK page: show scheduled fn's and add roadmap
+- 4cc574aa5 Link to guides. Fix scheduled fn snippet.
+- 755c6f80e Remove trailing slash from redirect
+- 639fa27bd Remove broken image
+- e4cb89ce4 Update link to match redirect
+- 0e20de191 Fix type issue in docs
+- 1c6082ffb Exclude blocked domains for link checker
+- 648a72c7e Fix various broken links
+- a3f9c2437 Add Cloudflare redirects to Next config
+- 04b425ef9 Render hidden sections to preserve links
+- 0c69f93e7 Fix docs prev/next links
+- 800ea8998 Link to Next.js SDK guide from blog post
+- 532d44362 Fix broken inngest.json links in guides
+- 2762dd21e Fix broken links in examples
+- 70dbdc99f Fix render social previews for docs sections
+- 001491289 Add docs sections. Add new retries reference
+- bd8c82acf Remove deploy/nextjs
+- 30f9c0384 nextjs => frameworks
+- 45c03ddee Add types to express docs
+- 421e34d09 typo
+- 6e989cb0f Update next guide with typegen
+- 1222037fd Add next guide
+- f93f175a3 Remove underscores from types
+- 799df9a78 Add "TypeScript" section to "Writing functions" docs page
+- ec8cd83a6 Update Retool guide using SDK
+- 1c52dc9da When generating types, allow custom input types as a generic
+- 9f2a10eb9 Don't error if an event version has no schema
+- 533f458ee Ensure generated `Events` block is always `Readonly`; disallow mutation
+- ce5d3fbb4 Remove `inngest types --check`; need to ensure TS types always the same
+- 58639aa32 Add new `inngest types typescript|ts` command
+- 72520e18c Share `DeviceAuth` and `FetchEvents` for reuse in `inngest types`
+- f1e574d31 Fix link
+- 3c39b41e1 SDK mobile hot fix
+- ebbff1f02 Add express docs
+- 676ff766e Add next deploy docs
+- 1aadfff94 Add `npm install` step for "Deploy: Netlify" page
+- 26c055de7 Add simple `Deploy: Netlify` page to docs
+- 01824c432 SDK homepage responsive improvements
+- 184f28703 Update SDK page post-release
+- 2d253a069 Homepage refresh for SDK launch
+- 1f331b47c Move aside below
+- 099d6c147 deploy updates
+- 7b7f7285b Add event format and event key docs
+- e9fe3e103 remove fn redirects
+- e72169ac0 Update quick start links
+- 36110001a Reformat docs for SDK
+- 70039669f Fix classes for mobile
+- 24d1fe51f Fix SDK page on mobile
+- 6e9b14f32 Create SDK landing page
+- 42fd23312 Fix cascade issue and layout flow
+- cf674fc5d Fix hero overflow
+- 6c28792b9 Mobile nav fixes for overflow submenu
+- 02214cd81 New Homepage - August 2022
+- aae06f7cc Same with functions
+- 671d4f7a0 Only test suffixes of step IDs
+- deb75d287 Also verify step IDs
+- 793521907 Ensure that function IDs are slugs
+- 9c103677a Pass in fn_id and step_id to step args via `ctx`
+- 92c432e18 inngest-sdk@v0.2.0 - Automatically track utm params
+- bc42ad775 Remove deprecated & hidden workflows docs
+- ed7329b8c Fix dark mode for docs home quick starts
+- 57cbfbbec Fix layout on mobile for data gov page
+- f394f6279 Fix pricing typography and resource table layout on mobile
+- 66c35f705 Fix nav logo horizontal spacing on mobile
+- 1bd810463 Fix sign up page layout on mobile
+- fa83e4681 Add Docker and Docker Buildx install instructions (#177)
+- aa3fbf3b1 Add discordbot image
+- 6eb5e0bc9 Tidy blog list styles
+- c85697e5b Add olotl blog post
+- 027499c48 Fix nav links
+- 65e6d759a Always create hidden docs pages, but hide them from nav and indexing (#176)
+- c82f91a44 Add docs and quick starts to learn section of nav
+- 462a02016 Move Docker warning to point to our own docs for specific instructions
+- 587aedbad Add non-blocking broken link checker (#175)
+- 0dc4a6b28 Fix forced CSS button styling on quick start taking over layout
+- 598feb94c Fix mobile display
+- e70e246d7 Update nav
+- 022321d71 Update nav
+- b764f3feb Add dropdown to nav
+- 7513c00fe For now, center hero text on feature pages
+- 574e6a251 Fix logs
+- 89fbae24a Box callout
+- 38683744b Add inngest image
+- 814f3c63e Fill out data governance feature page
+- 104125ea9 Add governance template
+- b382900a6 Add ability to `inngest step add`
+- beed2d85f Ensure quick-start cards at bottom of single page take full height
+- aeba5e620 Add quick-starts prompt and button to docs homepage
+- 8e99c7f9a Add quick-starts link to footer
+- 0d13b5383 Set meta title/description for quick-starts page
+- 62e8dd632 Ensure tag-only filtering works correctly for quick-starts
+- 397021be3 Ensure quick-start tags space vertically
+- 8e6611a51 Set quick-start cards to take the full height of their grid cell
+- dbd168ffa nits
+- cbdf2ccc3 Use `function.JsonConfigName` for writing `inngest.json` file
+- 0b0414efc Strip "description" and "tags" from template functions on clone
+- 64dca8c4e Nits
+- ba0c71a05 Add tests asserting steps and responses work in wait expression
+- 188139b81 Allow `response` in wait field expressions
+- 43c0fa653 Add snapshot replay GIF
+- b90eace90 Add docs for `inngest run --snapshot` with some use cases
+- 3988fd187 Remove dangling "os" import in `dockerdriver`
+- 7e608a766 Don't pass host env as default in `dockerdriver`
+- 6155f43f2 Use `jsonc` to render `inngest.json` file in `simple-env-vars` example
+- bf5188134 Add to `inngest.json` config for `simple-env-vars` example
+- 9e41aa992 Add `README.md` for `simple-env-vars` example
+- 276d91257 Remove JavaScript step from `simple-env-vars` example; use TypeScript
+- 6b0c2c2eb Remove inline event definition in `simple-env-vars` example
+- 70b1e8b00 Fix quick-starts not displaying correctly due to `<Link>` in grid
+- 626c70299 Add sample `.env` file to `google-process-images` example
+- da8861a19 Add human cron description back to `init`
+- 7bcb83854 Add summary readme
+- 65052f5f8 Add weekly scheduled summary example
+- 49cac66e0 Add initial `simple-env-vars` examples for all scaffold languages
+- eb9b05e44 Nits
+- 109597152 Add new docs guides
+- 08baa7917 Add prev <> next links to footer of docs pages
+- e05591a00 Add new docs homepage
+- 29a0bca81 Improve slack errors
+- 86b8bf86f Add close.io step
+- de3cd1a55 Add readme
+- 40bb9a3cb Add account federation example
+- 549b34063 Export `CueConfigName` as well as `JsonConfigName`
+- d92026e3c Use `main` branch `schema.json` for `inngest.json`
+- 4e60bf20b Remove ESM support in `google-process-images` example `process` step
+- ffee221e4 Handle resizing errors in `google-process-images` example
+- c89fa14a4 Add comments to code within `google-process-images` example
+- 66cd9a8a5 `README.md` pass for `google-process-images` example
+- f608a9cdb Add basic alert logic to `google-process-images` example
+- f4f5b5f20 `README.md` progress for `google-process-images` example
+- 9092570e0 Remove shared types for steps
+- 41c0b18bd Fix image resizing not working correctly
+- cc19525f6 Fix detections not working correctly
+- 7003831a3 Fix `process` step not using the explicit Google Service Account
+- 51511d76f Shift `process` step back to CommonJS for Sharp usage
+- 67e731825 Add `process` step packages and stub
+- 68e4f4151 Fix output of `safety-check` step
+- 6444dc56d Add `package-lock.json` to `process` step
+- 82989e3ca Duplicate `types.ts` for all steps
+- ad725bb6c Add `dockerfile` field to `RuntimeDocker` following #215
+- 2ac092965 Add warning message when Docker fails to load
+- 6b9992aae Bump terser from 4.8.0 to 4.8.1
+- 93a5a7179 orgId
+- e4c4b7e44 Add fullstory
+- 17d4038b1 Update guide image for Retool
+- c408a950d Guide: Trigger your code directly from Retool
+- 3bf936c36 Add temp workaround to remove dockerfile for action serialization
+- c48f8a0c8 Add support for custom Dockerfile
+- 805397cd9 Initial stub for Google Vision API quick start
+- 5dd7643fe `"$trigger"` also matches `"type":"string"` in `schema`
+- 8f613e058 Add `$schema` to examples
+- 23929d7e4 Add static JSON Schema for Inngest config files
+- 857943c38 Ensure function deploy errors are more specific
+- 59958bc0c Move `zod@^3.18.0` and `cross-fetch@^3.1.5` from dev deps to prod deps
+- 5e4119aa9 Remove test data from quick-start list fetching
+- d01b455d9 Remove quick-start test data and add `.jsonc` support
+- e6423fe3b Fix quick-start page code snippet being full width
+- b3ef67314 Fix relative links in Prisma TypeScript example
+- 569993285 Alter `--template` function's `id` and `name` during cloning
+- 011a0614b Export function.RandomID for re-use
+- 2d359afa5 Export `JsonConfigName` for re-use
+- 564108970 Allow waits to be created using expression data
+- ced663f95 Create SECURITY.md
+- 10eaad4d4 More spacing for GitHub bullets
+- 3bcd97f50 Update Stripe->Prisma example to include README, description, and tags
+- 72a73ad06 Add stub quickstart template
+- 587688377 Handle loading mermaid lib late
+- b35e03b27 Add syntax highlighting to example pages
+- 6556a0514 Add `highlight.js@^11.6.0`
+- 2ac761374 Use new README example for testing
+- bf69c86cd Add mermaid rendering to examples
+- b0ecc0894 Add more sensible meta tags to examples
+- 58e205fcb Strip first header of example readmes if they exists
+- 37f7f14c3 Add spec asserting multiline env files are parsed with \n
+- 708544ac4 Stub `README.md` for Prisma TypeScript example
+- 5ea1a4d6b Add support for .env files in local development
+- 9a137cea4 Add filtering by tags and state based on query params
+- b66237b35 Add `next-usequerystate@^1.7.2`
+- eca141bf7 Ensure an error is logged when the CLI fails to load replay events
+- c905da066 Move URL of `/examples` to `/quick-starts` and change copy
+- 121677c45 Only avoid `fn.Slug()` for templated functions
+- a58cd6df5 Fix trying to read scaffold function when we should be cloning
+- 9a0620d4a Reuse existing `initModel.shouldCloneTemplate()` logic
+- 9a2e19f65 Firm up styling for examples pages
+- 926e6fadf Styling clean-up for library examples hub page
+- 1b285ea59 Add reusable `reqWithSchema` util
+- 6b36903ad Add tags to parsed `inngest.json`
+- 544843265 Refactor logic position for example pages
+- 14dd336e3 Comments and cleaning for new cloning functionality
+- 7e08b1a73 Add prettier cloning loading spinner during template fetching
+- 049a7c509 Check function validity during cloning while still in tmp dir
+- 4f42f94ef Refactor cloning during `inngest init` to use BubbleTea Commands
+- 0a42c4faf Check name collisions at first step of `inngest init --name`
+- fd58b550e Move `cloneTemplate` for `inngest init --template` to TUI
+- 6a57f0b54 Improve user journey page on mobile
+- 3b5636917 Fix metadata override for blog & docs
+- 4650f2bb7 Create new user journey automation use case page
+- 835eae973 Update image, remove deb.shared
+- 9b17e8801 Add meta title to blog
+- 1775febd3 Add hero image
+- af175b8c4 Add step functions blog post
+- 1aa045063 Allow relative README.md links and add `id` for in-page header links
+- 643fef454 Add GitHub icon to example page "Explore the code" button
+- 3477b58b9 Add `@types/marked@^4.0.5`
+- af6492cc8 Initial push for `inngest init --template` command
+- 64c28ba99 stub
+- e9d8edd12 Add search to examples page
+- 12eb65061 Add `fuse.js@^6.6.2`
+- 5e3713419 Add stub examples list page
+- c7d76e519 Open "Explore Code" link in new tab/window
+- 4ee906b53 Improve styling of example page and add listing random other examples
+- 9d60d491e Add `lodash.shuffle@^4.2.0`
+- f42bc0252 Move `/library` to `/examples` and add vague page shape
+- ca00bcb75 Share part of `<CLIInstall>` to use the base elsewhere
+- 76709fa79 Add `@tailwindcss/typography@^0.5.4` for example page usage
+- 03c41db44 When an example changes, rebuild the website
+- 3925c2264 Generic fixes for example page generation
+- 06d06eb39 Grab `README.md` file for example pages if present
+- e68a023e3 Fix config test
+- d7c763af8 Add build tags - golangcilint doesnt respect file names on windows
+- 90df12e86 Skip lint on tests dir
+- 0aba2bd17 Fix unix-specific child killing
+- f970bf0e9 Add test asserting that trigger expressions work as anticipated
+- ae6242bdd Fix build:  cue types are not supported
+- c312282cb Update config page
+- a199fd8dc Document adding steps to functions
+- 9599eda24 Add step function documentation
+- 4f1aeeb65 Always round up if there's less than one second in SQS
+- 5ce3c2ee1 Ensure that we kill each process after running
+- f79e01a95 Add thread safe buffer for race condition checker in testdsl
+- f03416f90 Increase e2e timeouts for slow SQS mock platform
+- 8773d1fb0 Truncate time to nearest second in SQS re-enqueue
+- 2da075f41 Always use latest code via `go run` in e2e tests
+- 737cf023a Add integration test covering async timeout functionality
+- f228ddc68 Clearing confusing naming in `[example].tsx`
+- d52712017 Add examples page generation by getting from GitHub
+- 897973abc Add `cross-fetch@^3.1.5` and `zod@^3.18.0` as dev dependencies
+- 45547de0b Ensure dir is based off of OS filepath
+- 36bf80332 Add windows disk parsing for windows deploy
+- 8dbd627df Make size less ambiguous
+- da33bc4af Add note
+- a3b9c48fe Add more funcs to expression docs
+- 7921388e0 Add full examples
+- 23d616344 Change units in now_plus
+- 1a5b13623 Document expressions
+- 860ab0714 Add expression docs
+- 0137be839 Use mocks in executor to decrease speed for windows
+- 07ea6eff2 Embed txtar in a variable.  This doesn't parse on GH windows
+- 30bb7bafd Refactor tests for windows support
+- e7213f181 Rename `INNGEST_API_KEY` env var to `INNGEST_AUTH_TOKEN`
+- cdd945ab8 Refactor testdsl loop for better flow
+- 36bc649be Formatting
+- 56d320f05 s#/dir/filepath.FromSlash/
+- 22d2303ad strategy: matrix for `go test`
+- afa5f9533 s/sigterm/sigint
+- 2205cabdb Add `windows-latest` to tests
+- 3929d19af Standardize parsing of cue overlay for windows
+- 84f26061f Vendor runc downgrade
+- daa903efb Downgrade runc
+- 0d4a37581 Add optional `[dir]` to `inngest deploy`
+- b06ef0131 Add ability to log in using a static API key via `inngest login --token`
+- ec539e09b Add use of `INNGEST_API_KEY` env var to provide auth context
+- 44e87fe31 Config-related test fixes following `major` struct tag changes
+- 6fd3578d8 Fix config tests following `major` struct tag changes
+- 46d8db9d0 Fix `major` version struct tag for `function.cue` too
+- e39114141 Fix `major` version struct tag
+- e31a19104 Fix use case metadata. Add warning
+- 749b89d2a Fix tracking demo viewed
+- 00c3948f4 Use custom step retry attempt count if available
+- bf3d6b930 Add `Retries` to actions and steps based on each other
+- e7489e38d Add `Retries` to actions so they can be passed to steps further up
+- 082a3c83f Adjust `workflows.cue` to have optional `retries` like `function.cue`
+- e2e51c0ff Add `retries.attempts` (and parsing + test) to function config
+- a4e1d47a4 Directly using `github.com/google/go-cmp`
+- fc566306b Add per-step `retries.attempts` to `function` and `workflow` schema
+- 04edc8ed1 New homepage header video.
+- 8f92e3071 Add use cases column to footer
+- d91ec5f0b Use new page banner for Prisma guide
+- 39f86b8f4 Add `retries-go` to tested functions
+- f69f7a760 Add `RequireStepRetries` to function test harness
+- f9e0e07b2 Refactor `requireLogFields` to match partial maps rather than deepequal
+- d46bde86e Add `retries-go` to test functions
+- 1d0d03869 Adjust test timings for `basic-single-step`; failed periodically
+- 9d305a4bf Change ref to tools
+- a7ee8662f Contact changes
+- 1f6a70176 Prettier
+- 933e7c656 Add to footer
+- 595f436e2 Internal tools use case
+- b1a06f2d6 Move to deps vs devdeps
+- 62ecf2950 Add to footer
+- 20dc551ae Add node background jobs apge
+- 56475fcb9 Add background texter to task scheduler
+- aaf2bf55e Add node background jobs use case scaffolding
+- da921d7df Update images
+- 05ad04de1 remove bullet point from prisma
+- 8ed9db785 Add v0.5.2 release notes post
+- 36a0eef18 Fix blog tags build
+- 068059211 Add link to GH repo for example
+- ff16b2a86 Add prisma guide
+- 927ff3b1a Add Prisma example to Inngest repo
+- 786d1a295 Separate npm deploy from goreleaser deployment for easier retriggering
+- 2d001af7e Don't introduce dirty state before goreleaser; it's not a fan
+- 76202ffc8 Remove caching - deps are tiny anyway
+- 68b5826fd Hard-code an `.npmrc` file instead of relying on an action to create it
+- ae7fbfa77 Set up Node in `npm` dir to ensure `.npmrc` file is in the right place
+- dbbdd1d65 Still run `npm ci` then `npm run build`
+- f3e1b7fb7 Add blog category tags
+- 0a3073676 ignore scripts during `npm install`
+- 30627cddc Update release.yml for npm dir
+- 49a93bdf3 Add internal backlinks to replay blog post
+- 341b51b9e Update metadata for demo page
+- 4686b3270 Load events from all workspaces when running `init`
+- 1a3d769eb Simplify truthy expression for golangci-lint
+- 2189695a5 Ensure we skip all questions that are already answered
+- 455f3e1a9 Ensure that pre-filled URLs quit and render the fn immediately
+- afbf273f8 Allow init flags to bypass questions
+- 471a9eb7c Add /demo page and CTA
+- d7d620c91 Ensure `run` and `dev` use network mode host
+- f4014e12a Change event prefix to website
+- 10552c824 Fix tracking before inngest-sdk.js is loaded
+- e9b70748a Add hack for React image rendering issue
+- 42744b427 Add FadeIn component to prevent flash
+- 4fe532001 Adapt and use `<Experiment>` component for rendering experiment variants
+- 3b3fcdfca INN-600: A/B test homepage hero text and graphic
+- 4536af57b Ensure Anonymous ID is set wherever it's used
+- 892806ae8 window => globalThis?.
+- 02b3442bd Send anon ID to oauth redirect
+- c09c8d19d Set date of "Introducing CLI Replays" to 2022-08-03
+- 6a32879e1 Add header for "Introducing CLI Replays" blog
+- 18edb0506 Comment out current experiments to leave them as examples
+- 8761d0ff1 Send an `app/experiment.viewed` event when a variant is fetched
+- 4a94087cf Add some comments to `trackingHooks`
+- 22d24b6fc Refactor `sign-up` page to use new `useAnonId()` hook
+- 02db889bf Add stub `useAbTest` hook for choosing experiments
+- a43e03ec5 Add `deterministic-split@^1.0.4`
+- 629cd163f Standardised Discord link for CLI replays blog post
+- 70473e7dd Rephrase CLI replays ecosystem language
+- e4f10e97f Update date
+- 26d05faea Fix notion links
+- c9b210bfb Update pages/blog/_posts/2022-07-load-testing-event-queue.md
+- 397cac440 Fix typo
+- eb9a458e6 Update heading
+- 3cb5359a5 Add K6 blog post with image
+- 994b2ed13 Refresh README for brevity and structure
+- 4d84c19d3 Only generate random seed for `inngest run` if stdin wasn't available
+- c84e27a37 On `npm publish`, include `README.md` from main repo
+- 51a12ef12 Add `inngest run --snapshot` to return only event data
+- a79580e2b Ensure `generatedEventLoader` can handle multi-line stdin input
+- 5f1f871eb Add /mailing-list redirect to Mailchimp
+- 83ad7115b Add new npm CLI install instructions using `<Code>` in docs
+- ed03bf5be Saner defaults for dark/light when rendering `<Code>`
+- d01361ebd Introduce `inline` property to `<Code>` to allow a more compact version
+- 09302a08e Revert highlighting to `bash` if not recognised in `<Code>`
+- 21f47f3ea Add `<Code>` component to `.mdx` files
+- 4f6175aa4 Add stub  script for local dev
+- 1c5c71ce9 Remove TODO from `release.yml`
+- fad2ef4b4 SEO fixes: Add product page info, standardize meta tags.
+- f7b438c31 Qualify ease-of-use of other systems
+- 767dfd7ce Add example GIF to "Introducing CLI Replays"
+- 6c9a5694d Add blog post "Introducing CLI Replays"
+- 5e6e5ad2a Fix `function` tests to ensure step versions are being passed through
+- 364f25f8f Add step version when a default step is created
+- d8c95a42d Add comment for `Step.version` in `function.cue`
+- 5beb3c1d0 Remove completed TODO comment
+- 215819b56 Remove unneeded test for `FunctionVersion.Actions()`; not used
+- 1d67903ad Add CUE unmarshal test for functions with step version constraints
+- 824c27770 Set `Step.version` type to use `VersionConstraint` in `function.cue`
+- 97fae353e Add JSON unmarshal test for functions and step version constraints
+- 4edfa26fd Remove some completed progress comments
+- 98f3f7971 Blog post: Building webhooks that scale
+- 7e27a89e0 Ensure `function.Workflow()` and `function.Actions()` return versions
+- 3d4a1226f Set step version constraint after actions have been deployed
+- ed798d3c6 Ensure `deployAction` returns the existing or versioned action version
+- 645e96c79 Comment digging progress
+- bcac185cc Fix `function_version.go` tests
+- e0d12a001 Add a `VersionConstraint` to steps as they as parsed in `Function.Workflow()`
+- 6285fadd7 Rename `steps` to `buildOpts` for clarity in `deploy` command
+- 68f54b6e0 Add `Version` to `Step` struct
+- e4bcd4de1 Add initial `actionVersion` to `function.cue`
+- c89dcbc66 Be destructive and remove `FunctionVersion.Actions()`
+- af51b3924 Add image
+- 81148a2e5 Add v0.5.0 release notes
+- 1a4c17f84 Rename module to github.com/inngest/inngest
+- 1c2304b17 Add DataStore to self-hosting docs. Update Core API.
+- 537e2b38e Add DataStore & Core API to High-level Architecture for v0.5.0
+- 927e82491 Use updated terminology in docs for 0.5.0 release.
+- a055e45ef Rename `@inngest/cli` to `inngest-cli`
+- c149450d5 Replace `request` with `node-fetch`
+- 09838935a Grab GitHub artifact via `cli.inngest.com`
+- e7cd4fa8b Search for both `.cue` and `.json` in `findConfigFileUp`
+- 4940f62b5 Fix some React warnings.
+- b28904355 Always set anon-id cookie. Set cookie to Secure.
+- 70ee42988 Canonicalize edges when parsing functions
+- 5a0d7bb6e Try overwriting the global `CacheDir` during testing
+- 858305f97 Add traversal of parent directories to find `inngest.json` or `inngest.cue`
+- 37f9ed949 Adjust `scaffold` test to test new `root` property
+- 1945e9abc Avoid use of `fs.FS` for Windows
+- a0882066e Remove comments from built postinstall.js file for npm deploys
+- d8683c8b9 Add npm publishing to release action
+- 473a99ec7 Add first pass for `npm i -g @inngest/cli` using a postinstall script
+- d288f3e74 Support deploy command to self-hosted Core API
+- 40235f492 Dev UX tidyup and clistate refactor
+- 228039c30 Remove data juggling for archived event marshalling
+- 8b76d1a63 Remove dangling comments
+- fc3020d1e Refactor `run` to used event loaders based on input flags
+- 9bdf3f8df WIP Refactor event loading and move marshalling to its own function
+- 1630e5463 Include `User` and `Version` in replayed events
+- fcaf30e71 Link to function trigger explanation from `inngest run`
+- 524d62bd8 Mention how `--verbose` affects `inngest run` in docs
+- 2ae1db1a7 Add tip callouts to `inngest run` docs
+- 98d54cdad Tweak CLI run docs and add replaying an event GIF
+- 555d49b4b Add initial stub for inngest run docs expansion
+- f6ef82373 Add some GIFs for CLI run command demonstrations
+- e919ecb46 Cover some basic errors for `inngest run --replay`
+- 6703d9c3f Add comments covering `--replay` functionality
+- b413b8156 Add comments and rename `eventName` to `triggerName` for consistency
+- 2552e1b38 Handle teardown errors by logging them
+- 044207342 Handle rollback error if the transaction fails to be committed
+- 4b1fa84e7 Add inmemory Data Store to cue config
+- 062a37b3d Remove separate down migration
+- e73ac5d18 Add tests using embedded-postgres
+- fdfaf0d47 Move fs loader to inmemory datastore
+- e635f8dc4 Add stub driver to fix import cycles
+- 0cf66aee6 Add Postgres Data Store tests
+- 8d203783c Add Postgres DataStore. Add DataStore config.
+- 41ef42beb Add version to function_triggers. Improve indexes.
+- a23f8d7bc Improve Postgres data store indexes for function_triggers
+- e71939a5e Implement Execution opertaions for Postgres data store
+- bd0ab63e1 Rename ReadWriter pattern
+- a54014985 Add documentation for Postgres data store
+- e7dd304be Implement ActionVersion opertations for Postgres data store
+- fa8a8d37d Implement CreateFunctionVersion for Postgres data store
+- cb4b16b2f Fix Environment enum
+- a955368a7 Add Postgres DataStore. Add DataStore config.
+- 10b24e5ec Fix dev command flags
+- beb9ab776 Add resource limit table to /pricing
+- c106e8c0c Fix lints and tests
+- 644b6929f Handle attempting to replay with no trigger name given
+- 81d8e93e6 Remove dangling debug log
+- cb9d86f3a Rename `--event` to `--trigger` in `inngest init`
+- 15f0f7f15 Fix `inngest run` with a non-generated event showing the wrong logs
+- efb649eda Rename `--event` to `--trigger` in `inngest run`
+- 60889c337 Add handling of `--event-id` to `inngest run`
+- abce69cb7 Add oauth device login flow for passwordless login
+- 929709b1b Simplify logic and ensure correct status code is returned for `run`
+- c3fb9b027 Handle `--verbose` and fix flickering step outputs
+- 12a3fd685 Clean up `inngest run --replay` output
+- 2748aa03d Remove some debug logging from `inngest run`
+- 7f7ac9dfe Fixed bad event payload for `inngest run --replay`
+- c327755c9 Add `--verbose` root flag
+- e39de9384 Add initial, WIP implementation of event replaying
+- 029725dba Rename `RecentRun(s)` to `RecentEvent(s)` and implement `RecentEvents`
+- c753e7aa0 Add stub code for initial `RecentRun` query
+- 783ef6cb9 Add stub flags for `inngest run --replay`
+- a68632e74 Re-add `--event-only` flag
+- 2f557b5ef Add executor pending tests
+- 35efd76e8 Add GraphQL extension for highlighting/validation of `.graphql` files
+- ea8bc24b3 Remove `HashiCorp.HCL` extension; we have no `.hcl` files
+- 64fe322eb Add Docker extension to devcontainer
+- e56f0934a Rename devcontainer to `inngest/inngest`
+- f680ff2a0 Add benchmarks to ECS stack
+- 057b26b82 Link to docker image
+- 77e2cf95c Document env vars
+- e0490670d Add more detail to self-hosting
+- 39dc7cd3d Add "Hashicorp HCL" extension to devcontainer for `.hcl` highlighting
+- 51808e12b Use `brody715.vscode-cuelang` for formatting/linting of `.cue` files
+- d45686d3a Auto-format `devcontainer.json` 🙄
+- 320dec18d Add basic devcontainer with required tooling
+- 6e05e1cbb Add exported fns
+- 8ca6ca138 Add marshalling of functions as canonical cue code
+- e10a48f8d Fix config
+- 8aa866b55 Allow DSN to be provided when configuring redis.
+- fea877459 Add env var expansion into configuration files
+- 031e20d21 Don't send in dev
+- 6e482572f Assert fn UUIDs are deterministic
+- 5db95da87 Add basic AWS self-hosted stack via terraform
+- 1cf646d2e Add Environment type
+- f8c304d9e Re-use ActionVersion struct
+- 8973de36a Re-use FunctionVersion struct
+- cdb16d4d5 Add action version query edge for core api
+- e2cc9be63 Add coreapi package README
+- c67502cfb Add Action Version loaders and mutations
+- 922aacb85 Add FunctionVersion and stub out CreateFunctionVersion interface
+- 437d63fd4 Create CoreAPI service
+- 96c8de69a Switch arm + amd
+- 39c4a6536 Fix goreleaser formatter
+- 80371a8d9 Add platform
+- 1e0411f5f Remove major/minor
+- d915ea6a5 Add v to manifest
+- 55e729c36 Fix image architectures
+- 4f298d266 Add docker images to goreleaser
+- 55d5ba1dc Formatting
+- 1d3173e43 Ensure all tests run by building images; add redis test
+- 9544ab9cf %v for fields
+- be6fabe97 Improve test config sqs start.sh
+- 04de84cc4 Wait for queue to be created
+- ac23f94a1 Improve testing framework: run each combo as a test
+- 1c940e588 Add config test env parsing
+- 30efc4438 Force 127.0.0.1 for gh actions
+- b91d470f8 Add (basic) E2E framework
+- d9332783d Simplify retry checking, add final err
+- 1b1827d65 Implement full SQS queue and pubsub compatibility
+- 0e6491c0a vendor
+- de0561faf Refactor state, queue into driver registration, add base SQS queue
+- d4cc4e80c Add edge tiemout handling to services
+- 7b0d1881c Fix tests
+- f26bbc3d9 Add pubsub implementations, log step outputs, add waitgroup to queue Stop service
+- 8d9b53381 Add test and vet cuedefs to make test
+- b49001727 Remove execution error, log critical on queue/state failures
+- b1df18b76 Improve retry comments
+- e813fb377 Make max size configurable within API server
+- f9fd5de64 Use chan to communicate err within s.Run
+- 911a1a998 Overwrite drivers when registering
+- 43ff60407 Reconfigure dev server test
+- 5e28442b2 Initialize executor drivers based off of config
+- ba64ccca7 Move driver config to individual packages;  have them register configs
+- 80ceb2a13 Add drivers to config
+- 9c41cba65 Add all services to serve
+- 8fef1f33f Improve logging
+- 9ff943a92 Add logs to executor
+- 72ec31b98 Add singleton fs execution loader to dev server, build images on run
+- d7f1b5931 Fix tests
+- 6d0abf14d Add global mutex for locking Cue access.
+- 7d13c37fb Refactor the dev server to use new services.
+- 5fe3613e8 Implement a Runner and Executor service
+- 9eeb15d92 Implement pubsub within the API service
+- 6a0d15b1a Update config to add Queue and State configuration
+- 4e9e815c4 Add the `coredata` package, replacing actionloader
+- e59e3c6ad Add StartAll and StopTimeouter to service
+- 508f04ae8 Rename test config.cue
+- 07235f2d8 Fix typo
+- 47cc2a386 Set timestamp to current time during run
+- c60c454de Add idempotency keys to state.Identifier
+- bd53851cf Remove context cancelled error when subscription ends
+- d362f50b5 Change Publish fn signature to match Subscribe
+- 4572342cc Pass anon id via sign up and cookie for attribution
+- 1a299f71a Add URLType to support GCP Pub/Sub
+- 806be3cf3 Fix data races in broker tests by converting to atomic
+- 0a8a55c06 Add SubscribeN and Cancellation tests to pubsub
+- b75e498df Vendor
+- 9147c4ebd Open-source pubsub mechanisms for the event stream
+- fc4a3b879 Use text color for better outline buttons
+- e5719c7b0 Nits
+- a37f39099 Tie conf to API serve
+- d2bb714e4 Add config package, with initial config schema
+- aa63ebcb1 Add event flag to specify trigger in multi-trigger functions
+- 4874e292a Add signal tests to server package
+- fb65557ee s/recovered/panicked
+- c13ca17cd Add Server package for long running servers
+- 2e5f8f9fa Update gorelaeser
+- 3f49afee4 Update repo name for install script
+- 3dee0371e Update changelog w/ changed breaking vs non-breaking
+- 36aa6db82 Update changelog
+- 84c9db94c Add changelog for v0.4.0
+- 9f7f4ee07 add valid cron
+- 029075a62 Update repo URL with new name
+- 407c52f8a Check cron schedules during fn validation
+- 25e06c841 Add ctx to trigger validation
+- 44bf8175c Add expression validation to functions
+- 127912c79 Add queue vs bus img
+- 72847cd54 Update all CLI install commands to use new url
+- 35c0af6a1 Update subtitle
+- 30d14fe9b Update date
+- d2dc6c2fd Add message bus vs queue post
+- 3a2afdb67 Add `statusCode` fallback
+- 9ddb047c9 Improve flaky redis test by reducing concurrency to N=100
+- d6481fdc7 Ensure log and errors are shown appropriately in run and dev.
+- 38a4e51cf Change retryable to gt
+- fd6484d24 Split cmd metadata from event metadata within Send
+- 3cc8c4903 Implement a basic queue interface
+- 0135b5bf9 Optimize all images for new pages
+- 5b6896258 Refactor state.Manager interface:  store Result & Pending count
+- 9f7fe2f53 Mobile improvements
+- 797d70117 Update links. Refresh pricing and sign-up
+- 3e0e060f0 Add graphics for product page
+- 96bea6aee Add product-cli graphics. Add choice section
+- f2edd12f3 Don't wrap nav text
+- 2831fcfc6 Fix homepage rendering
+- 6acdce0f6 Start product page
+- 2ce27ddb0 Vertical flow. New graphics
+- ba424b931 Add Next Level section and closing
+- ca483c756 Mobile improvements
+- 15cc09584 New homepage June 2022
+- 57ae37faa Expand getting started with self hosting guide
+- f8019746f Change logging to use 'function'
+- 1e14219c3 Rename `hostname` flag to `host` for `inngest dev`
+- 389c732e2 Add ability to specify hostname to bind to when starting dev server
+- bcd244e5a Remove unnecessary Pauses() from inmemory interface
+- 71cb91319 Add pause querying, pause iterator, and in-memory implementation
+- e2f04bb83 Fix typo
+- 7a3f10e34 Add note in high-level architecture
+- b1186bfda Update diagram to latest version
+- 794c5cef0 State comments
+- 4e225ad6c Add deterministic workflow UUID generation to dev server
+- 9b93932b8 Improve comments and golang documentation
+- 2bb715ceb lint
+- 833b6ae5d Add a Lease() mechanism to pauses, including InMemory and Redis states
+- ab1b04510 Remove redundant checks;  test harness covers them
+- 275f29bcf go mod vendor && go mod tidy
+- cb36436a3 WIP: Add basic Redis state implementation
+- 2c4c78456 Change blog post date
+- baaa73a4a Typo
+- a38a5fc68 Add building an event-driven queue blogpost
+- 4141b4942 Improve dev server guide docs
+- b4014de53 Fix cat -> echo
+- 02c29fe5a Render social previews during build time
+- 14f5cb6c7 Dynamically generate social preview image for docs
+- b23fe9d73 Bump cross-fetch from 3.1.4 to 3.1.5
+- e32fd7981 Add mutexes to improve data races with in memory drivers
+- 053907093 Update os.args in runtime
+- 83c8a3782 Add runtimes docs
+- d60d6c1e3 Add args & stdout
+- 3a9ca79c8 Add data and retry documentation
+- 5d1d1055a Fix pricing layout on screens < 1000px
+- 20ff5f787 Fix menu horiz layout and overlay issues on mobile
+- d49a3f2b2 Fix typo
+- 715f17541 Add redirects from the previous docs pages
+- 7833be6a5 Updates
+- 327229e78 Fix CTA button alignment
+- 19e8c9303 Fix links & spelling error
+- 99ffab258 Add Twitter Card large format metadata
+- 0075d13ef Homepage refresh for OS Launch
+- 049e53478 Update architecture img
+- 4717adf36 Update goreleaser to go 1.18
+- 89521e30c Remove stdin
+- ffc6fd278 Update website banner
+- 1763b1423 Update architecture diagram
+- aa1b03213 Redirect /docs to what is inngest
+- 0e9236da0 Add links to docs from OS post
+- b070a204f Blog: Make posts live for launch day
+- 733fa5d1b Update quick start, add images
+- 11a0559ce re-enable tracking
+- 122a71061 Bold
+- 43fad5e37 Add links
+- a6f995b31 fix run
+- 9007636ba Add quick start
+- a407e915c First parts of getting started
+- 324dcf24c Update install url
+- 4d953d6c8 Move CLI + IDE guides to cloud
+- fb8cc817b Intro to data flow
+- 98c3b23bf Add error & remove "internal implementation"
+- ce114702d Add architecture and data flow
+- 9be1fe396 Tighten up ending of what is intro.
+- 1c00ed81f Add "what is inngest", high level overview.
+- 255218ada Split docs by cli and cloud.
+- 8d4973bf3 Add function run FAQ
+- ea3fab6e9 Update plans for open source launch
+- 97bf650e3 Add ARCHITECTURE.md doc
+- 74a99a0be Fix broken link in dev server post
+- 17c0d9a7f Add link to readme.
+- 0bb4112a7 Update logo for light backgrounds
+- ec6a8e2b8 Add new logo w/ bg for open source READMEs
+- c7dd07ebd Blog: Open source announcement
+- f4d28cc6e Remove warnings for dev server
+- 9967423b0 Add showHidden=true query param
+- 14941dce0 Update README.md
+- d07589ff0 Condense trying && install
+- f8da5e970 Readme updates
+- fb3b57eb3 Update readme.
+- e64999f14 Fix date for post
+- bd35afe3c Add 'hide' feature to blog post to hide from /blog
+- 30882a78d Edit intro to DevServer post
+- 4558ec1bd Blog: Inngest Dev Server
+- e4309f75f Don't run the dev server when there are no functions
+- 370f7a32f Ensure we print the correct error in `inngest run`
+- 2d56da8df Add slugname to tpl literal
+- 7c1d65ab4 Add slug name to scaffold tpl
+- d8c5c6706 Update Discord CTAs
+- c691d7ed6 Add Discord icon to docs CTA
+- 879884c49 Add info about steps. Stub Step Functions page.
+- b4e39ac06 Add basic inngest.json documentation
+- 9c821bdc0 Fix issue with twoslash syntax highlighting
+- 5e8862663 Add events on cmd invocation
+- 3a46c49b5 Add version cmd to output
+- 708d65765 Always build on linux/x86 when deploying
+- 97544de12 Ensure metadata is nullable
+- fc44a60be Add tagline etc. below long description letters.
+- 5f3bb6376 Add --event flag to `inngest init`
+- 750136a10 Scaffold functions using steps
+- 342b1f381 Add step IDs to init-generated functions
+- f8c360d27 Docs: Add Managing Secrets
+- 607053c37 Hide legacy workflow docs
+- 9d14a63cc Vendor
+- b62f74ff4 Downgrade runc et al
+- bb8aa4e3d Downgrade docker client to 1.7.9
+- fc78339fd Allow custom edge evaluators
+- a2a4c7a41 Include ActionVersion in driver.Response
+- 0b3a8f6c2 Add timeouts to asynchronous edges
+- 674eb1d3f Rename `New` for package func
+- b877023aa Add EdgeExpressionData unit tests via mocks
+- 2683010c4 Move AvailableChildren to state interface
+- 513a4e7ee Vendor
+- 958493d99 Remove ccache from expressions natively
+- 1b67f1a72 Further clean the expression type, remove from Executor interface
+- f3c57bd81 This changes the expression data gen type to use inngest.Edge directly
+- 0232be3d9 Update license to SSPL-1.0
+- 233561bcd Add step IDs, alongside uint-based clientID fields
+- 84be4c859 Sort edges returned from available children
+- d90065bff Expose driver.Response from Execute in the executor
+- bbf160cff Change executor interface to make AvailableChildren public
+- 937f81356 Add feature request template
+- 3834ebbd8 Add unit test asserting single steps have edges created automatically
+- d08029df3 Enable single-step functions to run without After being specified
+- 16c74928e Add event payload to log output
+- 83697f99b Print response error for login command
+- 6f24ace18 use ULIDv2
+- e900fd41e update github workflows to go 1.18
+- 8a1b8ca69 Change the starting type in state manager to `any`
+- 27eb33d34 Rename Go module
+- 445ce535f Output JSON when --json flag is set
+- c247f6ed3 Add non-TTY output to our cli build package
+- dad97931b Move engine into devserver package
+- 248408c54 vendor
+- 2da0df969 Add engine tests asserting async edges work as expected
+- ca4f2c66d Add capability to pause and resume dag edge traversals
+- d4da1f03c Add unit tests for expressions package and executor
+- 38331782d Add expression matching to event handling
+- a28045aa9 fix lints
+- 307cf468c Recreate the cronmanager on each call to Load()
+- 6e1799ac0 Invoke cron functions after loading
+- 9abafdfba Update dev, run, build for multi-step and multi-fn build
+- 49ff04182 Add ab abs path field to Function
+- dd94faf30 Setup to execute functions on new events
+- cb1e61820 Rename vars for readability
+- 3cf723f5d Find functions with matching triggers for event
+- 9302b7f1f Fix linting issues
+- 6a10aa1e5 Fix function test definition nil pointer
+- 7a651aa0f Create engine for loading and handling function runs
+- 8100f2570 Create dev server abstraction
+- bf6a6844e Add logger package
+- 0bf883d54 Add basic dev command and API server
+- e53af25e1 Add step during init
+- 9bd2d7e4f Use an in-memory queue for our dev runner
+- e88d3a683 Validate edges, remove image from docker runtime, ensure deterministic flow output
+- fad0dc15c Add support for step functions in function definitions
+- 2a5d201e9 Add support for waits within memory runner.
+- 5373c7e81 lints
+- 8e21aef0f fix docker response, fix exit on build error
+- 3e7d951a2 Pass event into runner when creating
+- 0cd0a4657 Store output and errors, show state in cli run
+- 83f9ee27c Hook up executor to CLI run package & UI
+- a37efb784 vendor
+- 910278eba WIP: Drag in open source executor
+- 81211406f Update Cloudflare build command to include _redirects
+- d1e5e02ab Add /discord redirect to our Discord community
+- 9813836ec Docs: Add basic http functions page
+- b250c84d0 Update favicon
+- 0cafdb74f Blog post: udpate date
+- 211247d42 Blog: Add Next.js HTTP function post
+- b00d73355 Clean up INNGEST_API env var, move to one place
+- e1c16b35d Use the workspace environment in published HTTP actions
+- 6c63e61ff Update contact link
+- 93aad4c26 Send HTTP runtime request with json content type header
+- 6d95b1418 Add Node SDK example to docs
+- e6052436f Add ref params for nav links
+- 7f4aabd85 Encode steps as a map of steps, vs a slice.
+- 4d7d3a1bb Default to `test` workspace, with `--prod` flag and env var overrides
+- a53843625 Swap state view ordering
+- ac0a2e6c6 Enable `inngest deploy` of HTTP-based functions
+- 247507511 Add HTTP runtime tests
+- 6ad867c16 Implement `inngest run` for HTTP-based runtimes.
+- 44ec93008 vendor
+- e2a7695a5 Add support for scheduled funcs and URL-based funcs in `init`
+- 1175f8d0c Extend function.cue definitions with idempotency, throttles, and steps
+- a19170456 Schedule a consultation copy
+- 6a3d065eb Add JS/TS Node SDK to docs. Rename JS to Browser SDK.
+- 14e454cd3 Fix gtag ID to fix Google Analytics tracking.
+- 236f65afa Fix image blank space. Add cache bust param.
+- 8f1ca8b8e Add featured images for old blog posts
+- a61ce96c3 Add light/dark theme toggle to blog
+- 0a57e52f7 Update blog home layout. Add light-mode support.
+- 5d655a973 Add support for light mode to Nav component
+- 059a40883 Update blog layout. Add Open Graph metadata.
+- 721b75c49 Use sticky nav on blog posts
+- 4f3ba1c26 Fix broken link
+- a84a77b1a Update page banner for CLI guide
+- e916e7d18 Update issue templates
+- 7ce389e72 Use Next.js Link component for smooth page transitions
+- 84e4dd753 Fix issue with Next.js build
+- a7a335120 Update footer SDK link
+- 2ff5aaeb2 Add cli doc pages for install & commands
+- f72ac1f1a Add TOC order file
+- 44824db32 Update code snippet formatting
+- 3cb53f65b Move docs table of contents order to own file
+- 13c9510fd Allow for code formatting in docs titles
+- 476313dfb Fix the light mode highlight color
+- d1e652c9b Fix nil pointer error if no workspace set
+- c15286545 Disable failing library build
+- 7ea8a66e1 Add link to cli guide. Update characters.
+- d79219069 Hide old function guide
+- a2c3ea7b0 Fix links, copy in docs.
+- 181a5ce7e Update inline code color for contrast
+- 9d2650fbd Prevent arrow from wrapping to line by itself
+- c9d0a7205 Docs layout fixes w/ PageBanner on mobile
+- 357c12640 Update guide URLs. Rename file.
+- 0d3d5a6e1 Add basic functions doc intro page
+- 5231520eb Re-org and update sending data docs section
+- fcea162e4 Pass order prop to category to match type
+- 918214ca4 Add featured image for high level arch
+- 2610e2e28 Update docs homepage. Make TOC sticky.
+- b1a5d0188 Docs: add new high level arch doc
+- 3ceffd66a Re-organize docs
+- 79ba44e50 New docs intro page
+- de8bf8f45 Add icons to homepage CTA buttons
+- cdda1e6cc Order docs categories
+- 5c0d3089e Enable banner for entire site for IDE post
+- 2400f260f Fix image width issue on mobile
+- 7567c5ed6 Prevent button text wrapping on mobile
+- d67c1976b Add light/dark mode toggle to docs
+- 884f92d17 Add docs CTAs
+- b796bac1a Add description for meta tags
+- 8c26d7b8d Fix layout on docs root page
+- b4f1a93b9 Add docs featured iamge as og:image
+- d861ef277 Fix blog layout issues. Add featured image.
+- 6581f5405 Add Web IDE guide to docs
+- b6cf1f2fa New docs design April 2022
+- 2b1caac06 Bump next from 12.0.7 to 12.1.0
+- 0dd5b17e9 Bump minimist from 1.2.5 to 1.2.6
+- 1165e4bbc Bump nanoid from 3.1.30 to 3.3.3
+- a0189c755 Add run video to guide
+- 3bb9d0fd7 Add preliminary guide copy to the CLI in one page
+- d52242496 Add href to home buttons below video
+- 17ff23996 br -> nbsp
+- c696b0a4a Move dev deps into main
+- 9c66f35ae Update pricing copy to 'functions'
+- 165d5fb63 Fix odd React child component issue
+- c1dd1b6c7 Add autoplay observer to start if out of viewport on load
+- d6b480dc4 Update Icons, hide banner until cli guide is live
+- 196a6be2c Add homepage video player with chapters
+- 0526cfc93 Improve wrapping for banner on mobile
+- c611ecf19 Ensure nav links are centered on screen
+- aa8611f1b New homepage
+- e194c543f Copy homepage to /product page
+- a650ab791 Rename inngestctl to inngest
+- 0d05d75a9 Track ref URL tag as parameter
+- b615cc510 Track first touch if no anon uuid is set
+- b2f54b8ae Use separate GTag ID for local + dev to keep prod separate
+- 7f6dc837b Update hero graphic color for Node.js circle
+- ac62343f7 Change date
+- dacbbc2e1 Add Bubbletea blog post
+- 87abe9878 Fix reflow of event browser with no welcome message
+- 2661d6381 Allow templating in next steps
+- 272ae4dc1 Fix React warnings
+- 77666f62e Update CTA refs throughout site
+- 7d30fc0e6 Update image IDs added to action metadata within function definitions
+- b41205f80 Adjust blog and footer font sizes. Fade grid svg.
+- 309b7af76 Adjust nav weights
+- e8d504b83 Fix header spacing, weights.
+- 679e57607 Add FF Real
+- c07127269 Darken site and change fonts. Reduce grid opacity.
+- 4b3df6360 [fix] sign-up with google redirect link
+- 2b9d34d92 Use image embedded within action.cue if specified
+- f898b882e Push and deploy without doing fn logic
+- 2c17d537d Remove redundant return
+- b11271355 Add command to deploy actions without functions
+- 8557d587e Hide welcome msg in small TTYs
+- 009a1916d Update demo video with rename to `inngest`
+- 3084d7656 s/inngestctl/inngest
+- bd65354d2 Vendor
+- 5d2777994 Keep intro for now
+- b14468241 Update goreleaser and install script to work with repo rename
+- 24ad21439 Tidy init in event browser
+- 3687a402b Add video to readme.
+- 64cfd506a Improve readme in CLI
+- 129f41e3e Improve progress for multi-stage dockerfiles
+- 98b16a42a Update team for April 2022
+- b505a793f Add Page Viewed tracking via Inngest SDK
+- 908ede099 Fixes
+- 00319af5c Add template-render to gitignore to ignore test-generated files
+- 0ce3c5007 Fix tests
+- dae3d0b8b go mod vendor
+- a66996568 Add deploy functionality
+- 731806267 Add empty event trigger format and definition when scaffolding
+- a389714dc Add --seed flag to deterministically generate fake data
+- 4dd3899dd Enable fake data generation by default in `inngestctl run`
+- 1a7a7d1cb Fix build percents, exit with non-zero exit code on build failures
+- 137b0fa09 Fix tests, lint
+- dc425f149 Minor cleanup
+- cd9837e6a Render input event to string when running functions
+- c57e9904e Tidy run by moving everything into its own CLI view.
+- 625389b13 Vendor
+- 491ea2f6a Add base functionality for running functions locally
+- 4c25c8611 Render event types into ./events/ within scaffolded directories.
+- 10917c5be Render empty type with no event schemas in typescript.
+- 174ae02ee Show new event in event list to make autocomplete easier
+- 74b81d770 Fall back to unauthed events on err, ignore "already up to date" scaffolds
+- 8fe54fe40 Update repo pull checks
+- 9e6eeb3df vendor
+- 0e062e426 Add functionality for cloning, updating, and parsing scaffolds
+- d600789c3 Remove duplicate field Scopes
+- 7eb3ef7a8 Fix: Support scopes defined in actions
+- 5c2e2e4d6 Fix copy error on pricing table. Update icons.
+- 3f6235876 Ensure we correctly quit early without making inngest.json
+- 48b770d83 vendor
+- 102acd31b Add initial UI for creating a new function via init
+- 7bf264b68 Add initial function file configuration logic
+- dc993f529 Update builder to use envvar and make top flag
+- 29f1f599c Updates to pass golangci
+- a5977587b Add golangci to builds
+- 1a07b3714 Update all dependencies
+- 323505e06 Remove init, move to register commands
+- 2d9828f3e Add initial build command
+- de60d70d9 Pass through error from docker inspect
+- db6266b70 Prevent non linux images during push
+- 8157e390f Prevent non amd64 images during push
+- b66e22c28 Prefer using domains on action deploy
+- 67796c89a Prefer using domains on deploy
+- 8bbbf970c Add styling for mobile on 'about us'
+- cd4e09ded Add blog footer CTA
+- 705c8d69b Use className instead of class
+- 4d4f685db Break word
+- f259eec00 Break all for a tags
+- 5ec1b869b Change grid to 980px;  include break word for long links
+- b132fc642 Match code style from shiki snippets
+- 00238e639 Add links to GH in svelte post
+- 4f7b5e154 Remove 404s from footer for now
+- 484b65e0e Fix feature screenshot radius
+- 7472a8a0b Fix spacing on mobile
+- 57cfc0196 Add SDK logos and links
+- 710fffef7 Add syntax highlight for code snippet
+- e2de1cc4b Code example padding and spacing
+- 1b6861178 Remove duplciate section label
+- 8986045d1 Tighten up feature banner
+- 8676eedce Add border to event mesh img
+- d43bffe5d Match design for section labels
+- c3927c65c Fix vertical alignment of banner items
+- d5d17b4f9 Adjust page outline numbers
+- 51929271f Add prettier config to package.json
+- d1f47982e Update hero proportions and primary button style
+- efc84980c Add top border accent to all pages
+- c97554985 Header nav button size to match Figma
+- bcf8f497a Add border-radius to nav link hover state
+- fffc572b7 Re-add GA
+- 9aade535c Add TypedWebhook.tools to footer
+- 173c16ccb Re-add API docs
+- 35dd9741c Change endpoint URL
+- af29b3f73 Redesign (#39)
+- 080dff32c Fix doc link
+- a7419567f Add product updates
+- ee424dabc Update docs footer & add serverless func tutorial
+- f4ae694f1 Do not require login for action validation
+- 2f001b079 Allow action config to be defined without account identifiers
+- c2d2211e5 Always "publish" actions when pushing
+- 06ae5efa4 Add title to library
+- 29dc139c6 Arrows
+- 0d2d1f537 Add titles to the blog and docs pages
+- 6a85d9330 Add sitemap to build process
+- dd217b5c4 2022
+- 1f2d2d6d0 Add product updates
+- a5d3fd09a Bump marked from 3.0.8 to 4.0.10
+- 38fed7cf5 Prettier
+- 091458695 Fix undefined
+- 6e4bb76da Fix spacing
+- 93c03e77b Mobile-friendly pricing grid
+- 11de33f0d Link "get in touch" in resources to contact page.
+- 171db2a3e Link homepage to contact in CTA
+- 9eb76c9d3 Add contact page; add link to footer
+- fafc55bee Add gradient to homepage;  change CTA
+- e354a6d77 Add pricing page (+ prettier)
+- 43bfbf951 Remove reference to another co
+- 5ff8d8450 Add new programmable event systems blog post
+- fd4f8a141 Update workflow cue def to match internal
+- c960d7db4 Add webhook docs and getting started guide
+- 2b503f915 Add crisp chat to the site
+- 95d234f9e Add styling for mobile docs content
+- 56362ff99 Add mobile styling for homepage
+- e57a6f93e Hover image focus
+- 350dd10fa mailto
+- 3525c09fe Hide unfilled docs
+- 77c3d9bfe Update favicon everywhere
+- 8574c29ef remove blue
+- 73220a8f0 build
+- 0a006a168 Remove placeholder
+- ba1e2de5d Image
+- f70d972fd Add images
+- 4e9cde096 Remove non-created links
+- c155073c9 Add hero image
+- 566fcbf3d Add action documentation
+- 7e04432ca Add documentation on string functions
+- 7a38031bd Add initial documentation regarding workflow data.
+- a477aa129 Add base CLI documentation
+- 24bfeb689 WIP: Workflow CLI
+- c66293558 Add "workflows" overview
+- f9ea29097 Send events TLDR
+- b386a9c74 Highlight TL;DR sections of docs
+- e52e1e51a Add TOC to sidebar on scroll
+- d7e5b8d57 s/32/256/
+- 6c70daadb Fix warnings
+- 2ac8f1161 Fix library
+- d3d7327fb Ensure inline logs have increased contrast on hover
+- 8518239f2 Add twoslash for nicer logging with JS-related code
+- 7e69d4dcd Add code formatting using shiki
+- 1b1f572a3 Add API and webhook documentation
+- 6529334e5 Add event transforms documentation
+- bea2db981 Add event format, user identification
+- c82195802 Add 'what is inngest' doc guide
+- 778341121 moar pages
+- b2dd9b249 Toggles
+- 9f9f37834 Add toggling of categories to tidy view
+- 99fd68abe fix type
+- af8d073f6 Add more docs
+- 5eae5f3d0 Add category icons & ordering
+- 66d539ade Add subcategory rendering based off of slugs
+- 7ce5f3414 Add recursive directory checking, initial category mapping
+- 2889329cc Add TOC for docs content
+- a305c6977 Add base documentation integration
+- 5d1a69120 Add blog to header
+- cbae081f0 Add blog layout
+- 0cc95b14f Add base styles to library
+- 23a42f7d4 Add icons
+- 6e2f8363b Add remaining content
+- 3c037518c Change favicon
+- e1e485839 Add solve grid
+- b9a49085e Add iterate header
+- 1b4a75d1c Replace hero, add initial feature grid
+- 8ba4eb01c update git workflow
+- a8674475c Update vendor
+- 2f0d980bd Update to go 1.17 for darwin/arm64
+- d9848434d Correct install script for mac os
+- a9ba880d1 Add validate funcitonality
+- 2ffede0c0 Add ability to format configuration files
+- 06df58f90 Enable idempotent deploys of workflows via the CLI
+- 5ad4260bf Add support for ID fields within workflow config files
+- f304d891e Add prompt for creating workflows and actions
+- 5706b2d78 Add workflow version listing, workflow config command
+- 3c754b52f Only show live workflows by default
+- 7aaa7d902 Show current triggers in workflow list
+- 3798608d7 Add `workflows` command to list workflows, with minor UX changes along the way
+- 8bd90db43 Improve login:  prompt for username instead of fatalling
+- f1610ff8e Hide library until it's ready
+- ef6e38d7f Set proper tag= in search
+- f05575c5b FIx name
+- 927f19988 import useState
+- 4acf1a4a2 Fix checkbox selection
+- 288096788 Improve conditional UI
+- 6ebee8b29 Show edge name in library
+- c1744f305 remove cgo
+- f86eb54eb Update makefile
+- 928efb556 Add getlibrary binary for cloudflare
+- 97edce91a Bump ansi-regex from 5.0.0 to 5.0.1
+- 56eb9ac75 build fixes
+- 6949a9918 Update makefile
+- 2e4f433bc Misc build fixes
+- 9e763befd Remove submodule
+- 0bdb1eeab Ensure library folder is kept
+- f7703c67b Add library UI
+- 18ba08ead Add automatic static generation of all library pages
+- 17b5313e4 Add library list display, start of library UI
+- 50cd808c3 Clone via HTTPS for netlify
+- 737394c42 Fix error
+- 325542222 Improve error msg
+- a396f6fa0 Add library JSON generation to website
+- de6f679f0 Copy changes
+- 08008d12a Fix product borders
+- 446d5eefc Sign up link
+- 3ab0c0df4 Minor wording changes
+- bc0a4cb0b Change learn more to blog post
+- 0c7be0dbc Move blog posts folder for build
+- 4a59bf816 Re-add product
+- d79f30f5d Add initial blog
+- 6542df414 Add blog framework
+- cf6937550 Minor copy changes
+- e993b0b34 Update hero for eng focus
+- 510924d59 Add signup links to typeform
+- a967b9949 High level color changes
+- b471465b3 Add absence of events
+- ba5c11fd3 Add use cases to homepage
+- 20ae80789 Add GA
+- 14d59f728 Bump next from 10.2.0 to 11.1.1
+- fb6f23ed1 Remove about
+- 6dbc65a54 Prettier
+- 036189403 Product mobile, first pass
+- 7b0880342 Mobile homepage
+- ad0e40b0c Prettier
+- 1e87a2702 Update homage with new graphics
+- 8a8e65333 Add react to anything graphic
+- 046c78e3c Make homepage 3d, change bullet point
+- 6a5f7ff68 Update homepage
+- 18de2a49d Add homepage graphic
+- 6ba3f6080 Add images and final product section
+- d7a6a81df Lighten graphic text
+- 8095e2629 Add full graphics for product
+- 94d4b0c75 Add other graphics
+- 38e52403a Add time management graphic
+- 32a9579bf Add logic graphic
+- 893597333 prettier
+- da915d731 Add drag image
+- 8a934f881 text changes
+- 1f13f68bd Homepage copy changes
+- 4bea51802 Start of product page
+- e548ea9fd Add new content - homepage, nav
+- 9480f9e53 copy changes + add integrations section
+- 533690130 s/twitter/terms
+- 54df21733 Add install script
+- 5b8eb53ac Only run goreleaser on versioned releases
+- 2d6908dc9 Add goreleaser
+- 1b7c167a0 Add terms, privacy as iframes for now
+- 961f565ec lint
+- c64714e9e make logo a link
+- 9e355cad4 add security page
+- 76b4ad096 Build with `CGO_ENABLED=0`
+- 4a9db6ec0 Remove templating from toggle
+- e1113232e Also add placeholder to form value
+- db53eadd6 Allow any types in a choice, and add hints to #Form definition
+- 8513d9336 Display better errors when validating action/workflow configurations
+- 0398d9600 Update link
+- 3980f5a65 clear email on submit, center text
+- 5c6084094 Add small footer
+- d16e3b333 Add how it works section
+- bc4096297 Font size
+- eddc211b9 CTA changes
+- 380224576 nbsp
+- 7fe84224c Basic mobile version
+- e1a66b51f Add copyright
+- 5e05f1c6d Env key
+- 56a4688a4 Add signup
+- 7f56b37d3 Add styles, image
+- fa27a5968 WIP: New site
+- af8574a7d Add validation function, plus action scopes
+- d7f325822 Support array based entrypoints
+- 496fb669c Add memory configuration to Docker runtime
+- cc9ac880a Update install in README
+- e8604f626 scaffold => new
+- 3002c49b3 Add json tags for cue format casing
+- abf302cee Add scaffold functionality
+- 05de5047e Default to help
+- 34d43e3bc Auto publish actions on deploy, add flag to prevent
+- 307975cca Add ability to publish actions
+- 06c7be290 Add table writer
+- a6590eb40 List actions within your account
+- b46db6464 Support for pushing docker images without creating action versions
+- adaa3594b Respect INNGEST_API env variable when logging in
+- 208d9fdfd Initial commit with barebones structure
+- 65271dadf copy change
+- 169dd0d67 copy changes
+- de69fbe8c less aggressive font sizes
+- 90687ea04 Update homepage
+- 3e9f0e190 add npm sdk
+- 3bfaf8cba update to right logo
+- 64bc55229 add transparent logo
+- 2fb6ebe91 add press kit
+- e0498684e clear inputs on submit
+- 7388d2d8f update ingest key
+- 13aa64b53 add support page
+- e3d5606f1 submit on enter
+- 73402a4bb new ingestion key, fix email validation
+- d5db99c0c Fix user assignment within site
+- 1e950b8a6 fix for mobile
+- e1a5a16d7 add og: tags
+- dfd02fd03 change img
+- c58047296 add website
+- ce09b4631 Initial commit from Create Next App
+
+---
+
+## v1.52.2-test.1 → v1.52.2-test.2
+
+**Date range:** 2025-12-19 → 2025-12-19  
+**Commits:** 1  
+**Changes:**  1 file changed, 2 insertions(+)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 2 | `.goreleaser.yml` |
+
+### Commits
+
+- c8523ae02 bump goreleaser config version
+
+---
+
+## v1.52.2-test.2 → v1.52.2-test.3
+
+**Date range:** 2025-12-19 → 2025-12-19  
+**Commits:** 1  
+**Changes:**  1 file changed, 4 deletions(-)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 4 | `.goreleaser.yml` |
+
+### Commits
+
+- 9f5f007f5 remove hallucination
+
+---
+
+## v1.52.2-test.3 → v1.52.2-test.4
+
+**Date range:** 2025-12-19 → 2025-12-19  
+**Commits:** 1  
+**Changes:**  1 file changed, 2 insertions(+), 2 deletions(-)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 4 | `.goreleaser.yml` |
+
+### Commits
+
+- 8e2eee300 update homebrew related stuff
+
+---
+
+## v1.52.2-test.4 → v1.52.2-test.5
+
+**Date range:** 2025-12-19 → 2025-12-19  
+**Commits:** 1  
+**Changes:**  2 files changed, 2 insertions(+)
+
+### Top changed files
+
+| Lines changed | File |
+|--------------|------|
+| 1 | `.goreleaser.yml` |
+| 1 | `.github/workflows/release.yml` |
+
+### Commits
+
+- 407d4a6e3 use a tap pat
+
+---
+
