@@ -121,6 +121,7 @@ var Attrs = struct {
 	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
+	ResponseSteps      attr[*ResponseOps]
 
 	IsCheckpoint attr[*bool]
 
@@ -223,4 +224,18 @@ var Attrs = struct {
 	MetadataKind:  StringishAttr[metadata.Kind]("metadata.kind"),
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
+}
+
+type ResponseOps []ResponseOp
+
+// ResponseOp is an op tracked for each HTTP response
+type ResponseOp struct {
+	// Op represents the type of operation invoked in the function.
+	Op enums.Opcode `json:"op"`
+	// ID represents a hashed unique ID for the operation.  This acts
+	// as the generated step ID for the state store.
+	ID string `json:"id"`
+	// Name represents the name of the step, or the sleep duration for
+	// sleeps.
+	Name string `json:"name"`
 }
