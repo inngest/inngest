@@ -5,6 +5,7 @@ import type { SpanMetadata, SpanMetadataKind } from './types';
 
 const inngestKindLabels: Record<string, string> = {
   ai: 'AI Metadata',
+  experiment: 'Experiment',
   http: 'HTTP Metadata',
   response_headers: 'Response Headers',
   usage: 'Run Usage',

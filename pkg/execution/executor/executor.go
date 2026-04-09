@@ -3857,6 +3857,9 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		ParallelMode: gen.ParallelMode(),
 	}
 
+	parent := tracing.RunSpanRefFromMetadata(runCtx.Metadata())
+	attrs := tracing.GeneratorAttrs(&gen)
+
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -3867,8 +3870,8 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStepPlanned"},
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  tracing.GeneratorAttrs(&gen),
+			Parent:      parent,
+			Attributes:  attrs,
 		},
 	)
 	if err != nil {
