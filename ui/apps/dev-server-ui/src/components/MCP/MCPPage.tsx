@@ -1,15 +1,21 @@
 import { useState, useMemo } from 'react';
+import { buildAgenticGuides } from './agenticGuides';
 
 export default function MCPPage() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
-  // Get dynamic MCP endpoint based on current location
-  const mcpEndpoint = useMemo(() => {
-    if (typeof window === 'undefined') return 'http://127.0.0.1:8288/mcp';
+  const serverOrigin = useMemo(() => {
+    if (typeof window === 'undefined') return 'http://127.0.0.1:8288';
     const hostname = window.location.hostname || '127.0.0.1';
     const port = window.location.port || '8288';
-    return `http://${hostname}:${port}/mcp`;
+    return `http://${hostname}:${port}`;
   }, []);
+
+  const mcpEndpoint = `${serverOrigin}/mcp`;
+  const agenticGuides = buildAgenticGuides({
+    apiBaseUrl: `${serverOrigin}/api/v2`,
+    serverOrigin,
+  });
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -178,6 +184,152 @@ export default function MCPPage() {
               <code className="text-basis text-sm">
                 Search the docs for rate limiting examples
               </code>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-basis mb-4 text-2xl font-semibold">
+            Agentic API
+          </h2>
+          <p className="text-muted mb-4 text-base">
+            Use the local agentic API when you want a coding agent or CLI to
+            invoke functions, inspect run output, and inspect traces without
+            using the dashboard.
+          </p>
+
+          <div className="bg-canvasSubtle border-subtle mb-4 rounded border p-4">
+            <div className="mb-2 flex items-center justify-between gap-4">
+              <h3 className="text-basis text-lg font-medium">Base URL</h3>
+              <button
+                onClick={() =>
+                  copyToClipboard(agenticGuides.apiBaseUrl, 'agentic-url')
+                }
+                className="bg-canvasBase border-subtle hover:bg-canvasMuted shrink-0 rounded border px-3 py-1.5 text-xs font-medium transition-colors"
+              >
+                {copiedText === 'agentic-url' ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <code className="text-basis text-sm">
+              {agenticGuides.apiBaseUrl}
+            </code>
+            <p className="text-muted mt-3 text-sm">
+              Local auth is optional. If a client insists on an API key, any
+              <code className="bg-canvasBase mx-1 rounded px-1 py-0.5">
+                sk-inn-api-*
+              </code>
+              value works in dev mode.
+            </p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="bg-canvasSubtle border-subtle rounded border">
+              <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
+                <span className="text-muted text-xs font-medium">
+                  curl examples
+                </span>
+                <button
+                  onClick={() =>
+                    copyToClipboard(
+                      [
+                        agenticGuides.invokeCommand,
+                        agenticGuides.runCommand,
+                        agenticGuides.traceCommand,
+                      ].join('\n\n'),
+                      'agentic-curl',
+                    )
+                  }
+                  className="text-muted hover:text-basis text-xs"
+                >
+                  {copiedText === 'agentic-curl' ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <pre className="overflow-x-auto p-4">
+                <code className="text-basis text-sm">
+                  {agenticGuides.invokeCommand}
+                  {'\n\n'}
+                  {agenticGuides.runCommand}
+                  {'\n\n'}
+                  {agenticGuides.traceCommand}
+                </code>
+              </pre>
+            </div>
+
+            <div className="bg-canvasSubtle border-subtle rounded border">
+              <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
+                <span className="text-muted text-xs font-medium">
+                  CLI examples
+                </span>
+                <button
+                  onClick={() =>
+                    copyToClipboard(agenticGuides.cliExamples, 'agentic-cli')
+                  }
+                  className="text-muted hover:text-basis text-xs"
+                >
+                  {copiedText === 'agentic-cli' ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <pre className="overflow-x-auto p-4">
+                <code className="text-basis text-sm">
+                  {agenticGuides.cliExamples}
+                </code>
+              </pre>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-basis mb-4 text-2xl font-semibold">
+            Agent Files
+          </h2>
+          <p className="text-muted mb-4 text-base">
+            Drop these into a repo when you want a local agent to prefer the dev
+            server for function invocation and debugging.
+          </p>
+
+          <div className="mb-4">
+            <div className="bg-canvasSubtle border-subtle relative rounded border">
+              <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
+                <span className="text-muted text-xs font-medium">
+                  skills.md
+                </span>
+                <button
+                  onClick={() =>
+                    copyToClipboard(agenticGuides.skillsMd, 'skills-md')
+                  }
+                  className="text-muted hover:text-basis text-xs"
+                >
+                  {copiedText === 'skills-md' ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <pre className="overflow-x-auto p-4">
+                <code className="text-basis text-sm">
+                  {agenticGuides.skillsMd}
+                </code>
+              </pre>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="bg-canvasSubtle border-subtle relative rounded border">
+              <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
+                <span className="text-muted text-xs font-medium">
+                  CLAUDE.md
+                </span>
+                <button
+                  onClick={() =>
+                    copyToClipboard(agenticGuides.claudeMd, 'claude-md')
+                  }
+                  className="text-muted hover:text-basis text-xs"
+                >
+                  {copiedText === 'claude-md' ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <pre className="overflow-x-auto p-4">
+                <code className="text-basis text-sm">
+                  {agenticGuides.claudeMd}
+                </code>
+              </pre>
             </div>
           </div>
         </section>
