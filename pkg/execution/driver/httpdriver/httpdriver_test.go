@@ -2,6 +2,7 @@ package httpdriver
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -268,11 +269,87 @@ func TestExecuteDriverRequest_DecodesBrotliGeneratorResponse(t *testing.T) {
 	require.Equal(t, "step-id", dr.Generator[0].ID)
 }
 
+func TestHandleHttpResponse_DecompressesGzipBody(t *testing.T) {
+	r := require.New(t)
+
+	body := `{"result":"ok"}`
+	compressed := gzipCompressedJSON(t, body)
+
+	resp := &Response{
+		Body:       compressed,
+		StatusCode: 200,
+		IsSDK:      true,
+		Header:     http.Header{"Content-Encoding": []string{"gzip"}},
+	}
+
+	dr, err := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NoError(err)
+	r.NotNil(dr)
+
+	// The body should have been decompressed before parsing.
+	out, ok := dr.Output.(map[string]interface{})
+	r.True(ok, "expected parsed JSON map, got %T", dr.Output)
+	r.Equal("ok", out["result"])
+}
+
+func TestHandleHttpResponse_DecompressesBrotliBody(t *testing.T) {
+	r := require.New(t)
+
+	body := `[{"op":"StepRun","id":"step-id","name":"step"}]`
+	compressed := brotliCompressedJSON(t, body)
+
+	resp := &Response{
+		Body:       compressed,
+		StatusCode: 206,
+		IsSDK:      true,
+		Header:     http.Header{"Content-Encoding": []string{"br"}},
+	}
+
+	dr, err := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NoError(err)
+	r.NotNil(dr)
+	r.Len(dr.Generator, 1)
+	r.Equal(enums.OpcodeStepRun, dr.Generator[0].Op)
+}
+
+func TestHandleHttpResponse_NoDoubleDecompress(t *testing.T) {
+	r := require.New(t)
+
+	// Simulate the HTTP path: body is already decompressed, no Content-Encoding header.
+	body := `{"result":"ok"}`
+	resp := &Response{
+		Body:       []byte(body),
+		StatusCode: 200,
+		IsSDK:      true,
+		Header:     http.Header{},
+	}
+
+	dr, err := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NoError(err)
+	r.NotNil(dr)
+
+	out, ok := dr.Output.(map[string]interface{})
+	r.True(ok, "expected parsed JSON map, got %T", dr.Output)
+	r.Equal("ok", out["result"])
+}
+
 func brotliCompressedJSON(t *testing.T, input string) []byte {
 	t.Helper()
 
 	var buf bytes.Buffer
 	writer := brotli.NewWriter(&buf)
+	_, err := writer.Write([]byte(input))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	return buf.Bytes()
+}
+
+func gzipCompressedJSON(t *testing.T, input string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	writer, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
 	_, err := writer.Write([]byte(input))
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
