@@ -1,0 +1,5 @@
+{
+  "title": "Webhooks",
+  "description": "Create and manage inbound webhooks",
+  "pages": ["ListWebhooks", "CreateWebhook"]
+}

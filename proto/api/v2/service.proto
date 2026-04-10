@@ -29,6 +29,12 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
       }
     }
   }
+  tags: { name: "Account"      description: "Manage your account" }
+  tags: { name: "Environments" description: "Create and manage environments" }
+  tags: { name: "Keys"         description: "Manage event and signing keys" }
+  tags: { name: "Webhooks"     description: "Create and manage inbound webhooks" }
+  tags: { name: "Functions"    description: "Invoke and manage functions" }
+  tags: { name: "Partner API"  description: "Partner account management" }
 };
 
 
@@ -91,6 +97,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create partner account"
       description: "Creates a sub-account (if you have partner access)"
+      tags: "Partner API"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -174,6 +181,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create environment"
       description: "Create custom environment"
+      tags: "Environments"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -259,6 +267,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List partner accounts"
       description: "Lists sub-accounts (if you have partner access)"
+      tags: "Partner API"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -330,6 +339,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get account"
       description: "Returns the account for the authenticated user"
+      tags: "Account"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -390,6 +400,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List environments"
       description: "List of all custom environments."
+      tags: "Environments"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -471,6 +482,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List account event keys"
+      tags: "Keys"
       description: "Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys."
       parameters: {
         headers: {
@@ -561,6 +573,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List account signing keys"
+      tags: "Keys"
       description: "Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys."
       parameters: {
         headers: {
@@ -653,6 +666,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create webhook"
       description: "Creates a new webhook for receiving events"
+      tags: "Webhooks"
       parameters: {
         headers: {
           name: "X-Inngest-Env"
@@ -754,6 +768,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List webhooks"
       description: "Lists all webhooks in the specified environment"
+      tags: "Webhooks"
       parameters: {
         headers: {
           name: "X-Inngest-Env"
@@ -834,6 +849,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update environment"
       description: "Partially updates an environment. Only the provided fields will be modified."
+      tags: "Environments"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -928,6 +944,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Invoke function"
       description: "Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request body"
+      tags: "Functions"
       security: {
         security_requirement: {
           key: "BearerAuth"

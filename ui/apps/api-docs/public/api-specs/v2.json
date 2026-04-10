@@ -632,7 +632,7 @@
           }
         ],
         "summary": "Get account",
-        "tags": ["V2"]
+        "tags": ["Account"]
       }
     },
     "/apps/{app_id}/functions/{function_id}/invoke": {
@@ -778,7 +778,7 @@
           }
         ],
         "summary": "Invoke function",
-        "tags": ["V2"]
+        "tags": ["Functions"]
       }
     },
     "/env/webhooks": {
@@ -872,7 +872,7 @@
           }
         ],
         "summary": "List webhooks",
-        "tags": ["V2"]
+        "tags": ["Webhooks"]
       },
       "post": {
         "description": "Creates a new webhook for receiving events",
@@ -977,7 +977,7 @@
           }
         ],
         "summary": "Create webhook",
-        "tags": ["V2"]
+        "tags": ["Webhooks"]
       }
     },
     "/envs": {
@@ -1129,7 +1129,7 @@
           }
         ],
         "summary": "List environments",
-        "tags": ["V2"]
+        "tags": ["Environments"]
       },
       "post": {
         "description": "Create custom environment",
@@ -1246,7 +1246,7 @@
           }
         ],
         "summary": "Create environment",
-        "tags": ["V2"]
+        "tags": ["Environments"]
       }
     },
     "/envs/{id}": {
@@ -1353,7 +1353,7 @@
           }
         ],
         "summary": "Update environment",
-        "tags": ["V2"]
+        "tags": ["Environments"]
       }
     },
     "/health": {
@@ -1591,7 +1591,7 @@
           }
         ],
         "summary": "List account event keys",
-        "tags": ["V2"]
+        "tags": ["Keys"]
       }
     },
     "/keys/signing": {
@@ -1747,7 +1747,7 @@
           }
         ],
         "summary": "List account signing keys",
-        "tags": ["V2"]
+        "tags": ["Keys"]
       }
     },
     "/partner/accounts": {
@@ -1901,7 +1901,7 @@
           }
         ],
         "summary": "List partner accounts",
-        "tags": ["V2"]
+        "tags": ["Partner API"]
       },
       "post": {
         "description": "Creates a sub-account (if you have partner access)",
@@ -2051,7 +2051,7 @@
           }
         ],
         "summary": "Create partner account",
-        "tags": ["V2"]
+        "tags": ["Partner API"]
       }
     }
   },
@@ -2066,6 +2066,30 @@
     }
   ],
   "tags": [
+    {
+      "description": "Manage your account",
+      "name": "Account"
+    },
+    {
+      "description": "Create and manage environments",
+      "name": "Environments"
+    },
+    {
+      "description": "Manage event and signing keys",
+      "name": "Keys"
+    },
+    {
+      "description": "Create and manage inbound webhooks",
+      "name": "Webhooks"
+    },
+    {
+      "description": "Invoke and manage functions",
+      "name": "Functions"
+    },
+    {
+      "description": "Partner account management",
+      "name": "Partner API"
+    },
     {
       "name": "V2"
     }

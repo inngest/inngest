@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { generateFiles } from 'fumadocs-openapi';
 import { createOpenAPI } from 'fumadocs-openapi/server';
@@ -64,11 +64,40 @@ async function main() {
     per: 'operation',
   });
 
+  // Clean generated v2 content so stale files don't accumulate between runs.
+  rmSync(join(appRoot, 'content/docs/v2'), { recursive: true, force: true });
+  mkdirSync(join(appRoot, 'content/docs/v2'), { recursive: true });
+
   console.log('\nGenerating v2 API docs...');
   await generateFiles({
     input: openapiV2,
     output: join(appRoot, 'content/docs/v2'),
     per: 'operation',
+    groupBy: 'tag',
+    meta: { groupStyle: 'separator' },
+    beforeWrite(files) {
+      // Strip the "V2_" prefix from generated file paths and their meta.json references.
+      for (const file of files) {
+        file.path = file.path.replace(/V2_/g, '');
+      }
+      // Update page references inside meta.json files to match renamed paths.
+      for (const file of files) {
+        if (file.path.endsWith('meta.json')) {
+          const meta = JSON.parse(file.content);
+          if (Array.isArray(meta.pages)) {
+            meta.pages = meta.pages.map((p: string) => p.replace(/V2_/g, ''));
+          }
+          file.content = JSON.stringify(meta, null, 2);
+        }
+      }
+      // Set the nav heading for v2.
+      const topMeta = files.find((f) => f.path === 'meta.json');
+      if (topMeta) {
+        const meta = JSON.parse(topMeta.content);
+        meta.title = 'v2';
+        topMeta.content = JSON.stringify(meta, null, 2);
+      }
+    },
   });
 
   console.log('\nDone.');

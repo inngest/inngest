@@ -1,4 +1,19 @@
 {
-  "title": "v2",
-  "root": false
+  "pages": [
+    "---Account---",
+    "...account",
+    "---Functions---",
+    "...functions",
+    "---Webhooks---",
+    "...webhooks",
+    "---Environments---",
+    "...environments",
+    "---V2---",
+    "...v2",
+    "---Keys---",
+    "...keys",
+    "---Partner A P I---",
+    "...partner-api"
+  ],
+  "title": "v2"
 }
