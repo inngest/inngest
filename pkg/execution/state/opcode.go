@@ -528,3 +528,31 @@ func (g *GeneratorOpcode) ParallelMode() enums.ParallelMode {
 
 	return mode
 }
+
+// RaceGroupID returns the race group ID for the step, if any.
+// This groups sibling steps that should be cancelled when one wins.
+func (g *GeneratorOpcode) RaceGroupID() string {
+	var optByt []byte
+	switch typ := g.Opts.(type) {
+	case []byte:
+		optByt = typ
+	default:
+		var err error
+		optByt, err = json.Marshal(g.Opts)
+		if err != nil {
+			return ""
+		}
+	}
+
+	var opts map[string]any
+	if err := json.Unmarshal(optByt, &opts); err != nil {
+		return ""
+	}
+
+	raw, ok := opts["raceGroupId"].(string)
+	if !ok {
+		return ""
+	}
+
+	return raw
+}

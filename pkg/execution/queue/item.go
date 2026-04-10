@@ -359,6 +359,10 @@ type Item struct {
 	// Only present on start jobs for function concurrency, or on all items
 	// for worker concurrency (app-scoped semaphores).
 	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
+
+	// RaceGroupID groups sibling steps in a race so the server can cancel
+	// losers when one finishes first.
+	RaceGroupID string `json:"rgid,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {

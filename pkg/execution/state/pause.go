@@ -256,6 +256,10 @@ type Pause struct {
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
 
+	// RaceGroupID groups sibling steps in a race so the server can cancel
+	// losers when one finishes first.
+	RaceGroupID string `json:"rgid,omitempty"`
+
 	// CreatedAt is the timestamp when the pause was saved. This field may
 	// be empty for older pauses created before this field was added. It's used to
 	// determine which time-based storage blocks contain this pause, as block

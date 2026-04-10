@@ -1553,6 +1553,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// we're now done with this execution.
 			return nil, nil
 		}
+
+		// Cancel race siblings when the winner completes.
+		if item.ParallelMode == enums.ParallelModeRace && hasPendingSteps {
+			e.cancelRaceSiblings(ctx, sv2.ID{
+				RunID:      id.RunID,
+				FunctionID: id.WorkflowID,
+				Tenant: sv2.Tenant{
+					AppID:     id.AppID,
+					EnvID:     id.WorkspaceID,
+					AccountID: id.AccountID,
+				},
+			}, edge.Outgoing, item.RaceGroupID)
+		}
+
 		// After the sleep, we start a new step.  This means we also want to start a new
 		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
 		// scheduled in this executor run)
@@ -2926,6 +2940,12 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			e.log.Error("error creating span for next step after resume timeout", "error", err)
 		}
 
+		// Cancel race siblings before enqueuing discovery so that sentinels
+		// are saved before the SDK is re-invoked.
+		if pause.ParallelMode == enums.ParallelModeRace && hasPendingSteps {
+			e.cancelRaceSiblings(ctx, md.ID, pause.DataKey, pause.RaceGroupID)
+		}
+
 		err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 		if err != nil {
 			if errors.Is(err, queue.ErrQueueItemExists) {
@@ -3098,6 +3118,12 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				e.log.Debug("error creating span for next step after resume", "error", err)
 			}
 
+			// Cancel race siblings before enqueuing discovery so that sentinels
+			// are saved before the SDK is re-invoked.
+			if pause.ParallelMode == enums.ParallelModeRace && consumeResult.HasPendingSteps {
+				e.cancelRaceSiblings(ctx, md.ID, pause.DataKey, pause.RaceGroupID)
+			}
+
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 			if err != nil {
 				if err == queue.ErrQueueItemExists {
@@ -3227,8 +3253,11 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
-	// We only save pending steps if there's >= 1 step planned op.
-	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
+	// Save pending steps when there's >= 1 step planned op, OR when any
+	// step has parallelMode "race". Race-mode steps (including WaitForEvent,
+	// Sleep, etc.) must be tracked in the pending set so that
+	// cancelRaceSiblings can identify and cancel them when one wins.
+	if (hasPlanOp(resp.Generator) || hasRaceOp(resp.Generator)) && i.md.ShouldCoalesceParallelism(resp) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
@@ -3383,6 +3412,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
+		RaceGroupID:           gen.RaceGroupID(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
@@ -3407,6 +3437,12 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 			// return fmt.Errorf("error creating span for next step after
 			// Step: %w", err)
 			e.log.Debug("error creating span for next step after Step", "error", err)
+		}
+
+		// Cancel race siblings before enqueuing discovery so that sentinels
+		// are saved before the SDK is re-invoked.
+		if gen.ParallelMode() == enums.ParallelModeRace && hasPendingSteps {
+			e.cancelRaceSiblings(ctx, runCtx.Metadata().ID, gen.ID, gen.RaceGroupID())
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -3695,6 +3731,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
+		RaceGroupID:           gen.RaceGroupID(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
@@ -3719,6 +3756,12 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 			// return fmt.Errorf("error creating span for next step after
 			// StepError: %w", err)
 			e.log.Debug("error creating span for next step after StepFailed", "error", err)
+		}
+
+		// Cancel race siblings before enqueuing discovery so that sentinels
+		// are saved before the SDK is re-invoked.
+		if runCtx.ParallelMode() == enums.ParallelModeRace && hasPendingSteps {
+			e.cancelRaceSiblings(ctx, runCtx.Metadata().ID, gen.ID, gen.RaceGroupID())
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -3855,6 +3898,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		},
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
+		RaceGroupID:  gen.RaceGroupID(),
 	}
 
 	parent := tracing.RunSpanRefFromMetadata(runCtx.Metadata())
@@ -3932,6 +3976,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
+		RaceGroupID:           gen.RaceGroupID(),
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
@@ -4140,6 +4185,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
+		RaceGroupID:           gen.RaceGroupID(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
@@ -4162,6 +4208,12 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		)
 		if err != nil {
 			e.log.Debug("error creating span for next step after Gateway", "error", err)
+		}
+
+		// Cancel race siblings before enqueuing discovery so that sentinels
+		// are saved before the SDK is re-invoked.
+		if gen.ParallelMode() == enums.ParallelModeRace && hasPendingSteps {
+			e.cancelRaceSiblings(ctx, runCtx.Metadata().ID, gen.ID, gen.RaceGroupID())
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -4399,6 +4451,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
+		RaceGroupID:           gen.RaceGroupID(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
@@ -4421,6 +4474,12 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		)
 		if err != nil {
 			e.log.Debug("error creating span for next step after AI Gateway", "error", err)
+		}
+
+		// Cancel race siblings before enqueuing discovery so that sentinels
+		// are saved before the SDK is re-invoked.
+		if runCtx.ParallelMode() == enums.ParallelModeRace && hasPendingSteps {
+			e.cancelRaceSiblings(ctx, runCtx.Metadata().ID, gen.ID, gen.RaceGroupID())
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -4500,6 +4559,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		RaceGroupID:  gen.RaceGroupID(),
 		CreatedAt:    now,
 	}
 
@@ -4520,6 +4580,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		},
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
+		RaceGroupID:  gen.RaceGroupID(),
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
@@ -4696,6 +4757,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		RaceGroupID:  gen.RaceGroupID(),
 		CreatedAt:    now,
 	}
 
@@ -4718,6 +4780,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		},
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
+		RaceGroupID:  gen.RaceGroupID(),
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
@@ -4909,6 +4972,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		RaceGroupID:  gen.RaceGroupID(),
 		CreatedAt:    now,
 	}
 
@@ -4934,6 +4998,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		},
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
+		RaceGroupID:  gen.RaceGroupID(),
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
@@ -5383,6 +5448,56 @@ func shouldEnqueueDiscovery(hasPendingSteps bool, mode enums.ParallelMode) bool 
 	return !hasPendingSteps || mode == enums.ParallelModeRace
 }
 
+// cancelRaceSiblings cancels pending sibling steps after one step in a race
+// group completes. This is best-effort: errors are logged but not returned.
+func (e *executor) cancelRaceSiblings(ctx context.Context, id sv2.ID, winnerStepID string, raceGroupID string) {
+	l := e.log.With(
+		"run_id", id.RunID.String(),
+		"winner_step_id", winnerStepID,
+		"race_group_id", raceGroupID,
+	)
+
+	pending, err := e.smv2.LoadPending(ctx, id)
+	if err != nil {
+		l.Error("error loading pending steps for race cancellation", "error", err)
+		return
+	}
+
+	// TODO: Filter siblings by raceGroupID to support concurrent
+	// group.parallel() calls in the same SDK response. Currently, all pending
+	// steps are cancelled regardless of group. This is correct for the common
+	// case (single race group) but could over-cancel with concurrent groups.
+	// The pending set is a flat SSET with no group association; filtering
+	// requires a pause lookup that needs an Index (workspace + event name)
+	// which we don't have here. Deferring until the pending set structure
+	// supports group metadata.
+
+	for _, stepID := range pending {
+		if stepID == winnerStepID {
+			continue
+		}
+
+		sl := l.With("sibling_step_id", stepID)
+
+		// Save a null sentinel to atomically remove the step from pending.
+		// Using null matches the existing timeout behavior for waitForEvent
+		// and avoids breaking event schema validation in the SDK.
+		_, err := e.smv2.SaveStep(ctx, id, stepID, []byte("null"))
+		if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+			sl.Error("error saving cancellation sentinel for race sibling", "error", err)
+		}
+
+		// Compute the deterministic pause ID (same formula used when creating
+		// pauses) and delete it.
+		pauseID := inngest.DeterministicSha1UUID(id.RunID.String() + stepID)
+		if err := e.pm.DeletePauseByID(ctx, pauseID, id.Tenant.EnvID); err != nil {
+			sl.Debug("error deleting pause for race sibling", "error", err, "pause_id", pauseID.String())
+		}
+
+		sl.Debug("cancelled race sibling step")
+	}
+}
+
 func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Metadata) *meta.SpanReference {
 	if item.Kind != queue.KindSleep {
 		return tracing.SpanRefFromQueueItem(&item)
@@ -5489,6 +5604,15 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 	for _, op := range ops {
 		if op.Op == enums.OpcodeStepPlanned {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRaceOp(ops []*state.GeneratorOpcode) bool {
+	for _, op := range ops {
+		if op.ParallelMode() == enums.ParallelModeRace {
 			return true
 		}
 	}

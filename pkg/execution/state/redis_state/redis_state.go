@@ -845,6 +845,26 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 	return nil
 }
 
+// LoadPending returns the set of pending step IDs for the given run ID.
+func (m shardedMgr) LoadPending(ctx context.Context, i state.Identifier) ([]string, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadPending"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	key := fnRunState.kg.Pending(ctx, isSharded, i)
+	result, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Smembers().Key(key).Build()
+	}).AsStrSlice()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("error loading pending steps: %w", err)
+	}
+	return result, nil
+}
+
 // Delete deletes state from the state store.  Previously, we would handle this in a
 // lifecycle.  Now, state stores must account for deletion directly.  Note that if the
 // state store is queue-aware, it must delete queue items for the run also.  This may

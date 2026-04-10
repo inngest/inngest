@@ -49,6 +49,8 @@ type RunService interface {
 	SaveStep(ctx context.Context, id ID, stepID string, data []byte) (hasPending bool, err error)
 	// SavePending saves pending step IDs for the given run ID.
 	SavePending(ctx context.Context, id ID, pending []string) error
+	// LoadPending returns the set of pending step IDs for the given run ID.
+	LoadPending(ctx context.Context, id ID) ([]string, error)
 
 	// ConsumePause consumes a pause by its ID. It does not care about the pause's origin;
 	// it only uses the pause data to populate the state of a run.

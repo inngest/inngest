@@ -434,6 +434,26 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 	return err
 }
 
+// LoadPending returns the set of pending step IDs for the given run ID.
+func (v v2) LoadPending(ctx context.Context, id state.ID) ([]string, error) {
+	v1id := statev1.Identifier{
+		RunID:      id.RunID,
+		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+
+	result, err := util.WithRetry(
+		ctx,
+		"state.LoadPending",
+		func(ctx context.Context) ([]string, error) {
+			return v.mgr.LoadPending(ctx, v1id)
+		},
+		v.retryPolicy(),
+	)
+
+	return result, err
+}
+
 // ConsumePause consumes a pause by its ID such that it can't be used again.
 func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.ConsumePauseOpts) (statev1.ConsumePauseResult, error) {
 	r, err := util.WithRetry(
