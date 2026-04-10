@@ -2,6 +2,7 @@
 package exechttp
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/tls"
@@ -136,6 +137,12 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	if err != nil {
 		return nil, err
 	}
+	if bodyEncoding != "" {
+		// Clear the Content-Encoding header after decompression so that
+		// downstream consumers (e.g. HandleHttpResponse) know the body is
+		// already decoded and don't attempt to decompress again.
+		resp.Header.Del("Content-Encoding")
+	}
 	if bodyCloser != nil {
 		defer func() {
 			_ = bodyCloser.Close()
@@ -208,28 +215,74 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	return out, err
 }
 
-func decodeResponseBody(resp *http.Response) (io.Reader, string, io.Closer, error) {
-	encoding := strings.TrimSpace(resp.Header.Get("Content-Encoding"))
-	if encoding == "" {
-		return resp.Body, "", nil, nil
+// normalizeEncoding validates and normalizes a Content-Encoding header value.
+// Returns the lowercase encoding name, or an error for unsupported/multi-valued encodings.
+// An empty input returns "" with no error.
+func normalizeEncoding(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
 	}
 
-	normalized := strings.ToLower(encoding)
+	normalized := strings.ToLower(trimmed)
 	if strings.Contains(normalized, ",") {
-		return nil, "", nil, fmt.Errorf("unsupported content encoding: %q", encoding)
+		return "", fmt.Errorf("unsupported content encoding: %q", raw)
 	}
 
 	switch normalized {
+	case "gzip", "br":
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("unsupported content encoding: %q", raw)
+	}
+}
+
+// DecompressBody decompresses body bytes based on a Content-Encoding value.
+// Returns the bytes unchanged if contentEncoding is empty.
+func DecompressBody(data []byte, contentEncoding string) ([]byte, error) {
+	enc, err := normalizeEncoding(contentEncoding)
+	if err != nil {
+		return nil, err
+	}
+	if enc == "" {
+		return data, nil
+	}
+
+	switch enc {
+	case "gzip":
+		reader, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("error creating gzip decoder: %w", err)
+		}
+		defer reader.Close()
+		return io.ReadAll(reader)
+	case "br":
+		return io.ReadAll(brotli.NewReader(bytes.NewReader(data)))
+	default:
+		return nil, fmt.Errorf("unsupported content encoding: %q", contentEncoding)
+	}
+}
+
+func decodeResponseBody(resp *http.Response) (io.Reader, string, io.Closer, error) {
+	enc, err := normalizeEncoding(resp.Header.Get("Content-Encoding"))
+	if err != nil {
+		return nil, "", nil, err
+	}
+	if enc == "" {
+		return resp.Body, "", nil, nil
+	}
+
+	switch enc {
 	case "gzip":
 		reader, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error creating gzip decoder: %w", err)
 		}
-		return reader, normalized, reader, nil
+		return reader, enc, reader, nil
 	case "br":
-		return brotli.NewReader(resp.Body), normalized, nil, nil
+		return brotli.NewReader(resp.Body), enc, nil, nil
 	default:
-		return nil, "", nil, fmt.Errorf("unsupported content encoding: %q", encoding)
+		return nil, "", nil, fmt.Errorf("unsupported content encoding: %q", enc)
 	}
 }
 

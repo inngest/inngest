@@ -166,6 +166,19 @@ func ExecuteDriverRequest(ctx context.Context, c exechttp.RequestExecutor, r Req
 func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
 	l := logger.StdlibLogger(ctx)
 
+	// Decompress body if Content-Encoding is still set.  In the HTTP path,
+	// exechttp.DoRequest already decompresses and clears the header, so this
+	// is a no-op.  For other paths (e.g. gateway proxy) the body may still
+	// be compressed.
+	if enc := resp.Header.Get("Content-Encoding"); enc != "" {
+		decoded, err := exechttp.DecompressBody(resp.Body, enc)
+		if err != nil {
+			return nil, fmt.Errorf("error decompressing response body: %w", err)
+		}
+		resp.Body = decoded
+		resp.Header.Del("Content-Encoding")
+	}
+
 	var err error
 	if resp.StatusCode == 206 {
 		// This is a generator-based function returning opcodes.

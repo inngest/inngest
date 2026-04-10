@@ -287,6 +287,68 @@ func TestDoRequest_RejectsInvalidCompressedResponse(t *testing.T) {
 	r.ErrorContains(err, "error decoding gzip response body")
 }
 
+func TestDecompressBody_Gzip(t *testing.T) {
+	r := require.New(t)
+	original := `{"result":"hello"}`
+	compressed := gzipCompressed(t, original)
+
+	decoded, err := DecompressBody(compressed, "gzip")
+	r.NoError(err)
+	r.Equal(original, string(decoded))
+}
+
+func TestDecompressBody_Brotli(t *testing.T) {
+	r := require.New(t)
+	original := `{"result":"hello"}`
+	compressed := brotliCompressed(t, original)
+
+	decoded, err := DecompressBody(compressed, "br")
+	r.NoError(err)
+	r.Equal(original, string(decoded))
+}
+
+func TestDecompressBody_EmptyEncoding(t *testing.T) {
+	r := require.New(t)
+	original := []byte(`{"result":"hello"}`)
+
+	decoded, err := DecompressBody(original, "")
+	r.NoError(err)
+	r.Equal(original, decoded)
+}
+
+func TestDecompressBody_Unsupported(t *testing.T) {
+	r := require.New(t)
+	_, err := DecompressBody([]byte("data"), "zstd")
+	r.ErrorContains(err, `unsupported content encoding: "zstd"`)
+}
+
+func TestDoRequest_ClearsContentEncodingAfterDecode(t *testing.T) {
+	r := require.New(t)
+	ctx := silenceLogger(t.Context())
+
+	expectedBody := `{"result":"hello"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Encoding", "br")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(brotliCompressed(t, expectedBody))
+	}))
+	defer server.Close()
+
+	client := ExtendedClient{Client: server.Client()}
+	resp, err := client.DoRequest(ctx, SerializableRequest{
+		Method: http.MethodPost,
+		URL:    server.URL,
+		Body:   json.RawMessage(`{}`),
+		Header: http.Header{"Accept-Encoding": []string{"br"}},
+	})
+
+	r.NoError(err)
+	r.NotNil(resp)
+	r.Equal(expectedBody, string(resp.Body))
+	r.Empty(resp.Header.Get("Content-Encoding"), "Content-Encoding should be cleared after decompression")
+}
+
 func brotliCompressed(t *testing.T, input string) []byte {
 	t.Helper()
 
