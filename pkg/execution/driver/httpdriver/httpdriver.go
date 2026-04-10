@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -181,6 +182,15 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 			SDK:            resp.Sdk,
 			Header:         resp.Header,
 		}
+		if !resp.IsSDK {
+			dr.Generator = []*state.GeneratorOpcode{{Op: enums.OpcodeNone}}
+			if resp.SysErr != nil {
+				dr.SetError(resp.SysErr)
+			}
+			dr.SetError(ErrNotSDK)
+			return dr, nil
+		}
+
 		dr.Generator, err = ParseGenerator(ctx, resp.Body, resp.NoRetry)
 		if err != nil {
 			return nil, err
@@ -201,9 +211,6 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 			dr.SetError(resp.SysErr)
 		}
 
-		if !resp.IsSDK {
-			dr.SetError(ErrNotSDK)
-		}
 		return dr, nil
 	}
 

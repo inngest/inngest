@@ -216,6 +216,21 @@ func TestExecuteDriverRequest_DecodesBrotliGeneratorResponse(t *testing.T) {
 	require.Equal(t, "step-id", dr.Generator[0].ID)
 }
 
+func TestHandleHttpResponse_NonSDK206DoesNotParseGenerator(t *testing.T) {
+	dr, err := HandleHttpResponse(context.Background(), Request{}, &Response{
+		Body:       []byte("<html>hi</html>"),
+		StatusCode: http.StatusPartialContent,
+		IsSDK:      false,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, dr)
+	require.Equal(t, "<html>hi</html>", dr.Output)
+	require.Len(t, dr.Generator, 1)
+	require.Equal(t, enums.OpcodeNone, dr.Generator[0].Op)
+	require.Equal(t, ErrNotSDK.Error(), dr.Error())
+}
+
 func TestStreamResponseTooLarge(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data := make([]byte, consts.MaxSDKResponseBodySize+2)
