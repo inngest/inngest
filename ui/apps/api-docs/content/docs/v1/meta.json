@@ -1,4 +1,16 @@
 {
+  "pages": [
+    "---Events---",
+    "...events",
+    "---Function runs---",
+    "...function-runs",
+    "---Signals---",
+    "...signals",
+    "---Cancellations---",
+    "...cancellations",
+    "---Webhooks---",
+    "...webhooks"
+  ],
   "title": "v1",
   "root": false
 }

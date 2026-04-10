@@ -57,11 +57,30 @@ async function main() {
     input: async () => ({ '/api-specs/v2.json': v2Doc }),
   });
 
+  // Clean generated v1 content, preserving hand-written files.
+  const v1Dir = join(appRoot, 'content/docs/v1');
+  const v1IndexPath = join(v1Dir, 'index.mdx');
+  const v1IndexContent = readFileSync(v1IndexPath, 'utf8');
+  rmSync(v1Dir, { recursive: true, force: true });
+  mkdirSync(v1Dir, { recursive: true });
+  writeFileSync(v1IndexPath, v1IndexContent);
+
   console.log('\nGenerating v1 API docs...');
   await generateFiles({
     input: openapiV1,
-    output: join(appRoot, 'content/docs/v1'),
+    output: v1Dir,
     per: 'operation',
+    groupBy: 'tag',
+    meta: { groupStyle: 'separator' },
+    beforeWrite(files) {
+      const topMeta = files.find((f) => f.path === 'meta.json');
+      if (topMeta) {
+        const meta = JSON.parse(topMeta.content);
+        meta.title = 'v1';
+        meta.root = false;
+        topMeta.content = JSON.stringify(meta, null, 2);
+      }
+    },
   });
 
   // Clean generated v2 content so stale files don't accumulate between runs.

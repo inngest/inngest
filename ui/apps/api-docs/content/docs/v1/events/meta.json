@@ -1,0 +1,4 @@
+{
+  "title": "Events",
+  "pages": ["list-v1-events", "get-v1-events-internalID", "get-v1-events-internalID-runs"]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Webhooks",
+  "pages": [
+    "v1GetWebhooks",
+    "v1CreateWebhook",
+    "v1GetWebhook",
+    "v1DeleteWebhook",
+    "v1UpdateWebhook"
+  ]
+}

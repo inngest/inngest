@@ -31,6 +31,7 @@ servers:
 tags:
   - name: Events
   - name: Function runs
+  - name: Signals
   - name: Cancellations
   - name: Webhooks
 paths:
