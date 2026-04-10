@@ -313,6 +313,10 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	if enqueueAt.Before(earliest) {
 		enqueueAt = earliest
 	}
+	// Never enqueue after the fire time — the item must be dequeued before it fires.
+	if enqueueAt.After(fireAt) {
+		enqueueAt = fireAt
+	}
 
 	nextItem := CronItem{
 		ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),

@@ -1140,7 +1140,11 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 
 	// Refresh jitter from the live function config so that config updates
 	// take effect on the next occurrence without depending on FunctionVersion.
-	ci.Jitter = conf.CronJitter(ci.Expression)
+	// The expression should already be present because of the guard above; keep
+	// this defensive check so we do not clear jitter if that assumption changes.
+	if conf.HasCronExpression(ci.Expression) {
+		ci.Jitter = conf.CronJitter(ci.Expression)
+	}
 
 	// enqueue the next schedule
 	_, err = s.croner.ScheduleNext(ctx, ci)
