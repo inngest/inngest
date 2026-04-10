@@ -1,6 +1,7 @@
 package httpdriver
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -242,4 +244,38 @@ func TestTiming(t *testing.T) {
 	require.True(t, result.ServerProcessing > time.Second)
 	require.True(t, result.Total > time.Second)
 	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), fmt.Sprintf("%s:%d", result.ConnectedTo.IP, result.ConnectedTo.Port))
+}
+
+func TestExecuteDriverRequest_DecodesBrotliGeneratorResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Encoding", "br")
+		w.Header().Set(headerSDK, "inngest-js:v3.35.1")
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write(brotliCompressedJSON(t, `[{"op":"StepRun","id":"step-id","name":"step"}]`))
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	dr, _, err := ExecuteDriverRequest(context.Background(), client, Request{
+		URL:     parseURL(ts.URL),
+		Headers: map[string]string{"Accept-Encoding": "br"},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, dr)
+	require.Len(t, dr.Generator, 1)
+	require.Equal(t, enums.OpcodeStepRun, dr.Generator[0].Op)
+	require.Equal(t, "step-id", dr.Generator[0].ID)
+}
+
+func brotliCompressedJSON(t *testing.T, input string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	writer := brotli.NewWriter(&buf)
+	_, err := writer.Write([]byte(input))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	return buf.Bytes()
 }
