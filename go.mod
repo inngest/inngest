@@ -13,6 +13,7 @@ require (
 	github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
 	github.com/VividCortex/ewma v1.2.0
 	github.com/alicebob/miniredis/v2 v2.34.0
+	github.com/andybalholm/brotli v1.0.5
 	github.com/aws/aws-lambda-go v1.41.0
 	github.com/aws/smithy-go v1.20.3
 	github.com/cespare/xxhash/v2 v2.3.0

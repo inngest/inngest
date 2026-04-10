@@ -2,6 +2,7 @@
 package exechttp
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime"
@@ -130,10 +132,20 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 		return nil, fmt.Errorf("nil response received from URL: %s", r.URL)
 	}
 
+	body, bodyEncoding, bodyCloser, err := decodeResponseBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	if bodyCloser != nil {
+		defer func() {
+			_ = bodyCloser.Close()
+		}()
+	}
+
 	// We're going to reassign this to use a LimitReader, ensuring we don't read an infinite amount
 	// of data from the request.  We need to do this so that we can continue to close resp.Body to
 	// release the underlying conn in the above dever.
-	body := io.LimitReader(resp.Body, consts.MaxSDKResponseBodySize+1)
+	body = io.LimitReader(body, consts.MaxSDKResponseBodySize+1)
 
 	if e.publish && r.Publish.ShouldPublish() {
 		rdr, err := realtime.TeeStreamReaderToAPI(body, r.Publish.PublishURL, realtime.TeeStreamOptions{
@@ -170,6 +182,9 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	// Read 1 extra byte above the max so that we can check if the response is too large
 	byt, err := io.ReadAll(body)
 	if err != nil {
+		if bodyEncoding != "" {
+			return nil, fmt.Errorf("error decoding %s response body: %w", bodyEncoding, err)
+		}
 		return nil, ErrUnexpectedEnd
 	}
 
@@ -191,6 +206,31 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	// parse errors into common responses
 	err = CommonHTTPErrors(err)
 	return out, err
+}
+
+func decodeResponseBody(resp *http.Response) (io.Reader, string, io.Closer, error) {
+	encoding := strings.TrimSpace(resp.Header.Get("Content-Encoding"))
+	if encoding == "" {
+		return resp.Body, "", nil, nil
+	}
+
+	normalized := strings.ToLower(encoding)
+	if strings.Contains(normalized, ",") {
+		return nil, "", nil, fmt.Errorf("unsupported content encoding: %q", encoding)
+	}
+
+	switch normalized {
+	case "gzip":
+		reader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("error creating gzip decoder: %w", err)
+		}
+		return reader, normalized, reader, nil
+	case "br":
+		return brotli.NewReader(resp.Body), normalized, nil, nil
+	default:
+		return nil, "", nil, fmt.Errorf("unsupported content encoding: %q", encoding)
+	}
 }
 
 type Response struct {
