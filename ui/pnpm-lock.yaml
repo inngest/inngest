@@ -102,7 +102,7 @@ importers:
         version: 3.2.0(graphql@16.13.2)
       '@headlessui/react':
         specifier: ^1.7.18
-        version: 1.7.19(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 2.2.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@headlessui/tailwindcss':
         specifier: ^0.2.0
         version: 0.2.2(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.3))
@@ -331,7 +331,7 @@ importers:
     dependencies:
       '@headlessui/react':
         specifier: ^1.7.17
-        version: 1.7.19(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 2.2.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@inngest/components':
         specifier: workspace:*
         version: link:../../packages/components
@@ -467,7 +467,7 @@ importers:
         version: 3.2.0(graphql@16.13.2)
       '@headlessui/react':
         specifier: ^2.2.9
-        version: 2.2.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 2.2.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@remixicon/react':
         specifier: ^4.7.0
         version: 4.9.0(react@19.2.4)
@@ -594,7 +594,7 @@ importers:
     dependencies:
       '@headlessui/react':
         specifier: ^1.7.18
-        version: 1.7.19(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 2.2.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@headlessui/tailwindcss':
         specifier: ^0.2.0
         version: 0.2.2(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.3))
@@ -2193,15 +2193,8 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  '@headlessui/react@1.7.19':
-    resolution: {integrity: sha512-Ll+8q3OlMJfJbAKM/+/Y2q6PPYbryqNTXDbryx7SXLIDamkF6iQFbriYHga0dY44PvDhvvBWCx1Xj4U5+G4hOw==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      react: ^16 || ^17 || ^18
-      react-dom: ^16 || ^17 || ^18
-
-  '@headlessui/react@2.2.9':
-    resolution: {integrity: sha512-Mb+Un58gwBn0/yWZfyrCh0TJyurtT+dETj7YHleylHk5od3dv2XqETPGWMyQ5/7sYN7oWdyM1u9MvC0OC8UmzQ==}
+  '@headlessui/react@2.2.10':
+    resolution: {integrity: sha512-5pVLNK9wlpxTUTy9GpgbX/SdcRh+HBnPktjM2wbiLTH4p+2EPHBO1aoSryUCuKUIItdDWO9ITlhUL8UnUN/oIA==}
     engines: {node: '>=10'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -12943,14 +12936,7 @@ snapshots:
       protobufjs: 7.5.4
       yargs: 17.7.2
 
-  '@headlessui/react@1.7.19(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@tanstack/react-virtual': 3.13.23(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      client-only: 0.0.1
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-
-  '@headlessui/react@2.2.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@headlessui/react@2.2.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@floating-ui/react': 0.26.28(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@react-aria/focus': 3.21.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
