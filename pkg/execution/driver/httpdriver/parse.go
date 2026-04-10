@@ -21,6 +21,9 @@ import (
 // an OpcodeStepError was raised with a NonRetriableError.
 func ParseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.GeneratorOpcode, error) {
 	generators, err := parseGenerator(ctx, byt, noRetry)
+	if err != nil {
+		return generators, err
+	}
 	for n, item := range generators {
 		// Ensure that we set no retries on the opcode error directly.
 		// This is needed for the executor to check how to handle the error.
