@@ -11,5 +11,5 @@ const (
 	FnCronName      = InternalNamePrefix + "scheduled.timer"
 	HttpRequestName = InternalNamePrefix + "http.request"
 
-	DeferredStartName = "deferred.start"
+	DeferredStartName = InternalNamePrefix + "deferred.start"
 )

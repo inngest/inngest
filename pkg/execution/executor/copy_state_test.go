@@ -109,7 +109,7 @@ func TestCopyRunState(t *testing.T) {
 	// Step 2: Call copyRunState and inspect the result
 	// ----------------------------------------------------------------
 	t.Run("copyRunState populates steps and embeds original events", func(t *testing.T) {
-		deferredEvt := `{"name":"deferred.start","data":{"fnSlug":"my-fn","runId":"abc"}}`
+		deferredEvt := `{"name":"inngest/deferred.start","data":{"fnSlug":"my-fn","runId":"abc"}}`
 		newState := sv2.CreateState{
 			Steps:  []state.MemoizedStep{},
 			Events: []json.RawMessage{json.RawMessage(deferredEvt)},
@@ -162,7 +162,7 @@ func TestCopyRunState(t *testing.T) {
 	//         survive the full Create → LoadMetadata → LoadSteps round-trip
 	// ----------------------------------------------------------------
 	t.Run("new run has memoized steps after Create", func(t *testing.T) {
-		deferredEvt := `{"name":"deferred.start","data":{"fnSlug":"my-fn","runId":"abc"}}`
+		deferredEvt := `{"name":"inngest/deferred.start","data":{"fnSlug":"my-fn","runId":"abc"}}`
 		newState := sv2.CreateState{
 			Steps:  []state.MemoizedStep{},
 			Events: []json.RawMessage{json.RawMessage(deferredEvt)},
@@ -234,7 +234,7 @@ func TestCopyRunState(t *testing.T) {
 		var storedEvt map[string]any
 		err = json.Unmarshal(storedEvents[0], &storedEvt)
 		require.NoError(t, err)
-		require.Equal(t, "deferred.start", storedEvt["name"])
+		require.Equal(t, "inngest/deferred.start", storedEvt["name"])
 
 		evtData := storedEvt["data"].(map[string]any)
 		origEvt := evtData["event"].(map[string]any)
@@ -317,7 +317,7 @@ func TestCopyRunState_IdempotencyRace(t *testing.T) {
 				EventIDs:        []ulid.ULID{ulid.MustNew(ulid.Now(), rand.Reader)},
 			}),
 		},
-		Events: []json.RawMessage{json.RawMessage(`{"name":"deferred.start","data":{}}`)},
+		Events: []json.RawMessage{json.RawMessage(`{"name":"inngest/deferred.start","data":{}}`)},
 		Steps:  []state.MemoizedStep{}, // NO steps - this is the normal path
 	}
 	_, err = smv2.Create(ctx, normalState)
@@ -344,7 +344,7 @@ func TestCopyRunState_IdempotencyRace(t *testing.T) {
 			EventIDs:        []ulid.ULID{ulid.MustNew(ulid.Now(), rand.Reader)},
 		}),
 	}
-	deferredState.Events = []json.RawMessage{json.RawMessage(`{"name":"deferred.start","data":{}}`)}
+	deferredState.Events = []json.RawMessage{json.RawMessage(`{"name":"inngest/deferred.start","data":{}}`)}
 	_, err = smv2.Create(ctx, deferredState)
 	// This will return ErrIdentifierExists because the normal path already created the state
 	require.ErrorIs(t, err, state.ErrIdentifierExists, "second Create with same idempotency key should conflict")
