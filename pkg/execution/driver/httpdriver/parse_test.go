@@ -1,9 +1,11 @@
 package httpdriver
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,4 +47,55 @@ func TestParseResponse(t *testing.T) {
 		map[string]any{"nested": map[string]any{"deep": "hi"}},
 		ParseResponse([]byte(`"{\"nested\": {\"deep\": \"hi\"}}"`)),
 	)
+}
+
+func TestParseGeneratorAllowsExplicitEmptyArray(t *testing.T) {
+	t.Parallel()
+
+	ops, err := ParseGenerator(context.Background(), []byte("[]"), false)
+	require.NoError(t, err)
+	require.Len(t, ops, 1)
+	require.Equal(t, enums.OpcodeNone, ops[0].Op)
+}
+
+func TestParseGeneratorRejectsInvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseGenerator(context.Background(), []byte("not-json"), false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "error reading generator opcode response")
+}
+
+func TestParseGeneratorRejectsImplicitNoneObject(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseGenerator(context.Background(), []byte(`{}`), false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `must include "op"`)
+}
+
+func TestParseGeneratorRejectsImplicitNoneArrayItem(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseGenerator(context.Background(), []byte(`[{}]`), false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `must include "op"`)
+}
+
+func TestParseGeneratorRejectsNullArrayItem(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseGenerator(context.Background(), []byte(`[null]`), false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `must be an object with an "op" field`)
+}
+
+func TestParseGeneratorAllowsExplicitStepRun(t *testing.T) {
+	t.Parallel()
+
+	ops, err := ParseGenerator(context.Background(), []byte(`[{"op":"StepRun","id":"step-1","name":"step"}]`), false)
+	require.NoError(t, err)
+	require.Len(t, ops, 1)
+	require.Equal(t, enums.OpcodeStepRun, ops[0].Op)
+	require.Equal(t, "step-1", ops[0].ID)
 }

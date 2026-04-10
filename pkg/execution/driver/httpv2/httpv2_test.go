@@ -369,6 +369,21 @@ func TestParseOpcodes(t *testing.T) {
 			expectedOps: []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}},
 		},
 		{
+			name:          "object without op is rejected",
+			input:         []byte(`[{}]`),
+			expectedError: "SDK returned an unexpected response",
+		},
+		{
+			name:          "null opcode is rejected",
+			input:         []byte(`[null]`),
+			expectedError: "SDK returned an unexpected response",
+		},
+		{
+			name:          "top level null is rejected",
+			input:         []byte(`null`),
+			expectedError: "SDK returned an unexpected response",
+		},
+		{
 			name:          "invalid JSON",
 			input:         []byte(`invalid json`),
 			expectedError: "SDK returned an unexpected response",

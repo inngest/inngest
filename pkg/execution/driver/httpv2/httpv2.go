@@ -1,6 +1,7 @@
 package httpv2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -238,8 +239,31 @@ func (d httpv2) async(ctx context.Context, opts driver.V2RequestOpts) (*state.Dr
 }
 
 func parseOpcodes(byt []byte, status int) ([]*state.GeneratorOpcode, errs.UserError) {
+	trimmed := bytes.TrimSpace(byt)
+	if len(trimmed) == 0 || trimmed[0] != '[' {
+		return nil, NewNonGeneratorError(byt, status)
+	}
+
+	rawOps := []json.RawMessage{}
+	if err := json.Unmarshal(trimmed, &rawOps); err != nil {
+		return nil, NewNonGeneratorError(byt, status)
+	}
+
+	for _, raw := range rawOps {
+		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+			return nil, NewNonGeneratorError(byt, status)
+		}
+
+		var payload struct {
+			Op *string `json:"op"`
+		}
+		if err := json.Unmarshal(raw, &payload); err != nil || payload.Op == nil {
+			return nil, NewNonGeneratorError(byt, status)
+		}
+	}
+
 	gen := []*state.GeneratorOpcode{}
-	if err := json.Unmarshal(byt, &gen); err != nil {
+	if err := json.Unmarshal(trimmed, &gen); err != nil {
 		// TODO: ADD UNIT TESTS ASSERTING THAT THE USER ERROR CONTAINS OUR RESPONSE BODY.
 		return nil, NewNonGeneratorError(byt, status)
 	}
@@ -257,6 +281,10 @@ func parseOpcodes(byt []byte, status int) ([]*state.GeneratorOpcode, errs.UserEr
 	// Check every op we've parsed, making sure it adheres to any limits we're
 	// enforcing
 	for _, op := range gen {
+		if op == nil {
+			return nil, NewNonGeneratorError(byt, status)
+		}
+
 		if err := op.Validate(); err != nil {
 			err = fmt.Errorf("error validating generator opcode %s: %w", op.ID, err)
 			return nil, errs.WrapUser(0, false, "invalid opcode: %w", err)
