@@ -382,9 +382,7 @@ func (f Function) ScheduleTriggers() []ScheduledCronTrigger {
 
 		jitter, err := t.CronTrigger.JitterDuration()
 		if err != nil {
-			logger.StdlibLogger(context.Background()).Warn("unparseable cron jitter, defaulting to zero",
-				"error", err,
-			)
+			logger.StdlibLogger(context.Background()).Warn("unparseable cron jitter, defaulting to zero")
 		}
 
 		cronTriggers = append(cronTriggers, ScheduledCronTrigger{
@@ -393,6 +391,17 @@ func (f Function) ScheduleTriggers() []ScheduledCronTrigger {
 		})
 	}
 	return cronTriggers
+}
+
+// CronJitter returns the parsed jitter duration for the given cron expression,
+// or zero if the expression is not found or jitter is not configured.
+func (f Function) CronJitter(expr string) time.Duration {
+	for _, t := range f.ScheduleTriggers() {
+		if t.Expression == expr {
+			return t.Jitter
+		}
+	}
+	return 0
 }
 
 func (f Function) IsBatchEnabled() bool {

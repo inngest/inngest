@@ -1114,7 +1114,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		AppID:          ci.AppID,
 		Function:       *conf,
 		Events:         []event.TrackedEvent{evt},
-		At:             &at,
+		At:             &fireAt,
 		IdempotencyKey: &idempotencyKey,
 	})
 
@@ -1137,6 +1137,10 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	} else {
 		l.Trace("cron function run scheduled", "idempotencyKey", idempotencyKey)
 	}
+
+	// Refresh jitter from the live function config so that config updates
+	// take effect on the next occurrence without depending on FunctionVersion.
+	ci.Jitter = conf.CronJitter(ci.Expression)
 
 	// enqueue the next schedule
 	_, err = s.croner.ScheduleNext(ctx, ci)

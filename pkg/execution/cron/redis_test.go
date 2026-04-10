@@ -866,7 +866,7 @@ func TestRedisCronManager(t *testing.T) {
 			assert.Greater(t, nextItem2.FunctionVersion, nextItem1.FunctionVersion)
 		})
 
-		t.Run("jitter updates only affect future scheduled items", func(t *testing.T) {
+		t.Run("jitter updates with same function version affect the next occurrence", func(t *testing.T) {
 			cronItem := createCronItem(enums.CronOpNew)
 			cronItem.Expression = "0 * * * *"
 			cronItem.Jitter = 5 * time.Minute
@@ -878,9 +878,7 @@ func TestRedisCronManager(t *testing.T) {
 
 			originalFireAt := nextItem1.FireTime()
 
-			cronItemUpdate := cronItem
-			cronItemUpdate.FunctionVersion++
-			cronItemUpdate.Op = enums.CronOpUpdate
+			cronItemUpdate := *nextItem1
 			cronItemUpdate.Jitter = time.Minute
 
 			nextItem2, err := cm.ScheduleNext(ctx, cronItemUpdate)
@@ -888,8 +886,8 @@ func TestRedisCronManager(t *testing.T) {
 			require.NotNil(t, nextItem2)
 
 			assert.True(t, nextItem1.FireTime().Equal(originalFireAt))
-			assert.True(t, nextItem1.ScheduledTime().Equal(nextItem2.ScheduledTime()))
-			assert.NotEqual(t, nextItem1.FunctionVersion, nextItem2.FunctionVersion)
+			assert.Equal(t, nextItem1.FunctionVersion, nextItem2.FunctionVersion)
+			assert.True(t, nextItem2.ScheduledTime().After(nextItem1.ScheduledTime()))
 			assert.GreaterOrEqual(t, nextItem2.FireTime(), nextItem2.ScheduledTime())
 			assert.True(t, nextItem2.FireTime().Before(nextItem2.ScheduledTime().Add(time.Minute)))
 		})

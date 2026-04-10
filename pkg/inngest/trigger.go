@@ -20,7 +20,7 @@ import (
 const (
 	MaxCronLength      = 255
 	MaxEventNameLength = 255
-	MaxCronJitter      = 24 * time.Hour
+	MaxCronJitter      = 5 * time.Minute
 )
 
 // Triggerable represents a single or multiple triggers for a function.

@@ -448,6 +448,33 @@ func TestScheduleTriggers(t *testing.T) {
 	})
 }
 
+func TestCronJitter(t *testing.T) {
+	jitter5m := "5m"
+	jitter1h := "1h"
+
+	f := Function{
+		Triggers: []Trigger{
+			{CronTrigger: &CronTrigger{Cron: "0 9 * * *", Jitter: &jitter5m}},
+			{CronTrigger: &CronTrigger{Cron: "0 * * * *", Jitter: &jitter1h}},
+			{CronTrigger: &CronTrigger{Cron: "*/5 * * * *"}},
+			{EventTrigger: &EventTrigger{Event: "user.created"}},
+		},
+	}
+
+	t.Run("returns jitter for matching expression", func(t *testing.T) {
+		require.Equal(t, 5*time.Minute, f.CronJitter("0 9 * * *"))
+		require.Equal(t, time.Hour, f.CronJitter("0 * * * *"))
+	})
+
+	t.Run("returns zero for expression without jitter", func(t *testing.T) {
+		require.Equal(t, time.Duration(0), f.CronJitter("*/5 * * * *"))
+	})
+
+	t.Run("returns zero for unknown expression", func(t *testing.T) {
+		require.Equal(t, time.Duration(0), f.CronJitter("0 0 * * *"))
+	})
+}
+
 func TestCronTriggerValidate(t *testing.T) {
 	ctx := context.Background()
 

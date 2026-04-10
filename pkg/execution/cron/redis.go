@@ -281,7 +281,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 
 	from := ci.ScheduledTime()
 
-	// Parse the cron expression and get the next execution time
+	// Compute the next canonical cron execution time from `from`.
 	next, err := Next(ci.Expression, from)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
@@ -298,15 +298,20 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion))
 
 	fireAt := next
-	var enqueueAt time.Time
-	internalLeadTime := time.Duration(0)
 	if ci.Jitter > 0 {
 		fireAt = next.Add(deterministicJitter(jobID, ci.Jitter))
-		enqueueAt = fireAt
-	} else {
-		// Preserve existing near-boundary behavior when user-visible jitter is unset.
-		internalLeadTime = generateJitter(c.opt.jitterMin, c.opt.jitterMax)
-		enqueueAt = next.Add(-internalLeadTime)
+	}
+
+	// Apply internal lead time consistently so the queue item is dequeued
+	// slightly before the target time, whether that target is the canonical
+	// boundary (no jitter) or the jittered fire time.
+	internalLeadTime := generateJitter(c.opt.jitterMin, c.opt.jitterMax)
+	enqueueAt := fireAt.Add(-internalLeadTime)
+
+	// Never enqueue earlier than the existing no-jitter behavior would allow.
+	earliest := next.Add(-internalLeadTime)
+	if enqueueAt.Before(earliest) {
+		enqueueAt = earliest
 	}
 
 	nextItem := CronItem{

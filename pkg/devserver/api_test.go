@@ -335,7 +335,6 @@ func TestRegister_CronJitterPropagation(t *testing.T) {
 	items = syncer.Items()
 	require.Len(t, items, 2)
 	require.Equal(t, 1*time.Minute, items[1].Jitter)
-	require.NotEqual(t, items[0].FunctionVersion, items[1].FunctionVersion)
 }
 
 // newTestDevServer creates a test devserver with in-memory data store
