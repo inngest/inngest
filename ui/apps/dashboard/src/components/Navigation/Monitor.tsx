@@ -3,6 +3,7 @@ import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { RiFlaskLine } from '@remixicon/react';
 
 import type { Environment as EnvType } from '@/utils/environments';
 import { getNavRoute } from './Navigation';
@@ -40,6 +41,12 @@ export default function Monitor({
         collapsed={collapsed}
         text="Events"
         icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
+      />
+      <MenuItem
+        to={getNavRoute(activeEnv, 'experiments')}
+        collapsed={collapsed}
+        text="Experiments"
+        icon={<RiFlaskLine className="h-[18px] w-[18px]" />}
       />
       <MenuItem
         to={getNavRoute(activeEnv, 'insights')}
