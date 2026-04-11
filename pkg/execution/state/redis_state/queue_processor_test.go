@@ -412,26 +412,35 @@ func TestQueueRunExtended(t *testing.T) {
 		}
 	}()
 
-	// Wait for all items to complete
+	// Wait for the enqueue phase to finish.
 	<-time.After(enqueueDuration)
 
-	// The default wait
-	wait := atomic.LoadInt32(&delayMax) + atomic.LoadInt32(&jobCompleteMax) + 100
+	// Poll until all enqueued items have been handled instead of using a
+	// fixed sleep.  Items may be delayed by lease expiry when ephemeral
+	// workers are cancelled, and the race detector adds significant
+	// overhead, so a static multiplier is fragile under CI load.
+	waitTimeout := time.Duration(
+		(atomic.LoadInt32(&delayMax)+atomic.LoadInt32(&jobCompleteMax)+100)*8,
+	) * time.Millisecond
+	deadline := time.After(waitTimeout)
 
-	// Increasing, because of the race detector
-	wait = wait * 5
-
-	// We enqueue jobs up to delayMax, and they can take up to jobCompleteMax, so add
-	// 100ms of buffer.
-	<-time.After(time.Duration(wait) * time.Millisecond)
-
-	a := atomic.LoadInt64(&added)
-	h := atomic.LoadInt64(&handled)
-
-	fmt.Printf("Added %d items\n", a)
-	fmt.Printf("Handled %d items\n", h)
-
-	require.EqualValues(t, a, h, "Added %d, handled %d (delta: %d)", a, h, a-h)
+	for {
+		a := atomic.LoadInt64(&added)
+		h := atomic.LoadInt64(&handled)
+		if h >= a {
+			fmt.Printf("Added %d items\n", a)
+			fmt.Printf("Handled %d items\n", h)
+			break
+		}
+		select {
+		case <-deadline:
+			fmt.Printf("Added %d items\n", a)
+			fmt.Printf("Handled %d items\n", h)
+			require.EqualValues(t, a, h, "Added %d, handled %d (delta: %d)", a, h, a-h)
+		case <-time.After(500 * time.Millisecond):
+			// continue polling
+		}
+	}
 
 	cancel()
 

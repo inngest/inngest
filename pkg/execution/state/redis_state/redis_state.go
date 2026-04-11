@@ -829,6 +829,7 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 
 	keys := []string{
 		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
 
 	args := []string{string(byt)}

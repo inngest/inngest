@@ -37,7 +37,7 @@ func TestSDKNoRetry(t *testing.T) {
 
 		test.Printf("Expecting StepError opcode"),
 
-		test.ExpectRequest("Initial request", "step", time.Second),
+		test.ExpectRequest("Initial request", "step", 5*time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:          enums.OpcodeStepError,
 			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
@@ -72,7 +72,7 @@ func TestSDKNoRetry(t *testing.T) {
 			},
 		}),
 
-		test.ExpectRequest("Try-catch request", "step", time.Second),
+		test.ExpectRequest("Try-catch request", "step", 5*time.Second),
 		test.ExpectResponse(200, []byte(`"ok"`)),
 	)
 

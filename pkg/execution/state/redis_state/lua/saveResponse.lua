@@ -23,7 +23,14 @@ local metadataSizeDelta = tonumber(ARGV[3]) or 0
 if redis.call("HEXISTS", keyStep, stepID) == 1 then
 	-- If the data is exactly the same, return -2, indicating an idempotent save req.
 	if redis.call("HGET", keyStep, stepID) == outputData then
-		-- The data is the same.
+		-- Clean up stale pending entries before checking count.
+		local remaining = redis.call("SMEMBERS", keyStepsPending)
+		for _, step in ipairs(remaining) do
+			if redis.call("HEXISTS", keyStep, step) == 1 then
+				redis.call("SREM", keyStepsPending, step)
+			end
+		end
+
 		local hasStepsPending = redis.call("SCARD", keyStepsPending) > 0 and 1 or 0
 		return { -2, hasStepsPending }
 	end
@@ -48,4 +55,14 @@ redis.call("HSET", keyStep, stepID, outputData)
 redis.call("RPUSH", keyStack, stepID)
 
 redis.call("SREM", keyStepsPending, stepID)
+
+-- Clean up stale pending entries that were re-added by a retried savePending
+-- but have already been completed (exist in the actions hash).
+local remaining = redis.call("SMEMBERS", keyStepsPending)
+for _, step in ipairs(remaining) do
+	if redis.call("HEXISTS", keyStep, step) == 1 then
+		redis.call("SREM", keyStepsPending, step)
+	end
+end
+
 return redis.call("SCARD", keyStepsPending) > 0 and { 1 } or { 0 }
