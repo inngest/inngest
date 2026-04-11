@@ -38,8 +38,14 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		return []osqueue.JobResponse{}, nil
 	}
 
+	// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+	members := make([]string, 0, len(jobIDs.Elements)/2)
+	for i := 0; i < len(jobIDs.Elements); i += 2 {
+		members = append(members, jobIDs.Elements[i])
+	}
+
 	// Get all job items.
-	jsonItems, err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hmget().Key(q.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hmget().Key(q.RedisClient.kg.QueueItem()).Field(members...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -128,7 +134,13 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 				continue
 			}
 
-			hmgetCmd := rc.B().Hmget().Key(queueItemKey).Field(res.Elements...).Build()
+			// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+			members := make([]string, 0, len(res.Elements)/2)
+			for i := 0; i < len(res.Elements); i += 2 {
+				members = append(members, res.Elements[i])
+			}
+
+			hmgetCmd := rc.B().Hmget().Key(queueItemKey).Field(members...).Build()
 			vals, err := rc.Do(ctx, hmgetCmd).AsStrSlice()
 			if err != nil && err != rueidis.Nil {
 				return totalRemoved, fmt.Errorf("error checking queue items for status %q: %w", status, err)
@@ -137,7 +149,7 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 			var orphans []string
 			for i, val := range vals {
 				if val == "" {
-					orphans = append(orphans, res.Elements[i])
+					orphans = append(orphans, members[i])
 				}
 			}
 
@@ -667,12 +679,18 @@ func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.Q
 		return []*osqueue.QueueItem{}, nil
 	}
 
+	// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+	members := make([]string, 0, len(itemIDs.Elements)/2)
+	for i := 0; i < len(itemIDs.Elements); i += 2 {
+		members = append(members, itemIDs.Elements[i])
+	}
+
 	items, err := rc.Do(
 		ctx,
 		rc.B().
 			Hmget().
 			Key(kg.QueueItem()).
-			Field(itemIDs.Elements...).
+			Field(members...).
 			Build(),
 	).AsStrSlice()
 	if err != nil {
