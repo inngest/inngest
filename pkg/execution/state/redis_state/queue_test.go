@@ -3318,20 +3318,11 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 
 	_, shard := newQueue(t, rc)
 	ctx := context.Background()
-	kg := &queueKeyGenerator{
-		queueDefaultKey: QueueDefaultKey,
-		queueItemKeyGenerator: queueItemKeyGenerator{
-			queueDefaultKey: QueueDefaultKey,
-		},
-	}
-
 	fnID := uuid.New()
 	acctID := uuid.New()
 	start := time.Now().Truncate(time.Second)
 
-	statusStartKey := kg.Status("start", fnID)
-	statusInProgressKey := kg.Status("in-progress", fnID)
-	statusSleepKey := kg.Status("sleep", fnID)
+
 
 	t.Run("removes start status index", func(t *testing.T) {
 		r.FlushAll()
@@ -3348,20 +3339,17 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the status index was created by enqueue.
-		members, err := r.ZMembers(statusStartKey)
+		count, err := shard.StatusCount(ctx, fnID, "start")
 		require.NoError(t, err)
-		require.Len(t, members, 1, "status:start index should have 1 member after enqueue")
+		require.EqualValues(t, 1, count, "status:start index should have 1 member after enqueue")
 
 		// RemoveQueueItem should clean up the status index.
 		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		// Key may be gone entirely (Redis deletes empty sorted sets).
-		if r.Exists(statusStartKey) {
-			members, err = r.ZMembers(statusStartKey)
-			require.NoError(t, err)
-			require.NotContains(t, members, item.ID)
-		}
+		count, err = shard.StatusCount(ctx, fnID, "start")
+		require.NoError(t, err)
+		require.EqualValues(t, 0, count, "status:start index should be empty after remove")
 	})
 
 	t.Run("removes in-progress status index", func(t *testing.T) {
@@ -3378,18 +3366,16 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		members, err := r.ZMembers(statusInProgressKey)
+		count, err := shard.StatusCount(ctx, fnID, "in-progress")
 		require.NoError(t, err)
-		require.Len(t, members, 1, "status:in-progress index should have 1 member after enqueue")
+		require.EqualValues(t, 1, count, "status:in-progress index should have 1 member after enqueue")
 
 		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		if r.Exists(statusInProgressKey) {
-			members, err = r.ZMembers(statusInProgressKey)
-			require.NoError(t, err)
-			require.NotContains(t, members, item.ID)
-		}
+		count, err = shard.StatusCount(ctx, fnID, "in-progress")
+		require.NoError(t, err)
+		require.EqualValues(t, 0, count, "status:in-progress index should be empty after remove")
 	})
 
 	t.Run("removes sleep status index", func(t *testing.T) {
@@ -3406,18 +3392,16 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		members, err := r.ZMembers(statusSleepKey)
+		count, err := shard.StatusCount(ctx, fnID, "sleep")
 		require.NoError(t, err)
-		require.Len(t, members, 1, "status:sleep index should have 1 member after enqueue")
+		require.EqualValues(t, 1, count, "status:sleep index should have 1 member after enqueue")
 
 		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		if r.Exists(statusSleepKey) {
-			members, err = r.ZMembers(statusSleepKey)
-			require.NoError(t, err)
-			require.NotContains(t, members, item.ID)
-		}
+		count, err = shard.StatusCount(ctx, fnID, "sleep")
+		require.NoError(t, err)
+		require.EqualValues(t, 0, count, "status:sleep index should be empty after remove")
 	})
 
 	t.Run("only removes targeted item from status index", func(t *testing.T) {
@@ -3434,7 +3418,7 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		itemB, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+		_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
@@ -3445,18 +3429,17 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		}, start.Add(time.Second), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		members, err := r.ZMembers(statusStartKey)
+		count, err := shard.StatusCount(ctx, fnID, "start")
 		require.NoError(t, err)
-		require.Len(t, members, 2)
+		require.EqualValues(t, 2, count)
 
 		// Remove only itemA.
 		err = shard.RemoveQueueItem(ctx, fnID.String(), itemA.ID)
 		require.NoError(t, err)
 
-		members, err = r.ZMembers(statusStartKey)
+		count, err = shard.StatusCount(ctx, fnID, "start")
 		require.NoError(t, err)
-		require.Len(t, members, 1)
-		require.Contains(t, members, itemB.ID)
+		require.EqualValues(t, 1, count)
 	})
 
 	t.Run("non-UUID partition skips status index cleanup", func(t *testing.T) {
@@ -3474,9 +3457,9 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		members, err := r.ZMembers(statusStartKey)
+		count, err := shard.StatusCount(ctx, fnID, "start")
 		require.NoError(t, err)
-		require.Contains(t, members, item.ID)
+		require.EqualValues(t, 1, count)
 
 		// Calling with a non-UUID partition should not error, but also won't
 		// clean up status indexes (no function ID to derive keys from).
@@ -3484,8 +3467,8 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		require.NoError(t, err)
 
 		// Status index should still contain the item since we used the wrong partition.
-		members, err = r.ZMembers(statusStartKey)
+		count, err = shard.StatusCount(ctx, fnID, "start")
 		require.NoError(t, err)
-		require.Contains(t, members, item.ID)
+		require.EqualValues(t, 1, count)
 	})
 }
