@@ -101,8 +101,8 @@ importers:
         specifier: ^3.2.0
         version: 3.2.0(graphql@16.13.2)
       '@headlessui/react':
-        specifier: ^1.7.18
-        version: 1.7.19(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^2.2.10
+        version: 2.2.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@headlessui/tailwindcss':
         specifier: ^0.2.0
         version: 0.2.2(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.3))
