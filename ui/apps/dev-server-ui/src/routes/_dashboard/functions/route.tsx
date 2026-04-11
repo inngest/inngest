@@ -82,9 +82,18 @@ const columns = [
   columnHelper.accessor('url', {
     header: () => <span>App URL</span>,
     cell: (props) => {
-      const cleanUrl = new URL(props.getValue() || '');
-      cleanUrl.search = '';
-      return <p className="text-sm">{cleanUrl.toString()}</p>;
+      const value = props.getValue();
+      if (!value) {
+        return <p className="text-sm"></p>;
+      }
+      try {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8288';
+        const cleanUrl = new URL(value, origin);
+        cleanUrl.search = '';
+        return <p className="text-sm">{cleanUrl.toString()}</p>;
+      } catch {
+        return <p className="text-sm">{value}</p>;
+      }
     },
     enableSorting: false,
     enableGlobalFilter: false,
