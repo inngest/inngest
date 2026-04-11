@@ -157,10 +157,10 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 				zremCmd := rc.B().Zrem().Key(key).Member(orphans...).Build()
 				removed, err := rc.Do(ctx, zremCmd).AsInt64()
 				if err != nil {
-					l.Error("error removing orphaned index entries", "error", err, "status", status, "count", len(orphans))
+					l.Error("error removing orphaned index entries", "error", err, "fnID", fnID, "status", status, "count", len(orphans))
 				} else {
 					totalRemoved += removed
-					l.Info("removed orphaned status index entries", "status", status, "removed", removed)
+					l.Info("removed orphaned status index entries", "status", status, "fnID", fnID, "removed", removed, "total_removed", totalRemoved)
 				}
 			}
 

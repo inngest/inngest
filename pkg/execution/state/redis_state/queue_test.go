@@ -3322,8 +3322,6 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 	acctID := uuid.New()
 	start := time.Now().Truncate(time.Second)
 
-
-
 	t.Run("removes start status index", func(t *testing.T) {
 		r.FlushAll()
 
