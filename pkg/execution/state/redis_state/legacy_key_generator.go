@@ -196,6 +196,9 @@ type legacyQueueKeyGenerator interface {
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
 
+	// ActiveRuns returns the key for the sorted set tracking all active runs.
+	ActiveRuns() string
+
 	// ***************** Deprecated ************************
 	BatchPointer(context.Context, uuid.UUID) string
 	Batch(context.Context, ulid.ULID) string
@@ -329,4 +332,8 @@ func (d legacyDefaultQueueKeyGenerator) Status(status string, fnID uuid.UUID) st
 
 func (d legacyDefaultQueueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
 	return fmt.Sprintf("%s:queue:concurrency-ewma:%s", d.Prefix, fnID)
+}
+
+func (d legacyDefaultQueueKeyGenerator) ActiveRuns() string {
+	return fmt.Sprintf("%s:active-runs", d.Prefix)
 }

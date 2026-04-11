@@ -234,6 +234,11 @@ type QueueKeyGenerator interface {
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
 
+	// ActiveRuns returns the key for the sorted set tracking all active (in-progress) runs.
+	// Members are JSON-encoded run identifiers, scored by start time in milliseconds.
+	// This is used by the stale run scavenger to detect orphaned runs.
+	ActiveRuns() string
+
 	// QueuePrefix returns the hash prefix used in the queue.
 	// This is likely going to be a redis specific requirement.
 	QueuePrefix() string
@@ -345,6 +350,10 @@ func (u queueKeyGenerator) Status(status string, fnID uuid.UUID) string {
 
 func (u queueKeyGenerator) ConcurrencyFnEWMA(fnID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:queue:concurrency-ewma:%s", u.queueDefaultKey, fnID)
+}
+
+func (u queueKeyGenerator) ActiveRuns() string {
+	return fmt.Sprintf("{%s}:active-runs", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) AccountPartitionIndex(accountId uuid.UUID) string {

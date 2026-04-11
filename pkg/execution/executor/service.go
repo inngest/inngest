@@ -257,6 +257,10 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 
 func (s *svc) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
+
+	// Start stale run recovery in background (self-contained coordinator).
+	go NewStaleRunRecovery(s.log, s.queue, s.exec).Run(ctx)
+
 	return s.queue.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)

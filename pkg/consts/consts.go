@@ -162,6 +162,19 @@ const (
 	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
 
 	ConstraintAPIScavengerTick = 500 * time.Millisecond
+
+	// StaleRunThreshold is the duration after which a RUNNING run with no outstanding
+	// queue items is considered stale and will be automatically cancelled. This handles
+	// orphaned runs caused by lost events during rolling deployments.
+	StaleRunThreshold = 5 * time.Minute
+
+	// StaleRunScavengerInterval is how frequently the stale run scavenger checks for
+	// orphaned runs.
+	StaleRunScavengerInterval = 30 * time.Second
+
+	// StaleRunScavengerBatchSize is the maximum number of stale run candidates to
+	// process per scavenger tick.
+	StaleRunScavengerBatchSize = 100
 )
 
 var (
