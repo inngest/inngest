@@ -38,8 +38,14 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		return []osqueue.JobResponse{}, nil
 	}
 
+	// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+	members := make([]string, 0, len(jobIDs.Elements)/2)
+	for i := 0; i < len(jobIDs.Elements); i += 2 {
+		members = append(members, jobIDs.Elements[i])
+	}
+
 	// Get all job items.
-	jsonItems, err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hmget().Key(q.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hmget().Key(q.RedisClient.kg.QueueItem()).Field(members...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -98,6 +104,69 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 	}
 
 	return count, nil
+}
+
+func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CleanupStatusIndexes"), redis_telemetry.ScopeQueue)
+
+	l := logger.StdlibLogger(ctx).With("fn_id", fnID.String())
+	rc := q.RedisClient.unshardedRc
+	kg := q.RedisClient.kg
+	queueItemKey := kg.QueueItem()
+
+	var totalRemoved int64
+
+	for _, status := range []string{"start", "in-progress", "sleep"} {
+		key := kg.Status(status, fnID)
+
+		var cursor uint64
+		for {
+			scanCmd := rc.B().Zscan().Key(key).Cursor(cursor).Count(500).Build()
+			res, err := rc.Do(ctx, scanCmd).AsScanEntry()
+			if err != nil {
+				return totalRemoved, fmt.Errorf("error scanning status index %q: %w", status, err)
+			}
+			cursor = res.Cursor
+			var orphans []string
+
+			if len(res.Elements) > 0 {
+				// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+				members := make([]string, 0, len(res.Elements)/2)
+				for i := 0; i < len(res.Elements); i += 2 {
+					members = append(members, res.Elements[i])
+				}
+
+				hmgetCmd := rc.B().Hmget().Key(queueItemKey).Field(members...).Build()
+				vals, err := rc.Do(ctx, hmgetCmd).AsStrSlice()
+				if err != nil && err != rueidis.Nil {
+					return totalRemoved, fmt.Errorf("error checking queue items for status %q: %w", status, err)
+				}
+
+				for i, val := range vals {
+					if val == "" {
+						orphans = append(orphans, members[i])
+					}
+				}
+			}
+
+			if len(orphans) > 0 {
+				zremCmd := rc.B().Zrem().Key(key).Member(orphans...).Build()
+				removed, err := rc.Do(ctx, zremCmd).AsInt64()
+				if err != nil {
+					l.Error("error removing orphaned status index entries", "error", err, "fnID", fnID, "status", status, "count", len(orphans))
+				} else {
+					totalRemoved += removed
+					l.Info("removed orphaned status index entries", "status", status, "fnID", fnID, "removed", removed, "total_removed", totalRemoved)
+				}
+			}
+
+			if cursor == 0 {
+				break
+			}
+		}
+	}
+
+	return totalRemoved, nil
 }
 
 func (q *queue) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error) {
@@ -605,12 +674,18 @@ func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.Q
 		return []*osqueue.QueueItem{}, nil
 	}
 
+	// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+	members := make([]string, 0, len(itemIDs.Elements)/2)
+	for i := 0; i < len(itemIDs.Elements); i += 2 {
+		members = append(members, itemIDs.Elements[i])
+	}
+
 	items, err := rc.Do(
 		ctx,
 		rc.B().
 			Hmget().
 			Key(kg.QueueItem()).
-			Field(itemIDs.Elements...).
+			Field(members...).
 			Build(),
 	).AsStrSlice()
 	if err != nil {
