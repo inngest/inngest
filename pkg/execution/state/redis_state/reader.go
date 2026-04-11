@@ -121,11 +121,8 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 				return totalRemoved, fmt.Errorf("error scanning status index %q: %w", status, err)
 			}
 
-			// ZSCAN returns alternating [member, score, member, score, ...] in Elements.
-			// Extract only the members (even indices).
 			var orphans []string
-			for i := 0; i < len(res.Elements); i += 2 {
-				itemID := res.Elements[i]
+			for _, itemID := range res.Elements {
 				existsCmd := rc.B().Hexists().Key(queueItemKey).Field(itemID).Build()
 				exists, err := rc.Do(ctx, existsCmd).AsBool()
 				if err != nil && !rueidis.IsRedisNil(err) {
