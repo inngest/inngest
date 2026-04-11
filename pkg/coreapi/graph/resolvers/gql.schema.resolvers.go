@@ -577,7 +577,9 @@ func (r *functionRunV2Resolver) Trace(ctx context.Context, obj *models.FunctionR
 
 // TotalCount is the resolver for the totalCount field.
 func (r *runsV2ConnectionResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection, preview *bool) (int, error) {
-	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter, preview)
+	// Pass nil cursor for count queries — totalCount should return the full dataset count,
+	// not the count of remaining rows after a pagination cursor.
+	opts := toRunsQueryOpt(0, nil, obj.OrderBy, obj.Filter, preview)
 	count, err := r.Data.GetTraceRunsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for runs: %w", err)

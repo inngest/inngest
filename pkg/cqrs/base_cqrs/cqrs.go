@@ -2279,22 +2279,109 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	// explicitly set it to zero so it would not attempt to paginate
-	opt.Items = 0
-	var (
-		res []*cqrs.TraceRun
-		err error
-	)
 	if opt.Preview {
-		res, err = w.GetSpanRuns(ctx, opt)
-	} else {
-		res, err = w.GetTraceRuns(ctx, opt)
+		return w.getSpanRunsCount(ctx, opt)
 	}
+	return w.getTraceRunsCount(ctx, opt)
+}
+
+// getTraceRunsCount uses SELECT COUNT(*) against the trace_runs table.
+// When CEL event-ID or output filters are active, it falls back to fetching rows
+// because trigger_ids storage format differs between dialects and output matching
+// requires row materialisation.
+func (w wrapper) getTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	// Check for CEL expressions that require post-query filtering (event-ID or output filters).
+	// These cannot be pushed into a SQL COUNT because trigger_ids is stored as opaque bytes
+	// and output matching requires deserialising each row.
+	if opt.Filter.CEL != "" {
+		expHandler, err := run.NewExpressionHandler(ctx,
+			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+		)
+		if err != nil {
+			return 0, err
+		}
+		if expHandler.HasEventFilters() || expHandler.HasOutputFilters() {
+			// Fall back: fetch all matching rows and count in Go.
+			// Use a local copy to avoid mutating the caller's opt.
+			countOpt := opt
+			countOpt.Items = 0
+			res, err := w.GetTraceRuns(ctx, countOpt)
+			if err != nil {
+				return 0, err
+			}
+			return len(res), nil
+		}
+	}
+
+	builder := newRunsQueryBuilder(ctx, opt)
+	// ignore builder.order for count queries — ORDER BY with COUNT errors on Postgres
+
+	query, args, err := sq.Dialect(w.dialect()).
+		From("trace_runs").
+		Select(sq.COUNT("*").As("count")).
+		Where(builder.filter...).
+		ToSQL()
 	if err != nil {
 		return 0, err
 	}
 
-	return len(res), nil
+	var count int64
+	err = w.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
+// getSpanRunsCount uses SELECT COUNT(DISTINCT run_id) against the spans table.
+func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	adapter := w.spanRunsAdapter()
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+
+	// Parse CEL expressions for additional filters
+	var celFilters []sq.Expression
+	var useJoin bool
+	if opt.Filter.CEL != "" {
+		expHandler, err := run.NewExpressionHandler(ctx,
+			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+			run.WithExpressionSQLConverter(adapter.celConverter),
+		)
+		if err != nil {
+			return 0, err
+		}
+		if expHandler.HasFilters() {
+			celFilters, err = expHandler.ToSQLFilters(ctx)
+			if err != nil {
+				return 0, err
+			}
+			useJoin = needsEventJoin(opt.Filter.CEL)
+		}
+	}
+
+	allFilters := append(builder.filter, celFilters...)
+
+	q := sq.Dialect(adapter.dialect).From("spans")
+	if useJoin {
+		q = adapter.buildEventJoin(q)
+	}
+
+	q = q.Select(sq.L("COUNT(DISTINCT spans.run_id)").As("count")).
+		Where(sq.L("spans.dynamic_span_id").In(
+			sq.Dialect(adapter.dialect).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+		)).
+		Where(allFilters...)
+
+	query, args, err := q.ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	err = w.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
@@ -2333,7 +2420,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	// change this to a continuous loop with limits instead of just attempting to grab everything.
 	// might not matter though since this is primarily meant for local
 	// development
-	sql, args, err := sq.Dialect(w.dialect()).
+	q := sq.Dialect(w.dialect()).
 		From("trace_runs").
 		Select(
 			"app_id",
@@ -2353,8 +2440,13 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"has_ai",
 		).
 		Where(filter...).
-		Order(order...).
-		ToSQL()
+		Order(order...)
+
+	if opt.Items > 0 {
+		q = q.Limit(opt.Items + 1) // fetch one extra to determine hasNextPage
+	}
+
+	sql, args, err := q.ToSQL()
 	if err != nil {
 		return nil, err
 	}
@@ -2791,14 +2883,24 @@ func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerCon
 }
 
 func (w wrapper) GetWorkerConnectionsCount(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) (int, error) {
-	// explicitly set it to zero so it would not attempt to paginate
-	opt.Items = 0
-	res, err := w.GetWorkerConnections(ctx, opt)
+	builder := newWorkerConnectionsQueryBuilder(ctx, opt)
+	// ignore builder.order for count queries — ORDER BY with COUNT errors on Postgres
+
+	query, args, err := sq.Dialect(w.dialect()).
+		From("worker_connections").
+		Select(sq.COUNT("*").As("count")).
+		Where(builder.filter...).
+		ToSQL()
 	if err != nil {
 		return 0, err
 	}
 
-	return len(res), nil
+	var count int64
+	err = w.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
 }
 
 func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) ([]*cqrs.WorkerConnection, error) {
