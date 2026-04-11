@@ -100,6 +100,64 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 	return count, nil
 }
 
+func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CleanupStatusIndexes"), redis_telemetry.ScopeQueue)
+
+	l := logger.StdlibLogger(ctx).With("fn_id", fnID.String())
+	rc := q.RedisClient.unshardedRc
+	kg := q.RedisClient.kg
+	queueItemKey := kg.QueueItem()
+
+	var totalRemoved int64
+
+	for _, status := range []string{"start", "in-progress", "sleep"} {
+		key := kg.Status(status, fnID)
+
+		var cursor uint64
+		for {
+			scanCmd := rc.B().Zscan().Key(key).Cursor(cursor).Count(500).Build()
+			res, err := rc.Do(ctx, scanCmd).AsScanEntry()
+			if err != nil {
+				return totalRemoved, fmt.Errorf("error scanning status index %q: %w", status, err)
+			}
+
+			// ZSCAN returns alternating [member, score, member, score, ...] in Elements.
+			// Extract only the members (even indices).
+			var orphans []string
+			for i := 0; i < len(res.Elements); i += 2 {
+				itemID := res.Elements[i]
+				existsCmd := rc.B().Hexists().Key(queueItemKey).Field(itemID).Build()
+				exists, err := rc.Do(ctx, existsCmd).AsBool()
+				if err != nil && !rueidis.IsRedisNil(err) {
+					l.Error("error checking queue item existence", "error", err, "item_id", itemID, "status", status)
+					continue
+				}
+				if !exists {
+					orphans = append(orphans, itemID)
+				}
+			}
+
+			if len(orphans) > 0 {
+				zremCmd := rc.B().Zrem().Key(key).Member(orphans...).Build()
+				removed, err := rc.Do(ctx, zremCmd).AsInt64()
+				if err != nil {
+					l.Error("error removing orphaned index entries", "error", err, "status", status, "count", len(orphans))
+				} else {
+					totalRemoved += removed
+					l.Info("removed orphaned status index entries", "status", status, "removed", removed)
+				}
+			}
+
+			cursor = res.Cursor
+			if cursor == 0 {
+				break
+			}
+		}
+	}
+
+	return totalRemoved, nil
+}
+
 func (q *queue) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
 
