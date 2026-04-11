@@ -126,30 +126,26 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 			if err != nil {
 				return totalRemoved, fmt.Errorf("error scanning status index %q: %w", status, err)
 			}
-
-			if len(res.Elements) == 0 {
-				if res.Cursor == 0 {
-					break
-				}
-				continue
-			}
-
-			// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
-			members := make([]string, 0, len(res.Elements)/2)
-			for i := 0; i < len(res.Elements); i += 2 {
-				members = append(members, res.Elements[i])
-			}
-
-			hmgetCmd := rc.B().Hmget().Key(queueItemKey).Field(members...).Build()
-			vals, err := rc.Do(ctx, hmgetCmd).AsStrSlice()
-			if err != nil && err != rueidis.Nil {
-				return totalRemoved, fmt.Errorf("error checking queue items for status %q: %w", status, err)
-			}
-
+			cursor = res.Cursor
 			var orphans []string
-			for i, val := range vals {
-				if val == "" {
-					orphans = append(orphans, members[i])
+
+			if len(res.Elements) > 0 {
+				// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+				members := make([]string, 0, len(res.Elements)/2)
+				for i := 0; i < len(res.Elements); i += 2 {
+					members = append(members, res.Elements[i])
+				}
+
+				hmgetCmd := rc.B().Hmget().Key(queueItemKey).Field(members...).Build()
+				vals, err := rc.Do(ctx, hmgetCmd).AsStrSlice()
+				if err != nil && err != rueidis.Nil {
+					return totalRemoved, fmt.Errorf("error checking queue items for status %q: %w", status, err)
+				}
+
+				for i, val := range vals {
+					if val == "" {
+						orphans = append(orphans, members[i])
+					}
 				}
 			}
 
@@ -164,7 +160,6 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 				}
 			}
 
-			cursor = res.Cursor
 			if cursor == 0 {
 				break
 			}
