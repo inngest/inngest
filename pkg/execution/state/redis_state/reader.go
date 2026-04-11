@@ -121,16 +121,23 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 				return totalRemoved, fmt.Errorf("error scanning status index %q: %w", status, err)
 			}
 
-			var orphans []string
-			for _, itemID := range res.Elements {
-				existsCmd := rc.B().Hexists().Key(queueItemKey).Field(itemID).Build()
-				exists, err := rc.Do(ctx, existsCmd).AsBool()
-				if err != nil && !rueidis.IsRedisNil(err) {
-					l.Error("error checking queue item existence", "error", err, "item_id", itemID, "status", status)
-					continue
+			if len(res.Elements) == 0 {
+				if res.Cursor == 0 {
+					break
 				}
-				if !exists {
-					orphans = append(orphans, itemID)
+				continue
+			}
+
+			hmgetCmd := rc.B().Hmget().Key(queueItemKey).Field(res.Elements...).Build()
+			vals, err := rc.Do(ctx, hmgetCmd).AsStrSlice()
+			if err != nil && err != rueidis.Nil {
+				return totalRemoved, fmt.Errorf("error checking queue items for status %q: %w", status, err)
+			}
+
+			var orphans []string
+			for i, val := range vals {
+				if val == "" {
+					orphans = append(orphans, res.Elements[i])
 				}
 			}
 
