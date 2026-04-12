@@ -66,11 +66,10 @@ func MSet(client Client, ctx context.Context, kvs map[string]string) map[string]
 	}
 
 	cmds := mgetcmdsp.Get(0, len(kvs))
-	defer mgetcmdsp.Put(cmds)
 	for k, v := range kvs {
 		cmds.s = append(cmds.s, client.B().Set().Key(k).Value(v).Build().Pin())
 	}
-	return doMultiSet(client, ctx, cmds.s)
+	return doMultiSet(client, ctx, cmds)
 }
 
 // MDel is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into DELs
@@ -85,11 +84,10 @@ func MDel(client Client, ctx context.Context, keys []string) map[string]error {
 	}
 
 	cmds := mgetcmdsp.Get(len(keys), len(keys))
-	defer mgetcmdsp.Put(cmds)
 	for i, k := range keys {
 		cmds.s[i] = client.B().Del().Key(k).Build().Pin()
 	}
-	return doMultiSet(client, ctx, cmds.s)
+	return doMultiSet(client, ctx, cmds)
 }
 
 // MSetNX is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into MSETNXs or multiple SETNXs
@@ -104,11 +102,10 @@ func MSetNX(client Client, ctx context.Context, kvs map[string]string) map[strin
 	}
 
 	cmds := mgetcmdsp.Get(0, len(kvs))
-	defer mgetcmdsp.Put(cmds)
 	for k, v := range kvs {
 		cmds.s = append(cmds.s, client.B().Set().Key(k).Value(v).Nx().Build().Pin())
 	}
-	return doMultiSet(client, ctx, cmds.s)
+	return doMultiSet(client, ctx, cmds)
 }
 
 // JsonMGetCache is a helper that consults the client-side caches with multiple keys by grouping keys within the same slot into multiple JSON.GETs
@@ -150,11 +147,10 @@ func JsonMSet(client Client, ctx context.Context, kvs map[string]string, path st
 	}
 
 	cmds := mgetcmdsp.Get(0, len(kvs))
-	defer mgetcmdsp.Put(cmds)
 	for k, v := range kvs {
 		cmds.s = append(cmds.s, client.B().JsonSet().Key(k).Path(path).Value(v).Build().Pin())
 	}
-	return doMultiSet(client, ctx, cmds.s)
+	return doMultiSet(client, ctx, cmds)
 }
 
 // DecodeSliceOfJSON is a helper that struct-scans each RedisMessage into dest, which must be a slice of the pointer.
@@ -236,15 +232,27 @@ func doMultiCache(cc Client, ctx context.Context, cmds []CacheableTTL, keys []st
 	return ret, nil
 }
 
-func doMultiSet(cc Client, ctx context.Context, cmds []Completed) (ret map[string]error) {
+// doMultiSet runs DoMulti, recycles each Completed on success, and returns buf to
+// mgetcmdsp when every result has no non-Redis error. If any non-Redis error
+// occurs (e.g. context deadline), the auto-pipelining writer may still be
+// reading buf.s, so buf is not Put back.
+func doMultiSet(cc Client, ctx context.Context, buf *mgetcmds) (ret map[string]error) {
+	cmds := buf.s
 	ret = make(map[string]error, len(cmds))
 	resps := cc.DoMulti(ctx, cmds...)
+	recycle := true
 	for i, resp := range resps {
-		if ret[cmds[i].Commands()[1]] = resp.Error(); resp.NonRedisError() == nil {
+		ret[cmds[i].Commands()[1]] = resp.Error()
+		if resp.NonRedisError() != nil {
+			recycle = false
+		} else {
 			intl.PutCompletedForce(cmds[i])
 		}
 	}
 	resultsp.Put(&redisresults{s: resps})
+	if recycle {
+		mgetcmdsp.Put(buf)
+	}
 	return ret
 }
 
@@ -265,7 +273,6 @@ func clusterMGet(client Client, ctx context.Context, keys []string) (ret map[str
 	hint := len(keys) / 2
 	slotIdx := make(map[uint16]int, hint)
 	cmds := mgetcmdsp.Get(0, hint)
-	defer mgetcmdsp.Put(cmds)
 
 	for _, key := range keys {
 		slot := intl.Slot(key)
@@ -289,11 +296,9 @@ func clusterMGet(client Client, ctx context.Context, keys []string) (ret map[str
 		for j, val := range arr {
 			ret[cmds.s[i].Commands()[j+1]] = val
 		}
-	}
-
-	for i := range cmds.s {
 		intl.PutCompletedForce(cmds.s[i])
 	}
+	mgetcmdsp.Put(cmds)
 	return ret, nil
 }
 
@@ -307,7 +312,6 @@ func clusterJsonMGet(client Client, ctx context.Context, keys []string, path str
 	hint := len(keys) / 2
 	slotIdx := make(map[uint16]int, hint)
 	cmds := mgetcmdsp.Get(0, hint)
-	defer mgetcmdsp.Put(cmds)
 
 	for _, key := range keys {
 		slot := intl.Slot(key)
@@ -335,11 +339,9 @@ func clusterJsonMGet(client Client, ctx context.Context, keys []string, path str
 		for j, val := range arr {
 			ret[cmds.s[i].Commands()[j+1]] = val
 		}
-	}
-
-	for i := range cmds.s {
 		intl.PutCompletedForce(cmds.s[i])
 	}
+	mgetcmdsp.Put(cmds)
 	return ret, nil
 }
 

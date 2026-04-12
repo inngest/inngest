@@ -21,7 +21,7 @@ import (
 )
 
 const LibName = "rueidis"
-const LibVer = "1.0.73"
+const LibVer = "1.0.74"
 
 var (
 	noHello = regexp.MustCompile("unknown command .?(HELLO|hello).?")
@@ -57,6 +57,7 @@ type wire interface {
 
 	CleanSubscriptions()
 	SetPubSubHooks(hooks PubSubHooks) <-chan error
+	GetPubSubHooks() PubSubHooks
 	SetOnCloseHook(fn func(error))
 	StopTimer() bool
 	ResetTimer() bool
@@ -434,7 +435,8 @@ func (p *pipe) _background() {
 	p.nsubs.Close()
 	p.psubs.Close()
 	p.ssubs.Close()
-	if old := p.pshks.Swap(emptypshks); old.close != nil {
+	old := p.pshks.Swap(emptypshks)
+	if old.close != nil {
 		old.close <- err
 		close(old.close)
 	}
@@ -450,6 +452,9 @@ func (p *pipe) _background() {
 	}
 	if p.onInvalidations != nil {
 		p.onInvalidations(nil)
+	}
+	if old.hooks.onInvalidations != nil {
+		old.hooks.onInvalidations(nil)
 	}
 
 	resp := newErrResult(err)
@@ -743,64 +748,89 @@ func (p *pipe) handlePush(values []RedisMessage) (reply bool, unsubscribe bool) 
 				p.onInvalidations(values[1].values())
 			}
 		}
+		if fn := p.pshks.Load().hooks.onInvalidations; fn != nil {
+			if values[1].IsNil() {
+				fn(nil)
+			} else {
+				fn(values[1].values())
+			}
+		}
 	case "message":
 		if len(values) >= 3 {
 			m := PubSubMessage{Channel: values[1].string(), Message: values[2].string()}
 			p.nsubs.Publish(values[1].string(), m)
-			p.pshks.Load().hooks.OnMessage(m)
+			if fn := p.pshks.Load().hooks.OnMessage; fn != nil {
+				fn(m)
+			}
 		}
 	case "pmessage":
 		if len(values) >= 4 {
 			m := PubSubMessage{Pattern: values[1].string(), Channel: values[2].string(), Message: values[3].string()}
 			p.psubs.Publish(values[1].string(), m)
-			p.pshks.Load().hooks.OnMessage(m)
+			if fn := p.pshks.Load().hooks.OnMessage; fn != nil {
+				fn(m)
+			}
 		}
 	case "smessage":
 		if len(values) >= 3 {
 			m := PubSubMessage{Channel: values[1].string(), Message: values[2].string()}
 			p.ssubs.Publish(values[1].string(), m)
-			p.pshks.Load().hooks.OnMessage(m)
+			if fn := p.pshks.Load().hooks.OnMessage; fn != nil {
+				fn(m)
+			}
 		}
 	case "unsubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.nsubs.Unsubscribe(s)
-			p.pshks.Load().hooks.OnSubscription(s)
+			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
+				fn(s)
+			}
 		}
 		return true, true
 	case "punsubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.psubs.Unsubscribe(s)
-			p.pshks.Load().hooks.OnSubscription(s)
+			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
+				fn(s)
+			}
 		}
 		return true, true
 	case "sunsubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.ssubs.Unsubscribe(s)
-			p.pshks.Load().hooks.OnSubscription(s)
+			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
+				fn(s)
+			}
 		}
 		return true, true
 	case "subscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.nsubs.Confirm(s)
-			p.pshks.Load().hooks.OnSubscription(s)
+			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
+				fn(s)
+			}
 		}
 		return true, false
 	case "psubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.psubs.Confirm(s)
-			p.pshks.Load().hooks.OnSubscription(s)
+			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
+				fn(s)
+			}
 		}
 		return true, false
 	case "ssubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.ssubs.Confirm(s)
-			p.pshks.Load().hooks.OnSubscription(s)
+			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
+				fn(s)
+			}
 		}
 		return true, false
 	}
@@ -892,6 +922,16 @@ func (p *pipe) CleanSubscriptions() {
 	}
 }
 
+func (p *pipe) GetPubSubHooks() PubSubHooks {
+	if p.r2p != nil {
+		return p.r2p.pipe(context.Background()).GetPubSubHooks()
+	}
+	if pshks := p.pshks.Load(); pshks != emptypshks {
+		return pshks.hooks
+	}
+	return PubSubHooks{}
+}
+
 func (p *pipe) SetPubSubHooks(hooks PubSubHooks) <-chan error {
 	if p.r2p != nil {
 		return p.r2p.pipe(context.Background()).SetPubSubHooks(hooks)
@@ -901,12 +941,6 @@ func (p *pipe) SetPubSubHooks(hooks PubSubHooks) <-chan error {
 			close(old.close)
 		}
 		return nil
-	}
-	if hooks.OnMessage == nil {
-		hooks.OnMessage = func(m PubSubMessage) {}
-	}
-	if hooks.OnSubscription == nil {
-		hooks.OnSubscription = func(s PubSubSubscription) {}
 	}
 	ch := make(chan error, 1)
 	if old := p.pshks.Swap(&pshks{hooks: hooks, close: ch}); old.close != nil {
@@ -1784,13 +1818,7 @@ type pshks struct {
 	close chan error
 }
 
-var emptypshks = &pshks{
-	hooks: PubSubHooks{
-		OnMessage:      func(m PubSubMessage) {},
-		OnSubscription: func(s PubSubSubscription) {},
-	},
-	close: nil,
-}
+var emptypshks = &pshks{}
 
 var emptyclhks = func(error) {}
 

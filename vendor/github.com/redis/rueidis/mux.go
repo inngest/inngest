@@ -394,8 +394,12 @@ func (m *mux) Acquire(ctx context.Context) wire {
 }
 
 func (m *mux) Store(w wire) {
+	hasOnInvalidations := w.GetPubSubHooks().onInvalidations != nil
 	w.SetPubSubHooks(PubSubHooks{})
 	w.CleanSubscriptions()
+	if hasOnInvalidations {
+		w.Do(context.Background(), cmds.ClientTrackingOffCmd)
+	}
 	m.dpool.Store(w)
 }
 
