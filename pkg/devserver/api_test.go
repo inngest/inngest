@@ -27,23 +27,16 @@ import (
 )
 
 type capturingCronSyncer struct {
-	mu    sync.Mutex
 	items []cronpkg.CronItem
 }
 
 func (c *capturingCronSyncer) Sync(_ context.Context, ci cronpkg.CronItem) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.items = append(c.items, ci)
 	return nil
 }
 
 func (c *capturingCronSyncer) Items() []cronpkg.CronItem {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	out := make([]cronpkg.CronItem, len(c.items))
-	copy(out, c.items)
-	return out
+	return c.items
 }
 
 func TestRegister_FunctionVersionIncrement(t *testing.T) {
@@ -312,18 +305,27 @@ func TestRegister_CronJitterPropagation(t *testing.T) {
 		Functions: []sdk.SDKFunction{sdkFunction},
 	}
 
+	// Create a test devserver with in-memory data store
+	// and a capturing cron syncer
 	ds := newTestDevServer(t)
 	syncer := &capturingCronSyncer{}
 	ds.CronSyncer = syncer
 	api := &devapi{devserver: ds}
 
+	// register the app with a cron function that has jitter configured
 	_, err := api.register(ctx, req)
 	require.NoError(t, err)
 
+	// Verify the cron item was synced
 	items := syncer.Items()
 	require.Len(t, items, 1)
 	require.Equal(t, "0 * * * *", items[0].Expression)
-	require.Equal(t, 5*time.Minute, items[0].Jitter)
+
+	// Verify jitter is persisted in the function config and retrievable.
+	fns, err := ds.Data.Functions(ctx)
+	require.NoError(t, err)
+	require.Len(t, fns, 1)
+	require.Equal(t, 5*time.Minute, fns[0].CronJitter("0 * * * *"))
 
 	updatedJitter := "1m"
 	sdkFunction.Triggers[0].CronTrigger.Jitter = &updatedJitter
@@ -332,9 +334,15 @@ func TestRegister_CronJitterPropagation(t *testing.T) {
 	_, err = api.register(ctx, req)
 	require.NoError(t, err)
 
+	// Verify the cron item was synced a second time again with the updated jitter
 	items = syncer.Items()
 	require.Len(t, items, 2)
-	require.Equal(t, 1*time.Minute, items[1].Jitter)
+
+	// Verify updated jitter is in the function config.
+	fns, err = ds.Data.Functions(ctx)
+	require.NoError(t, err)
+	require.Len(t, fns, 1)
+	require.Equal(t, 1*time.Minute, fns[0].CronJitter("0 * * * *"))
 }
 
 // newTestDevServer creates a test devserver with in-memory data store

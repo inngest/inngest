@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
@@ -57,12 +58,9 @@ type CronManager interface {
 
 // CronItem represent an item that can be scheduled via the cron expression
 type CronItem struct {
-	// ID remains the stable identity for the cron occurrence.
-	//
-	// Historically, the ULID timestamp implicitly represented the cron boundary. New code
-	// should prefer ScheduledTime() for the canonical cron boundary and FireTime() for the
-	// actual dispatch time. ScheduledTime() intentionally falls back to ID.Timestamp() for
-	// older payloads that predate explicit ScheduledAt/FireAt fields.
+	// ID embeds the time this job needs to run if it's a process type
+	// ULID was chosen as a convinent way to provide a unique identifier with a timestamp
+	// embedded in it
 	ID ulid.ULID `json:"id"`
 	// Tenant
 	AccountID       uuid.UUID `json:"acctID"`
@@ -72,13 +70,6 @@ type CronItem struct {
 	FunctionVersion int       `json:"fnV"`
 	// Expression is the actual cron expression being used
 	Expression string `json:"expr"`
-	// ScheduledAt stores the canonical cron boundary for this occurrence in Unix milliseconds.
-	// This remains the stable identity of the cron occurrence.
-	ScheduledAt int64 `json:"scheduledAt,omitempty"`
-	// FireAt stores the actual randomized dispatch time for this occurrence in Unix milliseconds.
-	FireAt int64 `json:"fireAt,omitempty"`
-	// Jitter is the parsed, user-configured post-boundary delay window for this cron expression.
-	Jitter time.Duration `json:"jitter,omitempty"`
 	// JobID stores queue item ID that's supposed to be handling this cron item.
 	// This is only available if it's a process type.
 	//
@@ -94,18 +85,17 @@ func (i CronItem) SyncID() string {
 	return fmt.Sprintf("%s:sync", i.ID)
 }
 
-func (i CronItem) ScheduledTime() time.Time {
-	if i.ScheduledAt != 0 {
-		return time.UnixMilli(i.ScheduledAt)
+// DeterministicJitter returns a stable jitter duration in (0, max] derived from
+// the given seed string using xxhash. The same seed always produces the same result.
+// The result is always at least 1ns so that jittered times are strictly after the
+// canonical boundary.
+func DeterministicJitter(seed string, max time.Duration) time.Duration {
+	if max <= 0 {
+		return 0
 	}
-	return i.ID.Timestamp()
-}
 
-func (i CronItem) FireTime() time.Time {
-	if i.FireAt != 0 {
-		return time.UnixMilli(i.FireAt)
-	}
-	return i.ScheduledTime()
+	rangeNs := uint64(max / time.Nanosecond)
+	return time.Duration(xxhash.Sum64String(seed)%rangeNs) + 1
 }
 
 type CronHealthCheckStatus struct {

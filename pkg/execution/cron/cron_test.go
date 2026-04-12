@@ -11,6 +11,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDeterministicJitter(t *testing.T) {
+	t.Run("returns zero for non-positive max", func(t *testing.T) {
+		assert.Zero(t, DeterministicJitter("seed", 0))
+	})
+
+	t.Run("is stable for the same seed and bounded by max", func(t *testing.T) {
+		j1 := DeterministicJitter("same-seed", 5*time.Minute)
+		j2 := DeterministicJitter("same-seed", 5*time.Minute)
+
+		assert.Equal(t, j1, j2)
+		assert.Greater(t, j1, time.Duration(0))
+		assert.LessOrEqual(t, j1, 5*time.Minute)
+	})
+}
+
 func TestCronItem(t *testing.T) {
 
 	t.Run("SyncID", func(t *testing.T) {
