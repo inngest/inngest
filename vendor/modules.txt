@@ -672,7 +672,7 @@ github.com/fsnotify/fsnotify/internal
 github.com/getkin/kin-openapi/openapi2
 github.com/getkin/kin-openapi/openapi2conv
 github.com/getkin/kin-openapi/openapi3
-# github.com/getsentry/sentry-go v0.45.0
+# github.com/getsentry/sentry-go v0.45.1
 ## explicit; go 1.24.0
 github.com/getsentry/sentry-go
 github.com/getsentry/sentry-go/attribute
