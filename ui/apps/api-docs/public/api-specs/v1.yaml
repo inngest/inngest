@@ -74,7 +74,7 @@ paths:
           required: false
           schema:
             type: string
-      operationId: list-v1-events
+      operationId: ListEvents
       responses:
         '200':
           description: The response when listing events.
@@ -354,7 +354,7 @@ paths:
                       - 'null'
                   status:
                     type: integer
-      operationId: get-v1-events-internalID
+      operationId: GetEvent
       x-stoplight:
         id: pswkqb7u3obet
       description: 'Retrieve a single event within your environment, given its internal ID'
@@ -498,7 +498,7 @@ paths:
                       - 'null'
                   status:
                     type: integer
-      operationId: get-v1-events-internalID-runs
+      operationId: ListEventRuns
       x-stoplight:
         id: yoyeen3mu7wj0
       description: Returns function runs initialized by the given event
@@ -640,7 +640,7 @@ paths:
                       - 'null'
                   status:
                     type: integer
-      operationId: get-v1-runs-runID
+      operationId: GetRun
       x-stoplight:
         id: ojjs82y5lmbwq
       description: Returns a single function run by its run ID
@@ -653,7 +653,7 @@ paths:
             type: string
     delete:
       summary: Cancel a function run
-      operationId: delete-v1-runs-runID
+      operationId: CancelRun
       responses:
         '200':
           description: OK
@@ -730,7 +730,7 @@ paths:
                 required:
                   - data
                   - metadata
-      operationId: get-v1-runs-runID-jobs
+      operationId: GetRunJobs
       x-stoplight:
         id: fgnob41ksy695
       description: |-
@@ -759,7 +759,7 @@ paths:
           required: false
           schema:
             type: string
-      operationId: v1-resume-signal
+      operationId: ResumeSignal
       responses:
         '200':
           description: The run ID of the run resumed.
@@ -883,7 +883,7 @@ paths:
                           x-stoplight:
                             id: 3gce6zim8zjku
                       x-readme-ref-name: Cancellation
-      operationId: get-v1-cancellations
+      operationId: ListCancellations
       x-stoplight:
         id: yhygl2rzix8xf
       description: Returns all cancellations in your environment
@@ -898,7 +898,7 @@ paths:
       summary: Create a cancellation
       tags:
         - Cancellations
-      operationId: post-v1-cancellations
+      operationId: CreateCancellation
       responses:
         '200':
           description: OK
@@ -1012,7 +1012,7 @@ paths:
       responses:
         '200':
           description: Cancellation deleted
-      operationId: delete-v1-cancellations-id
+      operationId: DeleteCancellation
       x-stoplight:
         id: ythdnvv40r4ar
       description: 'Delete a cancellation, preventing the cancellation from stopping function runs between the given dates with a given expression.'
@@ -1025,7 +1025,7 @@ paths:
             type: string
   /v1/webhooks:
     get:
-      operationId: v1GetWebhooks
+      operationId: ListWebhooks
       summary: Get webhooks
       description: Get all webhook endpoints in the given environment.
       tags:
@@ -1046,7 +1046,7 @@ paths:
                         transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
                         url: 'https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw'
     post:
-      operationId: v1CreateWebhook
+      operationId: CreateWebhook
       summary: Create webhook
       description: Create a new webhook endpoint with the given configuration.
       tags:
@@ -1080,7 +1080,7 @@ paths:
         description: uuid
         required: true
     get:
-      operationId: v1GetWebhook
+      operationId: GetWebhook
       summary: Get webhook
       description: Get a webhook endpoint's configuration
       tags:
@@ -1101,7 +1101,7 @@ paths:
                       transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
                       url: 'https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw'
     put:
-      operationId: v1UpdateWebhook
+      operationId: UpdateWebhook
       summary: Update webhook
       description: Update a webhook endpoint's configuration
       tags:
@@ -1127,7 +1127,7 @@ paths:
                       transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
                       url: 'https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw'
     delete:
-      operationId: v1DeleteWebhook
+      operationId: DeleteWebhook
       summary: Delete webhook
       description: Delete a webhook endpoint
       tags:

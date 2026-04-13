@@ -102,7 +102,7 @@
             }
           }
         ],
-        "operationId": "list-v1-events",
+        "operationId": "ListEvents",
         "responses": {
           "200": {
             "description": "The response when listing events.",
@@ -459,7 +459,7 @@
             }
           }
         },
-        "operationId": "get-v1-events-internalID",
+        "operationId": "GetEvent",
         "x-stoplight": {
           "id": "pswkqb7u3obet"
         },
@@ -624,7 +624,7 @@
             }
           }
         },
-        "operationId": "get-v1-events-internalID-runs",
+        "operationId": "ListEventRuns",
         "x-stoplight": {
           "id": "yoyeen3mu7wj0"
         },
@@ -786,7 +786,7 @@
             }
           }
         },
-        "operationId": "get-v1-runs-runID",
+        "operationId": "GetRun",
         "x-stoplight": {
           "id": "ojjs82y5lmbwq"
         },
@@ -805,7 +805,7 @@
       },
       "delete": {
         "summary": "Cancel a function run",
-        "operationId": "delete-v1-runs-runID",
+        "operationId": "CancelRun",
         "responses": {
           "200": {
             "description": "OK"
@@ -910,7 +910,7 @@
             }
           }
         },
-        "operationId": "get-v1-runs-runID-jobs",
+        "operationId": "GetRunJobs",
         "x-stoplight": {
           "id": "fgnob41ksy695"
         },
@@ -944,7 +944,7 @@
             }
           }
         ],
-        "operationId": "v1-resume-signal",
+        "operationId": "ResumeSignal",
         "responses": {
           "200": {
             "description": "The run ID of the run resumed.",
@@ -1116,7 +1116,7 @@
             }
           }
         },
-        "operationId": "get-v1-cancellations",
+        "operationId": "ListCancellations",
         "x-stoplight": {
           "id": "yhygl2rzix8xf"
         },
@@ -1136,7 +1136,7 @@
       "post": {
         "summary": "Create a cancellation",
         "tags": ["Cancellations"],
-        "operationId": "post-v1-cancellations",
+        "operationId": "CreateCancellation",
         "responses": {
           "200": {
             "description": "OK",
@@ -1300,7 +1300,7 @@
             "description": "Cancellation deleted"
           }
         },
-        "operationId": "delete-v1-cancellations-id",
+        "operationId": "DeleteCancellation",
         "x-stoplight": {
           "id": "ythdnvv40r4ar"
         },
@@ -1320,7 +1320,7 @@
     },
     "/v1/webhooks": {
       "get": {
-        "operationId": "v1GetWebhooks",
+        "operationId": "ListWebhooks",
         "summary": "Get webhooks",
         "description": "Get all webhook endpoints in the given environment.",
         "tags": ["Webhooks"],
@@ -1352,7 +1352,7 @@
         }
       },
       "post": {
-        "operationId": "v1CreateWebhook",
+        "operationId": "CreateWebhook",
         "summary": "Create webhook",
         "description": "Create a new webhook endpoint with the given configuration.",
         "tags": ["Webhooks"],
@@ -1404,7 +1404,7 @@
         }
       ],
       "get": {
-        "operationId": "v1GetWebhook",
+        "operationId": "GetWebhook",
         "summary": "Get webhook",
         "description": "Get a webhook endpoint's configuration",
         "tags": ["Webhooks"],
@@ -1434,7 +1434,7 @@
         }
       },
       "put": {
-        "operationId": "v1UpdateWebhook",
+        "operationId": "UpdateWebhook",
         "summary": "Update webhook",
         "description": "Update a webhook endpoint's configuration",
         "tags": ["Webhooks"],
@@ -1473,7 +1473,7 @@
         }
       },
       "delete": {
-        "operationId": "v1DeleteWebhook",
+        "operationId": "DeleteWebhook",
         "summary": "Delete webhook",
         "description": "Delete a webhook endpoint",
         "tags": ["Webhooks"],
