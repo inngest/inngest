@@ -67,12 +67,6 @@ func (d httpv2) Do(ctx context.Context, sl sv2.StateLoader, opts driver.V2Reques
 	return d.async(ctx, opts)
 }
 
-// sync re-enters synchronous functions, allowing regular API endpoints to be resumed as if they're
-// generic async functions.
-//
-// sync entry is relatively simple: we re-execute a specific API request, and we add Inngest-specific
-// headers to the request.  The SDK will then fetch the requisite function state such that it can resume
-// where it left off.
 // loadHTTPRequestEvent attempts to load the triggering event from state and parse
 // it as an HTTP request event. Returns nil if loading fails, the event name doesn't
 // match, or the event can't be parsed.
@@ -95,6 +89,12 @@ func loadHTTPRequestEvent(ctx context.Context, sl sv2.StateLoader, id sv2.ID) *i
 	return evt
 }
 
+// sync re-enters synchronous functions, allowing regular API endpoints to be resumed as if they're
+// generic async functions.
+//
+// sync entry is relatively simple: we re-execute a specific API request, and we add Inngest-specific
+// headers to the request.  The SDK will then fetch the requisite function state such that it can resume
+// where it left off.
 func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
 	method := http.MethodPost
 	if m, _ := opts.Fn.Driver.Metadata["method"].(string); m != "" {
