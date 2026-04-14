@@ -379,15 +379,15 @@ export const NewCodeBlock = ({
                     </span>
                   )}
                 </code>
-                {hoveredPath && (
+                <span className={hoveredPath ? '' : 'invisible'}>
                   <CopyButton
                     size="small"
-                    code={hoveredPath}
+                    code={hoveredPath ?? ''}
                     isCopying={isCopying}
                     handleCopyClick={handleCopyClick}
                     appearance="ghost"
                   />
-                )}
+                </span>
               </div>
             </div>
           ) : (
@@ -446,15 +446,15 @@ export const NewCodeBlock = ({
                       </span>
                     )}
                   </code>
-                  {cursorPath && (
+                  <span className={cursorPath ? '' : 'invisible'}>
                     <CopyButton
                       size="small"
-                      code={cursorPath}
+                      code={cursorPath ?? ''}
                       isCopying={isCopying}
                       handleCopyClick={handleCopyClick}
                       appearance="ghost"
                     />
-                  )}
+                  </span>
                 </div>
               )}
             </div>
