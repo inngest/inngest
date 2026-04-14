@@ -194,6 +194,8 @@ export const NewCodeBlock = ({
   const [mode, setMode] = useState<'tree' | 'raw'>('raw');
   const [wordWrap, setWordWrap] = useLocalStorage('wordWrap', false);
   const { handleCopyClick, isCopying } = useCopyToClipboard();
+  // Shared across tree view and raw editor JSON path bars. If both modes are enabled,
+  // copying in one then switching can briefly show a stale "Copied" state in the other.
   const { handleCopyClick: handlePathCopyClick, isCopying: isPathCopying } = useCopyToClipboard();
   const [editEmtpy, setEditEmtpy] = useState(false);
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
