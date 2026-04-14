@@ -371,7 +371,7 @@ export const NewCodeBlock = ({
                   getItemString={() => null}
                 />
               </div>
-              <div className="bg-canvasSubtle text-muted border-subtle flex shrink-0 items-center justify-between border-t px-3 py-1">
+              <div className="bg-canvasSubtle text-muted border-subtle flex min-h-8 shrink-0 items-center justify-between border-t px-3 py-1">
                 <code className="truncate font-mono text-xs">
                   {hoveredPath || (
                     <span className="text-muted flex items-center gap-1">
@@ -380,15 +380,15 @@ export const NewCodeBlock = ({
                     </span>
                   )}
                 </code>
-                <span className={hoveredPath ? '' : 'invisible'}>
+                {hoveredPath && (
                   <CopyButton
                     size="small"
-                    code={hoveredPath ?? ''}
+                    code={hoveredPath}
                     isCopying={isPathCopying}
                     handleCopyClick={handlePathCopyClick}
                     appearance="outlined"
                   />
-                </span>
+                )}
               </div>
             </div>
           ) : (
@@ -438,7 +438,7 @@ export const NewCodeBlock = ({
                 />
               </div>
               {language === 'json' && (
-                <div className="bg-canvasSubtle text-muted border-subtle flex shrink-0 items-center justify-between border-t px-3 py-1">
+                <div className="bg-canvasSubtle text-muted border-subtle flex min-h-8 shrink-0 items-center justify-between border-t px-3 py-1">
                   <code className="truncate font-mono text-xs">
                     {cursorPath || (
                       <span className="text-muted flex items-center gap-1">
@@ -447,15 +447,15 @@ export const NewCodeBlock = ({
                       </span>
                     )}
                   </code>
-                  <span className={cursorPath ? '' : 'invisible'}>
+                  {cursorPath && (
                     <CopyButton
                       size="small"
-                      code={cursorPath ?? ''}
+                      code={cursorPath}
                       isCopying={isPathCopying}
                       handleCopyClick={handlePathCopyClick}
                       appearance="outlined"
                     />
-                  </span>
+                  )}
                 </div>
               )}
             </div>
