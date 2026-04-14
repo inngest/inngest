@@ -623,3 +623,14 @@ func HistogramStateWrittenCounter(ctx context.Context, bytes int64, opts Histogr
 		Boundaries:  stateStoreBytesWrittenBoundaries,
 	})
 }
+
+func HistogramConstraintAPISemaphoreDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_semaphore_duration",
+		Description: "Distribution of semaphore manager operation duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
