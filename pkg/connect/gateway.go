@@ -331,27 +331,27 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				return
 			}
 
-				// Wait for the worker to close the connection, worker should make sure that it established
-				// a new connection before closing the current one.
-				var workerClosed bool
-				select {
-				case <-workerDrainedCtx.Done():
-					ch.log.Debug("worker closed connection")
-					workerClosed = true
-				case <-time.After(c.drainAckTimeout):
-					ch.log.Debug("timed out waiting for drain ack, marking connection as draining")
-				}
+			// Wait for the worker to close the connection, worker should make sure that it established
+			// a new connection before closing the current one.
+			var workerClosed bool
+			select {
+			case <-workerDrainedCtx.Done():
+				ch.log.Debug("worker closed connection")
+				workerClosed = true
+			case <-time.After(c.drainAckTimeout):
+				ch.log.Debug("timed out waiting for drain ack, marking connection as draining")
+			}
 
-				// Only upsert the DRAINING status when the drain-ack timeout
-				// fired. When the worker closed first, the deferred cleanup
-				// is already running DeleteConnection; upserting here would
-				// race with that delete and potentially re-create an
-				// already-removed connection in Redis.
-				if !workerClosed {
-					if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
-						ch.log.ReportError(statusErr, "could not update connection status after drain ack")
-					}
+			// Only upsert the DRAINING status when the drain-ack timeout
+			// fired. When the worker closed first, the deferred cleanup
+			// is already running DeleteConnection; upserting here would
+			// race with that delete and potentially re-create an
+			// already-removed connection in Redis.
+			if !workerClosed {
+				if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
+					ch.log.ReportError(statusErr, "could not update connection status after drain ack")
 				}
+			}
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
 
 			for _, l := range c.lifecycles {
