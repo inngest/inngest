@@ -194,6 +194,7 @@ export const NewCodeBlock = ({
   const [mode, setMode] = useState<'tree' | 'raw'>('raw');
   const [wordWrap, setWordWrap] = useLocalStorage('wordWrap', false);
   const { handleCopyClick, isCopying } = useCopyToClipboard();
+  const { handleCopyClick: handlePathCopyClick, isCopying: isPathCopying } = useCopyToClipboard();
   const [editEmtpy, setEditEmtpy] = useState(false);
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [cursorPath, setCursorPath] = useState<string | null>(null);
@@ -383,9 +384,9 @@ export const NewCodeBlock = ({
                   <CopyButton
                     size="small"
                     code={hoveredPath ?? ''}
-                    isCopying={isCopying}
-                    handleCopyClick={handleCopyClick}
-                    appearance="ghost"
+                    isCopying={isPathCopying}
+                    handleCopyClick={handlePathCopyClick}
+                    appearance="outlined"
                   />
                 </span>
               </div>
@@ -450,9 +451,9 @@ export const NewCodeBlock = ({
                     <CopyButton
                       size="small"
                       code={cursorPath ?? ''}
-                      isCopying={isCopying}
-                      handleCopyClick={handleCopyClick}
-                      appearance="ghost"
+                      isCopying={isPathCopying}
+                      handleCopyClick={handlePathCopyClick}
+                      appearance="outlined"
                     />
                   </span>
                 </div>
