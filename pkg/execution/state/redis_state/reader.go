@@ -109,7 +109,7 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CleanupStatusIndexes"), redis_telemetry.ScopeQueue)
 
-	l := logger.StdlibLogger(ctx).With("fn_id", fnID.String())
+	l := logger.StdlibLogger(ctx).With("fn_id", fnID.String(), "method", "CleanupStatusIndexes", "queue_shard", q.Name())
 	rc := q.RedisClient.unshardedRc
 	kg := q.RedisClient.kg
 	queueItemKey := kg.QueueItem()
@@ -153,14 +153,16 @@ func (q *queue) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64
 				zremCmd := rc.B().Zrem().Key(key).Member(orphans...).Build()
 				removed, err := rc.Do(ctx, zremCmd).AsInt64()
 				if err != nil {
-					l.Error("error removing orphaned status index entries", "error", err, "fnID", fnID, "status", status, "count", len(orphans))
+					l.Error("error removing orphaned status index entries", "error", err, "status", status, "count", len(orphans))
 				} else {
 					totalRemoved += removed
-					l.Info("removed orphaned status index entries", "status", status, "fnID", fnID, "removed", removed, "total_removed", totalRemoved)
+					l.Info("removed orphaned status index entries", "status", status, "removed", removed)
 				}
 			}
 
+			l.Debug("scanning status index for orphans", "status_key", key, "cursor", cursor, "orphans_found", len(orphans), "queue_items_found", len(res.Elements), "total_removed", totalRemoved)
 			if cursor == 0 {
+				l.Debug("no more items to scan in status index", "status_key", key, "queue_shard", q.Name())
 				break
 			}
 		}
