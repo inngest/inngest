@@ -267,6 +267,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		if err != nil {
 			return err
 		}
+		realtimePubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		realtimeSubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
 	} else {
 		// Use in-memory Redis
 		shardedRc, shardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
