@@ -689,7 +689,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{
 				lifecycles.NewHistoryLifecycle(dbcqrs),
-				lifecycles.NewSemaphoreLifecycleListener(semaphores),
+				lifecycles.NewSemaphoreLifecycleListener(semaphores, time.Time{}),
 			}),
 	)
 
