@@ -31,7 +31,7 @@ func DurationWithTags[T any](ctx context.Context, queueShardName string, op stri
 
 	d := time.Since(start)
 	if d > time.Second {
-		logger.StdlibLogger(ctx).Warn("queue operation took >1s", "op", op, "duration", d)
+		logger.StdlibLogger(ctx).Warn("queue operation took >1s", "op", op, "duration", d.String(), "queue_shard", queueShardName)
 	}
 	metrics.HistogramQueueOperationDuration(
 		ctx,
