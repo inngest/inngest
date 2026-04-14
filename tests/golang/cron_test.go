@@ -260,14 +260,7 @@ func TestCronAddCronTrigger(t *testing.T) {
 // TestCronJitter verifies that a cron function with jitter configured fires
 // with both scheduledAt and fireAt in the event data, and that fireAt is
 // within the jitter window.
-//
-// TODO: This test is skipped because inngestgo's CronTrigger does not have a
-// Jitter field yet. The test uses CronTriggerWithJitter which requires a
-// vendor patch to inngestgo. Once inngestgo adds Jitter support upstream,
-// remove the t.Skip, revert the vendor patch, and replace
-// CronTriggerWithJitter with the official SDK API.
 func TestCronJitter(t *testing.T) {
-	t.Skip("requires inngestgo SDK support for jitter field on CronTrigger")
 	t.Parallel()
 	ctx := context.Background()
 
@@ -288,9 +281,7 @@ func TestCronJitter(t *testing.T) {
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "cron-jitter-test"},
-		// TODO: replace with inngestgo.CronTriggerWithJitter("* * * * *", "30s")
-		// once inngestgo adds the Jitter field.
-		inngestgo.CronTrigger("* * * * *"),
+		inngestgo.CronTriggerWithJitter("* * * * *", jitterDuration),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID
@@ -338,6 +329,91 @@ func TestCronJitter(t *testing.T) {
 	})
 }
 
+// TestCronJitterRemovalAppliesToCurrentOccurrence verifies that removing jitter
+// before the next cron boundary causes the current occurrence to use the
+// canonical boundary rather than the previously registered jitter.
+func TestCronJitterRemovalAppliesToCurrentOccurrence(t *testing.T) {
+	// Note - this test intentionally does not run in parallel to avoid contention with other tests.
+	ctx := context.Background()
+
+	r := require.New(t)
+	c := client.New(t)
+
+	// ensures 20s before the next minute to both register and update cron configurations
+	waitForSafeCronWindow(t, 20*time.Second)
+
+	appID := randomSuffix("cron-jitter-update")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
+
+	var (
+		counter    int32
+		runID      string
+		executedAt atomic.Value
+	)
+
+	// Register with 50s jitter first.
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "cron-jitter-test"},
+		inngestgo.CronTriggerWithJitter("* * * * *", 50*time.Second),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+			executedAt.Store(time.Now().UTC())
+			atomic.AddInt32(&counter, 1)
+			return "schedule done", nil
+		},
+	)
+	r.NoError(err)
+	registerFuncs()
+
+	// Re-register without jitter. Since handleCron() reads jitter from the
+	// live config, removing jitter should cause the current occurrence to fire
+	// at the canonical boundary.
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "cron-jitter-test"},
+		inngestgo.CronTrigger("* * * * *"),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+			executedAt.Store(time.Now().UTC())
+			atomic.AddInt32(&counter, 1)
+			return "schedule done", nil
+		},
+	)
+	r.NoError(err)
+	registerFuncs()
+
+	r.Eventually(func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 121*time.Second, 5*time.Second)
+
+	run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted})
+	r.NotNil(run.CronSchedule)
+	r.Equal("* * * * *", *run.CronSchedule)
+
+	trigger := c.RunTrigger(ctx, runID)
+	require.NotNil(t, trigger)
+	require.NotNil(t, trigger.Cron)
+	require.GreaterOrEqual(t, len(trigger.Payloads), 1)
+
+	_, scheduledAt, fireAt := parseCronTriggerPayload(t, trigger.Payloads[0])
+	executedAtVal := executedAt.Load()
+	require.NotNil(t, executedAtVal, "executedAt should be captured in the function body")
+	executedAtTime, ok := executedAtVal.(time.Time)
+	require.True(t, ok, "executedAt should be a time.Time")
+
+	assert.True(t, !fireAt.Before(scheduledAt), "fireAt %s should not be before scheduledAt %s", fireAt, scheduledAt)
+	assert.True(t, fireAt.Equal(scheduledAt), "fireAt %s should equal scheduledAt %s once jitter is removed", fireAt, scheduledAt)
+	assert.True(t, !executedAtTime.Before(scheduledAt), "executedAt %s should not be before scheduledAt %s", executedAtTime, scheduledAt)
+	tolerance := 10 * time.Second
+	assert.True(t, !executedAtTime.After(fireAt.Add(tolerance)), "executedAt %s should not be too much after fireAt %s (tolerance %s)", executedAtTime, fireAt, tolerance)
+}
+
 // parseCronTriggerPayload is a helper function to parse the payload of a cron trigger
 // and extract the scheduledAt and fireAt times for assertions in tests.
 func parseCronTriggerPayload(t *testing.T, raw string) (cronTriggerPayload, time.Time, time.Time) {
@@ -355,4 +431,17 @@ func parseCronTriggerPayload(t *testing.T, raw string) (cronTriggerPayload, time
 	require.NoError(t, err)
 
 	return payload, scheduledAt, fireAt
+}
+
+// waitForSafeCronWindow ensures we have enough "minLead" seconds before the next minute
+// boundary to both register and update cron configurations within the same interval
+func waitForSafeCronWindow(t *testing.T, minLead time.Duration) {
+	t.Helper()
+
+	now := time.Now().UTC()
+	nextBoundary := now.Truncate(time.Minute).Add(time.Minute)
+	untilBoundary := time.Until(nextBoundary)
+	if untilBoundary < minLead {
+		time.Sleep(untilBoundary + 2*time.Second)
+	}
 }
