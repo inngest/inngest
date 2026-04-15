@@ -46,7 +46,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "sonner": "^1.2.0",
-    "srvx": "0.8.15",
+    "srvx": "0.11.13",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.0.0",
     "urql": "^4.0.5",
