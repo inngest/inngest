@@ -66,6 +66,7 @@ for i = 1, eventCount do
 
   local idemKey = string.format(idemKeyFmt, prefix, eventID)
   local newEvent = redis.call("SET", idemKey, "1", "NX", "EX", idempotenceSetTTL)
+  if not newEvent then newEvent = false end
   -- TODO: Remove this legacy check. All old sorted sets should expire within 30 min after deploy.
   if newEvent and redis.call("ZSCORE", legacyIdempotenceKey, eventID) then
     newEvent = false
