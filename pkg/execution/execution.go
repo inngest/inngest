@@ -27,6 +27,21 @@ const (
 	SdkInvokeTimeoutError = "InngestInvokeTimeoutError"
 )
 
+type Scheduler interface {
+	// Schedule is called to schedule a given function with the given event.  This
+	// creates a new function run by initializing blank function state and placing
+	// the run in the queue.
+	//
+	// Note that the executor does *not* handle rate limiting, debouncing, batching,
+	// expressions, etc.  Any Schedule request will immediately be scheduled for the
+	// given time. Filtering of events in any way must be handled prior scheduling.
+	Schedule(ctx context.Context, r ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error)
+
+	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
+
+	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
+}
+
 // Executor manages executing actions.  It interfaces over a state store to save
 // action and workflow data once an action finishes or fails.  Once a function
 // finishes, its children become available to execute.  This is not handled
@@ -53,14 +68,10 @@ const (
 // for storing the outcome of an action via Resume and Fail at any point after an
 // action has started.
 type Executor interface {
-	// Schedule is called to schedule a given function with the given event.  This
-	// creates a new function run by initializing blank function state and placing
-	// the run in the queue.
-	//
-	// Note that the executor does *not* handle rate limiting, debouncing, batching,
-	// expressions, etc.  Any Schedule request will immediately be scheduled for the
-	// given time. Filtering of events in any way must be handled prior scheduling.
-	Schedule(ctx context.Context, r ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error)
+	// Scheduler is embedded so that the Executor can delegate scheduling calls
+	// (Schedule, AppendAndScheduleBatch, RetrieveAndScheduleBatch) to an
+	// underlying scheduler.
+	Scheduler
 
 	// Execute runs the given function via the execution drivers.  If the
 	// from ID is "$trigger" this is treated as a new workflow invocation from the
@@ -129,13 +140,6 @@ type Executor interface {
 
 	// InvokeFailHandler invokes the invoke fail handler.
 	InvokeFailHandler(context.Context, InvokeFailHandlerOpts) error
-
-	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
-
-	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
-
-	// NOTE: Temporary for manually resuming pauses, you likely shouldn't use this
-	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error)
 }
 
 // RunContext provides the context needed for HandleGenerator execution without

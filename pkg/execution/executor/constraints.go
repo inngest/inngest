@@ -278,7 +278,7 @@ func stepSemaphores(md sv2.Metadata) []constraintapi.Semaphore {
 
 // evaluateFnConcurrency evaluates function concurrency limits against event data
 // and returns the corresponding semaphore entries to store in run metadata.
-func (e *executor) evaluateFnConcurrency(
+func evaluateFnConcurrency(
 	ctx context.Context,
 	accountID, functionID uuid.UUID,
 	fnLimits []inngest.FnConcurrency,

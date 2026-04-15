@@ -483,7 +483,47 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
+	lifecycleListeners := []execution.LifecycleListener{
+		history.NewLifecycleListener(
+			nil,
+			hd,
+			hmw,
+		),
+		Lifecycle{
+			Cqrs:       dbcqrs,
+			Pb:         pb,
+			EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
+		},
+		run.NewTraceLifecycleListener(nil),
+	}
+
+	sched, err := executor.NewScheduler(
+		executor.WithSchedulerLogger(l),
+		executor.WithSchedulerStateManager(smv2),
+		executor.WithSchedulerPauseManager(pauseMgr),
+		executor.WithSchedulerProducer(rq),
+		executor.WithSchedulerJobQueueReader(rq),
+		executor.WithSchedulerTraceReader(dbcqrs),
+		executor.WithSchedulerTracerProvider(tp),
+		executor.WithSchedulerRateLimiter(rl),
+		executor.WithSchedulerDebouncer(debouncer),
+		executor.WithSchedulerSingletonManager(sn),
+		executor.WithSchedulerBatcher(batcher),
+		executor.WithSchedulerCapacityManager(cm),
+		executor.WithSchedulerUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			return true
+		}),
+		executor.WithSchedulerEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
+			return false
+		}),
+		executor.WithSchedulerLifecycleListeners(lifecycleListeners...),
+	)
+	if err != nil {
+		return err
+	}
+
 	executorOpts := []executor.ExecutorOpt{
+		executor.WithScheduler(sched),
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
@@ -491,7 +531,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
-		executor.WithRateLimiter(rl),
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
@@ -502,21 +541,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}
 			return []byte(*opts.SigningKey), nil
 		}),
-		executor.WithLifecycleListeners(
-			append([]execution.LifecycleListener{
-				history.NewLifecycleListener(
-					nil,
-					hd,
-					hmw,
-				),
-				Lifecycle{
-					Cqrs:       dbcqrs,
-					Pb:         pb,
-					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
-				},
-				run.NewTraceLifecycleListener(nil),
-			}, metrics.NewLifecycleListeners()...)...,
-		),
+		executor.WithLifecycleListeners(lifecycleListeners...),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
 				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
@@ -535,12 +560,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithInvokeEventHandler(getInvokeEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithDebouncer(debouncer),
-		executor.WithSingletonManager(sn),
-		executor.WithBatcher(batcher),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTraceReader(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
@@ -550,14 +571,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-		executor.WithCapacityManager(cm),
 		executor.WithSemaphoreManager(semaphores),
-		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}),
-		executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
-			return false
-		}),
 	}
 
 	exec, err := executor.NewExecutor(executorOpts...)
