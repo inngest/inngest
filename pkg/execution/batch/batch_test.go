@@ -479,55 +479,6 @@ func TestPerEventIdempotenceKeys(t *testing.T) {
 	require.Equal(t, enums.BatchAppend, res.Status)
 }
 
-// TestPerEventIdempotenceLegacyFallback verifies that events written to the legacy
-// sorted set before migration are still deduped via the ZSCORE fallback.
-func TestPerEventIdempotenceLegacyFallback(t *testing.T) {
-	r := miniredis.RunT(t)
-
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	bm := NewRedisBatchManager(bc, nil, WithoutBuffer())
-
-	fnId := uuid.New()
-	fn := inngest.Function{
-		ID: fnId,
-		EventBatch: &inngest.EventBatchConfig{
-			MaxSize: 100,
-			Timeout: "60s",
-		},
-	}
-
-	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
-	bi := BatchItem{
-		AccountID:  uuid.New(),
-		FunctionID: fnId,
-		EventID:    eventID,
-		Event:      event.Event{ID: "test"},
-	}
-
-	// Simulate a legacy event by writing directly to the old sorted set
-	legacyKey := bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)
-	r.ZAdd(legacyKey, float64(time.Now().Unix()), eventID.String())
-
-	// Append the same event — should be rejected via legacy fallback
-	res, err := bm.Append(context.Background(), bi, fn)
-	require.NoError(t, err)
-	require.Equal(t, enums.BatchItemExists, res.Status)
-
-	// A different event should go through fine
-	bi2 := bi
-	bi2.EventID = ulid.MustNew(ulid.Now(), rand.Reader)
-	res, err = bm.Append(context.Background(), bi2, fn)
-	require.NoError(t, err)
-	require.Equal(t, enums.BatchNew, res.Status)
-}
-
 // TestPerEventIdempotenceBulkAppend verifies per-event dedup works in the bulk append path.
 func TestPerEventIdempotenceBulkAppend(t *testing.T) {
 	r := miniredis.RunT(t)
@@ -587,49 +538,6 @@ func TestPerEventIdempotenceBulkAppend(t *testing.T) {
 	require.Equal(t, 1, res.Duplicates)
 }
 
-// TestPerEventIdempotenceBulkAppendLegacyFallback verifies the legacy ZSCORE fallback
-// works in the bulk append path.
-func TestPerEventIdempotenceBulkAppendLegacyFallback(t *testing.T) {
-	r := miniredis.RunT(t)
-
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	mgr := NewRedisBatchManager(bc, nil, WithoutBuffer())
-	bm := mgr.(*redisBatchManager)
-
-	fnId := uuid.New()
-	fn := inngest.Function{
-		ID: fnId,
-		EventBatch: &inngest.EventBatchConfig{
-			MaxSize: 100,
-			Timeout: "60s",
-		},
-	}
-
-	legacyEventID := ulid.MustNew(ulid.Now(), rand.Reader)
-	newEventID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-	// Simulate legacy event in the old sorted set
-	legacyKey := bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)
-	r.ZAdd(legacyKey, float64(time.Now().Unix()), legacyEventID.String())
-
-	items := []BatchItem{
-		{AccountID: uuid.New(), FunctionID: fnId, EventID: legacyEventID, Event: event.Event{ID: "legacy"}},
-		{AccountID: uuid.New(), FunctionID: fnId, EventID: newEventID, Event: event.Event{ID: "new"}},
-	}
-
-	res, err := bm.BulkAppend(context.Background(), items, fn)
-	require.NoError(t, err)
-	require.Equal(t, 1, res.Committed)
-	require.Equal(t, 1, res.Duplicates)
-}
-
 func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -643,7 +551,7 @@ func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
 	// Set a 5s TTL on per-event idem keys to ensure they expire after inactivity.
 	// Disable buffer to test direct append behavior.
-	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchIdempotenceSetTTL(5), WithRedisBatchIdempotenceSetCleanupCutoff(300))
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchIdempotenceSetTTL(5))
 
 	accountId := uuid.New()
 	fnId := uuid.New()
