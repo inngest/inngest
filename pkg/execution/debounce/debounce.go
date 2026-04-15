@@ -203,11 +203,11 @@ type RunDebounceResult struct {
 	EventID string
 }
 
-func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primaryQueueShard queue.QueueShard, primaryQueueManager queue.QueueManager) Debouncer {
+func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primaryQueueShard queue.QueueShard, primaryQueueProducer queue.Producer) Debouncer {
 	return debouncer{
 		c:                     clockwork.NewRealClock(),
 		primaryDebounceClient: primaryDebounceClient,
-		primaryQueueManager:   primaryQueueManager,
+		primaryQueueProducer:  primaryQueueProducer,
 		primaryQueueShard:     primaryQueueShard,
 		shouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return false
@@ -218,12 +218,12 @@ func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primar
 type DebouncerOpts struct {
 	// Destination/Target: New system queue + colocated debounce state shard
 	PrimaryDebounceClient *redis_state.DebounceClient
-	PrimaryQueue          queue.QueueManager
+	PrimaryQueue          queue.Producer
 	PrimaryQueueShard     queue.QueueShard
 
 	// Source/Old: Default queue cluster
 	SecondaryDebounceClient *redis_state.DebounceClient
-	SecondaryQueue          queue.QueueManager
+	SecondaryQueue          queue.Producer
 	SecondaryQueueShard     queue.QueueShard
 
 	ShouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
@@ -245,12 +245,12 @@ func NewRedisDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
 
 		// New
 		primaryDebounceClient: o.PrimaryDebounceClient,
-		primaryQueueManager:   o.PrimaryQueue,
+		primaryQueueProducer:  o.PrimaryQueue,
 		primaryQueueShard:     o.PrimaryQueueShard,
 
 		// Old
 		secondaryDebounceClient: o.SecondaryDebounceClient,
-		secondaryQueueManager:   o.SecondaryQueue,
+		secondaryQueueProducer:  o.SecondaryQueue,
 		secondaryQueueShard:     o.SecondaryQueueShard,
 
 		shouldMigrate: o.ShouldMigrate,
@@ -261,12 +261,12 @@ type debouncer struct {
 	c clockwork.Clock
 	// New: system queue
 	primaryDebounceClient *redis_state.DebounceClient
-	primaryQueueManager   queue.QueueManager
+	primaryQueueProducer  queue.Producer
 	primaryQueueShard     queue.QueueShard
 
 	// Old: default queue
 	secondaryDebounceClient *redis_state.DebounceClient
-	secondaryQueueManager   queue.QueueManager
+	secondaryQueueProducer  queue.Producer
 	secondaryQueueShard     queue.QueueShard
 
 	// shouldMigrate determines if old debounces should be migrated to new cluster on the fly
@@ -278,7 +278,7 @@ func (d debouncer) usePrimary(shouldMigrate bool) bool {
 	// before the migration started or after the migration is completed.
 	// As soon as both (new) primary and (current) secondary are provided, we must
 	// only use the primary if we're actively migrating.
-	if d.secondaryDebounceClient == nil || d.secondaryQueueManager == nil || d.secondaryQueueShard == nil || d.secondaryQueueShard.Name() == "" {
+	if d.secondaryDebounceClient == nil || d.secondaryQueueProducer == nil || d.secondaryQueueShard == nil || d.secondaryQueueShard.Name() == "" {
 		return true
 	}
 
@@ -306,11 +306,11 @@ func (d debouncer) queueShard(shouldMigrate bool) queue.QueueShard {
 	return d.secondaryQueueShard
 }
 
-func (d debouncer) queueManager(shouldMigrate bool) queue.QueueManager {
+func (d debouncer) queueProducer(shouldMigrate bool) queue.Producer {
 	if d.usePrimary(shouldMigrate) {
-		return d.primaryQueueManager
+		return d.primaryQueueProducer
 	}
-	return d.secondaryQueueManager
+	return d.secondaryQueueProducer
 }
 
 // DeleteDebounceItem removes a debounce from the map.
@@ -612,7 +612,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// - Subsequent calls to this method will attempt to create/update debounces on the new system, this is desired.
 	// - We must carry over the previous timeout to ensure debounces don't run longer than intended.
 	//
-	hasSecondary := d.secondaryQueueShard != nil && d.secondaryQueueShard.Name() != "" && d.secondaryQueueManager != nil && d.secondaryDebounceClient != nil
+	hasSecondary := d.secondaryQueueShard != nil && d.secondaryQueueShard.Name() != "" && d.secondaryQueueProducer != nil && d.secondaryDebounceClient != nil
 	if shouldMigrate && hasSecondary {
 		debounceID, debounceTimeout, err := d.prepareMigration(ctx, di, fn)
 		if err != nil {
@@ -794,9 +794,9 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		// deadline.
 		qi := d.queueItem(ctx, di, newDebounceID)
 
-		queueManager := d.queueManager(shouldMigrate)
-		if queueManager == nil {
-			return nil, fmt.Errorf("queueManager did not return QueueManager")
+		queueProducer := d.queueProducer(shouldMigrate)
+		if queueProducer == nil {
+			return nil, fmt.Errorf("queueProducer did not return Producer")
 		}
 
 		queueShard := d.queueShard(shouldMigrate)
@@ -804,7 +804,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 			return nil, fmt.Errorf("queueShard did not return QueueShard")
 		}
 
-		err = queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
+		err = queueProducer.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
 			// Debounce timeout items must live on the same Redis instance as the state.
 			ForceQueueShardName: queueShard.Name(),
 		})
@@ -922,9 +922,9 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		return fmt.Errorf("client did not return DebounceClient")
 	}
 
-	queueManager := d.queueManager(shouldMigrate)
-	if queueManager == nil {
-		return fmt.Errorf("queueManager did not return QueueManager")
+	queueProducer := d.queueProducer(shouldMigrate)
+	if queueProducer == nil {
+		return fmt.Errorf("queueProducer did not return Producer")
 	}
 
 	queueShard := d.queueShard(shouldMigrate)
@@ -972,7 +972,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// enqueue a new item
 		qi := d.queueItem(ctx, di, debounceID)
 
-		return queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
+		return queueProducer.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
 			// Debounce timeout items must live on the same Redis instance as the state.
 			ForceQueueShardName: queueShard.Name(),
 		})
@@ -980,7 +980,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
 		actualTTL := time.Second * time.Duration(out)
-		err = queueManager.RequeueByJobID(
+		err = queueProducer.RequeueByJobID(
 			ctx,
 			queueShard,
 			debounceID.String(),
@@ -1194,8 +1194,8 @@ func (d debouncer) RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunD
 	}
 
 	// Use the primary queue manager
-	queueManager := d.primaryQueueManager
-	if queueManager == nil {
+	queueProducer := d.primaryQueueProducer
+	if queueProducer == nil {
 		return nil, fmt.Errorf("queue manager not configured")
 	}
 
@@ -1205,7 +1205,7 @@ func (d debouncer) RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunD
 	}
 
 	// Requeue the debounce to run in 1 second
-	err = queueManager.RequeueByJobID(
+	err = queueProducer.RequeueByJobID(
 		ctx,
 		queueShard,
 		debounceID.String(),
