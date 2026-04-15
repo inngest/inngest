@@ -170,6 +170,18 @@ export const pathCreator = {
       functionSlug,
     )}/cancellations`;
   },
+  experiments({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/experiments`;
+  },
+  experiment({
+    envSlug,
+    experimentName,
+  }: {
+    envSlug: string;
+    experimentName: string;
+  }) {
+    return `/env/${envSlug}/experiments/${encodeURIComponent(experimentName)}`;
+  },
   insights({ envSlug, ref }: { envSlug: string; ref?: string }) {
     return `/env/${envSlug}/insights${ref ? `?ref=${ref}` : ''}`;
   },

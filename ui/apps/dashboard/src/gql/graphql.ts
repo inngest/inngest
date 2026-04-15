@@ -912,6 +912,47 @@ export type EventsFilter = {
   until?: InputMaybe<Scalars['Time']['input']>;
 };
 
+export type Experiment = {
+  __typename?: 'Experiment';
+  firstSeen: Scalars['Time']['output'];
+  functionID: Scalars['ID']['output'];
+  lastSeen: Scalars['Time']['output'];
+  name: Scalars['String']['output'];
+  selectionStrategy: Scalars['String']['output'];
+  totalRuns: Scalars['Int']['output'];
+  variantCount: Scalars['Int']['output'];
+  variants: Array<Scalars['String']['output']>;
+};
+
+export type ExperimentDetail = {
+  __typename?: 'ExperimentDetail';
+  availableFields: Array<ExperimentMetadataField>;
+  rows: Array<ExperimentInsightsRow>;
+  selectedFields: Array<ExperimentMetadataField>;
+  summary: Experiment;
+};
+
+export type ExperimentDimensionValue = {
+  __typename?: 'ExperimentDimensionValue';
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type ExperimentInsightsRow = {
+  __typename?: 'ExperimentInsightsRow';
+  dimensions: Array<ExperimentDimensionValue>;
+  failureRate: Scalars['Float']['output'];
+  percentOfTotal: Scalars['Float']['output'];
+  runCount: Scalars['Int']['output'];
+};
+
+export type ExperimentMetadataField = {
+  __typename?: 'ExperimentMetadataField';
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  valueType: Scalars['String']['output'];
+};
+
 export type FilterList = {
   __typename?: 'FilterList';
   events: Maybe<Array<Scalars['String']['output']>>;
@@ -1641,6 +1682,8 @@ export type Query = {
   envs: EnvsConnection;
   events: Maybe<PaginatedEvents>;
   executionTimeSeries: Array<TimeSeries>;
+  experimentDetail: ExperimentDetail;
+  experiments: Array<Experiment>;
   insights: InsightsResponse;
   insightsQuery: InsightsQueryStatement;
   metrics: MetricsResponse;
@@ -1686,6 +1729,18 @@ export type QueryEventsArgs = {
 
 export type QueryExecutionTimeSeriesArgs = {
   timeOptions: TimeSeriesOptions;
+};
+
+
+export type QueryExperimentDetailArgs = {
+  experimentName: Scalars['String']['input'];
+  fields: InputMaybe<Array<Scalars['String']['input']>>;
+  workspaceID: Scalars['ID']['input'];
+};
+
+
+export type QueryExperimentsArgs = {
+  workspaceID: Scalars['ID']['input'];
 };
 
 
