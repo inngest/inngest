@@ -11,6 +11,11 @@ export default defineConfig(async () => ({
       // fumadocs-openapi/ui uses next/dynamic for lazy-loading APIPlayground.
       // Shim it with React.lazy so it works outside of Next.js.
       'next/dynamic': new URL('./src/shims/next-dynamic.ts', import.meta.url).pathname,
+      // fumadocs-mdx/runtime/server imports node:path at the top level. Rollup
+      // tree-shakes it away in production, but Vite dev pre-bundles it with
+      // esbuild which evaluates it in browser context. Shim it so the module
+      // initialises cleanly in SPA dev mode.
+      'node:path': new URL('./src/shims/node-path.ts', import.meta.url).pathname,
     },
   },
   plugins: [

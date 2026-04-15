@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm install -g pnpm@10 && pnpm install",
+  "outputDirectory": "dist/client",
+  "rewrites": [{ "source": "/(.*)", "destination": "/_shell.html" }]
+}
