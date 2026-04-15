@@ -19,7 +19,7 @@ const (
 // Enqueue adds an item to the queue to be processed at the given time.
 // TODO: Lift this function and the queue interface to a higher level, so that it's disconnected from the
 // concrete Redis implementation.
-func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
+func (q *QueueProducer) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
 	l := logger.StdlibLogger(ctx)
 
 	// propagate

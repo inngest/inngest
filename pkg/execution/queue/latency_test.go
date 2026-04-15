@@ -218,10 +218,14 @@ func TestEnqueueLatencyJob(t *testing.T) {
 				}),
 				WithClock(fakeClock),
 			),
-			primaryQueueShard: shard,
-			queueShardClients: map[string]QueueShard{"test": shard},
-			shardSelector: func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-				return shard, nil
+
+			queueProducer: &QueueProducer{
+				clock:             fakeClock,
+				queueKindMapping:  make(map[string]string),
+				queueShardClients: map[string]QueueShard{"test": shard},
+				shardSelector: func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
+					return shard, nil
+				},
 			},
 		}
 
@@ -241,9 +245,8 @@ func TestEnqueueLatencyJob(t *testing.T) {
 			},
 		}
 
-		qp.primaryQueueShard = captureShard
-		qp.queueShardClients = map[string]QueueShard{"test": captureShard}
-		qp.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
+		qp.queueProducer.queueShardClients = map[string]QueueShard{"test": captureShard}
+		qp.queueProducer.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
 			return captureShard, nil
 		}
 
