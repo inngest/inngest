@@ -926,18 +926,49 @@ export type Experiment = {
 
 export type ExperimentDetail = {
   __typename?: 'ExperimentDetail';
+  firstSeen: Scalars['Time']['output'];
+  lastSeen: Scalars['Time']['output'];
   name: Scalars['String']['output'];
+  selectionStrategy: Scalars['String']['output'];
+  variantWeights: Array<VariantWeight>;
   variants: Array<ExperimentVariantMetrics>;
+};
+
+export type ExperimentScoringConfig = {
+  __typename?: 'ExperimentScoringConfig';
+  experimentName: Scalars['String']['output'];
+  metrics: Array<ExperimentScoringMetric>;
+  updatedAt: Scalars['Time']['output'];
+};
+
+export type ExperimentScoringMetric = {
+  __typename?: 'ExperimentScoringMetric';
+  displayName: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  invert: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
+  labelBest: Scalars['String']['output'];
+  labelWorst: Scalars['String']['output'];
+  maxValue: Scalars['Float']['output'];
+  minValue: Scalars['Float']['output'];
+  points: Scalars['Int']['output'];
+};
+
+export type ExperimentScoringMetricInput = {
+  displayName: Scalars['String']['input'];
+  enabled: Scalars['Boolean']['input'];
+  invert: Scalars['Boolean']['input'];
+  key: Scalars['String']['input'];
+  labelBest: Scalars['String']['input'];
+  labelWorst: Scalars['String']['input'];
+  maxValue: Scalars['Float']['input'];
+  minValue: Scalars['Float']['input'];
+  points: Scalars['Int']['input'];
 };
 
 export type ExperimentVariantMetrics = {
   __typename?: 'ExperimentVariantMetrics';
-  avgAccuracy: Scalars['Float']['output'];
-  avgCost: Scalars['Float']['output'];
-  avgDuration: Scalars['Float']['output'];
-  avgSafety: Scalars['Float']['output'];
-  avgTokens: Scalars['Float']['output'];
-  failureRate: Scalars['Float']['output'];
+  metrics: Array<VariantMetric>;
   runCount: Scalars['Int']['output'];
   variantName: Scalars['String']['output'];
 };
@@ -1267,6 +1298,7 @@ export type Mutation = {
   unpauseFunction: Workflow;
   updateAccount: Account;
   updateAccountAddonQuantity: Addon;
+  updateExperimentScoringConfig: ExperimentScoringConfig;
   updateIngestKey: IngestKey;
   updateInsightsQuery: InsightsQueryStatement;
   updatePaymentMethod: Maybe<Array<PaymentMethod>>;
@@ -1547,6 +1579,13 @@ export type MutationUpdateAccountAddonQuantityArgs = {
 };
 
 
+export type MutationUpdateExperimentScoringConfigArgs = {
+  experimentName: Scalars['String']['input'];
+  metrics: Array<ExperimentScoringMetricInput>;
+  workspaceID: Scalars['ID']['input'];
+};
+
+
 export type MutationUpdateIngestKeyArgs = {
   id: Scalars['ID']['input'];
   input: UpdateIngestKey;
@@ -1672,6 +1711,7 @@ export type Query = {
   events: Maybe<PaginatedEvents>;
   executionTimeSeries: Array<TimeSeries>;
   experimentDetail: ExperimentDetail;
+  experimentScoringConfig: ExperimentScoringConfig;
   experiments: Array<Experiment>;
   insights: InsightsResponse;
   insightsQuery: InsightsQueryStatement;
@@ -1722,6 +1762,14 @@ export type QueryExecutionTimeSeriesArgs = {
 
 
 export type QueryExperimentDetailArgs = {
+  experimentName: Scalars['String']['input'];
+  timeRange: InputMaybe<TimeRangeInput>;
+  variantFilter: InputMaybe<Scalars['String']['input']>;
+  workspaceID: Scalars['ID']['input'];
+};
+
+
+export type QueryExperimentScoringConfigArgs = {
   experimentName: Scalars['String']['input'];
   workspaceID: Scalars['ID']['input'];
 };
@@ -2209,6 +2257,11 @@ export type ThrottleConfiguration = {
   period: Scalars['String']['output'];
 };
 
+export type TimeRangeInput = {
+  from: Scalars['Time']['input'];
+  to: Scalars['Time']['input'];
+};
+
 export type TimeSeries = {
   __typename?: 'TimeSeries';
   data: Array<TimeSeriesPoint>;
@@ -2300,6 +2353,20 @@ export type UserlandSpan = {
   spanAttrs: Maybe<Scalars['Bytes']['output']>;
   spanKind: Maybe<Scalars['String']['output']>;
   spanName: Maybe<Scalars['String']['output']>;
+};
+
+export type VariantMetric = {
+  __typename?: 'VariantMetric';
+  avg: Scalars['Float']['output'];
+  key: Scalars['String']['output'];
+  max: Scalars['Float']['output'];
+  min: Scalars['Float']['output'];
+};
+
+export type VariantWeight = {
+  __typename?: 'VariantWeight';
+  variantName: Scalars['String']['output'];
+  weight: Scalars['Int']['output'];
 };
 
 export type VercelApp = {
