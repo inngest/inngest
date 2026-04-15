@@ -926,20 +926,31 @@ export type Experiment = {
 
 export type ExperimentDetail = {
   __typename?: 'ExperimentDetail';
-  name: Scalars['String']['output'];
-  variants: Array<ExperimentVariantMetrics>;
+  availableFields: Array<ExperimentMetadataField>;
+  rows: Array<ExperimentInsightsRow>;
+  selectedFields: Array<ExperimentMetadataField>;
+  summary: Experiment;
 };
 
-export type ExperimentVariantMetrics = {
-  __typename?: 'ExperimentVariantMetrics';
-  avgAccuracy: Scalars['Float']['output'];
-  avgCost: Scalars['Float']['output'];
-  avgDuration: Scalars['Float']['output'];
-  avgSafety: Scalars['Float']['output'];
-  avgTokens: Scalars['Float']['output'];
+export type ExperimentDimensionValue = {
+  __typename?: 'ExperimentDimensionValue';
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type ExperimentInsightsRow = {
+  __typename?: 'ExperimentInsightsRow';
+  dimensions: Array<ExperimentDimensionValue>;
   failureRate: Scalars['Float']['output'];
+  percentOfTotal: Scalars['Float']['output'];
   runCount: Scalars['Int']['output'];
-  variantName: Scalars['String']['output'];
+};
+
+export type ExperimentMetadataField = {
+  __typename?: 'ExperimentMetadataField';
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  valueType: Scalars['String']['output'];
 };
 
 export type FilterList = {
@@ -1723,6 +1734,7 @@ export type QueryExecutionTimeSeriesArgs = {
 
 export type QueryExperimentDetailArgs = {
   experimentName: Scalars['String']['input'];
+  fields: InputMaybe<Array<Scalars['String']['input']>>;
   workspaceID: Scalars['ID']['input'];
 };
 
