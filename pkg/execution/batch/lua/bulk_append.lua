@@ -38,15 +38,15 @@ end
 
 -- start execution
 local batchID = get_or_create_batch_key(batchPointerKey)
-local isNewBatch = (batchID == newULID)
 
 -- NOTE: these need to be identical to the ones in the queue key generator
 --   * Batch
 --   * BatchMetadata
 local keyfmt = "%s:batches:%s"
-local idempotenceKeyFmt = "%s:batch_idempotence"
+local idemKeyFmt = "%s:batch_idem:%s"
+local legacyIdempotenceKeyFmt = "%s:batch_idempotence"
+local legacyIdempotenceKey = string.format(legacyIdempotenceKeyFmt, prefix)
 local batchKey = string.format(keyfmt, prefix, batchID)
-local batchIdempotenceKey = string.format(idempotenceKeyFmt, prefix)
 local batchMetadataKey = string.format("%s:metadata", batchKey)
 
 -- set the batch status if it doesn't exist but don't overwrite
@@ -55,7 +55,7 @@ if is_status_empty(batchMetadataKey) then
   set_batch_status(batchMetadataKey, batchStatusAppending)
 end
 
--- Collect all events and check for duplicates
+-- Dedup: per-event SET keys (O(1)) with legacy sorted set fallback
 local eventsToAdd = {}
 local duplicateCount = 0
 local argOffset = 11
@@ -64,17 +64,18 @@ for i = 1, eventCount do
   local eventID = ARGV[argOffset + (i - 1) * 2]
   local eventData = ARGV[argOffset + (i - 1) * 2 + 1]
 
-  -- check if event has already been appended
-  local newEvent = redis.call("ZADD", batchIdempotenceKey, "NX", nowUnixSeconds, eventID)
-  if newEvent == 0 then
-    duplicateCount = duplicateCount + 1
-  else
+  local idemKey = string.format(idemKeyFmt, prefix, eventID)
+  local newEvent = redis.call("SET", idemKey, "1", "NX", "EX", idempotenceSetTTL)
+  -- TODO: Remove this legacy check. All old sorted sets should expire within 30 min after deploy.
+  if newEvent and redis.call("ZSCORE", legacyIdempotenceKey, eventID) then
+    newEvent = false
+  end
+  if newEvent then
     table.insert(eventsToAdd, eventData)
+  else
+    duplicateCount = duplicateCount + 1
   end
 end
-
--- Update idempotence set TTL
-redis.call("EXPIRE", batchIdempotenceKey, idempotenceSetTTL)
 
 -- If all events were duplicates, return early
 if #eventsToAdd == 0 then
