@@ -75,7 +75,7 @@
     "eslint": "9.39.4",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "4.6.2",
-    "globals": "17.4.0",
+    "globals": "17.5.0",
     "jsdom": "29.0.2",
     "postcss": "8.5.9",
     "storybook": "10.3.5",
