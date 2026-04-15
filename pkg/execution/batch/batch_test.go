@@ -513,7 +513,7 @@ func TestPerEventIdempotenceLegacyFallback(t *testing.T) {
 
 	// Simulate a legacy event by writing directly to the old sorted set
 	legacyKey := bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)
-	r.ZAdd(legacyKey, float64(time.Now().Unix()), eventID.String())
+	require.NoError(t, r.ZAdd(legacyKey, float64(time.Now().Unix()), eventID.String()))
 
 	// Append the same event — should be rejected via legacy fallback
 	res, err := bm.Append(context.Background(), bi, fn)
@@ -617,7 +617,7 @@ func TestPerEventIdempotenceBulkAppendLegacyFallback(t *testing.T) {
 
 	// Simulate legacy event in the old sorted set
 	legacyKey := bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)
-	r.ZAdd(legacyKey, float64(time.Now().Unix()), legacyEventID.String())
+	require.NoError(t, r.ZAdd(legacyKey, float64(time.Now().Unix()), legacyEventID.String()))
 
 	items := []BatchItem{
 		{AccountID: uuid.New(), FunctionID: fnId, EventID: legacyEventID, Event: event.Event{ID: "legacy"}},
