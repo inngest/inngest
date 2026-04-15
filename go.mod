@@ -40,7 +40,7 @@ require (
 	github.com/gosimple/slug v1.15.0
 	github.com/gowebpki/jcs v1.0.1
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20260415034537-bf445b64ed41
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
@@ -289,7 +289,7 @@ require (
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
