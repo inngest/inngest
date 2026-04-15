@@ -68,6 +68,12 @@ func New(
 		quit:         make(chan error, o.numWorkers),
 
 		shards: shards,
+		queueProducer: NewProducer(shards, ProducerOpts{
+			clock:              o.Clock,
+			queueKindMapping:   o.queueKindMapping,
+			enableJobPromotion: o.enableJobPromotion,
+			conditionalTracer:  o.ConditionalTracer,
+		}),
 
 		peekSizeCache: ccache.New(ccache.Configure[int64]().MaxSize(50_000)),
 
@@ -86,6 +92,9 @@ func New(
 			return nil, fmt.Errorf("No shards found for configured shard group: %s", o.runMode.ShardGroup)
 		}
 	}
+	if o.queueProducer != nil {
+		qp.queueProducer = o.queueProducer
+	}
 
 	qp.configureQueueRoles()
 
@@ -101,6 +110,8 @@ type queueProcessor struct {
 	// shards owns the {shards map, selector, primary} trio. Topology can be
 	// mutated at runtime via shards.SetPrimary.
 	shards QueueShardRegistry
+
+	queueProducer Producer
 
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
@@ -296,6 +307,11 @@ func (q *queueProcessor) Requeue(ctx context.Context, shard QueueShard, i QueueI
 // RequeueByJobID implements QueueManager.
 func (q *queueProcessor) RequeueByJobID(ctx context.Context, shard QueueShard, jobID string, at time.Time) error {
 	return shard.RequeueByJobID(ctx, jobID, at)
+}
+
+// Enqueue implements QueueManager.
+func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
+	return q.queueProducer.Enqueue(ctx, item, at, opts)
 }
 
 // TotalSystemQueueDepth implements QueueManager.
