@@ -80,13 +80,13 @@ func WithoutBuffer() RedisBatchManagerOpt {
 // Note that this buffers in-memory using the defaults via [DefaultMaxBufferDuration] and
 // [DefaultMaxBufferSize].  to change these or disable buffering, use [WithBufferSettings]
 // or [WithoutBuffer].
-func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
+func NewRedisBatchManager(b *redis_state.BatchClient, producer queue.Producer, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := &redisBatchManager{
 		b:                 b,
-		q:                 q,
+		producer:          producer,
 		sizeLimit:         defaultBatchSizeLimit,
 		idempotenceSetTTL: defaultEventIdempotenceSetTTL,
-		log:                                logger.StdlibLogger(context.Background()),
+		log:               logger.StdlibLogger(context.Background()),
 	}
 
 	// add default buffer
@@ -100,8 +100,8 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts
 }
 
 type redisBatchManager struct {
-	b *redis_state.BatchClient
-	q queue.QueueManager
+	b        *redis_state.BatchClient
+	producer queue.Producer
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
@@ -292,8 +292,8 @@ func (b *redisBatchManager) StartExecution(ctx context.Context, functionId uuid.
 
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
-	if b.q == nil {
-		// No queue manager configured, skip scheduling (useful for tests)
+	if b.producer == nil {
+		// No queue producer configured, skip scheduling (useful for tests)
 		return nil
 	}
 
@@ -301,7 +301,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	maxAttempts := consts.MaxRetries + 1
 
 	queueName := queue.KindScheduleBatch
-	err := b.q.Enqueue(ctx, queue.Item{
+	err := b.producer.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: opts.WorkspaceID,
