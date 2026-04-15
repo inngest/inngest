@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS apps (
 );
 
 CREATE TABLE IF NOT EXISTS events (
-	internal_id CHAR(26) PRIMARY KEY,
+	-- Keep this non-unique for compatibility with the legacy runtime schema.
+	internal_id CHAR(26),
 	account_id CHAR(36),
 	workspace_id CHAR(36),
 	source VARCHAR(255),
