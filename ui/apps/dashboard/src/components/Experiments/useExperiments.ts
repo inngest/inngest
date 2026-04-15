@@ -1,10 +1,16 @@
 import { useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import type { ExperimentListItem } from '@inngest/components/Experiments';
+import type {
+  ExperimentDetail,
+  ExperimentListItem,
+  ExperimentScoringConfig,
+  ExperimentScoringMetric,
+  TimeRangePreset,
+} from '@inngest/components/Experiments';
 
 const experimentsQuery = graphql(`
   query GetExperiments($workspaceID: ID!) {
@@ -54,5 +60,209 @@ export function useExperimentsList({
     queryFn,
     enabled,
     staleTime: 30_000,
+  });
+}
+
+const experimentDetailQuery = graphql(`
+  query GetExperimentDetail(
+    $workspaceID: ID!
+    $experimentName: String!
+    $timeRange: TimeRangeInput
+    $variantFilter: String
+  ) {
+    experimentDetail(
+      workspaceID: $workspaceID
+      experimentName: $experimentName
+      timeRange: $timeRange
+      variantFilter: $variantFilter
+    ) {
+      name
+      firstSeen
+      lastSeen
+      selectionStrategy
+      variantWeights {
+        variantName
+        weight
+      }
+      variants {
+        variantName
+        runCount
+        metrics {
+          key
+          avg
+          min
+          max
+        }
+      }
+    }
+  }
+`);
+
+const experimentScoringConfigQuery = graphql(`
+  query GetExperimentScoringConfig($workspaceID: ID!, $experimentName: String!) {
+    experimentScoringConfig(workspaceID: $workspaceID, experimentName: $experimentName) {
+      experimentName
+      updatedAt
+      metrics {
+        key
+        enabled
+        points
+        minValue
+        maxValue
+        invert
+        labelBest
+        labelWorst
+        displayName
+      }
+    }
+  }
+`);
+
+const updateExperimentScoringConfigMutation = graphql(`
+  mutation UpdateExperimentScoringConfig(
+    $workspaceID: ID!
+    $experimentName: String!
+    $metrics: [ExperimentScoringMetricInput!]!
+  ) {
+    updateExperimentScoringConfig(
+      workspaceID: $workspaceID
+      experimentName: $experimentName
+      metrics: $metrics
+    ) {
+      experimentName
+      updatedAt
+      metrics {
+        key
+        enabled
+        points
+        minValue
+        maxValue
+        invert
+        labelBest
+        labelWorst
+        displayName
+      }
+    }
+  }
+`);
+
+function presetToRange(preset: TimeRangePreset): { from: Date; to: Date } {
+  const to = new Date();
+  const hours = preset === '24h' ? 24 : preset === '7d' ? 24 * 7 : 24 * 30;
+  return { from: new Date(to.getTime() - hours * 60 * 60 * 1000), to };
+}
+
+export function useExperimentDetail(
+  experimentName: string,
+  preset: TimeRangePreset,
+  variantFilter: string | null,
+) {
+  const client = useClient();
+  const environment = useEnvironment();
+
+  const queryFn = useCallback(async (): Promise<ExperimentDetail> => {
+    const { from, to } = presetToRange(preset);
+    const result = await client
+      .query(
+        experimentDetailQuery,
+        {
+          workspaceID: environment.id,
+          experimentName,
+          timeRange: { from: from.toISOString(), to: to.toISOString() },
+          variantFilter: variantFilter || null,
+        },
+        { requestPolicy: 'network-only' },
+      )
+      .toPromise();
+
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error('No data returned');
+
+    const d = result.data.experimentDetail;
+    return {
+      name: d.name,
+      firstSeen: new Date(d.firstSeen),
+      lastSeen: new Date(d.lastSeen),
+      selectionStrategy: d.selectionStrategy,
+      variantWeights: d.variantWeights,
+      variants: d.variants.map((v) => ({
+        variantName: v.variantName,
+        runCount: v.runCount,
+        metrics: v.metrics,
+      })),
+    };
+  }, [client, environment.id, experimentName, preset, variantFilter]);
+
+  return useQuery<ExperimentDetail>({
+    queryKey: [
+      'experiment-detail',
+      environment.id,
+      experimentName,
+      preset,
+      variantFilter,
+    ],
+    queryFn,
+    staleTime: 30_000,
+  });
+}
+
+export function useExperimentScoringConfig(experimentName: string) {
+  const client = useClient();
+  const environment = useEnvironment();
+
+  const queryFn = useCallback(async (): Promise<ExperimentScoringConfig> => {
+    const result = await client
+      .query(
+        experimentScoringConfigQuery,
+        { workspaceID: environment.id, experimentName },
+        { requestPolicy: 'network-only' },
+      )
+      .toPromise();
+
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error('No data returned');
+
+    const c = result.data.experimentScoringConfig;
+    return {
+      experimentName: c.experimentName,
+      updatedAt: new Date(c.updatedAt),
+      metrics: c.metrics,
+    };
+  }, [client, environment.id, experimentName]);
+
+  return useQuery<ExperimentScoringConfig>({
+    queryKey: ['experiment-scoring', environment.id, experimentName],
+    queryFn,
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateExperimentScoringConfig(experimentName: string) {
+  const client = useClient();
+  const environment = useEnvironment();
+
+  return useMutation({
+    mutationKey: ['experiment-scoring-update', environment.id, experimentName],
+    mutationFn: async (
+      metrics: ExperimentScoringMetric[],
+    ): Promise<ExperimentScoringConfig> => {
+      const result = await client
+        .mutation(updateExperimentScoringConfigMutation, {
+          workspaceID: environment.id,
+          experimentName,
+          metrics,
+        })
+        .toPromise();
+
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error('No data returned');
+
+      const c = result.data.updateExperimentScoringConfig;
+      return {
+        experimentName: c.experimentName,
+        updatedAt: new Date(c.updatedAt),
+        metrics: c.metrics,
+      };
+    },
   });
 }
