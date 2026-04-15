@@ -18,8 +18,10 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
@@ -923,6 +925,8 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 	}
 
 	gwPort := freePort()
+	grpcGwPort := freePort()
+	grpcExecPort := freePort()
 
 	websocketUrl := fmt.Sprintf("ws://127.0.0.1:%d/v0/connect", gwPort)
 
@@ -953,6 +957,11 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		WithLifeCycles([]ConnectGatewayLifecycleListener{lifecycles}),
 		WithApiBaseUrl(fakeApiBaseUrl),
 		WithGatewayPublicPort(gwPort),
+		WithGRPCConfig(connectConfig.NewGRPCConfig(
+			ctx,
+			grpc.DefaultConnectGRPCIP, grpcGwPort,
+			grpc.DefaultConnectGRPCIP, grpcExecPort,
+		)),
 	}
 
 	if len(params) > 0 {
