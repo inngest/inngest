@@ -170,6 +170,10 @@ func (q *queueProcessor) GetShadowContinuations() map[string]ShadowContinuation 
 	return q.shadowContinues
 }
 
+func (q *queueProcessor) QueueProducer() Producer {
+	return q.queueProducer
+}
+
 func (q *queueProcessor) ClearShadowContinuations() {
 	q.shadowContinuesLock.Lock()
 	defer q.shadowContinuesLock.Unlock()
