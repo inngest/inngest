@@ -137,7 +137,7 @@ func NewManager(
 
 	return &manager{
 		shard: shard,
-		q:     q,
+		queue: q,
 		log:   log,
 		opt:   opt,
 	}
@@ -145,7 +145,7 @@ func NewManager(
 
 type manager struct {
 	shard queue.QueueShard
-	q     queue.Producer
+	queue queue.Producer
 
 	log logger.Logger
 	opt managerOpt
@@ -174,7 +174,7 @@ func (c *manager) Sync(ctx context.Context, ci CronItem) error {
 	at := time.Now()
 	jobID := ci.SyncID()
 
-	err := c.q.Enqueue(ctx, queue.Item{
+	err := c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: ci.WorkspaceID,
@@ -224,7 +224,7 @@ func (c *manager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
 
 	l := c.log.With("action", "cron.manager.EnqueueHealthCheck", "queue", kind, "ci", ci)
 
-	err := c.q.Enqueue(ctx, queue.Item{
+	err := c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		Kind:        kind,
@@ -257,7 +257,7 @@ func (c *manager) EnqueueNextHealthCheck(ctx context.Context) error {
 
 	l := c.log.With("action", "cron.manager.EnqueueNextHealthCheck", "queue", kind, "now", now, "nextCheck", nextCheck)
 
-	err := c.q.Enqueue(ctx, queue.Item{
+	err := c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		Kind:        kind,
@@ -364,7 +364,7 @@ func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, err
 		queueName = fmt.Sprintf("%s:%s", queue.KindCron, ci.WorkspaceID)
 	}
 
-	err = c.q.Enqueue(ctx, queue.Item{
+	err = c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: ci.WorkspaceID,
