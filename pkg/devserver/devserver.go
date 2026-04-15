@@ -812,7 +812,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		}))
 	}
 
-	return service.StartAll(ctx, services...)
+	if err := service.StartAll(ctx, services...); err != nil {
+		l.Error("all services stopped", "error", err)
+		return err
+	}
+	return nil
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, *miniredis.Miniredis, error) {

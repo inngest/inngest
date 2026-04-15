@@ -88,36 +88,41 @@ func TestRetryAfter(t *testing.T) {
 func TestParseRetry(t *testing.T) {
 	now := time.Now().Truncate(time.Second).UTC()
 
+	// ParseRetry calls time.Now() internally, so a second boundary may be
+	// crossed between capturing `now` above and the call inside ParseRetry.
+	// Allow up to 1 second of tolerance for all time comparisons.
+	const tolerance = 1 * time.Second
+
 	t.Run("It clips with too much time", func(t *testing.T) {
 		at := now.Add(2 * consts.MaxRetryDuration)
 		actual, err := ParseRetry(at.Format(time.RFC3339))
 		require.NoError(t, err)
-		require.Equal(t, now.Add(consts.MaxRetryDuration), actual)
+		require.InDelta(t, now.Add(consts.MaxRetryDuration).UnixMilli(), actual.UnixMilli(), float64(tolerance.Milliseconds()))
 	})
 
 	t.Run("It clips with too many seconds", func(t *testing.T) {
 		at := (2 * consts.MaxRetryDuration)
 		actual, err := ParseRetry(strconv.Itoa(int(at.Seconds())))
 		require.NoError(t, err)
-		require.Equal(t, now.Add(consts.MaxRetryDuration), actual)
+		require.InDelta(t, now.Add(consts.MaxRetryDuration).UnixMilli(), actual.UnixMilli(), float64(tolerance.Milliseconds()))
 	})
 
 	t.Run("It returns a minute in seconds", func(t *testing.T) {
 		actual, err := ParseRetry("60")
 		require.NoError(t, err)
-		require.Equal(t, now.Add(time.Minute), actual)
+		require.InDelta(t, now.Add(time.Minute).UnixMilli(), actual.UnixMilli(), float64(tolerance.Milliseconds()))
 	})
 
 	t.Run("It uses minimums in seconds", func(t *testing.T) {
 		actual, err := ParseRetry("1")
 		require.NoError(t, err)
-		require.Equal(t, now.Add(consts.MinRetryDuration), actual)
+		require.InDelta(t, now.Add(consts.MinRetryDuration).UnixMilli(), actual.UnixMilli(), float64(tolerance.Milliseconds()))
 	})
 
 	t.Run("It uses minimums with dates", func(t *testing.T) {
 		actual, err := ParseRetry(now.Add(time.Second).Format(time.RFC1123))
 		require.NoError(t, err)
-		require.Equal(t, now.Add(consts.MinRetryDuration), actual)
+		require.InDelta(t, now.Add(consts.MinRetryDuration).UnixMilli(), actual.UnixMilli(), float64(tolerance.Milliseconds()))
 	})
 }
 

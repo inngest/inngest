@@ -1247,7 +1247,9 @@ func TestCompaction(t *testing.T) {
 		duration: 5 * time.Second,
 	}
 
-	// Set compaction limit to 2, so 1 deletion won't trigger compaction
+	// Set compaction limit to 2, so 1 deletion won't trigger compaction.
+	// CompactionSample: -1 disables async compaction from Delete() so the test
+	// controls compaction timing explicitly via compact() calls.
 	store, err := NewBlockstore(BlockstoreOpts{
 		PauseClient:            pauseClient,
 		Bucket:                 bucket,
@@ -1255,7 +1257,7 @@ func TestCompaction(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              5,
 		CompactionGarbageRatio: 0.4,
-		CompactionSample:       1.0,
+		CompactionSample:       -1,
 		CompactionLeaser:       leaser,
 		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
@@ -1302,22 +1304,22 @@ func TestCompaction(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deleteCount)
 
-	// Wait for async compaction to complete
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		block, err := store.ReadBlock(ctx, index, blockID)
-		assert.NoError(t, err)
-		assert.Len(t, block.Pauses, 3)
+	// Trigger compaction explicitly (async compaction is disabled via CompactionSample: -1)
+	err = store.(*blockstore).compact(ctx, index)
+	require.NoError(t, err)
 
-		deleteKey := blockDeleteKey(index, blockID)
-		exists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
-		assert.NoError(t, err)
-		assert.False(t, exists)
+	// Verify compaction removed pause1 and pause5, leaving pause2, pause3, pause4
+	block, err = store.ReadBlock(ctx, index, blockID)
+	require.NoError(t, err)
+	require.Len(t, block.Pauses, 3)
 
-		// Assert that remaining pauses are pause2, pause3, and pause4 (pause1 and pause5 were deleted)
-		assert.Equal(t, pause2.ID, block.Pauses[0].ID)
-		assert.Equal(t, pause3.ID, block.Pauses[1].ID)
-		assert.Equal(t, pause4.ID, block.Pauses[2].ID)
-	}, 5*time.Second, 20*time.Millisecond)
+	exists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	require.Equal(t, pause2.ID, block.Pauses[0].ID)
+	require.Equal(t, pause3.ID, block.Pauses[1].ID)
+	require.Equal(t, pause4.ID, block.Pauses[2].ID)
 
 	// Verify that block index score was updated to the new latest timestamp (even though the blockID is stable)
 	indexKey := blockIndexKey(index)
@@ -1327,7 +1329,7 @@ func TestCompaction(t *testing.T) {
 
 	// Verify updated metadata reflects the new block composition with boundaries from pause2 to pause4
 	metadataKey := blockMetadataKey(index)
-	exists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
+	exists, err = rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -1351,29 +1353,31 @@ func TestCompaction(t *testing.T) {
 	err = store.Delete(ctx, index, *pause4)
 	require.NoError(t, err)
 
-	// Wait for async compaction to complete and verify block is completely removed
+	// Trigger compaction explicitly to remove the now-empty block
+	err = store.(*blockstore).compact(ctx, index)
+	require.NoError(t, err)
+
+	// Verify block is completely removed
 	blobKey := store.(*blockstore).BlockKey(index, blockID)
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		// Block should be removed from index
-		_, err := rc.Do(ctx, rc.B().Zscore().Key(indexKey).Member(blockID.String()).Build()).AsFloat64()
-		assert.True(t, rueidis.IsRedisNil(err), "expected Redis nil error when block is removed from index")
 
-		// Block metadata should be removed
-		metadataExists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
-		assert.NoError(t, err)
-		assert.False(t, metadataExists)
+	// Block should be removed from index
+	_, err = rc.Do(ctx, rc.B().Zscore().Key(indexKey).Member(blockID.String()).Build()).AsFloat64()
+	require.True(t, rueidis.IsRedisNil(err), "expected Redis nil error when block is removed from index")
 
-		// Delete tracking should be cleaned up
-		deleteKey := blockDeleteKey(index, blockID)
-		deleteExists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
-		assert.NoError(t, err)
-		assert.False(t, deleteExists)
+	// Block metadata should be removed
+	metadataExists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
+	require.NoError(t, err)
+	require.False(t, metadataExists)
 
-		// Block should be removed from blob storage
-		blobExists, err := bucket.Exists(ctx, blobKey)
-		assert.NoError(t, err)
-		assert.False(t, blobExists)
-	}, 5*time.Second, 20*time.Millisecond)
+	// Delete tracking should be cleaned up
+	deleteExists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
+	require.NoError(t, err)
+	require.False(t, deleteExists)
+
+	// Block should be removed from blob storage
+	blobExists, err := bucket.Exists(ctx, blobKey)
+	require.NoError(t, err)
+	require.False(t, blobExists)
 
 	// Verify no blocks exist for this index
 	blocks, err = store.BlocksSince(ctx, index, time.Time{})
@@ -1426,6 +1430,8 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 		duration: 5 * time.Second,
 	}
 
+	// CompactionSample: -1 disables async compaction from Delete() so the test
+	// controls compaction timing explicitly via compact() calls.
 	store, err := NewBlockstore(BlockstoreOpts{
 		PauseClient:            pauseClient,
 		Bucket:                 bucket,
@@ -1433,7 +1439,7 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              4,
 		CompactionGarbageRatio: 0.5,
-		CompactionSample:       1.0,
+		CompactionSample:       -1,
 		CompactionLeaser:       leaser,
 		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },

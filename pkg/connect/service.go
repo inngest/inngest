@@ -298,15 +298,17 @@ func (c *connectGatewaySvc) Name() string {
 	return "connect-gateway"
 }
 
+// StartTimeout returns the pre-start timeout for the connect gateway.
+// This is longer than the default 30s to give the retry loop in Pre()
+// enough headroom when Azure AD token acquisition is slow.
+func (c *connectGatewaySvc) StartTimeout() time.Duration {
+	return 60 * time.Second
+}
+
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
-	// Set up gateway-specific logger with info for correlations
+	// Always use the stdlib logger for the connect gateway so errors
+	// and retry warnings are never silenced.
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
-	if c.dev {
-		// Hide verbose connect gateway logs in dev server by default
-		if os.Getenv("CONNECT_GATEWAY_FULL_LOGS") != "true" {
-			c.logger = logger.VoidLogger()
-		}
-	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -316,8 +318,33 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 
 	c.ipAddress = c.grpcConfig.Gateway.IP
 
-	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
-		return fmt.Errorf("could not set initial gateway state: %w", err)
+	// Retry the initial gateway state update to handle slow token acquisition
+	// (e.g. Azure Workload Identity) on the first Redis operation after startup.
+	const maxRetries = 3
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
+			lastErr = err
+			if attempt < maxRetries {
+				c.logger.Warn("retrying initial gateway state update",
+					"attempt", attempt,
+					"max_retries", maxRetries,
+					"error", err,
+				)
+				select {
+				case <-time.After(time.Duration(attempt) * 2 * time.Second):
+				case <-ctx.Done():
+					return fmt.Errorf("could not set initial gateway state: context cancelled during retry: %w", ctx.Err())
+				}
+				continue
+			}
+		} else {
+			lastErr = nil
+			break
+		}
+	}
+	if lastErr != nil {
+		return fmt.Errorf("could not set initial gateway state after %d attempts: %w", maxRetries, lastErr)
 	}
 
 	c.grpcClientManager = grpc.NewGRPCClientManager(pb.NewConnectExecutorClient, grpc.WithLogger[pb.ConnectExecutorClient](c.logger))

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -83,16 +84,34 @@ func stopTimeout(s Service) time.Duration {
 // StartAll starts all of the specified services, stopping all services when
 // any of the group errors.
 func StartAll(ctx context.Context, all ...Service) (err error) {
+	l := logger.StdlibLogger(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	eg := &errgroup.Group{}
+	// Use sync.Once to ensure only the first service to exit is logged
+	// as the cascade trigger. Without this, two simultaneously-failing
+	// services could both see ctx.Err()==nil before either calls cancel(),
+	// causing both to log as the trigger.
+	var triggerOnce sync.Once
 	for _, s := range all {
 		svc := s
 		eg.Go(func() error {
 			err := Start(ctx, svc)
-			// Close all other services.
-			cancel()
+			isTrigger := false
+			triggerOnce.Do(func() {
+				isTrigger = true
+				// First service to exit — this is the cascade trigger.
+				if err != nil && err != context.Canceled {
+					l.Error("service exited with error, canceling all services", "service", svc.Name(), "error", err)
+				} else {
+					l.Info("service exited, canceling all services", "service", svc.Name())
+				}
+				cancel()
+			})
+			if !isTrigger {
+				l.Info("service exited after cascade cancellation", "service", svc.Name())
+			}
 			if err != nil && err != context.Canceled {
 				return fmt.Errorf("service %s errored: %w", svc.Name(), err)
 			}
@@ -121,6 +140,8 @@ func Start(ctx context.Context, s Service) (err error) {
 	}()
 
 	if preErr := pre(ctx, s); preErr != nil {
+		// Error is returned to the caller (e.g. StartAll) which logs it
+		// with cascade-shutdown context. Logging here would double-log.
 		return preErr
 	}
 
