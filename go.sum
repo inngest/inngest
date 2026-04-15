@@ -344,8 +344,8 @@ github.com/hashicorp/go-version v1.9.0 h1:CeOIz6k+LoN3qX9Z0tyQrPtiB1DFYRPfCIBtaX
 github.com/hashicorp/go-version v1.9.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=
 github.com/hashicorp/golang-lru/v2 v2.0.7/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
-github.com/inngest/expr v0.0.0-20260320153510-6ab6fcb7c7f3 h1:luND10UqFY6naiueOMcBfO19MQ/qZRbpZw3uFQ4rUk0=
-github.com/inngest/expr v0.0.0-20260320153510-6ab6fcb7c7f3/go.mod h1:fwLYQ2NlzdevRRQoldvMrMvCicAG6X3NaONAtxuiT8k=
+github.com/inngest/expr v0.0.0-20260415034537-bf445b64ed41 h1:aD+TD2Cs1ZUYsUAOtZFPvPIXIqqJC+ST3ASMGJesc68=
+github.com/inngest/expr v0.0.0-20260415034537-bf445b64ed41/go.mod h1:fwLYQ2NlzdevRRQoldvMrMvCicAG6X3NaONAtxuiT8k=
 github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48 h1:8NwXUrQTQjWrfGj99JgesfTbCYujtnLHusePp7YyFU8=
 github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48/go.mod h1:7SNLkGaD+tiTey1IF9WUNDNurTfqNZqjbdPZo3CmLW4=
 github.com/inngest/inngestgo v0.15.1 h1:JccdXQj5x1SZ7TOVgeUEeAzSugzPzUFzuYUQ9hB0jY0=
