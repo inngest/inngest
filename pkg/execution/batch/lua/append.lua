@@ -41,9 +41,9 @@ local resp = { status = "append", batchID = batchID, batchPointerKey = batchPoin
 --   * Batch
 --   * BatchMetadata
 local keyfmt = "%s:batches:%s"
-local idempotenceKeyFmt = "%s:batch_idempotence"
+local idemKeyFmt = "%s:batch_idem:%s"
+local legacyIdempotenceKeyFmt = "%s:batch_idempotence"
 local batchKey = string.format(keyfmt, prefix, batchID)
-local batchIdempotenceKey = string.format(idempotenceKeyFmt, prefix)
 local batchMetadataKey = string.format("%s:metadata", batchKey)
 
 -- set the batch status if it doesn't exist but don't overwrite
@@ -52,14 +52,17 @@ if is_status_empty(batchMetadataKey) then
   set_batch_status(batchMetadataKey, batchStatusAppending)
 end
 
--- check if event has already been appended to this batch
--- return early with status=exists if this event was already appended.
-local newEvent = redis.call("ZADD", batchIdempotenceKey, nowUnixSeconds, eventID)
-redis.call("EXPIRE", batchIdempotenceKey, idempotenceSetTTL)
-if newEvent == 0 then
-  -- if this event was already appended to a batch and there is only 
-  -- one element in the batch, return status=new to schedule this batch
-  -- for execution after the batch timeout.
+-- Dedup: per-event SET key (O(1)) with legacy sorted set fallback
+local idemKey = string.format(idemKeyFmt, prefix, eventID)
+local newEvent = redis.call("SET", idemKey, "1", "NX", "EX", idempotenceSetTTL)
+if not newEvent then newEvent = false end
+if newEvent then
+  local legacyKey = string.format(legacyIdempotenceKeyFmt, prefix)
+  -- TODO: Remove this legacy check. All old sorted sets should expire within 30 min after deploy.
+  -- It only exists to catch events written to the old ZSET before this change was rolled out.
+  if redis.call("ZSCORE", legacyKey, eventID) then newEvent = false end
+end
+if not newEvent then
   local size = redis.call("LLEN", batchKey)
   if size == 1 then
     resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey }
