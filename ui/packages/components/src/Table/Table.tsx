@@ -85,7 +85,7 @@ export function Table<T>({
             cell: () => <Skeleton className="my-2 block h-3" />,
           }))
         : columns,
-    [isLoading]
+    [isLoading, columns]
   );
 
   const table = useReactTable({

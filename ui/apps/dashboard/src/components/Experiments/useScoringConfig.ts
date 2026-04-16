@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 
 import {
@@ -91,11 +91,20 @@ export function useScoringConfig(experimentName: string) {
     );
   }, []);
 
+  const pointsLeft = useMemo(() => {
+    if (!localMetrics) return 100;
+    const allocated = localMetrics
+      .filter((m) => m.enabled)
+      .reduce((sum, m) => sum + m.points, 0);
+    return 100 - allocated;
+  }, [localMetrics]);
+
   return {
     metrics: localMetrics,
     setMetrics: setLocalMetrics,
     updateMetric,
     enableMetric,
+    pointsLeft,
     isSaving: updateScoring.isPending,
     isPending: scoring.isPending,
     error: scoring.error,

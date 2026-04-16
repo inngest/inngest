@@ -109,7 +109,7 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
   const color = colorForMetric(colorIndex);
 
   return (
-    <Card className="overflow-visible" contentClassName="overflow-visible">
+    <Card contentClassName="overflow-visible">
       <Card.Header className="flex-row items-center justify-between">
         <span className="text-basis text-sm font-medium">
           {metric.displayName}

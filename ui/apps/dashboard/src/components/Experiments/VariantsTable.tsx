@@ -5,7 +5,6 @@ import type {
   ExperimentVariantMetrics,
   VariantMetric,
 } from '@inngest/components/Experiments';
-import { Input } from '@inngest/components/Forms/Input';
 import { Pill } from '@inngest/components/Pill';
 import {
   Popover,
@@ -13,21 +12,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@inngest/components/Popover';
-import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
+import { Switch, SwitchLabel } from '@inngest/components/Switch';
 import { Table } from '@inngest/components/Table';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@inngest/components/Tooltip';
 import {
   RiAddLine,
   RiArrowRightUpLine,
-  RiEqualizerLine,
-  RiMore2Line,
+  RiMoreFill,
+  RiSettings3Line,
 } from '@remixicon/react';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 
+import { MetricAccordionItem } from '@/components/Experiments/ScoringFormulaSidebar';
 import { scoreVariant } from '@/lib/experiments/score';
 
 type Props = {
@@ -38,6 +33,7 @@ type Props = {
     patch: Partial<ExperimentScoringMetric>,
   ) => void;
   onEnableMetric: (key: string) => void;
+  pointsLeft: number;
   onOpenInsights: () => void;
   showInactive: boolean;
   onShowInactiveChange: (v: boolean) => void;
@@ -156,109 +152,48 @@ function MetricSubLabel({
 }
 
 // ---------------------------------------------------------------------------
-// Metric editor popover (with draft state)
+// Metric column header (stable component so Popover state survives re-renders)
 // ---------------------------------------------------------------------------
 
-function MetricEditorPopover({
+function MetricColumnHeader({
   metric,
-  onApply,
-  maxPoints,
+  pointsLeft,
+  onUpdateMetric,
+  isOpen,
+  onOpenChange,
 }: {
   metric: ExperimentScoringMetric;
-  onApply: (patch: Partial<ExperimentScoringMetric>) => void;
-  maxPoints: number;
+  pointsLeft: number;
+  onUpdateMetric: (
+    key: string,
+    patch: Partial<ExperimentScoringMetric>,
+  ) => void;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [draft, setDraft] = useState<Partial<ExperimentScoringMetric>>({});
-
-  const current = { ...metric, ...draft };
-
-  function reset() {
-    setDraft({});
-  }
-
-  function apply() {
-    onApply(draft);
-    setDraft({});
-  }
-
   return (
-    <div className="flex w-64 flex-col gap-3 p-3">
-      <p className="text-basis text-xs font-medium">Edit metric</p>
-
-      <Input
-        label="Display name"
-        inngestSize="small"
-        value={current.displayName}
-        onChange={(e) => setDraft({ ...draft, displayName: e.target.value })}
-      />
-
-      <div className="grid grid-cols-2 gap-2">
-        <Input
-          label="Min"
-          inngestSize="small"
-          type="number"
-          value={current.minValue}
-          onChange={(e) =>
-            setDraft({ ...draft, minValue: parseFloat(e.target.value) || 0 })
-          }
-        />
-        <Input
-          label="Max"
-          inngestSize="small"
-          type="number"
-          value={current.maxValue}
-          onChange={(e) =>
-            setDraft({ ...draft, maxValue: parseFloat(e.target.value) || 0 })
-          }
-        />
-      </div>
-
-      <Input
-        label="Points"
-        inngestSize="small"
-        type="number"
-        min={0}
-        max={maxPoints}
-        value={current.points}
-        onChange={(e) => {
-          const parsed = parseInt(e.target.value, 10) || 0;
-          setDraft({
-            ...draft,
-            points: Math.max(0, Math.min(maxPoints, parsed)),
-          });
-        }}
-      />
-
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={current.invert}
-          onChange={(e) => setDraft({ ...draft, invert: e.target.checked })}
-          className="accent-primary-moderate h-3.5 w-3.5 rounded"
-        />
-        <span className="text-basis text-xs">Invert (lower is better)</span>
-      </label>
-
-      <div className="flex items-center justify-end gap-2">
-        <PopoverClose asChild>
-          <Button
-            kind="secondary"
-            appearance="ghost"
-            size="small"
-            label="Cancel"
-            onClick={reset}
+    <div className="flex w-full items-center gap-1">
+      <span className="text-muted min-w-0 flex-1 truncate text-xs font-medium">
+        {metric.displayName}
+      </span>
+      <Popover open={isOpen} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="text-muted hover:text-basis ml-auto flex shrink-0 items-center"
+          >
+            <RiSettings3Line className="h-3.5 w-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start">
+          <MetricAccordionItem
+            metric={metric}
+            pointsLeft={pointsLeft}
+            collapsible={false}
+            onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
           />
-        </PopoverClose>
-        <PopoverClose asChild>
-          <Button
-            kind="primary"
-            appearance="solid"
-            size="small"
-            label="Apply"
-            onClick={apply}
-          />
-        </PopoverClose>
-      </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -303,11 +238,15 @@ export function VariantsTable({
   scoringConfig,
   onUpdateMetric,
   onEnableMetric,
+  pointsLeft,
   onOpenInsights,
   showInactive,
   onShowInactiveChange,
 }: Props) {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [openMetricPopover, setOpenMetricPopover] = useState<string | null>(
+    null,
+  );
 
   const enabledMetrics = useMemo(
     () =>
@@ -316,15 +255,6 @@ export function VariantsTable({
         .sort((a, b) => b.points - a.points),
     [scoringConfig],
   );
-
-  const totalAllocated = useMemo(
-    () =>
-      scoringConfig
-        .filter((m) => m.enabled)
-        .reduce((sum, m) => sum + m.points, 0),
-    [scoringConfig],
-  );
-  const pointsLeft = 100 - totalAllocated;
 
   const disabledMetrics = useMemo(
     () => scoringConfig.filter((m) => !m.enabled),
@@ -452,24 +382,15 @@ export function VariantsTable({
         columnHelper.display({
           id: `metric_${metric.key}`,
           header: () => (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="text-muted hover:text-basis flex items-center gap-1 text-xs font-medium"
-                >
-                  {metric.displayName}
-                  <RiEqualizerLine className="h-3 w-3" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start">
-                <MetricEditorPopover
-                  metric={metric}
-                  maxPoints={metric.points + pointsLeft}
-                  onApply={(patch) => onUpdateMetric(metric.key, patch)}
-                />
-              </PopoverContent>
-            </Popover>
+            <MetricColumnHeader
+              metric={metric}
+              pointsLeft={pointsLeft}
+              onUpdateMetric={onUpdateMetric}
+              isOpen={openMetricPopover === metric.key}
+              onOpenChange={(open) =>
+                setOpenMetricPopover(open ? metric.key : null)
+              }
+            />
           ),
           cell: (info) => {
             const row = info.row.original;
@@ -541,12 +462,74 @@ export function VariantsTable({
     pointsLeft,
     bestScore,
     worstScore,
+    openMetricPopover,
     onUpdateMetric,
     onEnableMetric,
   ]);
 
   return (
     <div className="flex flex-col">
+      {/* Header toolbar */}
+      <div className="flex items-center justify-between py-2">
+        <div className="flex flex-col gap-px">
+          <span className="text-basis text-sm font-medium">Variants</span>
+          <span className="text-subtle text-xs">
+            Adjust the scoring weight via the column title or sidebar.
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            kind="primary"
+            appearance="ghost"
+            size="small"
+            label="Open with insights"
+            icon={<RiArrowRightUpLine className="h-3.5 w-3.5" />}
+            iconSide="left"
+            onClick={onOpenInsights}
+          />
+
+          <Button
+            kind="primary"
+            appearance="solid"
+            size="small"
+            label="Compare"
+            disabled
+          />
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                kind="secondary"
+                appearance="outlined"
+                size="small"
+                icon={<RiMoreFill className="h-4 w-4" />}
+              />
+            </PopoverTrigger>
+            <PopoverContent align="end">
+              <div className="flex items-center gap-2 px-3 py-2">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <SwitchLabel
+                    htmlFor="show-inactive"
+                    className="text-basis text-sm"
+                  >
+                    Show inactive variants
+                  </SwitchLabel>
+                  <span className="text-subtle text-xs">
+                    This includes old variant [wip]
+                  </span>
+                </div>
+                <Switch
+                  id="show-inactive"
+                  checked={showInactive}
+                  onCheckedChange={onShowInactiveChange}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
       <Table
         columns={columns}
         data={rows}
@@ -555,61 +538,6 @@ export function VariantsTable({
         }
         cellClassName="py-2"
       />
-
-      {/* Footer toolbar */}
-      <div className="border-subtle flex items-center gap-2 border-t px-4 py-2">
-        <Button
-          kind="secondary"
-          appearance="ghost"
-          size="small"
-          label="Open with insights"
-          icon={<RiArrowRightUpLine className="h-3.5 w-3.5" />}
-          iconSide="left"
-          onClick={onOpenInsights}
-        />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <Button
-                kind="secondary"
-                appearance="ghost"
-                size="small"
-                label="Compare"
-                disabled
-              />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>Coming soon</TooltipContent>
-        </Tooltip>
-
-        <div className="flex-1" />
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              kind="secondary"
-              appearance="ghost"
-              size="small"
-              icon={<RiMore2Line className="h-4 w-4" />}
-            />
-          </PopoverTrigger>
-          <PopoverContent align="end">
-            <div className="p-3">
-              <SwitchWrapper>
-                <Switch
-                  id="show-inactive"
-                  checked={showInactive}
-                  onCheckedChange={onShowInactiveChange}
-                />
-                <SwitchLabel htmlFor="show-inactive">
-                  Show inactive variants
-                </SwitchLabel>
-              </SwitchWrapper>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
     </div>
   );
 }
