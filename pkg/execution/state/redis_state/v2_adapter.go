@@ -257,6 +257,10 @@ func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
 	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
 }
 
+func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status state.ScheduleStatus) error {
+	return v.mgr.SetDeferStatus(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hashedID, status)
+}
+
 // StreamState returns all state without loading in-memory
 func (v v2) StreamState(ctx context.Context, id state.ID) (io.Reader, error) {
 	return nil, fmt.Errorf("not implemented")

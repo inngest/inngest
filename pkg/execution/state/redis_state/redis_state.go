@@ -808,6 +808,32 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	}).Error()
 }
 
+func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hashedID string, status statev2.ScheduleStatus) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetDeferStatus"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	args, err := StrSlice([]any{hashedID, int(status)})
+	if err != nil {
+		return err
+	}
+
+	result, err := retriableScripts["setDeferStatus"].Exec(
+		redis_telemetry.WithScriptName(ctx, "setDeferStatus"),
+		r,
+		[]string{fnRunState.kg.Defers(ctx, isSharded, fnID, runID)},
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error setting defer status: %w", err)
+	}
+	if result == 0 {
+		return fmt.Errorf("defer not found for hashedID %q", hashedID)
+	}
+	return nil
+}
+
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveResponse"), redis_telemetry.ScopeFnRunState)
 

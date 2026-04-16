@@ -65,6 +65,11 @@ type RunService interface {
 	Duplicate(ctx context.Context, source State, destID ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error
 
 	SaveDefer(ctx context.Context, id ID, d Defer) error
+	// SetDeferStatus atomically updates only the ScheduleStatus field of an
+	// existing Defer. It returns an error if no defer exists with the given
+	// hashedID. Prefer this over reading a full Defer, mutating, and calling
+	// SaveDefer — that pattern races against concurrent SaveDefer writes.
+	SetDeferStatus(ctx context.Context, id ID, hashedID string, status ScheduleStatus) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
