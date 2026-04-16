@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
+import { InlineCode } from '@inngest/components/Code';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Search } from '@inngest/components/Forms/Search';
 import { Select } from '@inngest/components/Select/Select';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
-import { RiFlaskLine, RiTimeLine } from '@remixicon/react';
+import { RiTimeLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { formatDistanceToNow } from 'date-fns';
 
+import { ExperimentsBlankState } from './ExperimentsBlankState';
 import type { ExperimentListItem } from './types';
 
 const columnHelper = createColumnHelper<ExperimentListItem>();
@@ -150,13 +152,22 @@ export function ExperimentsTable({
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
 
-  const emptyMessage = searchFilter
+  const isFiltered = Boolean(searchFilter) || statusFilter !== 'all';
+  const emptyTitle = searchFilter
     ? `No experiments found matching "${searchFilter}"`
     : statusFilter === 'active'
     ? 'No active experiments'
     : statusFilter === 'completed'
     ? 'No completed experiments'
     : 'No experiments found';
+  const emptyDescription = isFiltered ? (
+    'Try adjusting your filters to find experiments.'
+  ) : (
+    <>
+      To define an experiment, use <InlineCode>group.experiment()</InlineCode> on your Inngest
+      function.
+    </>
+  );
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
@@ -213,13 +224,11 @@ export function ExperimentsTable({
           isLoading={isPending}
           onRowClick={onRowClick ? (row) => onRowClick(row.original.experimentName) : undefined}
           blankState={
-            <div className="flex flex-col items-center justify-center py-16">
-              <RiFlaskLine className="text-disabled mb-3 h-10 w-10" />
-              <p className="text-muted text-sm">{emptyMessage}</p>
-              <p className="text-subtle mt-1 text-xs">
-                Experiments will appear here once your functions start running experiment steps.
-              </p>
-            </div>
+            <ExperimentsBlankState
+              title={emptyTitle}
+              description={emptyDescription}
+              onRefresh={refetch}
+            />
           }
         />
       </div>

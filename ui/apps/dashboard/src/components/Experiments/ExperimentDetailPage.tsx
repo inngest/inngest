@@ -1,6 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
+import { InlineCode } from '@inngest/components/Code';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
-import type { TimeRangePreset } from '@inngest/components/Experiments';
+import {
+  ExperimentsBlankState,
+  type TimeRangePreset,
+} from '@inngest/components/Experiments';
 import {
   HelperPanelControl,
   type HelperItem,
@@ -142,39 +146,53 @@ export function ExperimentDetailPage({ experimentName }: Props) {
             <ErrorCard error={scoring.error} reset={() => scoring.refetch()} />
           )}
 
-          {/* Data */}
-          {filteredDetail && scoring.metrics && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <div className="col-span-1 md:col-span-2 xl:col-span-3">
-                <ScoreSummaryCard
-                  variants={filteredDetail.variants}
-                  metrics={scoring.metrics}
-                />
-              </div>
+          {/* Results */}
+          {filteredDetail &&
+            scoring.metrics &&
+            (filteredDetail.variants.length === 0 ? (
+              <ExperimentsBlankState
+                title="No variant data yet"
+                description={
+                  <>
+                    Once your function emits runs for this experiment via{' '}
+                    <InlineCode>group.experiment()</InlineCode>, variant metrics
+                    will appear here.
+                  </>
+                }
+                onRefresh={detail.refetch}
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="col-span-1 md:col-span-2 xl:col-span-3">
+                  <ScoreSummaryCard
+                    variants={filteredDetail.variants}
+                    metrics={scoring.metrics}
+                  />
+                </div>
 
-              {enabledMetrics.map((metric, i) => (
-                <MetricPanel
-                  key={metric.key}
-                  metric={metric}
-                  variants={filteredDetail.variants}
-                  colorIndex={i}
-                />
-              ))}
+                {enabledMetrics.map((metric, i) => (
+                  <MetricPanel
+                    key={metric.key}
+                    metric={metric}
+                    variants={filteredDetail.variants}
+                    colorIndex={i}
+                  />
+                ))}
 
-              <div className="col-span-1 md:col-span-2 xl:col-span-3">
-                <VariantsTable
-                  variants={filteredDetail.variants}
-                  scoringConfig={scoring.metrics}
-                  onUpdateMetric={scoring.updateMetric}
-                  onEnableMetric={scoring.enableMetric}
-                  pointsLeft={scoring.pointsLeft}
-                  onOpenInsights={onOpenInsights}
-                  showInactive={showInactive}
-                  onShowInactiveChange={setShowInactive}
-                />
+                <div className="col-span-1 md:col-span-2 xl:col-span-3">
+                  <VariantsTable
+                    variants={filteredDetail.variants}
+                    scoringConfig={scoring.metrics}
+                    onUpdateMetric={scoring.updateMetric}
+                    onEnableMetric={scoring.enableMetric}
+                    pointsLeft={scoring.pointsLeft}
+                    onOpenInsights={onOpenInsights}
+                    showInactive={showInactive}
+                    onShowInactiveChange={setShowInactive}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            ))}
         </div>
 
         {/* Sidebar panel */}
