@@ -4,8 +4,13 @@ import type {
   ExperimentScoringMetric,
   TimeRangePreset,
 } from '@inngest/components/Experiments';
+import {
+  HelperPanelControl,
+  type HelperItem,
+} from '@inngest/components/HelperPanelControl';
 import { Header } from '@inngest/components/Header/Header';
 import { Skeleton } from '@inngest/components/Skeleton';
+import { RiFlaskLine, RiListOrdered2 } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { ExperimentDetailToolbar } from '@/components/Experiments/ExperimentDetailToolbar';
@@ -13,10 +18,6 @@ import { InfoSidebar } from '@/components/Experiments/InfoSidebar';
 import { MetricPanel } from '@/components/Experiments/MetricPanel';
 import { ScoreSummaryCard } from '@/components/Experiments/ScoreSummaryCard';
 import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSidebar';
-import {
-  SidebarRail,
-  type SidebarTab,
-} from '@/components/Experiments/SidebarRail';
 import {
   useExperimentDetail,
   useExperimentScoringConfig,
@@ -37,7 +38,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
   const [preset, setPreset] = useState<TimeRangePreset>('24h');
   const [variantFilter, setVariantFilter] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [tab, setTab] = useState<SidebarTab>('scoring');
+  const [activePanel, setActivePanel] = useState<string | null>('scoring');
   const [localMetrics, setLocalMetrics] = useState<
     ExperimentScoringMetric[] | null
   >(null);
@@ -150,6 +151,19 @@ export function ExperimentDetailPage({ experimentName }: Props) {
     );
   }, []);
 
+  const helperItems: HelperItem[] = [
+    {
+      title: 'Info',
+      icon: <RiFlaskLine className="h-4 w-4" />,
+      action: () => setActivePanel((p) => (p === 'info' ? null : 'info')),
+    },
+    {
+      title: 'Scoring formula',
+      icon: <RiListOrdered2 className="h-4 w-4" />,
+      action: () => setActivePanel((p) => (p === 'scoring' ? null : 'scoring')),
+    },
+  ];
+
   return (
     <>
       <Header
@@ -162,8 +176,8 @@ export function ExperimentDetailPage({ experimentName }: Props) {
         ]}
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left content */}
+      <div className="flex h-full flex-1 overflow-hidden">
+        {/* Main content */}
         <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
           <h1 className="text-basis text-lg font-semibold">{experimentName}</h1>
 
@@ -219,22 +233,24 @@ export function ExperimentDetailPage({ experimentName }: Props) {
           )}
         </div>
 
-        {/* Sidebar rail */}
-        <SidebarRail active={tab} onChange={setTab} />
-
         {/* Sidebar panel */}
-        <aside className="border-subtle w-[360px] shrink-0 overflow-y-auto border-l">
-          {tab === 'info' && detail.data && (
-            <InfoSidebar detail={detail.data} topVariantName={topVariant} />
-          )}
-          {tab === 'scoring' && localMetrics && (
-            <ScoringFormulaSidebar
-              metrics={localMetrics}
-              onChange={setLocalMetrics}
-              isSaving={updateScoring.isPending}
-            />
-          )}
-        </aside>
+        {activePanel && (
+          <aside className="border-subtle w-[360px] shrink-0 overflow-y-auto border-l">
+            {activePanel === 'info' && detail.data && (
+              <InfoSidebar detail={detail.data} topVariantName={topVariant} />
+            )}
+            {activePanel === 'scoring' && localMetrics && (
+              <ScoringFormulaSidebar
+                metrics={localMetrics}
+                onChange={setLocalMetrics}
+                isSaving={updateScoring.isPending}
+              />
+            )}
+          </aside>
+        )}
+
+        {/* Icon rail — far right */}
+        <HelperPanelControl items={helperItems} activeTitle={activePanel} />
       </div>
     </>
   );
