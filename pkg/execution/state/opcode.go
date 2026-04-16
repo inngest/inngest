@@ -421,7 +421,8 @@ func (g GeneratorOpcode) DeferCancelOpts() (*DeferCancelOpts, error) {
 }
 
 type DeferCancelOpts struct {
-	CompanionID string `json:"companion_id"`
+	CompanionID    string `json:"companion_id"`
+	TargetHashedID string `json:"target_hashed_id"`
 }
 
 func (d *DeferCancelOpts) UnmarshalAny(a any) error {

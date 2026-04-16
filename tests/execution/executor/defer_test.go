@@ -465,18 +465,23 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	stepID := "step-defer"
+	// The DeferAdd step and the DeferCancel step have DIFFERENT hashed IDs.
+	// DeferCancel must locate the target defer by CompanionID, not by gen.ID.
+	deferStepID := "step-defer"
+	cancelStepID := "step-cancel"
 
 	// --- mock driver: returns DeferCancel opcode ---
+	// Send target_hashed_id to exercise the precise-cancellation path.
 	mockDriver := &mockDriverV1{
 		t: t,
 		response: &state.DriverResponse{
 			StatusCode: 206,
 			Generator: []*state.GeneratorOpcode{{
 				Op: enums.OpcodeDeferCancel,
-				ID: stepID,
+				ID: cancelStepID,
 				Opts: map[string]any{
-					"companion_id": "score",
+					"companion_id":     "score",
+					"target_hashed_id": deferStepID,
 				},
 			}},
 		},
@@ -510,7 +515,7 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	// --- pre-seed a defer (as if DeferAdd already ran) ---
 	require.NoError(t, smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 		CompanionID:    "score",
-		HashedID:       stepID,
+		HashedID:       deferStepID,
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
 	}))
@@ -522,8 +527,8 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 		WorkspaceID: wsID,
 		Kind:        queue.KindStart,
 		Identifier:  state.Identifier{WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID},
-		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: stepID}},
-	}, inngest.Edge{Incoming: "$trigger", Outgoing: stepID})
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
 	require.NoError(t, err)
 
 	// --- assert the defer status flipped to Cancelled ---
@@ -531,7 +536,7 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, defers, 1)
 
-	d := defers[stepID]
+	d := defers[deferStepID]
 	require.Equal(t, "score", d.CompanionID, "CompanionID should be preserved")
 	require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus, "status should be Cancelled")
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input), "Input should be preserved")

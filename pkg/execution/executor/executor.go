@@ -3470,8 +3470,8 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 }
 
 func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	_, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
-	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrDuplicateResponse) {
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
@@ -3501,29 +3501,55 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 
 	// continue execution, re-enqueue the discovery step
 	groupID := uuid.New().String()
-	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, true) // the run ain't done
+	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
 }
 
 func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// Load the existing defer so we preserve its fields (CompanionID, Input, etc.)
+	// Memoize with null data so the SDK doesn't re-emit this opcode on resume.
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		return err
+	}
+
+	opts, err := gen.DeferCancelOpts()
+	if err != nil {
+		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
+	}
+
+	// gen.ID is the cancel step's own hash, not the target defer's hash.
+	// Modern SDKs send target_hashed_id to identify the exact defer to cancel
+	// (needed when a run has multiple defers for the same companion). Older
+	// SDKs only send companion_id, which we fall back to scanning.
 	defers, err := e.smv2.LoadDefers(ctx, runCtx.Metadata().ID)
 	if err != nil {
 		return fmt.Errorf("error loading defers for cancel: %w", err)
 	}
 
-	d, ok := defers[gen.ID]
-	if !ok {
-		return fmt.Errorf("defer not found for step %s", gen.ID)
+	var target sv2.Defer
+	var found bool
+	if opts.TargetHashedID != "" {
+		target, found = defers[opts.TargetHashedID]
+	} else {
+		for _, d := range defers {
+			if d.CompanionID == opts.CompanionID {
+				target = d
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		return fmt.Errorf("defer not found for companion %q (target_hashed_id=%q)", opts.CompanionID, opts.TargetHashedID)
 	}
 
-	d.ScheduleStatus = sv2.ScheduleStatusCancelled
+	target.ScheduleStatus = sv2.ScheduleStatusCancelled
 
-	if err := e.smv2.SaveDefer(ctx, runCtx.Metadata().ID, d); err != nil {
+	if err := e.smv2.SaveDefer(ctx, runCtx.Metadata().ID, target); err != nil {
 		return fmt.Errorf("error saving cancelled defer: %w", err)
 	}
 
 	groupID := uuid.New().String()
-	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, true)
+	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
 }
 
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step

@@ -153,6 +153,18 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 		return
 	}
 
+	// Resolve the parent function's slug. opts.Optional.FnSlug is an optimization
+	// hint and may be empty — fall back to loading the function, same as finalizeEvents.
+	fnSlug := opts.Optional.FnSlug
+	if fnSlug == "" {
+		fn, err := e.fl.LoadFunction(ctx, opts.Metadata.ID.Tenant.EnvID, opts.Metadata.ID.FunctionID)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error loading function for deferred events", "error", err, "run_id", opts.Metadata.ID.RunID)
+			return
+		}
+		fnSlug = fn.Function.Slug
+	}
+
 	now := e.now()
 	var events []event.Event
 
@@ -172,7 +184,7 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 						"companion_id": d.CompanionID,
 					},
 					"parent_run": map[string]any{
-						"fn_slug": opts.Optional.FnSlug,
+						"fn_slug": fnSlug,
 						"run_id":  opts.Metadata.ID.RunID.String(),
 					},
 				},
