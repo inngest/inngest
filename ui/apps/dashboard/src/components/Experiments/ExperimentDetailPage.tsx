@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
-import type {
-  ExperimentScoringMetric,
-  TimeRangePreset,
-} from '@inngest/components/Experiments';
+import type { TimeRangePreset } from '@inngest/components/Experiments';
 import {
   HelperPanelControl,
   type HelperItem,
@@ -18,11 +15,8 @@ import { InfoSidebar } from '@/components/Experiments/InfoSidebar';
 import { MetricPanel } from '@/components/Experiments/MetricPanel';
 import { ScoreSummaryCard } from '@/components/Experiments/ScoreSummaryCard';
 import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSidebar';
-import {
-  useExperimentDetail,
-  useExperimentScoringConfig,
-  useUpdateExperimentScoringConfig,
-} from '@/components/Experiments/useExperiments';
+import { useExperimentDetail } from '@/components/Experiments/useExperiments';
+import { useScoringConfig } from '@/components/Experiments/useScoringConfig';
 import { VariantsTable } from '@/components/Experiments/VariantsTable';
 import { scoreVariant } from '@/lib/experiments/score';
 import { pathCreator } from '@/utils/urls';
@@ -41,75 +35,24 @@ export function ExperimentDetailPage({ experimentName }: Props) {
   const [activePanel, setActivePanel] = useState<string | null>(
     'Scoring formula',
   );
-  const [localMetrics, setLocalMetrics] = useState<
-    ExperimentScoringMetric[] | null
-  >(null);
-
   // --- hooks ---
   const detail = useExperimentDetail(experimentName, preset, variantFilter);
-  const scoring = useExperimentScoringConfig(experimentName);
-  const updateScoring = useUpdateExperimentScoringConfig(experimentName);
-
-  // Initialize localMetrics from server config
-  useEffect(() => {
-    if (scoring.data) {
-      setLocalMetrics(scoring.data.metrics);
-    }
-  }, [scoring.data]);
-
-  // --- debounced save ---
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const serverMetricsRef = useRef<ExperimentScoringMetric[] | null>(null);
-
-  useEffect(() => {
-    serverMetricsRef.current = scoring.data?.metrics ?? null;
-  }, [scoring.data]);
-
-  useEffect(() => {
-    if (!localMetrics) return;
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      const serverMetrics = serverMetricsRef.current;
-      if (
-        serverMetrics &&
-        JSON.stringify(localMetrics) !== JSON.stringify(serverMetrics)
-      ) {
-        updateScoring.mutate(localMetrics);
-      }
-    }, 600);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [localMetrics, updateScoring]);
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
+  const scoring = useScoringConfig(experimentName);
 
   // --- compute top variant ---
   const topVariant = useMemo(() => {
-    if (!detail.data || !localMetrics) return null;
+    if (!detail.data || !scoring.metrics) return null;
     let bestName: string | null = null;
     let bestScore = -Infinity;
     for (const v of detail.data.variants) {
-      const result = scoreVariant(v.metrics, localMetrics);
+      const result = scoreVariant(v.metrics, scoring.metrics);
       if (result.total > bestScore) {
         bestScore = result.total;
         bestName = v.variantName;
       }
     }
     return bestName;
-  }, [detail.data, localMetrics]);
+  }, [detail.data, scoring.metrics]);
 
   // --- available variants for toolbar filter ---
   const availableVariants = useMemo(
@@ -119,8 +62,8 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
   // --- enabled metrics for MetricPanel grid ---
   const enabledMetrics = useMemo(
-    () => (localMetrics ?? []).filter((m) => m.enabled),
-    [localMetrics],
+    () => (scoring.metrics ?? []).filter((m) => m.enabled),
+    [scoring.metrics],
   );
 
   // --- onOpenInsights callback ---
@@ -134,24 +77,6 @@ export function ExperimentDetailPage({ experimentName }: Props) {
       '_blank',
     );
   }, [experimentName, environment.slug]);
-
-  // --- metric update helpers for VariantsTable ---
-  const handleUpdateMetric = useCallback(
-    (key: string, patch: Partial<ExperimentScoringMetric>) => {
-      setLocalMetrics((prev) =>
-        prev ? prev.map((m) => (m.key === key ? { ...m, ...patch } : m)) : prev,
-      );
-    },
-    [],
-  );
-
-  const handleEnableMetric = useCallback((key: string) => {
-    setLocalMetrics((prev) =>
-      prev
-        ? prev.map((m) => (m.key === key ? { ...m, enabled: true } : m))
-        : prev,
-    );
-  }, []);
 
   const helperItems: HelperItem[] = [
     {
@@ -208,11 +133,11 @@ export function ExperimentDetailPage({ experimentName }: Props) {
           )}
 
           {/* Data */}
-          {detail.data && localMetrics && (
+          {detail.data && scoring.metrics && (
             <>
               <ScoreSummaryCard
                 variants={detail.data.variants}
-                metrics={localMetrics}
+                metrics={scoring.metrics}
               />
 
               <div className="grid grid-cols-3 gap-3">
@@ -227,9 +152,9 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
               <VariantsTable
                 variants={detail.data.variants}
-                scoringConfig={localMetrics}
-                onUpdateMetric={handleUpdateMetric}
-                onEnableMetric={handleEnableMetric}
+                scoringConfig={scoring.metrics}
+                onUpdateMetric={scoring.updateMetric}
+                onEnableMetric={scoring.enableMetric}
                 onOpenInsights={onOpenInsights}
                 showInactive={showInactive}
                 onShowInactiveChange={setShowInactive}
@@ -261,11 +186,11 @@ export function ExperimentDetailPage({ experimentName }: Props) {
               {activePanel === 'Info' && detail.data && (
                 <InfoSidebar detail={detail.data} topVariantName={topVariant} />
               )}
-              {activePanel === 'Scoring formula' && localMetrics && (
+              {activePanel === 'Scoring formula' && scoring.metrics && (
                 <ScoringFormulaSidebar
-                  metrics={localMetrics}
-                  onChange={setLocalMetrics}
-                  isSaving={updateScoring.isPending}
+                  metrics={scoring.metrics}
+                  onChange={scoring.setMetrics}
+                  isSaving={scoring.isSaving}
                 />
               )}
             </div>
