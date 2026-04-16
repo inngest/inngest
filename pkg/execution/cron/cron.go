@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
@@ -82,6 +83,19 @@ type CronItem struct {
 // SyncID is used for the jobID when enqueueing non processing types
 func (i CronItem) SyncID() string {
 	return fmt.Sprintf("%s:sync", i.ID)
+}
+
+// DeterministicJitter returns a stable jitter duration in (0, max] derived from
+// the given seed string using xxhash. The same seed always produces the same result.
+// The result is always at least 1ns so that jittered times are strictly after the
+// canonical boundary.
+func DeterministicJitter(seed string, max time.Duration) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+
+	rangeNs := uint64(max / time.Nanosecond)
+	return time.Duration(xxhash.Sum64String(seed)%rangeNs) + 1
 }
 
 type CronHealthCheckStatus struct {
