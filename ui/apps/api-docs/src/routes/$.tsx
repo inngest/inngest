@@ -7,13 +7,16 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page
 
 import { useMDXComponents } from '@/components/mdx';
 import { baseOptions } from '@/lib/layout.shared';
-import { source } from '@/lib/source';
 
 type LoaderData = { path: string; pageTree: Root };
 
 export const Route = createFileRoute('/$')({
   component: Page,
   loader: async ({ params }) => {
+    // Lazy import: source uses the server collection (eager MDX imports).
+    // Dynamic import keeps it out of the static module graph so the SSR
+    // shell renderer never loads it — loaders only run client-side in SPA mode.
+    const { source } = await import('@/lib/source');
     const slugs = (params as { _splat?: string })._splat?.split('/').filter(Boolean) ?? [];
     const page = source.getPage(slugs);
     if (!page) throw notFound();

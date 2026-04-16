@@ -15,7 +15,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
-    "dev:vite": "vite dev",
+    "dev:vite": "vite dev --port 3000 --host 127.0.0.1",
     "dev:graphql-codegen": "graphql-codegen -w -r dotenv/config",
     "build": "pnpm build:tsc && pnpm build:graphql-codegen && pnpm build:vite",
     "build:tsc": "tsc --noEmit",

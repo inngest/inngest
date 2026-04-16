@@ -7,13 +7,15 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page
 
 import { useMDXComponents } from '@/components/mdx';
 import { baseOptions } from '@/lib/layout.shared';
-import { source } from '@/lib/source';
 
 type LoaderData = { path: string; pageTree: Root };
 
 export const Route = createFileRoute('/')({
   component: Page,
   loader: async () => {
+    // Lazy import: keeps source out of the static module graph so the SSR
+    // shell renderer never loads it — loaders only run client-side in SPA mode.
+    const { source } = await import('@/lib/source');
     const page = source.getPage([]);
     if (!page) throw notFound();
 
