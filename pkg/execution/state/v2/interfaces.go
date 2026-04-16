@@ -63,6 +63,8 @@ type RunService interface {
 	// Step inputs must be loaded separately from the source backend since State.Steps
 	// only contains step outputs.
 	Duplicate(ctx context.Context, source State, destID ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error
+
+	SaveDefer(ctx context.Context, id ID, d Defer) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
@@ -106,6 +108,8 @@ type StateLoader interface {
 
 	// StreamState returns all state without loading in-memory
 	// StreamState(ctx context.Context, id ID) (io.Reader, error)
+
+	LoadDefers(ctx context.Context, id ID) (map[string]Defer, error)
 }
 
 //

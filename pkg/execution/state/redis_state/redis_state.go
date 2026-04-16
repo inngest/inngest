@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util/rueidisconn"
@@ -545,6 +546,28 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 	return &meta, nil
 }
 
+func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]statev2.Defer, error) {
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.Defers(ctx, isSharded, fnID, runID)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, err
+	}
+
+	defers := make(map[string]statev2.Defer, len(rmap))
+	for hashedID, raw := range rmap {
+		var d statev2.Defer
+		if err := json.Unmarshal([]byte(raw), &d); err != nil {
+			return nil, err
+		}
+		defers[hashedID] = d
+	}
+	return defers, nil
+}
+
 func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadEvents"), redis_telemetry.ScopeFnRunState)
 
@@ -769,6 +792,20 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 	return stack, nil
+}
+
+func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, d statev2.Defer) error {
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	data, err := json.Marshal(d)
+	if err != nil {
+		return err
+	}
+
+	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hset().Key(fnRunState.kg.Defers(ctx, isSharded, fnID, runID)).FieldValue().FieldValue(d.HashedID, string(data)).Build()
+	}).Error()
 }
 
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
