@@ -27,6 +27,7 @@ const (
 	OpcodeDiscoveryRequest
 
 	OpcodeDeferAdd
+	OpcodeDeferCancel
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.

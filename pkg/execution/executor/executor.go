@@ -3364,6 +3364,10 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferAdd:
+		return e.handleGeneratorDeferAdd(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferCancel:
+		return e.handleGeneratorDeferCancel(ctx, runCtx, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -3463,6 +3467,63 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 		groupID,
 		false,
 	)
+}
+
+func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	_, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrDuplicateResponse) {
+		return err
+	}
+
+	opts, err := gen.DeferAddOpts()
+	if err != nil {
+		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
+	}
+
+	// Derive the companion function's slug: {parent-slug}-defer-{companionID}
+	md := runCtx.Metadata()
+	fn, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return fmt.Errorf("error loading function for defer: %w", err)
+	}
+
+	d := sv2.Defer{
+		CompanionID:    opts.CompanionID,
+		FnSlug:         fn.Function.Slug + "-defer-" + opts.CompanionID,
+		HashedID:       gen.ID,
+		ScheduleStatus: sv2.ScheduleStatusAfterRun,
+		Input:          opts.Input,
+	}
+
+	if err := e.smv2.SaveDefer(ctx, runCtx.Metadata().ID, d); err != nil {
+		return fmt.Errorf("error saving defer: %w", err)
+	}
+
+	// continue execution, re-enqueue the discovery step
+	groupID := uuid.New().String()
+	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, true) // the run ain't done
+}
+
+func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// Load the existing defer so we preserve its fields (CompanionID, Input, etc.)
+	defers, err := e.smv2.LoadDefers(ctx, runCtx.Metadata().ID)
+	if err != nil {
+		return fmt.Errorf("error loading defers for cancel: %w", err)
+	}
+
+	d, ok := defers[gen.ID]
+	if !ok {
+		return fmt.Errorf("defer not found for step %s", gen.ID)
+	}
+
+	d.ScheduleStatus = sv2.ScheduleStatusCancelled
+
+	if err := e.smv2.SaveDefer(ctx, runCtx.Metadata().ID, d); err != nil {
+		return fmt.Errorf("error saving cancelled defer: %w", err)
+	}
+
+	groupID := uuid.New().String()
+	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, true)
 }
 
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step

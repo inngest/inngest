@@ -602,6 +602,9 @@ func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, 
 func (m *mockStateLoader) LoadV1Metadata(ctx context.Context, id sv2.ID) (*sv1.Metadata, error) {
 	return nil, nil
 }
+func (m *mockStateLoader) LoadDefers(ctx context.Context, id sv2.ID) (map[string]sv2.Defer, error) {
+	return nil, nil
+}
 
 func newHTTPRequestEvent(body []byte, contentType, queryParams string) json.RawMessage {
 	evt := inngestgo.GenericEvent[apiv1.NewAPIRunData]{

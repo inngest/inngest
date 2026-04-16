@@ -412,6 +412,38 @@ func (d *DeferAddOpts) UnmarshalAny(a any) error {
 	return nil
 }
 
+func (g GeneratorOpcode) DeferCancelOpts() (*DeferCancelOpts, error) {
+	opts := &DeferCancelOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, nil
+}
+
+type DeferCancelOpts struct {
+	CompanionID string `json:"companion_id"`
+}
+
+func (d *DeferCancelOpts) UnmarshalAny(a any) error {
+	opts := DeferCancelOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*d = opts
+	return nil
+}
+
 type SleepOpts struct {
 	Duration string `json:"duration"`
 }

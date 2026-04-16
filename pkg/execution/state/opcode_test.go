@@ -170,3 +170,17 @@ func TestDeferAddOpts(t *testing.T) {
 	require.Equal(t, "score", opts.CompanionID)
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(opts.Input))
 }
+
+func TestDeferCancelOpts(t *testing.T) {
+	g := GeneratorOpcode{
+		Op: enums.OpcodeDeferCancel,
+		ID: "deferred-step",
+		Opts: map[string]any{
+			"companion_id": "score",
+		},
+	}
+
+	opts, err := g.DeferCancelOpts()
+	require.NoError(t, err)
+	require.Equal(t, "score", opts.CompanionID)
+}

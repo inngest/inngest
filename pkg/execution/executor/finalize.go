@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -116,6 +118,11 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 	}
 
+	defers, deferErr := e.smv2.LoadDefers(ctx, opts.Metadata.ID)
+	if deferErr != nil {
+		l.Warn("error loading defers to finalize", "error", deferErr, "run_id", opts.Metadata.ID.RunID)
+	}
+
 	// Delete the function state in every case.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
@@ -133,11 +140,52 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		},
 	})
 
+	e.finalizeDefers(ctx, opts, defers)
 	e.finalizeRemoveJobs(ctx, opts)
 
 	// finalizeEvents creates function finished events, and also attempts to fast-resume
 	// any parent function that invoked this run.
 	return e.finalizeEvents(ctx, opts)
+}
+
+func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOpts, defers map[string]sv2.Defer) {
+	if e.finishHandler == nil || len(defers) == 0 {
+		return
+	}
+
+	now := e.now()
+	var events []event.Event
+
+	for _, d := range defers {
+		// TODO: what about an immediate execution mode?
+		if d.ScheduleStatus != sv2.ScheduleStatusAfterRun {
+			continue
+		}
+
+		events = append(events, event.Event{
+			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+			Name:      "inngest/deferred.start",
+			Timestamp: now.UnixMilli(),
+			Data: map[string]any{
+				"_inngest": map[string]any{
+					"deferred_run": map[string]any{
+						"companion_id": d.CompanionID,
+					},
+					"parent_run": map[string]any{
+						"fn_slug": opts.Optional.FnSlug,
+						"run_id":  opts.Metadata.ID.RunID.String(),
+					},
+				},
+				"input": json.RawMessage(d.Input),
+			},
+		})
+	}
+
+	if len(events) > 0 {
+		if err := e.finishHandler(ctx, opts.Metadata.ID, events); err != nil {
+			logger.StdlibLogger(ctx).Error("error publishing deferred start events", "error", err)
+		}
+	}
 }
 
 // finalizeRemoveJobs removes any other jobs for a finalized run, as the function is
