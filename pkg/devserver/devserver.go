@@ -137,6 +137,12 @@ type StartOpts struct {
 
 	NoUI bool
 
+	// DashboardUsername and DashboardPassword enable HTTP Basic Auth for the
+	// self-hosted dashboard (UI + static assets). When either is empty, no
+	// browser auth is enforced. SDK-facing endpoints are unaffected.
+	DashboardUsername string `json:"-"`
+	DashboardPassword string `json:"-"`
+
 	// Persist controls whether to persist data in between restarts.  If false,
 	// the dev server will use in-memory databases.
 	Persist bool `json:"persist"`
@@ -605,7 +611,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
+	dashboardAuth := authn.BasicAuthMiddleware(opts.DashboardUsername, opts.DashboardPassword, "Inngest Dashboard")
+	devAPI := NewDevAPI(ds, DevAPIOptions{
+		AuthMiddleware:          authn.SigningKeyMiddleware(opts.SigningKey),
+		DashboardAuthMiddleware: dashboardAuth,
+		disableUI:               opts.NoUI,
+	})
 
 	// Add MCP server route
 	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data, opts.Tick)

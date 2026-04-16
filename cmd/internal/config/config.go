@@ -37,6 +37,10 @@ type Config struct {
 	SigningKey string   `koanf:"signing-key"`
 	EventKey   []string `koanf:"event-key"`
 
+	// Dashboard HTTP Basic Auth (self-hosted)
+	DashboardUsername string `koanf:"dashboard-username"`
+	DashboardPassword string `koanf:"dashboard-password"`
+
 	// Database configuration
 	RedisURI                string `koanf:"redis-uri"`
 	PostgresURI             string `koanf:"postgres-uri"`

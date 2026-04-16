@@ -120,6 +120,20 @@ func Command() *cli.Command {
 				Name:     "no-ui",
 				Usage:    "Disable the web UI and GraphQL API endpoint",
 			},
+
+			// Dashboard authentication flags. Env vars INNGEST_DASHBOARD_USERNAME
+			// and INNGEST_DASHBOARD_PASSWORD are picked up via the shared koanf
+			// loader.
+			&cli.StringFlag{
+				Category: "Dashboard Auth",
+				Name:     "dashboard-username",
+				Usage:    "Username required to access the dashboard via HTTP Basic Auth. Must be set together with --dashboard-password. When empty, no browser auth is required.",
+			},
+			&cli.StringFlag{
+				Category: "Dashboard Auth",
+				Name:     "dashboard-password",
+				Usage:    "Password required to access the dashboard via HTTP Basic Auth. Must be set together with --dashboard-username. When empty, no browser auth is required.",
+			},
 		},
 	}
 

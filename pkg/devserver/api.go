@@ -49,6 +49,11 @@ type devapi struct {
 type DevAPIOptions struct {
 	disableUI      bool
 	AuthMiddleware func(http.Handler) http.Handler
+	// DashboardAuthMiddleware is applied to the browser-facing dashboard
+	// routes (SPA + static assets) so self-hosted deployments can require
+	// HTTP Basic Auth for dashboard access without impacting SDK-facing
+	// endpoints.
+	DashboardAuthMiddleware func(http.Handler) http.Handler
 }
 
 func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
@@ -58,11 +63,11 @@ func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
 		devserver: d,
 		disableUI: o.disableUI,
 	}
-	api.addRoutes(o.AuthMiddleware)
+	api.addRoutes(o.AuthMiddleware, o.DashboardAuthMiddleware)
 	return api
 }
 
-func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
+func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler, DashboardAuthMiddleware func(http.Handler) http.Handler) {
 	a.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			l := a.devserver.log.With("caller", a.devserver.Name())
@@ -96,15 +101,29 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 		//
 		// Create filesystem rooted at static/client for Tanstack assets
 		staticFS, _ := fs.Sub(static, "static/client")
-		a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-		a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-		a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
-		a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
-		a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
-		a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		staticHandler := http.FileServer(http.FS(staticFS))
+		uiHandler := http.HandlerFunc(a.UI)
+
+		// When a dashboard auth middleware is configured (HTTP Basic Auth for
+		// self-hosted deployments), wrap the browser-facing routes so users
+		// cannot load the dashboard without valid credentials. The middleware
+		// is a no-op when credentials are not configured.
+		var staticServe http.Handler = staticHandler
+		var uiServe http.Handler = uiHandler
+		if DashboardAuthMiddleware != nil {
+			staticServe = DashboardAuthMiddleware(staticHandler)
+			uiServe = DashboardAuthMiddleware(uiHandler)
+		}
+
+		a.Get("/images/*", staticServe.ServeHTTP)
+		a.Get("/assets/*", staticServe.ServeHTTP)
+		a.Get("/{file}.txt", staticServe.ServeHTTP)
+		a.Get("/{file}.svg", staticServe.ServeHTTP)
+		a.Get("/{file}.jpg", staticServe.ServeHTTP)
+		a.Get("/{file}.png", staticServe.ServeHTTP)
 		//
 		// Everything else loads the UI (SPA fallback)
-		a.NotFound(a.UI)
+		a.NotFound(uiServe.ServeHTTP)
 	}
 }
 

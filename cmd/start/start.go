@@ -122,10 +122,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
 	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
 
+	dashboardUsername := localconfig.GetValue(cmd, "dashboard-username", "")
+	dashboardPassword := localconfig.GetValue(cmd, "dashboard-password", "")
+	if (dashboardUsername == "") != (dashboardPassword == "") {
+		fmt.Println("Error: dashboard-username and dashboard-password must both be set to enable dashboard auth")
+		os.Exit(1)
+	}
+
 	opts := devserver.StartOpts{
 		Config:                  *conf,
 		ConnectGatewayHost:      conf.CoreAPI.Addr,
 		ConnectGatewayPort:      connectGatewayPort,
+		DashboardUsername:       dashboardUsername,
+		DashboardPassword:       dashboardPassword,
 		EventKeys:               eventKeys,
 		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
 		Persist:                 true,
