@@ -23,7 +23,7 @@
     "postinstall.js"
   ],
   "volta": {
-    "node": "24.14.1"
+    "node": "24.15.0"
   },
   "dependencies": {
     "adm-zip": "^0.5.10",
