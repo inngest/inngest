@@ -38,6 +38,11 @@ type RunStateKeyGenerator interface {
 	// run.
 	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
 
+	// PauseConsumeKey is an idempotency key used for making sure pause consumptions are idempotent
+	PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string
+
+	// Defers returns the key used to store the defer groups for a given run.
+	Defers(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 }
 
 type runStateKeyGenerator struct {
@@ -72,6 +77,12 @@ func (s runStateKeyGenerator) Events(ctx context.Context, isSharded bool, fnID u
 
 func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
+}
+
+func (s runStateKeyGenerator) Defers(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	// TODO: spec says groups, but why not `defers`?
+	// Probably to make it more generic but then why not make the `Defers` more generic a la `Groups` as well?
+	return fmt.Sprintf("{%s}:groups:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {

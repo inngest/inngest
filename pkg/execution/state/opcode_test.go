@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,4 +78,32 @@ func TestInvokeFunctionOpts_Expires(t *testing.T) {
 		require.NoError(t, err)
 		assert.WithinDuration(t, now.AddDate(1, 0, 0), got, time.Second)
 	})
+}
+
+// TestDeferAddOpts pins down the first real behavior of OpcodeDeferAdd:
+// the SDK emits a GeneratorOpcode whose Opts field carries the target
+// companion ID and the user input passed to `step.defer(...)`, and the
+// executor needs a typed accessor to read them.
+//
+// This mirrors the pattern used by every other opcode with options —
+// see InvokeFunctionOpts(), WaitForEventOpts(), SignalOpts() in opcode.go.
+//
+// To make this pass:
+//  1. Add a DeferAddOpts struct with `companion_id` and `input` JSON fields.
+//  2. Add an UnmarshalAny method on it (copy the shape of InvokeFunctionOpts).
+//  3. Add a DeferAddOpts() method on GeneratorOpcode that parses g.Opts.
+func TestDeferAddOpts(t *testing.T) {
+	g := GeneratorOpcode{
+		Op: enums.OpcodeDeferAdd,
+		ID: "deferred-step",
+		Opts: map[string]any{
+			"companion_id": "score",
+			"input":        map[string]any{"user_id": "u_123"},
+		},
+	}
+
+	opts, err := g.DeferAddOpts()
+	require.NoError(t, err)
+	require.Equal(t, "score", opts.CompanionID)
+	require.JSONEq(t, `{"user_id":"u_123"}`, string(opts.Input))
 }

@@ -204,6 +204,10 @@ func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {
 	return v.mgr.Exists(ctx, id.Tenant.AccountID, id.RunID)
 }
 
+func (v v2) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer, error) {
+	return v.mgr.LoadDefers(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
 // LoadEvents returns all events for a run.
 func (v v2) LoadEvents(ctx context.Context, id state.ID) ([]json.RawMessage, error) {
 	return v.mgr.LoadEvents(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
@@ -247,6 +251,10 @@ func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 	}
 
 	return state, nil
+}
+
+func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
+	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
 }
 
 // StreamState returns all state without loading in-memory
