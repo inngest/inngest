@@ -110,9 +110,16 @@ type ExperimentsTableProps = {
   isPending: boolean;
   error: Error | null;
   refetch: () => void;
+  onRowClick?: (experimentName: string) => void;
 };
 
-export function ExperimentsTable({ data, isPending, error, refetch }: ExperimentsTableProps) {
+export function ExperimentsTable({
+  data,
+  isPending,
+  error,
+  refetch,
+  onRowClick,
+}: ExperimentsTableProps) {
   const [searchInput, setSearchInput] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<ExperimentStatusFilter>('active');
@@ -204,6 +211,7 @@ export function ExperimentsTable({ data, isPending, error, refetch }: Experiment
           columns={columns}
           data={filteredData}
           isLoading={isPending}
+          onRowClick={onRowClick ? (row) => onRowClick(row.original.experimentName) : undefined}
           blankState={
             <div className="flex flex-col items-center justify-center py-16">
               <RiFlaskLine className="text-disabled mb-3 h-10 w-10" />

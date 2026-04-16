@@ -926,18 +926,49 @@ export type Experiment = {
 
 export type ExperimentDetail = {
   __typename?: 'ExperimentDetail';
+  firstSeen: Scalars['Time']['output'];
+  lastSeen: Scalars['Time']['output'];
   name: Scalars['String']['output'];
+  selectionStrategy: Scalars['String']['output'];
+  variantWeights: Array<VariantWeight>;
   variants: Array<ExperimentVariantMetrics>;
+};
+
+export type ExperimentScoringConfig = {
+  __typename?: 'ExperimentScoringConfig';
+  experimentName: Scalars['String']['output'];
+  metrics: Array<ExperimentScoringMetric>;
+  updatedAt: Scalars['Time']['output'];
+};
+
+export type ExperimentScoringMetric = {
+  __typename?: 'ExperimentScoringMetric';
+  displayName: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  invert: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
+  labelBest: Scalars['String']['output'];
+  labelWorst: Scalars['String']['output'];
+  maxValue: Scalars['Float']['output'];
+  minValue: Scalars['Float']['output'];
+  points: Scalars['Int']['output'];
+};
+
+export type ExperimentScoringMetricInput = {
+  displayName: Scalars['String']['input'];
+  enabled: Scalars['Boolean']['input'];
+  invert: Scalars['Boolean']['input'];
+  key: Scalars['String']['input'];
+  labelBest: Scalars['String']['input'];
+  labelWorst: Scalars['String']['input'];
+  maxValue: Scalars['Float']['input'];
+  minValue: Scalars['Float']['input'];
+  points: Scalars['Int']['input'];
 };
 
 export type ExperimentVariantMetrics = {
   __typename?: 'ExperimentVariantMetrics';
-  avgAccuracy: Scalars['Float']['output'];
-  avgCost: Scalars['Float']['output'];
-  avgDuration: Scalars['Float']['output'];
-  avgSafety: Scalars['Float']['output'];
-  avgTokens: Scalars['Float']['output'];
-  failureRate: Scalars['Float']['output'];
+  metrics: Array<VariantMetric>;
   runCount: Scalars['Int']['output'];
   variantName: Scalars['String']['output'];
 };
@@ -1267,6 +1298,7 @@ export type Mutation = {
   unpauseFunction: Workflow;
   updateAccount: Account;
   updateAccountAddonQuantity: Addon;
+  updateExperimentScoringConfig: ExperimentScoringConfig;
   updateIngestKey: IngestKey;
   updateInsightsQuery: InsightsQueryStatement;
   updatePaymentMethod: Maybe<Array<PaymentMethod>>;
@@ -1547,6 +1579,13 @@ export type MutationUpdateAccountAddonQuantityArgs = {
 };
 
 
+export type MutationUpdateExperimentScoringConfigArgs = {
+  experimentName: Scalars['String']['input'];
+  metrics: Array<ExperimentScoringMetricInput>;
+  workspaceID: Scalars['ID']['input'];
+};
+
+
 export type MutationUpdateIngestKeyArgs = {
   id: Scalars['ID']['input'];
   input: UpdateIngestKey;
@@ -1672,6 +1711,7 @@ export type Query = {
   events: Maybe<PaginatedEvents>;
   executionTimeSeries: Array<TimeSeries>;
   experimentDetail: ExperimentDetail;
+  experimentScoringConfig: ExperimentScoringConfig;
   experiments: Array<Experiment>;
   insights: InsightsResponse;
   insightsQuery: InsightsQueryStatement;
@@ -1722,6 +1762,14 @@ export type QueryExecutionTimeSeriesArgs = {
 
 
 export type QueryExperimentDetailArgs = {
+  experimentName: Scalars['String']['input'];
+  timeRange: InputMaybe<TimeRangeInput>;
+  variantFilter: InputMaybe<Scalars['String']['input']>;
+  workspaceID: Scalars['ID']['input'];
+};
+
+
+export type QueryExperimentScoringConfigArgs = {
   experimentName: Scalars['String']['input'];
   workspaceID: Scalars['ID']['input'];
 };
@@ -2209,6 +2257,11 @@ export type ThrottleConfiguration = {
   period: Scalars['String']['output'];
 };
 
+export type TimeRangeInput = {
+  from: Scalars['Time']['input'];
+  to: Scalars['Time']['input'];
+};
+
 export type TimeSeries = {
   __typename?: 'TimeSeries';
   data: Array<TimeSeriesPoint>;
@@ -2300,6 +2353,20 @@ export type UserlandSpan = {
   spanAttrs: Maybe<Scalars['Bytes']['output']>;
   spanKind: Maybe<Scalars['String']['output']>;
   spanName: Maybe<Scalars['String']['output']>;
+};
+
+export type VariantMetric = {
+  __typename?: 'VariantMetric';
+  avg: Scalars['Float']['output'];
+  key: Scalars['String']['output'];
+  max: Scalars['Float']['output'];
+  min: Scalars['Float']['output'];
+};
+
+export type VariantWeight = {
+  __typename?: 'VariantWeight';
+  variantName: Scalars['String']['output'];
+  weight: Scalars['Int']['output'];
 };
 
 export type VercelApp = {
@@ -3011,6 +3078,33 @@ export type GetExperimentsQueryVariables = Exact<{
 
 
 export type GetExperimentsQuery = { __typename?: 'Query', experiments: Array<{ __typename?: 'Experiment', name: string, functionID: string, selectionStrategy: string, totalRuns: number, variantCount: number, firstSeen: string, lastSeen: string }> };
+
+export type GetExperimentDetailQueryVariables = Exact<{
+  workspaceID: Scalars['ID']['input'];
+  experimentName: Scalars['String']['input'];
+  timeRange: InputMaybe<TimeRangeInput>;
+  variantFilter: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetExperimentDetailQuery = { __typename?: 'Query', experimentDetail: { __typename?: 'ExperimentDetail', name: string, firstSeen: string, lastSeen: string, selectionStrategy: string, variantWeights: Array<{ __typename?: 'VariantWeight', variantName: string, weight: number }>, variants: Array<{ __typename?: 'ExperimentVariantMetrics', variantName: string, runCount: number, metrics: Array<{ __typename?: 'VariantMetric', key: string, avg: number, min: number, max: number }> }> } };
+
+export type GetExperimentScoringConfigQueryVariables = Exact<{
+  workspaceID: Scalars['ID']['input'];
+  experimentName: Scalars['String']['input'];
+}>;
+
+
+export type GetExperimentScoringConfigQuery = { __typename?: 'Query', experimentScoringConfig: { __typename?: 'ExperimentScoringConfig', experimentName: string, updatedAt: string, metrics: Array<{ __typename?: 'ExperimentScoringMetric', key: string, enabled: boolean, points: number, minValue: number, maxValue: number, invert: boolean, labelBest: string, labelWorst: string, displayName: string }> } };
+
+export type UpdateExperimentScoringConfigMutationVariables = Exact<{
+  workspaceID: Scalars['ID']['input'];
+  experimentName: Scalars['String']['input'];
+  metrics: Array<ExperimentScoringMetricInput> | ExperimentScoringMetricInput;
+}>;
+
+
+export type UpdateExperimentScoringConfigMutation = { __typename?: 'Mutation', updateExperimentScoringConfig: { __typename?: 'ExperimentScoringConfig', experimentName: string, updatedAt: string, metrics: Array<{ __typename?: 'ExperimentScoringMetric', key: string, enabled: boolean, points: number, minValue: number, maxValue: number, invert: boolean, labelBest: string, labelWorst: string, displayName: string }> } };
 
 export type GetArchivedFuncBannerDataQueryVariables = Exact<{
   envID: Scalars['ID']['input'];
@@ -3805,6 +3899,9 @@ export const GetEventV2Document = {"kind":"Document","definitions":[{"kind":"Ope
 export const GetEventPayloadDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventPayload"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"raw"}}]}}]}}]}}]} as unknown as DocumentNode<GetEventPayloadQuery, GetEventPayloadQueryVariables>;
 export const GetEventV2RunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventV2Runs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"runs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"function"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}},{"kind":"Field","name":{"kind":"Name","value":"trace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"preview"},"value":{"kind":"BooleanValue","value":true}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"skipReason"}},{"kind":"Field","name":{"kind":"Name","value":"skipExistingRunID"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetEventV2RunsQuery, GetEventV2RunsQueryVariables>;
 export const GetExperimentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetExperiments"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experiments"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"functionID"}},{"kind":"Field","name":{"kind":"Name","value":"selectionStrategy"}},{"kind":"Field","name":{"kind":"Name","value":"totalRuns"}},{"kind":"Field","name":{"kind":"Name","value":"variantCount"}},{"kind":"Field","name":{"kind":"Name","value":"firstSeen"}},{"kind":"Field","name":{"kind":"Name","value":"lastSeen"}}]}}]}}]} as unknown as DocumentNode<GetExperimentsQuery, GetExperimentsQueryVariables>;
+export const GetExperimentDetailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetExperimentDetail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeRangeInput"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"variantFilter"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experimentDetail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"experimentName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}}},{"kind":"Argument","name":{"kind":"Name","value":"timeRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}}},{"kind":"Argument","name":{"kind":"Name","value":"variantFilter"},"value":{"kind":"Variable","name":{"kind":"Name","value":"variantFilter"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"firstSeen"}},{"kind":"Field","name":{"kind":"Name","value":"lastSeen"}},{"kind":"Field","name":{"kind":"Name","value":"selectionStrategy"}},{"kind":"Field","name":{"kind":"Name","value":"variantWeights"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"variantName"}},{"kind":"Field","name":{"kind":"Name","value":"weight"}}]}},{"kind":"Field","name":{"kind":"Name","value":"variants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"variantName"}},{"kind":"Field","name":{"kind":"Name","value":"runCount"}},{"kind":"Field","name":{"kind":"Name","value":"metrics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"avg"}},{"kind":"Field","name":{"kind":"Name","value":"min"}},{"kind":"Field","name":{"kind":"Name","value":"max"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetExperimentDetailQuery, GetExperimentDetailQueryVariables>;
+export const GetExperimentScoringConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetExperimentScoringConfig"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experimentScoringConfig"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"experimentName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experimentName"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"metrics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"points"}},{"kind":"Field","name":{"kind":"Name","value":"minValue"}},{"kind":"Field","name":{"kind":"Name","value":"maxValue"}},{"kind":"Field","name":{"kind":"Name","value":"invert"}},{"kind":"Field","name":{"kind":"Name","value":"labelBest"}},{"kind":"Field","name":{"kind":"Name","value":"labelWorst"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}}]}}]}}]}}]} as unknown as DocumentNode<GetExperimentScoringConfigQuery, GetExperimentScoringConfigQueryVariables>;
+export const UpdateExperimentScoringConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateExperimentScoringConfig"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"metrics"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ExperimentScoringMetricInput"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateExperimentScoringConfig"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"experimentName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}}},{"kind":"Argument","name":{"kind":"Name","value":"metrics"},"value":{"kind":"Variable","name":{"kind":"Name","value":"metrics"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experimentName"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"metrics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"points"}},{"kind":"Field","name":{"kind":"Name","value":"minValue"}},{"kind":"Field","name":{"kind":"Name","value":"maxValue"}},{"kind":"Field","name":{"kind":"Name","value":"invert"}},{"kind":"Field","name":{"kind":"Name","value":"labelBest"}},{"kind":"Field","name":{"kind":"Name","value":"labelWorst"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateExperimentScoringConfigMutation, UpdateExperimentScoringConfigMutationVariables>;
 export const GetArchivedFuncBannerDataDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetArchivedFuncBannerData"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"funcID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflow"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"funcID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}}]}}]}}]}}]} as unknown as DocumentNode<GetArchivedFuncBannerDataQuery, GetArchivedFuncBannerDataQueryVariables>;
 export const CreateCancellationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateCancellation"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateCancellationInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createCancellation"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateCancellationMutation, CreateCancellationMutationVariables>;
 export const GetCancellationRunCountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCancellationRunCount"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMin"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMax"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cancellationRunCount"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"queuedAtMin"},"value":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMin"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"queuedAtMax"},"value":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMax"}}}]}}]}]}}]}}]}}]} as unknown as DocumentNode<GetCancellationRunCountQuery, GetCancellationRunCountQueryVariables>;

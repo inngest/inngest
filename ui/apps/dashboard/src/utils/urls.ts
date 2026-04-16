@@ -170,6 +170,15 @@ export const pathCreator = {
       functionSlug,
     )}/cancellations`;
   },
+  experiment({
+    envSlug,
+    experimentName,
+  }: {
+    envSlug: string;
+    experimentName: string;
+  }) {
+    return `/env/${envSlug}/experiments/${encodeURIComponent(experimentName)}`;
+  },
   experiments({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/experiments`;
   },
