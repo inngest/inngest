@@ -32,9 +32,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
   const [preset, setPreset] = useState<TimeRangePreset>('24h');
   const [variantFilter, setVariantFilter] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [activePanel, setActivePanel] = useState<string | null>(
-    'Scoring formula',
-  );
+  const [activePanel, setActivePanel] = useState<string | null>('Info');
   // --- hooks ---
   const detail = useExperimentDetail(experimentName, preset, variantFilter);
   const scoring = useScoringConfig(experimentName);
@@ -106,9 +104,9 @@ export function ExperimentDetailPage({ experimentName }: Props) {
         ]}
       />
 
-      <div className="flex h-full flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-y-auto">
         {/* Main content */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 px-6 py-4">
           <h1 className="text-basis text-lg font-semibold">{experimentName}</h1>
 
           <ExperimentDetailToolbar
@@ -134,32 +132,35 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
           {/* Data */}
           {detail.data && scoring.metrics && (
-            <>
-              <ScoreSummaryCard
-                variants={detail.data.variants}
-                metrics={scoring.metrics}
-              />
-
-              <div className="grid grid-cols-3 gap-3">
-                {enabledMetrics.map((metric) => (
-                  <MetricPanel
-                    key={metric.key}
-                    metric={metric}
-                    variants={detail.data!.variants}
-                  />
-                ))}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="col-span-1 md:col-span-2 xl:col-span-3">
+                <ScoreSummaryCard
+                  variants={detail.data.variants}
+                  metrics={scoring.metrics}
+                />
               </div>
 
-              <VariantsTable
-                variants={detail.data.variants}
-                scoringConfig={scoring.metrics}
-                onUpdateMetric={scoring.updateMetric}
-                onEnableMetric={scoring.enableMetric}
-                onOpenInsights={onOpenInsights}
-                showInactive={showInactive}
-                onShowInactiveChange={setShowInactive}
-              />
-            </>
+              {enabledMetrics.map((metric, i) => (
+                <MetricPanel
+                  key={metric.key}
+                  metric={metric}
+                  variants={detail.data!.variants}
+                  colorIndex={i}
+                />
+              ))}
+
+              <div className="col-span-1 md:col-span-2 xl:col-span-3">
+                <VariantsTable
+                  variants={detail.data.variants}
+                  scoringConfig={scoring.metrics}
+                  onUpdateMetric={scoring.updateMetric}
+                  onEnableMetric={scoring.enableMetric}
+                  onOpenInsights={onOpenInsights}
+                  showInactive={showInactive}
+                  onShowInactiveChange={setShowInactive}
+                />
+              </div>
+            </div>
           )}
         </div>
 

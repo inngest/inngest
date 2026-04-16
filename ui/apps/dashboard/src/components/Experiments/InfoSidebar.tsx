@@ -3,6 +3,22 @@ import { Pill } from '@inngest/components/Pill';
 import type { ExperimentDetail } from '@inngest/components/Experiments';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiFlaskLine, RiScalesLine, RiTrophyLine } from '@remixicon/react';
+function formatDuration(from: Date): string {
+  const ms = Date.now() - from.getTime();
+  const minutes = Math.floor(ms / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) {
+    const remHours = hours % 24;
+    return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
+  }
+  if (hours > 0) {
+    const remMinutes = minutes % 60;
+    return remMinutes > 0 ? `${hours}h ${remMinutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
+}
 
 type Props = {
   detail: ExperimentDetail;
@@ -41,6 +57,15 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
             </div>
             <p className="text-muted text-xs">
               Started at {detail.firstSeen.toLocaleString()}
+            </p>
+            <p className="text-muted text-xs">
+              Running {formatDuration(detail.firstSeen)}
+            </p>
+            <p className="text-muted text-xs">
+              {detail.variants
+                .reduce((sum, v) => sum + v.runCount, 0)
+                .toLocaleString()}{' '}
+              total runs
             </p>
             {active && (
               <Pill kind="primary" appearance="outlined">
@@ -86,13 +111,20 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
                   key={v.variantName}
                   className={cn(
                     'flex items-center justify-between rounded px-2 py-1.5 text-sm',
-                    isTop ? 'bg-canvasSubtle' : '',
+                    isTop ? 'bg-primary-3xSubtle' : '',
                   )}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="text-basis truncate">{v.variantName}</span>
+                    <span
+                      className={cn(
+                        'truncate',
+                        isTop ? 'text-primary-intense' : 'text-basis',
+                      )}
+                    >
+                      {v.variantName}
+                    </span>
                     {isTop && (
-                      <RiTrophyLine className="text-accent-intense h-3.5 w-3.5 shrink-0" />
+                      <RiTrophyLine className="text-primary-intense h-3.5 w-3.5 shrink-0" />
                     )}
                   </div>
                   {weight != null && (

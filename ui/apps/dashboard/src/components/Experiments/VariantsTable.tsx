@@ -337,9 +337,23 @@ export function VariantsTable({
       return { ...v, score: result.total };
     });
 
-    if (showInactive) return allRows;
-    return allRows.filter((r) => r.runCount > 0);
+    const filtered = showInactive
+      ? allRows
+      : allRows.filter((r) => r.runCount > 0);
+    return filtered.sort((a, b) => b.score - a.score);
   }, [variants, scoringConfig, showInactive]);
+
+  const { bestScore, worstScore } = useMemo(() => {
+    const active = rows.filter((r) => r.runCount > 0);
+    if (active.length < 2) return { bestScore: null, worstScore: null };
+    let best = -Infinity;
+    let worst = Infinity;
+    for (const r of active) {
+      if (r.score > best) best = r.score;
+      if (r.score < worst) worst = r.score;
+    }
+    return { bestScore: best, worstScore: worst };
+  }, [rows]);
 
   // Pre-compute stats for each enabled metric
   const statsMap = useMemo(() => {
@@ -401,8 +415,16 @@ export function VariantsTable({
         cell: (info) => {
           const val = info.getValue();
           const hasRuns = info.row.original.runCount > 0;
+          let kind: 'primary' | 'error' | 'default' = 'default';
+          if (hasRuns && bestScore !== null && worstScore !== null) {
+            if (val === bestScore) {
+              kind = 'primary';
+            } else if (val === worstScore) {
+              kind = 'error';
+            }
+          }
           return (
-            <Pill kind={hasRuns ? 'primary' : 'default'} appearance="outlined">
+            <Pill kind={kind} appearance="solid">
               {Math.round(val)}
             </Pill>
           );
@@ -517,6 +539,8 @@ export function VariantsTable({
     rows,
     statsMap,
     pointsLeft,
+    bestScore,
+    worstScore,
     onUpdateMetric,
     onEnableMetric,
   ]);
