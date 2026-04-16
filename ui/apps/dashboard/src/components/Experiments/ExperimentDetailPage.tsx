@@ -10,7 +10,7 @@ import {
 } from '@inngest/components/HelperPanelControl';
 import { Header } from '@inngest/components/Header/Header';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { RiFlaskLine, RiListOrdered2 } from '@remixicon/react';
+import { RiCloseLine, RiFlaskLine, RiListOrdered2 } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { ExperimentDetailToolbar } from '@/components/Experiments/ExperimentDetailToolbar';
@@ -38,7 +38,9 @@ export function ExperimentDetailPage({ experimentName }: Props) {
   const [preset, setPreset] = useState<TimeRangePreset>('24h');
   const [variantFilter, setVariantFilter] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [activePanel, setActivePanel] = useState<string | null>('scoring');
+  const [activePanel, setActivePanel] = useState<string | null>(
+    'Scoring formula',
+  );
   const [localMetrics, setLocalMetrics] = useState<
     ExperimentScoringMetric[] | null
   >(null);
@@ -155,12 +157,15 @@ export function ExperimentDetailPage({ experimentName }: Props) {
     {
       title: 'Info',
       icon: <RiFlaskLine className="h-4 w-4" />,
-      action: () => setActivePanel((p) => (p === 'info' ? null : 'info')),
+      action: () => setActivePanel((p) => (p === 'Info' ? null : 'Info')),
     },
     {
       title: 'Scoring formula',
       icon: <RiListOrdered2 className="h-4 w-4" />,
-      action: () => setActivePanel((p) => (p === 'scoring' ? null : 'scoring')),
+      action: () =>
+        setActivePanel((p) =>
+          p === 'Scoring formula' ? null : 'Scoring formula',
+        ),
     },
   ];
 
@@ -235,17 +240,35 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
         {/* Sidebar panel */}
         {activePanel && (
-          <aside className="border-subtle w-[360px] shrink-0 overflow-y-auto border-l">
-            {activePanel === 'info' && detail.data && (
-              <InfoSidebar detail={detail.data} topVariantName={topVariant} />
-            )}
-            {activePanel === 'scoring' && localMetrics && (
-              <ScoringFormulaSidebar
-                metrics={localMetrics}
-                onChange={setLocalMetrics}
-                isSaving={updateScoring.isPending}
-              />
-            )}
+          <aside className="border-subtle flex w-[360px] shrink-0 flex-col overflow-hidden border-l">
+            {/* Panel header — matches InsightsHelperPanel */}
+            <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center justify-between border-b px-3">
+              <div className="flex flex-row items-center gap-2">
+                {helperItems.find((i) => i.title === activePanel)?.icon ?? null}
+                <div className="text-sm font-normal">{activePanel}</div>
+              </div>
+              <button
+                aria-label="Close panel"
+                className="hover:bg-canvasSubtle hover:text-basis text-subtle -mr-1 flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+                onClick={() => setActivePanel(null)}
+                type="button"
+              >
+                <RiCloseLine className="h-4 w-4" />
+              </button>
+            </div>
+            {/* Panel content */}
+            <div className="flex-1 overflow-y-auto">
+              {activePanel === 'Info' && detail.data && (
+                <InfoSidebar detail={detail.data} topVariantName={topVariant} />
+              )}
+              {activePanel === 'Scoring formula' && localMetrics && (
+                <ScoringFormulaSidebar
+                  metrics={localMetrics}
+                  onChange={setLocalMetrics}
+                  isSaving={updateScoring.isPending}
+                />
+              )}
+            </div>
           </aside>
         )}
 
