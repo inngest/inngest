@@ -45,7 +45,7 @@ require (
 	github.com/inngest/expr v0.0.0-20260320151211-8abd2c0b8427
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 	github.com/inngest/inngestgo v0.15.2-0.20260416001842-8bbfe3c34af0
-	github.com/jackc/pgx/v5 v5.7.5
+	github.com/jackc/pgx/v5 v5.9.1
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/karlseguin/ccache/v2 v2.0.8
