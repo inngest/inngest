@@ -61,11 +61,18 @@ export function ScoreSummaryCard({ variants, metrics }: Props) {
   );
 
   const chartHeight = Math.max(120, rows.length * 36);
+  const yAxisWidth = useMemo(() => {
+    const longest = rows.reduce(
+      (max, r) => Math.max(max, r.variantName.length),
+      0,
+    );
+    return Math.max(80, longest * 6.5);
+  }, [rows]);
   const topVariant = ranked[0] ?? null;
   const runnerUp = ranked[1] ?? null;
 
   return (
-    <Card>
+    <Card className="overflow-visible" contentClassName="overflow-visible">
       <Card.Header>
         <span className="text-basis text-sm font-medium">Score Summary</span>
       </Card.Header>
@@ -75,22 +82,33 @@ export function ScoreSummaryCard({ variants, metrics }: Props) {
             <BarChart
               data={rows}
               layout="vertical"
-              margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+              barSize={10}
+              margin={{ top: 4, right: 16, bottom: 16, left: 4 }}
             >
-              <XAxis type="number" domain={[0, maxPossible || 100]} hide />
+              <XAxis
+                type="number"
+                domain={[0, maxPossible || 100]}
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) => +v.toFixed(2) + ''}
+              />
               <YAxis
                 type="category"
                 dataKey="variantName"
-                width={100}
+                width={yAxisWidth}
                 tick={{ fontSize: 12 }}
               />
-              <Tooltip />
-              {enabledMetrics.map((m) => (
+              <Tooltip
+                allowEscapeViewBox={{ x: true, y: true }}
+                wrapperStyle={{ zIndex: 50 }}
+              />
+              {enabledMetrics.map((m, i) => (
                 <Bar
                   key={m.key}
                   dataKey={m.key}
                   stackId="score"
-                  fill={colorForMetric(m.key)}
+                  fill={colorForMetric(i)}
                   name={m.displayName}
                 />
               ))}
@@ -99,31 +117,21 @@ export function ScoreSummaryCard({ variants, metrics }: Props) {
         </div>
 
         {/* Callouts */}
-        <div className="flex w-48 shrink-0 flex-col justify-center gap-3">
+        <div className="flex w-64 shrink-0 flex-col gap-1">
           {topVariant && (
-            <div className="flex items-start gap-2">
-              <RiTrophyLine className="text-accent-intense mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <p className="text-muted text-xs">Recommended</p>
-                <p className="text-basis text-sm font-medium">
-                  {topVariant.variantName}
-                </p>
-                <p className="text-muted text-xs tabular-nums">
-                  {topVariant.total.toFixed(1)} pts
-                </p>
-              </div>
+            <div className="bg-primary-3xSubtle flex items-center gap-2 rounded px-2 py-1">
+              <RiTrophyLine className="text-primary-intense h-[18px] w-[18px] shrink-0" />
+              <p className="text-primary-intense min-w-0 truncate text-sm">
+                Recommended: {topVariant.variantName}
+              </p>
             </div>
           )}
           {runnerUp && (
-            <div className="flex items-start gap-2 opacity-60">
-              <span className="text-muted mt-0.5 text-xs font-medium">#2</span>
-              <div>
-                <p className="text-muted text-xs">Runner up</p>
-                <p className="text-basis text-sm">{runnerUp.variantName}</p>
-                <p className="text-muted text-xs tabular-nums">
-                  {runnerUp.total.toFixed(1)} pts
-                </p>
-              </div>
+            <div className="flex items-center gap-2 px-2 py-1">
+              <span className="text-subtle shrink-0 text-sm">#2</span>
+              <p className="text-subtle min-w-0 truncate text-sm">
+                Runner up: {runnerUp.variantName}
+              </p>
             </div>
           )}
         </div>

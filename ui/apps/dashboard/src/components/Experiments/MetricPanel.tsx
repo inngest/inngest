@@ -5,33 +5,65 @@ import type {
   ExperimentScoringMetric,
   ExperimentVariantMetrics,
 } from '@inngest/components/Experiments';
-import { cn } from '@inngest/components/utils/classNames';
 import { RiTrophyLine } from '@remixicon/react';
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import { colorForMetric } from '@/lib/experiments/colors';
+
+const DOT_RADIUS = 5;
+const LINE_HEIGHT = 2;
+
+function LineDotShape(props: any) {
+  const { x, y, width, height, fill } = props;
+  const cy = y + height / 2;
+  return (
+    <g>
+      <rect
+        x={x}
+        y={cy - LINE_HEIGHT / 2}
+        width={width}
+        height={LINE_HEIGHT}
+        fill={fill}
+      />
+      <circle
+        cx={x + width}
+        cy={cy}
+        r={DOT_RADIUS}
+        fill="white"
+        stroke={fill}
+        strokeWidth={2}
+      />
+    </g>
+  );
+}
 
 type Props = {
   metric: ExperimentScoringMetric;
   variants: ExperimentVariantMetrics[];
+  colorIndex: number;
 };
 
-type VariantRow = {
+type RowData = {
   variantName: string;
-  avg: number | null;
-  min: number | null;
-  max: number | null;
+  value: number;
 };
 
-function findWinner(rows: VariantRow[], invert: boolean): string | null {
-  let best: VariantRow | null = null;
+function findWinner(rows: RowData[], invert: boolean): string | null {
+  let best: RowData | null = null;
 
   for (const row of rows) {
-    if (row.avg == null) continue;
-    if (!best || best.avg == null) {
+    if (!best) {
       best = row;
       continue;
     }
-    if (invert ? row.avg < best.avg : row.avg > best.avg) {
+    if (invert ? row.value < best.value : row.value > best.value) {
       best = row;
     }
   }
@@ -39,18 +71,15 @@ function findWinner(rows: VariantRow[], invert: boolean): string | null {
   return best?.variantName ?? null;
 }
 
-export function MetricPanel({ metric, variants }: Props) {
-  const rows: VariantRow[] = useMemo(
+export function MetricPanel({ metric, variants, colorIndex }: Props) {
+  const rows: RowData[] = useMemo(
     () =>
-      variants.map((v) => {
-        const m = v.metrics.find((vm) => vm.key === metric.key);
-        return {
-          variantName: v.variantName,
-          avg: m?.avg ?? null,
-          min: m?.min ?? null,
-          max: m?.max ?? null,
-        };
-      }),
+      variants
+        .map((v) => {
+          const m = v.metrics.find((vm) => vm.key === metric.key);
+          return m ? { variantName: v.variantName, value: m.avg } : null;
+        })
+        .filter((r): r is RowData => r !== null),
     [variants, metric.key],
   );
 
@@ -59,25 +88,28 @@ export function MetricPanel({ metric, variants }: Props) {
     [rows, metric.invert],
   );
 
-  // Compute shared x-domain across all variants
   const domain = useMemo(() => {
-    let lo = metric.minValue;
     let hi = metric.maxValue;
-
     for (const row of rows) {
-      if (row.min != null) lo = Math.min(lo, row.min);
-      if (row.max != null) hi = Math.max(hi, row.max);
+      hi = Math.max(hi, row.value);
     }
+    if (hi <= 0) hi = 1;
+    return [0, hi] as const;
+  }, [rows, metric.maxValue]);
 
-    // Avoid zero-width domain
-    if (hi <= lo) hi = lo + 1;
-    return { lo, hi };
-  }, [rows, metric.minValue, metric.maxValue]);
+  const chartHeight = Math.max(120, rows.length * 36);
+  const yAxisWidth = useMemo(() => {
+    const longest = rows.reduce(
+      (max, r) => Math.max(max, r.variantName.length),
+      0,
+    );
+    return Math.max(80, longest * 6.5);
+  }, [rows]);
 
-  const color = colorForMetric(metric.key);
+  const color = colorForMetric(colorIndex);
 
   return (
-    <Card>
+    <Card className="overflow-visible" contentClassName="overflow-visible">
       <Card.Header className="flex-row items-center justify-between">
         <span className="text-basis text-sm font-medium">
           {metric.displayName}
@@ -85,7 +117,7 @@ export function MetricPanel({ metric, variants }: Props) {
         {winner && (
           <Pill
             kind="primary"
-            appearance="outlined"
+            appearance="solidBright"
             icon={<RiTrophyLine className="h-3 w-3" />}
             iconSide="left"
           >
@@ -93,102 +125,41 @@ export function MetricPanel({ metric, variants }: Props) {
           </Pill>
         )}
       </Card.Header>
-      <Card.Content className="flex flex-col gap-2">
-        {rows.map((row) => {
-          const hasData = row.avg != null && row.min != null && row.max != null;
-
-          return (
-            <div key={row.variantName} className="flex items-center gap-3">
-              <span className="text-muted w-32 shrink-0 truncate text-xs">
-                {row.variantName}
-              </span>
-
-              <div className="relative h-6 flex-1">
-                {hasData ? (
-                  <VariantTrack
-                    min={row.min!}
-                    max={row.max!}
-                    avg={row.avg!}
-                    domainLo={domain.lo}
-                    domainHi={domain.hi}
-                    color={color}
-                    isWinner={row.variantName === winner}
-                  />
-                ) : (
-                  <div className="bg-canvasSubtle absolute inset-x-0 top-1/2 h-px -translate-y-1/2" />
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Range labels */}
-        <div className="ml-[140px] flex justify-between">
-          <span className="text-disabled text-[10px] tabular-nums">
-            {metric.labelWorst || domain.lo.toFixed(1)}
-          </span>
-          <span className="text-disabled text-[10px] tabular-nums">
-            {metric.labelBest || domain.hi.toFixed(1)}
-          </span>
-        </div>
+      <Card.Content>
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <BarChart
+            data={rows}
+            layout="vertical"
+            barSize={DOT_RADIUS * 2}
+            margin={{ top: 4, right: DOT_RADIUS + 2, bottom: 16, left: 4 }}
+          >
+            <XAxis
+              type="number"
+              domain={domain}
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => +v.toFixed(2) + ''}
+            />
+            <YAxis
+              type="category"
+              dataKey="variantName"
+              width={yAxisWidth}
+              tick={{ fontSize: 12 }}
+            />
+            <Tooltip
+              allowEscapeViewBox={{ x: true, y: true }}
+              wrapperStyle={{ zIndex: 50 }}
+            />
+            <Bar
+              dataKey="value"
+              fill={color}
+              name={metric.displayName}
+              shape={<LineDotShape />}
+            />
+          </BarChart>
+        </ResponsiveContainer>
       </Card.Content>
     </Card>
-  );
-}
-
-function VariantTrack({
-  min,
-  max,
-  avg,
-  domainLo,
-  domainHi,
-  color,
-  isWinner,
-}: {
-  min: number;
-  max: number;
-  avg: number;
-  domainLo: number;
-  domainHi: number;
-  color: string;
-  isWinner: boolean;
-}) {
-  const span = domainHi - domainLo;
-  const toPercent = (val: number) => ((val - domainLo) / span) * 100;
-
-  const leftPct = toPercent(min);
-  const rightPct = toPercent(max);
-  const avgPct = toPercent(avg);
-
-  return (
-    <div className="absolute inset-0 flex items-center">
-      {/* Subtle background track */}
-      <div className="bg-canvasSubtle absolute inset-x-0 top-1/2 h-px -translate-y-1/2" />
-
-      {/* Range line from min to max */}
-      <div
-        className={cn(
-          'absolute top-1/2 h-0.5 -translate-y-1/2',
-          isWinner ? 'opacity-100' : 'opacity-60',
-        )}
-        style={{
-          left: `${leftPct}%`,
-          width: `${rightPct - leftPct}%`,
-          backgroundColor: color,
-        }}
-      />
-
-      {/* Dot at avg */}
-      <div
-        className={cn(
-          'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full',
-          isWinner ? 'ring-2 ring-white' : '',
-        )}
-        style={{
-          left: `${avgPct}%`,
-          backgroundColor: color,
-        }}
-      />
-    </div>
   );
 }

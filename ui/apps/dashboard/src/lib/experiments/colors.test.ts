@@ -4,17 +4,21 @@ import { colorForMetric, METRIC_PALETTE } from './colors';
 
 describe('colorForMetric', () => {
   it('returns a palette color', () => {
-    const c = colorForMetric('tokens');
+    const c = colorForMetric(0);
     expect(METRIC_PALETTE).toContain(c);
   });
 
-  it('is deterministic for the same key', () => {
-    expect(colorForMetric('tokens')).toBe(colorForMetric('tokens'));
+  it('is deterministic for the same index', () => {
+    expect(colorForMetric(2)).toBe(colorForMetric(2));
   });
 
-  it('different keys usually produce different colors', () => {
-    const a = colorForMetric('tokens');
-    const b = colorForMetric('cost');
+  it('sequential indices produce different colors', () => {
+    const a = colorForMetric(0);
+    const b = colorForMetric(1);
     expect(a).not.toBe(b);
+  });
+
+  it('wraps around the palette', () => {
+    expect(colorForMetric(METRIC_PALETTE.length)).toBe(colorForMetric(0));
   });
 });
