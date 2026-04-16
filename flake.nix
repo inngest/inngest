@@ -95,9 +95,9 @@
 
             # LSPs
             gopls
-            typescript-language-server
-            vscode-json-languageserver
-            yaml-language-server
+            nodePackages.typescript-language-server
+            nodePackages.vscode-json-languageserver
+            nodePackages.yaml-language-server
             lua-language-server
 
             # Tools
