@@ -162,9 +162,11 @@ function MetricSubLabel({
 function MetricEditorPopover({
   metric,
   onApply,
+  maxPoints,
 }: {
   metric: ExperimentScoringMetric;
   onApply: (patch: Partial<ExperimentScoringMetric>) => void;
+  maxPoints: number;
 }) {
   const [draft, setDraft] = useState<Partial<ExperimentScoringMetric>>({});
 
@@ -215,10 +217,16 @@ function MetricEditorPopover({
         label="Points"
         inngestSize="small"
         type="number"
+        min={0}
+        max={maxPoints}
         value={current.points}
-        onChange={(e) =>
-          setDraft({ ...draft, points: parseInt(e.target.value, 10) || 0 })
-        }
+        onChange={(e) => {
+          const parsed = parseInt(e.target.value, 10) || 0;
+          setDraft({
+            ...draft,
+            points: Math.max(0, Math.min(maxPoints, parsed)),
+          });
+        }}
       />
 
       <label className="flex items-center gap-2">
@@ -308,6 +316,15 @@ export function VariantsTable({
         .sort((a, b) => b.points - a.points),
     [scoringConfig],
   );
+
+  const totalAllocated = useMemo(
+    () =>
+      scoringConfig
+        .filter((m) => m.enabled)
+        .reduce((sum, m) => sum + m.points, 0),
+    [scoringConfig],
+  );
+  const pointsLeft = 100 - totalAllocated;
 
   const disabledMetrics = useMemo(
     () => scoringConfig.filter((m) => !m.enabled),
@@ -426,6 +443,7 @@ export function VariantsTable({
               <PopoverContent align="start">
                 <MetricEditorPopover
                   metric={metric}
+                  maxPoints={metric.points + pointsLeft}
                   onApply={(patch) => onUpdateMetric(metric.key, patch)}
                 />
               </PopoverContent>
@@ -498,6 +516,7 @@ export function VariantsTable({
     selectedRows,
     rows,
     statsMap,
+    pointsLeft,
     onUpdateMetric,
     onEnableMetric,
   ]);

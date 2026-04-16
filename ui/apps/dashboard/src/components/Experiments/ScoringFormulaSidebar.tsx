@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import { Input } from '@inngest/components/Forms/Input';
@@ -62,6 +62,7 @@ export function ScoringFormulaSidebar({ metrics, onChange, isSaving }: Props) {
             key={metric.key}
             metric={metric}
             disabled={isSaving}
+            pointsLeft={pointsLeft}
             onUpdate={(patch) => {
               const next = metrics.map((m, i) =>
                 i === idx ? { ...m, ...patch } : m,
@@ -84,10 +85,12 @@ function MetricAccordionItem({
   metric,
   onUpdate,
   disabled,
+  pointsLeft,
 }: {
   metric: ExperimentScoringMetric;
   onUpdate: (patch: Partial<ExperimentScoringMetric>) => void;
   disabled?: boolean;
+  pointsLeft: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -120,18 +123,21 @@ function MetricAccordionItem({
             size="small"
             icon={<RiSubtractLine className="h-3 w-3" />}
             disabled={disabled || metric.points <= 0}
-            onClick={() => onUpdate({ points: Math.max(0, metric.points - 5) })}
+            onClick={() => onUpdate({ points: Math.max(0, metric.points - 1) })}
           />
-          <span className="text-muted w-8 text-center text-xs tabular-nums">
-            {metric.points} pts
-          </span>
+          <PointsInput
+            value={metric.points}
+            maxValue={metric.points + pointsLeft}
+            onChange={(v) => onUpdate({ points: v })}
+          />
+          <span className="text-muted text-xs">pts</span>
           <Button
             kind="secondary"
             appearance="ghost"
             size="small"
             icon={<RiAddLine className="h-3 w-3" />}
-            disabled={disabled}
-            onClick={() => onUpdate({ points: metric.points + 5 })}
+            disabled={disabled || pointsLeft <= 0}
+            onClick={() => onUpdate({ points: metric.points + 1 })}
           />
         </div>
 
@@ -212,5 +218,85 @@ function MetricAccordionItem({
         </div>
       )}
     </div>
+  );
+}
+
+function PointsInput({
+  value,
+  maxValue,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  maxValue: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
+  const [localValue, setLocalValue] = useState(String(value));
+
+  useEffect(() => {
+    setLocalValue(String(value));
+  }, [value]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (
+      [
+        'Backspace',
+        'Delete',
+        'Tab',
+        'ArrowLeft',
+        'ArrowRight',
+        'Home',
+        'End',
+      ].includes(e.key) ||
+      e.metaKey ||
+      e.ctrlKey
+    ) {
+      return;
+    }
+    if (!/^\d$/.test(e.key)) {
+      e.preventDefault();
+      return;
+    }
+    const input = e.currentTarget;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    const current = input.value;
+    const next = current.slice(0, start) + e.key + current.slice(end);
+    const parsed = parseInt(next, 10);
+    if (isNaN(parsed) || parsed < 0 || parsed > maxValue) {
+      e.preventDefault();
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') {
+      setLocalValue('');
+      onChange(0);
+      return;
+    }
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= maxValue) {
+      setLocalValue(String(parsed));
+      onChange(parsed);
+    }
+  };
+
+  const handleBlur = () => {
+    setLocalValue(String(value));
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      className="text-muted w-8 bg-transparent text-center text-xs tabular-nums outline-none"
+      value={localValue}
+      onKeyDown={handleKeyDown}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      disabled={disabled}
+    />
   );
 }
