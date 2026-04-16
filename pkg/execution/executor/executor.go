@@ -3467,16 +3467,8 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
 	}
 
-	// Derive the companion function's slug: {parent-slug}-defer-{companionID}
-	md := runCtx.Metadata()
-	fn, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return fmt.Errorf("error loading function for defer: %w", err)
-	}
-
 	d := sv2.Defer{
 		CompanionID:    opts.CompanionID,
-		FnSlug:         fn.Function.Slug + "-defer-" + opts.CompanionID,
 		HashedID:       gen.ID,
 		ScheduleStatus: sv2.ScheduleStatusAfterRun,
 		Input:          opts.Input,

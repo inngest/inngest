@@ -3,8 +3,10 @@ package executor
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha1"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -118,9 +120,21 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 	}
 
-	defers, deferErr := e.smv2.LoadDefers(ctx, opts.Metadata.ID)
+	// Load defers BEFORE Delete — they live in state and won't survive it.
+	// Retry on transient failures because once we proceed past this point and
+	// Delete wipes state, the defers are unrecoverable. If load still fails,
+	// bail out and let the caller retry Finalize rather than silently dropping
+	// the deferred companion runs.
+	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers", func(ctx context.Context) (map[string]sv2.Defer, error) {
+		return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
+	}, util.NewRetryConf())
 	if deferErr != nil {
-		l.Warn("error loading defers to finalize", "error", deferErr, "run_id", opts.Metadata.ID.RunID)
+		l.Error(
+			"error loading defers to finalize, skipping state delete so finalize can be retried",
+			"error", deferErr,
+			"run_id", opts.Metadata.ID.RunID,
+		)
+		return fmt.Errorf("error loading defers to finalize: %w", deferErr)
 	}
 
 	// Delete the function state in every case.
@@ -174,8 +188,15 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 			continue
 		}
 
+		// Deterministic event ID so retrying Finalize doesn't produce
+		// duplicate inngest/deferred.start events (and duplicate companion runs).
+		// Same (run, companion, defer step) always hashes to the same ULID.
+		idHash := sha1.Sum([]byte(opts.Metadata.ID.RunID.String() + ":" + d.CompanionID + ":" + d.HashedID))
+		var eventID ulid.ULID
+		copy(eventID[:], idHash[:16])
+
 		events = append(events, event.Event{
-			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+			ID:        eventID.String(),
 			Name:      "inngest/deferred.start",
 			Timestamp: now.UnixMilli(),
 			Data: map[string]any{

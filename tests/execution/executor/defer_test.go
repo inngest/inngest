@@ -204,7 +204,6 @@ func TestDeferAddSavesDefer(t *testing.T) {
 
 	d := defers[stepID]
 	require.Equal(t, "score", d.CompanionID)
-	require.Equal(t, "test-fn-defer-score", d.FnSlug)
 	require.Equal(t, statev2.ScheduleStatusAfterRun, d.ScheduleStatus)
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input))
 }
@@ -326,16 +325,17 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	// --- save two defers: one active (AfterRun) and one cancelled ---
+	// Use a deeply nested input to prove the event carries structured JSON,
+	// not a stringified/escaped version of it.
+	nestedInputJSON := `{"user":{"id":"u_123","meta":{"role":"admin","tags":["a","b"]}},"score":0.87}`
 	activeDefer := statev2.Defer{
 		CompanionID:    "score",
-		FnSlug:         "my-app-score",
 		HashedID:       "hash-active",
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
-		Input:          json.RawMessage(`{"user_id":"u_123"}`),
+		Input:          json.RawMessage(nestedInputJSON),
 	}
 	cancelledDefer := statev2.Defer{
 		CompanionID:    "cleanup",
-		FnSlug:         "my-app-cleanup",
 		HashedID:       "hash-cancelled",
 		ScheduleStatus: statev2.ScheduleStatusCancelled,
 		Input:          json.RawMessage(`{}`),
@@ -384,9 +384,18 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	require.Equal(t, fn.Slug, parentRun["fn_slug"])
 	require.Equal(t, run.ID.RunID.String(), parentRun["run_id"])
 
-	// Verify user input is forwarded
-	input := data["input"].(map[string]any)
-	require.Equal(t, "u_123", input["user_id"])
+	// Verify user input is forwarded as structured JSON, not an escaped string.
+	// (If double-encoded, input would be a string, not a map.)
+	input, ok := data["input"].(map[string]any)
+	require.True(t, ok, "input should be a JSON object, got %T", data["input"])
+	user, ok := input["user"].(map[string]any)
+	require.True(t, ok, "input.user should be a JSON object, got %T", input["user"])
+	require.Equal(t, "u_123", user["id"])
+	meta, ok := user["meta"].(map[string]any)
+	require.True(t, ok, "input.user.meta should be a JSON object, got %T", user["meta"])
+	require.Equal(t, "admin", meta["role"])
+	require.Equal(t, []any{"a", "b"}, meta["tags"])
+	require.Equal(t, 0.87, input["score"])
 }
 
 // TestDeferCancelUpdatesDeferStatus verifies that when the executor processes
@@ -540,4 +549,145 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	require.Equal(t, "score", d.CompanionID, "CompanionID should be preserved")
 	require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus, "status should be Cancelled")
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input), "Input should be preserved")
+}
+
+// TestDeferCancelFallsBackToCompanionIDScan verifies that when a DeferCancel
+// opcode omits target_hashed_id (older SDKs), the handler still cancels the
+// matching defer by scanning companion_id.
+func TestDeferCancelFallsBackToCompanionIDScan(t *testing.T) {
+	ctx := context.Background()
+
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	require.NoError(t, err)
+	adapter := dbsqlite.New(db)
+	dbcqrs := base_cqrs.NewCQRS(adapter)
+	loader := dbcqrs.(state.FunctionLoader)
+
+	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	fn := inngest.Function{
+		ID:              fnID,
+		FunctionVersion: 1,
+		Name:            "test-fn",
+		Slug:            "test-fn",
+		Steps: []inngest.Step{
+			{ID: "step-defer", Name: "step-defer", URI: "/step-defer"},
+		},
+	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{ID: appID, Name: "test-app"})
+	require.NoError(t, err)
+	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID: fnID, AppID: appID, Name: fn.Name, Slug: fn.Slug, Config: string(config),
+	})
+	require.NoError(t, err)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
+	var sm state.Manager
+	sm, err = redis_state.New(ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	queueOpts := []queue.QueueOpt{queue.WithIdempotencyTTL(time.Hour)}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	rq, err := queue.New(
+		ctx, "test-queue", queueShard,
+		map[string]queue.QueueShard{queueShard.Name(): queueShard},
+		shardSelector, queueOpts...,
+	)
+	require.NoError(t, err)
+
+	deferStepID := "step-defer"
+	cancelStepID := "step-cancel"
+
+	// Mock driver returns a DeferCancel opcode WITHOUT target_hashed_id.
+	// This simulates an older SDK client.
+	mockDriver := &mockDriverV1{
+		t: t,
+		response: &state.DriverResponse{
+			StatusCode: 206,
+			Generator: []*state.GeneratorOpcode{{
+				Op: enums.OpcodeDeferCancel,
+				ID: cancelStepID,
+				Opts: map[string]any{
+					"companion_id": "score",
+				},
+			}},
+		},
+	}
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauseMgr),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithDriverV1(mockDriver),
+	)
+	require.NoError(t, err)
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		Function: fn, At: &now, AccountID: aID, WorkspaceID: wsID, AppID: appID,
+		Events: []event.TrackedEvent{
+			event.NewBaseTrackedEventWithID(event.Event{Name: "test/event"}, evtID),
+		},
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, smv2.SaveDefer(ctx, run.ID, statev2.Defer{
+		CompanionID:    "score",
+		HashedID:       deferStepID,
+		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		Input:          json.RawMessage(`{}`),
+	}))
+
+	_, err = exec.Execute(ctx, state.Identifier{
+		WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID,
+	}, queue.Item{
+		WorkspaceID: wsID,
+		Kind:        queue.KindStart,
+		Identifier:  state.Identifier{WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID},
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
+	require.NoError(t, err)
+
+	defers, err := smv2.LoadDefers(ctx, run.ID)
+	require.NoError(t, err)
+	require.Len(t, defers, 1)
+	require.Equal(t, statev2.ScheduleStatusCancelled, defers[deferStepID].ScheduleStatus,
+		"defer should be cancelled via companion_id fallback when target_hashed_id is absent")
 }

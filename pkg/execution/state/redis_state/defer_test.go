@@ -23,12 +23,11 @@ import (
 //
 //  1. statev2.ScheduleStatus enum (in pkg/execution/state/v2/) with the four
 //     constants from the ticket: Unknown, Scheduled, AfterRun, Cancelled.
-//  2. statev2.Defer struct with CompanionID, FnSlug, HashedID, ScheduleStatus,
-//     Input.
+//  2. statev2.Defer struct with CompanionID, HashedID, ScheduleStatus, Input.
 //  3. Add SaveDefer + LoadDefers methods to the RunService / StateLoader
 //     interfaces in pkg/execution/state/v2/interfaces.go.
 //  4. Implement them on the Redis adapter (v2_adapter.go), storing defers in a
-//     hash at the key `{state:runID}:defers:fnID:runID` (add a Defers() method
+//     hash at the key `{state:runID}:groups:fnID:runID` (add a Defers() method
 //     to RunStateKeyGenerator in key_generator.go alongside Actions/Stack/etc).
 func TestSaveDeferRoundTrip(t *testing.T) {
 	ctx := context.Background()
@@ -89,7 +88,6 @@ func TestSaveDeferRoundTrip(t *testing.T) {
 	// --- the actual test ---
 	want := statev2.Defer{
 		CompanionID:    "score",
-		FnSlug:         "my-app-score",
 		HashedID:       "hash-step-1",
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),

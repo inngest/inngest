@@ -22,9 +22,6 @@ type Defer struct {
 	// Deferred companion's key in `onDefer` record
 	CompanionID string
 
-	// Deferred companion's implicit fully-qualified function slug
-	FnSlug string
-
 	// Hashed step ID
 	HashedID string
 
