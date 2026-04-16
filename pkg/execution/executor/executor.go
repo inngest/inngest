@@ -3499,32 +3499,26 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 	// Modern SDKs send target_hashed_id to identify the exact defer to cancel
 	// (needed when a run has multiple defers for the same companion). Older
 	// SDKs only send companion_id, which we fall back to scanning.
-	defers, err := e.smv2.LoadDefers(ctx, runCtx.Metadata().ID)
-	if err != nil {
-		return fmt.Errorf("error loading defers for cancel: %w", err)
-	}
-
-	var target sv2.Defer
-	var found bool
-	if opts.TargetHashedID != "" {
-		target, found = defers[opts.TargetHashedID]
-	} else {
+	targetHashedID := opts.TargetHashedID
+	if targetHashedID == "" {
+		defers, err := e.smv2.LoadDefers(ctx, runCtx.Metadata().ID)
+		if err != nil {
+			return fmt.Errorf("error loading defers for cancel: %w", err)
+		}
 		for _, d := range defers {
 			if d.CompanionID == opts.CompanionID {
-				target = d
-				found = true
+				targetHashedID = d.HashedID
 				break
 			}
 		}
-	}
-	if !found {
-		return fmt.Errorf("defer not found for companion %q (target_hashed_id=%q)", opts.CompanionID, opts.TargetHashedID)
+		if targetHashedID == "" {
+			return fmt.Errorf("defer not found for companion %q", opts.CompanionID)
+		}
 	}
 
-	target.ScheduleStatus = sv2.ScheduleStatusCancelled
-
-	if err := e.smv2.SaveDefer(ctx, runCtx.Metadata().ID, target); err != nil {
-		return fmt.Errorf("error saving cancelled defer: %w", err)
+	// Atomic: no read-modify-write race against a concurrent SaveDefer.
+	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, targetHashedID, sv2.ScheduleStatusCancelled); err != nil {
+		return fmt.Errorf("error cancelling defer: %w", err)
 	}
 
 	groupID := uuid.New().String()
