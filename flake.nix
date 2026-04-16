@@ -77,7 +77,7 @@
 
           nativeBuildInputs = with pkgs; [
             # Go
-            go
+            go_1_25
             golangci-lint
             gotests
             gomodifytags
@@ -95,9 +95,9 @@
 
             # LSPs
             gopls
-            nodePackages.typescript-language-server
-            nodePackages.vscode-json-languageserver
-            nodePackages.yaml-language-server
+            typescript-language-server
+            vscode-json-languageserver
+            yaml-language-server
             lua-language-server
 
             # Tools
