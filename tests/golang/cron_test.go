@@ -321,7 +321,7 @@ func TestCronJitter(t *testing.T) {
 			// assert that scheduledAt < fireAt <= scheduledAt + jitterDuration,
 			// and that the function actually executes no later than fireAt + tolerance
 			assert.True(t, fireAt.After(scheduledAt), "fireAt %s should be after scheduledAt %s (jitter should be applied)", fireAt, scheduledAt)
-			assert.True(t, !fireAt.After(scheduledAt.Add(jitterDuration)), "fireAt %s should be within %s jitter of scheduledAt %s", fireAt, jitterDuration, scheduledAt)
+			assert.True(t, fireAt.Before(scheduledAt.Add(jitterDuration)), "fireAt %s should be within %s jitter of scheduledAt %s", fireAt, jitterDuration, scheduledAt)
 			assert.True(t, !executedAtTime.Before(scheduledAt), "executedAt %s should not be before scheduledAt %s", executedAtTime, scheduledAt)
 			tolerance := 10 * time.Second
 			assert.True(t, !executedAtTime.After(fireAt.Add(tolerance)), "executedAt %s should not be too much after fireAt %s (tolerance %s)", executedAtTime, fireAt, tolerance)

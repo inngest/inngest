@@ -1061,7 +1061,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			l.Error("CronItem.JobID is empty, using fallback seed for jitter")
 			jobID = fmt.Sprintf("%s:%s:%d", ci.FunctionID, ci.Expression, scheduledAt.UnixMilli())
 		}
-		fireAt = scheduledAt.Add(cron.DeterministicJitter(jobID, jitter))
+		fireAt = scheduledAt.Add(cron.DeterministicJitter(jobID, inngest.MinCronJitter, jitter))
 	}
 
 	l = l.With("jitter", jitter, "fireAt", fireAt)
