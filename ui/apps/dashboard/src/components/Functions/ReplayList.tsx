@@ -17,7 +17,6 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetReplays } from '@/components/Replay/useGetReplay';
 import NewReplayModal from '@/components/Replay/NewReplayModal';
-import { useFunction } from '@/queries/functions';
 import { pathCreator } from '@/utils/urls';
 import { useNavigate } from '@tanstack/react-router';
 
@@ -98,18 +97,15 @@ const columns = [
 
 type Props = {
   functionSlug: string;
+  disableNewReplay?: boolean;
 };
 
-export function ReplayList({ functionSlug }: Props) {
+export function ReplayList({ functionSlug, disableNewReplay = false }: Props) {
   const environment = useEnvironment();
   const navigate = useNavigate();
   const [replayOpen, setReplayOpen] = useState(false);
 
   const { isLoading, error, data: replays } = useGetReplays(functionSlug);
-  const [{ data: fnData }] = useFunction({ functionSlug });
-  const fn = fnData?.workspace.workflow;
-  const isArchived = fn?.isArchived ?? false;
-  const isPaused = fn?.isPaused ?? false;
 
   if (error) {
     throw error;
@@ -139,7 +135,7 @@ export function ReplayList({ functionSlug }: Props) {
                 <Button
                   label="New replay"
                   onClick={() => setReplayOpen(true)}
-                  disabled={isArchived || isPaused}
+                  disabled={disableNewReplay}
                   icon={<IconReplay />}
                   iconSide="left"
                 />
