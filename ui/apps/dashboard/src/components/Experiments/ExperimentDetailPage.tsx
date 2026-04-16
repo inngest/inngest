@@ -30,19 +30,37 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
   // --- state ---
   const [preset, setPreset] = useState<TimeRangePreset>('24h');
-  const [variantFilter, setVariantFilter] = useState<string | null>(null);
+  const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [activePanel, setActivePanel] = useState<string | null>('Info');
   // --- hooks ---
-  const detail = useExperimentDetail(experimentName, preset, variantFilter);
+  const detail = useExperimentDetail(experimentName, preset, null);
   const scoring = useScoringConfig(experimentName);
+
+  // --- available variants for toolbar filter ---
+  const availableVariants = useMemo(
+    () => detail.data?.variants.map((v) => v.variantName) ?? [],
+    [detail.data],
+  );
+
+  // --- filtered variants based on multi-select ---
+  const filteredDetail = useMemo(() => {
+    if (!detail.data) return null;
+    if (selectedVariants.length === 0) return detail.data;
+    return {
+      ...detail.data,
+      variants: detail.data.variants.filter((v) =>
+        selectedVariants.includes(v.variantName),
+      ),
+    };
+  }, [detail.data, selectedVariants]);
 
   // --- compute top variant ---
   const topVariant = useMemo(() => {
-    if (!detail.data || !scoring.metrics) return null;
+    if (!filteredDetail || !scoring.metrics) return null;
     let bestName: string | null = null;
     let bestScore = -Infinity;
-    for (const v of detail.data.variants) {
+    for (const v of filteredDetail.variants) {
       const result = scoreVariant(v.metrics, scoring.metrics);
       if (result.total > bestScore) {
         bestScore = result.total;
@@ -50,13 +68,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
       }
     }
     return bestName;
-  }, [detail.data, scoring.metrics]);
-
-  // --- available variants for toolbar filter ---
-  const availableVariants = useMemo(
-    () => detail.data?.variants.map((v) => v.variantName) ?? [],
-    [detail.data],
-  );
+  }, [filteredDetail, scoring.metrics]);
 
   // --- enabled metrics for MetricPanel grid ---
   const enabledMetrics = useMemo(
@@ -112,8 +124,8 @@ export function ExperimentDetailPage({ experimentName }: Props) {
           <ExperimentDetailToolbar
             preset={preset}
             onPresetChange={setPreset}
-            variantFilter={variantFilter}
-            onVariantFilterChange={setVariantFilter}
+            selectedVariants={selectedVariants}
+            onSelectedVariantsChange={setSelectedVariants}
             availableVariants={availableVariants}
           />
 
@@ -131,11 +143,11 @@ export function ExperimentDetailPage({ experimentName }: Props) {
           )}
 
           {/* Data */}
-          {detail.data && scoring.metrics && (
+          {filteredDetail && scoring.metrics && (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               <div className="col-span-1 md:col-span-2 xl:col-span-3">
                 <ScoreSummaryCard
-                  variants={detail.data.variants}
+                  variants={filteredDetail.variants}
                   metrics={scoring.metrics}
                 />
               </div>
@@ -144,17 +156,18 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                 <MetricPanel
                   key={metric.key}
                   metric={metric}
-                  variants={detail.data!.variants}
+                  variants={filteredDetail.variants}
                   colorIndex={i}
                 />
               ))}
 
               <div className="col-span-1 md:col-span-2 xl:col-span-3">
                 <VariantsTable
-                  variants={detail.data.variants}
+                  variants={filteredDetail.variants}
                   scoringConfig={scoring.metrics}
                   onUpdateMetric={scoring.updateMetric}
                   onEnableMetric={scoring.enableMetric}
+                  pointsLeft={scoring.pointsLeft}
                   onOpenInsights={onOpenInsights}
                   showInactive={showInactive}
                   onShowInactiveChange={setShowInactive}
@@ -190,7 +203,8 @@ export function ExperimentDetailPage({ experimentName }: Props) {
               {activePanel === 'Scoring formula' && scoring.metrics && (
                 <ScoringFormulaSidebar
                   metrics={scoring.metrics}
-                  onChange={scoring.setMetrics}
+                  onUpdateMetric={scoring.updateMetric}
+                  pointsLeft={scoring.pointsLeft}
                   isSaving={scoring.isSaving}
                 />
               )}

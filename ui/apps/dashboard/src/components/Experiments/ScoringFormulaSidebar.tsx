@@ -13,16 +13,21 @@ import {
 
 type Props = {
   metrics: ExperimentScoringMetric[];
-  onChange: (next: ExperimentScoringMetric[]) => void;
+  onUpdateMetric: (
+    key: string,
+    patch: Partial<ExperimentScoringMetric>,
+  ) => void;
+  pointsLeft: number;
   isSaving?: boolean;
 };
 
-export function ScoringFormulaSidebar({ metrics, onChange, isSaving }: Props) {
-  const totalAllocated = metrics
-    .filter((m) => m.enabled)
-    .reduce((sum, m) => sum + m.points, 0);
-  const pointsLeft = 100 - totalAllocated;
-  const barPercent = Math.max(0, Math.min(100, totalAllocated));
+export function ScoringFormulaSidebar({
+  metrics,
+  onUpdateMetric,
+  pointsLeft,
+  isSaving,
+}: Props) {
+  const barPercent = Math.max(0, Math.min(100, 100 - pointsLeft));
 
   return (
     <div className="flex min-w-[320px] flex-col gap-4 p-4">
@@ -57,18 +62,13 @@ export function ScoringFormulaSidebar({ metrics, onChange, isSaving }: Props) {
 
       {/* Metric accordion list */}
       <div className="flex flex-col gap-1">
-        {metrics.map((metric, idx) => (
+        {metrics.map((metric) => (
           <MetricAccordionItem
             key={metric.key}
             metric={metric}
             disabled={isSaving}
             pointsLeft={pointsLeft}
-            onUpdate={(patch) => {
-              const next = metrics.map((m, i) =>
-                i === idx ? { ...m, ...patch } : m,
-              );
-              onChange(next);
-            }}
+            onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
           />
         ))}
       </div>
@@ -81,18 +81,23 @@ export function ScoringFormulaSidebar({ metrics, onChange, isSaving }: Props) {
   );
 }
 
-function MetricAccordionItem({
+export function MetricAccordionItem({
   metric,
   onUpdate,
   disabled,
   pointsLeft,
+  defaultExpanded = false,
+  collapsible = true,
 }: {
   metric: ExperimentScoringMetric;
   onUpdate: (patch: Partial<ExperimentScoringMetric>) => void;
   disabled?: boolean;
   pointsLeft: number;
+  defaultExpanded?: boolean;
+  collapsible?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded || !collapsible);
+  const toggle = collapsible ? () => setExpanded((v) => !v) : undefined;
 
   return (
     <div className="border-subtle rounded-md border">
@@ -110,8 +115,9 @@ function MetricAccordionItem({
           className={cn(
             'min-w-0 flex-1 truncate text-left text-sm',
             metric.enabled ? 'text-basis' : 'text-muted',
+            !collapsible && 'cursor-default',
           )}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={toggle}
         >
           {metric.displayName}
         </button>
@@ -141,17 +147,19 @@ function MetricAccordionItem({
           />
         </div>
 
-        <button
-          type="button"
-          className="text-muted shrink-0"
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {expanded ? (
-            <RiArrowUpSLine className="h-4 w-4" />
-          ) : (
-            <RiArrowDownSLine className="h-4 w-4" />
-          )}
-        </button>
+        {collapsible && (
+          <button
+            type="button"
+            className="text-muted shrink-0"
+            onClick={toggle}
+          >
+            {expanded ? (
+              <RiArrowUpSLine className="h-4 w-4" />
+            ) : (
+              <RiArrowDownSLine className="h-4 w-4" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Expanded details */}

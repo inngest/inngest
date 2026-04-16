@@ -72,7 +72,7 @@ export function ScoreSummaryCard({ variants, metrics }: Props) {
   const runnerUp = ranked[1] ?? null;
 
   return (
-    <Card className="overflow-visible" contentClassName="overflow-visible">
+    <Card contentClassName="overflow-visible">
       <Card.Header>
         <span className="text-basis text-sm font-medium">Score Summary</span>
       </Card.Header>
