@@ -20,7 +20,8 @@ import (
 const (
 	MaxCronLength      = 255
 	MaxEventNameLength = 255
-	MaxCronJitter      = 5 * time.Minute
+	// MaxCronJitter is intentionally conservative for v1. Can be raised based on user feedback.
+	MaxCronJitter = 5 * time.Minute
 )
 
 // Triggerable represents a single or multiple triggers for a function.
@@ -46,6 +47,7 @@ func (m MultipleTriggers) Validate(ctx context.Context) error {
 	}
 
 	seen := make(map[string]struct{})
+	seenCronExprs := make(map[string]struct{})
 
 	for _, t := range m {
 		key, herr := t.Hash()
@@ -57,6 +59,14 @@ func (m MultipleTriggers) Validate(ctx context.Context) error {
 			err = multierror.Append(err, fmt.Errorf("duplicate trigger %s", t.Name()))
 		}
 		seen[key] = struct{}{}
+
+		// Reject duplicate cron expressions even if jitter differs.
+		if t.CronTrigger != nil {
+			if _, ok := seenCronExprs[t.CronTrigger.Cron]; ok {
+				err = multierror.Append(err, fmt.Errorf("duplicate cron expression: %s", t.CronTrigger.Cron))
+			}
+			seenCronExprs[t.CronTrigger.Cron] = struct{}{}
+		}
 
 		if terr := t.Validate(ctx); terr != nil {
 			err = multierror.Append(err, terr)

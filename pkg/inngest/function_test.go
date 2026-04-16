@@ -506,4 +506,19 @@ func TestCronTriggerValidate(t *testing.T) {
 	})
 }
 
+func TestDuplicateCronExpressionRejected(t *testing.T) {
+	ctx := context.Background()
+
+	jitter1 := "5m"
+	jitter2 := "10m"
+	triggers := MultipleTriggers{
+		{CronTrigger: &CronTrigger{Cron: "0 9 * * *", Jitter: &jitter1}},
+		{CronTrigger: &CronTrigger{Cron: "0 9 * * *", Jitter: &jitter2}},
+	}
+
+	err := triggers.Validate(ctx)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "duplicate cron expression")
+}
+
 func strptr(s string) *string { return &s }
