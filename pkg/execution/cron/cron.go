@@ -85,17 +85,18 @@ func (i CronItem) SyncID() string {
 	return fmt.Sprintf("%s:sync", i.ID)
 }
 
-// DeterministicJitter returns a stable jitter duration in (0, max] derived from
+// DeterministicJitter returns a stable jitter duration in [min, max) derived from
 // the given seed string using xxhash. The same seed always produces the same result.
-// The result is always at least 1ns so that jittered times are strictly after the
-// canonical boundary.
-func DeterministicJitter(seed string, max time.Duration) time.Duration {
-	if max <= 0 {
-		return 0
+func DeterministicJitter(seed string, min, max time.Duration) time.Duration {
+	if max <= 0 || max <= min {
+		return min
 	}
 
-	rangeNs := uint64(max / time.Nanosecond)
-	return time.Duration(xxhash.Sum64String(seed)%rangeNs) + 1
+	rangeNs := uint64((max - min) / time.Nanosecond)
+	if rangeNs == 0 {
+		return min
+	}
+	return min + time.Duration(xxhash.Sum64String(seed)%rangeNs)
 }
 
 type CronHealthCheckStatus struct {

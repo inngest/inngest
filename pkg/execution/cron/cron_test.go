@@ -12,17 +12,23 @@ import (
 )
 
 func TestDeterministicJitter(t *testing.T) {
-	t.Run("returns zero for non-positive max", func(t *testing.T) {
-		assert.Zero(t, DeterministicJitter("seed", 0))
+	t.Run("returns min when max is non-positive", func(t *testing.T) {
+		assert.Equal(t, time.Second, DeterministicJitter("seed", time.Second, 0))
 	})
 
-	t.Run("is stable for the same seed and bounded by max", func(t *testing.T) {
-		j1 := DeterministicJitter("same-seed", 5*time.Minute)
-		j2 := DeterministicJitter("same-seed", 5*time.Minute)
+	t.Run("returns min when max equals min", func(t *testing.T) {
+		assert.Equal(t, time.Second, DeterministicJitter("seed", time.Second, time.Second))
+	})
+
+	t.Run("is stable for the same seed and bounded by [min, max)", func(t *testing.T) {
+		min := time.Second
+		max := 5 * time.Minute
+		j1 := DeterministicJitter("same-seed", min, max)
+		j2 := DeterministicJitter("same-seed", min, max)
 
 		assert.Equal(t, j1, j2)
-		assert.Greater(t, j1, time.Duration(0))
-		assert.LessOrEqual(t, j1, 5*time.Minute)
+		assert.GreaterOrEqual(t, j1, min)
+		assert.Less(t, j1, max)
 	})
 }
 

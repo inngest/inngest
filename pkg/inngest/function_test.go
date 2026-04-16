@@ -498,6 +498,13 @@ func TestCronTriggerValidate(t *testing.T) {
 		require.ErrorContains(t, err, "greater than or equal to zero")
 	})
 
+	t.Run("rejects jitter below minimum", func(t *testing.T) {
+		jitter := "500ms"
+		err := (CronTrigger{Cron: "0 9 * * *", Jitter: &jitter}).Validate(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "at least")
+	})
+
 	t.Run("rejects jitter above hard cap", func(t *testing.T) {
 		jitter := "25h"
 		err := (CronTrigger{Cron: "0 9 * * *", Jitter: &jitter}).Validate(ctx)

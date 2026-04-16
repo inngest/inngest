@@ -20,6 +20,8 @@ import (
 const (
 	MaxCronLength      = 255
 	MaxEventNameLength = 255
+	// MinCronJitter ensures jitter is large enough to be visible at second precision (RFC3339).
+	MinCronJitter = 1 * time.Second
 	// MaxCronJitter is intentionally conservative for v1. Can be raised based on user feedback.
 	MaxCronJitter = 5 * time.Minute
 )
@@ -220,6 +222,9 @@ func (c CronTrigger) Validate(ctx context.Context) error {
 	}
 	if jitter < 0 {
 		return fmt.Errorf("cron jitter must be greater than or equal to zero")
+	}
+	if jitter > 0 && jitter < MinCronJitter {
+		return fmt.Errorf("cron jitter must be at least %s", MinCronJitter)
 	}
 	if jitter > MaxCronJitter {
 		return fmt.Errorf("cron jitter must be less than or equal to %s", MaxCronJitter)
