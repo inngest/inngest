@@ -1073,8 +1073,8 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		Name: consts.FnCronName,
 		Data: map[string]any{
 			"cron":        ci.Expression,
-			"scheduledAt": scheduledAt.UTC().Format(time.RFC3339),
-			"fireAt":      fireAt.UTC().Format(time.RFC3339),
+			"scheduledAt": scheduledAt.UTC().Format(time.RFC3339Nano),
+			"fireAt":      fireAt.UTC().Format(time.RFC3339Nano),
 		},
 		Timestamp: fireAt.UnixMilli(),
 	}, nil)

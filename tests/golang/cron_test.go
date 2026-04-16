@@ -425,9 +425,9 @@ func parseCronTriggerPayload(t *testing.T, raw string) (cronTriggerPayload, time
 	require.NotEmpty(t, payload.Data.ScheduledAt, "scheduledAt should be present in event data")
 	require.NotEmpty(t, payload.Data.FireAt, "fireAt should be present in event data")
 
-	scheduledAt, err := time.Parse(time.RFC3339, payload.Data.ScheduledAt)
+	scheduledAt, err := time.Parse(time.RFC3339Nano, payload.Data.ScheduledAt)
 	require.NoError(t, err)
-	fireAt, err := time.Parse(time.RFC3339, payload.Data.FireAt)
+	fireAt, err := time.Parse(time.RFC3339Nano, payload.Data.FireAt)
 	require.NoError(t, err)
 
 	return payload, scheduledAt, fireAt
