@@ -931,6 +931,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Defers(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
 
 	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
