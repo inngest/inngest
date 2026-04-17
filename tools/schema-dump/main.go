@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,7 +19,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/testcontainers/testcontainers-go"
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
@@ -239,7 +239,7 @@ func startPostgresContainer(ctx context.Context, image, password string, startup
 func migrateSQLite(ctx context.Context, db *sql.DB) error {
 	// Apply the embedded SQLite migrations into a fresh temporary database, then
 	// introspect the resulting schema from sqlite_schema.
-	src, err := iofs.New(base_cqrs.FS, path.Join("migrations", "sqlite"))
+	src, err := iofs.New(dbsqlite.MigrationsFS, "migrations")
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func migrateSQLite(ctx context.Context, db *sql.DB) error {
 func migratePostgres(ctx context.Context, db *sql.DB, dsn string) error {
 	// Apply the embedded Postgres migrations into the ephemeral container, then
 	// use pg_dump to extract the final DDL from the database itself.
-	src, err := iofs.New(base_cqrs.FS, path.Join("migrations", "postgres"))
+	src, err := iofs.New(dbpostgres.MigrationsFS, "migrations")
 	if err != nil {
 		return err
 	}
