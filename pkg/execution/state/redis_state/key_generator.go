@@ -38,9 +38,6 @@ type RunStateKeyGenerator interface {
 	// run.
 	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
 
-	// PauseConsumeKey is an idempotency key used for making sure pause consumptions are idempotent
-	PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string
-
 	// Defers returns the key used to store the run's Defer records, keyed
 	// by each defer's hashed step ID.
 	Defers(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
