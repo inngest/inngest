@@ -237,6 +237,26 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
+          # Keep these as nullable in generated SQLite code because sqlc.embed(function_finishes)
+          # is used in LEFT JOIN queries, and sqlc issue #2806 otherwise collapses the optional
+          # finish row into non-nullable fields. See:
+          # https://github.com/sqlc-dev/sqlc/issues/2806#issuecomment-1750038624
+          - column: "function_finishes.status"
+            go_type:
+              import: "database/sql"
+              type: "NullString"
+          - column: "function_finishes.output"
+            go_type:
+              import: "database/sql"
+              type: "NullString"
+          - column: "function_finishes.completed_step_count"
+            go_type:
+              import: "database/sql"
+              type: "NullInt64"
+          - column: "function_finishes.created_at"
+            go_type:
+              import: "database/sql"
+              type: "NullTime"
           - column: "function_runs.workspace_id"
             go_type: "github.com/google/uuid.UUID"
 
