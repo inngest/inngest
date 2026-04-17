@@ -205,7 +205,7 @@ importers:
         version: 3.52.7(@opentelemetry/core@2.6.1(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.12)(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(typescript@5.9.3)(zod@4.3.6)
       ky:
         specifier: ^2.0.0
-        version: 2.0.0
+        version: 2.0.1
       launchdarkly-react-client-sdk:
         specifier: ^3.0.8
         version: 3.9.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -8236,8 +8236,8 @@ packages:
   knitwork@1.3.0:
     resolution: {integrity: sha512-4LqMNoONzR43B1W0ek0fhXMsDNW/zxa1NdFAVMY+k28pgZLovR4G3PB5MrpTxCy1QaZCqNoiaKPr5w5qZHfSNw==}
 
-  ky@2.0.0:
-    resolution: {integrity: sha512-KzI4Vz5AbZFAUFYGx28PCSfFWUo6/qj9Br/P6KRwDieE1xfdz0tIONepJcLw/1xLocN13GgvfJGasa+pfSkbHg==}
+  ky@2.0.1:
+    resolution: {integrity: sha512-HJPEjEpQPZQ5M3G5eu90/LWZDwysCnvqcfbLvq9FUvfizBZRi58WEixswyyI32LOLcFQd43w7kcfgkCPFxDt/Q==}
     engines: {node: '>=22'}
 
   launchdarkly-eventsource@2.2.0:
@@ -11012,7 +11012,7 @@ packages:
   vite-tsconfig-paths@6.1.1:
     resolution: {integrity: sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg==}
     peerDependencies:
-      vite: '>=4.5.11'
+      vite: '>=6.2.7'
 
   vite@8.0.8:
     resolution: {integrity: sha512-dbU7/iLVa8KZALJyLOBOQ88nOXtNG8vxKuOT4I2mD+Ya70KPceF4IAmDsmU0h1Qsn5bPrvsY9HJstCRh3hG6Uw==}
@@ -19906,7 +19906,7 @@ snapshots:
 
   knitwork@1.3.0: {}
 
-  ky@2.0.0: {}
+  ky@2.0.1: {}
 
   launchdarkly-eventsource@2.2.0: {}
 
