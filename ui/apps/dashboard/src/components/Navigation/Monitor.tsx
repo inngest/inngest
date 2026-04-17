@@ -5,6 +5,7 @@ import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import type { Environment as EnvType } from '@/utils/environments';
 import { getNavRoute } from './Navigation';
 
@@ -15,6 +16,8 @@ export default function Monitor({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
+  const experimentsEnabled = useBooleanFlag('experimentation-steps');
+
   return (
     <div className={`flex w-full flex-col  ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
@@ -49,13 +52,15 @@ export default function Monitor({
         text="Insights"
         icon={<InsightsIcon className="h-[18px] w-[18px]" />}
       />
-      <MenuItem
-        to={getNavRoute(activeEnv, 'experiments')}
-        beta
-        collapsed={collapsed}
-        text="Experiments"
-        icon={<ExperimentsIcon className="h-[18px] w-[18px]" />}
-      />
+      {experimentsEnabled.value && (
+        <MenuItem
+          to={getNavRoute(activeEnv, 'experiments')}
+          beta
+          collapsed={collapsed}
+          text="Experiments"
+          icon={<ExperimentsIcon className="h-[18px] w-[18px]" />}
+        />
+      )}
     </div>
   );
 }

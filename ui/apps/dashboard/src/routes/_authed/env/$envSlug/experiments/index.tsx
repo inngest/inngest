@@ -7,7 +7,9 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 
+import NotFound from '@/components/Error/NotFound';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/experiments/')({
@@ -38,8 +40,10 @@ export default function ExperimentsComponent() {
     setIsMounted(true);
   }, []);
 
+  const experimentsEnabled = useBooleanFlag('experimentation-steps');
+
   const { data, isPending, error, refetch } = useExperimentsList({
-    enabled: isMounted,
+    enabled: isMounted && experimentsEnabled.value,
   });
 
   const handleRowClick = useCallback(
@@ -50,6 +54,10 @@ export default function ExperimentsComponent() {
     },
     [navigate, envSlug],
   );
+
+  if (experimentsEnabled.isReady && !experimentsEnabled.value) {
+    return <NotFound />;
+  }
 
   return (
     <>
