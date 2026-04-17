@@ -114,6 +114,11 @@ type History struct {
 	StepType             sql.NullString
 }
 
+type Migration struct {
+	Version int64
+	Dirty   bool
+}
+
 type QueueSnapshotChunk struct {
 	SnapshotID string
 	ChunkID    int32
