@@ -6,10 +6,10 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"sort"
 	"net/url"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"testing"
 
@@ -262,9 +262,6 @@ func expectedSchemaSnapshot(t *testing.T, dialect migrationDialect) schemaSnapsh
 
 	tables := parseSchemaColumns(t, string(schemaBytes))
 	indexes := parseIndexNames(t, string(schemaBytes))
-
-	delete(tables, "migrations")
-	delete(indexes, "migrations")
 	for tableName := range tables {
 		if _, ok := indexes[tableName]; !ok {
 			indexes[tableName] = nil
@@ -329,13 +326,15 @@ func parseIndexNames(t *testing.T, schema string) map[string][]string {
 
 		indexName := normalizeIdentifier(remainder[:onIdx])
 		tableSection := strings.TrimSpace(remainder[onIdx+len(" ON "):])
-		fields := strings.Fields(tableSection)
-		require.NotEmpty(t, fields, "invalid CREATE INDEX statement: %q", statement)
-
-		tableName := normalizeIdentifier(fields[0])
-		if tableName == "migrations" {
-			continue
+		if usingIdx := strings.Index(strings.ToUpper(tableSection), " USING "); usingIdx >= 0 {
+			tableSection = strings.TrimSpace(tableSection[:usingIdx])
 		}
+		tableNameSection := tableSection
+		if parenIdx := strings.Index(tableNameSection, "("); parenIdx >= 0 {
+			tableNameSection = tableNameSection[:parenIdx]
+		}
+
+		tableName := normalizeIdentifier(tableNameSection)
 		result[tableName] = append(result[tableName], indexName)
 	}
 
@@ -452,7 +451,7 @@ func readRuntimeTableNames(t *testing.T, db *sql.DB, dialect migrationDialect) [
 			FROM information_schema.tables
 			WHERE table_schema = current_schema()
 			  AND table_type = 'BASE TABLE'
-			  AND table_name NOT IN ('migrations', 'goose_db_version')
+			  AND table_name <> 'goose_db_version'
 			ORDER BY table_name
 		`
 	default:
@@ -461,7 +460,7 @@ func readRuntimeTableNames(t *testing.T, db *sql.DB, dialect migrationDialect) [
 			FROM sqlite_master
 			WHERE type = 'table'
 			  AND name NOT LIKE 'sqlite_%'
-			  AND name NOT IN ('migrations', 'goose_db_version')
+			  AND name <> 'goose_db_version'
 			ORDER BY name
 		`
 	}
@@ -605,11 +604,11 @@ func stripLineComments(schema string) string {
 
 func splitTopLevel(input string, separator rune) []string {
 	var (
-		result    []string
-		start     int
-		depth     int
-		inString  bool
-		prevRune  rune
+		result   []string
+		start    int
+		depth    int
+		inString bool
+		prevRune rune
 	)
 
 	for idx, r := range input {
@@ -679,7 +678,10 @@ func normalizeType(dataType string) string {
 	dataType = strings.ToLower(strings.TrimSpace(dataType))
 	dataType = strings.Join(strings.Fields(dataType), " ")
 	dataType = strings.ReplaceAll(dataType, "character varying", "varchar")
+	dataType = strings.ReplaceAll(dataType, "character(", "char(")
+	dataType = strings.ReplaceAll(dataType, "character", "char")
 	dataType = strings.ReplaceAll(dataType, "integer", "int")
+	dataType = strings.ReplaceAll(dataType, "boolean", "bool")
 	dataType = strings.ReplaceAll(dataType, "timestamp without time zone", "timestamp")
 	dataType = strings.ReplaceAll(dataType, "timestamp with time zone", "timestamptz")
 	return dataType

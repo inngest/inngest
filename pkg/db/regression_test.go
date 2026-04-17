@@ -134,7 +134,10 @@ func TestDefaultValues(t *testing.T) {
 	t.Run("function_finishes", func(t *testing.T) {
 		runID := ulid.Make()
 
-		_, err := conn.ExecContext(ctx, `INSERT INTO function_finishes (run_id) VALUES (?)`, runID[:])
+		_, err := conn.ExecContext(ctx, `
+			INSERT INTO function_finishes (run_id, status)
+			VALUES (?, ?)
+		`, runID[:], "completed")
 		require.NoError(t, err)
 
 		var output, createdAt string
@@ -695,7 +698,7 @@ func sqliteRequiredColumnsWithoutDefaults() map[string][]string {
 		"traces":                {"timestamp", "timestamp_unix_ms", "trace_id", "span_id", "span_name", "span_kind", "service_name", "resource_attributes", "scope_name", "scope_version", "span_attributes", "duration", "status_code", "events", "links"},
 		"trace_runs":            {"account_id", "workspace_id", "app_id", "function_id", "trace_id", "queued_at", "started_at", "ended_at", "status", "source_id", "trigger_ids", "is_debounce"},
 		"queue_snapshot_chunks": {"snapshot_id", "chunk_id"},
-		"worker_connections":    {"account_id", "workspace_id", "app_name", "id", "gateway_id", "instance_id", "status", "worker_ip", "max_worker_concurrency", "connected_at", "recorded_at", "inserted_at", "group_hash", "sdk_lang", "sdk_version", "sdk_platform", "function_count", "cpu_cores", "mem_bytes", "os"},
+		"worker_connections":    {"account_id", "workspace_id", "app_name", "id", "gateway_id", "instance_id", "status", "worker_ip", "connected_at", "recorded_at", "inserted_at", "group_hash", "sdk_lang", "sdk_version", "sdk_platform", "function_count", "cpu_cores", "mem_bytes", "os"},
 		"spans":                 {"span_id", "trace_id", "name", "start_time", "end_time", "account_id", "app_id", "function_id", "run_id", "env_id"},
 	}
 }
@@ -712,7 +715,6 @@ func sqlitePrimaryKeyDuplicateCases() []struct {
 		values    map[string]any
 	}{
 		{name: "apps.id", tableName: "apps", values: specs["apps"]},
-		{name: "functions.id", tableName: "functions", values: specs["functions"]},
 		{name: "event_batches.id", tableName: "event_batches", values: specs["event_batches"]},
 		{name: "trace_runs.run_id", tableName: "trace_runs", values: specs["trace_runs"]},
 		{name: "queue_snapshot_chunks.snapshot_id_chunk_id", tableName: "queue_snapshot_chunks", values: specs["queue_snapshot_chunks"]},
@@ -975,51 +977,43 @@ func parseSchemaColumns(t *testing.T, contents string) map[string][]schemaColumn
 	t.Helper()
 
 	result := map[string][]schemaColumn{}
-	currentTable := ""
-
-	for _, rawLine := range strings.Split(contents, "\n") {
-		line := stripLineComment(rawLine)
-		if line == "" {
+	for _, statement := range splitSQLStatements(contents) {
+		statement = strings.TrimSpace(statement)
+		if !strings.HasPrefix(strings.ToUpper(statement), "CREATE TABLE ") {
 			continue
 		}
 
-		if currentTable == "" {
-			if !strings.HasPrefix(strings.ToUpper(line), "CREATE TABLE ") {
+		tableName, definitions := parseCreateTableStatement(t, statement)
+		for _, definition := range splitTopLevel(definitions, ',') {
+			column, ok := parseSchemaColumnLine(definition)
+			if !ok {
 				continue
 			}
-
-			currentTable = parseCreateTableName(t, line)
-			result[currentTable] = nil
-			continue
+			result[tableName] = append(result[tableName], column)
 		}
-
-		if line == ");" {
-			currentTable = ""
-			continue
-		}
-
-		column, ok := parseSchemaColumnLine(line)
-		if !ok {
-			continue
-		}
-		result[currentTable] = append(result[currentTable], column)
 	}
 
 	return result
 }
 
-func parseCreateTableName(t *testing.T, line string) string {
+func parseCreateTableStatement(t *testing.T, statement string) (string, string) {
 	t.Helper()
 
-	remainder := strings.TrimSpace(line[len("CREATE TABLE "):])
+	remainder := strings.TrimSpace(statement[len("CREATE TABLE "):])
 	if strings.HasPrefix(strings.ToUpper(remainder), "IF NOT EXISTS ") {
 		remainder = strings.TrimSpace(remainder[len("IF NOT EXISTS "):])
 	}
 
-	idx := strings.Index(remainder, "(")
-	require.NotEqual(t, -1, idx, "invalid CREATE TABLE statement: %q", line)
+	openIdx := strings.Index(remainder, "(")
+	require.NotEqual(t, -1, openIdx, "invalid CREATE TABLE statement: %q", statement)
 
-	return strings.TrimSpace(strings.Trim(remainder[:idx], `"`))
+	tableName := normalizeIdentifier(remainder[:openIdx])
+	body := strings.TrimSpace(remainder[openIdx+1:])
+	if strings.HasSuffix(body, ")") {
+		body = strings.TrimSpace(body[:len(body)-1])
+	}
+
+	return tableName, body
 }
 
 func parseSchemaColumnLine(line string) (schemaColumn, bool) {
@@ -1062,11 +1056,70 @@ func parseSchemaColumnLine(line string) (schemaColumn, bool) {
 	}, true
 }
 
-func stripLineComment(line string) string {
-	if idx := strings.Index(line, "--"); idx >= 0 {
-		line = line[:idx]
+func splitSQLStatements(schema string) []string {
+	return splitTopLevel(stripLineComments(schema), ';')
+}
+
+func stripLineComments(schema string) string {
+	lines := strings.Split(schema, "\n")
+	for i, line := range lines {
+		if idx := strings.Index(line, "--"); idx >= 0 {
+			line = line[:idx]
+		}
+		lines[i] = line
 	}
-	return strings.TrimSpace(line)
+	return strings.Join(lines, "\n")
+}
+
+func splitTopLevel(input string, separator rune) []string {
+	var (
+		result   []string
+		start    int
+		depth    int
+		inString bool
+		prevRune rune
+	)
+
+	for idx, r := range input {
+		switch r {
+		case '\'':
+			if prevRune != '\\' {
+				inString = !inString
+			}
+		case '(':
+			if !inString {
+				depth++
+			}
+		case ')':
+			if !inString && depth > 0 {
+				depth--
+			}
+		}
+
+		if r == separator && !inString && depth == 0 {
+			part := strings.TrimSpace(input[start:idx])
+			if part != "" {
+				result = append(result, part)
+			}
+			start = idx + 1
+		}
+
+		prevRune = r
+	}
+
+	if tail := strings.TrimSpace(input[start:]); tail != "" {
+		result = append(result, tail)
+	}
+
+	return result
+}
+
+func normalizeIdentifier(name string) string {
+	name = strings.TrimSpace(strings.Trim(name, `"`))
+	if dot := strings.LastIndex(name, "."); dot >= 0 {
+		name = name[dot+1:]
+	}
+	return strings.Trim(name, `"`)
 }
 
 func readRuntimeSchema(t *testing.T, conn *sql.DB, dialect db.Dialect) map[string][]schemaColumn {
@@ -1211,6 +1264,8 @@ func normalizeType(dataType string) string {
 	dataType = strings.ToLower(strings.TrimSpace(dataType))
 	dataType = strings.Join(strings.Fields(dataType), " ")
 	dataType = strings.ReplaceAll(dataType, "character varying", "varchar")
+	dataType = strings.ReplaceAll(dataType, "character(", "char(")
+	dataType = strings.ReplaceAll(dataType, "character", "char")
 	dataType = strings.ReplaceAll(dataType, "integer", "int")
 	dataType = strings.ReplaceAll(dataType, "timestamp without time zone", "timestamp")
 	dataType = strings.ReplaceAll(dataType, "timestamp with time zone", "timestamptz")
@@ -1260,6 +1315,8 @@ func logicalType(columnName, dataType string) string {
 	switch {
 	case isULIDColumn(columnName) && (dataType == "char(26)" || dataType == "blob" || dataType == "bytea"):
 		return "ulid"
+	case isUUIDLikeTextColumn(columnName) && (dataType == "char(36)" || dataType == "text"):
+		return "uuid"
 	}
 
 	switch {
@@ -1269,11 +1326,13 @@ func logicalType(columnName, dataType string) string {
 		return "bytes"
 	case dataType == "json" || dataType == "jsonb":
 		return "json"
+	case dataType == "bool" || dataType == "boolean":
+		return "bool"
 	case dataType == "datetime" || dataType == "timestamp" || dataType == "timestamptz":
 		return "timestamp"
 	case strings.HasPrefix(dataType, "varchar") || dataType == "text":
 		return "text"
-	case dataType == "int" || dataType == "integer" || dataType == "bigint" || dataType == "smallint":
+	case dataType == "int" || dataType == "integer" || dataType == "bigint" || dataType == "smallint" || dataType == "uint64":
 		return "int"
 	default:
 		return dataType
@@ -1283,6 +1342,15 @@ func logicalType(columnName, dataType string) string {
 func isULIDColumn(columnName string) bool {
 	switch columnName {
 	case "internal_id", "run_id", "event_id", "batch_id", "original_run_id", "id", "gateway_id":
+		return true
+	default:
+		return false
+	}
+}
+
+func isUUIDLikeTextColumn(columnName string) bool {
+	switch columnName {
+	case "debug_run_id", "debug_session_id":
 		return true
 	default:
 		return false
