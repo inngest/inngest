@@ -1276,7 +1276,7 @@ SELECT
   input,
   output
 FROM spans
-WHERE run_id = ? AND span_id IN (/*SLICE:ids*/?)
+WHERE run_id = ?1 AND span_id IN (/*SLICE:ids*/?)
 LIMIT 2
 `
 
