@@ -31,7 +31,6 @@ export function ScoringFormulaSidebar({
 
   return (
     <div className="flex min-w-[320px] flex-col gap-4 p-4">
-      {/* Header */}
       <div>
         <h3 className="text-basis text-sm font-medium">Scoring formula</h3>
         <p className="text-muted mt-1 text-xs">
@@ -48,7 +47,6 @@ export function ScoringFormulaSidebar({
             Points left: {pointsLeft}
           </span>
         </div>
-        {/* Progress bar */}
         <div className="bg-canvasSubtle mt-1.5 h-1 w-full overflow-hidden rounded-full">
           <div
             className={cn(
@@ -60,7 +58,6 @@ export function ScoringFormulaSidebar({
         </div>
       </div>
 
-      {/* Metric accordion list */}
       <div className="flex flex-col gap-1">
         {metrics.map((metric) => (
           <MetricAccordionItem
@@ -73,7 +70,6 @@ export function ScoringFormulaSidebar({
         ))}
       </div>
 
-      {/* Footer */}
       <p className="text-muted text-xs">
         The unallocated points won&apos;t count towards the score.
       </p>
@@ -104,7 +100,6 @@ export function MetricAccordionItem({
 
   return (
     <div className="border-subtle rounded-md border">
-      {/* Collapsed row */}
       <div className="flex items-center gap-2 px-3 py-2">
         <Switch
           checked={metric.enabled}
@@ -165,7 +160,6 @@ export function MetricAccordionItem({
         )}
       </div>
 
-      {/* Expanded details */}
       {expanded && (
         <div className="border-subtle flex flex-col gap-3 border-t px-3 pb-3 pt-3">
           <Input

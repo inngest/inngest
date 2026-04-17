@@ -1,5 +1,5 @@
 export { ExperimentsTable } from './ExperimentsTable';
-export { ExperimentsBlankState, EXPERIMENTS_DOCS_URL } from './ExperimentsBlankState';
+export { ExperimentsBlankState } from './ExperimentsBlankState';
 export { isActive, getActiveThreshold, ACTIVE_THRESHOLD_DAYS } from './status';
 export type {
   ExperimentListItem,

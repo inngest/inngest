@@ -42,7 +42,6 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
 
   return (
     <div className="flex min-w-[300px] flex-col gap-5 p-4">
-      {/* Overview */}
       <section>
         <SectionLabel>Overview</SectionLabel>
         <Card>
@@ -74,7 +73,6 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
         </Card>
       </section>
 
-      {/* Type */}
       <section>
         <SectionLabel>Type</SectionLabel>
         <Card>
@@ -93,7 +91,6 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
         </Card>
       </section>
 
-      {/* Variants */}
       <section>
         <SectionLabel>Variants</SectionLabel>
         <Card>

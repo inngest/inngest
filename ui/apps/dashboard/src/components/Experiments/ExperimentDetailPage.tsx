@@ -23,6 +23,7 @@ import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSi
 import { useExperimentDetail } from '@/components/Experiments/useExperiments';
 import { useScoringConfig } from '@/components/Experiments/useScoringConfig';
 import { VariantsTable } from '@/components/Experiments/VariantsTable';
+import { experimentInsightsUrl } from '@/lib/experiments/insightsUrl';
 import { findExtremum, scoreVariants } from '@/lib/experiments/score';
 import { pathCreator } from '@/utils/urls';
 
@@ -49,13 +50,11 @@ export function ExperimentDetailPage({ experimentName }: Props) {
     setActivePanel((p) => (p === key ? null : key));
   }, []);
 
-  // --- available variants for toolbar filter ---
   const availableVariants = useMemo(
     () => detail.data?.variants.map((v) => v.variantName) ?? [],
     [detail.data],
   );
 
-  // --- filtered variants based on multi-select ---
   const filteredDetail = useMemo(() => {
     if (!detail.data) return null;
     if (selectedVariants.length === 0) return detail.data;
@@ -86,12 +85,8 @@ export function ExperimentDetailPage({ experimentName }: Props) {
   );
 
   const onOpenInsights = useCallback(() => {
-    const sql = `SELECT * FROM isteps WHERE \`inngest.experiment.values.experiment_name\` = '${experimentName.replace(
-      /'/g,
-      "''",
-    )}' ORDER BY started_at DESC`;
     window.open(
-      `/env/${environment.slug}/insights?sql=${encodeURIComponent(sql)}`,
+      experimentInsightsUrl(environment.slug, experimentName),
       '_blank',
     );
   }, [experimentName, environment.slug]);
@@ -122,7 +117,6 @@ export function ExperimentDetailPage({ experimentName }: Props) {
       />
 
       <div className="flex min-h-0 flex-1 overflow-y-auto">
-        {/* Main content */}
         <div className="flex min-w-0 flex-1 flex-col gap-4 px-6 py-4">
           <h1 className="text-basis text-lg font-semibold">{experimentName}</h1>
 
@@ -134,12 +128,10 @@ export function ExperimentDetailPage({ experimentName }: Props) {
             availableVariants={availableVariants}
           />
 
-          {/* Loading state */}
           {(detail.isPending || scoring.isPending) && (
             <Skeleton className="h-96 w-full rounded-lg" />
           )}
 
-          {/* Error states */}
           {detail.error && (
             <ErrorCard error={detail.error} reset={() => detail.refetch()} />
           )}
@@ -147,7 +139,6 @@ export function ExperimentDetailPage({ experimentName }: Props) {
             <ErrorCard error={scoring.error} reset={() => scoring.refetch()} />
           )}
 
-          {/* Results */}
           {filteredDetail &&
             scoring.metrics &&
             scoredVariants &&
@@ -165,12 +156,11 @@ export function ExperimentDetailPage({ experimentName }: Props) {
               />
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <div className="col-span-1 md:col-span-2 xl:col-span-3">
-                  <ScoreSummaryCard
-                    scoredVariants={scoredVariants}
-                    metrics={scoring.metrics}
-                  />
-                </div>
+                <ScoreSummaryCard
+                  className="col-span-1 md:col-span-2 xl:col-span-3"
+                  scoredVariants={scoredVariants}
+                  metrics={scoring.metrics}
+                />
 
                 {enabledMetrics.map((metric, i) => (
                   <MetricPanel
@@ -181,23 +171,21 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                   />
                 ))}
 
-                <div className="col-span-1 md:col-span-2 xl:col-span-3">
-                  <VariantsTable
-                    scoredVariants={scoredVariants}
-                    scoringConfig={scoring.metrics}
-                    onUpdateMetric={scoring.updateMetric}
-                    onEnableMetric={scoring.enableMetric}
-                    pointsLeft={scoring.pointsLeft}
-                    onOpenInsights={onOpenInsights}
-                    showInactive={showInactive}
-                    onShowInactiveChange={setShowInactive}
-                  />
-                </div>
+                <VariantsTable
+                  className="col-span-1 md:col-span-2 xl:col-span-3"
+                  scoredVariants={scoredVariants}
+                  scoringConfig={scoring.metrics}
+                  onUpdateMetric={scoring.updateMetric}
+                  onEnableMetric={scoring.enableMetric}
+                  pointsLeft={scoring.pointsLeft}
+                  onOpenInsights={onOpenInsights}
+                  showInactive={showInactive}
+                  onShowInactiveChange={setShowInactive}
+                />
               </div>
             ))}
         </div>
 
-        {/* Sidebar panel */}
         {activePanel && (
           <aside className="border-subtle flex w-[360px] shrink-0 flex-col overflow-hidden border-l">
             <HelperPanelFrame
@@ -223,7 +211,6 @@ export function ExperimentDetailPage({ experimentName }: Props) {
           </aside>
         )}
 
-        {/* Icon rail — far right */}
         <HelperPanelControl items={helperItems} activeTitle={activePanel} />
       </div>
     </>

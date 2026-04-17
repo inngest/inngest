@@ -54,7 +54,6 @@ export function useScoringConfig(experimentName: string) {
     debouncedSave();
   }, [localMetrics, debouncedSave]);
 
-  // --- convenience mutators ---
   const updateMetric = useCallback(
     (key: string, patch: Partial<ExperimentScoringMetric>) => {
       setLocalMetrics((prev) =>

@@ -4,7 +4,7 @@ import { Button } from '../Button';
 import { TableBlankState } from '../Table/TableBlankState';
 import { ExperimentsIcon } from '../icons/sections/Experiments';
 
-export const EXPERIMENTS_DOCS_URL = 'https://www.inngest.com/docs/features/step-experimentation';
+const DOCS_URL = 'https://www.inngest.com/docs/features/step-experimentation';
 
 type Props = {
   title: React.ReactNode;
@@ -32,7 +32,7 @@ export function ExperimentsBlankState({ title, description, onRefresh }: Props) 
             kind="primary"
             appearance="solid"
             label="Go to docs"
-            href={EXPERIMENTS_DOCS_URL}
+            href={DOCS_URL}
             target="_blank"
             icon={<RiExternalLinkLine />}
             iconSide="left"

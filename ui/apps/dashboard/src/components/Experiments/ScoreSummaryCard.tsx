@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Card } from '@inngest/components/Card';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiTrophyLine } from '@remixicon/react';
 import {
   Bar,
@@ -18,6 +19,7 @@ import type { ScoredVariant } from '@/lib/experiments/score';
 type Props = {
   scoredVariants: ScoredVariant[];
   metrics: ExperimentScoringMetric[];
+  className?: string;
 };
 
 type RowData = {
@@ -26,7 +28,11 @@ type RowData = {
   [metricKey: string]: string | number;
 };
 
-export function ScoreSummaryCard({ scoredVariants, metrics }: Props) {
+export function ScoreSummaryCard({
+  scoredVariants,
+  metrics,
+  className,
+}: Props) {
   const enabledMetrics = useMemo(
     () => metrics.filter((m) => m.enabled),
     [metrics],
@@ -61,7 +67,10 @@ export function ScoreSummaryCard({ scoredVariants, metrics }: Props) {
   const runnerUp = ranked[1] ?? null;
 
   return (
-    <Card className="overflow-visible" contentClassName="overflow-visible">
+    <Card
+      className={cn('overflow-visible', className)}
+      contentClassName="overflow-visible"
+    >
       <Card.Header className="rounded-t-md">
         <span className="text-basis text-sm font-medium">Score Summary</span>
       </Card.Header>

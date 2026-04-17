@@ -8,22 +8,26 @@ import type {
 import { Pill } from '@inngest/components/Pill';
 import {
   Popover,
-  PopoverClose,
   PopoverContent,
   PopoverTrigger,
 } from '@inngest/components/Popover';
 import { Switch, SwitchLabel } from '@inngest/components/Switch';
 import { Table } from '@inngest/components/Table';
-import {
-  RiAddLine,
-  RiArrowRightUpLine,
-  RiMoreFill,
-  RiSettings3Line,
-} from '@remixicon/react';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiAddLine, RiArrowRightUpLine, RiMoreFill } from '@remixicon/react';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 
-import { MetricAccordionItem } from '@/components/Experiments/ScoringFormulaSidebar';
 import { findBestAndWorst, type ScoredVariant } from '@/lib/experiments/score';
+import {
+  computeMetricStats,
+  formatMetricValue,
+  type MetricStats,
+} from './variantsTable/metricStats';
+import {
+  AddMetricPopover,
+  MetricColumnHeader,
+  MetricSubLabel,
+} from './variantsTable/parts';
 
 type Props = {
   scoredVariants: ScoredVariant[];
@@ -37,6 +41,7 @@ type Props = {
   onOpenInsights: () => void;
   showInactive: boolean;
   onShowInactiveChange: (v: boolean) => void;
+  className?: string;
 };
 
 type RowData = ExperimentVariantMetrics & {
@@ -47,163 +52,6 @@ type RowData = ExperimentVariantMetrics & {
 
 const columnHelper = createColumnHelper<RowData>();
 
-function formatMetricValue(val: number): string {
-  if (Number.isNaN(val)) return '-';
-  if (Math.abs(val) >= 1000)
-    return val.toLocaleString(undefined, { maximumFractionDigits: 1 });
-  if (Number.isInteger(val)) return String(val);
-  // Small floats: trim trailing zeros but keep up to 3 decimal places
-  return parseFloat(val.toFixed(3)).toString();
-}
-
-type MetricStats = {
-  bestAvg: number;
-  worstAvg: number;
-  bestVariant: string;
-  worstVariant: string;
-};
-
-function computeMetricStats(
-  rows: RowData[],
-  metricKey: string,
-  invert: boolean,
-): MetricStats | null {
-  const entries: { name: string; avg: number }[] = [];
-  for (const row of rows) {
-    const m = row.metricsByKey.get(metricKey);
-    if (m) entries.push({ name: row.variantName, avg: m.avg });
-  }
-  const pair = findBestAndWorst(entries, (e) => e.avg, invert);
-  if (!pair) return null;
-  return {
-    bestAvg: pair.best.avg,
-    worstAvg: pair.worst.avg,
-    bestVariant: pair.best.name,
-    worstVariant: pair.worst.name,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Metric cell sub-label
-// ---------------------------------------------------------------------------
-
-function MetricSubLabel({
-  variantName,
-  avg,
-  stats,
-  metric,
-}: {
-  variantName: string;
-  avg: number;
-  stats: MetricStats | null;
-  metric: ExperimentScoringMetric;
-}) {
-  if (!stats) return null;
-
-  if (variantName === stats.bestVariant) {
-    return (
-      <span className="text-success text-[10px]">
-        {metric.labelBest || 'Best'}
-      </span>
-    );
-  }
-
-  if (variantName === stats.worstVariant) {
-    return (
-      <span className="text-error text-[10px]">
-        {metric.labelWorst || 'Worst'}
-      </span>
-    );
-  }
-
-  // Middle variant: show delta vs best
-  if (stats.bestAvg === 0) return null;
-
-  const rawDelta = ((avg - stats.bestAvg) / stats.bestAvg) * 100;
-  const delta = rawDelta * (metric.invert ? -1 : 1);
-  const sign = delta >= 0 ? '+' : '';
-  return (
-    <span className="text-muted text-[10px] tabular-nums">
-      {sign}
-      {delta.toFixed(1)}% vs best
-    </span>
-  );
-}
-
-function MetricColumnHeader({
-  metric,
-  pointsLeft,
-  onUpdateMetric,
-}: {
-  metric: ExperimentScoringMetric;
-  pointsLeft: number;
-  onUpdateMetric: (
-    key: string,
-    patch: Partial<ExperimentScoringMetric>,
-  ) => void;
-}) {
-  return (
-    <div className="flex w-full items-center gap-1">
-      <span className="text-muted min-w-0 flex-1 truncate text-xs font-medium">
-        {metric.displayName}
-      </span>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="text-muted hover:text-basis ml-auto flex shrink-0 items-center"
-          >
-            <RiSettings3Line className="h-3.5 w-3.5" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="start">
-          <MetricAccordionItem
-            metric={metric}
-            pointsLeft={pointsLeft}
-            collapsible={false}
-            onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Add-metric popover
-// ---------------------------------------------------------------------------
-
-function AddMetricPopover({
-  disabledMetrics,
-  onEnable,
-}: {
-  disabledMetrics: ExperimentScoringMetric[];
-  onEnable: (key: string) => void;
-}) {
-  return (
-    <div className="flex w-52 flex-col gap-1 p-2">
-      <p className="text-muted px-2 py-1 text-xs font-medium">
-        Enable a metric
-      </p>
-      {disabledMetrics.map((m) => (
-        <PopoverClose key={m.key} asChild>
-          <button
-            type="button"
-            className="text-basis hover:bg-canvasSubtle rounded px-2 py-1.5 text-left text-sm"
-            onClick={() => onEnable(m.key)}
-          >
-            {m.displayName}
-          </button>
-        </PopoverClose>
-      ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export function VariantsTable({
   scoredVariants,
   scoringConfig,
@@ -213,6 +61,7 @@ export function VariantsTable({
   onOpenInsights,
   showInactive,
   onShowInactiveChange,
+  className,
 }: Props) {
   const enabledMetrics = useMemo(
     () =>
@@ -262,7 +111,6 @@ export function VariantsTable({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cols: ColumnDef<RowData, any>[] = [];
 
-    // 1. Score
     cols.push(
       columnHelper.accessor('score', {
         header: 'Score',
@@ -287,7 +135,6 @@ export function VariantsTable({
       }),
     );
 
-    // 2. Variant name
     cols.push(
       columnHelper.accessor('variantName', {
         header: 'Variant',
@@ -300,7 +147,6 @@ export function VariantsTable({
       }),
     );
 
-    // 3. One column per enabled metric
     for (const metric of enabledMetrics) {
       cols.push(
         columnHelper.display({
@@ -340,7 +186,6 @@ export function VariantsTable({
       );
     }
 
-    // 4. Add metric column
     cols.push(
       columnHelper.display({
         id: '__add_metric',
@@ -383,8 +228,7 @@ export function VariantsTable({
   ]);
 
   return (
-    <div className="flex flex-col">
-      {/* Header toolbar */}
+    <div className={cn('flex flex-col', className)}>
       <div className="flex items-center justify-between py-2">
         <div className="flex flex-col gap-px">
           <span className="text-basis text-sm font-medium">Variants</span>
