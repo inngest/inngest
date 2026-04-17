@@ -53,7 +53,7 @@ Platform detection env vars (Vercel, Railway, Render, etc.) are also read by all
 | `X-Inngest-Sync-Kind`                | Yes | Yes | Yes    | **Yes** (section 4.1.1) |
 | `X-Inngest-Event-Id-Seed`            | Yes | No  | Yes    | No                      |
 | `Server-Timing`                      | No  | Yes | Yes    | **Yes** (section 4.1.1) |
-| `X-Inngest-Signature` (on responses) | Yes | No  | No     | No                      |
+| `X-Inngest-Signature` (on responses) | Yes | No  | Yes    | No                      |
 
 #### 2.3 Response signing
 
