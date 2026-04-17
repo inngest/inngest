@@ -144,6 +144,7 @@ sql:
               import: "github.com/google/uuid"
               type: "UUID"
               pointer: true
+
   - engine: "sqlite"
     schema: "pkg/cqrs/base_cqrs/sqlc/sqlite/schema.sql"
     queries: "pkg/cqrs/base_cqrs/sqlc/sqlite/queries.sql"
@@ -236,6 +237,26 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
+          # Keep these as nullable in generated SQLite code because sqlc.embed(function_finishes)
+          # is used in LEFT JOIN queries, and sqlc issue #2806 otherwise collapses the optional
+          # finish row into non-nullable fields. See:
+          # https://github.com/sqlc-dev/sqlc/issues/2806#issuecomment-1750038624
+          - column: "function_finishes.status"
+            go_type:
+              import: "database/sql"
+              type: "NullString"
+          - column: "function_finishes.output"
+            go_type:
+              import: "database/sql"
+              type: "NullString"
+          - column: "function_finishes.completed_step_count"
+            go_type:
+              import: "database/sql"
+              type: "NullInt64"
+          - column: "function_finishes.created_at"
+            go_type:
+              import: "database/sql"
+              type: "NullTime"
           - column: "function_runs.workspace_id"
             go_type: "github.com/google/uuid.UUID"
 
@@ -263,6 +284,16 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
+          # ref: overwrite because of bug in sqlc sqlite
+          # https://github.com/sqlc-dev/sqlc/issues/3754
+          - column: "spans.debug_run_id"
+            go_type:
+              import: "database/sql"
+              type: "NullString"
+          - column: "spans.debug_session_id"
+            go_type:
+              import: "database/sql"
+              type: "NullString"
           - column: "worker_connections.id"
             go_type:
               import: "github.com/oklog/ulid/v2"
@@ -287,4 +318,3 @@ sql:
               import: "github.com/google/uuid"
               type: "UUID"
               pointer: true
-
