@@ -191,6 +191,9 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 		// Deterministic event ID so retrying Finalize doesn't produce
 		// duplicate inngest/deferred.start events (and duplicate deferred runs).
 		// Same (run, fn_slug, defer step) always hashes to the same ULID.
+		// We intentionally overwrite the full 16 bytes (including the time
+		// prefix) so the ID stays stable across retries; the event carries its
+		// own Timestamp field, so losing ULID sortability is acceptable here.
 		idHash := sha1.Sum([]byte(opts.Metadata.ID.RunID.String() + ":" + d.FnSlug + ":" + d.HashedID))
 		var eventID ulid.ULID
 		copy(eventID[:], idHash[:16])
@@ -226,6 +229,9 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 
 	if len(events) > 0 {
 		if err := e.finishHandler(ctx, opts.Metadata.ID, events); err != nil {
+			// State is already deleted, so a Finalize retry can't recover these
+			// defers. We intentionally swallow the error: a failed defer publish
+			// should not fail the parent run.
 			logger.StdlibLogger(ctx).Error("error publishing deferred start events", "error", err)
 		}
 	}
