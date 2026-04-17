@@ -35,9 +35,16 @@ const (
 	migrationDialectPostgres migrationDialect = "postgres"
 )
 
+type schemaColumn struct {
+	Name    string
+	Type    string
+	NotNull bool
+	Default string
+}
+
 type schemaSnapshot struct {
-	Tables  map[string][]string
-	Indexes map[string]map[string]string
+	Tables  map[string][]schemaColumn
+	Indexes map[string][]string
 }
 
 func TestBaselineOnFreshSQLite(t *testing.T) {
@@ -46,9 +53,7 @@ func TestBaselineOnFreshSQLite(t *testing.T) {
 
 	require.NoError(t, up(db, opts))
 
-	actual := readApplicationSchemaSnapshot(t, db, migrationDialectSQLite)
-	expected := expectedTableColumns(t, migrationDialectSQLite)
-	require.Equal(t, expected, actual.Tables)
+	assertMatchesExpectedSchema(t, db, migrationDialectSQLite)
 	assertGooseVersionTable(t, db)
 }
 
@@ -72,13 +77,7 @@ func TestSchemaMatchesSqlcSQLite(t *testing.T) {
 
 	require.NoError(t, up(db, opts))
 
-	actual := readApplicationSchemaSnapshot(t, db, migrationDialectSQLite)
-	expected := expectedTableColumns(t, migrationDialectSQLite)
-	require.Equal(t, expected, actual.Tables)
-
-	expectedIdx := expectedIndexNames(t, migrationDialectSQLite)
-	actualIdx := actualIndexNames(actual.Indexes)
-	require.Equal(t, expectedIdx, actualIdx, "indexes from migration do not match sqlc schema")
+	assertMatchesExpectedSchema(t, db, migrationDialectSQLite)
 }
 
 func TestLegacyMigrationThenGooseBaselineIsNoopSQLite(t *testing.T) {
@@ -101,9 +100,7 @@ func TestBaselineOnFreshPostgres(t *testing.T) {
 
 	require.NoError(t, up(db, opts))
 
-	actual := readApplicationSchemaSnapshot(t, db, migrationDialectPostgres)
-	expected := expectedTableColumns(t, migrationDialectPostgres)
-	require.Equal(t, expected, actual.Tables)
+	assertMatchesExpectedSchema(t, db, migrationDialectPostgres)
 	assertGooseVersionTable(t, db)
 }
 
@@ -127,13 +124,7 @@ func TestSchemaMatchesSqlcPostgres(t *testing.T) {
 
 	require.NoError(t, up(db, opts))
 
-	actual := readApplicationSchemaSnapshot(t, db, migrationDialectPostgres)
-	expected := expectedTableColumns(t, migrationDialectPostgres)
-	require.Equal(t, expected, actual.Tables)
-
-	expectedIdx := expectedIndexNames(t, migrationDialectPostgres)
-	actualIdx := actualIndexNames(actual.Indexes)
-	require.Equal(t, expectedIdx, actualIdx, "indexes from migration do not match sqlc schema")
+	assertMatchesExpectedSchema(t, db, migrationDialectPostgres)
 }
 
 func TestLegacyMigrationThenGooseBaselineIsNoopPostgres(t *testing.T) {
@@ -255,130 +246,172 @@ func upLegacy(db *sql.DB, opts BaseCQRSOptions) error {
 	return err
 }
 
-func expectedTableColumns(t *testing.T, dialect migrationDialect) map[string][]string {
+func assertMatchesExpectedSchema(t *testing.T, db *sql.DB, dialect migrationDialect) {
 	t.Helper()
 
-	schemaBytes, err := os.ReadFile(path.Join("sqlc", string(dialect), "schema.sql"))
-	require.NoError(t, err)
-
-	return parseTableColumns(t, string(schemaBytes))
+	actual := readApplicationSchemaSnapshot(t, db, dialect)
+	expected := expectedSchemaSnapshot(t, dialect)
+	require.Equal(t, expected, actual)
 }
 
-func expectedIndexNames(t *testing.T, dialect migrationDialect) map[string][]string {
+func expectedSchemaSnapshot(t *testing.T, dialect migrationDialect) schemaSnapshot {
 	t.Helper()
 
 	schemaBytes, err := os.ReadFile(path.Join("sqlc", string(dialect), "schema.sql"))
 	require.NoError(t, err)
 
-	result := parseIndexNames(string(schemaBytes))
+	tables := parseSchemaColumns(t, string(schemaBytes))
+	indexes := parseIndexNames(t, string(schemaBytes))
+
+	delete(tables, "migrations")
+	delete(indexes, "migrations")
+	for tableName := range tables {
+		if _, ok := indexes[tableName]; !ok {
+			indexes[tableName] = nil
+		}
+	}
+
+	return schemaSnapshot{
+		Tables:  tables,
+		Indexes: indexes,
+	}
+}
+
+func parseSchemaColumns(t *testing.T, schema string) map[string][]schemaColumn {
+	t.Helper()
+
+	result := map[string][]schemaColumn{}
+	for _, statement := range splitSQLStatements(schema) {
+		statement = strings.TrimSpace(statement)
+		if !strings.HasPrefix(strings.ToUpper(statement), "CREATE TABLE ") {
+			continue
+		}
+
+		tableName, definitions := parseCreateTableStatement(t, statement)
+		for _, definition := range splitTopLevel(definitions, ',') {
+			column, ok := parseSchemaColumnLine(definition)
+			if !ok {
+				continue
+			}
+			result[tableName] = append(result[tableName], column)
+		}
+	}
+
+	return result
+}
+
+func parseIndexNames(t *testing.T, schema string) map[string][]string {
+	t.Helper()
+
+	result := map[string][]string{}
+
+	for _, statement := range splitSQLStatements(schema) {
+		statement = strings.TrimSpace(statement)
+		upper := strings.ToUpper(statement)
+		if !strings.HasPrefix(upper, "CREATE INDEX ") && !strings.HasPrefix(upper, "CREATE UNIQUE INDEX ") {
+			continue
+		}
+
+		remainder := statement
+		switch {
+		case strings.HasPrefix(upper, "CREATE UNIQUE INDEX "):
+			remainder = strings.TrimSpace(statement[len("CREATE UNIQUE INDEX "):])
+		case strings.HasPrefix(upper, "CREATE INDEX "):
+			remainder = strings.TrimSpace(statement[len("CREATE INDEX "):])
+		}
+
+		if strings.HasPrefix(strings.ToUpper(remainder), "IF NOT EXISTS ") {
+			remainder = strings.TrimSpace(remainder[len("IF NOT EXISTS "):])
+		}
+
+		onIdx := strings.Index(strings.ToUpper(remainder), " ON ")
+		require.NotEqual(t, -1, onIdx, "invalid CREATE INDEX statement: %q", statement)
+
+		indexName := normalizeIdentifier(remainder[:onIdx])
+		tableSection := strings.TrimSpace(remainder[onIdx+len(" ON "):])
+		fields := strings.Fields(tableSection)
+		require.NotEmpty(t, fields, "invalid CREATE INDEX statement: %q", statement)
+
+		tableName := normalizeIdentifier(fields[0])
+		if tableName == "migrations" {
+			continue
+		}
+		result[tableName] = append(result[tableName], indexName)
+	}
+
 	for table := range result {
 		sort.Strings(result[table])
 	}
 	return result
 }
 
-func parseIndexNames(schema string) map[string][]string {
-	result := map[string][]string{}
+func parseCreateTableStatement(t *testing.T, statement string) (string, string) {
+	t.Helper()
 
-	for _, rawLine := range strings.Split(schema, "\n") {
-		line := strings.TrimSpace(rawLine)
+	remainder := strings.TrimSpace(statement[len("CREATE TABLE "):])
+	if strings.HasPrefix(strings.ToUpper(remainder), "IF NOT EXISTS ") {
+		remainder = strings.TrimSpace(remainder[len("IF NOT EXISTS "):])
+	}
 
-		if idx := strings.Index(line, "--"); idx >= 0 {
-			line = strings.TrimSpace(line[:idx])
+	openIdx := strings.Index(remainder, "(")
+	require.NotEqual(t, -1, openIdx, "invalid CREATE TABLE statement: %q", statement)
+
+	tableName := normalizeIdentifier(remainder[:openIdx])
+	body := strings.TrimSpace(remainder[openIdx+1:])
+	if strings.HasSuffix(body, ")") {
+		body = strings.TrimSpace(body[:len(body)-1])
+	}
+
+	return tableName, body
+}
+
+func parseSchemaColumnLine(definition string) (schemaColumn, bool) {
+	line := strings.TrimSpace(strings.TrimSuffix(definition, ","))
+	upper := strings.ToUpper(line)
+	if line == "" || strings.HasPrefix(upper, "PRIMARY KEY") || strings.HasPrefix(upper, "UNIQUE") || strings.HasPrefix(upper, "CONSTRAINT") {
+		return schemaColumn{}, false
+	}
+
+	nameEnd := strings.IndexAny(line, " \t")
+	if nameEnd == -1 {
+		return schemaColumn{}, false
+	}
+
+	name := normalizeIdentifier(line[:nameEnd])
+	remainder := strings.TrimSpace(line[nameEnd+1:])
+	typeEnd := len(remainder)
+	upperRemainder := strings.ToUpper(remainder)
+	for _, marker := range []string{" DEFAULT ", " NOT NULL", " PRIMARY KEY", " UNIQUE", " CHECK", " REFERENCES", " CONSTRAINT"} {
+		if idx := strings.Index(upperRemainder, marker); idx >= 0 && idx < typeEnd {
+			typeEnd = idx
 		}
-		if line == "" {
-			continue
-		}
+	}
 
-		if !strings.HasPrefix(line, "CREATE INDEX ") && !strings.HasPrefix(line, "CREATE UNIQUE INDEX ") {
-			continue
-		}
-
-		parts := strings.Fields(line)
-		// CREATE [UNIQUE] INDEX [IF NOT EXISTS] name ON table(...)
-		var indexName, tableName string
-		for i, p := range parts {
-			if strings.EqualFold(p, "ON") && i+1 < len(parts) {
-				indexName = parts[i-1]
-				tableName = parts[i+1]
-				// Strip parenthesized column list from table name
-				if paren := strings.Index(tableName, "("); paren >= 0 {
-					tableName = tableName[:paren]
-				}
+	defaultExpr := ""
+	if idx := strings.Index(upperRemainder, " DEFAULT "); idx >= 0 {
+		defaultExpr = strings.TrimSpace(remainder[idx+len(" DEFAULT "):])
+		upperDefault := strings.ToUpper(defaultExpr)
+		for _, marker := range []string{" NOT NULL", " PRIMARY KEY", " UNIQUE", " CHECK", " REFERENCES", " CONSTRAINT"} {
+			if end := strings.Index(upperDefault, marker); end >= 0 {
+				defaultExpr = strings.TrimSpace(defaultExpr[:end])
 				break
 			}
 		}
-		if indexName != "" && tableName != "" {
-			result[tableName] = append(result[tableName], indexName)
-		}
 	}
 
-	return result
-}
-
-func actualIndexNames(indexes map[string]map[string]string) map[string][]string {
-	result := map[string][]string{}
-	for table, idxMap := range indexes {
-		for name := range idxMap {
-			result[table] = append(result[table], name)
-		}
-		// Sort for deterministic comparison
-		sort.Strings(result[table])
-	}
-	return result
-}
-
-func parseTableColumns(t *testing.T, schema string) map[string][]string {
-	t.Helper()
-
-	result := map[string][]string{}
-
-	var currentTable string
-	for _, rawLine := range strings.Split(schema, "\n") {
-		line := strings.TrimSpace(rawLine)
-
-		if idx := strings.Index(line, "--"); idx >= 0 {
-			line = strings.TrimSpace(line[:idx])
-		}
-		if line == "" {
-			continue
-		}
-
-		if currentTable == "" {
-			if !strings.HasPrefix(line, "CREATE TABLE ") {
-				continue
-			}
-
-			parts := strings.Fields(line)
-			require.GreaterOrEqual(t, len(parts), 3, "invalid CREATE TABLE statement: %q", line)
-			currentTable = parts[2]
-			result[currentTable] = nil
-			continue
-		}
-
-		if line == ");" {
-			currentTable = ""
-			continue
-		}
-
-		line = strings.TrimSuffix(line, ",")
-		if strings.HasPrefix(line, "PRIMARY KEY") || strings.HasPrefix(line, "UNIQUE") || strings.HasPrefix(line, "CONSTRAINT") {
-			continue
-		}
-
-		parts := strings.Fields(line)
-		require.NotEmpty(t, parts, "invalid column definition: %q", rawLine)
-		result[currentTable] = append(result[currentTable], parts[0])
-	}
-
-	return result
+	return schemaColumn{
+		Name:    name,
+		Type:    normalizeType(strings.TrimSpace(remainder[:typeEnd])),
+		NotNull: strings.Contains(upperRemainder, " NOT NULL") || strings.Contains(upperRemainder, " PRIMARY KEY"),
+		Default: normalizeDefault(defaultExpr),
+	}, true
 }
 
 func readApplicationSchemaSnapshot(t *testing.T, db *sql.DB, dialect migrationDialect) schemaSnapshot {
 	t.Helper()
 
-	tables := readTableColumns(t, db, dialect)
-	indexes := map[string]map[string]string{}
+	tables := readRuntimeSchema(t, db, dialect)
+	indexes := map[string][]string{}
 
 	for tableName := range tables {
 		indexes[tableName] = readIndexes(t, db, dialect, tableName)
@@ -390,10 +423,21 @@ func readApplicationSchemaSnapshot(t *testing.T, db *sql.DB, dialect migrationDi
 	}
 }
 
-func readTableColumns(t *testing.T, db *sql.DB, dialect migrationDialect) map[string][]string {
+func readRuntimeSchema(t *testing.T, db *sql.DB, dialect migrationDialect) map[string][]schemaColumn {
 	t.Helper()
 
-	result := map[string][]string{}
+	tableNames := readRuntimeTableNames(t, db, dialect)
+	result := make(map[string][]schemaColumn, len(tableNames))
+
+	for _, tableName := range tableNames {
+		result[tableName] = readRuntimeColumns(t, db, dialect, tableName)
+	}
+
+	return result
+}
+
+func readRuntimeTableNames(t *testing.T, db *sql.DB, dialect migrationDialect) []string {
+	t.Helper()
 
 	var (
 		query string
@@ -434,58 +478,83 @@ func readTableColumns(t *testing.T, db *sql.DB, dialect migrationDialect) map[st
 	}
 	require.NoError(t, rows.Err())
 
-	for _, tableName := range tableNames {
-		switch dialect {
-		case migrationDialectPostgres:
-			columnRows, err := db.Query(`
-				SELECT column_name
-				FROM information_schema.columns
-				WHERE table_schema = current_schema()
-				  AND table_name = $1
-				ORDER BY ordinal_position
-			`, tableName)
-			require.NoError(t, err)
-
-			for columnRows.Next() {
-				var columnName string
-				require.NoError(t, columnRows.Scan(&columnName))
-				result[tableName] = append(result[tableName], columnName)
-			}
-			require.NoError(t, columnRows.Err())
-			require.NoError(t, columnRows.Close())
-		default:
-			columnRows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", tableName))
-			require.NoError(t, err)
-
-			for columnRows.Next() {
-				var (
-					cid        int
-					columnName string
-					dataType   string
-					notNull    int
-					defaultVal sql.NullString
-					pk         int
-				)
-				require.NoError(t, columnRows.Scan(&cid, &columnName, &dataType, &notNull, &defaultVal, &pk))
-				result[tableName] = append(result[tableName], columnName)
-			}
-			require.NoError(t, columnRows.Err())
-			require.NoError(t, columnRows.Close())
-		}
-	}
-
-	return result
+	return tableNames
 }
 
-func readIndexes(t *testing.T, db *sql.DB, dialect migrationDialect, tableName string) map[string]string {
+func readRuntimeColumns(t *testing.T, db *sql.DB, dialect migrationDialect, tableName string) []schemaColumn {
 	t.Helper()
-
-	result := map[string]string{}
 
 	switch dialect {
 	case migrationDialectPostgres:
 		rows, err := db.Query(`
-			SELECT i.indexname, i.indexdef
+			SELECT column_name, data_type, is_nullable, column_default, character_maximum_length
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = $1
+			ORDER BY ordinal_position
+		`, tableName)
+		require.NoError(t, err)
+		defer rows.Close()
+
+		var columns []schemaColumn
+		for rows.Next() {
+			var (
+				name          string
+				dataType      string
+				isNullable    string
+				defaultValue  sql.NullString
+				maxCharLength sql.NullInt64
+			)
+			require.NoError(t, rows.Scan(&name, &dataType, &isNullable, &defaultValue, &maxCharLength))
+			columns = append(columns, schemaColumn{
+				Name:    name,
+				Type:    normalizeType(postgresColumnType(dataType, maxCharLength)),
+				NotNull: isNullable == "NO",
+				Default: normalizeDefault(defaultValue.String),
+			})
+		}
+		require.NoError(t, rows.Err())
+		return columns
+	default:
+		rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info("%s")`, tableName))
+		require.NoError(t, err)
+		defer rows.Close()
+
+		var columns []schemaColumn
+		for rows.Next() {
+			var (
+				cid          int
+				name         string
+				dataType     string
+				notNull      int
+				defaultValue sql.NullString
+				primaryKey   int
+			)
+			require.NoError(t, rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &primaryKey))
+			columns = append(columns, schemaColumn{
+				Name:    name,
+				Type:    normalizeType(dataType),
+				NotNull: notNull == 1 || primaryKey > 0,
+				Default: normalizeDefault(defaultValue.String),
+			})
+		}
+		require.NoError(t, rows.Err())
+		return columns
+	}
+}
+
+func readIndexes(t *testing.T, db *sql.DB, dialect migrationDialect, tableName string) []string {
+	t.Helper()
+
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	switch dialect {
+	case migrationDialectPostgres:
+		rows, err = db.Query(`
+			SELECT i.indexname
 			FROM pg_indexes i
 			LEFT JOIN pg_constraint c
 			  ON c.conindid = (i.schemaname || '.' || i.indexname)::regclass
@@ -495,36 +564,143 @@ func readIndexes(t *testing.T, db *sql.DB, dialect migrationDialect, tableName s
 			  AND c.oid IS NULL
 			ORDER BY i.indexname
 		`, tableName)
-		require.NoError(t, err)
-		defer rows.Close()
-
-		for rows.Next() {
-			var name, definition string
-			require.NoError(t, rows.Scan(&name, &definition))
-			result[name] = definition
-		}
-		require.NoError(t, rows.Err())
 	default:
-		rows, err := db.Query(`
-			SELECT name, sql
+		rows, err = db.Query(`
+			SELECT name
 			FROM sqlite_master
 			WHERE type = 'index'
 			  AND tbl_name = ?
 			  AND sql IS NOT NULL
 			ORDER BY name
 		`, tableName)
-		require.NoError(t, err)
-		defer rows.Close()
+	}
+	require.NoError(t, err)
+	defer rows.Close()
 
-		for rows.Next() {
-			var name, definition string
-			require.NoError(t, rows.Scan(&name, &definition))
-			result[name] = definition
+	var indexes []string
+	for rows.Next() {
+		var name string
+		require.NoError(t, rows.Scan(&name))
+		indexes = append(indexes, name)
+	}
+	require.NoError(t, rows.Err())
+	sort.Strings(indexes)
+	return indexes
+}
+
+func splitSQLStatements(schema string) []string {
+	return splitTopLevel(stripLineComments(schema), ';')
+}
+
+func stripLineComments(schema string) string {
+	lines := strings.Split(schema, "\n")
+	for i, line := range lines {
+		if idx := strings.Index(line, "--"); idx >= 0 {
+			line = line[:idx]
 		}
-		require.NoError(t, rows.Err())
+		lines[i] = line
+	}
+	return strings.Join(lines, "\n")
+}
+
+func splitTopLevel(input string, separator rune) []string {
+	var (
+		result    []string
+		start     int
+		depth     int
+		inString  bool
+		prevRune  rune
+	)
+
+	for idx, r := range input {
+		switch r {
+		case '\'':
+			if prevRune != '\\' {
+				inString = !inString
+			}
+		case '(':
+			if !inString {
+				depth++
+			}
+		case ')':
+			if !inString && depth > 0 {
+				depth--
+			}
+		}
+
+		if r == separator && !inString && depth == 0 {
+			part := strings.TrimSpace(input[start:idx])
+			if part != "" {
+				result = append(result, part)
+			}
+			start = idx + 1
+		}
+
+		prevRune = r
+	}
+
+	if tail := strings.TrimSpace(input[start:]); tail != "" {
+		result = append(result, tail)
 	}
 
 	return result
+}
+
+func normalizeIdentifier(name string) string {
+	name = strings.TrimSpace(strings.Trim(name, `"`))
+	if dot := strings.LastIndex(name, "."); dot >= 0 {
+		name = name[dot+1:]
+	}
+	return strings.Trim(name, `"`)
+}
+
+func postgresColumnType(dataType string, maxCharLength sql.NullInt64) string {
+	switch dataType {
+	case "character varying":
+		if maxCharLength.Valid {
+			return fmt.Sprintf("varchar(%d)", maxCharLength.Int64)
+		}
+		return "varchar"
+	case "character":
+		if maxCharLength.Valid {
+			return fmt.Sprintf("char(%d)", maxCharLength.Int64)
+		}
+		return "char"
+	case "timestamp without time zone":
+		return "timestamp"
+	case "timestamp with time zone":
+		return "timestamptz"
+	default:
+		return dataType
+	}
+}
+
+func normalizeType(dataType string) string {
+	dataType = strings.ToLower(strings.TrimSpace(dataType))
+	dataType = strings.Join(strings.Fields(dataType), " ")
+	dataType = strings.ReplaceAll(dataType, "character varying", "varchar")
+	dataType = strings.ReplaceAll(dataType, "integer", "int")
+	dataType = strings.ReplaceAll(dataType, "timestamp without time zone", "timestamp")
+	dataType = strings.ReplaceAll(dataType, "timestamp with time zone", "timestamptz")
+	return dataType
+}
+
+func normalizeDefault(defaultExpr string) string {
+	defaultExpr = strings.TrimSpace(defaultExpr)
+	for strings.HasPrefix(defaultExpr, "(") && strings.HasSuffix(defaultExpr, ")") {
+		defaultExpr = strings.TrimSpace(defaultExpr[1 : len(defaultExpr)-1])
+	}
+	if idx := strings.Index(defaultExpr, "::"); idx >= 0 {
+		defaultExpr = defaultExpr[:idx]
+	}
+	defaultExpr = strings.TrimSpace(defaultExpr)
+	if defaultExpr == "" {
+		return ""
+	}
+	if strings.HasPrefix(defaultExpr, "'") {
+		return defaultExpr
+	}
+	return strings.ToLower(defaultExpr)
 }
 
 func assertGooseVersionTable(t *testing.T, db *sql.DB) {
