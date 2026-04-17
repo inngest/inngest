@@ -1247,17 +1247,22 @@ SELECT
   input,
   output
 FROM spans
-WHERE span_id IN (SELECT UNNEST($1::TEXT[]))
+WHERE run_id = $1::CHAR(26) AND span_id IN (SELECT UNNEST($2::TEXT[]))
 LIMIT 2
 `
+
+type GetSpanOutputParams struct {
+	RunID string
+	Ids   []string
+}
 
 type GetSpanOutputRow struct {
 	Input  pqtype.NullRawMessage
 	Output pqtype.NullRawMessage
 }
 
-func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error) {
-	rows, err := q.db.QueryContext(ctx, getSpanOutput, pq.Array(ids))
+func (q *Queries) GetSpanOutput(ctx context.Context, arg GetSpanOutputParams) ([]*GetSpanOutputRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSpanOutput, arg.RunID, pq.Array(arg.Ids))
 	if err != nil {
 		return nil, err
 	}

@@ -420,7 +420,7 @@ SELECT
   input,
   output
 FROM spans
-WHERE span_id IN (sqlc.slice('ids'))
+WHERE run_id = sqlc.arg(run_id) AND span_id IN (sqlc.slice('ids'))
 LIMIT 2;
 
 -- name: GetRunSpanByRunID :one

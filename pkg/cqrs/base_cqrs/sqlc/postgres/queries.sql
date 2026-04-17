@@ -447,7 +447,7 @@ SELECT
   input,
   output
 FROM spans
-WHERE span_id IN (SELECT UNNEST(sqlc.slice('ids')::TEXT[]))
+WHERE run_id = sqlc.arg(run_id)::CHAR(26) AND span_id IN (SELECT UNNEST(sqlc.slice('ids')::TEXT[]))
 LIMIT 2;
 
 -- name: GetRunSpanByRunID :one

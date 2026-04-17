@@ -78,7 +78,7 @@ type Querier interface {
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*SpanRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*SpanRow, error)
 	GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*SpanRow, error)
-	GetSpanOutput(ctx context.Context, ids []string) ([]*SpanOutputRow, error)
+	GetSpanOutput(ctx context.Context, runID string, ids []string) ([]*SpanOutputRow, error)
 	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*SpanRow, error)
 	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*SpanRow, error)
 
