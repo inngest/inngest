@@ -22,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/testcontainers/testcontainers-go"
+	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/wait"
 	_ "modernc.org/sqlite"
 )
@@ -119,6 +120,10 @@ func dumpSQLiteSchema(ctx context.Context) (string, error) {
 		return "", err
 	}
 
+	// Read the canonical DDL back out of SQLite's schema table after migrations
+	// have run. We keep only user-defined tables and indexes, skip the migration
+	// bookkeeping table, and preserve creation order so the generated schema file
+	// is stable across runs.
 	const query = `
 SELECT sql
 FROM sqlite_schema
@@ -171,6 +176,8 @@ func dumpPostgresSchema(ctx context.Context, image string, wait time.Duration) (
 		return "", err
 	}
 
+	// Use an ephemeral Postgres container so the schema dump always reflects the
+	// checked-in migrations instead of any locally running database state.
 	container, dsn, err := startPostgresContainer(ctx, image, password, wait)
 	if err != nil {
 		return "", err
@@ -187,6 +194,9 @@ func dumpPostgresSchema(ctx context.Context, image string, wait time.Duration) (
 		return "", err
 	}
 
+	// Run pg_dump inside the container that already has the migrated schema. This
+	// gives us the database's own canonical DDL, which we normalize below before
+	// writing it into the sqlc schema file.
 	dump, err := runContainerCommand(
 		ctx,
 		container,
@@ -211,6 +221,9 @@ func dumpPostgresSchema(ctx context.Context, image string, wait time.Duration) (
 }
 
 func startPostgresContainer(ctx context.Context, image, password string, startupTimeout time.Duration) (testcontainers.Container, string, error) {
+	// Match the test setup used elsewhere in the repo: start a throwaway
+	// container, wait for it to accept connections, then derive a DSN for
+	// running migrations and pg_dump.
 	req := testcontainers.ContainerRequest{
 		Image:        image,
 		ExposedPorts: []string{"5432/tcp"},
@@ -258,6 +271,8 @@ func startPostgresContainer(ctx context.Context, image, password string, startup
 }
 
 func migrateSQLite(ctx context.Context, db *sql.DB) error {
+	// Apply the embedded SQLite migrations into a fresh temporary database, then
+	// introspect the resulting schema from sqlite_schema.
 	src, err := iofs.New(base_cqrs.FS, path.Join("migrations", "sqlite"))
 	if err != nil {
 		return err
@@ -284,6 +299,8 @@ func migrateSQLite(ctx context.Context, db *sql.DB) error {
 }
 
 func migratePostgres(ctx context.Context, db *sql.DB, dsn string) error {
+	// Apply the embedded Postgres migrations into the ephemeral container, then
+	// use pg_dump to extract the final DDL from the database itself.
 	src, err := iofs.New(base_cqrs.FS, path.Join("migrations", "postgres"))
 	if err != nil {
 		return err
@@ -354,6 +371,9 @@ func normalizePostgresDump(raw string) string {
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
+		// pg_dump includes session setup, ownership, schema qualifiers, and other
+		// environment-specific statements that are not useful to sqlc. Strip those
+		// so the checked-in schema stays portable and focused on DDL.
 		switch {
 		case trimmed == "":
 			blankPending = len(filtered) > 0
@@ -405,7 +425,9 @@ func randomHex(byteCount int) (string, error) {
 }
 
 func runContainerCommand(ctx context.Context, container testcontainers.Container, args ...string) (string, error) {
-	exitCode, reader, err := container.Exec(ctx, args)
+	// Exec output is multiplexed by default; request the demultiplexed stream so
+	// pg_dump output is plain SQL text rather than Docker-framed bytes.
+	exitCode, reader, err := container.Exec(ctx, args, tcexec.Multiplexed())
 	if err != nil {
 		return "", err
 	}
