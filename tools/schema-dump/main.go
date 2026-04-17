@@ -170,7 +170,7 @@ func dumpPostgresSchema(ctx context.Context, image string, wait time.Duration) (
 		"--schema-only",
 		"--no-owner",
 		"--no-privileges",
-		"--exclude-table=migrations",
+		// "--exclude-table=migrations",
 		"--username", defaultPostgresUser,
 		"--dbname", defaultPostgresDBName,
 	)
@@ -344,33 +344,31 @@ func normalizePostgresDump(raw string) string {
 		case trimmed == "":
 			blankPending = len(filtered) > 0
 			continue
-		case strings.HasPrefix(trimmed, "--"):
-			continue
-		case strings.HasPrefix(trimmed, "SET "):
-			continue
-		case strings.HasPrefix(trimmed, "SELECT pg_catalog.set_config"):
-			continue
+		// case strings.HasPrefix(trimmed, "SET "):
+		// 	continue
+		// case strings.HasPrefix(trimmed, "SELECT pg_catalog.set_config"):
+		// 	continue
 		case strings.HasPrefix(trimmed, "\\restrict "):
 			continue
 		case strings.HasPrefix(trimmed, "\\unrestrict "):
 			continue
-		case strings.HasPrefix(trimmed, "CREATE SCHEMA public"):
-			continue
-		case strings.HasPrefix(trimmed, "COMMENT ON SCHEMA public"):
-			continue
-		case strings.HasPrefix(trimmed, "ALTER SCHEMA public OWNER TO"):
-			continue
-		case strings.HasPrefix(trimmed, "ALTER TABLE ") && strings.Contains(trimmed, " OWNER TO "):
-			continue
-		case strings.HasPrefix(trimmed, "ALTER INDEX ") && strings.Contains(trimmed, " OWNER TO "):
-			continue
-		case strings.HasPrefix(trimmed, "REVOKE "):
-			continue
-		case strings.HasPrefix(trimmed, "GRANT "):
-			continue
+			// case strings.HasPrefix(trimmed, "CREATE SCHEMA public"):
+			// 	continue
+			// case strings.HasPrefix(trimmed, "COMMENT ON SCHEMA public"):
+			// 	continue
+			// case strings.HasPrefix(trimmed, "ALTER SCHEMA public OWNER TO"):
+			// 	continue
+			// case strings.HasPrefix(trimmed, "ALTER TABLE ") && strings.Contains(trimmed, " OWNER TO "):
+			// 	continue
+			// case strings.HasPrefix(trimmed, "ALTER INDEX ") && strings.Contains(trimmed, " OWNER TO "):
+			// 	continue
+			// case strings.HasPrefix(trimmed, "REVOKE "):
+			// 	continue
+			// case strings.HasPrefix(trimmed, "GRANT "):
+			// 	continue
 		}
 
-		line = strings.ReplaceAll(line, "public.", "")
+		// line = strings.ReplaceAll(line, "public.", "")
 
 		if blankPending && len(filtered) > 0 {
 			filtered = append(filtered, "")
