@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@inngest/components/Button';
 import type {
   ExperimentScoringMetric,
@@ -41,6 +41,8 @@ type Props = {
 
 type RowData = ExperimentVariantMetrics & {
   score: number;
+  /** O(1) lookup from metric key → VariantMetric, to avoid `.find()` in cell renders. */
+  metricsByKey: Map<string, VariantMetric>;
 };
 
 const columnHelper = createColumnHelper<RowData>();
@@ -68,7 +70,7 @@ function computeMetricStats(
 ): MetricStats | null {
   const entries: { name: string; avg: number }[] = [];
   for (const row of rows) {
-    const m = row.metrics.find((vm) => vm.key === metricKey);
+    const m = row.metricsByKey.get(metricKey);
     if (m) entries.push({ name: row.variantName, avg: m.avg });
   }
   const pair = findBestAndWorst(entries, (e) => e.avg, invert);
@@ -128,16 +130,10 @@ function MetricSubLabel({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Metric column header (stable component so Popover state survives re-renders)
-// ---------------------------------------------------------------------------
-
 function MetricColumnHeader({
   metric,
   pointsLeft,
   onUpdateMetric,
-  isOpen,
-  onOpenChange,
 }: {
   metric: ExperimentScoringMetric;
   pointsLeft: number;
@@ -145,15 +141,13 @@ function MetricColumnHeader({
     key: string,
     patch: Partial<ExperimentScoringMetric>,
   ) => void;
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
 }) {
   return (
     <div className="flex w-full items-center gap-1">
       <span className="text-muted min-w-0 flex-1 truncate text-xs font-medium">
         {metric.displayName}
       </span>
-      <Popover open={isOpen} onOpenChange={onOpenChange}>
+      <Popover>
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -220,10 +214,6 @@ export function VariantsTable({
   showInactive,
   onShowInactiveChange,
 }: Props) {
-  const [openMetricPopover, setOpenMetricPopover] = useState<string | null>(
-    null,
-  );
-
   const enabledMetrics = useMemo(
     () =>
       [...scoringConfig]
@@ -241,6 +231,7 @@ export function VariantsTable({
     const allRows = scoredVariants.map(({ variant, result }) => ({
       ...variant,
       score: result.total,
+      metricsByKey: new Map(variant.metrics.map((m) => [m.key, m])),
     }));
     const filtered = showInactive
       ? allRows
@@ -319,17 +310,11 @@ export function VariantsTable({
               metric={metric}
               pointsLeft={pointsLeft}
               onUpdateMetric={onUpdateMetric}
-              isOpen={openMetricPopover === metric.key}
-              onOpenChange={(open) =>
-                setOpenMetricPopover(open ? metric.key : null)
-              }
             />
           ),
           cell: (info) => {
             const row = info.row.original;
-            const vm: VariantMetric | undefined = row.metrics.find(
-              (m) => m.key === metric.key,
-            );
+            const vm = row.metricsByKey.get(metric.key);
             if (!vm) {
               return <span className="text-muted text-sm">-</span>;
             }
@@ -389,12 +374,10 @@ export function VariantsTable({
   }, [
     enabledMetrics,
     disabledMetrics,
-    rows,
     statsMap,
     pointsLeft,
     bestScore,
     worstScore,
-    openMetricPopover,
     onUpdateMetric,
     onEnableMetric,
   ]);

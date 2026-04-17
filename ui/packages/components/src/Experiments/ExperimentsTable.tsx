@@ -10,7 +10,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { formatDistanceToNow } from 'date-fns';
 
 import { ExperimentsBlankState } from './ExperimentsBlankState';
-import { isActive } from './status';
+import { getActiveThreshold, isActive } from './status';
 import type { ExperimentListItem } from './types';
 
 const columnHelper = createColumnHelper<ExperimentListItem>();
@@ -28,63 +28,6 @@ function formatStrategy(strategy: string): string {
   if (!strategy) return '-';
   return `experiment.${strategy}`;
 }
-
-const columns = [
-  columnHelper.accessor('experimentName', {
-    header: 'Experiment name',
-    cell: (info) => {
-      const active = isActive(info.row.original.lastSeen);
-      return (
-        <div className="flex items-center gap-2">
-          <StatusDot status={active ? 'ACTIVE' : 'ARCHIVED'} size="small" />
-          <span className="text-basis truncate text-sm font-medium">{info.getValue()}</span>
-        </div>
-      );
-    },
-    size: 220,
-  }),
-  columnHelper.accessor('selectionStrategy', {
-    header: 'Experiment type',
-    cell: (info) => (
-      <span className="text-muted font-mono text-xs">{formatStrategy(info.getValue())}</span>
-    ),
-    size: 160,
-  }),
-  columnHelper.accessor('variantCount', {
-    header: 'Variants',
-    cell: (info) => {
-      const count = info.getValue();
-      return (
-        <span className="text-muted text-sm">
-          {count} {count === 1 ? 'variant' : 'variants'}
-        </span>
-      );
-    },
-    size: 120,
-  }),
-  columnHelper.accessor('firstSeen', {
-    header: 'Time running',
-    cell: (info) => {
-      const date = info.getValue();
-      return (
-        <div className="text-muted flex items-center gap-1 text-sm">
-          <RiTimeLine className="h-3.5 w-3.5 flex-shrink-0" />
-          <span>{formatDuration(date)}</span>
-        </div>
-      );
-    },
-    size: 140,
-  }),
-  columnHelper.accessor('totalRuns', {
-    header: 'Total run count',
-    cell: (info) => (
-      <span className="text-basis text-sm font-medium tabular-nums">
-        {formatNumber(info.getValue())}
-      </span>
-    ),
-    size: 130,
-  }),
-];
 
 export type ExperimentStatusFilter = 'all' | 'active' | 'completed';
 
@@ -120,14 +63,18 @@ export function ExperimentsTable({
     setSearchFilter(searchInput);
   }, 300);
 
+  // Compute the active/completed cutoff once per render so the filter AND the
+  // per-row status-dot cells share one `Date` allocation instead of N+1.
+  const activeThreshold = useMemo(() => getActiveThreshold(), [data]);
+
   const filteredData = useMemo(() => {
     if (!data) return [];
     let filtered = data;
 
     if (statusFilter === 'active') {
-      filtered = filtered.filter((item) => isActive(item.lastSeen));
+      filtered = filtered.filter((item) => isActive(item.lastSeen, activeThreshold));
     } else if (statusFilter === 'completed') {
-      filtered = filtered.filter((item) => !isActive(item.lastSeen));
+      filtered = filtered.filter((item) => !isActive(item.lastSeen, activeThreshold));
     }
 
     if (searchFilter) {
@@ -136,7 +83,67 @@ export function ExperimentsTable({
     }
 
     return filtered;
-  }, [data, searchFilter, statusFilter]);
+  }, [data, searchFilter, statusFilter, activeThreshold]);
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('experimentName', {
+        header: 'Experiment name',
+        cell: (info) => {
+          const active = isActive(info.row.original.lastSeen, activeThreshold);
+          return (
+            <div className="flex items-center gap-2">
+              <StatusDot status={active ? 'ACTIVE' : 'ARCHIVED'} size="small" />
+              <span className="text-basis truncate text-sm font-medium">{info.getValue()}</span>
+            </div>
+          );
+        },
+        size: 220,
+      }),
+      columnHelper.accessor('selectionStrategy', {
+        header: 'Experiment type',
+        cell: (info) => (
+          <span className="text-muted font-mono text-xs">{formatStrategy(info.getValue())}</span>
+        ),
+        size: 160,
+      }),
+      columnHelper.accessor('variantCount', {
+        header: 'Variants',
+        cell: (info) => {
+          const count = info.getValue();
+          return (
+            <span className="text-muted text-sm">
+              {count} {count === 1 ? 'variant' : 'variants'}
+            </span>
+          );
+        },
+        size: 120,
+      }),
+      columnHelper.accessor('firstSeen', {
+        header: 'Time running',
+        cell: (info) => {
+          const date = info.getValue();
+          return (
+            <div className="text-muted flex items-center gap-1 text-sm">
+              <RiTimeLine className="h-3.5 w-3.5 flex-shrink-0" />
+              <span>{formatDuration(date)}</span>
+            </div>
+          );
+        },
+        size: 140,
+      }),
+      columnHelper.accessor('totalRuns', {
+        header: 'Total run count',
+        cell: (info) => (
+          <span className="text-basis text-sm font-medium tabular-nums">
+            {formatNumber(info.getValue())}
+          </span>
+        ),
+        size: 130,
+      }),
+    ],
+    [activeThreshold]
+  );
 
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
