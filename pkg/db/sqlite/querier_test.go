@@ -1,30 +1,25 @@
 package sqlite
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBytesToAny(t *testing.T) {
+func TestBytesToRawMessage(t *testing.T) {
 	t.Run("nil returns nil", func(t *testing.T) {
-		assert.Nil(t, bytesToAny(nil))
+		assert.Nil(t, bytesToRawMessage(nil))
 	})
 
 	t.Run("empty slice returns nil", func(t *testing.T) {
-		assert.Nil(t, bytesToAny([]byte{}))
+		assert.Nil(t, bytesToRawMessage([]byte{}))
 	})
 
-	t.Run("converts bytes to string", func(t *testing.T) {
-		// Critical: SQLite JSON columns require TEXT, not BLOB.
-		// []byte passed as interface{} to database/sql is stored as BLOB,
-		// but string is stored as TEXT. json_group_array/json_object fail
-		// on BLOB values with "JSON cannot hold BLOB values".
+	t.Run("converts bytes to raw message", func(t *testing.T) {
 		input := []byte(`{"key":"value"}`)
-		got := bytesToAny(input)
+		got := bytesToRawMessage(input)
 
-		s, ok := got.(string)
-		assert.True(t, ok, "result must be a string, not []byte")
-		assert.Equal(t, `{"key":"value"}`, s)
+		assert.Equal(t, json.RawMessage(`{"key":"value"}`), got)
 	})
 }

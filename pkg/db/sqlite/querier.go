@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
@@ -16,13 +17,13 @@ type sqliteQuerier struct {
 	q sqlc.Querier
 }
 
-// bytesToAny converts a byte slice to a string for SQLite JSON columns,
-// returning nil when the slice is empty so that NULL checks work correctly.
-func bytesToAny(b []byte) any {
+// bytesToRawMessage preserves the db-layer []byte contract while matching the
+// generated SQLite query params, which now use json.RawMessage.
+func bytesToRawMessage(b []byte) json.RawMessage {
 	if len(b) == 0 {
 		return nil
 	}
-	return string(b)
+	return json.RawMessage(b)
 }
 
 // --- Apps ---
@@ -404,14 +405,14 @@ func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams
 		RunID: arg.RunID, AccountID: arg.AccountID, AppID: arg.AppID,
 		FunctionID: arg.FunctionID, EnvID: arg.EnvID,
 		DynamicSpanID:  arg.DynamicSpanID,
-		Attributes:     bytesToAny(arg.Attributes),
-		Links:          bytesToAny(arg.Links),
-		Output:         bytesToAny(arg.Output),
-		Input:          bytesToAny(arg.Input),
+		Attributes:     bytesToRawMessage(arg.Attributes),
+		Links:          bytesToRawMessage(arg.Links),
+		Output:         bytesToRawMessage(arg.Output),
+		Input:          bytesToRawMessage(arg.Input),
 		DebugRunID:     arg.DebugRunID,
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
-		EventIds:       bytesToAny(arg.EventIds),
+		EventIds:       bytesToRawMessage(arg.EventIds),
 	})
 }
 

@@ -427,18 +427,14 @@ func (r *GetSpanBySpanIDRow) ToSQLite() (*sqlc.GetSpanBySpanIDRow, error) {
 }
 
 func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
-	var input, output interface{}
+	var input, output json.RawMessage
 
 	if r.Input.Valid {
-		if err := json.Unmarshal(r.Input.RawMessage, &input); err != nil {
-			return nil, err
-		}
+		input = json.RawMessage(r.Input.RawMessage)
 	}
 
 	if r.Output.Valid {
-		if err := json.Unmarshal(r.Output.RawMessage, &output); err != nil {
-			return nil, err
-		}
+		output = json.RawMessage(r.Output.RawMessage)
 	}
 
 	return &sqlc.GetSpanOutputRow{
