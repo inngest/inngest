@@ -43,7 +43,7 @@ e2e-golang: ## Run Go SDK e2e tests
 .PHONY: gen
 gen: ## Run all code generators
 	go generate ./...
-	make gql queries constraintapi-snapshots tygo
+	make gql schema-dump queries constraintapi-snapshots tygo
 
 .PHONY: protobuf
 protobuf: ## Generate protobuf files
