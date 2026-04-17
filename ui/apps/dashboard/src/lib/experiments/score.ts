@@ -1,5 +1,6 @@
 import type {
   ExperimentScoringMetric,
+  ExperimentVariantMetrics,
   VariantMetric,
 } from '@inngest/components/Experiments';
 
@@ -12,6 +13,11 @@ export type ScoreResult = {
   total: number;
   maxPossible: number;
   segments: ScoreSegment[];
+};
+
+export type ScoredVariant = {
+  variant: ExperimentVariantMetrics;
+  result: ScoreResult;
 };
 
 function clamp01(n: number): number {
@@ -49,4 +55,52 @@ export function scoreVariant(
   }
 
   return { total, maxPossible, segments };
+}
+
+export function scoreVariants(
+  variants: ExperimentVariantMetrics[],
+  config: ExperimentScoringMetric[],
+): ScoredVariant[] {
+  return variants.map((variant) => ({
+    variant,
+    result: scoreVariant(variant.metrics, config),
+  }));
+}
+
+/**
+ * Returns the item with the highest value (or lowest, when `invert` is true).
+ * Returns null for an empty list. Ties resolve to the first item.
+ */
+export function findExtremum<T>(
+  items: readonly T[],
+  getValue: (item: T) => number,
+  invert = false,
+): T | null {
+  if (items.length === 0) return null;
+  let best = items[0]!;
+  let bestVal = getValue(best);
+  for (let i = 1; i < items.length; i++) {
+    const item = items[i]!;
+    const val = getValue(item);
+    if (invert ? val < bestVal : val > bestVal) {
+      best = item;
+      bestVal = val;
+    }
+  }
+  return best;
+}
+
+/**
+ * Best and worst items by `getValue`. When `invert` is true, "best" = lowest.
+ * Returns null when fewer than 2 items are provided (no meaningful contrast).
+ */
+export function findBestAndWorst<T>(
+  items: readonly T[],
+  getValue: (item: T) => number,
+  invert = false,
+): { best: T; worst: T } | null {
+  if (items.length < 2) return null;
+  const best = findExtremum(items, getValue, invert)!;
+  const worst = findExtremum(items, getValue, !invert)!;
+  return { best, worst };
 }

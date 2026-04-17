@@ -15,7 +15,9 @@ import {
   YAxis,
 } from 'recharts';
 
+import { computeChartSizing } from '@/lib/experiments/chart';
 import { colorForMetric } from '@/lib/experiments/colors';
+import { findExtremum } from '@/lib/experiments/score';
 
 const DOT_RADIUS = 5;
 const LINE_HEIGHT = 2;
@@ -55,22 +57,6 @@ type RowData = {
   value: number;
 };
 
-function findWinner(rows: RowData[], invert: boolean): string | null {
-  let best: RowData | null = null;
-
-  for (const row of rows) {
-    if (!best) {
-      best = row;
-      continue;
-    }
-    if (invert ? row.value < best.value : row.value > best.value) {
-      best = row;
-    }
-  }
-
-  return best?.variantName ?? null;
-}
-
 export function MetricPanel({ metric, variants, colorIndex }: Props) {
   const rows: RowData[] = useMemo(
     () =>
@@ -84,7 +70,8 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
   );
 
   const winner = useMemo(
-    () => findWinner(rows, metric.invert),
+    () =>
+      findExtremum(rows, (r) => r.value, metric.invert)?.variantName ?? null,
     [rows, metric.invert],
   );
 
@@ -97,14 +84,10 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
     return [0, hi] as const;
   }, [rows, metric.maxValue]);
 
-  const chartHeight = Math.max(120, rows.length * 36);
-  const yAxisWidth = useMemo(() => {
-    const longest = rows.reduce(
-      (max, r) => Math.max(max, r.variantName.length),
-      0,
-    );
-    return Math.max(80, longest * 6.5);
-  }, [rows]);
+  const { chartHeight, yAxisWidth } = useMemo(
+    () => computeChartSizing(rows.map((r) => r.variantName)),
+    [rows],
+  );
 
   const color = colorForMetric(colorIndex);
 

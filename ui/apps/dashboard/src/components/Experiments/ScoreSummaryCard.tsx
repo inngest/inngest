@@ -1,9 +1,6 @@
 import { useMemo } from 'react';
 import { Card } from '@inngest/components/Card';
-import type {
-  ExperimentScoringMetric,
-  ExperimentVariantMetrics,
-} from '@inngest/components/Experiments';
+import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import { RiTrophyLine } from '@remixicon/react';
 import {
   Bar,
@@ -14,11 +11,12 @@ import {
   YAxis,
 } from 'recharts';
 
+import { computeChartSizing } from '@/lib/experiments/chart';
 import { colorForMetric } from '@/lib/experiments/colors';
-import { scoreVariant } from '@/lib/experiments/score';
+import type { ScoredVariant } from '@/lib/experiments/score';
 
 type Props = {
-  variants: ExperimentVariantMetrics[];
+  scoredVariants: ScoredVariant[];
   metrics: ExperimentScoringMetric[];
 };
 
@@ -28,46 +26,37 @@ type RowData = {
   [metricKey: string]: string | number;
 };
 
-export function ScoreSummaryCard({ variants, metrics }: Props) {
+export function ScoreSummaryCard({ scoredVariants, metrics }: Props) {
   const enabledMetrics = useMemo(
     () => metrics.filter((m) => m.enabled),
     [metrics],
   );
 
   const { rows, ranked } = useMemo(() => {
-    const scored = variants.map((v) => {
-      const result = scoreVariant(v.metrics, metrics);
-      const row: RowData = { variantName: v.variantName, total: result.total };
-
+    const built = scoredVariants.map(({ variant, result }) => {
+      const row: RowData = {
+        variantName: variant.variantName,
+        total: result.total,
+      };
       for (const seg of result.segments) {
         row[seg.metricKey] = seg.contribution;
       }
-
-      return { variantName: v.variantName, total: result.total, row };
+      return { variantName: variant.variantName, total: result.total, row };
     });
 
-    // Sort descending by total score
-    const sorted = [...scored].sort((a, b) => b.total - a.total);
-
-    return {
-      rows: scored.map((s) => s.row),
-      ranked: sorted,
-    };
-  }, [variants, metrics]);
+    const sorted = [...built].sort((a, b) => b.total - a.total);
+    return { rows: built.map((b) => b.row), ranked: sorted };
+  }, [scoredVariants]);
 
   const maxPossible = useMemo(
     () => enabledMetrics.reduce((acc, m) => acc + m.points, 0),
     [enabledMetrics],
   );
 
-  const chartHeight = Math.max(120, rows.length * 36);
-  const yAxisWidth = useMemo(() => {
-    const longest = rows.reduce(
-      (max, r) => Math.max(max, r.variantName.length),
-      0,
-    );
-    return Math.max(80, longest * 6.5);
-  }, [rows]);
+  const { chartHeight, yAxisWidth } = useMemo(
+    () => computeChartSizing(rows.map((r) => r.variantName)),
+    [rows],
+  );
   const topVariant = ranked[0] ?? null;
   const runnerUp = ranked[1] ?? null;
 

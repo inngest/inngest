@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { AnyVariables, Client, TypedDocumentNode } from 'urql';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -13,6 +14,30 @@ import type {
 } from '@inngest/components/Experiments';
 
 const EXPERIMENTS_CACHE_MS = 5 * 60 * 1000;
+
+async function runQuery<Result, Variables extends AnyVariables>(
+  client: Client,
+  doc: TypedDocumentNode<Result, Variables>,
+  variables: Variables,
+): Promise<Result> {
+  const result = await client
+    .query(doc, variables, { requestPolicy: 'network-only' })
+    .toPromise();
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error('No data returned');
+  return result.data;
+}
+
+async function runMutation<Result, Variables extends AnyVariables>(
+  client: Client,
+  doc: TypedDocumentNode<Result, Variables>,
+  variables: Variables,
+): Promise<Result> {
+  const result = await client.mutation(doc, variables).toPromise();
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error('No data returned');
+  return result.data;
+}
 
 const experimentsQuery = graphql(`
   query GetExperiments($workspaceID: ID!) {
@@ -35,18 +60,10 @@ export function useExperimentsList({
   const environment = useEnvironment();
 
   const queryFn = useCallback(async (): Promise<ExperimentListItem[]> => {
-    const result = await client
-      .query(
-        experimentsQuery,
-        { workspaceID: environment.id },
-        { requestPolicy: 'network-only' },
-      )
-      .toPromise();
-
-    if (result.error) throw result.error;
-    if (!result.data) throw new Error('No data returned');
-
-    return result.data.experiments.map((exp) => ({
+    const data = await runQuery(client, experimentsQuery, {
+      workspaceID: environment.id,
+    });
+    return data.experiments.map((exp) => ({
       experimentName: exp.name,
       functionId: exp.functionID,
       selectionStrategy: exp.selectionStrategy,
@@ -165,23 +182,13 @@ export function useExperimentDetail(
 
   const queryFn = useCallback(async (): Promise<ExperimentDetail> => {
     const { from, to } = presetToRange(preset);
-    const result = await client
-      .query(
-        experimentDetailQuery,
-        {
-          workspaceID: environment.id,
-          experimentName,
-          timeRange: { from: from.toISOString(), to: to.toISOString() },
-          variantFilter: variantFilter || null,
-        },
-        { requestPolicy: 'network-only' },
-      )
-      .toPromise();
-
-    if (result.error) throw result.error;
-    if (!result.data) throw new Error('No data returned');
-
-    const d = result.data.experimentDetail;
+    const data = await runQuery(client, experimentDetailQuery, {
+      workspaceID: environment.id,
+      experimentName,
+      timeRange: { from: from.toISOString(), to: to.toISOString() },
+      variantFilter: variantFilter || null,
+    });
+    const d = data.experimentDetail;
     return {
       name: d.name,
       firstSeen: new Date(d.firstSeen),
@@ -215,18 +222,11 @@ export function useExperimentScoringConfig(experimentName: string) {
   const environment = useEnvironment();
 
   const queryFn = useCallback(async (): Promise<ExperimentScoringConfig> => {
-    const result = await client
-      .query(
-        experimentScoringConfigQuery,
-        { workspaceID: environment.id, experimentName },
-        { requestPolicy: 'network-only' },
-      )
-      .toPromise();
-
-    if (result.error) throw result.error;
-    if (!result.data) throw new Error('No data returned');
-
-    const c = result.data.experimentScoringConfig;
+    const data = await runQuery(client, experimentScoringConfigQuery, {
+      workspaceID: environment.id,
+      experimentName,
+    });
+    const c = data.experimentScoringConfig;
     return {
       experimentName: c.experimentName,
       updatedAt: new Date(c.updatedAt),
@@ -252,18 +252,12 @@ export function useUpdateExperimentScoringConfig(experimentName: string) {
     mutationFn: async (
       metrics: ExperimentScoringMetric[],
     ): Promise<ExperimentScoringConfig> => {
-      const result = await client
-        .mutation(updateExperimentScoringConfigMutation, {
-          workspaceID: environment.id,
-          experimentName,
-          metrics,
-        })
-        .toPromise();
-
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error('No data returned');
-
-      const c = result.data.updateExperimentScoringConfig;
+      const data = await runMutation(
+        client,
+        updateExperimentScoringConfigMutation,
+        { workspaceID: environment.id, experimentName, metrics },
+      );
+      const c = data.updateExperimentScoringConfig;
       return {
         experimentName: c.experimentName,
         updatedAt: new Date(c.updatedAt),

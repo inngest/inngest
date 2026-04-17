@@ -23,10 +23,10 @@ import {
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 
 import { MetricAccordionItem } from '@/components/Experiments/ScoringFormulaSidebar';
-import { scoreVariant } from '@/lib/experiments/score';
+import { findBestAndWorst, type ScoredVariant } from '@/lib/experiments/score';
 
 type Props = {
-  variants: ExperimentVariantMetrics[];
+  scoredVariants: ScoredVariant[];
   scoringConfig: ExperimentScoringMetric[];
   onUpdateMetric: (
     key: string,
@@ -45,10 +45,6 @@ type RowData = ExperimentVariantMetrics & {
 
 const columnHelper = createColumnHelper<RowData>();
 
-// ---------------------------------------------------------------------------
-// Value formatting helpers
-// ---------------------------------------------------------------------------
-
 function formatMetricValue(val: number): string {
   if (Number.isNaN(val)) return '-';
   if (Math.abs(val) >= 1000)
@@ -57,10 +53,6 @@ function formatMetricValue(val: number): string {
   // Small floats: trim trailing zeros but keep up to 3 decimal places
   return parseFloat(val.toFixed(3)).toString();
 }
-
-// ---------------------------------------------------------------------------
-// Per-metric best / worst computation
-// ---------------------------------------------------------------------------
 
 type MetricStats = {
   bestAvg: number;
@@ -75,32 +67,17 @@ function computeMetricStats(
   invert: boolean,
 ): MetricStats | null {
   const entries: { name: string; avg: number }[] = [];
-
   for (const row of rows) {
     const m = row.metrics.find((vm) => vm.key === metricKey);
     if (m) entries.push({ name: row.variantName, avg: m.avg });
   }
-
-  if (entries.length === 0) return null;
-
-  let best = entries[0]!;
-  let worst = entries[0]!;
-
-  for (const e of entries) {
-    if (invert) {
-      if (e.avg < best.avg) best = e;
-      if (e.avg > worst.avg) worst = e;
-    } else {
-      if (e.avg > best.avg) best = e;
-      if (e.avg < worst.avg) worst = e;
-    }
-  }
-
+  const pair = findBestAndWorst(entries, (e) => e.avg, invert);
+  if (!pair) return null;
   return {
-    bestAvg: best.avg,
-    worstAvg: worst.avg,
-    bestVariant: best.name,
-    worstVariant: worst.name,
+    bestAvg: pair.best.avg,
+    worstAvg: pair.worst.avg,
+    bestVariant: pair.best.name,
+    worstVariant: pair.worst.name,
   };
 }
 
@@ -234,7 +211,7 @@ function AddMetricPopover({
 // ---------------------------------------------------------------------------
 
 export function VariantsTable({
-  variants,
+  scoredVariants,
   scoringConfig,
   onUpdateMetric,
   onEnableMetric,
@@ -261,27 +238,21 @@ export function VariantsTable({
   );
 
   const rows: RowData[] = useMemo(() => {
-    const allRows = variants.map((v) => {
-      const result = scoreVariant(v.metrics, scoringConfig);
-      return { ...v, score: result.total };
-    });
-
+    const allRows = scoredVariants.map(({ variant, result }) => ({
+      ...variant,
+      score: result.total,
+    }));
     const filtered = showInactive
       ? allRows
       : allRows.filter((r) => r.runCount > 0);
     return filtered.sort((a, b) => b.score - a.score);
-  }, [variants, scoringConfig, showInactive]);
+  }, [scoredVariants, showInactive]);
 
   const { bestScore, worstScore } = useMemo(() => {
     const active = rows.filter((r) => r.runCount > 0);
-    if (active.length < 2) return { bestScore: null, worstScore: null };
-    let best = -Infinity;
-    let worst = Infinity;
-    for (const r of active) {
-      if (r.score > best) best = r.score;
-      if (r.score < worst) worst = r.score;
-    }
-    return { bestScore: best, worstScore: worst };
+    const pair = findBestAndWorst(active, (r) => r.score);
+    if (!pair) return { bestScore: null, worstScore: null };
+    return { bestScore: pair.best.score, worstScore: pair.worst.score };
   }, [rows]);
 
   // Pre-compute stats for each enabled metric

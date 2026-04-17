@@ -22,7 +22,7 @@ import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSi
 import { useExperimentDetail } from '@/components/Experiments/useExperiments';
 import { useScoringConfig } from '@/components/Experiments/useScoringConfig';
 import { VariantsTable } from '@/components/Experiments/VariantsTable';
-import { scoreVariant } from '@/lib/experiments/score';
+import { findExtremum, scoreVariants } from '@/lib/experiments/score';
 import { pathCreator } from '@/utils/urls';
 
 type Props = {
@@ -59,20 +59,18 @@ export function ExperimentDetailPage({ experimentName }: Props) {
     };
   }, [detail.data, selectedVariants]);
 
-  // --- compute top variant ---
-  const topVariant = useMemo(() => {
+  // Score each variant once so downstream panels (VariantsTable, ScoreSummaryCard,
+  // top-variant callout) share the same precomputed results.
+  const scoredVariants = useMemo(() => {
     if (!filteredDetail || !scoring.metrics) return null;
-    let bestName: string | null = null;
-    let bestScore = -Infinity;
-    for (const v of filteredDetail.variants) {
-      const result = scoreVariant(v.metrics, scoring.metrics);
-      if (result.total > bestScore) {
-        bestScore = result.total;
-        bestName = v.variantName;
-      }
-    }
-    return bestName;
+    return scoreVariants(filteredDetail.variants, scoring.metrics);
   }, [filteredDetail, scoring.metrics]);
+
+  const topVariantName = useMemo(() => {
+    if (!scoredVariants) return null;
+    const top = findExtremum(scoredVariants, (s) => s.result.total);
+    return top?.variant.variantName ?? null;
+  }, [scoredVariants]);
 
   // --- enabled metrics for MetricPanel grid ---
   const enabledMetrics = useMemo(
@@ -149,6 +147,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
           {/* Results */}
           {filteredDetail &&
             scoring.metrics &&
+            scoredVariants &&
             (filteredDetail.variants.length === 0 ? (
               <ExperimentsBlankState
                 title="No variant data yet"
@@ -165,7 +164,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <div className="col-span-1 md:col-span-2 xl:col-span-3">
                   <ScoreSummaryCard
-                    variants={filteredDetail.variants}
+                    scoredVariants={scoredVariants}
                     metrics={scoring.metrics}
                   />
                 </div>
@@ -181,7 +180,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
                 <div className="col-span-1 md:col-span-2 xl:col-span-3">
                   <VariantsTable
-                    variants={filteredDetail.variants}
+                    scoredVariants={scoredVariants}
                     scoringConfig={scoring.metrics}
                     onUpdateMetric={scoring.updateMetric}
                     onEnableMetric={scoring.enableMetric}
@@ -216,7 +215,10 @@ export function ExperimentDetailPage({ experimentName }: Props) {
             {/* Panel content */}
             <div className="flex-1 overflow-y-auto">
               {activePanel === 'Info' && detail.data && (
-                <InfoSidebar detail={detail.data} topVariantName={topVariant} />
+                <InfoSidebar
+                  detail={detail.data}
+                  topVariantName={topVariantName}
+                />
               )}
               {activePanel === 'Scoring formula' && scoring.metrics && (
                 <ScoringFormulaSidebar
