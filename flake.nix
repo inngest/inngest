@@ -6,8 +6,15 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -33,33 +40,27 @@
           os = if pkgs.stdenv.isDarwin then "darwin" else "linux";
 
           protoc-gen-grpc-gateway = pkgs.fetchurl {
-            url =
-              "https://github.com/grpc-ecosystem/grpc-gateway/releases/download/v${version}/protoc-gen-grpc-gateway-v${version}-${os}-${arch}";
-            sha256 = {
-              "darwin-x86_64" =
-                "0z53qg60mwax8kvrjcs5bngf46ksh86zdwib0pq0dbqz32n04n54";
-              "darwin-arm64" =
-                "0g6rnkl4sy5wd8iyxvli892y3d3228bsiia223p3md9nplsj1fba";
-              "linux-x86_64" =
-                "0jb6d53irbzkcmii0xaykc9m528zjja0inzl97g49mcp21qzidvl";
-              "linux-arm64" =
-                "1nmwjv8ymqm51q5sfkisx9vhkla5s03w14g69h33g6118rcq6zl3";
-            }."${os}-${arch}";
+            url = "https://github.com/grpc-ecosystem/grpc-gateway/releases/download/v${version}/protoc-gen-grpc-gateway-v${version}-${os}-${arch}";
+            sha256 =
+              {
+                "darwin-x86_64" = "0z53qg60mwax8kvrjcs5bngf46ksh86zdwib0pq0dbqz32n04n54";
+                "darwin-arm64" = "0g6rnkl4sy5wd8iyxvli892y3d3228bsiia223p3md9nplsj1fba";
+                "linux-x86_64" = "0jb6d53irbzkcmii0xaykc9m528zjja0inzl97g49mcp21qzidvl";
+                "linux-arm64" = "1nmwjv8ymqm51q5sfkisx9vhkla5s03w14g69h33g6118rcq6zl3";
+              }
+              ."${os}-${arch}";
           };
 
           protoc-gen-openapiv2 = pkgs.fetchurl {
-            url =
-              "https://github.com/grpc-ecosystem/grpc-gateway/releases/download/v${version}/protoc-gen-openapiv2-v${version}-${os}-${arch}";
-            sha256 = {
-              "darwin-x86_64" =
-                "19msmjgwcpzk6ji2b1dycgkxahmcm89ws7l52ssw80akzqqnn3ga";
-              "darwin-arm64" =
-                "13zi36ghlhv6cdcx9xza6iy2sp8mcz8axg8r4jy3n6626fwf4wrv";
-              "linux-x86_64" =
-                "09r3dscpxnj487iinqjxy5psyh14vz7gclj4xl4w21hm1wzcaqyi";
-              "linux-arm64" =
-                "1162m9s7899ia2g3pmynb2403pdszpn91b6dasagzm4pl4gdn41m";
-            }."${os}-${arch}";
+            url = "https://github.com/grpc-ecosystem/grpc-gateway/releases/download/v${version}/protoc-gen-openapiv2-v${version}-${os}-${arch}";
+            sha256 =
+              {
+                "darwin-x86_64" = "19msmjgwcpzk6ji2b1dycgkxahmcm89ws7l52ssw80akzqqnn3ga";
+                "darwin-arm64" = "13zi36ghlhv6cdcx9xza6iy2sp8mcz8axg8r4jy3n6626fwf4wrv";
+                "linux-x86_64" = "09r3dscpxnj487iinqjxy5psyh14vz7gclj4xl4w21hm1wzcaqyi";
+                "linux-arm64" = "1162m9s7899ia2g3pmynb2403pdszpn91b6dasagzm4pl4gdn41m";
+              }
+              ."${os}-${arch}";
           };
 
           dontUnpack = true;
@@ -71,13 +72,17 @@
           '';
         };
 
-      in {
+      in
+      {
         devShells.default = pkgs.mkShell {
-          packages = [ corepack grpc-gateway ];
+          packages = [
+            corepack
+            grpc-gateway
+          ];
 
           nativeBuildInputs = with pkgs; [
             # Go
-            go
+            go_1_25
             golangci-lint
             gotests
             gomodifytags
@@ -95,9 +100,9 @@
 
             # LSPs
             gopls
-            nodePackages.typescript-language-server
-            nodePackages.vscode-json-languageserver
-            nodePackages.yaml-language-server
+            typescript-language-server
+            vscode-json-languageserver
+            yaml-language-server
             lua-language-server
 
             # Tools
@@ -116,5 +121,6 @@
             export PATH="$PATH:$GOBIN:$HOME/go/bin"
           '';
         };
-      });
+      }
+    );
 }
