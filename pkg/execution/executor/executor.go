@@ -3495,29 +3495,15 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
 	}
 
-	// gen.ID is the cancel step's own hash, not the target defer's hash.
-	// Modern SDKs send target_hashed_id to identify the exact defer to cancel
-	// (needed when a run has multiple defers for the same fn_slug). Older
-	// SDKs only send fn_slug, which we fall back to scanning.
-	targetHashedID := opts.TargetHashedID
-	if targetHashedID == "" {
-		defers, err := e.smv2.LoadDefers(ctx, runCtx.Metadata().ID)
-		if err != nil {
-			return fmt.Errorf("error loading defers for cancel: %w", err)
-		}
-		for _, d := range defers {
-			if d.FnSlug == opts.FnSlug {
-				targetHashedID = d.HashedID
-				break
-			}
-		}
-		if targetHashedID == "" {
-			return fmt.Errorf("defer not found for fn_slug %q", opts.FnSlug)
-		}
+	// gen.ID is the cancel step's own hash; target_hashed_id is the target
+	// defer's hash. The SDK always knows the target hash at cancel time
+	// (callers cancel via a handle returned from defer.add), so this field
+	// is required.
+	if opts.TargetHashedID == "" {
+		return fmt.Errorf("DeferCancel missing required target_hashed_id")
 	}
 
-	// Atomic: no read-modify-write race against a concurrent SaveDefer.
-	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, targetHashedID, sv2.ScheduleStatusCancelled); err != nil {
+	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, sv2.ScheduleStatusCancelled); err != nil {
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
 

@@ -296,6 +296,16 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error finalizing sync run", "error", err)
 			}
 
+		case enums.OpcodeDeferAdd:
+			if err := c.saveDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+				return err
+			}
+
+		case enums.OpcodeDeferCancel:
+			if err := c.cancelDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+				return err
+			}
+
 		default:
 			// This is an async opcode (sleep, waitForEvent, invoke, etc.) that causes
 			// the run to transition from sync to async mode. Track this on the run span
@@ -435,6 +445,16 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
 
+		case enums.OpcodeDeferAdd:
+			if err := c.saveDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+				return err
+			}
+
+		case enums.OpcodeDeferCancel:
+			if err := c.cancelDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+				return err
+			}
+
 		default:
 			// Return an error
 			l.Error("unimplemented checkpoint op", "op", op.Op)
@@ -505,6 +525,77 @@ func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result ap
 		},
 		Optional: execution.FinalizeOptional{},
 	})
+}
+
+// cancelDeferFromOp memoizes the cancel step (with null data) and flips the
+// target Defer's ScheduleStatus to Cancelled. Mirrors the executor's
+// handleGeneratorDeferCancel without enqueueing a discovery step (the SDK is
+// still driving the run).
+func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
+	if !runComplete {
+		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) &&
+			!errors.Is(err, state.ErrIdempotentResponse) {
+			l.Error("error saving checkpointed DeferCancel step state", "error", err)
+			return fmt.Errorf("failed to save DeferCancel step %s: %w", op.ID, err)
+		}
+	}
+
+	opts, err := op.DeferCancelOpts()
+	if err != nil {
+		l.Error("error parsing DeferCancel opts in checkpoint", "error", err)
+		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
+	}
+
+	// op.ID is the cancel step's own hash; target_hashed_id is the target
+	// defer's hash. The SDK always knows the target hash at cancel time
+	// (callers cancel via a handle returned from defer.add), so this field
+	// is required.
+	if opts.TargetHashedID == "" {
+		l.Error("DeferCancel missing target_hashed_id in checkpoint",
+			"cancel_step_id", op.ID)
+		return fmt.Errorf("DeferCancel missing required target_hashed_id")
+	}
+
+	if err := c.State.SetDeferStatus(ctx, id, opts.TargetHashedID, state.ScheduleStatusCancelled); err != nil {
+		l.Error("error cancelling defer in checkpoint", "error", err)
+		return fmt.Errorf("error cancelling defer: %w", err)
+	}
+
+	return nil
+}
+
+// saveDeferFromOp memoizes the step (with null data) and persists a Defer
+// record for an OpcodeDeferAdd observed during checkpointing. Mirrors the
+// executor's handleGeneratorDeferAdd, without enqueueing a discovery step
+// (the SDK is still driving the run).
+func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
+	if !runComplete {
+		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) &&
+			!errors.Is(err, state.ErrIdempotentResponse) {
+			l.Error("error saving checkpointed DeferAdd step state", "error", err)
+			return fmt.Errorf("failed to save DeferAdd step %s: %w", op.ID, err)
+		}
+	}
+
+	opts, err := op.DeferAddOpts()
+	if err != nil {
+		l.Error("error parsing DeferAdd opts in checkpoint", "error", err)
+		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
+	}
+
+	if err := c.State.SaveDefer(ctx, id, state.Defer{
+		FnSlug:         opts.FnSlug,
+		HashedID:       op.ID,
+		ScheduleStatus: state.ScheduleStatusAfterRun,
+		Input:          opts.Input,
+	}); err != nil {
+		l.Error("error saving defer in checkpoint", "error", err)
+		return fmt.Errorf("error saving defer: %w", err)
+	}
+
+	return nil
 }
 
 func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

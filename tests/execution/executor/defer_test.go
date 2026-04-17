@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -470,12 +471,11 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// The DeferAdd step and the DeferCancel step have DIFFERENT hashed IDs.
-	// DeferCancel must locate the target defer by FnSlug, not by gen.ID.
+	// DeferCancel identifies the target defer by target_hashed_id, not by
+	// the cancel step's own gen.ID.
 	deferStepID := "step-defer"
 	cancelStepID := "step-cancel"
 
-	// --- mock driver: returns DeferCancel opcode ---
-	// Send target_hashed_id to exercise the precise-cancellation path.
 	mockDriver := &mockDriverV1{
 		t: t,
 		response: &state.DriverResponse{
@@ -484,7 +484,6 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 				Op: enums.OpcodeDeferCancel,
 				ID: cancelStepID,
 				Opts: map[string]any{
-					"fn_slug":          "onDefer-score",
 					"target_hashed_id": deferStepID,
 				},
 			}},
@@ -546,10 +545,29 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input), "Input should be preserved")
 }
 
-// TestDeferCancelFallsBackToFnSlugScan verifies that when a DeferCancel
-// opcode omits target_hashed_id (older SDKs), the handler still cancels the
-// matching defer by scanning fn_slug.
-func TestDeferCancelFallsBackToFnSlugScan(t *testing.T) {
+// deferTestInfra holds the shared infrastructure used by the checkpoint ↔
+// executor consistency tests below. It exists because building a real-Redis
+// state manager, queue, function loader, and tracing provider takes ~70 lines
+// of boilerplate per test, and the consistency tests need 3 parallel runs
+// (executor path, sync-checkpoint path, async-checkpoint path) using the same
+// backing store.
+type deferTestInfra struct {
+	ctx        context.Context
+	fn         inngest.Function
+	fnID       uuid.UUID
+	wsID       uuid.UUID
+	appID      uuid.UUID
+	aID        uuid.UUID
+	smv2       statev2.RunService
+	pauseMgr   pauses.Manager
+	loader     state.FunctionLoader
+	dbcqrs     cqrs.Manager
+	queueShard redis_state.RedisQueueShard
+	rq         queue.Queue
+}
+
+func newDeferTestInfra(t *testing.T) *deferTestInfra {
+	t.Helper()
 	ctx := context.Background()
 
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
@@ -582,11 +600,11 @@ func TestDeferCancelFallsBackToFnSlugScan(t *testing.T) {
 
 	_, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
-	defer shardedRc.Close()
+	t.Cleanup(func() { shardedRc.Close() })
 
 	_, unshardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
-	defer unshardedRc.Close()
+	t.Cleanup(func() { unshardedRc.Close() })
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
@@ -599,9 +617,7 @@ func TestDeferCancelFallsBackToFnSlugScan(t *testing.T) {
 	})
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
-
-	var sm state.Manager
-	sm, err = redis_state.New(ctx,
+	sm, err := redis_state.New(ctx,
 		redis_state.WithShardedClient(shardedClient),
 		redis_state.WithPauseDeleter(pauseMgr),
 	)
@@ -621,68 +637,305 @@ func TestDeferCancelFallsBackToFnSlugScan(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	deferStepID := "step-defer"
-	cancelStepID := "step-cancel"
+	return &deferTestInfra{
+		ctx:        ctx,
+		fn:         fn,
+		fnID:       fnID,
+		wsID:       wsID,
+		appID:      appID,
+		aID:        aID,
+		smv2:       smv2,
+		pauseMgr:   pauseMgr,
+		loader:     loader,
+		dbcqrs:     dbcqrs,
+		queueShard: queueShard,
+		rq:         rq,
+	}
+}
 
-	// Mock driver returns a DeferCancel opcode WITHOUT target_hashed_id.
-	// This simulates an older SDK client.
-	mockDriver := &mockDriverV1{
-		t: t,
-		response: &state.DriverResponse{
-			StatusCode: 206,
-			Generator: []*state.GeneratorOpcode{{
-				Op: enums.OpcodeDeferCancel,
-				ID: cancelStepID,
-				Opts: map[string]any{
-					"fn_slug": "onDefer-score",
-				},
-			}},
-		},
+// newExecutor builds an executor wired to the shared infra. Pass a non-nil
+// driver to drive Execute() calls; pass nil when only the checkpointer will
+// be used.
+func (i *deferTestInfra) newExecutor(t *testing.T, driver *mockDriverV1) execution.Executor {
+	t.Helper()
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return i.queueShard, nil
 	}
 
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauseMgr),
-		executor.WithQueue(rq),
-		executor.WithLogger(logger.StdlibLogger(ctx)),
-		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
+	opts := []executor.ExecutorOpt{
+		executor.WithStateManager(i.smv2),
+		executor.WithPauseManager(i.pauseMgr),
+		executor.WithQueue(i.rq),
+		executor.WithLogger(logger.StdlibLogger(i.ctx)),
+		executor.WithFunctionLoader(i.loader),
+		executor.WithAssignedQueueShard(i.queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithDriverV1(mockDriver),
-	)
-	require.NoError(t, err)
+	}
+	if driver != nil {
+		opts = append(opts, executor.WithDriverV1(driver))
+	}
 
+	exec, err := executor.NewExecutor(opts...)
+	require.NoError(t, err)
+	return exec
+}
+
+// newCheckpointer builds a Checkpointer using the shared infra. The Executor
+// is passed in so the checkpointer can reuse the same handler for non-Defer
+// async opcodes; for Defer-only tests, any executor works.
+func (i *deferTestInfra) newCheckpointer(t *testing.T, exec execution.Executor) checkpoint.Checkpointer {
+	t.Helper()
+	return checkpoint.New(checkpoint.Opts{
+		State:          i.smv2,
+		FnReader:       i.dbcqrs,
+		Executor:       exec,
+		TracerProvider: tracing.NewOtelTracerProvider(nil, time.Millisecond),
+		Queue:          i.rq,
+	})
+}
+
+// scheduleRun kicks off a fresh run and returns its metadata.
+func (i *deferTestInfra) scheduleRun(t *testing.T, exec execution.Executor) *statev2.Metadata {
+	t.Helper()
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
-	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
-		Function: fn, At: &now, AccountID: aID, WorkspaceID: wsID, AppID: appID,
+
+	_, run, err := exec.Schedule(i.ctx, execution.ScheduleRequest{
+		Function: i.fn, At: &now, AccountID: i.aID, WorkspaceID: i.wsID, AppID: i.appID,
 		Events: []event.TrackedEvent{
 			event.NewBaseTrackedEventWithID(event.Event{Name: "test/event"}, evtID),
 		},
 	})
 	require.NoError(t, err)
+	return run
+}
 
-	require.NoError(t, smv2.SaveDefer(ctx, run.ID, statev2.Defer{
+// TestDeferAdd_ExecutorAndCheckpointProduceSameDefer drives an OpcodeDeferAdd
+// through three code paths — executor.Execute, CheckpointSyncSteps, and
+// CheckpointAsyncSteps — and asserts the resulting Defer record is
+// byte-for-byte identical across all three. This is the core consistency
+// guarantee we want for the checkpointing work.
+func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
+	infra := newDeferTestInfra(t)
+	ctx := infra.ctx
+
+	op := state.GeneratorOpcode{
+		Op: enums.OpcodeDeferAdd,
+		ID: "step-defer",
+		Opts: map[string]any{
+			"fn_slug": "onDefer-score",
+			"input":   map[string]any{"user_id": "u_123"},
+		},
+	}
+
+	// --- Path A: executor.Execute ---
+	driver := &mockDriverV1{
+		t:        t,
+		response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&op}},
+	}
+	execA := infra.newExecutor(t, driver)
+	runA := infra.scheduleRun(t, execA)
+	_, err := execA.Execute(ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID,
+	}, queue.Item{
+		WorkspaceID: infra.wsID,
+		Kind:        queue.KindStart,
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID},
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: op.ID}},
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: op.ID})
+	require.NoError(t, err)
+
+	// --- Path B: CheckpointSyncSteps ---
+	execB := infra.newExecutor(t, nil)
+	runB := infra.scheduleRun(t, execB)
+	cp := infra.newCheckpointer(t, execB)
+	err = cp.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
+		RunID:     runB.ID.RunID,
+		FnID:      infra.fnID,
+		AppID:     infra.appID,
+		AccountID: infra.aID,
+		EnvID:     infra.wsID,
+		Metadata:  runB,
+		Steps:     []state.GeneratorOpcode{op},
+	})
+	require.NoError(t, err)
+
+	// --- Path C: CheckpointAsyncSteps ---
+	execC := infra.newExecutor(t, nil)
+	runC := infra.scheduleRun(t, execC)
+	cp = infra.newCheckpointer(t, execC)
+	err = cp.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
+		RunID:     runC.ID.RunID,
+		FnID:      infra.fnID,
+		AccountID: infra.aID,
+		EnvID:     infra.wsID,
+		Steps:     []state.GeneratorOpcode{op},
+		// No QueueItemRef → async path skips the ResetAttemptsByJobID call.
+	})
+	require.NoError(t, err)
+
+	// --- Consistency assertions ---
+	defersA, err := infra.smv2.LoadDefers(ctx, runA.ID)
+	require.NoError(t, err)
+	defersB, err := infra.smv2.LoadDefers(ctx, runB.ID)
+	require.NoError(t, err)
+	defersC, err := infra.smv2.LoadDefers(ctx, runC.ID)
+	require.NoError(t, err)
+
+	require.Len(t, defersA, 1)
+	require.Len(t, defersB, 1)
+	require.Len(t, defersC, 1)
+
+	// Every path should produce the same Defer record. The defers map is keyed
+	// by the hashed step ID, which is identical across runs (`step-defer`).
+	require.Equal(t, defersA[op.ID], defersB[op.ID],
+		"executor path and sync-checkpoint path must produce identical Defer records")
+	require.Equal(t, defersA[op.ID], defersC[op.ID],
+		"executor path and async-checkpoint path must produce identical Defer records")
+
+	// Step memoization should also be consistent (null payload in all paths).
+	stepsA, err := infra.smv2.LoadSteps(ctx, runA.ID)
+	require.NoError(t, err)
+	stepsB, err := infra.smv2.LoadSteps(ctx, runB.ID)
+	require.NoError(t, err)
+	stepsC, err := infra.smv2.LoadSteps(ctx, runC.ID)
+	require.NoError(t, err)
+	require.Equal(t, json.RawMessage("null"), stepsA[op.ID])
+	require.Equal(t, json.RawMessage("null"), stepsB[op.ID])
+	require.Equal(t, json.RawMessage("null"), stepsC[op.ID])
+}
+
+// TestDeferCancel_ExecutorAndCheckpointProduceSameDefer exercises DeferCancel
+// via all three paths (executor, sync checkpoint, async checkpoint) against
+// runs that have been pre-seeded with a matching defer. All three paths must
+// flip ScheduleStatus to Cancelled while preserving every other field.
+func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
+	infra := newDeferTestInfra(t)
+	ctx := infra.ctx
+
+	const (
+		deferStepID  = "step-defer"
+		cancelStepID = "step-cancel"
+	)
+	seed := statev2.Defer{
 		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
-		Input:          json.RawMessage(`{}`),
-	}))
+		Input:          json.RawMessage(`{"user_id":"u_123"}`),
+	}
 
-	_, err = exec.Execute(ctx, state.Identifier{
-		WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID,
+	cancelOp := state.GeneratorOpcode{
+		Op: enums.OpcodeDeferCancel,
+		ID: cancelStepID,
+		Opts: map[string]any{
+			"target_hashed_id": deferStepID,
+		},
+	}
+
+	// --- Path A: executor.Execute ---
+	driver := &mockDriverV1{
+		t:        t,
+		response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&cancelOp}},
+	}
+	execA := infra.newExecutor(t, driver)
+	runA := infra.scheduleRun(t, execA)
+	require.NoError(t, infra.smv2.SaveDefer(ctx, runA.ID, seed))
+	_, err := execA.Execute(ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID,
 	}, queue.Item{
-		WorkspaceID: wsID,
+		WorkspaceID: infra.wsID,
 		Kind:        queue.KindStart,
-		Identifier:  state.Identifier{WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID},
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID},
 		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
 	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
 	require.NoError(t, err)
 
-	defers, err := smv2.LoadDefers(ctx, run.ID)
+	// --- Path B: CheckpointSyncSteps ---
+	execB := infra.newExecutor(t, nil)
+	runB := infra.scheduleRun(t, execB)
+	require.NoError(t, infra.smv2.SaveDefer(ctx, runB.ID, seed))
+	cp := infra.newCheckpointer(t, execB)
+	err = cp.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
+		RunID:     runB.ID.RunID,
+		FnID:      infra.fnID,
+		AppID:     infra.appID,
+		AccountID: infra.aID,
+		EnvID:     infra.wsID,
+		Metadata:  runB,
+		Steps:     []state.GeneratorOpcode{cancelOp},
+	})
 	require.NoError(t, err)
-	require.Len(t, defers, 1)
-	require.Equal(t, statev2.ScheduleStatusCancelled, defers[deferStepID].ScheduleStatus,
-		"defer should be cancelled via fn_slug fallback when target_hashed_id is absent")
+
+	// --- Path C: CheckpointAsyncSteps ---
+	execC := infra.newExecutor(t, nil)
+	runC := infra.scheduleRun(t, execC)
+	require.NoError(t, infra.smv2.SaveDefer(ctx, runC.ID, seed))
+	cp = infra.newCheckpointer(t, execC)
+	err = cp.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
+		RunID:     runC.ID.RunID,
+		FnID:      infra.fnID,
+		AccountID: infra.aID,
+		EnvID:     infra.wsID,
+		Steps:     []state.GeneratorOpcode{cancelOp},
+	})
+	require.NoError(t, err)
+
+	// --- Consistency assertions ---
+	for name, runID := range map[string]statev2.ID{
+		"executor":    runA.ID,
+		"sync-ckpt":   runB.ID,
+		"async-ckpt":  runC.ID,
+	} {
+		defers, err := infra.smv2.LoadDefers(ctx, runID)
+		require.NoError(t, err, name)
+		require.Len(t, defers, 1, name)
+		d := defers[deferStepID]
+		require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus,
+			"%s: status should be Cancelled", name)
+		require.Equal(t, seed.FnSlug, d.FnSlug, "%s: FnSlug must be preserved", name)
+		require.Equal(t, seed.HashedID, d.HashedID, "%s: HashedID must be preserved", name)
+		require.JSONEq(t, string(seed.Input), string(d.Input),
+			"%s: Input must be preserved across status update", name)
+	}
+}
+
+// TestDeferInputEmptyObjectSurvivesStatusUpdate is a regression test for the
+// cjson `{}` → `[]` corruption in setDeferStatus.lua. SaveDefer normalizes an
+// empty-object Input to nil so the round-trip in the Lua script no longer
+// loses data. Without the normalization, the reloaded defer's Input would be
+// `[]` (or invalid JSON), breaking downstream event emission.
+func TestDeferInputEmptyObjectSurvivesStatusUpdate(t *testing.T) {
+	infra := newDeferTestInfra(t)
+	ctx := infra.ctx
+
+	exec := infra.newExecutor(t, nil)
+	md := infra.scheduleRun(t, exec)
+
+	const hashedID = "step-defer"
+	// Simulate an SDK that emits step.defer with no input (the SDK's default
+	// serialization for Go-side `nil` / JS `undefined` can be `{}`).
+	require.NoError(t, infra.smv2.SaveDefer(ctx, md.ID, statev2.Defer{
+		FnSlug:         "onDefer-score",
+		HashedID:       hashedID,
+		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		Input:          json.RawMessage(`{}`),
+	}))
+
+	// Flip status — this executes setDeferStatus.lua, which round-trips the
+	// full Defer JSON through cjson. Without normalization, `{}` would come
+	// back as `[]`.
+	require.NoError(t, infra.smv2.SetDeferStatus(ctx, md.ID, hashedID, statev2.ScheduleStatusCancelled))
+
+	defers, err := infra.smv2.LoadDefers(ctx, md.ID)
+	require.NoError(t, err)
+	d := defers[hashedID]
+
+	require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus)
+	// Input must not have been corrupted into `[]`. Accept either nil or
+	// a literal empty JSON object, since normalization picks nil.
+	if len(d.Input) > 0 {
+		require.JSONEq(t, `null`, string(d.Input),
+			"empty-object Input should normalize to null, got %s", string(d.Input))
+	}
 }

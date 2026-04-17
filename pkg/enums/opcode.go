@@ -38,6 +38,8 @@ var opcodeSyncMap = map[Opcode]struct{}{
 	OpcodeRunComplete:     {},
 	OpcodeSyncRunComplete: {},
 	OpcodeStepFailed:      {},
+	OpcodeDeferAdd:        {},
+	OpcodeDeferCancel:     {},
 }
 
 // OpcodeIsSync returns whether the given opcode is synchronous.  This

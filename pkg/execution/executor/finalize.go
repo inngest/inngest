@@ -212,7 +212,7 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 		if err := meta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error("invalid deferred event metadata",
 				"error", err, "run_id", opts.Metadata.ID.RunID)
-			return
+			continue
 		}
 		data[consts.InngestEventDataPrefix] = meta
 

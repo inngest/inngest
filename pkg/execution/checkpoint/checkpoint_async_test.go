@@ -232,6 +232,66 @@ func TestAsyncStepWithMetadataCreatesMetadataSpans(t *testing.T) {
 	require.True(hasMetadata, "Expected a metadata span")
 }
 
+// TestCheckpointAsyncSteps_DeferAdd asserts that the async checkpoint path
+// handles OpcodeDeferAdd the same way the sync path does: memoize the step
+// with null data and persist a Defer record. No discovery step is enqueued;
+// the SDK is driving the run.
+func TestCheckpointAsyncSteps_DeferAdd(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID: "step-defer",
+		Op: enums.OpcodeDeferAdd,
+		Opts: map[string]any{
+			"fn_slug": "onDefer-score",
+			"input":   map[string]any{"user_id": "u_123"},
+		},
+	}
+
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-defer", []byte("null")).Return(false, nil)
+	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
+		return d.FnSlug == "onDefer-score" &&
+			d.HashedID == "step-defer" &&
+			d.ScheduleStatus == state.ScheduleStatusAfterRun &&
+			string(d.Input) == `{"user_id":"u_123"}`
+	})).Return(nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	mocks.state.AssertExpectations(t)
+}
+
+// TestCheckpointAsyncSteps_DeferCancel asserts the async cancel path:
+// memoize the cancel step and flip the target defer to Cancelled.
+func TestCheckpointAsyncSteps_DeferCancel(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID: "step-cancel",
+		Op: enums.OpcodeDeferCancel,
+		Opts: map[string]any{
+			"target_hashed_id": "step-defer",
+		},
+	}
+
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
+	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", state.ScheduleStatusCancelled).Return(nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	mocks.state.AssertExpectations(t)
+}
+
 //
 //
 // Testing utils.
@@ -323,6 +383,25 @@ func (m *mockRunService) SaveStep(ctx context.Context, id state.ID, stepID strin
 
 func (m *mockRunService) UpdateMetadata(ctx context.Context, id state.ID, config state.MutableConfig) error {
 	args := m.Called(ctx, id, config)
+	return args.Error(0)
+}
+
+func (m *mockRunService) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
+	args := m.Called(ctx, id, d)
+	return args.Error(0)
+}
+
+func (m *mockRunService) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer, error) {
+	args := m.Called(ctx, id)
+	var defers map[string]state.Defer
+	if v := args.Get(0); v != nil {
+		defers = v.(map[string]state.Defer)
+	}
+	return defers, args.Error(1)
+}
+
+func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status state.ScheduleStatus) error {
+	args := m.Called(ctx, id, hashedID, status)
 	return args.Error(0)
 }
 
