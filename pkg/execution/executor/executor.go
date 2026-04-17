@@ -3481,7 +3481,7 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 	}
 
 	d := sv2.Defer{
-		CompanionID:    opts.CompanionID,
+		FnSlug:         opts.FnSlug,
 		HashedID:       gen.ID,
 		ScheduleStatus: sv2.ScheduleStatusAfterRun,
 		Input:          opts.Input,
@@ -3510,8 +3510,8 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 
 	// gen.ID is the cancel step's own hash, not the target defer's hash.
 	// Modern SDKs send target_hashed_id to identify the exact defer to cancel
-	// (needed when a run has multiple defers for the same companion). Older
-	// SDKs only send companion_id, which we fall back to scanning.
+	// (needed when a run has multiple defers for the same fn_slug). Older
+	// SDKs only send fn_slug, which we fall back to scanning.
 	targetHashedID := opts.TargetHashedID
 	if targetHashedID == "" {
 		defers, err := e.smv2.LoadDefers(ctx, runCtx.Metadata().ID)
@@ -3519,13 +3519,13 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 			return fmt.Errorf("error loading defers for cancel: %w", err)
 		}
 		for _, d := range defers {
-			if d.CompanionID == opts.CompanionID {
+			if d.FnSlug == opts.FnSlug {
 				targetHashedID = d.HashedID
 				break
 			}
 		}
 		if targetHashedID == "" {
-			return fmt.Errorf("defer not found for companion %q", opts.CompanionID)
+			return fmt.Errorf("defer not found for fn_slug %q", opts.FnSlug)
 		}
 	}
 

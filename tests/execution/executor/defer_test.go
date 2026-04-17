@@ -131,8 +131,8 @@ func TestDeferAddSavesDefer(t *testing.T) {
 				Op: enums.OpcodeDeferAdd,
 				ID: stepID,
 				Opts: map[string]any{
-					"companion_id": "score",
-					"input":        map[string]any{"user_id": "u_123"},
+					"fn_slug": "onDefer-score",
+					"input":   map[string]any{"user_id": "u_123"},
 				},
 			}},
 		},
@@ -203,7 +203,7 @@ func TestDeferAddSavesDefer(t *testing.T) {
 	require.Len(t, defers, 1, "expected exactly one defer")
 
 	d := defers[stepID]
-	require.Equal(t, "score", d.CompanionID)
+	require.Equal(t, "onDefer-score", d.FnSlug)
 	require.Equal(t, statev2.ScheduleStatusAfterRun, d.ScheduleStatus)
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input))
 }
@@ -329,13 +329,13 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	// not a stringified/escaped version of it.
 	nestedInputJSON := `{"user":{"id":"u_123","meta":{"role":"admin","tags":["a","b"]}},"score":0.87}`
 	activeDefer := statev2.Defer{
-		CompanionID:    "score",
+		FnSlug:         "onDefer-score",
 		HashedID:       "hash-active",
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(nestedInputJSON),
 	}
 	cancelledDefer := statev2.Defer{
-		CompanionID:    "cleanup",
+		FnSlug:         "onDefer-cleanup",
 		HashedID:       "hash-cancelled",
 		ScheduleStatus: statev2.ScheduleStatusCancelled,
 		Input:          json.RawMessage(`{}`),
@@ -377,7 +377,7 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	require.NoError(t, json.Unmarshal(evtData, &data))
 
 	inngestData := data["_inngest"].(map[string]any)
-	require.Equal(t, "score", inngestData["fn_slug"])
+	require.Equal(t, "onDefer-score", inngestData["fn_slug"])
 	require.Equal(t, fn.Slug, inngestData["parent_fn_slug"])
 	require.Equal(t, run.ID.RunID.String(), inngestData["parent_run_id"])
 
@@ -470,7 +470,7 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// The DeferAdd step and the DeferCancel step have DIFFERENT hashed IDs.
-	// DeferCancel must locate the target defer by CompanionID, not by gen.ID.
+	// DeferCancel must locate the target defer by FnSlug, not by gen.ID.
 	deferStepID := "step-defer"
 	cancelStepID := "step-cancel"
 
@@ -484,7 +484,7 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 				Op: enums.OpcodeDeferCancel,
 				ID: cancelStepID,
 				Opts: map[string]any{
-					"companion_id":     "score",
+					"fn_slug":          "onDefer-score",
 					"target_hashed_id": deferStepID,
 				},
 			}},
@@ -518,7 +518,7 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 
 	// --- pre-seed a defer (as if DeferAdd already ran) ---
 	require.NoError(t, smv2.SaveDefer(ctx, run.ID, statev2.Defer{
-		CompanionID:    "score",
+		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
@@ -541,15 +541,15 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	require.Len(t, defers, 1)
 
 	d := defers[deferStepID]
-	require.Equal(t, "score", d.CompanionID, "CompanionID should be preserved")
+	require.Equal(t, "onDefer-score", d.FnSlug, "FnSlug should be preserved")
 	require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus, "status should be Cancelled")
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input), "Input should be preserved")
 }
 
-// TestDeferCancelFallsBackToCompanionIDScan verifies that when a DeferCancel
+// TestDeferCancelFallsBackToFnSlugScan verifies that when a DeferCancel
 // opcode omits target_hashed_id (older SDKs), the handler still cancels the
-// matching defer by scanning companion_id.
-func TestDeferCancelFallsBackToCompanionIDScan(t *testing.T) {
+// matching defer by scanning fn_slug.
+func TestDeferCancelFallsBackToFnSlugScan(t *testing.T) {
 	ctx := context.Background()
 
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
@@ -634,7 +634,7 @@ func TestDeferCancelFallsBackToCompanionIDScan(t *testing.T) {
 				Op: enums.OpcodeDeferCancel,
 				ID: cancelStepID,
 				Opts: map[string]any{
-					"companion_id": "score",
+					"fn_slug": "onDefer-score",
 				},
 			}},
 		},
@@ -664,7 +664,7 @@ func TestDeferCancelFallsBackToCompanionIDScan(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, smv2.SaveDefer(ctx, run.ID, statev2.Defer{
-		CompanionID:    "score",
+		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(`{}`),
@@ -684,5 +684,5 @@ func TestDeferCancelFallsBackToCompanionIDScan(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, defers, 1)
 	require.Equal(t, statev2.ScheduleStatusCancelled, defers[deferStepID].ScheduleStatus,
-		"defer should be cancelled via companion_id fallback when target_hashed_id is absent")
+		"defer should be cancelled via fn_slug fallback when target_hashed_id is absent")
 }

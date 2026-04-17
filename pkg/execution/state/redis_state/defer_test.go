@@ -23,7 +23,7 @@ import (
 //
 //  1. statev2.ScheduleStatus enum (in pkg/execution/state/v2/) with the four
 //     constants from the ticket: Unknown, Scheduled, AfterRun, Cancelled.
-//  2. statev2.Defer struct with CompanionID, HashedID, ScheduleStatus, Input.
+//  2. statev2.Defer struct with FnSlug, HashedID, ScheduleStatus, Input.
 //  3. Add SaveDefer + LoadDefers methods to the RunService / StateLoader
 //     interfaces in pkg/execution/state/v2/interfaces.go.
 //  4. Implement them on the Redis adapter (v2_adapter.go), storing defers in a
@@ -87,7 +87,7 @@ func TestSaveDeferRoundTrip(t *testing.T) {
 
 	// --- the actual test ---
 	want := statev2.Defer{
-		CompanionID:    "score",
+		FnSlug:         "onDefer-score",
 		HashedID:       "hash-step-1",
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
@@ -104,7 +104,7 @@ func TestSaveDeferRoundTrip(t *testing.T) {
 
 // TestSetDeferStatus verifies the atomic status-only update used by DeferCancel.
 // It also checks that missing defers return an error and that other fields
-// (CompanionID, Input) are preserved across the status change.
+// (FnSlug, Input) are preserved across the status change.
 func TestSetDeferStatus(t *testing.T) {
 	ctx := context.Background()
 
@@ -163,7 +163,7 @@ func TestSetDeferStatus(t *testing.T) {
 
 	// Seed a defer so we can update it.
 	original := statev2.Defer{
-		CompanionID:    "score",
+		FnSlug:         "onDefer-score",
 		HashedID:       "hash-step-1",
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(`{"user":{"id":"u_123"}}`),
@@ -180,7 +180,7 @@ func TestSetDeferStatus(t *testing.T) {
 
 	got := defers[original.HashedID]
 	require.Equal(t, statev2.ScheduleStatusCancelled, got.ScheduleStatus)
-	require.Equal(t, original.CompanionID, got.CompanionID)
+	require.Equal(t, original.FnSlug, got.FnSlug)
 	require.Equal(t, original.HashedID, got.HashedID)
 	require.JSONEq(t, string(original.Input), string(got.Input),
 		"Input must survive the status update unchanged")
