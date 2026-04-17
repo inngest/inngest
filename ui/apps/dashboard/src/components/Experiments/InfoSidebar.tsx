@@ -1,8 +1,12 @@
 import { Card } from '@inngest/components/Card';
 import { Pill } from '@inngest/components/Pill';
-import type { ExperimentDetail } from '@inngest/components/Experiments';
+import {
+  isActive,
+  type ExperimentDetail,
+} from '@inngest/components/Experiments';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiFlaskLine, RiScalesLine, RiTrophyLine } from '@remixicon/react';
+
 function formatDuration(from: Date): string {
   const ms = Date.now() - from.getTime();
   const minutes = Math.floor(ms / 60_000);
@@ -24,12 +28,6 @@ type Props = {
   detail: ExperimentDetail;
   topVariantName: string | null;
 };
-
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
-
-function isActive(lastSeen: Date): boolean {
-  return Date.now() - lastSeen.getTime() < FIVE_MINUTES_MS;
-}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (

@@ -11,18 +11,10 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { formatDistanceToNow } from 'date-fns';
 
 import { ExperimentsBlankState } from './ExperimentsBlankState';
+import { isActive } from './status';
 import type { ExperimentListItem } from './types';
 
 const columnHelper = createColumnHelper<ExperimentListItem>();
-
-/** Experiments with no runs in the last 7 days are considered completed. */
-const COMPLETED_THRESHOLD_DAYS = 7;
-
-function isActive(item: ExperimentListItem): boolean {
-  const threshold = new Date();
-  threshold.setDate(threshold.getDate() - COMPLETED_THRESHOLD_DAYS);
-  return item.lastSeen > threshold;
-}
 
 function formatDuration(date: Date): string {
   if (!date || date.getTime() === 0) return '-';
@@ -42,7 +34,7 @@ const columns = [
   columnHelper.accessor('experimentName', {
     header: 'Experiment name',
     cell: (info) => {
-      const active = isActive(info.row.original);
+      const active = isActive(info.row.original.lastSeen);
       return (
         <div className="flex items-center gap-2">
           <span
@@ -135,9 +127,9 @@ export function ExperimentsTable({
     let filtered = data;
 
     if (statusFilter === 'active') {
-      filtered = filtered.filter(isActive);
+      filtered = filtered.filter((item) => isActive(item.lastSeen));
     } else if (statusFilter === 'completed') {
-      filtered = filtered.filter((item) => !isActive(item));
+      filtered = filtered.filter((item) => !isActive(item.lastSeen));
     }
 
     if (searchFilter) {

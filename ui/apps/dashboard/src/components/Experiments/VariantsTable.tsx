@@ -243,7 +243,6 @@ export function VariantsTable({
   showInactive,
   onShowInactiveChange,
 }: Props) {
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [openMetricPopover, setOpenMetricPopover] = useState<string | null>(
     null,
   );
@@ -297,48 +296,7 @@ export function VariantsTable({
   const columns = useMemo(() => {
     const cols: ColumnDef<RowData, any>[] = [];
 
-    // 1. Select checkbox
-    cols.push(
-      columnHelper.display({
-        id: '__select',
-        header: () => (
-          <input
-            type="checkbox"
-            className="accent-primary-moderate h-3.5 w-3.5 rounded"
-            checked={selectedRows.size > 0 && selectedRows.size === rows.length}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedRows(new Set(rows.map((r) => r.variantName)));
-              } else {
-                setSelectedRows(new Set());
-              }
-            }}
-          />
-        ),
-        cell: (info) => {
-          const name = info.row.original.variantName;
-          return (
-            <input
-              type="checkbox"
-              className="accent-primary-moderate h-3.5 w-3.5 rounded"
-              checked={selectedRows.has(name)}
-              onChange={(e) => {
-                const next = new Set(selectedRows);
-                if (e.target.checked) {
-                  next.add(name);
-                } else {
-                  next.delete(name);
-                }
-                setSelectedRows(next);
-              }}
-            />
-          );
-        },
-        enableSorting: false,
-      }),
-    );
-
-    // 2. Score
+    // 1. Score
     cols.push(
       columnHelper.accessor('score', {
         header: 'Score',
@@ -363,7 +321,7 @@ export function VariantsTable({
       }),
     );
 
-    // 3. Variant name
+    // 2. Variant name
     cols.push(
       columnHelper.accessor('variantName', {
         header: 'Variant',
@@ -376,7 +334,7 @@ export function VariantsTable({
       }),
     );
 
-    // 4. One column per enabled metric
+    // 3. One column per enabled metric
     for (const metric of enabledMetrics) {
       cols.push(
         columnHelper.display({
@@ -422,7 +380,7 @@ export function VariantsTable({
       );
     }
 
-    // 5. Add metric column
+    // 4. Add metric column
     cols.push(
       columnHelper.display({
         id: '__add_metric',
@@ -456,7 +414,6 @@ export function VariantsTable({
   }, [
     enabledMetrics,
     disabledMetrics,
-    selectedRows,
     rows,
     statsMap,
     pointsLeft,
@@ -516,7 +473,7 @@ export function VariantsTable({
                     Show inactive variants
                   </SwitchLabel>
                   <span className="text-subtle text-xs">
-                    This includes old variant [wip]
+                    Includes variants with no recent runs.
                   </span>
                 </div>
                 <Switch

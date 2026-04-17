@@ -100,22 +100,27 @@ export function useDeepLinkHandler({
     navigate,
   ]);
 
+  const currentQueryId =
+    typeof search.query_id === 'string' ? search.query_id : undefined;
+
   // Update URL when active tab changes
   useEffect(() => {
     // Don't sync URL until we've processed the initial query_id and tabs are hydrated
     if (!hasProcessedInitialDeepLink.current) return;
     if (!isHydrated) return;
 
-    const currentQueryId =
-      typeof search.query_id === 'string' ? search.query_id : undefined;
     const newQueryId = activeSavedQueryId;
 
     // Don't update if URL already has the correct query_id
     if (currentQueryId === newQueryId) return;
 
-    // Update URL without triggering navigation
+    // Update URL without triggering navigation. Return prev unchanged when the
+    // value matches so callers that short-circuit on same-reference don't replace.
     navigate({
       search: (prev: Record<string, unknown>) => {
+        const prevQueryId =
+          typeof prev.query_id === 'string' ? prev.query_id : undefined;
+        if (prevQueryId === newQueryId) return prev;
         const next = { ...prev };
         if (newQueryId) {
           next.query_id = newQueryId;
@@ -126,5 +131,5 @@ export function useDeepLinkHandler({
       },
       replace: true,
     });
-  }, [activeSavedQueryId, search, navigate, isHydrated]);
+  }, [activeSavedQueryId, currentQueryId, navigate, isHydrated]);
 }
