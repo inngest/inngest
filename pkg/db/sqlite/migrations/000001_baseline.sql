@@ -1,4 +1,11 @@
 -- +goose Up
+CREATE TABLE IF NOT EXISTS migrations (
+	version UINT64,
+	dirty BOOL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON migrations(version);
+
 CREATE TABLE IF NOT EXISTS apps (
 	id CHAR(36) PRIMARY KEY,
 	name VARCHAR NOT NULL,
@@ -79,7 +86,6 @@ CREATE TABLE IF NOT EXISTS history (
 	latency_ms INT,
 	step_name VARCHAR,
 	step_id VARCHAR,
-	step_type VARCHAR,
 	url VARCHAR,
 	cancel_request VARCHAR,
 	sleep VARCHAR,
@@ -87,7 +93,8 @@ CREATE TABLE IF NOT EXISTS history (
 	wait_result VARCHAR,
 	invoke_function VARCHAR,
 	invoke_function_result VARCHAR,
-	result VARCHAR
+	result VARCHAR,
+	step_type VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS event_batches (
@@ -215,6 +222,8 @@ CREATE INDEX IF NOT EXISTS idx_spans_account_status_time ON spans(account_id, st
 DROP TABLE IF EXISTS spans;
 DROP TABLE IF EXISTS worker_connections;
 DROP TABLE IF EXISTS queue_snapshot_chunks;
+DROP INDEX IF EXISTS version_unique;
+DROP TABLE IF EXISTS migrations;
 DROP TABLE IF EXISTS trace_runs;
 DROP TABLE IF EXISTS traces;
 DROP TABLE IF EXISTS event_batches;

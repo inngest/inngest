@@ -1,4 +1,9 @@
 -- +goose Up
+CREATE TABLE IF NOT EXISTS migrations (
+	version BIGINT NOT NULL PRIMARY KEY,
+	dirty BOOLEAN NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS apps (
 	id CHAR(36) PRIMARY KEY,
 	name VARCHAR NOT NULL,
@@ -195,10 +200,10 @@ CREATE TABLE IF NOT EXISTS spans (
 	run_id TEXT NOT NULL,
 	env_id TEXT NOT NULL,
 	output JSONB,
-	input JSONB,
 	debug_run_id TEXT,
 	debug_session_id TEXT,
 	status TEXT,
+	input JSONB,
 	event_ids JSONB,
 	PRIMARY KEY (trace_id, span_id)
 );
@@ -223,6 +228,7 @@ CREATE INDEX IF NOT EXISTS idx_traces_trace_id ON traces(trace_id);
 DROP TABLE IF EXISTS spans;
 DROP TABLE IF EXISTS worker_connections;
 DROP TABLE IF EXISTS queue_snapshot_chunks;
+DROP TABLE IF EXISTS migrations;
 DROP TABLE IF EXISTS trace_runs;
 DROP TABLE IF EXISTS traces;
 DROP TABLE IF EXISTS event_batches;
