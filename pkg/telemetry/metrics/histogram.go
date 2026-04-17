@@ -515,32 +515,6 @@ func HistogramScheduleTotalDuration(ctx context.Context, dur int64, opts Histogr
 	})
 }
 
-// HistogramScheduleStateCreateDuration records the duration of creating run
-// state during executor.Schedule.
-func HistogramScheduleStateCreateDuration(ctx context.Context, dur int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "schedule_state_create_duration",
-		Description: "Distribution of run state creation duration inside executor.Schedule",
-		Tags:        opts.Tags,
-		Unit:        "ms",
-		Boundaries:  DefaultBoundaries,
-	})
-}
-
-// HistogramScheduleEnqueueDuration records the duration of enqueueing the
-// start item during executor.Schedule.
-func HistogramScheduleEnqueueDuration(ctx context.Context, dur int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "schedule_enqueue_duration",
-		Description: "Distribution of start-item enqueue duration inside executor.Schedule",
-		Tags:        opts.Tags,
-		Unit:        "ms",
-		Boundaries:  DefaultBoundaries,
-	})
-}
-
 func HistogramConstraintAPIRequestStateSize(ctx context.Context, size int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, size, HistogramOpt{
 		PkgName:     opts.PkgName,

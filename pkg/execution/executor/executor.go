@@ -1248,24 +1248,7 @@ func (e *executor) schedule(
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
 		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
-		createStart := time.Now()
 		st, err := e.smv2.Create(ctx, newState)
-		createStatus := "success"
-		switch {
-		case err == nil:
-		case errors.Is(err, state.ErrIdentifierExists):
-			createStatus = "idempotency"
-		case errors.Is(err, state.ErrIdentifierTombstone):
-			createStatus = "tombstone"
-		default:
-			createStatus = "error"
-		}
-		metrics.HistogramScheduleStateCreateDuration(ctx, time.Since(createStart).Milliseconds(), metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"status": createStatus,
-			},
-		})
 		span.End()
 
 		switch {
@@ -1474,24 +1457,7 @@ func (e *executor) schedule(
 	}
 
 	// Schedule for async functons (the default)
-	enqueueStart := time.Now()
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
-	enqueueStatus := "success"
-	switch {
-	case err == nil:
-	case errors.Is(err, queue.ErrQueueItemExists):
-		enqueueStatus = "idempotency"
-	case errors.Is(err, queue.ErrQueueItemSingletonExists):
-		enqueueStatus = "singleton"
-	default:
-		enqueueStatus = "error"
-	}
-	metrics.HistogramScheduleEnqueueDuration(ctx, time.Since(enqueueStart).Milliseconds(), metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"status": enqueueStatus,
-		},
-	})
 
 	switch err {
 	case nil:
