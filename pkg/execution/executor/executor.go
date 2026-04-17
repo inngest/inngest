@@ -791,7 +791,7 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 // If the run was impacted by flow control (idempotency, rate limiting, debounce, etc.),
 // metadata will be nil.  This will return the original run ID if runs were skipped due
 // to idemptoency.
-func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (runIDOut *ulid.ULID, mdOut *sv2.Metadata, err error) {
+func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
 	ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.Schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
 
@@ -799,11 +799,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// This is the top-level "how long did Schedule take" metric used to diagnose
 	// scheduling delays (slow state create, slow constraint API, slow enqueue).
 	scheduleStart := time.Now()
+	var scheduleErr error
 	defer func() {
 		metrics.HistogramScheduleTotalDuration(ctx, time.Since(scheduleStart).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"status": ScheduleStatus(err),
+				"status": ScheduleStatus(scheduleErr),
 			},
 		})
 	}()
@@ -823,7 +824,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	key := idempotencyKey(req, *runID)
 
 	if len(req.Events) == 0 {
-		return nil, nil, fmt.Errorf("no events provided in schedule request")
+		scheduleErr = fmt.Errorf("no events provided in schedule request")
+		return nil, nil, scheduleErr
 	}
 
 	l := e.log.With(
@@ -862,6 +864,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}, util.WithBoundaries(2*time.Second))
 		})
 
+	scheduleErr = err
 	return runID, md, err
 }
 
