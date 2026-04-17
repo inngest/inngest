@@ -37,11 +37,7 @@ const columns = [
       const active = isActive(info.row.original.lastSeen);
       return (
         <div className="flex items-center gap-2">
-          <span
-            className={`h-2 w-2 flex-shrink-0 rounded-full ${
-              active ? 'bg-primary-moderate' : 'bg-surfaceMuted'
-            }`}
-          />
+          <StatusDot status={active ? 'ACTIVE' : 'ARCHIVED'} size="small" />
           <span className="text-basis truncate text-sm font-medium">{info.getValue()}</span>
         </div>
       );

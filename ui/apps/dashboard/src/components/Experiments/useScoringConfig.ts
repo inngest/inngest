@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 
 import {
   useExperimentScoringConfig,
@@ -23,15 +24,14 @@ export function useScoringConfig(experimentName: string) {
     ExperimentScoringMetric[] | null
   >(null);
 
-  // --- server → local sync (initial load & refetch) ---
   useEffect(() => {
     if (scoring.data) {
       setLocalMetrics(scoring.data.metrics);
     }
   }, [scoring.data]);
 
-  // --- debounced save ---
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localMetricsRef = useRef(localMetrics);
+  localMetricsRef.current = localMetrics;
   const serverMetricsRef = useRef<ExperimentScoringMetric[] | null>(null);
   const mutateRef = useRef(updateScoring.mutate);
   mutateRef.current = updateScoring.mutate;
@@ -40,38 +40,19 @@ export function useScoringConfig(experimentName: string) {
     serverMetricsRef.current = scoring.data?.metrics ?? null;
   }, [scoring.data]);
 
+  const debouncedSave = useDebounce(() => {
+    const current = localMetricsRef.current;
+    const serverMetrics = serverMetricsRef.current;
+    if (!current || !serverMetrics) return;
+    if (JSON.stringify(current) === JSON.stringify(serverMetrics)) return;
+    serverMetricsRef.current = current;
+    mutateRef.current(current);
+  }, DEBOUNCE_MS);
+
   useEffect(() => {
     if (!localMetrics) return;
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      const serverMetrics = serverMetricsRef.current;
-      if (
-        serverMetrics &&
-        JSON.stringify(localMetrics) !== JSON.stringify(serverMetrics)
-      ) {
-        serverMetricsRef.current = localMetrics;
-        mutateRef.current(localMetrics);
-      }
-    }, DEBOUNCE_MS);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [localMetrics]);
-
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
+    debouncedSave();
+  }, [localMetrics, debouncedSave]);
 
   // --- convenience mutators ---
   const updateMetric = useCallback(

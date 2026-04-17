@@ -1,14 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { Select, type Option } from '@inngest/components/Select/Select';
-import type { TimeRangePreset } from '@inngest/components/Experiments';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@inngest/components/Popover';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiAddLine, RiArrowDownSLine } from '@remixicon/react';
+  Select,
+  SelectWithSearch,
+  type Option,
+} from '@inngest/components/Select/Select';
+import type { TimeRangePreset } from '@inngest/components/Experiments';
+import { RiAddLine } from '@remixicon/react';
 
 import { colorForMetric } from '@/lib/experiments/colors';
 
@@ -35,38 +33,28 @@ function VariantMultiSelect({
   selectedVariants: string[];
   onSelectedVariantsChange: (v: string[]) => void;
 }) {
+  const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<string[]>(selectedVariants);
-  const [search, setSearch] = useState('');
-  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const filtered = useMemo(() => {
-    if (!search) return availableVariants;
-    const lower = search.toLowerCase();
-    return availableVariants.filter((v) => v.toLowerCase().includes(lower));
-  }, [availableVariants, search]);
+  const options: Option[] = useMemo(
+    () => availableVariants.map((name) => ({ id: name, name })),
+    [availableVariants],
+  );
 
-  const allSelected = draft.length === 0;
+  const draftOptions = useMemo(
+    () => options.filter((o) => draft.includes(o.id)),
+    [options, draft],
+  );
 
-  function toggle(name: string) {
-    setDraft((prev) => {
-      // If currently "all" (empty array), start with all except the toggled one
-      if (prev.length === 0) {
-        return availableVariants.filter((v) => v !== name);
-      }
-      if (prev.includes(name)) {
-        const next = prev.filter((v) => v !== name);
-        // If removing this means all are deselected, go back to "all"
-        return next.length === 0 ? [] : next;
-      }
-      const next = [...prev, name];
-      // If all variants are now selected, reset to "all"
-      return next.length === availableVariants.length ? [] : next;
-    });
-  }
+  const filteredOptions = useMemo(() => {
+    if (!query) return options;
+    const lower = query.toLowerCase();
+    return options.filter((o) => o.name.toLowerCase().includes(lower));
+  }, [options, query]);
 
-  function isChecked(name: string) {
-    return allSelected || draft.includes(name);
-  }
+  const allSelected =
+    draft.length === 0 || draft.length === availableVariants.length;
 
   const label =
     selectedVariants.length === 0
@@ -75,112 +63,59 @@ function VariantMultiSelect({
       ? selectedVariants[0]!
       : `${selectedVariants.length} variants`;
 
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) {
-          setDraft(selectedVariants);
-          setSearch('');
-        }
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="border-muted text-basis hover:bg-canvasSubtle inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-        >
-          {label}
-          <RiArrowDownSLine className="text-muted h-3.5 w-3.5" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-0">
-        <div className="flex flex-col">
-          {/* Search */}
-          <div className="px-3 pb-1 pt-2">
-            <input
-              type="text"
-              placeholder="Search variants"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="border-muted text-basis placeholder:text-disabled w-full rounded border px-2 py-1.5 text-sm outline-none focus:border-primary-moderate"
-            />
-          </div>
+  const handleApply = () => {
+    // "Empty = all" sentinel: collapse full selection to empty.
+    const next = allSelected ? [] : draft;
+    onSelectedVariantsChange(next);
+    buttonRef.current?.click();
+  };
 
-          {/* Options */}
-          <div className="max-h-48 overflow-y-auto py-1">
-            {filtered.map((name, i) => (
-              <button
-                key={name}
-                type="button"
-                className="hover:bg-canvasSubtle flex w-full items-center gap-2 px-4 py-1.5"
-                onClick={() => toggle(name)}
-              >
-                <span
-                  className={cn(
-                    'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
-                    isChecked(name)
-                      ? 'border-primary-moderate bg-primary-moderate text-alwaysWhite'
-                      : 'border-muted',
-                  )}
-                >
-                  {isChecked(name) && (
-                    <svg
-                      width="10"
-                      height="8"
-                      viewBox="0 0 10 8"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M1 4L3.5 6.5L9 1"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </span>
+  const handleReset = () => {
+    setDraft([]);
+  };
+
+  return (
+    <SelectWithSearch
+      multiple
+      value={draftOptions}
+      onChange={(value: Option[]) => {
+        setDraft(value.map((o) => o.id));
+      }}
+      label="Variants"
+      isLabelVisible={false}
+      size="small"
+    >
+      <SelectWithSearch.Button ref={buttonRef} size="small">
+        <span className="text-basis text-xs">{label}</span>
+      </SelectWithSearch.Button>
+      <SelectWithSearch.Options className="w-64">
+        <SelectWithSearch.SearchInput
+          displayValue={() => ''}
+          placeholder="Search variants"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setQuery(e.target.value)
+          }
+        />
+        <div className="max-h-48 overflow-y-auto">
+          {filteredOptions.map((opt) => (
+            <SelectWithSearch.CheckboxOption key={opt.id} option={opt}>
+              <span className="inline-flex items-center gap-2">
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{
                     backgroundColor: colorForMetric(
-                      availableVariants.indexOf(name),
+                      availableVariants.indexOf(opt.id),
                     ),
                   }}
                 />
-                <span className="text-basis truncate text-xs">{name}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Footer */}
-          <div className="border-subtle flex items-center justify-between border-t px-2 py-1.5">
-            <Button
-              kind="secondary"
-              appearance="ghost"
-              size="small"
-              label="Reset"
-              onClick={() => {
-                setDraft([]);
-              }}
-            />
-            <Button
-              kind="primary"
-              appearance="solid"
-              size="small"
-              label="Apply"
-              onClick={() => {
-                onSelectedVariantsChange(draft);
-                setOpen(false);
-              }}
-            />
-          </div>
+                <span className="text-basis truncate text-xs">{opt.name}</span>
+              </span>
+            </SelectWithSearch.CheckboxOption>
+          ))}
         </div>
-      </PopoverContent>
-    </Popover>
+        <SelectWithSearch.Footer onReset={handleReset} onApply={handleApply} />
+      </SelectWithSearch.Options>
+    </SelectWithSearch>
   );
 }
 

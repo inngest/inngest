@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -11,6 +11,8 @@ import type {
   ExperimentScoringMetric,
   TimeRangePreset,
 } from '@inngest/components/Experiments';
+
+const EXPERIMENTS_CACHE_MS = 5 * 60 * 1000;
 
 const experimentsQuery = graphql(`
   query GetExperiments($workspaceID: ID!) {
@@ -59,7 +61,8 @@ export function useExperimentsList({
     queryKey: ['experiments-list', environment.id],
     queryFn,
     enabled,
-    staleTime: 30_000,
+    staleTime: EXPERIMENTS_CACHE_MS,
+    gcTime: EXPERIMENTS_CACHE_MS,
   });
 }
 
@@ -202,7 +205,8 @@ export function useExperimentDetail(
       variantFilter,
     ],
     queryFn,
-    staleTime: 30_000,
+    staleTime: EXPERIMENTS_CACHE_MS,
+    gcTime: EXPERIMENTS_CACHE_MS,
   });
 }
 
@@ -233,13 +237,15 @@ export function useExperimentScoringConfig(experimentName: string) {
   return useQuery<ExperimentScoringConfig>({
     queryKey: ['experiment-scoring', environment.id, experimentName],
     queryFn,
-    staleTime: 30_000,
+    staleTime: EXPERIMENTS_CACHE_MS,
+    gcTime: EXPERIMENTS_CACHE_MS,
   });
 }
 
 export function useUpdateExperimentScoringConfig(experimentName: string) {
   const client = useClient();
   const environment = useEnvironment();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: ['experiment-scoring-update', environment.id, experimentName],
@@ -263,6 +269,12 @@ export function useUpdateExperimentScoringConfig(experimentName: string) {
         updatedAt: new Date(c.updatedAt),
         metrics: c.metrics,
       };
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        ['experiment-scoring', environment.id, experimentName],
+        data,
+      );
     },
   });
 }
