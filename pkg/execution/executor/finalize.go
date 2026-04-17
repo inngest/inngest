@@ -195,22 +195,32 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 		var eventID ulid.ULID
 		copy(eventID[:], idHash[:16])
 
+		data := map[string]any{}
+		if len(d.Input) > 0 {
+			if err := json.Unmarshal(d.Input, &data); err != nil {
+				logger.StdlibLogger(ctx).Error("deferred input is not a JSON object",
+					"error", err, "run_id", opts.Metadata.ID.RunID)
+				continue
+			}
+		}
+
+		meta := event.DeferredStartMetadata{
+			FnSlug:       d.CompanionID,
+			ParentFnSlug: fnSlug,
+			ParentRunID:  opts.Metadata.ID.RunID.String(),
+		}
+		if err := meta.Validate(); err != nil {
+			logger.StdlibLogger(ctx).Error("invalid deferred event metadata",
+				"error", err, "run_id", opts.Metadata.ID.RunID)
+			return
+		}
+		data[consts.InngestEventDataPrefix] = meta
+
 		events = append(events, event.Event{
 			ID:        eventID.String(),
 			Name:      "inngest/deferred.start",
 			Timestamp: now.UnixMilli(),
-			Data: map[string]any{
-				"_inngest": map[string]any{
-					"deferred_run": map[string]any{
-						"companion_id": d.CompanionID,
-					},
-					"parent_run": map[string]any{
-						"fn_slug": fnSlug,
-						"run_id":  opts.Metadata.ID.RunID.String(),
-					},
-				},
-				"input": json.RawMessage(d.Input),
-			},
+			Data:      data,
 		})
 	}
 

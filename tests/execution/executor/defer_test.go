@@ -377,25 +377,20 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	require.NoError(t, json.Unmarshal(evtData, &data))
 
 	inngestData := data["_inngest"].(map[string]any)
-	deferredRun := inngestData["deferred_run"].(map[string]any)
-	parentRun := inngestData["parent_run"].(map[string]any)
+	require.Equal(t, "score", inngestData["fn_slug"])
+	require.Equal(t, fn.Slug, inngestData["parent_fn_slug"])
+	require.Equal(t, run.ID.RunID.String(), inngestData["parent_run_id"])
 
-	require.Equal(t, "score", deferredRun["companion_id"])
-	require.Equal(t, fn.Slug, parentRun["fn_slug"])
-	require.Equal(t, run.ID.RunID.String(), parentRun["run_id"])
-
-	// Verify user input is forwarded as structured JSON, not an escaped string.
-	// (If double-encoded, input would be a string, not a map.)
-	input, ok := data["input"].(map[string]any)
-	require.True(t, ok, "input should be a JSON object, got %T", data["input"])
-	user, ok := input["user"].(map[string]any)
-	require.True(t, ok, "input.user should be a JSON object, got %T", input["user"])
+	// Verify user input is spread at the top of data as structured JSON,
+	// not escaped or nested under a wrapper key.
+	user, ok := data["user"].(map[string]any)
+	require.True(t, ok, "data.user should be a JSON object, got %T", data["user"])
 	require.Equal(t, "u_123", user["id"])
 	meta, ok := user["meta"].(map[string]any)
-	require.True(t, ok, "input.user.meta should be a JSON object, got %T", user["meta"])
+	require.True(t, ok, "data.user.meta should be a JSON object, got %T", user["meta"])
 	require.Equal(t, "admin", meta["role"])
 	require.Equal(t, []any{"a", "b"}, meta["tags"])
-	require.Equal(t, 0.87, input["score"])
+	require.Equal(t, 0.87, data["score"])
 }
 
 // TestDeferCancelUpdatesDeferStatus verifies that when the executor processes
