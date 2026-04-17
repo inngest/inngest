@@ -791,9 +791,22 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 // If the run was impacted by flow control (idempotency, rate limiting, debounce, etc.),
 // metadata will be nil.  This will return the original run ID if runs were skipped due
 // to idemptoency.
-func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (runIDOut *ulid.ULID, mdOut *sv2.Metadata, err error) {
 	ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.Schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
+
+	// Record total Schedule duration regardless of which internal path executes.
+	// This is the top-level "how long did Schedule take" metric used to diagnose
+	// scheduling delays (slow state create, slow constraint API, slow enqueue).
+	scheduleStart := time.Now()
+	defer func() {
+		metrics.HistogramScheduleTotalDuration(ctx, time.Since(scheduleStart).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"status": ScheduleStatus(err),
+			},
+		})
+	}()
 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
@@ -1235,7 +1248,24 @@ func (e *executor) schedule(
 	// Create run state if not skipped
 	if skipReason == enums.SkipReasonNone {
 		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
+		createStart := time.Now()
 		st, err := e.smv2.Create(ctx, newState)
+		createStatus := "success"
+		switch {
+		case err == nil:
+		case errors.Is(err, state.ErrIdentifierExists):
+			createStatus = "idempotency"
+		case errors.Is(err, state.ErrIdentifierTombstone):
+			createStatus = "tombstone"
+		default:
+			createStatus = "error"
+		}
+		metrics.HistogramScheduleStateCreateDuration(ctx, time.Since(createStart).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"status": createStatus,
+			},
+		})
 		span.End()
 
 		switch {
@@ -1444,7 +1474,24 @@ func (e *executor) schedule(
 	}
 
 	// Schedule for async functons (the default)
+	enqueueStart := time.Now()
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
+	enqueueStatus := "success"
+	switch {
+	case err == nil:
+	case errors.Is(err, queue.ErrQueueItemExists):
+		enqueueStatus = "idempotency"
+	case errors.Is(err, queue.ErrQueueItemSingletonExists):
+		enqueueStatus = "singleton"
+	default:
+		enqueueStatus = "error"
+	}
+	metrics.HistogramScheduleEnqueueDuration(ctx, time.Since(enqueueStart).Milliseconds(), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"status": enqueueStatus,
+		},
+	})
 
 	switch err {
 	case nil:
