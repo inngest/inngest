@@ -60,6 +60,7 @@ import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_auth
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
 import { Route as AuthedEnvEnvSlugInsightsIndexRouteImport } from './routes/_authed/env/$envSlug/insights/index'
 import { Route as AuthedEnvEnvSlugFunctionsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/index'
+import { Route as AuthedEnvEnvSlugExperimentsIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/index'
 import { Route as AuthedEnvEnvSlugEventsIndexRouteImport } from './routes/_authed/env/$envSlug/events/index'
 import { Route as AuthedEnvEnvSlugEventTypesIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/index'
 import { Route as AuthedEnvEnvSlugDebuggerIndexRouteImport } from './routes/_authed/env/$envSlug/debugger/index'
@@ -380,6 +381,12 @@ const AuthedEnvEnvSlugFunctionsIndexRoute =
     path: '/functions/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugExperimentsIndexRoute =
+  AuthedEnvEnvSlugExperimentsIndexRouteImport.update({
+    id: '/experiments/',
+    path: '/experiments/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugEventsIndexRoute =
   AuthedEnvEnvSlugEventsIndexRouteImport.update({
     id: '/events/',
@@ -666,6 +673,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -745,6 +753,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/debugger': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -838,6 +847,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/_authed/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/_authed/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/_authed/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/_authed/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/_authed/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -931,6 +941,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger/'
     | '/env/$envSlug/event-types/'
     | '/env/$envSlug/events/'
+    | '/env/$envSlug/experiments/'
     | '/env/$envSlug/functions/'
     | '/env/$envSlug/insights/'
     | '/env/$envSlug/manage/'
@@ -1010,6 +1021,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger'
     | '/env/$envSlug/event-types'
     | '/env/$envSlug/events'
+    | '/env/$envSlug/experiments'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/insights'
     | '/env/$envSlug/manage'
@@ -1102,6 +1114,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/debugger/'
     | '/_authed/env/$envSlug/event-types/'
     | '/_authed/env/$envSlug/events/'
+    | '/_authed/env/$envSlug/experiments/'
     | '/_authed/env/$envSlug/functions/'
     | '/_authed/env/$envSlug/insights/'
     | '/_authed/env/$envSlug/manage/'
@@ -1521,6 +1534,13 @@ declare module '@tanstack/react-router' {
       path: '/functions'
       fullPath: '/env/$envSlug/functions/'
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/experiments/': {
+      id: '/_authed/env/$envSlug/experiments/'
+      path: '/experiments'
+      fullPath: '/env/$envSlug/experiments/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugExperimentsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/events/': {
@@ -2110,6 +2130,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugDebuggerIndexRoute: typeof AuthedEnvEnvSlugDebuggerIndexRoute
   AuthedEnvEnvSlugEventTypesIndexRoute: typeof AuthedEnvEnvSlugEventTypesIndexRoute
   AuthedEnvEnvSlugEventsIndexRoute: typeof AuthedEnvEnvSlugEventsIndexRoute
+  AuthedEnvEnvSlugExperimentsIndexRoute: typeof AuthedEnvEnvSlugExperimentsIndexRoute
   AuthedEnvEnvSlugFunctionsIndexRoute: typeof AuthedEnvEnvSlugFunctionsIndexRoute
   AuthedEnvEnvSlugInsightsIndexRoute: typeof AuthedEnvEnvSlugInsightsIndexRoute
   AuthedEnvEnvSlugMetricsIndexRoute: typeof AuthedEnvEnvSlugMetricsIndexRoute
@@ -2134,6 +2155,7 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugDebuggerIndexRoute: AuthedEnvEnvSlugDebuggerIndexRoute,
   AuthedEnvEnvSlugEventTypesIndexRoute: AuthedEnvEnvSlugEventTypesIndexRoute,
   AuthedEnvEnvSlugEventsIndexRoute: AuthedEnvEnvSlugEventsIndexRoute,
+  AuthedEnvEnvSlugExperimentsIndexRoute: AuthedEnvEnvSlugExperimentsIndexRoute,
   AuthedEnvEnvSlugFunctionsIndexRoute: AuthedEnvEnvSlugFunctionsIndexRoute,
   AuthedEnvEnvSlugInsightsIndexRoute: AuthedEnvEnvSlugInsightsIndexRoute,
   AuthedEnvEnvSlugMetricsIndexRoute: AuthedEnvEnvSlugMetricsIndexRoute,
