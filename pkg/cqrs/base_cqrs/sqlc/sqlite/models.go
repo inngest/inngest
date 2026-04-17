@@ -103,7 +103,6 @@ type History struct {
 	LatencyMs            sql.NullInt64
 	StepName             sql.NullString
 	StepID               sql.NullString
-	StepType             sql.NullString
 	Url                  sql.NullString
 	CancelRequest        sql.NullString
 	Sleep                sql.NullString
@@ -112,6 +111,12 @@ type History struct {
 	InvokeFunction       sql.NullString
 	InvokeFunctionResult sql.NullString
 	Result               sql.NullString
+	StepType             sql.NullString
+}
+
+type Migration struct {
+	Version interface{}
+	Dirty   sql.NullBool
 }
 
 type QueueSnapshotChunk struct {
@@ -136,10 +141,10 @@ type Span struct {
 	RunID          string
 	EnvID          string
 	Output         interface{}
-	Input          interface{}
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
 	Status         sql.NullString
+	Input          interface{}
 	EventIds       interface{}
 }
 

@@ -358,17 +358,17 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE run_id = ?
-GROUP BY dynamic_span_id
+GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
 
 -- name: GetSpansByDebugRunID :many
@@ -380,17 +380,17 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE debug_run_id = ?
-GROUP BY dynamic_span_id
+GROUP BY trace_id, run_id, debug_session_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
 
 -- name: GetSpansByDebugSessionID :many
@@ -402,17 +402,17 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE debug_session_id = ?
-GROUP BY dynamic_span_id
+GROUP BY trace_id, run_id, debug_run_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
 
 -- name: GetSpanOutput :many
@@ -431,17 +431,17 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING SUM(name = 'executor.run') > 0
 ORDER BY start_time ASC
 LIMIT 1;
@@ -454,29 +454,29 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE span_id IN (
   SELECT
     parent_span_id
   FROM spans execSpans
   WHERE execSpans.run_id = sqlc.arg(run_id) AND execSpans.account_id = sqlc.arg(account_id) AND name != 'userland'
-  GROUP BY dynamic_span_id
+  GROUP BY dynamic_span_id, parent_span_id
   HAVING
     SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
     AND
     SUM(name = 'executor.execution') > 0
-  ORDER BY start_time
+  ORDER BY MIN(start_time)
   LIMIT 1
 ) AND name != 'userland'
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING SUM(name = 'executor.step.discovery') > 0
 UNION ALL
 SELECT
@@ -486,17 +486,17 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE run_id = sqlc.arg(run_id) AND account_id = sqlc.arg(account_id) AND name != 'userland'
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
   AND
@@ -512,17 +512,17 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE run_id = ? AND account_id = ? AND name != 'userland'
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
   AND
@@ -540,17 +540,17 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans b
 WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id) AND b.name != 'userland'
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
   AND
@@ -566,16 +566,16 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  json_group_array(json_object(
+  CAST(json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS span_fragments
+  )) AS JSON) AS span_fragments
 FROM spans
 WHERE run_id = ? AND span_id = ? AND account_id = ?
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
