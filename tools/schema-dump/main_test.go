@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -75,6 +77,35 @@ CREATE INDEX idx_apps_id ON public.apps (id);
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("normalized dump missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestRunSQLiteWritesRequestedOutput(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "nested", "sqlite-schema.sql")
+
+	err := run(context.Background(), config{
+		dialect:      "sqlite",
+		sqliteOutput: outputPath,
+	})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	got, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("reading output file: %v", err)
+	}
+
+	for _, want := range []string{
+		"CREATE TABLE apps",
+		"CREATE TABLE spans",
+	} {
+		if !strings.Contains(string(got), want) {
+			t.Fatalf("sqlite output missing %q:\n%s", want, string(got))
 		}
 	}
 }

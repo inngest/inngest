@@ -17,13 +17,13 @@ type sqliteQuerier struct {
 	q sqlc.Querier
 }
 
-// bytesToRawMessage preserves the db-layer []byte contract while matching the
-// generated SQLite query params, which now use json.RawMessage.
-func bytesToRawMessage(b []byte) json.RawMessage {
+// bytesToNullString preserves nil-vs-empty semantics while adapting db-layer
+// []byte JSON payloads to the generated SQLite insert params.
+func bytesToNullString(b []byte) sql.NullString {
 	if len(b) == 0 {
-		return nil
+		return sql.NullString{}
 	}
-	return json.RawMessage(b)
+	return sql.NullString{String: string(b), Valid: true}
 }
 
 // --- Apps ---
@@ -405,14 +405,14 @@ func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams
 		RunID: arg.RunID, AccountID: arg.AccountID, AppID: arg.AppID,
 		FunctionID: arg.FunctionID, EnvID: arg.EnvID,
 		DynamicSpanID:  arg.DynamicSpanID,
-		Attributes:     bytesToRawMessage(arg.Attributes),
-		Links:          bytesToRawMessage(arg.Links),
-		Output:         bytesToRawMessage(arg.Output),
-		Input:          bytesToRawMessage(arg.Input),
+		Attributes:     bytesToNullString(arg.Attributes),
+		Links:          bytesToNullString(arg.Links),
+		Output:         bytesToNullString(arg.Output),
+		Input:          bytesToNullString(arg.Input),
 		DebugRunID:     arg.DebugRunID,
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
-		EventIds:       bytesToRawMessage(arg.EventIds),
+		EventIds:       bytesToNullString(arg.EventIds),
 	})
 }
 
@@ -642,6 +642,8 @@ func toBytes(v interface{}) []byte {
 	switch b := v.(type) {
 	case []byte:
 		return b
+	case json.RawMessage:
+		return []byte(b)
 	case string:
 		return []byte(b)
 	default:

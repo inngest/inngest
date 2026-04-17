@@ -444,6 +444,25 @@ func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
 }
 
 func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
+	switch value := v.(type) {
+	case sql.NullString:
+		if !value.Valid || value.String == "" {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(value.String),
+			Valid:      true,
+		}
+	case *sql.NullString:
+		if value == nil || !value.Valid || value.String == "" {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(value.String),
+			Valid:      true,
+		}
+	}
+
 	data, err := json.Marshal(v)
 	if err != nil {
 		return pqtype.NullRawMessage{Valid: false}

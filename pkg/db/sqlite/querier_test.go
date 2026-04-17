@@ -7,19 +7,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBytesToRawMessage(t *testing.T) {
-	t.Run("nil returns nil", func(t *testing.T) {
-		assert.Nil(t, bytesToRawMessage(nil))
+func TestBytesToNullString(t *testing.T) {
+	t.Run("nil returns invalid null string", func(t *testing.T) {
+		assert.Equal(t, false, bytesToNullString(nil).Valid)
 	})
 
-	t.Run("empty slice returns nil", func(t *testing.T) {
-		assert.Nil(t, bytesToRawMessage([]byte{}))
+	t.Run("empty slice returns invalid null string", func(t *testing.T) {
+		assert.Equal(t, false, bytesToNullString([]byte{}).Valid)
 	})
 
-	t.Run("converts bytes to raw message", func(t *testing.T) {
+	t.Run("converts bytes to valid null string", func(t *testing.T) {
 		input := []byte(`{"key":"value"}`)
-		got := bytesToRawMessage(input)
+		got := bytesToNullString(input)
 
-		assert.Equal(t, json.RawMessage(`{"key":"value"}`), got)
+		assert.True(t, got.Valid)
+		assert.Equal(t, `{"key":"value"}`, got.String)
+	})
+}
+
+func TestToBytes(t *testing.T) {
+	t.Run("json raw message returns bytes", func(t *testing.T) {
+		input := json.RawMessage(`{"key":"value"}`)
+		assert.Equal(t, []byte(`{"key":"value"}`), toBytes(input))
+	})
+
+	t.Run("plain bytes still return bytes", func(t *testing.T) {
+		input := []byte(`{"key":"value"}`)
+		assert.Equal(t, input, toBytes(input))
 	})
 }
