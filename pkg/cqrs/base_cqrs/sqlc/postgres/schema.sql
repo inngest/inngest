@@ -1,4 +1,30 @@
-CREATE TABLE apps (
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 16.13
+-- Dumped by pg_dump version 16.13
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: apps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.apps (
     id character(36) NOT NULL,
     name character varying NOT NULL,
     sdk_language character varying NOT NULL,
@@ -15,7 +41,11 @@ CREATE TABLE apps (
     app_version character varying(128)
 );
 
-CREATE TABLE event_batches (
+--
+-- Name: event_batches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.event_batches (
     id character(26) NOT NULL,
     account_id uuid,
     workspace_id uuid,
@@ -27,7 +57,11 @@ CREATE TABLE event_batches (
     event_ids bytea NOT NULL
 );
 
-CREATE TABLE events (
+--
+-- Name: events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.events (
     internal_id bytea,
     account_id character(36),
     workspace_id character(36),
@@ -42,7 +76,11 @@ CREATE TABLE events (
     event_ts timestamp without time zone NOT NULL
 );
 
-CREATE TABLE function_finishes (
+--
+-- Name: function_finishes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.function_finishes (
     run_id bytea,
     status character varying NOT NULL,
     output character varying DEFAULT '{}'::character varying NOT NULL,
@@ -50,7 +88,11 @@ CREATE TABLE function_finishes (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-CREATE TABLE function_runs (
+--
+-- Name: function_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.function_runs (
     run_id bytea NOT NULL,
     run_started_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     function_id character(36),
@@ -62,7 +104,11 @@ CREATE TABLE function_runs (
     cron character varying
 );
 
-CREATE TABLE functions (
+--
+-- Name: functions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.functions (
     id character(36),
     app_id character(36),
     name character varying NOT NULL,
@@ -72,7 +118,11 @@ CREATE TABLE functions (
     archived_at timestamp without time zone
 );
 
-CREATE TABLE history (
+--
+-- Name: history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.history (
     id bytea,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     run_started_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -99,13 +149,30 @@ CREATE TABLE history (
     step_type character varying
 );
 
-CREATE TABLE queue_snapshot_chunks (
+--
+-- Name: migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.migrations (
+    version bigint NOT NULL,
+    dirty boolean NOT NULL
+);
+
+--
+-- Name: queue_snapshot_chunks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.queue_snapshot_chunks (
     snapshot_id character(26) NOT NULL,
     chunk_id integer NOT NULL,
     data bytea
 );
 
-CREATE TABLE spans (
+--
+-- Name: spans; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.spans (
     span_id text NOT NULL,
     trace_id text NOT NULL,
     parent_span_id text,
@@ -128,7 +195,11 @@ CREATE TABLE spans (
     event_ids jsonb
 );
 
-CREATE TABLE trace_runs (
+--
+-- Name: trace_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.trace_runs (
     run_id character(26) NOT NULL,
     account_id character(36) NOT NULL,
     workspace_id character(36) NOT NULL,
@@ -148,7 +219,11 @@ CREATE TABLE trace_runs (
     has_ai boolean DEFAULT false NOT NULL
 );
 
-CREATE TABLE traces (
+--
+-- Name: traces; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.traces (
     "timestamp" timestamp without time zone NOT NULL,
     timestamp_unix_ms bigint NOT NULL,
     trace_id character varying NOT NULL,
@@ -170,7 +245,11 @@ CREATE TABLE traces (
     run_id character(26)
 );
 
-CREATE TABLE worker_connections (
+--
+-- Name: worker_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.worker_connections (
     account_id uuid NOT NULL,
     workspace_id uuid NOT NULL,
     app_name character varying NOT NULL,
@@ -199,50 +278,145 @@ CREATE TABLE worker_connections (
     os character varying NOT NULL
 );
 
-ALTER TABLE ONLY apps
+--
+-- Name: apps apps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apps
     ADD CONSTRAINT apps_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY event_batches
+--
+-- Name: event_batches event_batches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_batches
     ADD CONSTRAINT event_batches_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY queue_snapshot_chunks
+--
+-- Name: migrations migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.migrations
+    ADD CONSTRAINT migrations_pkey PRIMARY KEY (version);
+
+--
+-- Name: queue_snapshot_chunks queue_snapshot_chunks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.queue_snapshot_chunks
     ADD CONSTRAINT queue_snapshot_chunks_pkey PRIMARY KEY (snapshot_id, chunk_id);
 
-ALTER TABLE ONLY spans
+--
+-- Name: spans spans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spans
     ADD CONSTRAINT spans_pkey PRIMARY KEY (trace_id, span_id);
 
-ALTER TABLE ONLY trace_runs
+--
+-- Name: trace_runs trace_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trace_runs
     ADD CONSTRAINT trace_runs_pkey PRIMARY KEY (run_id);
 
-ALTER TABLE ONLY worker_connections
+--
+-- Name: worker_connections worker_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_connections
     ADD CONSTRAINT worker_connections_pkey PRIMARY KEY (id, app_name);
 
-CREATE INDEX idx_events_internal_id ON events USING btree (internal_id);
+--
+-- Name: idx_events_internal_id; Type: INDEX; Schema: public; Owner: -
+--
 
-CREATE INDEX idx_events_internal_id_received_range ON events USING btree (internal_id, received_at DESC);
+CREATE INDEX idx_events_internal_id ON public.events USING btree (internal_id);
 
-CREATE INDEX idx_events_received_name ON events USING btree (received_at, event_name);
+--
+-- Name: idx_events_internal_id_received_range; Type: INDEX; Schema: public; Owner: -
+--
 
-CREATE INDEX idx_function_finishes_run_id ON function_finishes USING btree (run_id);
+CREATE INDEX idx_events_internal_id_received_range ON public.events USING btree (internal_id, received_at DESC);
 
-CREATE INDEX idx_function_runs_event_id ON function_runs USING btree (event_id);
+--
+-- Name: idx_events_received_name; Type: INDEX; Schema: public; Owner: -
+--
 
-CREATE INDEX idx_function_runs_run_id ON function_runs USING btree (run_id);
+CREATE INDEX idx_events_received_name ON public.events USING btree (received_at, event_name);
 
-CREATE INDEX idx_function_runs_timebound ON function_runs USING btree (run_started_at DESC, function_id);
+--
+-- Name: idx_function_finishes_run_id; Type: INDEX; Schema: public; Owner: -
+--
 
-CREATE INDEX idx_history_id ON history USING btree (id);
+CREATE INDEX idx_function_finishes_run_id ON public.function_finishes USING btree (run_id);
 
-CREATE INDEX idx_history_run_id_created ON history USING btree (run_id, created_at);
+--
+-- Name: idx_function_runs_event_id; Type: INDEX; Schema: public; Owner: -
+--
 
-CREATE INDEX idx_spans_account_status_time ON spans USING btree (account_id, status, start_time);
+CREATE INDEX idx_function_runs_event_id ON public.function_runs USING btree (event_id);
 
-CREATE INDEX idx_spans_run_id ON spans USING btree (run_id);
+--
+-- Name: idx_function_runs_run_id; Type: INDEX; Schema: public; Owner: -
+--
 
-CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans USING btree (run_id, dynamic_span_id, start_time);
+CREATE INDEX idx_function_runs_run_id ON public.function_runs USING btree (run_id);
 
-CREATE INDEX idx_spans_run_status ON spans USING btree (run_id, status);
+--
+-- Name: idx_function_runs_timebound; Type: INDEX; Schema: public; Owner: -
+--
 
-CREATE INDEX idx_spans_status ON spans USING btree (status);
+CREATE INDEX idx_function_runs_timebound ON public.function_runs USING btree (run_started_at DESC, function_id);
 
-CREATE INDEX idx_traces_trace_id ON traces USING btree (trace_id);
+--
+-- Name: idx_history_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_history_id ON public.history USING btree (id);
+
+--
+-- Name: idx_history_run_id_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_history_run_id_created ON public.history USING btree (run_id, created_at);
+
+--
+-- Name: idx_spans_account_status_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_account_status_time ON public.spans USING btree (account_id, status, start_time);
+
+--
+-- Name: idx_spans_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_run_id ON public.spans USING btree (run_id);
+
+--
+-- Name: idx_spans_run_id_dynamic_start_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_run_id_dynamic_start_time ON public.spans USING btree (run_id, dynamic_span_id, start_time);
+
+--
+-- Name: idx_spans_run_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_run_status ON public.spans USING btree (run_id, status);
+
+--
+-- Name: idx_spans_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_status ON public.spans USING btree (status);
+
+--
+-- Name: idx_traces_trace_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_traces_trace_id ON public.traces USING btree (trace_id);
+
+--
+-- PostgreSQL database dump complete
+--
