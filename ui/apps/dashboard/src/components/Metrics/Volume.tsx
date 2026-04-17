@@ -16,6 +16,7 @@ import {
   ConnectWorkerTotalCapacity,
 } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
+import { EventIngestionLatency } from './EventIngestionLatency';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -279,6 +280,17 @@ const GetVolumeMetrics = graphql(`
         }
       }
     }
+    workspace(id: $workspaceId) {
+      eventIngestionLatency(filter: { from: $from, until: $until }) {
+        granularity
+        data {
+          bucket
+          p50Ms
+          p95Ms
+          p99Ms
+        }
+      }
+    }
   }
 `);
 
@@ -301,6 +313,11 @@ export const MetricsVolume = ({
 
   const { value: connectMetricsEnabled, isReady: connectMetricsReady } =
     useBooleanFlag('connect-worker-concurrency-metrics');
+
+  const {
+    value: eventLatencyMetricsEnabled,
+    isReady: eventLatencyMetricsReady,
+  } = useBooleanFlag('ui-event-latency-metrics-enabled');
 
   const variables = {
     workspaceId: env.id,
@@ -354,6 +371,9 @@ export const MetricsVolume = ({
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
+            {eventLatencyMetricsEnabled && eventLatencyMetricsReady && (
+              <EventIngestionLatency workspace={data?.workspace} />
+            )}
           </div>
         </>
       )}

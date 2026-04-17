@@ -1996,6 +1996,27 @@ export type ScopedMetricsFilter = {
   until?: InputMaybe<Scalars['Time']['input']>;
 };
 
+export type EventIngestionLatencyFilter = {
+  from: Scalars['Time']['input'];
+  until?: InputMaybe<Scalars['Time']['input']>;
+};
+
+export type EventIngestionLatencyBucket = {
+  __typename?: 'EventIngestionLatencyBucket';
+  bucket: Scalars['Time']['output'];
+  p50Ms: Scalars['Float']['output'];
+  p95Ms: Scalars['Float']['output'];
+  p99Ms: Scalars['Float']['output'];
+};
+
+export type EventIngestionLatencyResponse = {
+  __typename?: 'EventIngestionLatencyResponse';
+  data: Array<EventIngestionLatencyBucket>;
+  from: Scalars['Time']['output'];
+  granularity: Scalars['String']['output'];
+  to: Scalars['Time']['output'];
+};
+
 export type ScopedMetricsResponse = {
   __typename?: 'ScopedMetricsResponse';
   from: Scalars['Time']['output'];
@@ -2403,6 +2424,7 @@ export type Workspace = {
   connectWorkerMetrics: ScopedMetricsResponse;
   createdAt: Scalars['Time']['output'];
   event: Maybe<Event>;
+  eventIngestionLatency: EventIngestionLatencyResponse;
   eventByNames: Array<EventType>;
   eventSearch: EventSearchConnection;
   eventType: EventTypeV2;
@@ -2560,6 +2582,11 @@ export type WorkspaceScopedFunctionStatusArgs = {
 
 export type WorkspaceScopedMetricsArgs = {
   filter: ScopedMetricsFilter;
+};
+
+
+export type WorkspaceEventIngestionLatencyArgs = {
+  filter: EventIngestionLatencyFilter;
 };
 
 
@@ -3227,7 +3254,7 @@ export type VolumeMetricsQueryVariables = Exact<{
 }>;
 
 
-export type VolumeMetricsQuery = { __typename?: 'Query', accountConcurrency: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, workspace: { __typename?: 'Workspace', runsThroughput: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, sdkThroughputEnded: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, sdkThroughputStarted: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, sdkThroughputScheduled: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, stepThroughput: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, backlog: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, stepRunning: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, accountStepRunning: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, concurrency: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, workerPercentageUsed: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, workerTotalCapacity: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> } } };
+export type VolumeMetricsQuery = { __typename?: 'Query', accountConcurrency: { __typename?: 'MetricsResponse', from: string, to: string, granularity: string, data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> }, workspace: { __typename?: 'Workspace', runsThroughput: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, sdkThroughputEnded: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, sdkThroughputStarted: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, sdkThroughputScheduled: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, stepThroughput: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, backlog: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, stepRunning: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, accountStepRunning: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, concurrency: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, workerPercentageUsed: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, workerTotalCapacity: { __typename?: 'ScopedMetricsResponse', metrics: Array<{ __typename?: 'ScopedMetric', id: string, tagName: string | null, tagValue: string | null, data: Array<{ __typename?: 'MetricsData', value: number, bucket: string }> }> }, eventIngestionLatency: { __typename?: 'EventIngestionLatencyResponse', granularity: string, data: Array<{ __typename?: 'EventIngestionLatencyBucket', bucket: string, p50Ms: number, p95Ms: number, p99Ms: number }> } } };
 
 export type QuickSearchQueryVariables = Exact<{
   term: Scalars['String']['input'];
