@@ -64,7 +64,7 @@ queries: ## Generate sqlc queries
 
 .PHONY: schema-dump
 schema-dump: ## Dump SQLite and Postgres schema files from migrations
-	CGO_ENABLED=0 go run ./tools/schema-dump
+	go run ./tools/schema-dump
 
 .PHONY: snapshot
 snapshot: ## Build release snapshot
