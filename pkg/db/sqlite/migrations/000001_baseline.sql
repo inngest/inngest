@@ -1,6 +1,6 @@
 -- +goose Up
 CREATE TABLE IF NOT EXISTS apps (
-	id UUID PRIMARY KEY,
+	id CHAR(36) PRIMARY KEY,
 	name VARCHAR NOT NULL,
 	sdk_language VARCHAR NOT NULL,
 	sdk_version VARCHAR NOT NULL,
@@ -12,13 +12,13 @@ CREATE TABLE IF NOT EXISTS apps (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-	method VARCHAR NOT NULL DEFAULT 'serve',
+	method VARCHAR(32) NOT NULL DEFAULT 'serve',
 	app_version VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS events (
 	-- Keep this non-unique for compatibility with the legacy runtime schema.
-	internal_id CHAR(26),
+	internal_id BLOB,
 	account_id CHAR(36),
 	workspace_id CHAR(36),
 	source VARCHAR(255),
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE TABLE IF NOT EXISTS functions (
-	id UUID PRIMARY KEY,
-	app_id UUID,
+	id CHAR(36),
+	app_id CHAR(36),
 	name VARCHAR NOT NULL,
 	slug VARCHAR NOT NULL,
 	config VARCHAR NOT NULL,
@@ -43,31 +43,31 @@ CREATE TABLE IF NOT EXISTS functions (
 );
 
 CREATE TABLE IF NOT EXISTS function_runs (
-	run_id CHAR(26) NOT NULL,
+	run_id BLOB NOT NULL,
 	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	function_id UUID,
+	function_id CHAR(36),
 	function_version INT NOT NULL,
 	trigger_type VARCHAR NOT NULL DEFAULT 'event',
-	event_id CHAR(26) NOT NULL,
-	batch_id CHAR(26),
-	original_run_id CHAR(26),
+	event_id BLOB NOT NULL,
+	batch_id BLOB,
+	original_run_id BLOB,
 	cron VARCHAR,
 	workspace_id UUID
 );
 
 CREATE TABLE IF NOT EXISTS function_finishes (
 	run_id BLOB,
-	status VARCHAR,
-	output VARCHAR DEFAULT '{}',
-	completed_step_count INT DEFAULT 1,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	status VARCHAR NOT NULL,
+	output VARCHAR NOT NULL DEFAULT '{}',
+	completed_step_count INT NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS history (
 	id BLOB,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	function_id UUID,
+	function_id CHAR(36),
 	function_version INT NOT NULL,
 	run_id BLOB NOT NULL,
 	event_id BLOB NOT NULL,
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS worker_connections (
 	instance_id VARCHAR NOT NULL,
 	status INT NOT NULL,
 	worker_ip VARCHAR NOT NULL,
-	max_worker_concurrency INT NOT NULL,
+	max_worker_concurrency INT NOT NULL DEFAULT 0,
 	connected_at INT NOT NULL,
 	last_heartbeat_at INT,
 	disconnected_at INT,
@@ -197,16 +197,19 @@ CREATE TABLE IF NOT EXISTS spans (
 	run_id TEXT NOT NULL,
 	env_id TEXT NOT NULL,
 	output JSON,
-	input JSON,
-	debug_run_id TEXT,
-	debug_session_id TEXT,
+	debug_run_id CHAR(36),
+	debug_session_id CHAR(36),
 	status TEXT,
+	input JSON,
 	event_ids JSON,
 	PRIMARY KEY (trace_id, span_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_spans_run_id ON spans(run_id);
 CREATE INDEX IF NOT EXISTS idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_spans_status ON spans(status);
+CREATE INDEX IF NOT EXISTS idx_spans_run_status ON spans(run_id, status);
+CREATE INDEX IF NOT EXISTS idx_spans_account_status_time ON spans(account_id, status, start_time);
 
 -- +goose Down
 DROP TABLE IF EXISTS spans;

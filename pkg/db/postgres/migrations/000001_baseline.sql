@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS worker_connections (
 	instance_id VARCHAR NOT NULL,
 	status smallint NOT NULL,
 	worker_ip VARCHAR NOT NULL,
-	max_worker_concurrency BIGINT NOT NULL,
+	max_worker_concurrency BIGINT NOT NULL DEFAULT 0,
 	connected_at BIGINT NOT NULL,
 	last_heartbeat_at BIGINT,
 	disconnected_at BIGINT,
@@ -205,6 +205,19 @@ CREATE TABLE IF NOT EXISTS spans (
 
 CREATE INDEX IF NOT EXISTS idx_spans_run_id ON spans(run_id);
 CREATE INDEX IF NOT EXISTS idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_events_internal_id ON events(internal_id);
+CREATE INDEX IF NOT EXISTS idx_events_internal_id_received_range ON events(internal_id, received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_received_name ON events(received_at, event_name);
+CREATE INDEX IF NOT EXISTS idx_function_finishes_run_id ON function_finishes(run_id);
+CREATE INDEX IF NOT EXISTS idx_function_runs_event_id ON function_runs(event_id);
+CREATE INDEX IF NOT EXISTS idx_function_runs_run_id ON function_runs(run_id);
+CREATE INDEX IF NOT EXISTS idx_function_runs_timebound ON function_runs(run_started_at DESC, function_id);
+CREATE INDEX IF NOT EXISTS idx_history_id ON history(id);
+CREATE INDEX IF NOT EXISTS idx_history_run_id_created ON history(run_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_spans_account_status_time ON spans(account_id, status, start_time);
+CREATE INDEX IF NOT EXISTS idx_spans_run_status ON spans(run_id, status);
+CREATE INDEX IF NOT EXISTS idx_spans_status ON spans(status);
+CREATE INDEX IF NOT EXISTS idx_traces_trace_id ON traces(trace_id);
 
 -- +goose Down
 DROP TABLE IF EXISTS spans;
