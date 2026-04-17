@@ -19,8 +19,9 @@ type State struct {
 }
 
 type Defer struct {
-	// Deferred companion's key in `onDefer` record
-	CompanionID string
+	// Fully-qualified function slug (`{app-slug}-{fn-slug}`) of the
+	// `onDefer` Inngest function that will handle this deferred run.
+	FnSlug string
 
 	// Hashed step ID
 	HashedID string

@@ -124,7 +124,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	// Retry on transient failures because once we proceed past this point and
 	// Delete wipes state, the defers are unrecoverable. If load still fails,
 	// bail out and let the caller retry Finalize rather than silently dropping
-	// the deferred companion runs.
+	// the deferred runs.
 	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers", func(ctx context.Context) (map[string]sv2.Defer, error) {
 		return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
 	}, util.NewRetryConf())
@@ -189,9 +189,9 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 		}
 
 		// Deterministic event ID so retrying Finalize doesn't produce
-		// duplicate inngest/deferred.start events (and duplicate companion runs).
-		// Same (run, companion, defer step) always hashes to the same ULID.
-		idHash := sha1.Sum([]byte(opts.Metadata.ID.RunID.String() + ":" + d.CompanionID + ":" + d.HashedID))
+		// duplicate inngest/deferred.start events (and duplicate deferred runs).
+		// Same (run, fn_slug, defer step) always hashes to the same ULID.
+		idHash := sha1.Sum([]byte(opts.Metadata.ID.RunID.String() + ":" + d.FnSlug + ":" + d.HashedID))
 		var eventID ulid.ULID
 		copy(eventID[:], idHash[:16])
 
@@ -205,7 +205,7 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 		}
 
 		meta := event.DeferredStartMetadata{
-			FnSlug:       d.CompanionID,
+			FnSlug:       d.FnSlug,
 			ParentFnSlug: fnSlug,
 			ParentRunID:  opts.Metadata.ID.RunID.String(),
 		}

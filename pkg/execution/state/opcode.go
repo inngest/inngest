@@ -347,8 +347,8 @@ func (g GeneratorOpcode) DeferAddOpts() (*DeferAddOpts, error) {
 }
 
 type DeferAddOpts struct {
-	CompanionID string          `json:"companion_id"`
-	Input       json.RawMessage `json:"input,omitempty"`
+	FnSlug string          `json:"fn_slug"`
+	Input  json.RawMessage `json:"input,omitempty"`
 }
 
 func (d *DeferAddOpts) UnmarshalAny(a any) error {
@@ -380,7 +380,7 @@ func (g GeneratorOpcode) DeferCancelOpts() (*DeferCancelOpts, error) {
 }
 
 type DeferCancelOpts struct {
-	CompanionID    string `json:"companion_id"`
+	FnSlug         string `json:"fn_slug"`
 	TargetHashedID string `json:"target_hashed_id"`
 }
 

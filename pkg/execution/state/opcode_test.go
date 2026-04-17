@@ -82,14 +82,14 @@ func TestInvokeFunctionOpts_Expires(t *testing.T) {
 
 // TestDeferAddOpts pins down the first real behavior of OpcodeDeferAdd:
 // the SDK emits a GeneratorOpcode whose Opts field carries the target
-// companion ID and the user input passed to `step.defer(...)`, and the
-// executor needs a typed accessor to read them.
+// onDefer function slug and the user input passed to `step.defer(...)`,
+// and the executor needs a typed accessor to read them.
 //
 // This mirrors the pattern used by every other opcode with options —
 // see InvokeFunctionOpts(), WaitForEventOpts(), SignalOpts() in opcode.go.
 //
 // To make this pass:
-//  1. Add a DeferAddOpts struct with `companion_id` and `input` JSON fields.
+//  1. Add a DeferAddOpts struct with `fn_slug` and `input` JSON fields.
 //  2. Add an UnmarshalAny method on it (copy the shape of InvokeFunctionOpts).
 //  3. Add a DeferAddOpts() method on GeneratorOpcode that parses g.Opts.
 func TestDeferAddOpts(t *testing.T) {
@@ -97,14 +97,14 @@ func TestDeferAddOpts(t *testing.T) {
 		Op: enums.OpcodeDeferAdd,
 		ID: "deferred-step",
 		Opts: map[string]any{
-			"companion_id": "score",
-			"input":        map[string]any{"user_id": "u_123"},
+			"fn_slug": "onDefer-score",
+			"input":   map[string]any{"user_id": "u_123"},
 		},
 	}
 
 	opts, err := g.DeferAddOpts()
 	require.NoError(t, err)
-	require.Equal(t, "score", opts.CompanionID)
+	require.Equal(t, "onDefer-score", opts.FnSlug)
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(opts.Input))
 }
 
@@ -113,13 +113,13 @@ func TestDeferCancelOpts(t *testing.T) {
 		Op: enums.OpcodeDeferCancel,
 		ID: "deferred-step",
 		Opts: map[string]any{
-			"companion_id":     "score",
+			"fn_slug":          "onDefer-score",
 			"target_hashed_id": "1bbc125d9bcd5b2a07d7d2ea2f0bb42cc721268b",
 		},
 	}
 
 	opts, err := g.DeferCancelOpts()
 	require.NoError(t, err)
-	require.Equal(t, "score", opts.CompanionID)
+	require.Equal(t, "onDefer-score", opts.FnSlug)
 	require.Equal(t, "1bbc125d9bcd5b2a07d7d2ea2f0bb42cc721268b", opts.TargetHashedID)
 }
