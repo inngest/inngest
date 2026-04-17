@@ -88,6 +88,13 @@ type FunctionRun struct {
 	Cron            sql.NullString
 }
 
+type GooseDbVersion struct {
+	ID        int32
+	VersionID int64
+	IsApplied bool
+	Tstamp    time.Time
+}
+
 type History struct {
 	ID                   ulid.ULID
 	CreatedAt            time.Time
