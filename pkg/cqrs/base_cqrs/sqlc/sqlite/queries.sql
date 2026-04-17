@@ -587,14 +587,14 @@ SELECT
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
-  CAST(json_group_array(json_object(
+  json_group_array(json_object(
     'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
-  )) AS JSON) AS span_fragments
+  )) AS span_fragments
 FROM spans
 WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
