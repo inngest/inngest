@@ -41,7 +41,8 @@ type RunStateKeyGenerator interface {
 	// PauseConsumeKey is an idempotency key used for making sure pause consumptions are idempotent
 	PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string
 
-	// Defers returns the key used to store the defer groups for a given run.
+	// Defers returns the key used to store the run's Defer records, keyed
+	// by each defer's hashed step ID.
 	Defers(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 }
 
@@ -80,9 +81,7 @@ func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, fnID 
 }
 
 func (s runStateKeyGenerator) Defers(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
-	// TODO: spec says groups, but why not `defers`?
-	// Probably to make it more generic but then why not make the `Defers` more generic a la `Groups` as well?
-	return fmt.Sprintf("{%s}:groups:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
+	return fmt.Sprintf("{%s}:defers:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {

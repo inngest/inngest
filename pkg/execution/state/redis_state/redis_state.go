@@ -1,6 +1,7 @@
 package redis_state
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"embed"
@@ -797,6 +798,13 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, d statev2.Defer) error {
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	// Normalize an empty-object Input to nil so the cjson round-trip inside
+	// setDeferStatus.lua doesn't re-encode `{}` as `[]` (cjson cannot
+	// distinguish an empty map from an empty array).
+	if bytes.Equal(bytes.TrimSpace(d.Input), []byte("{}")) {
+		d.Input = nil
+	}
 
 	data, err := json.Marshal(d)
 	if err != nil {

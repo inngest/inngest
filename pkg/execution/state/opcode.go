@@ -421,7 +421,6 @@ func (g GeneratorOpcode) DeferCancelOpts() (*DeferCancelOpts, error) {
 }
 
 type DeferCancelOpts struct {
-	FnSlug         string `json:"fn_slug"`
 	TargetHashedID string `json:"target_hashed_id"`
 }
 

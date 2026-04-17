@@ -176,13 +176,11 @@ func TestDeferCancelOpts(t *testing.T) {
 		Op: enums.OpcodeDeferCancel,
 		ID: "deferred-step",
 		Opts: map[string]any{
-			"fn_slug":          "onDefer-score",
 			"target_hashed_id": "1bbc125d9bcd5b2a07d7d2ea2f0bb42cc721268b",
 		},
 	}
 
 	opts, err := g.DeferCancelOpts()
 	require.NoError(t, err)
-	require.Equal(t, "onDefer-score", opts.FnSlug)
 	require.Equal(t, "1bbc125d9bcd5b2a07d7d2ea2f0bb42cc721268b", opts.TargetHashedID)
 }

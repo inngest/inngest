@@ -642,6 +642,143 @@ func TestSyncStepNonVariantOptsEmitsNoExperimentMetadata(t *testing.T) {
 	require.Equal(meta.SpanNameStep, mocks.tracer.createdSpans[0].name)
 }
 
+// TestCheckpointSyncSteps_DeferAdd asserts that a sync checkpoint containing
+// an OpcodeDeferAdd memoizes the step with null data and persists a Defer
+// record with ScheduleStatusAfterRun — matching the executor's non-checkpoint
+// handleGeneratorDeferAdd path.
+func TestCheckpointSyncSteps_DeferAdd(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID: "step-defer",
+		Op: enums.OpcodeDeferAdd,
+		Opts: map[string]any{
+			"fn_slug": "onDefer-score",
+			"input":   map[string]any{"user_id": "u_123"},
+		},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, op)
+
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-defer", []byte("null")).Return(false, nil)
+	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
+		return d.FnSlug == "onDefer-score" &&
+			d.HashedID == "step-defer" &&
+			d.ScheduleStatus == state.ScheduleStatusAfterRun &&
+			string(d.Input) == `{"user_id":"u_123"}`
+	})).Return(nil)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	mocks.state.AssertExpectations(t)
+	// No discovery step should be enqueued (the SDK is driving the run).
+	mocks.queue.AssertNotCalled(t, "Enqueue")
+	// DeferAdd is a sync opcode — no async mode transition should fire.
+	mocks.tracer.AssertNotCalled(t, "UpdateSpan")
+}
+
+// TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep asserts that when
+// the same batch also contains a RunComplete, SaveStep is elided (we're about
+// to delete state via Finalize anyway). SaveDefer still runs so Finalize's
+// LoadDefers can read the record before deletion.
+func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	ops := []state.GeneratorOpcode{
+		{
+			ID:   "step-defer",
+			Op:   enums.OpcodeDeferAdd,
+			Opts: map[string]any{"fn_slug": "onDefer-score"},
+		},
+		{
+			ID:   "run-complete",
+			Op:   enums.OpcodeRunComplete,
+			Data: json.RawMessage(`{"data": {"status_code": 200}}`),
+		},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+	// >1 op in sync batch triggers ForceStepPlan.
+	mocks.state.On("UpdateMetadata", ctx, testData.metadata.ID, mock.MatchedBy(func(config state.MutableConfig) bool {
+		return config.ForceStepPlan == true
+	})).Return(nil)
+
+	// No SaveStep for the defer (runComplete=true optimization).
+	// SaveDefer still runs so Finalize can read it.
+	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
+		return d.HashedID == "step-defer" && d.FnSlug == "onDefer-score"
+	})).Return(nil)
+
+	// Finalize goes through Executor.Finalize.
+	mocks.executor.On("Finalize", ctx, mock.AnythingOfType("execution.FinalizeOpts")).Return(nil)
+
+	mocks.metrics.On("OnFnFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.RunStatusCompleted)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	mocks.state.AssertNotCalled(t, "SaveStep", ctx, testData.metadata.ID, "step-defer", mock.Anything)
+	mocks.state.AssertExpectations(t)
+	mocks.executor.AssertExpectations(t)
+}
+
+// TestCheckpointSyncSteps_DeferCancel asserts that a sync-checkpointed
+// OpcodeDeferCancel memoizes the cancel step and flips the target defer to
+// Cancelled via SetDeferStatus.
+func TestCheckpointSyncSteps_DeferCancel(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID: "step-cancel",
+		Op: enums.OpcodeDeferCancel,
+		Opts: map[string]any{
+			"target_hashed_id": "step-defer",
+		},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, op)
+
+	// The cancel step memoizes itself (cancel's own hash, not the target's).
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
+	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", state.ScheduleStatusCancelled).Return(nil)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	mocks.state.AssertExpectations(t)
+	mocks.queue.AssertNotCalled(t, "Enqueue")
+	mocks.tracer.AssertNotCalled(t, "UpdateSpan")
+}
+
+// TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID asserts that a
+// DeferCancel without target_hashed_id returns an error — the field is
+// required, not optional.
+func TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-cancel",
+		Op:   enums.OpcodeDeferCancel,
+		Opts: map[string]any{},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, op)
+
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.Error(err)
+	require.Contains(err.Error(), "target_hashed_id")
+
+	mocks.state.AssertNotCalled(t, "SetDeferStatus", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
 //
 //
 // Testing utils.
