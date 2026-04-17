@@ -1606,11 +1606,10 @@ func (x *Pause) GetDataKey() string {
 }
 
 type ConsumePauseOpts struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	Data           []byte                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []byte                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ConsumePauseOpts) Reset() {
@@ -1641,13 +1640,6 @@ func (x *ConsumePauseOpts) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ConsumePauseOpts.ProtoReflect.Descriptor instead.
 func (*ConsumePauseOpts) Descriptor() ([]byte, []int) {
 	return file_state_v2_state_proto_rawDescGZIP(), []int{28}
-}
-
-func (x *ConsumePauseOpts) GetIdempotencyKey() string {
-	if x != nil {
-		return x.IdempotencyKey
-	}
-	return ""
 }
 
 func (x *ConsumePauseOpts) GetData() []byte {
@@ -1937,10 +1929,9 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\n" +
 	"identifier\x18\x03 \x01(\v2\x19.state.v2.PauseIdentifierR\n" +
 	"identifier\x12\x19\n" +
-	"\bdata_key\x18\x04 \x01(\tR\adataKey\"O\n" +
-	"\x10ConsumePauseOpts\x12'\n" +
-	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\fR\x04data\"a\n" +
+	"\bdata_key\x18\x04 \x01(\tR\adataKey\",\n" +
+	"\x10ConsumePauseOpts\x12\x12\n" +
+	"\x04data\x18\x02 \x01(\fR\x04dataJ\x04\b\x01\x10\x02\"a\n" +
 	"\x12ConsumePauseResult\x12\x1f\n" +
 	"\vdid_consume\x18\x01 \x01(\bR\n" +
 	"didConsume\x12*\n" +

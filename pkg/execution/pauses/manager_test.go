@@ -170,8 +170,7 @@ func TestConsumePause(t *testing.T) {
 
 	// Test consuming a pause
 	result, cleanup, err := manager.ConsumePause(ctx, mockRunService, pause, state.ConsumePauseOpts{
-		IdempotencyKey: "test-key",
-		Data:           "test-data",
+		Data: "test-data",
 	})
 	require.NoError(t, err)
 	require.NoError(t, cleanup())

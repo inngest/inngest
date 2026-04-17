@@ -2677,8 +2677,7 @@ func (e *executor) handlePause(
 			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 			// NOTE: cleanup closure is ignored here since there's already another one that will be called
 			_, _, err = e.pm.ConsumePause(context.Background(), e.smv2, *pause, state.ConsumePauseOpts{
-				IdempotencyKey: evtID.String(),
-				Data:           nil,
+				Data: nil,
 			})
 			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 				atomic.AddInt32(&res[1], 1)
@@ -3001,8 +3000,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
 			_, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
-				IdempotencyKey: r.IdempotencyKey,
-				Data:           nil,
+				Data: nil,
 			})
 			switch err {
 			case nil, state.ErrPauseNotFound: // no-op
@@ -3014,8 +3012,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		consumeResult, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
-			IdempotencyKey: r.IdempotencyKey,
-			Data:           r.With,
+			Data: r.With,
 		})
 		if err != nil {
 			return fmt.Errorf("error consuming pause via event: %w", err)
