@@ -72,11 +72,11 @@ export function ScoreSummaryCard({ variants, metrics }: Props) {
   const runnerUp = ranked[1] ?? null;
 
   return (
-    <Card contentClassName="overflow-visible">
-      <Card.Header>
+    <Card className="overflow-visible" contentClassName="overflow-visible">
+      <Card.Header className="rounded-t-md">
         <span className="text-basis text-sm font-medium">Score Summary</span>
       </Card.Header>
-      <Card.Content className="flex gap-6">
+      <Card.Content className="flex gap-6 rounded-b-md">
         <div className="min-w-0 flex-1">
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart
