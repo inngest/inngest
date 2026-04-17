@@ -1,7 +1,6 @@
--- +goose Up
-CREATE TABLE IF NOT EXISTS migrations (version uint64,dirty bool);
-CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON migrations (version);
-CREATE TABLE IF NOT EXISTS apps (
+CREATE TABLE migrations (version uint64,dirty bool);
+CREATE UNIQUE INDEX version_unique ON migrations (version);
+CREATE TABLE apps (
 	id CHAR(36) PRIMARY KEY,
 	name VARCHAR NOT NULL,
 	sdk_language VARCHAR NOT NULL,
@@ -15,7 +14,7 @@ CREATE TABLE IF NOT EXISTS apps (
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL
 , "method" VARCHAR(32) NOT NULL DEFAULT 'serve', "app_version" VARCHAR);
-CREATE TABLE IF NOT EXISTS functions (
+CREATE TABLE functions (
 	-- id CHAR(36) PRIMARY KEY, -- ADD this when https://github.com/duckdb/duckdb/issues/1631 is fixed.
 	id CHAR(36),
 	app_id CHAR(36),
@@ -24,7 +23,7 @@ CREATE TABLE IF NOT EXISTS functions (
 	config VARCHAR NOT NULL,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 , archived_at TIMESTAMP);
-CREATE TABLE IF NOT EXISTS events (
+CREATE TABLE events (
 	internal_id BLOB,
 	-- cannot use CHAR(26) for ulids, nor primary keys for null ter
 	account_id CHAR(36),
@@ -39,7 +38,7 @@ CREATE TABLE IF NOT EXISTS events (
 	event_v VARCHAR,
 	event_ts TIMESTAMP NOT NULL
 );
-CREATE TABLE IF NOT EXISTS function_runs (
+CREATE TABLE function_runs (
 	run_id BLOB NOT NULL,
 	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	function_id CHAR(36),
@@ -51,14 +50,14 @@ CREATE TABLE IF NOT EXISTS function_runs (
 	original_run_id BLOB,
 	cron VARCHAR
 , workspace_id UUID);
-CREATE TABLE IF NOT EXISTS function_finishes (
+CREATE TABLE function_finishes (
 	run_id BLOB,
 	status VARCHAR NOT NULL,
 	output VARCHAR NOT NULL DEFAULT '{}',
 	completed_step_count INT NOT NULL DEFAULT 1,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS history (
+CREATE TABLE history (
 	id BLOB,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -83,7 +82,7 @@ CREATE TABLE IF NOT EXISTS history (
 	invoke_function_result VARCHAR,
 	result VARCHAR
 , step_type VARCHAR);
-CREATE TABLE IF NOT EXISTS event_batches (
+CREATE TABLE event_batches (
 	id CHAR(26) PRIMARY KEY,
 	account_id UUID,
 	workspace_id UUID,
@@ -94,7 +93,7 @@ CREATE TABLE IF NOT EXISTS event_batches (
 	executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	event_ids BLOB NOT NULL
 );
-CREATE TABLE IF NOT EXISTS traces (
+CREATE TABLE traces (
 	timestamp TIMESTAMP NOT NULL,
 	timestamp_unix_ms INT NOT NULL,
 	trace_id VARCHAR NOT NULL,
@@ -115,7 +114,7 @@ CREATE TABLE IF NOT EXISTS traces (
 	links BLOB NOT NULL,  -- list of links
 	run_id CHAR(26)
 );
-CREATE TABLE IF NOT EXISTS trace_runs (
+CREATE TABLE trace_runs (
 	run_id CHAR(26) PRIMARY KEY,
 
 	account_id CHAR(36) NOT NULL,
@@ -136,13 +135,13 @@ CREATE TABLE IF NOT EXISTS trace_runs (
 	batch_id BLOB,
 	cron_schedule TEXT
 , has_ai BOOLEAN NOT NULL DEFAULT FALSE);
-CREATE TABLE IF NOT EXISTS queue_snapshot_chunks (
+CREATE TABLE queue_snapshot_chunks (
     snapshot_id CHAR(26) NOT NULL,
     chunk_id INT NOT NULL,
     data BLOB,
     PRIMARY KEY (snapshot_id, chunk_id)
 );
-CREATE TABLE IF NOT EXISTS spans (
+CREATE TABLE spans (
   -- otel
   span_id TEXT NOT NULL,
   trace_id TEXT NOT NULL,
@@ -164,12 +163,12 @@ CREATE TABLE IF NOT EXISTS spans (
 
   PRIMARY KEY (trace_id, span_id)
 );
-CREATE INDEX IF NOT EXISTS idx_spans_run_id ON spans(run_id);
-CREATE INDEX IF NOT EXISTS idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
-CREATE INDEX IF NOT EXISTS idx_spans_status ON spans(status);
-CREATE INDEX IF NOT EXISTS idx_spans_run_status ON spans(run_id, status);
-CREATE INDEX IF NOT EXISTS idx_spans_account_status_time ON spans(account_id, status, start_time);
-CREATE TABLE IF NOT EXISTS worker_connections (
+CREATE INDEX idx_spans_run_id ON spans(run_id);
+CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
+CREATE INDEX idx_spans_status ON spans(status);
+CREATE INDEX idx_spans_run_status ON spans(run_id, status);
+CREATE INDEX idx_spans_account_status_time ON spans(account_id, status, start_time);
+CREATE TABLE worker_connections (
     account_id CHAR(36) NOT NULL,
     workspace_id CHAR(36) NOT NULL,
 
@@ -205,24 +204,3 @@ CREATE TABLE IF NOT EXISTS worker_connections (
 
     PRIMARY KEY(id, app_name)
 );
-
--- +goose Down
-DROP TABLE IF EXISTS worker_connections;
-DROP INDEX IF EXISTS idx_spans_account_status_time;
-DROP INDEX IF EXISTS idx_spans_run_status;
-DROP INDEX IF EXISTS idx_spans_status;
-DROP INDEX IF EXISTS idx_spans_run_id_dynamic_start_time;
-DROP INDEX IF EXISTS idx_spans_run_id;
-DROP TABLE IF EXISTS spans;
-DROP TABLE IF EXISTS queue_snapshot_chunks;
-DROP TABLE IF EXISTS trace_runs;
-DROP TABLE IF EXISTS traces;
-DROP TABLE IF EXISTS event_batches;
-DROP TABLE IF EXISTS history;
-DROP TABLE IF EXISTS function_finishes;
-DROP TABLE IF EXISTS function_runs;
-DROP TABLE IF EXISTS events;
-DROP TABLE IF EXISTS functions;
-DROP TABLE IF EXISTS apps;
-DROP INDEX IF EXISTS version_unique;
-DROP TABLE IF EXISTS migrations;

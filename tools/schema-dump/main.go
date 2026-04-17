@@ -9,19 +9,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -29,29 +27,33 @@ import (
 )
 
 const (
-	defaultSQLiteOutput   = "pkg/cqrs/base_cqrs/sqlc/sqlite/schema.sql"
-	defaultPostgresOutput = "pkg/cqrs/base_cqrs/sqlc/postgres/schema.sql"
-	defaultPostgresImage  = "postgres:16-alpine"
-	defaultPostgresDBName = "inngest_schema_dump"
-	defaultPostgresUser   = "postgres"
+	defaultSQLiteOutputs   = "pkg/cqrs/base_cqrs/sqlc/sqlite/schema.sql,pkg/db/sqlite/schema.sql"
+	defaultPostgresOutputs = "pkg/cqrs/base_cqrs/sqlc/postgres/schema.sql,pkg/db/postgres/schema.sql"
+	defaultPostgresImage   = "postgres:16-alpine"
+	defaultPostgresDBName  = "inngest_schema_dump"
+	defaultPostgresUser    = "postgres"
 )
 
 type config struct {
-	dialect        string
-	sqliteOutput   string
-	postgresOutput string
-	postgresImage  string
-	postgresWait   time.Duration
+	dialect         string
+	sqliteOutputs   []string
+	postgresOutputs []string
+	postgresImage   string
+	postgresWait    time.Duration
 }
 
 func main() {
 	cfg := config{}
+	var sqliteOutputs string
+	var postgresOutputs string
 	flag.StringVar(&cfg.dialect, "dialect", "all", "Which schema to dump: sqlite, postgres, or all")
-	flag.StringVar(&cfg.sqliteOutput, "sqlite-output", defaultSQLiteOutput, "Path to write the SQLite schema dump")
-	flag.StringVar(&cfg.postgresOutput, "postgres-output", defaultPostgresOutput, "Path to write the Postgres schema dump")
+	flag.StringVar(&sqliteOutputs, "sqlite-output", defaultSQLiteOutputs, "Comma-separated paths to write the SQLite schema dump")
+	flag.StringVar(&postgresOutputs, "postgres-output", defaultPostgresOutputs, "Comma-separated paths to write the Postgres schema dump")
 	flag.StringVar(&cfg.postgresImage, "postgres-image", defaultPostgresImage, "Docker image to use for the ephemeral Postgres instance")
 	flag.DurationVar(&cfg.postgresWait, "postgres-wait", 30*time.Second, "How long to wait for the Postgres container to accept connections")
 	flag.Parse()
+	cfg.sqliteOutputs = splitOutputPaths(sqliteOutputs)
+	cfg.postgresOutputs = splitOutputPaths(postgresOutputs)
 
 	if err := run(context.Background(), cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "schema dump failed: %v\n", err)
@@ -62,44 +64,44 @@ func main() {
 func run(ctx context.Context, cfg config) error {
 	switch cfg.dialect {
 	case "sqlite":
-		return dumpSQLiteToFile(ctx, cfg.sqliteOutput)
+		return dumpSQLiteToFiles(ctx, cfg.sqliteOutputs)
 	case "postgres":
-		return dumpPostgresToFile(ctx, cfg.postgresOutput, cfg.postgresImage, cfg.postgresWait)
+		return dumpPostgresToFiles(ctx, cfg.postgresOutputs, cfg.postgresImage, cfg.postgresWait)
 	case "all":
-		if err := dumpSQLiteToFile(ctx, cfg.sqliteOutput); err != nil {
+		if err := dumpSQLiteToFiles(ctx, cfg.sqliteOutputs); err != nil {
 			return err
 		}
-		return dumpPostgresToFile(ctx, cfg.postgresOutput, cfg.postgresImage, cfg.postgresWait)
+		return dumpPostgresToFiles(ctx, cfg.postgresOutputs, cfg.postgresImage, cfg.postgresWait)
 	default:
 		return fmt.Errorf("unsupported dialect %q", cfg.dialect)
 	}
 }
 
-func dumpSQLiteToFile(ctx context.Context, outputPath string) error {
+func dumpSQLiteToFiles(ctx context.Context, outputPaths []string) error {
 	schema, err := dumpSQLiteSchema(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := writeSchema(outputPath, schema); err != nil {
+	if err := writeSchemaFiles(outputPaths, schema); err != nil {
 		return err
 	}
 
-	fmt.Printf("wrote sqlite schema to %s\n", outputPath)
+	fmt.Printf("wrote sqlite schema to %s\n", strings.Join(outputPaths, ", "))
 	return nil
 }
 
-func dumpPostgresToFile(ctx context.Context, outputPath, image string, wait time.Duration) error {
+func dumpPostgresToFiles(ctx context.Context, outputPaths []string, image string, wait time.Duration) error {
 	schema, err := dumpPostgresSchema(ctx, image, wait)
 	if err != nil {
 		return err
 	}
 
-	if err := writeSchema(outputPath, schema); err != nil {
+	if err := writeSchemaFiles(outputPaths, schema); err != nil {
 		return err
 	}
 
-	fmt.Printf("wrote postgres schema to %s\n", outputPath)
+	fmt.Printf("wrote postgres schema to %s\n", strings.Join(outputPaths, ", "))
 	return nil
 }
 
@@ -121,6 +123,10 @@ func dumpSQLiteSchema(ctx context.Context) (string, error) {
 		return "", err
 	}
 
+	if _, err := db.ExecContext(ctx, `DROP TABLE IF EXISTS goose_db_version`); err != nil {
+		return "", fmt.Errorf("dropping sqlite goose metadata table: %w", err)
+	}
+
 	// Use the sqlite3 shell's .schema output instead of reconstructing DDL from
 	// sqlite_schema rows ourselves. This stays closer to the SQL text SQLite
 	// emits for humans, which is a better fit for the checked-in sqlc schema.
@@ -133,7 +139,7 @@ func dumpSQLiteSchema(ctx context.Context) (string, error) {
 		return "", errors.New("sqlite schema dump was empty")
 	}
 
-	return dump, nil
+	return normalizeSQLiteDump(dump), nil
 }
 
 func dumpPostgresSchema(ctx context.Context, image string, wait time.Duration) (string, error) {
@@ -156,8 +162,12 @@ func dumpPostgresSchema(ctx context.Context, image string, wait time.Duration) (
 	}
 	defer db.Close()
 
-	if err := migratePostgres(ctx, db, dsn); err != nil {
+	if err := migratePostgres(ctx, db); err != nil {
 		return "", err
+	}
+
+	if _, err := db.ExecContext(ctx, `DROP TABLE IF EXISTS goose_db_version`); err != nil {
+		return "", fmt.Errorf("dropping postgres goose metadata table: %w", err)
 	}
 
 	// Run pg_dump inside the container that already has the migrated schema. This
@@ -237,58 +247,34 @@ func startPostgresContainer(ctx context.Context, image, password string, startup
 }
 
 func migrateSQLite(ctx context.Context, db *sql.DB) error {
-	// Apply the embedded SQLite migrations into a fresh temporary database, then
-	// introspect the resulting schema from sqlite_schema.
-	src, err := iofs.New(dbsqlite.MigrationsFS, "migrations")
+	migrationsFS, err := fs.Sub(dbsqlite.MigrationsFS, "migrations")
 	if err != nil {
 		return err
 	}
 
-	driver, err := sqlite.WithInstance(db, &sqlite.Config{
-		MigrationsTable: "migrations",
-		NoTxWrap:        true,
-	})
+	provider, err := goose.NewProvider(goose.DialectSQLite3, db, migrationsFS)
 	if err != nil {
 		return err
 	}
 
-	m, err := migrate.NewWithInstance("iofs", src, "sqlite", driver)
-	if err != nil {
-		return err
-	}
-
-	err = m.Up()
-	if err == migrate.ErrNoChange {
-		return nil
-	}
+	_, err = provider.Up(ctx)
 	return err
 }
 
-func migratePostgres(ctx context.Context, db *sql.DB, dsn string) error {
+func migratePostgres(ctx context.Context, db *sql.DB) error {
 	// Apply the embedded Postgres migrations into the ephemeral container, then
 	// use pg_dump to extract the final DDL from the database itself.
-	src, err := iofs.New(dbpostgres.MigrationsFS, "migrations")
+	migrationsFS, err := fs.Sub(dbpostgres.MigrationsFS, "migrations")
 	if err != nil {
 		return err
 	}
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{
-		MigrationsTable: "migrations",
-		DatabaseName:    defaultPostgresDBName,
-	})
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrationsFS)
 	if err != nil {
 		return err
 	}
 
-	m, err := migrate.NewWithInstance("iofs", src, dsn, driver)
-	if err != nil {
-		return err
-	}
-
-	err = m.Up()
-	if err == migrate.ErrNoChange {
-		return nil
-	}
+	_, err = provider.Up(ctx)
 	return err
 }
 
@@ -322,11 +308,81 @@ func waitForPostgres(ctx context.Context, dsn string, timeout time.Duration) (*s
 	return nil, fmt.Errorf("waiting for postgres: %w", lastErr)
 }
 
-func writeSchema(outputPath, contents string) error {
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
-		return err
+func writeSchemaFiles(outputPaths []string, contents string) error {
+	if len(outputPaths) == 0 {
+		return errors.New("no output paths configured")
 	}
-	return os.WriteFile(outputPath, []byte(contents), 0o644)
+
+	for _, outputPath := range outputPaths {
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
+			return err
+		}
+		if err := os.WriteFile(outputPath, []byte(contents), 0o644); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func splitOutputPaths(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+
+	seen := map[string]struct{}{}
+	outputs := make([]string, 0, 2)
+	for _, item := range strings.Split(raw, ",") {
+		path := strings.TrimSpace(item)
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		outputs = append(outputs, path)
+	}
+
+	return outputs
+}
+
+func normalizeSQLiteDump(raw string) string {
+	lines := strings.Split(raw, "\n")
+	filtered := make([]string, 0, len(lines))
+	blankPending := false
+	skipStatement := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if skipStatement {
+			if strings.HasSuffix(trimmed, ";") {
+				skipStatement = false
+			}
+			continue
+		}
+
+		switch {
+		case trimmed == "":
+			blankPending = len(filtered) > 0
+			continue
+		case strings.Contains(trimmed, "goose_db_version"):
+			skipStatement = !strings.HasSuffix(trimmed, ";")
+			continue
+		case strings.Contains(trimmed, "sqlite_sequence"):
+			skipStatement = !strings.HasSuffix(trimmed, ";")
+			continue
+		}
+
+		if blankPending && len(filtered) > 0 {
+			filtered = append(filtered, "")
+		}
+		blankPending = false
+		filtered = append(filtered, strings.TrimRight(line, " \t"))
+	}
+
+	return strings.TrimSpace(strings.Join(filtered, "\n")) + "\n"
 }
 
 func normalizePostgresDump(raw string) string {
