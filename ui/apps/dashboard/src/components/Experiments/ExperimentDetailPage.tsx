@@ -7,11 +7,12 @@ import {
 } from '@inngest/components/Experiments';
 import {
   HelperPanelControl,
+  HelperPanelFrame,
   type HelperItem,
 } from '@inngest/components/HelperPanelControl';
 import { Header } from '@inngest/components/Header/Header';
 import { Skeleton } from '@inngest/components/Skeleton';
-import { RiCloseLine, RiFlaskLine, RiListOrdered2 } from '@remixicon/react';
+import { RiFlaskLine, RiListOrdered2 } from '@remixicon/react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { ExperimentDetailToolbar } from '@/components/Experiments/ExperimentDetailToolbar';
@@ -29,17 +30,24 @@ type Props = {
   experimentName: string;
 };
 
+const INFO_PANEL = 'Info';
+const SCORING_PANEL = 'Scoring formula';
+type PanelKey = typeof INFO_PANEL | typeof SCORING_PANEL;
+
 export function ExperimentDetailPage({ experimentName }: Props) {
   const environment = useEnvironment();
 
-  // --- state ---
   const [preset, setPreset] = useState<TimeRangePreset>('24h');
   const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [showInactive, setShowInactive] = useState(false);
-  const [activePanel, setActivePanel] = useState<string | null>('Info');
-  // --- hooks ---
+  const [activePanel, setActivePanel] = useState<PanelKey | null>(INFO_PANEL);
+
   const detail = useExperimentDetail(experimentName, preset, null);
   const scoring = useScoringConfig(experimentName);
+
+  const togglePanel = useCallback((key: PanelKey) => {
+    setActivePanel((p) => (p === key ? null : key));
+  }, []);
 
   // --- available variants for toolbar filter ---
   const availableVariants = useMemo(
@@ -72,13 +80,11 @@ export function ExperimentDetailPage({ experimentName }: Props) {
     return top?.variant.variantName ?? null;
   }, [scoredVariants]);
 
-  // --- enabled metrics for MetricPanel grid ---
   const enabledMetrics = useMemo(
     () => (scoring.metrics ?? []).filter((m) => m.enabled),
     [scoring.metrics],
   );
 
-  // --- onOpenInsights callback ---
   const onOpenInsights = useCallback(() => {
     const sql = `SELECT * FROM isteps WHERE \`inngest.experiment.values.experiment_name\` = '${experimentName.replace(
       /'/g,
@@ -92,17 +98,14 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
   const helperItems: HelperItem[] = [
     {
-      title: 'Info',
+      title: INFO_PANEL,
       icon: <RiFlaskLine className="h-4 w-4" />,
-      action: () => setActivePanel((p) => (p === 'Info' ? null : 'Info')),
+      action: () => togglePanel(INFO_PANEL),
     },
     {
-      title: 'Scoring formula',
+      title: SCORING_PANEL,
       icon: <RiListOrdered2 className="h-4 w-4" />,
-      action: () =>
-        setActivePanel((p) =>
-          p === 'Scoring formula' ? null : 'Scoring formula',
-        ),
+      action: () => togglePanel(SCORING_PANEL),
     },
   ];
 
@@ -197,30 +200,18 @@ export function ExperimentDetailPage({ experimentName }: Props) {
         {/* Sidebar panel */}
         {activePanel && (
           <aside className="border-subtle flex w-[360px] shrink-0 flex-col overflow-hidden border-l">
-            {/* Panel header — matches InsightsHelperPanel */}
-            <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center justify-between border-b px-3">
-              <div className="flex flex-row items-center gap-2">
-                {helperItems.find((i) => i.title === activePanel)?.icon ?? null}
-                <div className="text-sm font-normal">{activePanel}</div>
-              </div>
-              <button
-                aria-label="Close panel"
-                className="hover:bg-canvasSubtle hover:text-basis text-subtle -mr-1 flex h-8 w-8 items-center justify-center rounded-md transition-colors"
-                onClick={() => setActivePanel(null)}
-                type="button"
-              >
-                <RiCloseLine className="h-4 w-4" />
-              </button>
-            </div>
-            {/* Panel content */}
-            <div className="flex-1 overflow-y-auto">
-              {activePanel === 'Info' && detail.data && (
+            <HelperPanelFrame
+              title={activePanel}
+              icon={helperItems.find((i) => i.title === activePanel)?.icon}
+              onClose={() => setActivePanel(null)}
+            >
+              {activePanel === INFO_PANEL && detail.data && (
                 <InfoSidebar
                   detail={detail.data}
                   topVariantName={topVariantName}
                 />
               )}
-              {activePanel === 'Scoring formula' && scoring.metrics && (
+              {activePanel === SCORING_PANEL && scoring.metrics && (
                 <ScoringFormulaSidebar
                   metrics={scoring.metrics}
                   onUpdateMetric={scoring.updateMetric}
@@ -228,7 +219,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                   isSaving={scoring.isSaving}
                 />
               )}
-            </div>
+            </HelperPanelFrame>
           </aside>
         )}
 

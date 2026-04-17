@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
+import { InlineCode } from '@inngest/components/Code';
 import { ExperimentsTable } from '@inngest/components/Experiments';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
@@ -63,6 +64,13 @@ export default function ExperimentsComponent() {
         error={error}
         refetch={refetch}
         onRowClick={handleRowClick}
+        emptyDescription={
+          <>
+            To define an experiment, use{' '}
+            <InlineCode>group.experiment()</InlineCode> on your Inngest
+            function.
+          </>
+        }
       />
     </>
   );

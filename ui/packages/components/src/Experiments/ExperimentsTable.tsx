@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { InlineCode } from '@inngest/components/Code';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Search } from '@inngest/components/Forms/Search';
 import { Select } from '@inngest/components/Select/Select';
@@ -101,6 +100,8 @@ type ExperimentsTableProps = {
   error: Error | null;
   refetch: () => void;
   onRowClick?: (experimentName: string) => void;
+  /** Copy shown in the blank state when no experiments exist (unfiltered). */
+  emptyDescription: ReactNode;
 };
 
 export function ExperimentsTable({
@@ -109,6 +110,7 @@ export function ExperimentsTable({
   error,
   refetch,
   onRowClick,
+  emptyDescription: unfilteredEmptyDescription,
 }: ExperimentsTableProps) {
   const [searchInput, setSearchInput] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
@@ -148,14 +150,9 @@ export function ExperimentsTable({
     : statusFilter === 'completed'
     ? 'No completed experiments'
     : 'No experiments found';
-  const emptyDescription = isFiltered ? (
-    'Try adjusting your filters to find experiments.'
-  ) : (
-    <>
-      To define an experiment, use <InlineCode>group.experiment()</InlineCode> on your Inngest
-      function.
-    </>
-  );
+  const emptyDescription = isFiltered
+    ? 'Try adjusting your filters to find experiments.'
+    : unfilteredEmptyDescription;
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">

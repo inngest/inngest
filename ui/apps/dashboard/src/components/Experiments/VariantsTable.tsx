@@ -265,6 +265,10 @@ export function VariantsTable({
   }, [rows, enabledMetrics]);
 
   const columns = useMemo(() => {
+    // tanstack-react-table's ColumnDef is invariant in its value type, so a
+    // mixed list of accessor columns (score: number, variantName: string) plus
+    // display columns only unifies at `any`. Scoped to this local array.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cols: ColumnDef<RowData, any>[] = [];
 
     // 1. Score

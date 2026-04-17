@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import { Input } from '@inngest/components/Forms/Input';
@@ -96,8 +96,11 @@ export function MetricAccordionItem({
   defaultExpanded?: boolean;
   collapsible?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded || !collapsible);
-  const toggle = collapsible ? () => setExpanded((v) => !v) : undefined;
+  const [internalExpanded, setInternalExpanded] = useState(
+    defaultExpanded ?? false,
+  );
+  const expanded = collapsible ? internalExpanded : true;
+  const toggle = collapsible ? () => setInternalExpanded((v) => !v) : undefined;
 
   return (
     <div className="border-subtle rounded-md border">
@@ -241,10 +244,11 @@ function PointsInput({
   disabled?: boolean;
 }) {
   const [localValue, setLocalValue] = useState(String(value));
-
-  useEffect(() => {
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setLocalValue(String(value));
-  }, [value]);
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (

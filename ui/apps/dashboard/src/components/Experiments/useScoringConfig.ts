@@ -12,9 +12,9 @@ const DEBOUNCE_MS = 600;
 /**
  * Manages local scoring-config state with debounced persistence.
  *
- * Every call to `setMetrics`, `updateMetric`, or `enableMetric` applies
- * optimistically and schedules a save after DEBOUNCE_MS of inactivity.
- * The save is skipped when the local state matches the last-known server state.
+ * Every mutator (`updateMetric`, `enableMetric`) applies optimistically and
+ * schedules a save after DEBOUNCE_MS of inactivity. The save is skipped when
+ * the local state matches the last-known server state.
  */
 export function useScoringConfig(experimentName: string) {
   const scoring = useExperimentScoringConfig(experimentName);
@@ -82,7 +82,6 @@ export function useScoringConfig(experimentName: string) {
 
   return {
     metrics: localMetrics,
-    setMetrics: setLocalMetrics,
     updateMetric,
     enableMetric,
     pointsLeft,

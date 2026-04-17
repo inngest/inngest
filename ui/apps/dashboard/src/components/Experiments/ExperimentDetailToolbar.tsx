@@ -18,11 +18,19 @@ type Props = {
   availableVariants: string[];
 };
 
-const TIME_OPTIONS: { id: TimeRangePreset; name: string }[] = [
+const TIME_OPTIONS = [
   { id: '24h', name: 'Last 24 hours' },
   { id: '7d', name: 'Last 7 days' },
   { id: '30d', name: 'Last 30 days' },
-];
+] as const satisfies readonly { id: TimeRangePreset; name: string }[];
+
+const DEFAULT_TIME_OPTION = TIME_OPTIONS[0];
+
+const TIME_PRESET_SET = new Set<string>(TIME_OPTIONS.map((o) => o.id));
+
+function isTimeRangePreset(id: string): id is TimeRangePreset {
+  return TIME_PRESET_SET.has(id);
+}
 
 function VariantMultiSelect({
   availableVariants,
@@ -56,11 +64,12 @@ function VariantMultiSelect({
   const allSelected =
     draft.length === 0 || draft.length === availableVariants.length;
 
+  const [firstSelected] = selectedVariants;
   const label =
-    selectedVariants.length === 0
+    selectedVariants.length === 0 || firstSelected === undefined
       ? 'All variants'
       : selectedVariants.length === 1
-      ? selectedVariants[0]!
+      ? firstSelected
       : `${selectedVariants.length} variants`;
 
   const handleApply = () => {
@@ -127,7 +136,7 @@ export function ExperimentDetailToolbar({
   availableVariants,
 }: Props) {
   const selectedTimeOption =
-    TIME_OPTIONS.find((o) => o.id === preset) ?? TIME_OPTIONS[0]!;
+    TIME_OPTIONS.find((o) => o.id === preset) ?? DEFAULT_TIME_OPTION;
 
   return (
     <div className="flex items-center justify-between gap-3">
@@ -137,7 +146,7 @@ export function ExperimentDetailToolbar({
           isLabelVisible={false}
           value={selectedTimeOption}
           onChange={(opt: Option) => {
-            onPresetChange(opt.id as TimeRangePreset);
+            if (isTimeRangePreset(opt.id)) onPresetChange(opt.id);
           }}
           size="small"
         >

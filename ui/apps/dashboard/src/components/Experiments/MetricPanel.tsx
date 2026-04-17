@@ -22,8 +22,21 @@ import { findExtremum } from '@/lib/experiments/score';
 const DOT_RADIUS = 5;
 const LINE_HEIGHT = 2;
 
-function LineDotShape(props: any) {
-  const { x, y, width, height, fill } = props;
+type BarShapeProps = {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+};
+
+function LineDotShape({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  fill,
+}: BarShapeProps) {
   const cy = y + height / 2;
   return (
     <g>
@@ -75,13 +88,13 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
     [rows, metric.invert],
   );
 
-  const domain = useMemo(() => {
+  const domain = useMemo<[number, number]>(() => {
     let hi = metric.maxValue;
     for (const row of rows) {
       hi = Math.max(hi, row.value);
     }
     if (hi <= 0) hi = 1;
-    return [0, hi] as const;
+    return [0, hi];
   }, [rows, metric.maxValue]);
 
   const { chartHeight, yAxisWidth } = useMemo(
