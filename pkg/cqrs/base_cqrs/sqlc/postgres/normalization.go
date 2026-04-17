@@ -457,3 +457,36 @@ func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
 		Valid:      true,
 	}
 }
+
+// rawJSONToNullRawMessage handles values that are already valid JSON (string or []byte).
+// Unlike toNullRawMessage, it avoids double-encoding by using the raw JSON directly.
+func rawJSONToNullRawMessage(v interface{}) pqtype.NullRawMessage {
+	switch val := v.(type) {
+	case string:
+		if val == "" {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		if !json.Valid([]byte(val)) {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(val),
+			Valid:      true,
+		}
+	case []byte:
+		if len(val) == 0 {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		if !json.Valid(val) {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(val),
+			Valid:      true,
+		}
+	case nil:
+		return pqtype.NullRawMessage{Valid: false}
+	default:
+		return toNullRawMessage(v)
+	}
+}

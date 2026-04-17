@@ -858,12 +858,12 @@ func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.Inser
 	pgArg := InsertSpanParams{
 		AccountID:      arg.AccountID,
 		AppID:          arg.AppID,
-		Attributes:     toNullRawMessage(arg.Attributes),
+		Attributes:     rawJSONToNullRawMessage(arg.Attributes),
 		DynamicSpanID:  arg.DynamicSpanID,
 		EndTime:        arg.EndTime,
 		EnvID:          arg.EnvID,
 		FunctionID:     arg.FunctionID,
-		Links:          toNullRawMessage(arg.Links),
+		Links:          rawJSONToNullRawMessage(arg.Links),
 		Name:           arg.Name,
 		Output:         toNullRawMessage(arg.Output),
 		ParentSpanID:   arg.ParentSpanID,
@@ -875,7 +875,7 @@ func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.Inser
 		DebugRunID:     arg.DebugRunID,
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
-		EventIds:       toNullRawMessage(arg.EventIds),
+		EventIds:       rawJSONToNullRawMessage(arg.EventIds),
 	}
 
 	return q.db.InsertSpan(ctx, pgArg)
