@@ -1,5 +1,7 @@
+CREATE TABLE migrations (version uint64,dirty bool);
+CREATE UNIQUE INDEX version_unique ON migrations (version);
 CREATE TABLE apps (
-	id UUID PRIMARY KEY,
+	id CHAR(36) PRIMARY KEY,
 	name VARCHAR NOT NULL,
 	sdk_language VARCHAR NOT NULL,
 	sdk_version VARCHAR NOT NULL,
@@ -8,15 +10,22 @@ CREATE TABLE apps (
 	status VARCHAR NOT NULL,
 	error TEXT,
 	checksum VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP,
-	url VARCHAR NOT NULL,
-    method VARCHAR NOT NULL DEFAULT 'serve',
-    app_version VARCHAR
-);
-
+	url VARCHAR NOT NULL
+, "method" VARCHAR(32) NOT NULL DEFAULT 'serve', "app_version" VARCHAR);
+CREATE TABLE functions (
+	-- id CHAR(36) PRIMARY KEY, -- ADD this when https://github.com/duckdb/duckdb/issues/1631 is fixed.
+	id CHAR(36),
+	app_id CHAR(36),
+	name VARCHAR NOT NULL,
+	slug VARCHAR NOT NULL,
+	config VARCHAR NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+, archived_at TIMESTAMP);
 CREATE TABLE events (
-	internal_id CHAR(26) PRIMARY KEY,
+	internal_id BLOB,
+	-- cannot use CHAR(26) for ulids, nor primary keys for null ter
 	account_id CHAR(36),
 	workspace_id CHAR(36),
 	source VARCHAR(255),
@@ -29,44 +38,30 @@ CREATE TABLE events (
 	event_v VARCHAR,
 	event_ts TIMESTAMP NOT NULL
 );
-
-CREATE TABLE functions (
-	id UUID PRIMARY KEY,
-	app_id UUID,
-	name VARCHAR NOT NULL,
-	slug VARCHAR NOT NULL,
-	config VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL,
-	archived_at TIMESTAMP
-);
-
 CREATE TABLE function_runs (
-	run_id CHAR(26) NOT NULL,
-	run_started_at TIMESTAMP NOT NULL,
-	function_id UUID,
+	run_id BLOB NOT NULL,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	function_id CHAR(36),
 	function_version INT NOT NULL,
-	trigger_type VARCHAR NOT NULL,
-	event_id CHAR(26) NOT NULL,
-	batch_id CHAR(26),
-	original_run_id CHAR(26),
-	cron VARCHAR,
-	workspace_id UUID
-);
-
+	trigger_type VARCHAR NOT NULL DEFAULT 'event',
+	-- or 'cron' if this is a cron-based function.
+	event_id BLOB NOT NULL,
+	batch_id BLOB,
+	original_run_id BLOB,
+	cron VARCHAR
+, workspace_id UUID);
 CREATE TABLE function_finishes (
 	run_id BLOB,
-	-- Ignoring not null because of https://github.com/sqlc-dev/sqlc/issues/2806#issuecomment-1750038624
-	status VARCHAR,
-	output VARCHAR DEFAULT '{}',
-	completed_step_count INT DEFAULT 1,
-	created_at TIMESTAMP
+	status VARCHAR NOT NULL,
+	output VARCHAR NOT NULL DEFAULT '{}',
+	completed_step_count INT NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE history (
 	id BLOB,
-	created_at TIMESTAMP NOT NULL,
-	run_started_at TIMESTAMP NOT NULL,
-	function_id UUID,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	function_id CHAR(36),
 	function_version INT NOT NULL,
 	run_id BLOB NOT NULL,
 	event_id BLOB NOT NULL,
@@ -78,7 +73,6 @@ CREATE TABLE history (
 	latency_ms INT,
 	step_name VARCHAR,
 	step_id VARCHAR,
-	step_type VARCHAR,
 	url VARCHAR,
 	cancel_request VARCHAR,
 	sleep VARCHAR,
@@ -87,8 +81,7 @@ CREATE TABLE history (
 	invoke_function VARCHAR,
 	invoke_function_result VARCHAR,
 	result VARCHAR
-);
-
+, step_type VARCHAR);
 CREATE TABLE event_batches (
 	id CHAR(26) PRIMARY KEY,
 	account_id UUID,
@@ -100,7 +93,6 @@ CREATE TABLE event_batches (
 	executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	event_ids BLOB NOT NULL
 );
-
 CREATE TABLE traces (
 	timestamp TIMESTAMP NOT NULL,
 	timestamp_unix_ms INT NOT NULL,
@@ -122,7 +114,6 @@ CREATE TABLE traces (
 	links BLOB NOT NULL,  -- list of links
 	run_id CHAR(26)
 );
-
 CREATE TABLE trace_runs (
 	run_id CHAR(26) PRIMARY KEY,
 
@@ -142,17 +133,41 @@ CREATE TABLE trace_runs (
 	output BLOB,
 	is_debounce BOOLEAN NOT NULL,
 	batch_id BLOB,
-	cron_schedule TEXT,
-	has_ai BOOLEAN NOT NULL DEFAULT FALSE
-);
-
+	cron_schedule TEXT
+, has_ai BOOLEAN NOT NULL DEFAULT FALSE);
 CREATE TABLE queue_snapshot_chunks (
     snapshot_id CHAR(26) NOT NULL,
     chunk_id INT NOT NULL,
     data BLOB,
     PRIMARY KEY (snapshot_id, chunk_id)
 );
+CREATE TABLE spans (
+  -- otel
+  span_id TEXT NOT NULL,
+  trace_id TEXT NOT NULL,
+  parent_span_id TEXT,
+  name TEXT NOT NULL,
+  start_time DATETIME NOT NULL,
+  end_time DATETIME NOT NULL,
+  attributes JSON,
+  links JSON,
 
+  -- custom
+  dynamic_span_id TEXT,
+  account_id TEXT NOT NULL,
+  app_id TEXT NOT NULL,
+  function_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  env_id TEXT NOT NULL,
+  output JSON, debug_run_id CHAR(36), debug_session_id CHAR(36), status TEXT, input JSON, event_ids JSON,
+
+  PRIMARY KEY (trace_id, span_id)
+);
+CREATE INDEX idx_spans_run_id ON spans(run_id);
+CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
+CREATE INDEX idx_spans_status ON spans(status);
+CREATE INDEX idx_spans_run_status ON spans(run_id, status);
+CREATE INDEX idx_spans_account_status_time ON spans(account_id, status, start_time);
 CREATE TABLE worker_connections (
     account_id CHAR(36) NOT NULL,
     workspace_id CHAR(36) NOT NULL,
@@ -165,7 +180,7 @@ CREATE TABLE worker_connections (
     instance_id VARCHAR NOT NULL,
     status INT NOT NULL,
     worker_ip VARCHAR NOT NULL,
-    max_worker_concurrency INT NOT NULL,
+    max_worker_concurrency INT NOT NULL DEFAULT 0,
 
     connected_at INT NOT NULL,
     last_heartbeat_at INT,
@@ -189,34 +204,3 @@ CREATE TABLE worker_connections (
 
     PRIMARY KEY(id, app_name)
 );
-
-CREATE TABLE spans (
-  -- otel
-  span_id TEXT NOT NULL,
-  trace_id TEXT NOT NULL,
-  parent_span_id TEXT,
-  name TEXT NOT NULL,
-  start_time DATETIME NOT NULL,
-  end_time DATETIME NOT NULL,
-  attributes JSON,
-  links JSON,
-
-  -- custom
-  dynamic_span_id TEXT,
-  account_id TEXT NOT NULL,
-  app_id TEXT NOT NULL,
-  function_id TEXT NOT NULL,
-  run_id TEXT NOT NULL,
-  env_id TEXT NOT NULL,
-  output JSON,
-  input JSON,
-  debug_run_id TEXT,
-  debug_session_id TEXT,
-  status TEXT,
-  event_ids JSON,
-
-  PRIMARY KEY (trace_id, span_id)
-);
-
-CREATE INDEX idx_spans_run_id ON spans(run_id); -- mainly for debugging
-CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);

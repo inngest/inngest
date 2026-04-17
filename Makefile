@@ -59,7 +59,6 @@ protobuf: ## Generate protobuf files
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
 queries: ## Generate sqlc queries
-	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	sqlc generate
 
 .PHONY: schema-dump

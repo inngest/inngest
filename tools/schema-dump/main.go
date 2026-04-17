@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -120,54 +121,19 @@ func dumpSQLiteSchema(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	// Read the canonical DDL back out of SQLite's schema table after migrations
-	// have run. We keep only user-defined tables and indexes, skip the migration
-	// bookkeeping table, and preserve creation order so the generated schema file
-	// is stable across runs.
-	const query = `
-SELECT sql
-FROM sqlite_schema
-WHERE sql IS NOT NULL
-  AND type IN ('table', 'index')
-  AND name NOT LIKE 'sqlite_%'
-  AND name != 'migrations'
-ORDER BY
-  CASE type WHEN 'table' THEN 0 ELSE 1 END,
-  rowid
-`
-
-	rows, err := db.QueryContext(ctx, query)
+	// Use the sqlite3 shell's .schema output instead of reconstructing DDL from
+	// sqlite_schema rows ourselves. This stays closer to the SQL text SQLite
+	// emits for humans, which is a better fit for the checked-in sqlc schema.
+	dump, err := runCommand(ctx, "sqlite3", dbPath, ".schema")
 	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	statements := []string{}
-	for rows.Next() {
-		var stmt string
-		if err := rows.Scan(&stmt); err != nil {
-			return "", err
-		}
-
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" {
-			continue
-		}
-		if !strings.HasSuffix(stmt, ";") {
-			stmt += ";"
-		}
-		statements = append(statements, stmt)
+		return "", fmt.Errorf("dumping sqlite schema: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		return "", err
-	}
-
-	if len(statements) == 0 {
+	if len(dump) == 0 {
 		return "", errors.New("sqlite schema dump was empty")
 	}
 
-	return strings.Join(statements, "\n\n") + "\n", nil
+	return dump, nil
 }
 
 func dumpPostgresSchema(ctx context.Context, image string, wait time.Duration) (string, error) {
@@ -416,6 +382,42 @@ func normalizePostgresDump(raw string) string {
 	return strings.TrimSpace(strings.Join(filtered, "\n")) + "\n"
 }
 
+func splitSQLStatements(raw string) []string {
+	var (
+		statements []string
+		current    strings.Builder
+		inSingle   bool
+		inDouble   bool
+	)
+
+	for i := 0; i < len(raw); i++ {
+		ch := raw[i]
+		current.WriteByte(ch)
+
+		switch ch {
+		case '\'':
+			if !inDouble && (i == 0 || raw[i-1] != '\\') {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle && (i == 0 || raw[i-1] != '\\') {
+				inDouble = !inDouble
+			}
+		case ';':
+			if !inSingle && !inDouble {
+				statements = append(statements, current.String())
+				current.Reset()
+			}
+		}
+	}
+
+	if tail := strings.TrimSpace(current.String()); tail != "" {
+		statements = append(statements, tail)
+	}
+
+	return statements
+}
+
 func randomHex(byteCount int) (string, error) {
 	buf := make([]byte, byteCount)
 	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
@@ -448,4 +450,25 @@ func runContainerCommand(ctx context.Context, container testcontainers.Container
 	}
 
 	return output.String(), nil
+}
+
+func runCommand(ctx context.Context, name string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = strings.TrimSpace(stdout.String())
+		}
+		if msg == "" {
+			msg = err.Error()
+		}
+		return "", errors.New(msg)
+	}
+
+	return stdout.String(), nil
 }
