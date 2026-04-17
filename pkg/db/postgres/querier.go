@@ -230,6 +230,9 @@ func (pq *pgQuerier) GetEventsIDbound(ctx context.Context, arg db.GetEventsIDbou
 // --- Event Batches ---
 
 func (pq *pgQuerier) InsertEventBatch(ctx context.Context, arg db.InsertEventBatchParams) error {
+	// sqlc maps these CHAR(26) insert params to ulid.ULID, but pgx binds that
+	// as binary bytes. Write the textual ULID form explicitly so Postgres stores
+	// the schema-defined 26-character values.
 	_, err := pq.db.ExecContext(ctx, `
 		INSERT INTO event_batches
 			(id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids)
