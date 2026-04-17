@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	"github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -230,26 +231,17 @@ func (pq *pgQuerier) GetEventsIDbound(ctx context.Context, arg db.GetEventsIDbou
 // --- Event Batches ---
 
 func (pq *pgQuerier) InsertEventBatch(ctx context.Context, arg db.InsertEventBatchParams) error {
-	// sqlc maps these CHAR(26) insert params to ulid.ULID, but pgx binds that
-	// as binary bytes. Write the textual ULID form explicitly so Postgres stores
-	// the schema-defined 26-character values.
-	_, err := pq.db.ExecContext(ctx, `
-		INSERT INTO event_batches
-			(id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids)
-		VALUES
-			($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`,
-		arg.ID.String(),
-		arg.AccountID,
-		arg.WorkspaceID,
-		arg.AppID,
-		arg.WorkflowID,
-		arg.RunID.String(),
-		arg.StartedAt,
-		arg.ExecutedAt,
-		arg.EventIds,
-	)
-	return err
+	return pq.q.InsertEventBatch(ctx, sqlc.InsertEventBatchParams{
+		ID:          sqltypes.FromULID(arg.ID),
+		AccountID:   arg.AccountID,
+		WorkspaceID: arg.WorkspaceID,
+		AppID:       arg.AppID,
+		WorkflowID:  arg.WorkflowID,
+		RunID:       sqltypes.FromULID(arg.RunID),
+		StartedAt:   arg.StartedAt,
+		ExecutedAt:  arg.ExecutedAt,
+		EventIds:    arg.EventIds,
+	})
 }
 
 func (pq *pgQuerier) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*db.EventBatch, error) {

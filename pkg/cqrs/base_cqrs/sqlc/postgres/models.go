@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	sqltypes "github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	ulid "github.com/oklog/ulid/v2"
 	"github.com/sqlc-dev/pqtype"
 )
@@ -46,12 +47,12 @@ type Event struct {
 }
 
 type EventBatch struct {
-	ID          ulid.ULID
+	ID          sqltypes.TextULID
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
 	AppID       uuid.UUID
 	WorkflowID  uuid.UUID
-	RunID       ulid.ULID
+	RunID       sqltypes.TextULID
 	StartedAt   time.Time
 	ExecutedAt  time.Time
 	EventIds    []byte
