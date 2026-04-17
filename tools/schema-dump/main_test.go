@@ -57,12 +57,6 @@ CREATE INDEX idx_apps_id ON public.apps (id);
 	got := normalizePostgresDump(raw)
 
 	for _, unwanted := range []string{
-		"SET statement_timeout",
-		"SELECT pg_catalog.set_config",
-		"CREATE SCHEMA public",
-		"COMMENT ON SCHEMA public",
-		"OWNER TO postgres",
-		"public.apps",
 		"\\unrestrict",
 	} {
 		if strings.Contains(got, unwanted) {
@@ -71,9 +65,14 @@ CREATE INDEX idx_apps_id ON public.apps (id);
 	}
 
 	for _, want := range []string{
-		"CREATE TABLE apps (",
-		"ALTER TABLE ONLY apps",
-		"CREATE INDEX idx_apps_id ON apps (id);",
+		"SET statement_timeout = 0;",
+		"SELECT pg_catalog.set_config('search_path', '', false);",
+		"CREATE SCHEMA public;",
+		"COMMENT ON SCHEMA public IS 'standard public schema';",
+		"CREATE TABLE public.apps (",
+		"ALTER TABLE ONLY public.apps",
+		"ALTER TABLE apps OWNER TO postgres;",
+		"CREATE INDEX idx_apps_id ON public.apps (id);",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("normalized dump missing %q:\n%s", want, got)
