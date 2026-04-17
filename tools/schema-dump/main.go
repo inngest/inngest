@@ -382,42 +382,6 @@ func normalizePostgresDump(raw string) string {
 	return strings.TrimSpace(strings.Join(filtered, "\n")) + "\n"
 }
 
-func splitSQLStatements(raw string) []string {
-	var (
-		statements []string
-		current    strings.Builder
-		inSingle   bool
-		inDouble   bool
-	)
-
-	for i := 0; i < len(raw); i++ {
-		ch := raw[i]
-		current.WriteByte(ch)
-
-		switch ch {
-		case '\'':
-			if !inDouble && (i == 0 || raw[i-1] != '\\') {
-				inSingle = !inSingle
-			}
-		case '"':
-			if !inSingle && (i == 0 || raw[i-1] != '\\') {
-				inDouble = !inDouble
-			}
-		case ';':
-			if !inSingle && !inDouble {
-				statements = append(statements, current.String())
-				current.Reset()
-			}
-		}
-	}
-
-	if tail := strings.TrimSpace(current.String()); tail != "" {
-		statements = append(statements, tail)
-	}
-
-	return statements
-}
-
 func randomHex(byteCount int) (string, error) {
 	buf := make([]byte, byteCount)
 	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
