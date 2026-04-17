@@ -15,6 +15,7 @@ import {
 import { computeChartSizing } from '@/lib/experiments/chart';
 import { colorForMetric } from '@/lib/experiments/colors';
 import type { ScoredVariant } from '@/lib/experiments/score';
+import { ChartTooltip } from './ChartTooltip';
 
 type Props = {
   scoredVariants: ScoredVariant[];
@@ -98,8 +99,10 @@ export function ScoreSummaryCard({
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
+                content={<ChartTooltip />}
+                cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
                 allowEscapeViewBox={{ x: true, y: true }}
-                wrapperStyle={{ zIndex: 50 }}
+                wrapperStyle={{ zIndex: 50, outline: 'none' }}
               />
               {enabledMetrics.map((m, i) => (
                 <Bar

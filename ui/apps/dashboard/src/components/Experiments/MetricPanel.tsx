@@ -18,6 +18,7 @@ import {
 import { computeChartSizing } from '@/lib/experiments/chart';
 import { colorForMetric } from '@/lib/experiments/colors';
 import { findExtremum } from '@/lib/experiments/score';
+import { ChartTooltip } from './ChartTooltip';
 
 const DOT_RADIUS = 5;
 const LINE_HEIGHT = 2;
@@ -105,8 +106,8 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
   const color = colorForMetric(colorIndex);
 
   return (
-    <Card contentClassName="overflow-visible">
-      <Card.Header className="flex-row items-center justify-between">
+    <Card className="overflow-visible" contentClassName="overflow-visible">
+      <Card.Header className="flex-row items-center justify-between rounded-t-md">
         <span className="text-basis text-sm font-medium">
           {metric.displayName}
         </span>
@@ -121,7 +122,7 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
           </Pill>
         )}
       </Card.Header>
-      <Card.Content>
+      <Card.Content className="rounded-b-md">
         <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
             data={rows}
@@ -144,8 +145,10 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
               tick={{ fontSize: 12 }}
             />
             <Tooltip
+              content={<ChartTooltip />}
+              cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
               allowEscapeViewBox={{ x: true, y: true }}
-              wrapperStyle={{ zIndex: 50 }}
+              wrapperStyle={{ zIndex: 50, outline: 'none' }}
             />
             <Bar
               dataKey="value"

@@ -180,15 +180,34 @@ export function useExperimentDetail(
   const client = useClient();
   const environment = useEnvironment();
 
-  const queryFn = useCallback(async (): Promise<ExperimentDetail> => {
+  const queryFn = useCallback(async (): Promise<ExperimentDetail | null> => {
     const { from, to } = presetToRange(preset);
-    const data = await runQuery(client, experimentDetailQuery, {
-      workspaceID: environment.id,
-      experimentName,
-      timeRange: { from: from.toISOString(), to: to.toISOString() },
-      variantFilter: variantFilter || null,
-    });
-    const d = data.experimentDetail;
+    const result = await client
+      .query(
+        experimentDetailQuery,
+        {
+          workspaceID: environment.id,
+          experimentName,
+          timeRange: { from: from.toISOString(), to: to.toISOString() },
+          variantFilter: variantFilter || null,
+        },
+        { requestPolicy: 'network-only' },
+      )
+      .toPromise();
+
+    // The server returns null when an experiment has no runs in the selected
+    // time range. The GraphQL field is non-nullable, so urql surfaces this as
+    // a "null which the schema does not allow" error. Treat it as empty data
+    // rather than propagating as an error to the UI.
+    const isNoDataInRange = result.error?.graphQLErrors.some((e) =>
+      e.message.includes('null which the schema does not allow'),
+    );
+    if (isNoDataInRange) return null;
+
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error('No data returned');
+
+    const d = result.data.experimentDetail;
     return {
       name: d.name,
       firstSeen: new Date(d.firstSeen),
@@ -203,7 +222,7 @@ export function useExperimentDetail(
     };
   }, [client, environment.id, experimentName, preset, variantFilter]);
 
-  return useQuery<ExperimentDetail>({
+  return useQuery<ExperimentDetail | null>({
     queryKey: [
       'experiment-detail',
       environment.id,

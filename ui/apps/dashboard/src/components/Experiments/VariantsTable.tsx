@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Button } from '@inngest/components/Button';
 import type {
   ExperimentScoringMetric,
@@ -64,10 +64,7 @@ export function VariantsTable({
   className,
 }: Props) {
   const enabledMetrics = useMemo(
-    () =>
-      [...scoringConfig]
-        .filter((m) => m.enabled)
-        .sort((a, b) => b.points - a.points),
+    () => scoringConfig.filter((m) => m.enabled),
     [scoringConfig],
   );
 
@@ -75,6 +72,32 @@ export function VariantsTable({
     () => scoringConfig.filter((m) => !m.enabled),
     [scoringConfig],
   );
+
+  // Stable signatures: change only when the SET of enabled/disabled metric keys
+  // changes. Used as the columns memo dependency so that editing a metric's
+  // points — which rewrites scoringConfig on every keystroke — doesn't
+  // rebuild the columns array and force tanstack to remount header cells (which
+  // would close the metric-settings Popover anchored inside a header).
+  const enabledKeysSig = enabledMetrics.map((m) => m.key).join('\0');
+  const disabledKeysSig = disabledMetrics.map((m) => m.key).join('\0');
+
+  // Dynamic values that cells read at render time via a ref so we don't need
+  // them as columns memo deps. Cells still re-render on every VariantsTable
+  // render, so they read the latest values.
+  const liveRef = useRef({
+    enabledMetrics,
+    disabledMetrics,
+    pointsLeft,
+    onUpdateMetric,
+    onEnableMetric,
+  });
+  liveRef.current = {
+    enabledMetrics,
+    disabledMetrics,
+    pointsLeft,
+    onUpdateMetric,
+    onEnableMetric,
+  };
 
   const rows: RowData[] = useMemo(() => {
     const allRows = scoredVariants.map(({ variant, result }) => ({
@@ -104,6 +127,9 @@ export function VariantsTable({
     return map;
   }, [rows, enabledMetrics]);
 
+  const cellDataRef = useRef({ statsMap, bestScore, worstScore });
+  cellDataRef.current = { statsMap, bestScore, worstScore };
+
   const columns = useMemo(() => {
     // tanstack-react-table's ColumnDef is invariant in its value type, so a
     // mixed list of accessor columns (score: number, variantName: string) plus
@@ -116,6 +142,7 @@ export function VariantsTable({
         cell: (info) => {
           const val = info.getValue();
           const hasRuns = info.row.original.runCount > 0;
+          const { bestScore, worstScore } = cellDataRef.current;
           let kind: 'primary' | 'error' | 'default' = 'default';
           if (hasRuns && bestScore !== null && worstScore !== null) {
             if (val === bestScore) {
@@ -146,26 +173,38 @@ export function VariantsTable({
       }),
     );
 
-    for (const metric of enabledMetrics) {
+    // Build one column per enabled metric key. The current `metric` is looked
+    // up by key from the live ref, so edits to `metric.points` don't rebuild
+    // the columns array — only toggling a metric on/off does.
+    const enabledKeys = enabledKeysSig ? enabledKeysSig.split('\0') : [];
+    for (const metricKey of enabledKeys) {
       cols.push(
         columnHelper.display({
-          id: `metric_${metric.key}`,
-          header: () => (
-            <MetricColumnHeader
-              metric={metric}
-              pointsLeft={pointsLeft}
-              onUpdateMetric={onUpdateMetric}
-            />
-          ),
+          id: `metric_${metricKey}`,
+          header: () => {
+            const metric = liveRef.current.enabledMetrics.find(
+              (m) => m.key === metricKey,
+            );
+            if (!metric) return null;
+            return (
+              <MetricColumnHeader
+                metric={metric}
+                pointsLeft={liveRef.current.pointsLeft}
+                onUpdateMetric={liveRef.current.onUpdateMetric}
+              />
+            );
+          },
           cell: (info) => {
+            const metric = liveRef.current.enabledMetrics.find(
+              (m) => m.key === metricKey,
+            );
+            if (!metric) return null;
             const row = info.row.original;
-            const vm = row.metricsByKey.get(metric.key);
+            const vm = row.metricsByKey.get(metricKey);
             if (!vm) {
               return <span className="text-muted text-sm">-</span>;
             }
-
-            const stats = statsMap.get(metric.key) ?? null;
-
+            const stats = cellDataRef.current.statsMap.get(metricKey) ?? null;
             return (
               <div className="flex flex-col">
                 <span className="text-basis text-sm tabular-nums">
@@ -188,43 +227,37 @@ export function VariantsTable({
     cols.push(
       columnHelper.display({
         id: '__add_metric',
-        header: () => (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                kind="secondary"
-                appearance="ghost"
-                size="small"
-                icon={<RiAddLine className="h-3.5 w-3.5" />}
-                disabled={disabledMetrics.length === 0}
-              />
-            </PopoverTrigger>
-            {disabledMetrics.length > 0 && (
-              <PopoverContent align="end">
-                <AddMetricPopover
-                  disabledMetrics={disabledMetrics}
-                  onEnable={onEnableMetric}
+        header: () => {
+          const { disabledMetrics, onEnableMetric } = liveRef.current;
+          return (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  kind="secondary"
+                  appearance="ghost"
+                  size="small"
+                  icon={<RiAddLine className="h-3.5 w-3.5" />}
+                  disabled={disabledMetrics.length === 0}
                 />
-              </PopoverContent>
-            )}
-          </Popover>
-        ),
+              </PopoverTrigger>
+              {disabledMetrics.length > 0 && (
+                <PopoverContent align="end">
+                  <AddMetricPopover
+                    disabledMetrics={disabledMetrics}
+                    onEnable={onEnableMetric}
+                  />
+                </PopoverContent>
+              )}
+            </Popover>
+          );
+        },
         cell: () => null,
         enableSorting: false,
       }),
     );
 
     return cols;
-  }, [
-    enabledMetrics,
-    disabledMetrics,
-    statsMap,
-    pointsLeft,
-    bestScore,
-    worstScore,
-    onUpdateMetric,
-    onEnableMetric,
-  ]);
+  }, [enabledKeysSig, disabledKeysSig]);
 
   return (
     <div className={cn('flex flex-col', className)}>

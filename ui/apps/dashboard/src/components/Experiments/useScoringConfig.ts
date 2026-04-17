@@ -25,9 +25,17 @@ export function useScoringConfig(experimentName: string) {
   >(null);
 
   useEffect(() => {
-    if (scoring.data) {
-      setLocalMetrics(scoring.data.metrics);
-    }
+    const next = scoring.data?.metrics;
+    if (!next) return;
+    // Preserve the existing reference when values are unchanged. After a
+    // successful save, React Query puts a new object into the cache even though
+    // the server echoed back what we just sent. Without this check, the new
+    // reference propagates through props and tanstack-react-table would rebuild
+    // the VariantsTable columns, unmounting the metric-settings Popover.
+    setLocalMetrics((prev) => {
+      if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
+      return next;
+    });
   }, [scoring.data]);
 
   const localMetricsRef = useRef(localMetrics);

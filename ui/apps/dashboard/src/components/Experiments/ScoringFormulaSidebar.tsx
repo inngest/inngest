@@ -18,14 +18,12 @@ type Props = {
     patch: Partial<ExperimentScoringMetric>,
   ) => void;
   pointsLeft: number;
-  isSaving?: boolean;
 };
 
 export function ScoringFormulaSidebar({
   metrics,
   onUpdateMetric,
   pointsLeft,
-  isSaving,
 }: Props) {
   const barPercent = Math.max(0, Math.min(100, 100 - pointsLeft));
 
@@ -63,7 +61,6 @@ export function ScoringFormulaSidebar({
           <MetricAccordionItem
             key={metric.key}
             metric={metric}
-            disabled={isSaving}
             pointsLeft={pointsLeft}
             onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
           />

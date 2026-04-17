@@ -139,6 +139,14 @@ export function ExperimentDetailPage({ experimentName }: Props) {
             <ErrorCard error={scoring.error} reset={() => scoring.refetch()} />
           )}
 
+          {!detail.isPending && !detail.error && detail.data === null && (
+            <ExperimentsBlankState
+              title="No runs in this time range"
+              description="Try selecting a wider time range."
+              onRefresh={detail.refetch}
+            />
+          )}
+
           {filteredDetail &&
             scoring.metrics &&
             scoredVariants &&
@@ -204,7 +212,6 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                   metrics={scoring.metrics}
                   onUpdateMetric={scoring.updateMetric}
                   pointsLeft={scoring.pointsLeft}
-                  isSaving={scoring.isSaving}
                 />
               )}
             </HelperPanelFrame>
