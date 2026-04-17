@@ -59,6 +59,7 @@ export function MetricColumnHeader({
   metric,
   pointsLeft,
   onUpdateMetric,
+  range,
 }: {
   metric: ExperimentScoringMetric;
   pointsLeft: number;
@@ -66,6 +67,7 @@ export function MetricColumnHeader({
     key: string,
     patch: Partial<ExperimentScoringMetric>,
   ) => void;
+  range?: { min: number; max: number };
 }) {
   return (
     <div className="flex w-full items-center gap-1">
@@ -85,6 +87,7 @@ export function MetricColumnHeader({
           <MetricAccordionItem
             metric={metric}
             pointsLeft={pointsLeft}
+            range={range}
             collapsible={false}
             onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
           />

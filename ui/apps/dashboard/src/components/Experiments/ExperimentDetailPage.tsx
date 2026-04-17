@@ -79,6 +79,25 @@ export function ExperimentDetailPage({ experimentName }: Props) {
     return top?.variant.variantName ?? null;
   }, [scoredVariants]);
 
+  // Per-metric min/max of observed avg values across all variants, so the
+  // scoring inputs can offer a "fit to data" shortcut.
+  const metricRanges = useMemo(() => {
+    const map: Record<string, { min: number; max: number }> = {};
+    if (!scoredVariants) return map;
+    for (const { variant } of scoredVariants) {
+      for (const m of variant.metrics) {
+        const range = map[m.key];
+        if (!range) {
+          map[m.key] = { min: m.avg, max: m.avg };
+        } else {
+          if (m.avg < range.min) range.min = m.avg;
+          if (m.avg > range.max) range.max = m.avg;
+        }
+      }
+    }
+    return map;
+  }, [scoredVariants]);
+
   const enabledMetrics = useMemo(
     () => (scoring.metrics ?? []).filter((m) => m.enabled),
     [scoring.metrics],
@@ -183,6 +202,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                   className="col-span-1 md:col-span-2 xl:col-span-3"
                   scoredVariants={scoredVariants}
                   scoringConfig={scoring.metrics}
+                  metricRanges={metricRanges}
                   onUpdateMetric={scoring.updateMetric}
                   onEnableMetric={scoring.enableMetric}
                   pointsLeft={scoring.pointsLeft}
@@ -210,6 +230,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
               {activePanel === SCORING_PANEL && scoring.metrics && (
                 <ScoringFormulaSidebar
                   metrics={scoring.metrics}
+                  metricRanges={metricRanges}
                   onUpdateMetric={scoring.updateMetric}
                   pointsLeft={scoring.pointsLeft}
                 />

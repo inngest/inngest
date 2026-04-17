@@ -11,8 +11,11 @@ import {
   RiSubtractLine,
 } from '@remixicon/react';
 
+type MetricRange = { min: number; max: number };
+
 type Props = {
   metrics: ExperimentScoringMetric[];
+  metricRanges?: Record<string, MetricRange>;
   onUpdateMetric: (
     key: string,
     patch: Partial<ExperimentScoringMetric>,
@@ -22,6 +25,7 @@ type Props = {
 
 export function ScoringFormulaSidebar({
   metrics,
+  metricRanges,
   onUpdateMetric,
   pointsLeft,
 }: Props) {
@@ -61,6 +65,7 @@ export function ScoringFormulaSidebar({
           <MetricAccordionItem
             key={metric.key}
             metric={metric}
+            range={metricRanges?.[metric.key]}
             pointsLeft={pointsLeft}
             onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
           />
@@ -79,6 +84,7 @@ export function MetricAccordionItem({
   onUpdate,
   disabled,
   pointsLeft,
+  range,
   defaultExpanded = false,
   collapsible = true,
 }: {
@@ -86,6 +92,7 @@ export function MetricAccordionItem({
   onUpdate: (patch: Partial<ExperimentScoringMetric>) => void;
   disabled?: boolean;
   pointsLeft: number;
+  range?: MetricRange;
   defaultExpanded?: boolean;
   collapsible?: boolean;
 }) {
@@ -167,27 +174,48 @@ export function MetricAccordionItem({
             disabled={disabled}
           />
 
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              label="Min score"
-              inngestSize="small"
-              type="number"
-              value={metric.minValue}
-              onChange={(e) =>
-                onUpdate({ minValue: parseFloat(e.target.value) || 0 })
-              }
-              disabled={disabled}
-            />
-            <Input
-              label="Max score"
-              inngestSize="small"
-              type="number"
-              value={metric.maxValue}
-              onChange={(e) =>
-                onUpdate({ maxValue: parseFloat(e.target.value) || 0 })
-              }
-              disabled={disabled}
-            />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-muted text-xs">Score range</span>
+              {range && (
+                <Button
+                  kind="secondary"
+                  appearance="ghost"
+                  size="small"
+                  label="Fit to data"
+                  disabled={
+                    disabled ||
+                    (metric.minValue === range.min &&
+                      metric.maxValue === range.max)
+                  }
+                  onClick={() =>
+                    onUpdate({ minValue: range.min, maxValue: range.max })
+                  }
+                />
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                label="Min score"
+                inngestSize="small"
+                type="number"
+                value={metric.minValue}
+                onChange={(e) =>
+                  onUpdate({ minValue: parseFloat(e.target.value) || 0 })
+                }
+                disabled={disabled}
+              />
+              <Input
+                label="Max score"
+                inngestSize="small"
+                type="number"
+                value={metric.maxValue}
+                onChange={(e) =>
+                  onUpdate({ maxValue: parseFloat(e.target.value) || 0 })
+                }
+                disabled={disabled}
+              />
+            </div>
           </div>
 
           <label className="flex items-center gap-2">

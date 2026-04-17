@@ -32,6 +32,7 @@ import {
 type Props = {
   scoredVariants: ScoredVariant[];
   scoringConfig: ExperimentScoringMetric[];
+  metricRanges?: Record<string, { min: number; max: number }>;
   onUpdateMetric: (
     key: string,
     patch: Partial<ExperimentScoringMetric>,
@@ -55,6 +56,7 @@ const columnHelper = createColumnHelper<RowData>();
 export function VariantsTable({
   scoredVariants,
   scoringConfig,
+  metricRanges,
   onUpdateMetric,
   onEnableMetric,
   pointsLeft,
@@ -90,6 +92,7 @@ export function VariantsTable({
     pointsLeft,
     onUpdateMetric,
     onEnableMetric,
+    metricRanges,
   });
   liveRef.current = {
     enabledMetrics,
@@ -97,6 +100,7 @@ export function VariantsTable({
     pointsLeft,
     onUpdateMetric,
     onEnableMetric,
+    metricRanges,
   };
 
   const rows: RowData[] = useMemo(() => {
@@ -191,6 +195,7 @@ export function VariantsTable({
                 metric={metric}
                 pointsLeft={liveRef.current.pointsLeft}
                 onUpdateMetric={liveRef.current.onUpdateMetric}
+                range={liveRef.current.metricRanges?.[metricKey]}
               />
             );
           },
