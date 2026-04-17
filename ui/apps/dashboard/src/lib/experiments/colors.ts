@@ -12,5 +12,5 @@ export const METRIC_PALETTE = [
 ] as const;
 
 export function colorForMetric(index: number): string {
-  return METRIC_PALETTE[index % METRIC_PALETTE.length]!;
+  return METRIC_PALETTE[index % METRIC_PALETTE.length];
 }

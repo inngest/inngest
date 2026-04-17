@@ -77,10 +77,10 @@ export function findExtremum<T>(
   invert = false,
 ): T | null {
   if (items.length === 0) return null;
-  let best = items[0]!;
+  let best = items[0];
   let bestVal = getValue(best);
   for (let i = 1; i < items.length; i++) {
-    const item = items[i]!;
+    const item = items[i];
     const val = getValue(item);
     if (invert ? val < bestVal : val > bestVal) {
       best = item;
