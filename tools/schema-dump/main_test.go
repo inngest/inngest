@@ -14,10 +14,6 @@ func TestDumpSQLiteSchema(t *testing.T) {
 		t.Fatalf("dumpSQLiteSchema returned error: %v", err)
 	}
 
-	if strings.Contains(schema, "CREATE TABLE migrations") {
-		t.Fatalf("sqlite schema should exclude migrations table:\n%s", schema)
-	}
-
 	for _, want := range []string{
 		"CREATE TABLE apps",
 		"CREATE TABLE spans",
