@@ -1150,7 +1150,6 @@ func readRuntimeTableNames(t *testing.T, conn *sql.DB, dialect db.Dialect) []str
 			FROM information_schema.tables
 			WHERE table_schema = current_schema()
 			  AND table_type = 'BASE TABLE'
-			  AND table_name <> 'goose_db_version'
 			ORDER BY table_name
 		`)
 	default:
@@ -1159,7 +1158,6 @@ func readRuntimeTableNames(t *testing.T, conn *sql.DB, dialect db.Dialect) []str
 			FROM sqlite_master
 			WHERE type = 'table'
 			  AND name NOT LIKE 'sqlite_%'
-			  AND name <> 'goose_db_version'
 			ORDER BY name
 		`)
 	}
@@ -1294,6 +1292,9 @@ func toLogicalSchema(schema map[string][]schemaColumn) map[string][]logicalColum
 	result := make(map[string][]logicalColumn, len(schema))
 
 	for tableName, columns := range schema {
+		if tableName == "goose_db_version" {
+			continue
+		}
 		for _, column := range columns {
 			if tableName == "function_runs" && column.Name == "workspace_id" {
 				continue
