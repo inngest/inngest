@@ -1,5 +1,8 @@
 # Changelog
 
+ - 2026-04-17 v1.49.0: Upgrade to  [SQLite 3.53.0](https://sqlite.org/releaselog/3_53_0.html).
+     - Added `-DSQLITE_ENABLE_DBPAGE_VTAB` to the transpilation. See ["The SQLITE_DBPAGE Virtual Table"](https://www.sqlite.org/dbpage.html) for details.
+
  - 2026-04-06 v1.48.2:
      - Fix ABI mapping mismatch in the pre-update hook trampoline that caused silent truncation of large 64-bit RowIDs.
      - Ensure the Go trampoline signature correctly aligns with the public `sqlite3_preupdate_hook` C API, preventing data corruption for high-entropy keys (e.g., Snowflake IDs).
