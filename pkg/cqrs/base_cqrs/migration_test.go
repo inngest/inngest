@@ -85,10 +85,10 @@ func TestLegacyMigrationThenGooseBaselineIsNoopSQLite(t *testing.T) {
 	defer cleanup()
 
 	require.NoError(t, upLegacy(db, opts))
-	before := readApplicationSchemaSnapshot(t, db, migrationDialectSQLite)
+	before := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectSQLite))
 
 	require.NoError(t, up(db, opts))
-	after := readApplicationSchemaSnapshot(t, db, migrationDialectSQLite)
+	after := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectSQLite))
 
 	require.Equal(t, before, after)
 	assertGooseVersionTable(t, db)
@@ -132,10 +132,10 @@ func TestLegacyMigrationThenGooseBaselineIsNoopPostgres(t *testing.T) {
 	defer cleanup()
 
 	require.NoError(t, upLegacy(db, opts))
-	before := readApplicationSchemaSnapshot(t, db, migrationDialectPostgres)
+	before := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectPostgres))
 
 	require.NoError(t, up(db, opts))
-	after := readApplicationSchemaSnapshot(t, db, migrationDialectPostgres)
+	after := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectPostgres))
 
 	require.Equal(t, before, after)
 	assertGooseVersionTable(t, db)
@@ -420,6 +420,12 @@ func readApplicationSchemaSnapshot(t *testing.T, db *sql.DB, dialect migrationDi
 		Tables:  tables,
 		Indexes: indexes,
 	}
+}
+
+func snapshotWithoutGooseVersionTable(snapshot schemaSnapshot) schemaSnapshot {
+	delete(snapshot.Tables, "goose_db_version")
+	delete(snapshot.Indexes, "goose_db_version")
+	return snapshot
 }
 
 func readRuntimeSchema(t *testing.T, db *sql.DB, dialect migrationDialect) map[string][]schemaColumn {
