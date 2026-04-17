@@ -82,7 +82,7 @@
 
           nativeBuildInputs = with pkgs; [
             # Go
-            go_1_25
+            go
             golangci-lint
             gotests
             gomodifytags
