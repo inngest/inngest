@@ -451,7 +451,6 @@ func readRuntimeTableNames(t *testing.T, db *sql.DB, dialect migrationDialect) [
 			FROM information_schema.tables
 			WHERE table_schema = current_schema()
 			  AND table_type = 'BASE TABLE'
-			  AND table_name <> 'goose_db_version'
 			ORDER BY table_name
 		`
 	default:
@@ -460,7 +459,6 @@ func readRuntimeTableNames(t *testing.T, db *sql.DB, dialect migrationDialect) [
 			FROM sqlite_master
 			WHERE type = 'table'
 			  AND name NOT LIKE 'sqlite_%'
-			  AND name <> 'goose_db_version'
 			ORDER BY name
 		`
 	}
