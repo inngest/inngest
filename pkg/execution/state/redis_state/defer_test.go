@@ -15,26 +15,9 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 )
 
-// TestSaveDeferRoundTrip pins down the next behavior after OpcodeDeferAdd is
-// parsed: the executor persists a Defer record into run state so that
-// finalization can load it back and emit inngest/deferred.start events.
-//
-// To make this pass you'll need to build, roughly in this order:
-//
-//  1. statev2.ScheduleStatus enum (in pkg/execution/state/v2/) with the four
-//     constants from the ticket: Unknown, Scheduled, AfterRun, Cancelled.
-//  2. statev2.Defer struct with FnSlug, HashedID, ScheduleStatus, Input.
-//  3. Add SaveDefer + LoadDefers methods to the RunService / StateLoader
-//     interfaces in pkg/execution/state/v2/interfaces.go.
-//  4. Implement them on the Redis adapter (v2_adapter.go), storing defers in a
-//     hash at the key `{state:runID}:defers:fnID:runID` (add a Defers() method
-//     to RunStateKeyGenerator in key_generator.go alongside Actions/Stack/etc).
 func TestSaveDeferRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
-	// --- boilerplate: miniredis + v2 state service ---
-	// Copied verbatim from TestV2Adapter. Everything up to the Create() call
-	// is plumbing — skip over it on your first read.
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
 	defer mr.Close()
