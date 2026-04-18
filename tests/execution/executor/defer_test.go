@@ -29,14 +29,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDeferAddSavesDefer verifies that when the executor processes an
-// OpcodeDeferAdd generator response, it:
-//  1. Memoizes the step with null data (SaveStep)
-//  2. Persists a Defer record in the run's defers map (SaveDefer)
 func TestDeferAddSavesDefer(t *testing.T) {
 	ctx := context.Background()
 
-	// --- boilerplate: database + function loader ---
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 	adapter := dbsqlite.New(db)
@@ -77,7 +72,6 @@ func TestDeferAddSavesDefer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- boilerplate: Redis + state manager + queue ---
 	_, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
 	defer shardedRc.Close()
@@ -122,7 +116,6 @@ func TestDeferAddSavesDefer(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// --- mock driver: returns a DeferAdd opcode ---
 	stepID := "step-defer"
 	mockDriver := &mockDriverV1{
 		t: t,
@@ -139,7 +132,6 @@ func TestDeferAddSavesDefer(t *testing.T) {
 		},
 	}
 
-	// --- create executor ---
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
@@ -153,7 +145,6 @@ func TestDeferAddSavesDefer(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// --- schedule + execute ---
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
@@ -190,15 +181,11 @@ func TestDeferAddSavesDefer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- assertions ---
-
-	// 1. The step should be memoized with null data
 	steps, err := smv2.LoadSteps(ctx, run.ID)
 	require.NoError(t, err)
 	require.Contains(t, steps, stepID, "step.defer should be memoized")
 	require.Equal(t, json.RawMessage("null"), steps[stepID], "memoized data should be null")
 
-	// 2. A defer record should exist in the run's defers map
 	defers, err := smv2.LoadDefers(ctx, run.ID)
 	require.NoError(t, err)
 	require.Len(t, defers, 1, "expected exactly one defer")
@@ -215,7 +202,6 @@ func TestDeferAddSavesDefer(t *testing.T) {
 func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	ctx := context.Background()
 
-	// --- boilerplate: database + function loader ---
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 	adapter := dbsqlite.New(db)
@@ -245,7 +231,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- boilerplate: Redis + state manager + queue ---
 	_, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
 	defer shardedRc.Close()
@@ -287,7 +272,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// --- create executor (no driver needed — we won't Execute, just Finalize) ---
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
@@ -300,14 +284,12 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// --- set up a spy to capture events published during finalization ---
 	var capturedEvents []event.Event
 	exec.SetFinalizer(func(ctx context.Context, id statev2.ID, events []event.Event) error {
 		capturedEvents = append(capturedEvents, events...)
 		return nil
 	})
 
-	// --- schedule a run so state exists ---
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
@@ -325,9 +307,7 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- save two defers: one active (AfterRun) and one cancelled ---
-	// Use a deeply nested input to prove the event carries structured JSON,
-	// not a stringified/escaped version of it.
+	// Nested input verifies the event carries structured JSON rather than a stringified payload.
 	nestedInputJSON := `{"user":{"id":"u_123","meta":{"role":"admin","tags":["a","b"]}},"score":0.87}`
 	activeDefer := statev2.Defer{
 		FnSlug:         "onDefer-score",
@@ -345,7 +325,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	require.NoError(t, smv2.SaveDefer(ctx, run.ID, activeDefer))
 	require.NoError(t, smv2.SaveDefer(ctx, run.ID, cancelledDefer))
 
-	// --- finalize the run ---
 	err = exec.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: *run,
 		Response: execution.FinalizeResponse{
@@ -358,7 +337,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- assert inngest/deferred.start events ---
 	var deferredEvents []event.Event
 	for _, evt := range capturedEvents {
 		if evt.Name == "inngest/deferred.start" {
@@ -373,7 +351,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	evtData, err := json.Marshal(evt.Data)
 	require.NoError(t, err)
 
-	// Verify the event shape from the ticket
 	var data map[string]any
 	require.NoError(t, json.Unmarshal(evtData, &data))
 
@@ -382,8 +359,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	require.Equal(t, fn.Slug, inngestData["parent_fn_slug"])
 	require.Equal(t, run.ID.RunID.String(), inngestData["parent_run_id"])
 
-	// Verify user input is spread at the top of data as structured JSON,
-	// not escaped or nested under a wrapper key.
 	user, ok := data["user"].(map[string]any)
 	require.True(t, ok, "data.user should be a JSON object, got %T", data["user"])
 	require.Equal(t, "u_123", user["id"])
@@ -399,7 +374,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	ctx := context.Background()
 
-	// --- boilerplate: database + function loader ---
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 	adapter := dbsqlite.New(db)
@@ -428,7 +402,6 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- boilerplate: Redis + state manager + queue ---
 	_, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
 	defer shardedRc.Close()
@@ -503,7 +476,6 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// --- schedule a run ---
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
@@ -515,7 +487,7 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- pre-seed a defer (as if DeferAdd already ran) ---
+	// Pre-seed a defer as if DeferAdd had already run.
 	require.NoError(t, smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
@@ -523,7 +495,6 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
 	}))
 
-	// --- execute the DeferCancel opcode ---
 	_, err = exec.Execute(ctx, state.Identifier{
 		WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID,
 	}, queue.Item{
@@ -534,7 +505,6 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
 	require.NoError(t, err)
 
-	// --- assert the defer status flipped to Cancelled ---
 	defers, err := smv2.LoadDefers(ctx, run.ID)
 	require.NoError(t, err)
 	require.Len(t, defers, 1)
@@ -545,12 +515,9 @@ func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
 	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input), "Input should be preserved")
 }
 
-// deferTestInfra holds the shared infrastructure used by the checkpoint ↔
-// executor consistency tests below. It exists because building a real-Redis
-// state manager, queue, function loader, and tracing provider takes ~70 lines
-// of boilerplate per test, and the consistency tests need 3 parallel runs
-// (executor path, sync-checkpoint path, async-checkpoint path) using the same
-// backing store.
+// deferTestInfra holds the shared state manager, queue, and loader used by the
+// checkpoint-vs-executor consistency tests so each test can spin up 3 runs
+// against the same backing store.
 type deferTestInfra struct {
 	ctx        context.Context
 	fn         inngest.Function
@@ -712,10 +679,8 @@ func (i *deferTestInfra) scheduleRun(t *testing.T, exec execution.Executor) *sta
 }
 
 // TestDeferAdd_ExecutorAndCheckpointProduceSameDefer drives an OpcodeDeferAdd
-// through three code paths — executor.Execute, CheckpointSyncSteps, and
-// CheckpointAsyncSteps — and asserts the resulting Defer record is
-// byte-for-byte identical across all three. This is the core consistency
-// guarantee we want for the checkpointing work.
+// through executor.Execute, CheckpointSyncSteps, and CheckpointAsyncSteps and
+// asserts the resulting Defer record is identical across all three paths.
 func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	infra := newDeferTestInfra(t)
 	ctx := infra.ctx
@@ -729,7 +694,6 @@ func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 		},
 	}
 
-	// --- Path A: executor.Execute ---
 	driver := &mockDriverV1{
 		t:        t,
 		response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&op}},
@@ -746,7 +710,6 @@ func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	}, inngest.Edge{Incoming: "$trigger", Outgoing: op.ID})
 	require.NoError(t, err)
 
-	// --- Path B: CheckpointSyncSteps ---
 	execB := infra.newExecutor(t, nil)
 	runB := infra.scheduleRun(t, execB)
 	cp := infra.newCheckpointer(t, execB)
@@ -761,7 +724,6 @@ func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- Path C: CheckpointAsyncSteps ---
 	execC := infra.newExecutor(t, nil)
 	runC := infra.scheduleRun(t, execC)
 	cp = infra.newCheckpointer(t, execC)
@@ -775,7 +737,6 @@ func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- Consistency assertions ---
 	defersA, err := infra.smv2.LoadDefers(ctx, runA.ID)
 	require.NoError(t, err)
 	defersB, err := infra.smv2.LoadDefers(ctx, runB.ID)
@@ -833,7 +794,6 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 		},
 	}
 
-	// --- Path A: executor.Execute ---
 	driver := &mockDriverV1{
 		t:        t,
 		response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&cancelOp}},
@@ -851,7 +811,6 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
 	require.NoError(t, err)
 
-	// --- Path B: CheckpointSyncSteps ---
 	execB := infra.newExecutor(t, nil)
 	runB := infra.scheduleRun(t, execB)
 	require.NoError(t, infra.smv2.SaveDefer(ctx, runB.ID, seed))
@@ -867,7 +826,6 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- Path C: CheckpointAsyncSteps ---
 	execC := infra.newExecutor(t, nil)
 	runC := infra.scheduleRun(t, execC)
 	require.NoError(t, infra.smv2.SaveDefer(ctx, runC.ID, seed))
@@ -881,7 +839,6 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// --- Consistency assertions ---
 	for name, runID := range map[string]statev2.ID{
 		"executor":    runA.ID,
 		"sync-ckpt":   runB.ID,
@@ -900,11 +857,9 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	}
 }
 
-// TestDeferInputEmptyObjectSurvivesStatusUpdate is a regression test for the
-// cjson `{}` → `[]` corruption in setDeferStatus.lua. SaveDefer normalizes an
-// empty-object Input to nil so the round-trip in the Lua script no longer
-// loses data. Without the normalization, the reloaded defer's Input would be
-// `[]` (or invalid JSON), breaking downstream event emission.
+// TestDeferInputEmptyObjectSurvivesStatusUpdate guards against cjson's
+// `{}` → `[]` corruption in setDeferStatus.lua by verifying that an
+// empty-object Input survives a status flip.
 func TestDeferInputEmptyObjectSurvivesStatusUpdate(t *testing.T) {
 	infra := newDeferTestInfra(t)
 	ctx := infra.ctx
