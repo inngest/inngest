@@ -14,7 +14,7 @@ export default defineConfig(async () => ({
       // fumadocs-mdx/runtime/server imports node:path at the top level. Rollup
       // tree-shakes it away in production, but Vite dev pre-bundles it with
       // esbuild which evaluates it in browser context. Shim it so the module
-      // initialises cleanly in SPA dev mode.
+      // initialises cleanly in browser context.
       'node:path': new URL('./src/shims/node-path.ts', import.meta.url).pathname,
     },
   },
@@ -22,9 +22,7 @@ export default defineConfig(async () => ({
     tsConfigPaths({ projects: ['./tsconfig.json'] }),
     mdx(await import('./source.config')),
     tailwindcss(),
-    tanstackStart({
-      spa: { enabled: true },
-    }),
+    tanstackStart(),
     viteReact(),
   ],
 }));

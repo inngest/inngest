@@ -7,29 +7,19 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page
 
 import { useMDXComponents } from '@/components/mdx';
 import { baseOptions } from '@/lib/layout.shared';
+import { getDocPage } from '@/lib/page-data';
 
 type LoaderData = { path: string; pageTree: Root };
 
 export const Route = createFileRoute('/$')({
   component: Page,
   loader: async ({ params }) => {
-    // Lazy import: source uses the server collection (eager MDX imports).
-    // Dynamic import keeps it out of the static module graph so the SSR
-    // shell renderer never loads it — loaders only run client-side in SPA mode.
-    const { source } = await import('@/lib/source');
     const slugs = (params as { _splat?: string })._splat?.split('/').filter(Boolean) ?? [];
-    const page = source.getPage(slugs);
-    if (!page) throw notFound();
+    const data = await getDocPage({ data: { slugs } });
+    if (!data) throw notFound();
 
-    await clientLoader.preload(page.path);
-    // SPA mode: loader runs in the browser, no serialization occurs.
-    // Cast pageTree to any to bypass TanStack Router's JSON-serializable
-    // constraint (Root.name is ReactNode which fails the static check).
-    return {
-      path: page.path,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pageTree: source.getPageTree() as any,
-    };
+    await clientLoader.preload(data.path);
+    return data as LoaderData;
   },
 });
 
@@ -48,7 +38,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
 });
 
 function Page() {
-  const { path, pageTree } = Route.useLoaderData() as unknown as LoaderData;
+  const { path, pageTree } = Route.useLoaderData();
 
   return (
     <DocsLayout {...baseOptions()} tree={pageTree} githubUrl="https://github.com/inngest/inngest">

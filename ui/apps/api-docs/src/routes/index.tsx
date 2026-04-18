@@ -7,24 +7,18 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page
 
 import { useMDXComponents } from '@/components/mdx';
 import { baseOptions } from '@/lib/layout.shared';
+import { getDocPage } from '@/lib/page-data';
 
 type LoaderData = { path: string; pageTree: Root };
 
 export const Route = createFileRoute('/')({
   component: Page,
   loader: async () => {
-    // Lazy import: keeps source out of the static module graph so the SSR
-    // shell renderer never loads it — loaders only run client-side in SPA mode.
-    const { source } = await import('@/lib/source');
-    const page = source.getPage([]);
-    if (!page) throw notFound();
+    const data = await getDocPage({ data: { slugs: [] } });
+    if (!data) throw notFound();
 
-    await clientLoader.preload(page.path);
-    return {
-      path: page.path,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pageTree: source.getPageTree() as any,
-    };
+    await clientLoader.preload(data.path);
+    return data as LoaderData;
   },
 });
 
@@ -43,7 +37,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
 });
 
 function Page() {
-  const { path, pageTree } = Route.useLoaderData() as unknown as LoaderData;
+  const { path, pageTree } = Route.useLoaderData();
 
   return (
     <DocsLayout {...baseOptions()} tree={pageTree} githubUrl="https://github.com/inngest/inngest">
