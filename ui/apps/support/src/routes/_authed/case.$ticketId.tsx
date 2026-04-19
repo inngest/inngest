@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useUser } from "@clerk/tanstack-react-start";
@@ -316,6 +316,15 @@ function ReplyForm({
     userEmail,
     onError: setError,
   });
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [message]);
+
   const hasContent =
     message.trim().length > 0 || uploadedAttachmentIds.length > 0;
 
@@ -359,11 +368,12 @@ function ReplyForm({
       <form onSubmit={handleSubmit}>
         <div className="border-muted bg-canvasBase flex flex-col gap-2 rounded-lg border px-4 py-3 shadow-sm">
           <textarea
+            ref={textareaRef}
             placeholder="Add new message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={1}
-            className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
+            className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
             disabled={isSubmitting}
           />
 
