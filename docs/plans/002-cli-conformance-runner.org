@@ -540,15 +540,15 @@ Overview:
 - make the conformance command discoverable even before all runners and suites are complete
 
 Subtasks:
-- [ ] Add =cmd/conformance= and register it in the root CLI.
-- [ ] Define the top-level subcommands: =run=, =list=, =doctor=, and =report=.
-- [ ] Define shared config, suite, case, feature, status, and report types.
-- [ ] Define report schema versioning and a stable JSON shape.
-- [ ] Implement =list= against the shared registry so available suites and cases are visible.
-- [ ] Implement a stub =run= path that loads config, selects suites, and validates inputs.
-- [ ] Define fixture and golden-data conventions, including sanitization and normalization
+- [X] Add =cmd/conformance= and register it in the root CLI.
+- [X] Define the top-level subcommands: =run=, =list=, =doctor=, and =report=.
+- [X] Define shared config, suite, case, feature, status, and report types.
+- [X] Define report schema versioning and a stable JSON shape.
+- [X] Implement =list= against the shared registry so available suites and cases are visible.
+- [X] Implement a stub =run= path that loads config, selects suites, and validates inputs.
+- [X] Define fixture and golden-data conventions, including sanitization and normalization
   rules.
-- [ ] Establish the compatibility classification model: full, partial, incompatible, and
+- [X] Establish the compatibility classification model: full, partial, incompatible, and
   unknown.
 
 ** Phase 2: Serve runner
