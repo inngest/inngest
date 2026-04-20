@@ -1,4 +1,8 @@
-# Database Adapter Refactor Plan
+---
+STATUS: Active
+---
+
+# Database Adapter Refactor
 
 ## Overview
 
