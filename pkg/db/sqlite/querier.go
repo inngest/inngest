@@ -399,9 +399,12 @@ func (sq *sqliteQuerier) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*d
 // --- Spans ---
 
 func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams) error {
+	startTime := arg.StartTime.Round(0).UTC()
+	endTime := arg.EndTime.Round(0).UTC()
+
 	return sq.q.InsertSpan(ctx, sqlc.InsertSpanParams{
 		SpanID: arg.SpanID, TraceID: arg.TraceID, ParentSpanID: arg.ParentSpanID,
-		Name: arg.Name, StartTime: arg.StartTime, EndTime: arg.EndTime,
+		Name: arg.Name, StartTime: startTime, EndTime: endTime,
 		RunID: arg.RunID, AccountID: arg.AccountID, AppID: arg.AppID,
 		FunctionID: arg.FunctionID, EnvID: arg.EnvID,
 		DynamicSpanID:  arg.DynamicSpanID,
@@ -605,7 +608,7 @@ func (sq *sqliteQuerier) InsertWorkerConnection(ctx context.Context, arg db.Inse
 		GatewayID: arg.GatewayID, InstanceID: arg.InstanceID,
 		Status: arg.Status, WorkerIp: arg.WorkerIp,
 		MaxWorkerConcurrency: arg.MaxWorkerConcurrency,
-		ConnectedAt: arg.ConnectedAt, LastHeartbeatAt: arg.LastHeartbeatAt,
+		ConnectedAt:          arg.ConnectedAt, LastHeartbeatAt: arg.LastHeartbeatAt,
 		DisconnectedAt: arg.DisconnectedAt, RecordedAt: arg.RecordedAt,
 		InsertedAt: arg.InsertedAt, DisconnectReason: arg.DisconnectReason,
 		GroupHash: arg.GroupHash, SdkLang: arg.SdkLang, SdkVersion: arg.SdkVersion,

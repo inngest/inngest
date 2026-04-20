@@ -3,6 +3,8 @@ package brotli
 import (
 	"errors"
 	"io"
+
+	"github.com/andybalholm/brotli/matchfinder"
 )
 
 const (
@@ -117,3 +119,56 @@ type nopCloser struct {
 }
 
 func (nopCloser) Close() error { return nil }
+
+// NewWriterV2 is like NewWriterLevel, but it uses the new implementation
+// based on the matchfinder package. It currently supports up to level 9;
+// if a higher level is specified, level 9 will be used.
+func NewWriterV2(dst io.Writer, level int) *matchfinder.Writer {
+	var mf matchfinder.MatchFinder
+	if level < 2 {
+		mf = matchfinder.M0{Lazy: level == 1}
+	} else if level < 8 {
+		hashLen := 6
+		if level >= 6 {
+			hashLen = 5
+		}
+		chainLen := 16
+		switch level {
+		case 2:
+			chainLen = 0
+		case 3:
+			chainLen = 1
+		case 4:
+			chainLen = 2
+		case 5:
+			chainLen = 4
+		case 6:
+			chainLen = 8
+		}
+		mf = &matchfinder.M4{
+			MaxDistance:     1 << 20,
+			ChainLength:     chainLen,
+			HashLen:         hashLen,
+			DistanceBitCost: 66,
+		}
+	} else {
+		chainLen := 32
+		hashLen := 5
+		if level == 8 {
+			chainLen = 4
+			hashLen = 6
+		}
+		mf = &matchfinder.Pathfinder{
+			MaxDistance: 1 << 20,
+			ChainLength: chainLen,
+			HashLen:     hashLen,
+		}
+	}
+
+	return &matchfinder.Writer{
+		Dest:        dst,
+		MatchFinder: mf,
+		Encoder:     &Encoder{},
+		BlockSize:   1 << 16,
+	}
+}

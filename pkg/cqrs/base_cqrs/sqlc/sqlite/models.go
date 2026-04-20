@@ -88,6 +88,13 @@ type FunctionRun struct {
 	WorkspaceID     uuid.UUID
 }
 
+type GooseDbVersion struct {
+	ID        int64
+	VersionID int64
+	IsApplied int64
+	Tstamp    sql.NullTime
+}
+
 type History struct {
 	ID                   ulid.ULID
 	CreatedAt            time.Time

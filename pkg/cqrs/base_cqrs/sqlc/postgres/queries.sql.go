@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	sqltypes "github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/lib/pq"
 	ulid "github.com/oklog/ulid/v2"
 	"github.com/sqlc-dev/pqtype"
@@ -369,7 +370,7 @@ func (q *Queries) GetEventBatchByRunID(ctx context.Context, dollar_1 string) (*E
 }
 
 const getEventBatchesByEventID = `-- name: GetEventBatchesByEventID :many
-SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE POSITION(CAST($1 AS TEXT) IN CAST(event_ids AS TEXT)) > 0
+SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE POSITION(CAST($1 AS TEXT) IN convert_from(event_ids, 'UTF8')) > 0
 `
 
 func (q *Queries) GetEventBatchesByEventID(ctx context.Context, dollar_1 string) ([]*EventBatch, error) {
@@ -1838,12 +1839,12 @@ INSERT INTO event_batches
 `
 
 type InsertEventBatchParams struct {
-	ID          ulid.ULID
+	ID          sqltypes.TextULID
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
 	AppID       uuid.UUID
 	WorkflowID  uuid.UUID
-	RunID       ulid.ULID
+	RunID       sqltypes.TextULID
 	StartedAt   time.Time
 	ExecutedAt  time.Time
 	EventIds    []byte

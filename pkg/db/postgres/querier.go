@@ -9,13 +9,15 @@ import (
 	"github.com/google/uuid"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	"github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/oklog/ulid/v2"
 )
 
 var _ db.Querier = (*pgQuerier)(nil)
 
 type pgQuerier struct {
-	q *sqlc.Queries
+	db sqlc.DBTX
+	q  *sqlc.Queries
 }
 
 // --- Apps ---
@@ -230,9 +232,15 @@ func (pq *pgQuerier) GetEventsIDbound(ctx context.Context, arg db.GetEventsIDbou
 
 func (pq *pgQuerier) InsertEventBatch(ctx context.Context, arg db.InsertEventBatchParams) error {
 	return pq.q.InsertEventBatch(ctx, sqlc.InsertEventBatchParams{
-		ID: arg.ID, AccountID: arg.AccountID, WorkspaceID: arg.WorkspaceID,
-		AppID: arg.AppID, WorkflowID: arg.WorkflowID, RunID: arg.RunID,
-		StartedAt: arg.StartedAt, ExecutedAt: arg.ExecutedAt, EventIds: arg.EventIds,
+		ID:          sqltypes.FromULID(arg.ID),
+		AccountID:   arg.AccountID,
+		WorkspaceID: arg.WorkspaceID,
+		AppID:       arg.AppID,
+		WorkflowID:  arg.WorkflowID,
+		RunID:       sqltypes.FromULID(arg.RunID),
+		StartedAt:   arg.StartedAt,
+		ExecutedAt:  arg.ExecutedAt,
+		EventIds:    arg.EventIds,
 	})
 }
 
@@ -375,7 +383,7 @@ func (pq *pgQuerier) InsertHistory(ctx context.Context, arg db.InsertHistoryPara
 		GroupID: arg.GroupID, IdempotencyKey: arg.IdempotencyKey,
 		Type: arg.Type, Attempt: int32(arg.Attempt),
 		LatencyMs: sql.NullInt32{Int32: int32(arg.LatencyMs.Int64), Valid: arg.LatencyMs.Valid},
-		StepName: arg.StepName, StepID: arg.StepID, StepType: arg.StepType,
+		StepName:  arg.StepName, StepID: arg.StepID, StepType: arg.StepType,
 		Url: arg.Url, CancelRequest: arg.CancelRequest, Sleep: arg.Sleep,
 		WaitForEvent: arg.WaitForEvent, WaitResult: arg.WaitResult,
 		InvokeFunction: arg.InvokeFunction, InvokeFunctionResult: arg.InvokeFunctionResult,
@@ -442,17 +450,20 @@ func (pq *pgQuerier) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*db.Qu
 // --- Spans ---
 
 func (pq *pgQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams) error {
+	startTime := arg.StartTime.Round(0).UTC()
+	endTime := arg.EndTime.Round(0).UTC()
+
 	return pq.q.InsertSpan(ctx, sqlc.InsertSpanParams{
 		SpanID: arg.SpanID, TraceID: arg.TraceID, ParentSpanID: arg.ParentSpanID,
-		Name: arg.Name, StartTime: arg.StartTime, EndTime: arg.EndTime,
+		Name: arg.Name, StartTime: startTime, EndTime: endTime,
 		RunID: arg.RunID, AccountID: arg.AccountID, AppID: arg.AppID,
 		FunctionID: arg.FunctionID, EnvID: arg.EnvID,
 		DynamicSpanID: arg.DynamicSpanID,
-		Attributes: bytesToNullRaw(arg.Attributes),
-		Links:      bytesToNullRaw(arg.Links),
-		Output:     bytesToNullRaw(arg.Output),
-		Input:      bytesToNullRaw(arg.Input),
-		DebugRunID: arg.DebugRunID, DebugSessionID: arg.DebugSessionID,
+		Attributes:    bytesToNullRaw(arg.Attributes),
+		Links:         bytesToNullRaw(arg.Links),
+		Output:        bytesToNullRaw(arg.Output),
+		Input:         bytesToNullRaw(arg.Input),
+		DebugRunID:    arg.DebugRunID, DebugSessionID: arg.DebugSessionID,
 		Status:   arg.Status,
 		EventIds: bytesToNullRaw(arg.EventIds),
 	})
@@ -486,7 +497,7 @@ func (pq *pgQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.Nu
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
 			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: r.SpanFragments,
-			DebugRunID: debugRunID, DebugSessionID: r.DebugSessionID,
+			DebugRunID:    debugRunID, DebugSessionID: r.DebugSessionID,
 		}
 	}
 	return out, nil
@@ -504,7 +515,7 @@ func (pq *pgQuerier) GetSpansByDebugSessionID(ctx context.Context, debugSessionI
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
 			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: r.SpanFragments,
-			DebugRunID: r.DebugRunID, DebugSessionID: debugSessionID,
+			DebugRunID:    r.DebugRunID, DebugSessionID: debugSessionID,
 		}
 	}
 	return out, nil
@@ -608,7 +619,7 @@ func (pq *pgQuerier) InsertTraceRun(ctx context.Context, arg db.InsertTraceRunPa
 	return pq.q.InsertTraceRun(ctx, sqlc.InsertTraceRunParams{
 		AccountID: arg.AccountID, WorkspaceID: arg.WorkspaceID,
 		AppID: arg.AppID, FunctionID: arg.FunctionID, TraceID: arg.TraceID,
-		RunID: arg.RunID.String(),
+		RunID:    arg.RunID.String(),
 		QueuedAt: arg.QueuedAt, StartedAt: arg.StartedAt, EndedAt: arg.EndedAt,
 		Status: int32(arg.Status), SourceID: arg.SourceID, TriggerIds: arg.TriggerIds,
 		Output: arg.Output, BatchID: arg.BatchID[:], IsDebounce: arg.IsDebounce,
@@ -659,7 +670,7 @@ func (pq *pgQuerier) InsertWorkerConnection(ctx context.Context, arg db.InsertWo
 		GatewayID: arg.GatewayID, InstanceID: arg.InstanceID,
 		Status: int16(arg.Status), WorkerIp: arg.WorkerIp,
 		MaxWorkerConcurrency: arg.MaxWorkerConcurrency,
-		ConnectedAt: arg.ConnectedAt, LastHeartbeatAt: arg.LastHeartbeatAt,
+		ConnectedAt:          arg.ConnectedAt, LastHeartbeatAt: arg.LastHeartbeatAt,
 		DisconnectedAt: arg.DisconnectedAt, RecordedAt: arg.RecordedAt,
 		InsertedAt: arg.InsertedAt, DisconnectReason: arg.DisconnectReason,
 		GroupHash: arg.GroupHash, SdkLang: arg.SdkLang, SdkVersion: arg.SdkVersion,

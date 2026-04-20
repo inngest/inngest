@@ -85,26 +85,46 @@ func TestRunSQLiteWritesRequestedOutput(t *testing.T) {
 
 	tempDir := t.TempDir()
 	outputPath := filepath.Join(tempDir, "nested", "sqlite-schema.sql")
+	outputPath2 := filepath.Join(tempDir, "pkg-db", "sqlite", "schema.sql")
 
 	err := run(context.Background(), config{
-		dialect:      "sqlite",
-		sqliteOutput: outputPath,
+		dialect:       "sqlite",
+		sqliteOutputs: []string{outputPath, outputPath2},
 	})
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
 
-	got, err := os.ReadFile(outputPath)
-	if err != nil {
-		t.Fatalf("reading output file: %v", err)
+	for _, path := range []string{outputPath, outputPath2} {
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading output file %s: %v", path, err)
+		}
+
+		for _, want := range []string{
+			"CREATE TABLE apps",
+			"CREATE TABLE spans",
+		} {
+			if !strings.Contains(string(got), want) {
+				t.Fatalf("sqlite output %s missing %q:\n%s", path, want, string(got))
+			}
+		}
+	}
+}
+
+func TestSplitOutputPathsDedupesAndTrims(t *testing.T) {
+	t.Parallel()
+
+	got := splitOutputPaths(" a.sql, b.sql, a.sql , ,c.sql ")
+	want := []string{"a.sql", "b.sql", "c.sql"}
+
+	if len(got) != len(want) {
+		t.Fatalf("unexpected output count: got %v want %v", got, want)
 	}
 
-	for _, want := range []string{
-		"CREATE TABLE apps",
-		"CREATE TABLE spans",
-	} {
-		if !strings.Contains(string(got), want) {
-			t.Fatalf("sqlite output missing %q:\n%s", want, string(got))
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected output at %d: got %q want %q", i, got[i], want[i])
 		}
 	}
 }

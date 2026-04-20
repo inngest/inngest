@@ -25,9 +25,9 @@ sql:
 
           - column: "event_batches.id"
             go_type:
-              import: "github.com/oklog/ulid/v2"
-              package: "ulid"
-              type: "ULID"
+              import: "github.com/inngest/inngest/pkg/db/postgres/sqltypes"
+              package: "sqltypes"
+              type: "TextULID"
           - column: "event_batches.account_id"
             go_type: "github.com/google/uuid.UUID"
           - column: "event_batches.workspace_id"
@@ -38,9 +38,9 @@ sql:
             go_type: "github.com/google/uuid.UUID"
           - column: "event_batches.run_id"
             go_type:
-              import: "github.com/oklog/ulid/v2"
-              package: "ulid"
-              type: "ULID"
+              import: "github.com/inngest/inngest/pkg/db/postgres/sqltypes"
+              package: "sqltypes"
+              type: "TextULID"
 
           - column: "history.id"
             go_type:
