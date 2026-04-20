@@ -343,12 +343,22 @@ func (g GeneratorOpcode) DeferAddOpts() (*DeferAddOpts, error) {
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
 		return nil, err
 	}
-	return opts, nil
+	return opts, opts.Validate()
 }
 
 type DeferAddOpts struct {
 	FnSlug string          `json:"fn_slug"`
 	Input  json.RawMessage `json:"input,omitempty"`
+}
+
+func (d *DeferAddOpts) Validate() error {
+	if d.FnSlug == "" {
+		return fmt.Errorf("FnSlug is required")
+	}
+	if len(d.Input) == 0 {
+		return fmt.Errorf("Input is required")
+	}
+	return nil
 }
 
 func (d *DeferAddOpts) UnmarshalAny(a any) error {

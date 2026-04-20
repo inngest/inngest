@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -3278,6 +3279,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					e.log.Error(
 						"panic in handleGenerator",
 						"error", r,
+						"stack", string(debug.Stack()),
 					)
 				}
 			}()
