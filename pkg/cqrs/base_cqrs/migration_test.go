@@ -4,29 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"embed"
 	"fmt"
-	"net/url"
+	"io/fs"
 	"os"
 	"path"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
-	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
-
-//go:embed migrations/*/*.sql
-var legacyMigrationsFS embed.FS
 
 type migrationDialect string
 
@@ -178,72 +170,66 @@ func newRawMigrationTestDB(t *testing.T, dialect migrationDialect) (*sql.DB, Bas
 }
 
 func upLegacy(db *sql.DB, opts BaseCQRSOptions) error {
-	var (
-		err    error
-		src    source.Driver
-		driver database.Driver
-		dbName string
-	)
-
-	if opts.PostgresURI != "" {
-		src, err = iofs.New(legacyMigrationsFS, path.Join("migrations", "postgres"))
-		if err != nil {
-			return err
-		}
-
-		dbName = "postgres"
-		parsedURL, err := url.Parse(opts.PostgresURI)
-		if err != nil {
-			return fmt.Errorf("error parsing postgres URI to retrieve DB name: invalid format")
-		}
-		if parsedURL.Path != "" && parsedURL.Path != "/" {
-			dbName = parsedURL.Path[1:]
-		}
-
-		driver, err = migratepostgres.WithInstance(db, &migratepostgres.Config{
-			MigrationsTable: "migrations",
-			DatabaseName:    dbName,
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		src, err = iofs.New(legacyMigrationsFS, path.Join("migrations", "sqlite"))
-		if err != nil {
-			return err
-		}
-
-		driver, err = migratesqlite.WithInstance(db, &migratesqlite.Config{
-			MigrationsTable: "migrations",
-			NoTxWrap:        true,
-		})
-		if err != nil {
-			return err
-		}
-
-		dbName = "sqlite"
-	}
-
-	m, err := migrate.NewWithInstance("iofs", src, dbName, driver)
+	statements, err := legacyBaselineStatements(opts)
 	if err != nil {
 		return err
 	}
 
-	v, dirty, err := m.Version()
-	if err != migrate.ErrNilVersion && err != nil {
-		return err
-	}
-	if dirty {
-		if err := m.Migrate(v); err != nil {
-			return fmt.Errorf("error migrating to version %d resetting dirty: %w", v, err)
+	for _, statement := range statements {
+		if _, err := db.Exec(statement); err != nil {
+			return fmt.Errorf("apply legacy schema statement %q: %w", statement, err)
 		}
 	}
 
-	err = m.Up()
-	if err == migrate.ErrNoChange {
-		return nil
+	if opts.PostgresURI != "" {
+		_, err = db.Exec(`INSERT INTO migrations (version, dirty) VALUES ($1, $2)`, 18, false)
+		return err
 	}
+
+	_, err = db.Exec(`INSERT INTO migrations (version, dirty) VALUES (?, ?)`, 18, false)
 	return err
+}
+
+func legacyBaselineStatements(opts BaseCQRSOptions) ([]string, error) {
+	var (
+		migrationsFS fs.FS
+		err          error
+	)
+
+	if opts.PostgresURI != "" {
+		migrationsFS, err = fs.Sub(dbpostgres.MigrationsFS, "migrations")
+	} else {
+		migrationsFS, err = fs.Sub(dbsqlite.MigrationsFS, "migrations")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	baseline, err := fs.ReadFile(migrationsFS, "000001_baseline.sql")
+	if err != nil {
+		return nil, err
+	}
+
+	return gooseUpStatements(string(baseline))
+}
+
+func gooseUpStatements(migration string) ([]string, error) {
+	const (
+		upMarker   = "-- +goose Up"
+		downMarker = "-- +goose Down"
+	)
+
+	upStart := strings.Index(migration, upMarker)
+	if upStart == -1 {
+		return nil, fmt.Errorf("missing goose up marker")
+	}
+
+	upSQL := migration[upStart+len(upMarker):]
+	if downStart := strings.Index(upSQL, downMarker); downStart >= 0 {
+		upSQL = upSQL[:downStart]
+	}
+
+	return splitSQLStatements(upSQL), nil
 }
 
 func assertMatchesExpectedSchema(t *testing.T, db *sql.DB, dialect migrationDialect) {
