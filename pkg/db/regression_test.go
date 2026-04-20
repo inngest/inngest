@@ -33,6 +33,11 @@ type schemaColumn struct {
 	Default string
 }
 
+type schemaSnapshot struct {
+	Tables  map[string][]schemaColumn
+	Indexes map[string][]string
+}
+
 type logicalColumn struct {
 	Name string
 	Type string
@@ -47,9 +52,9 @@ func TestSchemaColumnsMatchSqlc(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
 
-	actual := readRuntimeSchema(t, adapter.Conn(), adapter.Dialect())
-	expected := readExpectedSchema(t, adapter.Dialect())
-	applyLegacyRuntimeCompatibilityOverrides(expected, adapter.Dialect())
+	actual := readRuntimeSchemaSnapshot(t, adapter.Conn(), adapter.Dialect())
+	expected := readExpectedSchemaSnapshot(t, adapter.Dialect())
+	applyLegacyRuntimeCompatibilityOverrides(expected.Tables, adapter.Dialect())
 
 	require.Equal(t, expected, actual)
 }
@@ -957,6 +962,23 @@ func readExpectedSchema(t *testing.T, dialect db.Dialect) map[string][]schemaCol
 	return parseSchemaColumns(t, string(contents))
 }
 
+func readExpectedSchemaSnapshot(t *testing.T, dialect db.Dialect) schemaSnapshot {
+	t.Helper()
+
+	tables := readExpectedSchema(t, dialect)
+	indexes := readExpectedIndexes(t, dialect)
+	for tableName := range tables {
+		if _, ok := indexes[tableName]; !ok {
+			indexes[tableName] = nil
+		}
+	}
+
+	return schemaSnapshot{
+		Tables:  tables,
+		Indexes: indexes,
+	}
+}
+
 func applyLegacyRuntimeCompatibilityOverrides(schema map[string][]schemaColumn, dialect db.Dialect) {
 	if dialect != db.DialectSQLite {
 		return
@@ -991,6 +1013,64 @@ func parseSchemaColumns(t *testing.T, contents string) map[string][]schemaColumn
 			}
 			result[tableName] = append(result[tableName], column)
 		}
+	}
+
+	return result
+}
+
+func readExpectedIndexes(t *testing.T, dialect db.Dialect) map[string][]string {
+	t.Helper()
+
+	path := filepath.Join(string(dialect), "schema.sql")
+	contents, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	return parseIndexNames(t, string(contents))
+}
+
+func parseIndexNames(t *testing.T, schema string) map[string][]string {
+	t.Helper()
+
+	result := map[string][]string{}
+
+	for _, statement := range splitSQLStatements(schema) {
+		statement = strings.TrimSpace(statement)
+		upper := strings.ToUpper(statement)
+		if !strings.HasPrefix(upper, "CREATE INDEX ") && !strings.HasPrefix(upper, "CREATE UNIQUE INDEX ") {
+			continue
+		}
+
+		remainder := statement
+		switch {
+		case strings.HasPrefix(upper, "CREATE UNIQUE INDEX "):
+			remainder = strings.TrimSpace(statement[len("CREATE UNIQUE INDEX "):])
+		case strings.HasPrefix(upper, "CREATE INDEX "):
+			remainder = strings.TrimSpace(statement[len("CREATE INDEX "):])
+		}
+
+		if strings.HasPrefix(strings.ToUpper(remainder), "IF NOT EXISTS ") {
+			remainder = strings.TrimSpace(remainder[len("IF NOT EXISTS "):])
+		}
+
+		onIdx := strings.Index(strings.ToUpper(remainder), " ON ")
+		require.NotEqual(t, -1, onIdx, "invalid CREATE INDEX statement: %q", statement)
+
+		indexName := normalizeIdentifier(remainder[:onIdx])
+		tableSection := strings.TrimSpace(remainder[onIdx+len(" ON "):])
+		if usingIdx := strings.Index(strings.ToUpper(tableSection), " USING "); usingIdx >= 0 {
+			tableSection = strings.TrimSpace(tableSection[:usingIdx])
+		}
+		tableNameSection := tableSection
+		if parenIdx := strings.Index(tableNameSection, "("); parenIdx >= 0 {
+			tableNameSection = tableNameSection[:parenIdx]
+		}
+
+		tableName := normalizeIdentifier(tableNameSection)
+		result[tableName] = append(result[tableName], indexName)
+	}
+
+	for tableName := range result {
+		sort.Strings(result[tableName])
 	}
 
 	return result
@@ -1135,6 +1215,22 @@ func readRuntimeSchema(t *testing.T, conn *sql.DB, dialect db.Dialect) map[strin
 	return result
 }
 
+func readRuntimeSchemaSnapshot(t *testing.T, conn *sql.DB, dialect db.Dialect) schemaSnapshot {
+	t.Helper()
+
+	tables := readRuntimeSchema(t, conn, dialect)
+	indexes := map[string][]string{}
+
+	for tableName := range tables {
+		indexes[tableName] = readRuntimeIndexes(t, conn, dialect, tableName)
+	}
+
+	return schemaSnapshot{
+		Tables:  tables,
+		Indexes: indexes,
+	}
+}
+
 func readRuntimeTableNames(t *testing.T, conn *sql.DB, dialect db.Dialect) []string {
 	t.Helper()
 
@@ -1235,6 +1331,51 @@ func readRuntimeColumns(t *testing.T, conn *sql.DB, dialect db.Dialect, tableNam
 		require.NoError(t, rows.Err())
 		return columns
 	}
+}
+
+func readRuntimeIndexes(t *testing.T, conn *sql.DB, dialect db.Dialect, tableName string) []string {
+	t.Helper()
+
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	switch dialect {
+	case db.DialectPostgres:
+		rows, err = conn.Query(`
+			SELECT i.indexname
+			FROM pg_indexes i
+			LEFT JOIN pg_constraint c
+			  ON c.conindid = (i.schemaname || '.' || i.indexname)::regclass
+			  AND c.contype = 'p'
+			WHERE i.schemaname = current_schema()
+			  AND i.tablename = $1
+			  AND c.oid IS NULL
+			ORDER BY i.indexname
+		`, tableName)
+	default:
+		rows, err = conn.Query(`
+			SELECT name
+			FROM sqlite_master
+			WHERE type = 'index'
+			  AND tbl_name = ?
+			  AND sql IS NOT NULL
+			ORDER BY name
+		`, tableName)
+	}
+	require.NoError(t, err)
+	defer rows.Close()
+
+	var indexes []string
+	for rows.Next() {
+		var name string
+		require.NoError(t, rows.Scan(&name))
+		indexes = append(indexes, name)
+	}
+	require.NoError(t, rows.Err())
+	sort.Strings(indexes)
+	return indexes
 }
 
 func postgresColumnType(dataType string, maxCharLength sql.NullInt64) string {
