@@ -950,7 +950,7 @@ func readStoredSpanState(t *testing.T, ctx context.Context, adapter db.Adapter, 
 func readExpectedSchema(t *testing.T, dialect db.Dialect) map[string][]schemaColumn {
 	t.Helper()
 
-	path := filepath.Join("..", "cqrs", "base_cqrs", "sqlc", string(dialect), "schema.sql")
+	path := filepath.Join(string(dialect), "schema.sql")
 	contents, err := os.ReadFile(path)
 	require.NoError(t, err)
 

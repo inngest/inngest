@@ -243,7 +243,7 @@ func assertMatchesExpectedSchema(t *testing.T, db *sql.DB, dialect migrationDial
 func expectedSchemaSnapshot(t *testing.T, dialect migrationDialect) schemaSnapshot {
 	t.Helper()
 
-	schemaBytes, err := os.ReadFile(path.Join("sqlc", string(dialect), "schema.sql"))
+	schemaBytes, err := os.ReadFile(path.Join("..", "..", "db", string(dialect), "schema.sql"))
 	require.NoError(t, err)
 
 	tables := parseSchemaColumns(t, string(schemaBytes))
