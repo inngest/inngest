@@ -1,0 +1,38 @@
+:root {
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color-scheme: light dark;
+  color: #111;
+  background: #fafafa;
+}
+@media (prefers-color-scheme: dark) {
+  :root { color: #e8e8e8; background: #0e0e10; }
+  .card { background: #17171a !important; border-color: #2a2a2f !important; }
+  input, select, button { background: #17171a; color: #e8e8e8; border-color: #2a2a2f; }
+  a { color: #9cc3ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.container { max-width: 1080px; margin: 0 auto; padding: 24px; }
+h1 { margin: 0 0 12px; font-size: 22px; }
+h2 { margin: 24px 0 8px; font-size: 16px; font-weight: 600; }
+nav { display: flex; gap: 16px; padding: 12px 24px; border-bottom: 1px solid #ddd; background: transparent; }
+nav a { text-decoration: none; color: inherit; padding: 4px 8px; border-radius: 4px; }
+nav a.active { background: #e5e7eb; }
+.card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; min-width: 140px; }
+input, select { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
+button { padding: 8px 14px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font: inherit; }
+button.primary { background: #2563eb; color: white; border-color: #1e40af; }
+button.danger { background: #dc2626; color: white; border-color: #991b1b; }
+.metric { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e5e7eb; font-variant-numeric: tabular-nums; }
+.metric:last-child { border-bottom: 0; }
+.muted { opacity: 0.7; font-size: 12px; }
+.status-pending { color: #a16207; }
+.status-running { color: #2563eb; }
+.status-completed { color: #16a34a; }
+.status-failed { color: #dc2626; }
+.status-stopped { color: #6b7280; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }

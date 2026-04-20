@@ -1,0 +1,8 @@
+bin/
+*.db
+*.db-wal
+*.db-shm
+ui/node_modules/
+ui/dist/
+ui/src/routeTree.gen.ts
+internal/uiembed/dist/assets/

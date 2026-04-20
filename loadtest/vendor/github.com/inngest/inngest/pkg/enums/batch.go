@@ -1,0 +1,18 @@
+//go:generate go run github.com/dmarkham/enumer -trimprefix=Batch -type=Batch -json -text
+
+package enums
+
+type Batch int
+
+const (
+	// BatchAppend represents an item being appended to an existing batch
+	BatchAppend Batch = iota
+	// BatchNew represents a newly created batch
+	BatchNew
+	// BatchFull represents a full batch
+	BatchFull
+	// BatchNew indicates the batch has reached the size limit of a batch
+	BatchMaxSize
+	// BatchItemExists represents status when appending an item that was already appended to a batch
+	BatchItemExists
+)
