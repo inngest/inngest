@@ -535,41 +535,94 @@ This gives higher assurance but will be expensive, brittle, and uneven across la
 
 * Phases
 ** Phase 1: Command and shared model
+Overview:
+- establish the CLI surface and the shared data model that every later phase builds on
+- make the conformance command discoverable even before all runners and suites are complete
+
+Subtasks:
 - [ ] Add =cmd/conformance= and register it in the root CLI.
-- [ ] Define shared config, suite, case, feature, and report types.
-- [ ] Implement =list= and a stub =run= command.
-- [ ] Define report schema versioning.
-- [ ] Define fixture and golden-data conventions, including sanitization rules.
+- [ ] Define the top-level subcommands: =run=, =list=, =doctor=, and =report=.
+- [ ] Define shared config, suite, case, feature, status, and report types.
+- [ ] Define report schema versioning and a stable JSON shape.
+- [ ] Implement =list= against the shared registry so available suites and cases are visible.
+- [ ] Implement a stub =run= path that loads config, selects suites, and validates inputs.
+- [ ] Define fixture and golden-data conventions, including sanitization and normalization
+  rules.
+- [ ] Establish the compatibility classification model: full, partial, incompatible, and
+  unknown.
 
 ** Phase 2: Serve runner
+Overview:
+- deliver the first useful end-to-end runner by targeting SDKs that expose the standard HTTP
+  serve flow
+- prove the shared model works in a real transport before adding connect-specific complexity
+
+Subtasks:
 - [ ] Extract serve-oriented protocol logic from =tests/= into =pkg/conformance/runner/serve=.
-- [ ] Implement a small initial case set.
-- [ ] Emit pretty and JSON reports.
-- [ ] Add basic doctor checks for serve mode.
-- [ ] Add the first negative-input serve cases.
+- [ ] Define the serve transport contract, including introspection, registration, and event
+  injection expectations.
+- [ ] Implement the first happy-path cases: registration, invocation, steps, retry, cancel,
+  and wait-for-event.
+- [ ] Add serve-mode doctor checks for SDK reachability, required endpoints, and basic config
+  validation.
+- [ ] Emit pretty and JSON reports from serve runs using the shared report model.
+- [ ] Add the first negative-input serve cases, focusing on malformed payloads and safe error
+  handling.
+- [ ] Add basic security assertions in serve mode, including secret redaction and env var
+  non-disclosure checks.
+- [ ] Validate that failures still produce a useful artifact bundle and do not fail fast by
+  default.
 
 ** Phase 3: Connect runner
-- [ ] Implement worker process orchestration.
-- [ ] Add readiness checks against dev server Connect state.
-- [ ] Reuse shared cases where transport-independent.
-- [ ] Add Connect-specific doctor checks and diagnostics.
+Overview:
+- extend the system to SDKs that use Connect workers instead of HTTP serve endpoints
+- keep the case model shared, while adapting orchestration, readiness, and evidence capture
+  to the Connect transport
+
+Subtasks:
+- [ ] Implement worker process orchestration, lifecycle handling, and cleanup.
+- [ ] Add readiness checks against dev server Connect state before test execution begins.
+- [ ] Define the connect transport contract in terms of observable behavior rather than raw
+  protocol implementation.
+- [ ] Reuse shared feature cases where transport-independent and add transport adapters where
+  needed.
+- [ ] Add Connect-specific doctor checks and diagnostics for worker startup, readiness, and
+  state visibility.
 - [ ] Add connect-safe negative cases that validate error handling without requiring the
   runner to implement the wire protocol directly.
+- [ ] Add transport-critical cases for reconnect, drain, and lease-extension behavior.
+- [ ] Feed transport-critical case results into the overall compatibility classification.
 
 ** Phase 4: Reporting and CI ergonomics
-- [ ] Implement =report= subcommand.
-- [ ] Add JUnit and Markdown renderers.
-- [ ] Support stable artifact paths and exit codes for CI.
-- [ ] Document usage for SDK repositories.
-- [ ] Ensure reports and captures redact secrets and unstable values.
+Overview:
+- make the runner useful in CI and easy to consume by humans without reading raw logs
+- ensure failure artifacts are stable, sanitized, and structured enough for regression
+  tracking
+
+Subtasks:
+- [ ] Implement =report= for re-rendering existing artifacts without re-running tests.
+- [ ] Add output renderers for pretty terminal output, JSON, JUnit, and Markdown.
+- [ ] Finalize the default failure artifact bundle and optional verbose capture behavior.
+- [ ] Support stable artifact paths, stable exit codes, and CI-friendly summary output.
+- [ ] Ensure reports and captures redact secrets and unstable values consistently.
+- [ ] Add normalized reason codes and evidence snippets to improve triage quality.
+- [ ] Document how CI should store, render, and diff conformance artifacts.
 
 ** Phase 5: Config and adoption
-- [ ] Add =init= scaffolding for SDK repos.
-- [ ] Support per-repo config files for commands, env, and suites.
-- [ ] Trial adoption in =inngestgo= first, then other SDK repos.
-- [ ] Add =negative= and =security= suites to the default CI recommendation once stable.
+Overview:
+- make adoption easy for SDK repositories and validate the design across multiple language
+  implementations
+- use early adopters to refine config, fixture expectations, and compatibility reporting
 
-* Open Questions
+Subtasks:
+- [ ] Add =init= scaffolding for SDK repos.
+- [ ] Support per-repo config files for commands, env, suites, and fixture metadata.
+- [ ] Define a small canonical config example for serve and connect transports.
+- [ ] Trial adoption in =inngestgo= first to validate both shared cases and connect support.
+- [ ] Extend adoption to =inngest-rs= and =inngest-kt=, refining assumptions where the SDK
+  architecture differs.
+- [ ] Add =negative= and =security= suites to the default CI recommendation once stable.
+- [ ] Use adoption feedback to tune classifications, reason codes, and fixture requirements.
 
 * Success Criteria
 - An SDK repository can run =inngest conformance run= locally with one command.
