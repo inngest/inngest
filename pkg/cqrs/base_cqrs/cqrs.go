@@ -2997,9 +2997,23 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	allFilters := append(builder.filter, celFilters...)
+	// The inner subquery is bounded by Until (an executor.run always precedes
+	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
+	// also apply the From floor so the inner scan stops growing O(total
+	// executor.run history) as the system ages — at the cost of excluding runs
+	// whose root started before From but had EXTEND activity inside the
+	// window. For end_time-based windows we skip the floor: a run that ended
+	// in-window can legitimately have started arbitrarily earlier.
+	innerPreds := []sq.Expression{
+		sq.C("name").Eq(meta.SpanNameRun),
+		sq.C("start_time").Lt(opt.Filter.Until.UTC()),
+	}
+	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
+		innerPreds = append(innerPreds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
+	}
 	q = q.Select(selectCols...).
 		Where(sq.L("spans.dynamic_span_id").In(
-			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(innerPreds...),
 		)).
 		Where(allFilters...).
 		GroupBy(groupByCols...).

@@ -271,21 +271,25 @@ export function RunsPage({
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
         <div className="flex h-11 items-center justify-between gap-1.5 px-3">
           <div className="flex items-center gap-1.5">
-            <Button
-              icon={<RiSearchLine />}
-              size="small"
-              kind="secondary"
-              iconSide="left"
-              appearance="outlined"
-              label={showSearch ? 'Hide search' : 'Show search'}
-              onClick={() => setShowSearch((prev) => !prev)}
-              className={cn(
-                search
-                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                  : '',
-                'h-[26px] w-[103px] rounded'
-              )}
-            />
+            {/* CEL search scans the returned run set and gets prohibitively slow on large pages,
+                so only offer it when the total is small or the user already has a query applied. */}
+            {(totalCount === undefined || totalCount < 1000 || !!search) && (
+              <Button
+                icon={<RiSearchLine />}
+                size="small"
+                kind="secondary"
+                iconSide="left"
+                appearance="outlined"
+                label={showSearch ? 'Hide search' : 'Show search'}
+                onClick={() => setShowSearch((prev) => !prev)}
+                className={cn(
+                  search
+                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                    : '',
+                  'h-[26px] w-[103px] rounded'
+                )}
+              />
+            )}
             <SelectGroup>
               <TimeFieldFilter
                 selectedTimeField={timeField}
