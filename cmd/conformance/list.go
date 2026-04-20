@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 
+	"github.com/inngest/inngest/pkg/cli/output"
 	conf "github.com/inngest/inngest/pkg/conformance"
 	"github.com/urfave/cli/v3"
 )
@@ -37,45 +37,7 @@ func listCommand() *cli.Command {
 				return nil
 			}
 
-			fmt.Println("Transports:")
-			for _, transport := range conf.ValidTransports() {
-				fmt.Printf("  - %s\n", transport)
-			}
-			fmt.Println("")
-
-			suiteIDs := make([]string, 0, len(registry.Suites))
-			for suiteID := range registry.Suites {
-				suiteIDs = append(suiteIDs, suiteID)
-			}
-			sort.Strings(suiteIDs)
-
-			fmt.Println("Suites:")
-			for _, suiteID := range suiteIDs {
-				suite := registry.Suites[suiteID]
-				fmt.Printf("  - %s: %s\n", suite.ID, suite.Label)
-				if suite.Description != "" {
-					fmt.Printf("      %s\n", suite.Description)
-				}
-				for _, caseID := range suite.CaseIDs {
-					testCase := registry.Cases[caseID]
-					fmt.Printf("      case: %s\n", testCase.ID)
-				}
-			}
-			fmt.Println("")
-
-			featureIDs := make([]string, 0, len(registry.Features))
-			for featureID := range registry.Features {
-				featureIDs = append(featureIDs, featureID)
-			}
-			sort.Strings(featureIDs)
-
-			fmt.Println("Features:")
-			for _, featureID := range featureIDs {
-				feature := registry.Features[featureID]
-				fmt.Printf("  - %s: %s\n", feature.ID, feature.Label)
-			}
-
-			return nil
+			return output.TextConformanceCatalog(registry)
 		},
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/inngest/inngest/pkg/cli/output"
 	conf "github.com/inngest/inngest/pkg/conformance"
 	"github.com/urfave/cli/v3"
 )
@@ -101,29 +102,7 @@ func runCommand() *cli.Command {
 				return nil
 			}
 
-			fmt.Printf("Transport: %s\n", valueOrDefault(string(plan.Transport), "all"))
-			fmt.Printf("Suites: %d\n", len(plan.Suites))
-			fmt.Printf("Cases: %d\n", len(plan.Cases))
-			fmt.Printf("Features: %d\n", len(plan.Features))
-			fmt.Println("")
-			fmt.Println("Resolved suites:")
-			for _, suite := range plan.Suites {
-				fmt.Printf("  - %s\n", suite.ID)
-			}
-			fmt.Println("")
-			fmt.Println("Resolved cases:")
-			for _, testCase := range plan.Cases {
-				fmt.Printf("  - %s\n", testCase.ID)
-			}
-			fmt.Println("")
-			fmt.Println("Compatibility classes:")
-			fmt.Println("  - full")
-			fmt.Println("  - partial")
-			fmt.Println("  - incompatible")
-			fmt.Println("  - unknown")
-			fmt.Println("")
-			fmt.Println("Phase 1 validates configuration and selection only. Execution is not implemented yet.")
-			return nil
+			return output.TextConformanceRunPlan(plan)
 		},
 	}
 }
@@ -133,11 +112,4 @@ func mergeStringSlices(base []string, overrides []string) []string {
 		return base
 	}
 	return overrides
-}
-
-func valueOrDefault(value, fallback string) string {
-	if value == "" {
-		return fallback
-	}
-	return value
 }

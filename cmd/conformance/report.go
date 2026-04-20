@@ -2,8 +2,8 @@ package conformance
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/inngest/inngest/pkg/cli/output"
 	"github.com/urfave/cli/v3"
 )
 
@@ -14,8 +14,7 @@ func reportCommand() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			_ = ctx
 			_ = cmd
-			fmt.Println("Phase 1 stub: conformance report rendering is not implemented yet.")
-			return nil
+			return output.TextConformanceStub("report", "Phase 1 stub: conformance report rendering is not implemented yet.")
 		},
 	}
 }
