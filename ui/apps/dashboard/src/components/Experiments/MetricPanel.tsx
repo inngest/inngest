@@ -52,7 +52,7 @@ function LineDotShape({
         cx={x + width}
         cy={cy}
         r={DOT_RADIUS}
-        fill="white"
+        fill="rgb(var(--color-background-canvas-base))"
         stroke={fill}
         strokeWidth={2}
       />
