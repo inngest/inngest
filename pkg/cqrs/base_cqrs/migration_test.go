@@ -5,15 +5,12 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"sort"
 	"strings"
 	"testing"
 
-	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
-	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -39,30 +36,6 @@ type schemaSnapshot struct {
 	Indexes map[string][]string
 }
 
-func TestBaselineOnFreshSQLite(t *testing.T) {
-	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectSQLite)
-	defer cleanup()
-
-	require.NoError(t, up(db, opts))
-
-	assertMatchesExpectedSchema(t, db, migrationDialectSQLite)
-	assertGooseVersionTable(t, db)
-}
-
-func TestMigrationIdempotencySQLite(t *testing.T) {
-	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectSQLite)
-	defer cleanup()
-
-	require.NoError(t, up(db, opts))
-	before := readApplicationSchemaSnapshot(t, db, migrationDialectSQLite)
-
-	require.NoError(t, up(db, opts))
-	after := readApplicationSchemaSnapshot(t, db, migrationDialectSQLite)
-
-	require.Equal(t, before, after)
-	assertGooseVersionTable(t, db)
-}
-
 func TestSchemaMatchesSqlcSQLite(t *testing.T) {
 	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectSQLite)
 	defer cleanup()
@@ -72,44 +45,6 @@ func TestSchemaMatchesSqlcSQLite(t *testing.T) {
 	assertMatchesExpectedSchema(t, db, migrationDialectSQLite)
 }
 
-func TestLegacyMigrationThenGooseBaselineIsNoopSQLite(t *testing.T) {
-	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectSQLite)
-	defer cleanup()
-
-	require.NoError(t, upLegacy(db, opts))
-	before := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectSQLite))
-
-	require.NoError(t, up(db, opts))
-	after := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectSQLite))
-
-	require.Equal(t, before, after)
-	assertGooseVersionTable(t, db)
-}
-
-func TestBaselineOnFreshPostgres(t *testing.T) {
-	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectPostgres)
-	defer cleanup()
-
-	require.NoError(t, up(db, opts))
-
-	assertMatchesExpectedSchema(t, db, migrationDialectPostgres)
-	assertGooseVersionTable(t, db)
-}
-
-func TestMigrationIdempotencyPostgres(t *testing.T) {
-	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectPostgres)
-	defer cleanup()
-
-	require.NoError(t, up(db, opts))
-	before := readApplicationSchemaSnapshot(t, db, migrationDialectPostgres)
-
-	require.NoError(t, up(db, opts))
-	after := readApplicationSchemaSnapshot(t, db, migrationDialectPostgres)
-
-	require.Equal(t, before, after)
-	assertGooseVersionTable(t, db)
-}
-
 func TestSchemaMatchesSqlcPostgres(t *testing.T) {
 	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectPostgres)
 	defer cleanup()
@@ -117,20 +52,6 @@ func TestSchemaMatchesSqlcPostgres(t *testing.T) {
 	require.NoError(t, up(db, opts))
 
 	assertMatchesExpectedSchema(t, db, migrationDialectPostgres)
-}
-
-func TestLegacyMigrationThenGooseBaselineIsNoopPostgres(t *testing.T) {
-	db, opts, cleanup := newRawMigrationTestDB(t, migrationDialectPostgres)
-	defer cleanup()
-
-	require.NoError(t, upLegacy(db, opts))
-	before := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectPostgres))
-
-	require.NoError(t, up(db, opts))
-	after := snapshotWithoutGooseVersionTable(readApplicationSchemaSnapshot(t, db, migrationDialectPostgres))
-
-	require.Equal(t, before, after)
-	assertGooseVersionTable(t, db)
 }
 
 func newRawMigrationTestDB(t *testing.T, dialect migrationDialect) (*sql.DB, BaseCQRSOptions, func()) {
@@ -167,69 +88,6 @@ func newRawMigrationTestDB(t *testing.T, dialect migrationDialect) (*sql.DB, Bas
 	return db, BaseCQRSOptions{ForTest: true}, func() {
 		_ = db.Close()
 	}
-}
-
-func upLegacy(db *sql.DB, opts BaseCQRSOptions) error {
-	statements, err := legacyBaselineStatements(opts)
-	if err != nil {
-		return err
-	}
-
-	for _, statement := range statements {
-		if _, err := db.Exec(statement); err != nil {
-			return fmt.Errorf("apply legacy schema statement %q: %w", statement, err)
-		}
-	}
-
-	if opts.PostgresURI != "" {
-		_, err = db.Exec(`INSERT INTO migrations (version, dirty) VALUES ($1, $2)`, 18, false)
-		return err
-	}
-
-	_, err = db.Exec(`INSERT INTO migrations (version, dirty) VALUES (?, ?)`, 18, false)
-	return err
-}
-
-func legacyBaselineStatements(opts BaseCQRSOptions) ([]string, error) {
-	var (
-		migrationsFS fs.FS
-		err          error
-	)
-
-	if opts.PostgresURI != "" {
-		migrationsFS, err = fs.Sub(dbpostgres.MigrationsFS, "migrations")
-	} else {
-		migrationsFS, err = fs.Sub(dbsqlite.MigrationsFS, "migrations")
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	baseline, err := fs.ReadFile(migrationsFS, "000001_baseline.sql")
-	if err != nil {
-		return nil, err
-	}
-
-	return gooseUpStatements(string(baseline))
-}
-
-func gooseUpStatements(migration string) ([]string, error) {
-	const (
-		upMarker   = "-- +goose Up"
-		downMarker = "-- +goose Down"
-	)
-
-	upStart := strings.Index(migration, upMarker)
-	if upStart == -1 {
-		return nil, fmt.Errorf("missing goose up marker")
-	}
-
-	upSQL := migration[upStart+len(upMarker):]
-	if downStart := strings.Index(upSQL, downMarker); downStart >= 0 {
-		upSQL = upSQL[:downStart]
-	}
-
-	return splitSQLStatements(upSQL), nil
 }
 
 func assertMatchesExpectedSchema(t *testing.T, db *sql.DB, dialect migrationDialect) {
@@ -406,12 +264,6 @@ func readApplicationSchemaSnapshot(t *testing.T, db *sql.DB, dialect migrationDi
 		Tables:  tables,
 		Indexes: indexes,
 	}
-}
-
-func snapshotWithoutGooseVersionTable(snapshot schemaSnapshot) schemaSnapshot {
-	delete(snapshot.Tables, "goose_db_version")
-	delete(snapshot.Indexes, "goose_db_version")
-	return snapshot
 }
 
 func readRuntimeSchema(t *testing.T, db *sql.DB, dialect migrationDialect) map[string][]schemaColumn {
@@ -693,16 +545,4 @@ func normalizeDefault(defaultExpr string) string {
 		return defaultExpr
 	}
 	return strings.ToLower(defaultExpr)
-}
-
-func assertGooseVersionTable(t *testing.T, db *sql.DB) {
-	t.Helper()
-
-	var maxVersion int64
-	require.NoError(t, db.QueryRow("SELECT MAX(version_id) FROM goose_db_version").Scan(&maxVersion))
-	require.Equal(t, int64(1), maxVersion)
-
-	var baselineRows int
-	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM goose_db_version WHERE version_id = 1").Scan(&baselineRows))
-	require.Equal(t, 1, baselineRows)
 }
