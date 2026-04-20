@@ -182,34 +182,36 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                 onRefresh={detail.refetch}
               />
             ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <ScoreSummaryCard
-                  className="col-span-1 md:col-span-2 xl:col-span-3"
-                  scoredVariants={scoredVariants}
-                  metrics={scoring.metrics}
-                />
-
-                {enabledMetrics.map((metric, i) => (
-                  <MetricPanel
-                    key={metric.key}
-                    metric={metric}
-                    variants={filteredDetail.variants}
-                    colorIndex={i}
+              <div className="@container">
+                <div className="grid grid-cols-1 gap-3 @[576px]:grid-cols-2 @[900px]:grid-cols-3">
+                  <ScoreSummaryCard
+                    className="col-span-full"
+                    scoredVariants={scoredVariants}
+                    metrics={scoring.metrics}
                   />
-                ))}
 
-                <VariantsTable
-                  className="col-span-1 md:col-span-2 xl:col-span-3"
-                  scoredVariants={scoredVariants}
-                  scoringConfig={scoring.metrics}
-                  metricRanges={metricRanges}
-                  onUpdateMetric={scoring.updateMetric}
-                  onEnableMetric={scoring.enableMetric}
-                  pointsLeft={scoring.pointsLeft}
-                  onOpenInsights={onOpenInsights}
-                  showInactive={showInactive}
-                  onShowInactiveChange={setShowInactive}
-                />
+                  {enabledMetrics.map((metric, i) => (
+                    <MetricPanel
+                      key={metric.key}
+                      metric={metric}
+                      variants={filteredDetail.variants}
+                      colorIndex={i}
+                    />
+                  ))}
+
+                  <VariantsTable
+                    className="col-span-full"
+                    scoredVariants={scoredVariants}
+                    scoringConfig={scoring.metrics}
+                    metricRanges={metricRanges}
+                    onUpdateMetric={scoring.updateMetric}
+                    onEnableMetric={scoring.enableMetric}
+                    pointsLeft={scoring.pointsLeft}
+                    onOpenInsights={onOpenInsights}
+                    showInactive={showInactive}
+                    onShowInactiveChange={setShowInactive}
+                  />
+                </div>
               </div>
             ))}
         </div>
