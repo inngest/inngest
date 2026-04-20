@@ -14,20 +14,17 @@ import {
 import { Switch, SwitchLabel } from '@inngest/components/Switch';
 import { Table } from '@inngest/components/Table';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiAddLine, RiArrowRightUpLine, RiMoreFill } from '@remixicon/react';
+import { RiArrowRightUpLine, RiMoreFill } from '@remixicon/react';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 
+import { truncateCenter } from '@/lib/experiments/chart';
 import { findBestAndWorst, type ScoredVariant } from '@/lib/experiments/score';
 import {
   computeMetricStats,
   formatMetricValue,
   type MetricStats,
 } from './variantsTable/metricStats';
-import {
-  AddMetricPopover,
-  MetricColumnHeader,
-  MetricSubLabel,
-} from './variantsTable/parts';
+import { MetricColumnHeader, MetricSubLabel } from './variantsTable/parts';
 
 type Props = {
   scoredVariants: ScoredVariant[];
@@ -37,7 +34,6 @@ type Props = {
     key: string,
     patch: Partial<ExperimentScoringMetric>,
   ) => void;
-  onEnableMetric: (key: string) => void;
   pointsLeft: number;
   onOpenInsights: () => void;
   showInactive: boolean;
@@ -58,7 +54,6 @@ export function VariantsTable({
   scoringConfig,
   metricRanges,
   onUpdateMetric,
-  onEnableMetric,
   pointsLeft,
   onOpenInsights,
   showInactive,
@@ -70,36 +65,26 @@ export function VariantsTable({
     [scoringConfig],
   );
 
-  const disabledMetrics = useMemo(
-    () => scoringConfig.filter((m) => !m.enabled),
-    [scoringConfig],
-  );
-
-  // Stable signatures: change only when the SET of enabled/disabled metric keys
+  // Stable signature: changes only when the SET of enabled metric keys
   // changes. Used as the columns memo dependency so that editing a metric's
   // points — which rewrites scoringConfig on every keystroke — doesn't
   // rebuild the columns array and force tanstack to remount header cells (which
   // would close the metric-settings Popover anchored inside a header).
   const enabledKeysSig = enabledMetrics.map((m) => m.key).join('\0');
-  const disabledKeysSig = disabledMetrics.map((m) => m.key).join('\0');
 
   // Dynamic values that cells read at render time via a ref so we don't need
   // them as columns memo deps. Cells still re-render on every VariantsTable
   // render, so they read the latest values.
   const liveRef = useRef({
     enabledMetrics,
-    disabledMetrics,
     pointsLeft,
     onUpdateMetric,
-    onEnableMetric,
     metricRanges,
   });
   liveRef.current = {
     enabledMetrics,
-    disabledMetrics,
     pointsLeft,
     onUpdateMetric,
-    onEnableMetric,
     metricRanges,
   };
 
@@ -168,11 +153,14 @@ export function VariantsTable({
     cols.push(
       columnHelper.accessor('variantName', {
         header: 'Variant',
-        cell: (info) => (
-          <span className="text-basis text-sm font-medium">
-            {info.getValue()}
-          </span>
-        ),
+        cell: (info) => {
+          const full = info.getValue();
+          return (
+            <span className="text-basis text-sm font-medium" title={full}>
+              {truncateCenter(full)}
+            </span>
+          );
+        },
         enableSorting: false,
       }),
     );
@@ -229,40 +217,8 @@ export function VariantsTable({
       );
     }
 
-    cols.push(
-      columnHelper.display({
-        id: '__add_metric',
-        header: () => {
-          const { disabledMetrics, onEnableMetric } = liveRef.current;
-          return (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  kind="secondary"
-                  appearance="ghost"
-                  size="small"
-                  icon={<RiAddLine className="h-3.5 w-3.5" />}
-                  disabled={disabledMetrics.length === 0}
-                />
-              </PopoverTrigger>
-              {disabledMetrics.length > 0 && (
-                <PopoverContent align="end">
-                  <AddMetricPopover
-                    disabledMetrics={disabledMetrics}
-                    onEnable={onEnableMetric}
-                  />
-                </PopoverContent>
-              )}
-            </Popover>
-          );
-        },
-        cell: () => null,
-        enableSorting: false,
-      }),
-    );
-
     return cols;
-  }, [enabledKeysSig, disabledKeysSig]);
+  }, [enabledKeysSig]);
 
   return (
     <div className={cn('flex flex-col', className)}>
@@ -326,14 +282,25 @@ export function VariantsTable({
         </div>
       </div>
 
-      <Table
-        columns={columns}
-        data={rows}
-        blankState={
-          <span className="text-muted text-sm">No variant data available</span>
-        }
-        cellClassName="py-2"
-      />
+      <div
+        className={cn(
+          'border-subtle overflow-hidden rounded-md border',
+          '[&_th]:border-subtle [&_th]:border-r [&_th:last-child]:border-r-0',
+          '[&_td]:border-subtle [&_td]:border-r [&_td:last-child]:border-r-0',
+          '[&_thead]:border-subtle [&_thead]:border-b',
+        )}
+      >
+        <Table
+          columns={columns}
+          data={rows}
+          blankState={
+            <span className="text-muted text-sm">
+              No variant data available
+            </span>
+          }
+          cellClassName="py-2"
+        />
+      </div>
     </div>
   );
 }

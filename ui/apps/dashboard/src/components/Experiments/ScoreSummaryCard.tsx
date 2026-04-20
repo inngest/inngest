@@ -6,16 +6,18 @@ import { RiTrophyLine } from '@remixicon/react';
 import {
   Bar,
   BarChart,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 
-import { computeChartSizing } from '@/lib/experiments/chart';
+import { computeChartSizing, truncateCenter } from '@/lib/experiments/chart';
 import { colorForMetric } from '@/lib/experiments/colors';
 import type { ScoredVariant } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
+import { VariantAxisTick } from './VariantAxisTick';
 
 type Props = {
   scoredVariants: ScoredVariant[];
@@ -60,10 +62,11 @@ export function ScoreSummaryCard({
     [enabledMetrics],
   );
 
-  const { chartHeight, yAxisWidth } = useMemo(
-    () => computeChartSizing(rows.map((r) => r.variantName)),
-    [rows],
-  );
+  const { chartHeight, yAxisWidth } = useMemo(() => {
+    const sizing = computeChartSizing(rows.map((r) => r.variantName));
+    // Reserve room for the metric legend below the bars.
+    return { ...sizing, chartHeight: sizing.chartHeight + 28 };
+  }, [rows]);
   const topVariant = ranked[0] ?? null;
   const runnerUp = ranked[1] ?? null;
 
@@ -75,14 +78,14 @@ export function ScoreSummaryCard({
       <Card.Header className="rounded-t-md">
         <span className="text-basis text-sm font-medium">Score Summary</span>
       </Card.Header>
-      <Card.Content className="flex gap-6 rounded-b-md">
+      <Card.Content className="flex gap-6 rounded-b-md pb-2 pl-2 pt-2">
         <div className="min-w-0 flex-1">
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart
               data={rows}
               layout="vertical"
               barSize={10}
-              margin={{ top: 4, right: 16, bottom: 16, left: 4 }}
+              margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
             >
               <XAxis
                 type="number"
@@ -96,13 +99,21 @@ export function ScoreSummaryCard({
                 type="category"
                 dataKey="variantName"
                 width={yAxisWidth}
-                tick={{ fontSize: 12 }}
+                tick={<VariantAxisTick />}
+                interval={0}
               />
               <Tooltip
                 content={<ChartTooltip />}
                 cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
                 allowEscapeViewBox={{ x: true, y: true }}
                 wrapperStyle={{ zIndex: 50, outline: 'none' }}
+              />
+              <Legend
+                verticalAlign="bottom"
+                height={24}
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{ fontSize: 12 }}
               />
               {enabledMetrics.map((m, i) => (
                 <Bar
@@ -122,16 +133,22 @@ export function ScoreSummaryCard({
           {topVariant && (
             <div className="bg-primary-3xSubtle flex items-center gap-2 rounded px-2 py-1">
               <RiTrophyLine className="text-primary-intense h-[18px] w-[18px] shrink-0" />
-              <p className="text-primary-intense min-w-0 truncate text-sm">
-                Recommended: {topVariant.variantName}
+              <p
+                className="text-primary-intense min-w-0 truncate text-sm"
+                title={topVariant.variantName}
+              >
+                Recommended: {truncateCenter(topVariant.variantName)}
               </p>
             </div>
           )}
           {runnerUp && (
             <div className="flex items-center gap-2 px-2 py-1">
               <span className="text-subtle shrink-0 text-sm">#2</span>
-              <p className="text-subtle min-w-0 truncate text-sm">
-                Runner up: {runnerUp.variantName}
+              <p
+                className="text-subtle min-w-0 truncate text-sm"
+                title={runnerUp.variantName}
+              >
+                Runner up: {truncateCenter(runnerUp.variantName)}
               </p>
             </div>
           )}

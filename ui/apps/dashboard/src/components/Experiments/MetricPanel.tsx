@@ -9,16 +9,18 @@ import { RiTrophyLine } from '@remixicon/react';
 import {
   Bar,
   BarChart,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 
-import { computeChartSizing } from '@/lib/experiments/chart';
-import { colorForMetric } from '@/lib/experiments/colors';
+import { computeChartSizing, truncateCenter } from '@/lib/experiments/chart';
+import { colorForVariant } from '@/lib/experiments/colors';
 import { findExtremum } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
+import { VariantAxisTick } from './VariantAxisTick';
 
 const DOT_RADIUS = 5;
 const LINE_HEIGHT = 2;
@@ -63,21 +65,24 @@ function LineDotShape({
 type Props = {
   metric: ExperimentScoringMetric;
   variants: ExperimentVariantMetrics[];
-  colorIndex: number;
 };
 
 type RowData = {
   variantName: string;
   value: number;
+  /** Index of the variant in the shared list, used to pick a stable palette color. */
+  variantIndex: number;
 };
 
-export function MetricPanel({ metric, variants, colorIndex }: Props) {
+export function MetricPanel({ metric, variants }: Props) {
   const rows: RowData[] = useMemo(
     () =>
       variants
-        .map((v) => {
+        .map((v, variantIndex) => {
           const m = v.metrics.find((vm) => vm.key === metric.key);
-          return m ? { variantName: v.variantName, value: m.avg } : null;
+          return m
+            ? { variantName: v.variantName, value: m.avg, variantIndex }
+            : null;
         })
         .filter((r): r is RowData => r !== null),
     [variants, metric.key],
@@ -103,8 +108,6 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
     [rows],
   );
 
-  const color = colorForMetric(colorIndex);
-
   return (
     <Card className="overflow-visible" contentClassName="overflow-visible">
       <Card.Header className="flex-row items-center justify-between rounded-t-md">
@@ -113,22 +116,22 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
         </span>
         {winner && (
           <Pill
-            kind="primary"
+            kind="default"
             appearance="solidBright"
             icon={<RiTrophyLine className="h-3 w-3" />}
             iconSide="left"
           >
-            {winner}
+            <span title={winner}>{truncateCenter(winner)}</span>
           </Pill>
         )}
       </Card.Header>
-      <Card.Content className="rounded-b-md">
+      <Card.Content className="flex items-center justify-center rounded-b-md pb-2 pl-2 pt-2">
         <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
             data={rows}
             layout="vertical"
             barSize={DOT_RADIUS * 2}
-            margin={{ top: 4, right: DOT_RADIUS + 2, bottom: 16, left: 4 }}
+            margin={{ top: 8, right: DOT_RADIUS + 2, bottom: 4, left: 4 }}
           >
             <XAxis
               type="number"
@@ -142,7 +145,8 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
               type="category"
               dataKey="variantName"
               width={yAxisWidth}
-              tick={{ fontSize: 12 }}
+              tick={<VariantAxisTick />}
+              interval={0}
             />
             <Tooltip
               content={<ChartTooltip />}
@@ -152,10 +156,16 @@ export function MetricPanel({ metric, variants, colorIndex }: Props) {
             />
             <Bar
               dataKey="value"
-              fill={color}
               name={metric.displayName}
               shape={<LineDotShape />}
-            />
+            >
+              {rows.map((row) => (
+                <Cell
+                  key={row.variantName}
+                  fill={colorForVariant(row.variantIndex)}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </Card.Content>

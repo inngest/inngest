@@ -1,14 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { Button } from '@inngest/components/Button';
 import {
   Select,
   SelectWithSearch,
   type Option,
 } from '@inngest/components/Select/Select';
 import type { TimeRangePreset } from '@inngest/components/Experiments';
-import { RiAddLine } from '@remixicon/react';
 
-import { colorForMetric } from '@/lib/experiments/colors';
+import { colorForVariant } from '@/lib/experiments/colors';
 
 type Props = {
   preset: TimeRangePreset;
@@ -112,7 +110,7 @@ function VariantMultiSelect({
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{
-                    backgroundColor: colorForMetric(
+                    backgroundColor: colorForVariant(
                       availableVariants.indexOf(opt.id),
                     ),
                   }}
@@ -139,41 +137,30 @@ export function ExperimentDetailToolbar({
     TIME_OPTIONS.find((o) => o.id === preset) ?? DEFAULT_TIME_OPTION;
 
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <Select
-          label="Time range"
-          isLabelVisible={false}
-          value={selectedTimeOption}
-          onChange={(opt: Option) => {
-            if (isTimeRangePreset(opt.id)) onPresetChange(opt.id);
-          }}
-          size="small"
-        >
-          <Select.Button size="small">{selectedTimeOption.name}</Select.Button>
-          <Select.Options>
-            {TIME_OPTIONS.map((opt) => (
-              <Select.Option key={opt.id} option={opt}>
-                {opt.name}
-              </Select.Option>
-            ))}
-          </Select.Options>
-        </Select>
-
-        <VariantMultiSelect
-          availableVariants={availableVariants}
-          selectedVariants={selectedVariants}
-          onSelectedVariantsChange={onSelectedVariantsChange}
-        />
-      </div>
-
-      <Button
-        kind="secondary"
-        appearance="outlined"
+    <div className="flex items-center gap-2">
+      <Select
+        label="Time range"
+        isLabelVisible={false}
+        value={selectedTimeOption}
+        onChange={(opt: Option) => {
+          if (isTimeRangePreset(opt.id)) onPresetChange(opt.id);
+        }}
         size="small"
-        icon={<RiAddLine className="h-4 w-4" />}
-        label="New visualization"
-        disabled
+      >
+        <Select.Button size="small">{selectedTimeOption.name}</Select.Button>
+        <Select.Options>
+          {TIME_OPTIONS.map((opt) => (
+            <Select.Option key={opt.id} option={opt}>
+              {opt.name}
+            </Select.Option>
+          ))}
+        </Select.Options>
+      </Select>
+
+      <VariantMultiSelect
+        availableVariants={availableVariants}
+        selectedVariants={selectedVariants}
+        onSelectedVariantsChange={onSelectedVariantsChange}
       />
     </div>
   );

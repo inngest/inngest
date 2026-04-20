@@ -190,12 +190,11 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                     metrics={scoring.metrics}
                   />
 
-                  {enabledMetrics.map((metric, i) => (
+                  {enabledMetrics.map((metric) => (
                     <MetricPanel
                       key={metric.key}
                       metric={metric}
                       variants={filteredDetail.variants}
-                      colorIndex={i}
                     />
                   ))}
 
@@ -205,7 +204,6 @@ export function ExperimentDetailPage({ experimentName }: Props) {
                     scoringConfig={scoring.metrics}
                     metricRanges={metricRanges}
                     onUpdateMetric={scoring.updateMetric}
-                    onEnableMetric={scoring.enableMetric}
                     pointsLeft={scoring.pointsLeft}
                     onOpenInsights={onOpenInsights}
                     showInactive={showInactive}
