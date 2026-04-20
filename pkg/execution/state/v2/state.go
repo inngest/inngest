@@ -36,6 +36,19 @@ type Defer struct {
 	Input json.RawMessage
 }
 
+func (d Defer) Validate() error {
+	if d.FnSlug == "" {
+		return fmt.Errorf("FnSlug is required")
+	}
+	if d.HashedID == "" {
+		return fmt.Errorf("HashedId is required")
+	}
+	if d.ScheduleStatus == ScheduleStatusUnknown {
+		return fmt.Errorf("ScheduleStatus is required")
+	}
+	return nil
+}
+
 type ScheduleStatus int
 
 const (

@@ -183,6 +183,15 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 	var events []event.Event
 
 	for _, d := range defers {
+		if err := d.Validate(); err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"invalid defer",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+			)
+			continue
+		}
+
 		// TODO: what about an immediate execution mode?
 		if d.ScheduleStatus != sv2.ScheduleStatusAfterRun {
 			continue
@@ -204,6 +213,11 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 				logger.StdlibLogger(ctx).Error("deferred input is not a JSON object",
 					"error", err, "run_id", opts.Metadata.ID.RunID)
 				continue
+			}
+			if data == nil {
+				// Reachable if the input is `null`. We need to set it to an
+				// empty map to avoid panicking later
+				data = make(map[string]any)
 			}
 		}
 
