@@ -299,7 +299,9 @@ func TestCronJitter(t *testing.T) {
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-		runID := runIDVal.Load().(string)
+		val := runIDVal.Load()
+		require.NotNil(t, val, "runID should have been captured by the handler")
+		runID := val.(string)
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted})
 
 		r.NotNil(run.CronSchedule)
@@ -387,7 +389,9 @@ func TestCronJitterRemovalAppliesToCurrentOccurrence(t *testing.T) {
 		return atomic.LoadInt32(&counter) == 1
 	}, 121*time.Second, 5*time.Second)
 
-	runID := runIDVal.Load().(string)
+	val := runIDVal.Load()
+	r.NotNil(val, "runID should have been captured by the handler")
+	runID := val.(string)
 	run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusCompleted})
 	r.NotNil(run.CronSchedule)
 	r.Equal("* * * * *", *run.CronSchedule)
