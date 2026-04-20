@@ -3,13 +3,22 @@ import { Button } from '@inngest/components/Button';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import { Input } from '@inngest/components/Forms/Input';
 import { Switch } from '@inngest/components/Switch';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiAddLine,
   RiArrowDownSLine,
   RiArrowUpSLine,
+  RiQuestionLine,
   RiSubtractLine,
 } from '@remixicon/react';
+
+import { roundMetricValue } from './variantsTable/metricStats';
 
 type MetricRange = { min: number; max: number };
 
@@ -165,7 +174,7 @@ export function MetricAccordionItem({
       </div>
 
       {expanded && (
-        <div className="border-subtle flex flex-col gap-3 border-t px-3 pb-3 pt-3">
+        <div className="bg-canvasSubtle border-subtle flex flex-col gap-3 rounded-b-md border-t px-3 pb-3 pt-3">
           <Input
             label="Display name"
             inngestSize="small"
@@ -178,20 +187,41 @@ export function MetricAccordionItem({
             <div className="flex items-center justify-between">
               <span className="text-muted text-xs">Score range</span>
               {range && (
-                <Button
-                  kind="secondary"
-                  appearance="ghost"
-                  size="small"
-                  label="Fit to data"
-                  disabled={
-                    disabled ||
-                    (metric.minValue === range.min &&
-                      metric.maxValue === range.max)
-                  }
-                  onClick={() =>
-                    onUpdate({ minValue: range.min, maxValue: range.max })
-                  }
-                />
+                <div className="flex items-center gap-1">
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-subtle flex items-center"
+                        >
+                          <RiQuestionLine className="h-[14px] w-[14px]" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="end" hasArrow={false}>
+                        Snap min and max to the range observed in this time
+                        window.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Button
+                    kind="secondary"
+                    appearance="ghost"
+                    size="small"
+                    label="Fit to data"
+                    disabled={
+                      disabled ||
+                      (metric.minValue === roundMetricValue(range.min) &&
+                        metric.maxValue === roundMetricValue(range.max))
+                    }
+                    onClick={() =>
+                      onUpdate({
+                        minValue: roundMetricValue(range.min),
+                        maxValue: roundMetricValue(range.max),
+                      })
+                    }
+                  />
+                </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">

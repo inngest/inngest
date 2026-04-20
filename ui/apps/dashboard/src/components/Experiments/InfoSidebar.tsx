@@ -3,9 +3,15 @@ import { Pill } from '@inngest/components/Pill';
 import {
   isActive,
   type ExperimentDetail,
+  type ExperimentVariantMetrics,
 } from '@inngest/components/Experiments';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiFlaskLine, RiScalesLine, RiTrophyLine } from '@remixicon/react';
+import {
+  RiArrowLeftLine,
+  RiFlaskLine,
+  RiScalesLine,
+  RiTrophyLine,
+} from '@remixicon/react';
 
 function formatDuration(from: Date): string {
   const ms = Date.now() - from.getTime();
@@ -37,6 +43,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function IconTile({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-canvasSubtle border-subtle flex h-9 w-9 shrink-0 items-center justify-center rounded border">
+      {children}
+    </div>
+  );
+}
+
 export function InfoSidebar({ detail, topVariantName }: Props) {
   const active = isActive(detail.lastSeen);
 
@@ -45,18 +59,27 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
       <section>
         <SectionLabel>Overview</SectionLabel>
         <Card>
-          <Card.Content className="flex flex-col gap-2">
+          <Card.Content className="flex flex-col gap-2 p-2">
             <div className="flex items-center gap-2">
-              <RiFlaskLine className="text-muted h-4 w-4 shrink-0" />
-              <span className="text-basis truncate text-sm font-medium">
-                {detail.name}
-              </span>
+              <IconTile>
+                <RiFlaskLine className="text-muted h-[18px] w-[18px]" />
+              </IconTile>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="text-basis truncate text-sm font-medium">
+                  {detail.name}
+                </span>
+                <span className="text-muted truncate text-xs">
+                  Running {formatDuration(detail.firstSeen)}
+                </span>
+              </div>
+              {active && (
+                <Pill kind="primary" appearance="outlined">
+                  Active
+                </Pill>
+              )}
             </div>
             <p className="text-muted text-xs">
               Started at {detail.firstSeen.toLocaleString()}
-            </p>
-            <p className="text-muted text-xs">
-              Running {formatDuration(detail.firstSeen)}
             </p>
             <p className="text-muted text-xs">
               {detail.variants
@@ -64,11 +87,6 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
                 .toLocaleString()}{' '}
               total runs
             </p>
-            {active && (
-              <Pill kind="primary" appearance="outlined">
-                Active
-              </Pill>
-            )}
           </Card.Content>
         </Card>
       </section>
@@ -76,10 +94,12 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
       <section>
         <SectionLabel>Type</SectionLabel>
         <Card>
-          <Card.Content className="flex flex-col gap-2">
+          <Card.Content className="flex flex-col gap-2 p-2">
             <div className="flex items-center gap-2">
-              <RiScalesLine className="text-muted h-4 w-4 shrink-0" />
-              <span className="text-basis text-sm">
+              <IconTile>
+                <RiScalesLine className="text-muted h-[18px] w-[18px]" />
+              </IconTile>
+              <span className="text-basis min-w-0 flex-1 truncate text-sm">
                 {detail.selectionStrategy}
               </span>
             </div>
@@ -91,48 +111,108 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
         </Card>
       </section>
 
-      <section>
-        <SectionLabel>Variants</SectionLabel>
-        <Card>
-          <Card.Content className="flex flex-col gap-1">
-            {detail.variants.map((v) => {
-              const weight = detail.variantWeights.find(
-                (w) => w.variantName === v.variantName,
-              );
-              const isTop = v.variantName === topVariantName;
-
-              return (
-                <div
-                  key={v.variantName}
-                  className={cn(
-                    'flex items-center justify-between rounded px-2 py-1.5 text-sm',
-                    isTop ? 'bg-primary-3xSubtle' : '',
-                  )}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        'truncate',
-                        isTop ? 'text-primary-intense' : 'text-basis',
-                      )}
-                    >
-                      {v.variantName}
-                    </span>
-                    {isTop && (
-                      <RiTrophyLine className="text-primary-intense h-3.5 w-3.5 shrink-0" />
-                    )}
-                  </div>
-                  {weight != null && (
-                    <span className="text-muted tabular-nums text-xs">
-                      {weight.weight}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </Card.Content>
-        </Card>
-      </section>
+      <VariantsSection detail={detail} topVariantName={topVariantName} />
     </div>
+  );
+}
+
+function VariantsSection({
+  detail,
+  topVariantName,
+}: {
+  detail: ExperimentDetail;
+  topVariantName: string | null;
+}) {
+  const isFixed = detail.selectionStrategy === 'fixed';
+  const hasWeights = detail.variantWeights.length > 0;
+
+  // For fixed experiments, the "selected" variant is the one that actually
+  // received traffic — fall back to the first variant if nothing has run yet.
+  const selectedFixedVariant = isFixed
+    ? detail.variants.reduce<ExperimentVariantMetrics | null>(
+        (top, v) => (v.runCount > (top?.runCount ?? -1) ? v : top),
+        null,
+      )
+    : null;
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between">
+        <SectionLabel>Variants ({detail.variants.length})</SectionLabel>
+        {!isFixed && hasWeights && (
+          <span className="text-light text-[11px] font-normal">Weight</span>
+        )}
+      </div>
+
+      <div className="border-subtle overflow-hidden rounded-md border">
+        {detail.variants.map((v, i) => {
+          const weight = detail.variantWeights.find(
+            (w) => w.variantName === v.variantName,
+          );
+          const isTop = v.variantName === topVariantName;
+          const isSelected =
+            selectedFixedVariant?.variantName === v.variantName;
+          const isLast = i === detail.variants.length - 1;
+
+          if (isFixed) {
+            return (
+              <div
+                key={v.variantName}
+                className={cn(
+                  'flex h-8 items-center gap-2 px-2 text-sm',
+                  !isLast && 'border-subtle border-b',
+                  !isSelected && 'bg-canvasSubtle text-disabled',
+                )}
+              >
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate',
+                    isSelected ? 'text-muted' : 'text-disabled',
+                  )}
+                  title={v.variantName}
+                >
+                  {v.variantName}
+                </span>
+                {isSelected && (
+                  <RiArrowLeftLine className="text-muted h-4 w-4 shrink-0" />
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={v.variantName}
+              className={cn(
+                'flex h-8 items-center gap-2 px-2 text-sm',
+                !isLast && 'border-subtle border-b',
+              )}
+            >
+              <span
+                className="text-muted min-w-0 flex-1 truncate"
+                title={v.variantName}
+              >
+                {v.variantName}
+              </span>
+              {isTop && (
+                <Pill
+                  kind="primary"
+                  appearance="solidBright"
+                  icon={<RiTrophyLine className="h-3 w-3" />}
+                  iconSide="iconOnly"
+                >
+                  {null}
+                </Pill>
+              )}
+              {weight != null && (
+                <span className="text-basis font-mono text-sm tabular-nums">
+                  {weight.weight}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

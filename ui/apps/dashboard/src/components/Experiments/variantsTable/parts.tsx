@@ -1,7 +1,6 @@
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import {
   Popover,
-  PopoverClose,
   PopoverContent,
   PopoverTrigger,
 } from '@inngest/components/Popover';
@@ -93,33 +92,6 @@ export function MetricColumnHeader({
           />
         </PopoverContent>
       </Popover>
-    </div>
-  );
-}
-
-export function AddMetricPopover({
-  disabledMetrics,
-  onEnable,
-}: {
-  disabledMetrics: ExperimentScoringMetric[];
-  onEnable: (key: string) => void;
-}) {
-  return (
-    <div className="flex w-52 flex-col gap-1 p-2">
-      <p className="text-muted px-2 py-1 text-xs font-medium">
-        Enable a metric
-      </p>
-      {disabledMetrics.map((m) => (
-        <PopoverClose key={m.key} asChild>
-          <button
-            type="button"
-            className="text-basis hover:bg-canvasSubtle rounded px-2 py-1.5 text-left text-sm"
-            onClick={() => onEnable(m.key)}
-          >
-            {m.displayName}
-          </button>
-        </PopoverClose>
-      ))}
     </div>
   );
 }
