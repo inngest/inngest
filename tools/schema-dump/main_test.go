@@ -8,6 +8,18 @@ import (
 	"testing"
 )
 
+func TestDefaultOutputsOnlyTargetPkgDBSchemas(t *testing.T) {
+	t.Parallel()
+
+	if got, want := defaultSQLiteOutputs, "pkg/db/sqlite/schema.sql"; got != want {
+		t.Fatalf("unexpected sqlite default outputs: got %q want %q", got, want)
+	}
+
+	if got, want := defaultPostgresOutputs, "pkg/db/postgres/schema.sql"; got != want {
+		t.Fatalf("unexpected postgres default outputs: got %q want %q", got, want)
+	}
+}
+
 func TestDumpSQLiteSchema(t *testing.T) {
 	t.Parallel()
 

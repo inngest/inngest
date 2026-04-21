@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	defaultSQLiteOutputs   = "pkg/cqrs/base_cqrs/sqlc/sqlite/schema.sql,pkg/db/sqlite/schema.sql"
-	defaultPostgresOutputs = "pkg/cqrs/base_cqrs/sqlc/postgres/schema.sql,pkg/db/postgres/schema.sql"
+	defaultSQLiteOutputs   = "pkg/db/sqlite/schema.sql"
+	defaultPostgresOutputs = "pkg/db/postgres/schema.sql"
 	defaultPostgresImage   = "postgres:16-alpine"
 	defaultPostgresDBName  = "inngest_schema_dump"
 	defaultPostgresUser    = "postgres"

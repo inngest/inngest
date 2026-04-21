@@ -1,5 +1,5 @@
 ---
-STATUS: Active
+STATUS: Done
 ---
 
 # Database Adapter Refactor
@@ -82,7 +82,7 @@ Current status:
 - [x] Switched `base_cqrs` runtime migrations to goose
 - [x] Added idempotent baseline migrations for SQLite and Postgres under `pkg/db/{sqlite,postgres}/migrations/`
 - [x] Added migration verification tests covering fresh DB setup, idempotency, schema parity, and legacy-to-goose no-op compatibility
-- [ ] Remove golang-migrate and delete legacy incremental migration files in a follow-up PR
+- [x] Remove golang-migrate and delete legacy incremental migration files in a follow-up PR
 
 **Decision: Replace golang-migrate with pressly/goose v3.**
 
@@ -140,7 +140,7 @@ Because the baseline is fully idempotent, no bridge from golang-migrate is neede
   - `TestBaselineOnFreshPostgres` — same, on testcontainer Postgres
   - `TestMigrationIdempotency` — runs `up()` twice on the same DB, second call is a no-op
   - `TestSchemaMatchesSqlc` — compares table/column list after migrations against expected schema from `sqlc/{dialect}/schema.sql`
-- [ ] **Step 7: Clean up** — Remove `github.com/golang-migrate/migrate/v4` from `go.mod`/`go.sum`, delete the old 72 incremental migration files. Deferred intentionally so this PR can prove legacy migrations followed by goose baseline produce no schema changes.
+- [x] **Step 7: Clean up** — Removed `github.com/golang-migrate/migrate/v4` from `go.mod`/`go.sum`, deleted the old 72 incremental migration files, and replaced the legacy-compatibility test harness with direct seeding from the embedded baseline migration files.
 
 #### 5.4 — Risks & mitigations
 

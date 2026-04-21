@@ -2,7 +2,7 @@ version: 2
 
 sql:
   - engine: "postgresql"
-    schema: "pkg/cqrs/base_cqrs/sqlc/postgres/schema.sql"
+    schema: "pkg/db/postgres/schema.sql"
     queries: "pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql"
     gen:
       go:
@@ -146,7 +146,7 @@ sql:
               pointer: true
 
   - engine: "sqlite"
-    schema: "pkg/cqrs/base_cqrs/sqlc/sqlite/schema.sql"
+    schema: "pkg/db/sqlite/schema.sql"
     queries: "pkg/cqrs/base_cqrs/sqlc/sqlite/queries.sql"
     gen:
       go:
