@@ -147,7 +147,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		Tags: map[string]any{
 			"kind":        item.Data.Kind,
 			"queue_shard": p.Queue.Shard().Name(),
-			"attempt":     item.Data.Attempt,
 		},
 	})
 
