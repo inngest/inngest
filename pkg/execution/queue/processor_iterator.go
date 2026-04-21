@@ -141,7 +141,17 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		span.SetAttributes(attribute.String("job_id", *item.Data.JobID))
 	}
 
-	if item.IsLeased(p.Queue.Clock().Now()) {
+	now := p.Queue.Clock().Now()
+	metrics.HistogramQueueItemVestDelay(ctx, now.Sub(time.UnixMilli(item.AtMS)), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"kind":        item.Data.Kind,
+			"queue_shard": p.Queue.Shard().Name(),
+			"attempt":     item.Data.Attempt,
+		},
+	})
+
+	if item.IsLeased(now) {
 		span.SetAttributes(attribute.String("skip_reason", "already_leased"))
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,

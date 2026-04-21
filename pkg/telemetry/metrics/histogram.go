@@ -154,6 +154,22 @@ func HistogramQueueOperationDelay(ctx context.Context, delay time.Duration, opts
 	})
 }
 
+// HistogramQueueItemVestDelay records how long after a queue item's scheduled
+// vest time (`At`) processing began. Negative values (items picked up via the
+// partition lookahead window) are clamped to 0; positive values indicate queue
+// lag past the scheduled run time.
+func HistogramQueueItemVestDelay(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	ms := max(delay.Milliseconds(), 0)
+	RecordIntHistogramMetric(ctx, ms, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_item_vest_delay",
+		Description: "Distribution of delay between a queue item's scheduled vest time and when processing begins",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
 func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, value, HistogramOpt{
 		PkgName:     opts.PkgName,
