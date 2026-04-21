@@ -1,11 +1,14 @@
 package auth
 
 import (
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
+	"context"
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	connect "github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSessionToken(t *testing.T) {
@@ -173,4 +176,60 @@ func TestSessionToken(t *testing.T) {
 		require.Nil(t, response)
 	})
 
+}
+
+func TestJWTAuthHandler(t *testing.T) {
+	accountId, envId := uuid.New(), uuid.New()
+	secret := []byte("this-is-a-very-strong-secret")
+
+	newRequest := func(token string) *connect.WorkerConnectRequestData {
+		return &connect.WorkerConnectRequestData{
+			AuthData: &connect.AuthData{SessionToken: token},
+		}
+	}
+
+	t.Run("missing token returns (nil, nil)", func(t *testing.T) {
+		handler := NewJWTAuthHandler(secret)
+		resp, err := handler(context.Background(), newRequest(""))
+		require.NoError(t, err)
+		require.Nil(t, resp)
+	})
+
+	t.Run("valid token returns response", func(t *testing.T) {
+		token, err := signSessionToken(secret, accountId, envId, DefaultExpiry, Entitlements{})
+		require.NoError(t, err)
+
+		handler := NewJWTAuthHandler(secret)
+		resp, err := handler(context.Background(), newRequest(token))
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, accountId, resp.AccountID)
+		require.Equal(t, envId, resp.EnvID)
+	})
+
+	t.Run("invalid-signature token surfaces a wrapped error instead of silent skip", func(t *testing.T) {
+		forgedSecret := []byte("this-is-the-wrong-secret")
+		token, err := signSessionToken(forgedSecret, accountId, envId, DefaultExpiry, Entitlements{})
+		require.NoError(t, err)
+
+		handler := NewJWTAuthHandler(secret)
+		resp, err := handler(context.Background(), newRequest(token))
+		require.Error(t, err, "invalid-signature token must not silently coerce to (nil, nil)")
+		require.ErrorContains(t, err, "connect JWT verification failed")
+		require.ErrorContains(t, err, "token signature is invalid")
+		require.Nil(t, resp)
+	})
+
+	t.Run("expired token surfaces a wrapped error", func(t *testing.T) {
+		token, err := signSessionToken(secret, accountId, envId, time.Millisecond, Entitlements{})
+		require.NoError(t, err)
+		<-time.After(time.Millisecond * 5)
+
+		handler := NewJWTAuthHandler(secret)
+		resp, err := handler(context.Background(), newRequest(token))
+		require.Error(t, err)
+		require.ErrorContains(t, err, "connect JWT verification failed")
+		require.ErrorContains(t, err, "token is expired")
+		require.Nil(t, resp)
+	})
 }

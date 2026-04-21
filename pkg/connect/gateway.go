@@ -1338,9 +1338,9 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 			c.log.ReportError(err, "connect auth failed")
 			return nil, &connecterrors.SocketError{
-				SysCode:    syscode.CodeConnectInternal,
-				StatusCode: websocket.StatusInternalError,
-				Msg:        "Internal error",
+				SysCode:    syscode.CodeConnectAuthFailed,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Authentication failed",
 			}
 		}
 

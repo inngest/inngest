@@ -114,7 +114,7 @@ func NewJWTAuthHandler(jwtSecret []byte) Handler {
 
 		verified, err := VerifySessionToken(jwtSecret, token)
 		if err != nil {
-			return nil, nil
+			return nil, fmt.Errorf("connect JWT verification failed: %w", err)
 		}
 
 		return &Response{
