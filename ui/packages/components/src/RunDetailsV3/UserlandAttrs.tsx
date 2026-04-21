@@ -14,9 +14,9 @@ export const UserlandAttrs = ({ userlandSpan }: { userlandSpan: UserlandSpanType
   return attrs ? (
     <div className="h-full overflow-y-auto">
       <div className="mb-4 mt-2 flex max-h-full flex-col gap-2">
-        <div className="text-muted bg-canvasSubtle sticky top-0 flex flex-row px-4 py-2 text-sm font-medium leading-tight">
-          <div className="w-72">Key</div>
-          <div className="">Value</div>
+        <div className="text-muted bg-canvasSubtle sticky top-0 grid grid-cols-[18rem_1fr] px-4 py-2 text-sm font-medium leading-tight">
+          <div>Key</div>
+          <div>Value</div>
         </div>
         {Object.entries(attrs)
           .filter(([key]) => !internalPrevixes.some((prefix) => key.startsWith(prefix)))
@@ -24,10 +24,10 @@ export const UserlandAttrs = ({ userlandSpan }: { userlandSpan: UserlandSpanType
             return (
               <div
                 key={`userland-span-attr-${key}`}
-                className="border-canvasSubtle flex flex-row items-center border-b px-4 pb-2"
+                className="border-canvasSubtle grid grid-cols-[18rem_1fr] items-center border-b px-4 pb-2"
               >
-                <div className="text-muted w-72 text-sm font-normal leading-tight">{key}</div>
-                <div className="text-basis truncate text-sm font-normal leading-tight">
+                <div className="text-muted text-sm font-normal leading-tight">{key}</div>
+                <div className="text-basis min-w-0 truncate text-sm font-normal leading-tight">
                   {String(value) || '--'}
                 </div>
               </div>
