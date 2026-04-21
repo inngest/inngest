@@ -326,6 +326,9 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 			if bulkResult.Duplicates > 0 {
 				metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
 			}
+			if len(bulkResult.OverflowBatches) > 1 {
+				metrics.HistogramBatchBufferOverflowBatches(ctx, int64(len(bulkResult.OverflowBatches)), metrics.HistogramOpt{PkgName: pkgName})
+			}
 		}()
 
 	}
@@ -414,10 +417,16 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 			return
 		}
 
-		// Schedule execution after timeout for the overflow batch
-		if result.NextBatchID != "" {
-			if err := ab.scheduleBatchExecution(ctx, mgr, result.NextBatchID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
-				return
+		// Schedule each overflow batch: full ones immediately, the last (partial) one after timeout
+		for _, ob := range result.OverflowBatches {
+			if ob.Full {
+				if err := ab.scheduleBatchExecution(ctx, mgr, ob.ID, result, firstItem, fn, time.Now(), "overflow_full"); err != nil {
+					return
+				}
+			} else {
+				if err := ab.scheduleBatchExecution(ctx, mgr, ob.ID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
+					return
+				}
 			}
 		}
 	}

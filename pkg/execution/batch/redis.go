@@ -462,13 +462,19 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*R
 
 // BulkAppendResult represents the result of a bulk append operation.
 type BulkAppendResult struct {
-	Status        string `json:"status"`                  // "new", "append", "full", "overflow", "maxsize", "itemexists"
-	BatchID       string `json:"batchID"`                 // The batch ID that events were added to
-	BatchPointer  string `json:"batchPointerKey"`         // The batch pointer key
-	Committed     int    `json:"committed"`               // Number of events committed
-	Duplicates    int    `json:"duplicates"`              // Number of duplicate events skipped
-	NextBatchID   string `json:"nextBatchID,omitempty"`   // If overflow, the new batch ID
-	OverflowCount int    `json:"overflowCount,omitempty"` // Number of events in overflow batch
+	Status          string          `json:"status"`                    // "new", "append", "full", "overflow", "maxsize", "itemexists"
+	BatchID         string          `json:"batchID"`                   // The batch ID that events were added to
+	BatchPointer    string          `json:"batchPointerKey"`           // The batch pointer key
+	Committed       int             `json:"committed"`                 // Number of events committed
+	Duplicates      int             `json:"duplicates"`                // Number of duplicate events skipped
+	OverflowBatches []OverflowBatch `json:"overflowBatches,omitempty"` // Overflow batches created (each capped at batchLimit)
+}
+
+// OverflowBatch represents a single overflow batch created by the Lua script.
+type OverflowBatch struct {
+	ID    string `json:"id"`
+	Count int    `json:"count"`
+	Full  bool   `json:"full"`
 }
 
 // BulkAppend appends multiple items to a batch atomically. If the batch becomes full,
@@ -494,10 +500,20 @@ func (b *redisBatchManager) BulkAppend(ctx context.Context, items []BatchItem, f
 	}
 
 	nowUnixSeconds := time.Now().Unix()
-	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
-	overflowULID := ulid.MustNew(uint64(time.Now().UnixMilli())+1, rand.Reader)
+	nowMs := uint64(time.Now().UnixMilli())
+	newULID := ulid.MustNew(nowMs, rand.Reader)
 
-	// Build args: batchLimit, batchSizeLimit, prefix, statuses, timestamps, ULIDs, eventCount, then event pairs
+	// Pre-generate enough overflow ULIDs for worst case: all items overflow
+	// and each batch holds config.MaxSize items. Add 1 extra for the "full
+	// with no overflow" case where we still need to rotate the pointer.
+	maxOverflowBatches := (len(items) / config.MaxSize) + 1
+	overflowULIDs := make([]ulid.ULID, maxOverflowBatches)
+	for i := range overflowULIDs {
+		overflowULIDs[i] = ulid.MustNew(nowMs+uint64(i)+1, rand.Reader)
+	}
+
+	// Build args: batchLimit, batchSizeLimit, prefix, statuses, timestamps,
+	// newULID, overflowULIDCount, overflowULIDs..., eventCount, then event pairs
 	baseArgs := []any{
 		config.MaxSize,
 		b.sizeLimit,
@@ -507,9 +523,12 @@ func (b *redisBatchManager) BulkAppend(ctx context.Context, items []BatchItem, f
 		nowUnixSeconds,
 		b.idempotenceSetTTL,
 		newULID,
-		overflowULID,
-		len(items),
+		len(overflowULIDs),
 	}
+	for _, u := range overflowULIDs {
+		baseArgs = append(baseArgs, u)
+	}
+	baseArgs = append(baseArgs, len(items))
 
 	// Add event pairs: eventID1, event1, eventID2, event2, ...
 	for _, item := range items {
