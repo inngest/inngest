@@ -44,7 +44,6 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
         id: col.name,
         enableResizing: true,
         minSize: COLUMN_SIZE_BY_TYPE[col.type] ?? DEFAULT_COLUMN_SIZE,
-        maxSize: 1200,
       }),
     );
   }, [data?.columns]);
