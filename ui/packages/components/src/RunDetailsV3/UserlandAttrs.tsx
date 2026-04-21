@@ -26,7 +26,9 @@ export const UserlandAttrs = ({ userlandSpan }: { userlandSpan: UserlandSpanType
                 key={`userland-span-attr-${key}`}
                 className="border-canvasSubtle grid grid-cols-[18rem_1fr] items-center border-b px-4 pb-2"
               >
-                <div className="text-muted text-sm font-normal leading-tight">{key}</div>
+                <div className="text-muted min-w-0 truncate text-sm font-normal leading-tight">
+                  {key}
+                </div>
                 <div className="text-basis min-w-0 truncate text-sm font-normal leading-tight">
                   {String(value) || '--'}
                 </div>
