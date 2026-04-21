@@ -9,6 +9,9 @@ on:
     paths:
       - "npm/**"
 
+permissions:
+  contents: read
+
 jobs:
   install:
     name: Test CLI installation

@@ -11,6 +11,9 @@ on:
       - "ui/**"
       - "pkg/coreapi/**/*.graphql"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

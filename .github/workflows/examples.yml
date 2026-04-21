@@ -7,6 +7,9 @@ on:
     paths:
       - 'examples/**'
 
+permissions:
+  contents: read
+
 jobs:
   deploy-website:
     runs-on: ubuntu-latest

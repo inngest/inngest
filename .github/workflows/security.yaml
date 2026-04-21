@@ -9,9 +9,15 @@ on:
   schedule:
     - cron: "0 0 * * 0"
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     env:
       GO111MODULE: on
     steps:

@@ -9,6 +9,9 @@ on:
     paths:
       - "ui/packages/components/**"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
