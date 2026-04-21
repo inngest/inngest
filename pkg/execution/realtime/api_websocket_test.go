@@ -15,6 +15,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAPI_GetWebsocketUpgrade_RejectsCrossOriginBrowserUpgrade(t *testing.T) {
+	bc := newTestBroadcaster(t)
+	server := httptest.NewServer(NewAPI(APIOpts{
+		JWTSecret:   []byte("test-secret"),
+		Broadcaster: bc,
+	}))
+	defer server.Close()
+
+	topics := []Topic{
+		{Kind: streamingtypes.TopicKindRun, Channel: "user:123", Name: "ai"},
+	}
+	jwt, err := NewJWT(context.Background(), []byte("test-secret"), uuid.New(), uuid.New(), topics)
+	require.NoError(t, err)
+
+	// Issue a raw WebSocket upgrade request with an Origin header pointing at a
+	// different host. coder/websocket's default verification must reject it;
+	// prior to dropping InsecureSkipVerify the server accepted any origin.
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/realtime/connect", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+jwt)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Sec-WebSocket-Version", "13")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	req.Header.Set("Origin", "https://evil.example.com")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusForbidden, resp.StatusCode,
+		"cross-origin browser upgrade must be rejected with 403")
+	require.Equal(t, 0, subCount(bc), "no subscription should be created for rejected upgrade")
+}
+
 func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 	t.Run("successful connection and upgrade", func(t *testing.T) {
 		bc := newTestBroadcaster(t)

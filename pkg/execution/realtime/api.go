@@ -281,9 +281,11 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // We don't care about verifying the origin.
-	})
+	// coder/websocket's default (no InsecureSkipVerify, no OriginPatterns)
+	// enforces same-host origin verification for browsers while accepting
+	// requests with no Origin header (server-side SDK dials). JWT auth above
+	// is the primary authentication control; origin check is defense in depth.
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{})
 	if err != nil {
 		w.WriteHeader(400)
 		logger.StdlibLogger(ctx).Error("error upgrading ws connection", "error", err)
