@@ -138,6 +138,50 @@ const experimentScoringConfigQuery = graphql(`
   }
 `);
 
+const experimentInsightsQueryDoc = graphql(`
+  query GetExperimentInsightsQuery(
+    $workspaceID: ID!
+    $experimentName: String!
+    $timeRange: TimeRangeInput
+  ) {
+    experimentInsightsQuery(
+      workspaceID: $workspaceID
+      experimentName: $experimentName
+      timeRange: $timeRange
+    )
+  }
+`);
+
+export function useExperimentInsightsQuery(
+  experimentName: string,
+  preset: TimeRangePreset,
+) {
+  const client = useClient();
+  const environment = useEnvironment();
+
+  const queryFn = useCallback(async (): Promise<string> => {
+    const { from, to } = presetToRange(preset);
+    const data = await runQuery(client, experimentInsightsQueryDoc, {
+      workspaceID: environment.id,
+      experimentName,
+      timeRange: { from: from.toISOString(), to: to.toISOString() },
+    });
+    return data.experimentInsightsQuery;
+  }, [client, environment.id, experimentName, preset]);
+
+  return useQuery<string>({
+    queryKey: [
+      'experiment-insights-query',
+      environment.id,
+      experimentName,
+      preset,
+    ],
+    queryFn,
+    staleTime: EXPERIMENTS_CACHE_MS,
+    gcTime: EXPERIMENTS_CACHE_MS,
+  });
+}
+
 const updateExperimentScoringConfigMutation = graphql(`
   mutation UpdateExperimentScoringConfig(
     $workspaceID: ID!

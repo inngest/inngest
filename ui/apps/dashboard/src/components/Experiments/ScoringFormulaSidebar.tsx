@@ -14,7 +14,7 @@ import {
   RiAddLine,
   RiArrowDownSLine,
   RiArrowUpSLine,
-  RiQuestionLine,
+  RiErrorWarningLine,
   RiSubtractLine,
 } from '@remixicon/react';
 
@@ -45,8 +45,9 @@ export function ScoringFormulaSidebar({
       <div>
         <h3 className="text-basis text-sm font-medium">Scoring formula</h3>
         <p className="text-muted mt-1 text-xs">
-          Distribute up to 100 points across your metrics to weight how each
-          contributes to the overall score.
+          Distribute 100 points across active metrics — toggle a metric off to
+          exclude it from the score entirely. Higher points means more
+          influence.
         </p>
         <div className="mt-3 flex items-center justify-between">
           <span
@@ -62,7 +63,7 @@ export function ScoringFormulaSidebar({
           <div
             className={cn(
               'h-full rounded-full transition-all',
-              pointsLeft < 0 ? 'bg-error' : 'bg-primary-moderate',
+              pointsLeft < 0 ? 'bg-error' : 'bg-contrast',
             )}
             style={{ width: `${barPercent}%` }}
           />
@@ -133,7 +134,7 @@ export function MetricAccordionItem({
           {metric.displayName}
         </button>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="border-subtle flex shrink-0 items-center gap-1 rounded border px-1">
           <Button
             kind="secondary"
             appearance="ghost"
@@ -176,8 +177,9 @@ export function MetricAccordionItem({
       {expanded && (
         <div className="bg-canvasSubtle border-subtle flex flex-col gap-3 rounded-b-md border-t px-3 pb-3 pt-3">
           <Input
-            label="Display name"
+            label="Name"
             inngestSize="small"
+            className="bg-canvasBase"
             value={metric.displayName}
             onChange={(e) => onUpdate({ displayName: e.target.value })}
             disabled={disabled}
@@ -185,99 +187,139 @@ export function MetricAccordionItem({
 
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <span className="text-muted text-xs">Score range</span>
-              {range && (
-                <div className="flex items-center gap-1">
-                  <TooltipProvider delayDuration={200}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-subtle flex items-center"
-                        >
-                          <RiQuestionLine className="h-[14px] w-[14px]" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" align="end" hasArrow={false}>
-                        Snap min and max to the range observed in this time
-                        window.
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <Button
-                    kind="secondary"
-                    appearance="ghost"
-                    size="small"
-                    label="Fit to data"
-                    disabled={
-                      disabled ||
-                      (metric.minValue === roundMetricValue(range.min) &&
-                        metric.maxValue === roundMetricValue(range.max))
-                    }
-                    onClick={() =>
-                      onUpdate({
-                        minValue: roundMetricValue(range.min),
-                        maxValue: roundMetricValue(range.max),
-                      })
-                    }
-                  />
-                </div>
-              )}
+              <span className="text-basis text-sm font-medium">
+                Min. & Max scores
+              </span>
+              <div className="flex items-center gap-1">
+                <InfoTooltip>
+                  Snap min and max to the range observed in this time window.
+                </InfoTooltip>
+                <Button
+                  kind="secondary"
+                  appearance="ghost"
+                  size="small"
+                  label="Fit to data"
+                  disabled={
+                    disabled ||
+                    !range ||
+                    (metric.minValue === roundMetricValue(range.min) &&
+                      metric.maxValue === roundMetricValue(range.max))
+                  }
+                  onClick={() =>
+                    range &&
+                    onUpdate({
+                      minValue: roundMetricValue(range.min),
+                      maxValue: roundMetricValue(range.max),
+                    })
+                  }
+                />
+              </div>
             </div>
+            <p className="text-muted mb-2 text-xs">
+              Assign the lowest &amp; highest score for this metric
+            </p>
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                label="Min score"
-                inngestSize="small"
-                type="number"
-                value={metric.minValue}
-                onChange={(e) =>
-                  onUpdate({ minValue: parseFloat(e.target.value) || 0 })
-                }
-                disabled={disabled}
-              />
-              <Input
-                label="Max score"
-                inngestSize="small"
-                type="number"
-                value={metric.maxValue}
-                onChange={(e) =>
-                  onUpdate({ maxValue: parseFloat(e.target.value) || 0 })
-                }
-                disabled={disabled}
-              />
+              <div className="flex flex-col gap-1">
+                <span className="text-subtle text-xs uppercase">Min score</span>
+                <Input
+                  inngestSize="small"
+                  className="bg-canvasBase"
+                  type="number"
+                  value={metric.minValue}
+                  onChange={(e) =>
+                    onUpdate({ minValue: parseFloat(e.target.value) || 0 })
+                  }
+                  disabled={disabled}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-subtle text-xs uppercase">Max score</span>
+                <Input
+                  inngestSize="small"
+                  className="bg-canvasBase"
+                  type="number"
+                  value={metric.maxValue}
+                  onChange={(e) =>
+                    onUpdate({ maxValue: parseFloat(e.target.value) || 0 })
+                  }
+                  disabled={disabled}
+                />
+              </div>
             </div>
           </div>
 
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={metric.invert}
-              onChange={(e) => onUpdate({ invert: e.target.checked })}
-              disabled={disabled}
-              className="accent-primary-moderate h-3.5 w-3.5 rounded"
-            />
-            <span className="text-basis text-xs">Invert (lower is better)</span>
-          </label>
+          <div className="flex items-center gap-1">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={metric.invert}
+                onChange={(e) => onUpdate({ invert: e.target.checked })}
+                disabled={disabled}
+                className="accent-primary-moderate h-3.5 w-3.5 rounded"
+              />
+              <span className="text-basis text-xs">Invert</span>
+            </label>
+            <InfoTooltip>
+              Enable when a lower metric value represents better performance
+              (for example, latency or error rate). The score will be inverted
+              so smaller values map to the max score.
+            </InfoTooltip>
+          </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              label="Worst label"
-              inngestSize="small"
-              value={metric.labelWorst}
-              onChange={(e) => onUpdate({ labelWorst: e.target.value })}
-              disabled={disabled}
-            />
-            <Input
-              label="Best label"
-              inngestSize="small"
-              value={metric.labelBest}
-              onChange={(e) => onUpdate({ labelBest: e.target.value })}
-              disabled={disabled}
-            />
+          <div className="flex flex-col gap-1">
+            <span className="text-basis text-sm font-medium">
+              Performance Labels
+            </span>
+            <p className="text-muted mb-2 text-xs">
+              Shown next to the best and worst values in the table
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-subtle text-xs uppercase">
+                  Worst label
+                </span>
+                <Input
+                  inngestSize="small"
+                  className="bg-canvasBase"
+                  value={metric.labelWorst}
+                  onChange={(e) => onUpdate({ labelWorst: e.target.value })}
+                  disabled={disabled}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-subtle text-xs uppercase">
+                  Best label
+                </span>
+                <Input
+                  inngestSize="small"
+                  className="bg-canvasBase"
+                  value={metric.labelBest}
+                  onChange={(e) => onUpdate({ labelBest: e.target.value })}
+                  disabled={disabled}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function InfoTooltip({ children }: { children: React.ReactNode }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button type="button" className="text-subtle flex items-center">
+            <RiErrorWarningLine className="h-[14px] w-[14px]" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="end" hasArrow={false}>
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

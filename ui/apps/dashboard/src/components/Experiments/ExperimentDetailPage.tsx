@@ -20,10 +20,13 @@ import { InfoSidebar } from '@/components/Experiments/InfoSidebar';
 import { MetricPanel } from '@/components/Experiments/MetricPanel';
 import { ScoreSummaryCard } from '@/components/Experiments/ScoreSummaryCard';
 import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSidebar';
-import { useExperimentDetail } from '@/components/Experiments/useExperiments';
+import {
+  useExperimentDetail,
+  useExperimentInsightsQuery,
+} from '@/components/Experiments/useExperiments';
 import { useScoringConfig } from '@/components/Experiments/useScoringConfig';
 import { VariantsTable } from '@/components/Experiments/VariantsTable';
-import { experimentInsightsUrl } from '@/lib/experiments/insightsUrl';
+import { insightsUrl } from '@/lib/experiments/insightsUrl';
 import { findExtremum, scoreVariants } from '@/lib/experiments/score';
 import { pathCreator } from '@/utils/urls';
 
@@ -45,6 +48,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
 
   const detail = useExperimentDetail(experimentName, preset, null);
   const scoring = useScoringConfig(experimentName);
+  const insightsQuery = useExperimentInsightsQuery(experimentName, preset);
 
   const togglePanel = useCallback((key: PanelKey) => {
     setActivePanel((p) => (p === key ? null : key));
@@ -104,11 +108,10 @@ export function ExperimentDetailPage({ experimentName }: Props) {
   );
 
   const onOpenInsights = useCallback(() => {
-    window.open(
-      experimentInsightsUrl(environment.slug, experimentName),
-      '_blank',
-    );
-  }, [experimentName, environment.slug]);
+    const sql = insightsQuery.data;
+    if (!sql) return;
+    window.open(insightsUrl(environment.slug, sql), '_blank');
+  }, [insightsQuery.data, environment.slug]);
 
   const helperItems: HelperItem[] = [
     {
@@ -135,8 +138,8 @@ export function ExperimentDetailPage({ experimentName }: Props) {
         ]}
       />
 
-      <div className="flex min-h-0 flex-1 overflow-y-auto">
-        <div className="flex min-w-0 flex-1 flex-col gap-4 px-6 py-4">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-10 pt-4">
           <h1 className="text-basis text-lg font-semibold">{experimentName}</h1>
 
           <ExperimentDetailToolbar
@@ -183,7 +186,7 @@ export function ExperimentDetailPage({ experimentName }: Props) {
               />
             ) : (
               <div className="@container">
-                <div className="grid grid-cols-1 gap-3 @[576px]:grid-cols-2 @[900px]:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
                   <ScoreSummaryCard
                     className="col-span-full"
                     scoredVariants={scoredVariants}

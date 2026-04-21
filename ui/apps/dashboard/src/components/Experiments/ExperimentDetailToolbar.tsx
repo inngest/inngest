@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Select,
   SelectWithSearch,
@@ -40,17 +40,15 @@ function VariantMultiSelect({
   onSelectedVariantsChange: (v: string[]) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [draft, setDraft] = useState<string[]>(selectedVariants);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const options: Option[] = useMemo(
     () => availableVariants.map((name) => ({ id: name, name })),
     [availableVariants],
   );
 
-  const draftOptions = useMemo(
-    () => options.filter((o) => draft.includes(o.id)),
-    [options, draft],
+  const selectedOptions = useMemo(
+    () => options.filter((o) => selectedVariants.includes(o.id)),
+    [options, selectedVariants],
   );
 
   const filteredOptions = useMemo(() => {
@@ -58,9 +56,6 @@ function VariantMultiSelect({
     const lower = query.toLowerCase();
     return options.filter((o) => o.name.toLowerCase().includes(lower));
   }, [options, query]);
-
-  const allSelected =
-    draft.length === 0 || draft.length === availableVariants.length;
 
   const [firstSelected] = selectedVariants;
   const label =
@@ -70,29 +65,27 @@ function VariantMultiSelect({
       ? firstSelected
       : `${selectedVariants.length} variants`;
 
-  const handleApply = () => {
+  const handleChange = (value: Option[]) => {
+    const next = value.map((o) => o.id);
     // "Empty = all" sentinel: collapse full selection to empty.
-    const next = allSelected ? [] : draft;
-    onSelectedVariantsChange(next);
-    buttonRef.current?.click();
+    const collapsed = next.length === availableVariants.length ? [] : next;
+    onSelectedVariantsChange(collapsed);
   };
 
   const handleReset = () => {
-    setDraft([]);
+    onSelectedVariantsChange([]);
   };
 
   return (
     <SelectWithSearch
       multiple
-      value={draftOptions}
-      onChange={(value: Option[]) => {
-        setDraft(value.map((o) => o.id));
-      }}
+      value={selectedOptions}
+      onChange={handleChange}
       label="Variants"
       isLabelVisible={false}
       size="small"
     >
-      <SelectWithSearch.Button ref={buttonRef} size="small">
+      <SelectWithSearch.Button size="small">
         <span className="text-basis text-xs">{label}</span>
       </SelectWithSearch.Button>
       <SelectWithSearch.Options className="w-64">
@@ -120,7 +113,7 @@ function VariantMultiSelect({
             </SelectWithSearch.CheckboxOption>
           ))}
         </div>
-        <SelectWithSearch.Footer onReset={handleReset} onApply={handleApply} />
+        <SelectWithSearch.Footer onReset={handleReset} />
       </SelectWithSearch.Options>
     </SelectWithSearch>
   );

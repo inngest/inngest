@@ -19,6 +19,31 @@ import type { ScoredVariant } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
 import { VariantAxisTick } from './VariantAxisTick';
 
+type BackgroundLineProps = {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+};
+
+function BackgroundLineShape({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+}: BackgroundLineProps) {
+  const cy = y + height / 2;
+  return (
+    <rect
+      x={x}
+      y={cy - 0.5}
+      width={width}
+      height={1}
+      fill="rgb(var(--color-border-subtle))"
+    />
+  );
+}
+
 type Props = {
   scoredVariants: ScoredVariant[];
   metrics: ExperimentScoringMetric[];
@@ -75,17 +100,17 @@ export function ScoreSummaryCard({
       className={cn('overflow-visible', className)}
       contentClassName="overflow-visible"
     >
-      <Card.Header className="rounded-t-md">
+      <Card.Header className="rounded-t-md border-b-0 py-2 pl-3 pr-2">
         <span className="text-basis text-sm font-medium">Score Summary</span>
       </Card.Header>
-      <Card.Content className="flex gap-6 rounded-b-md pb-2 pl-2 pt-2">
+      <Card.Content className="flex gap-6 rounded-b-md px-2 py-0">
         <div className="min-w-0 flex-1">
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart
               data={rows}
               layout="vertical"
               barSize={10}
-              margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+              margin={{ top: 0, right: 16, bottom: 0, left: 4 }}
             >
               <XAxis
                 type="number"
@@ -122,6 +147,7 @@ export function ScoreSummaryCard({
                   stackId="score"
                   fill={colorForMetric(i)}
                   name={m.displayName}
+                  background={i === 0 ? <BackgroundLineShape /> : undefined}
                 />
               ))}
             </BarChart>
