@@ -558,14 +558,14 @@ Overview:
 - prove the shared model works in a real transport before adding connect-specific complexity
 
 Subtasks:
-- [ ] Extract serve-oriented protocol logic from =tests/= into =pkg/conformance/runner/serve=.
-- [ ] Define the serve transport contract, including introspection, registration, and event
+- [X] Extract serve-oriented protocol logic from =tests/= into =pkg/conformance/runner/serve=.
+- [X] Define the serve transport contract, including introspection, registration, and event
   injection expectations.
-- [ ] Implement the first happy-path cases: registration, invocation, steps, retry, cancel,
+- [X] Implement the first happy-path cases: registration, invocation, steps, retry, cancel,
   and wait-for-event.
-- [ ] Add serve-mode doctor checks for SDK reachability, required endpoints, and basic config
+- [X] Add serve-mode doctor checks for SDK reachability, required endpoints, and basic config
   validation.
-- [ ] Emit pretty and JSON reports from serve runs using the shared report model.
+- [X] Emit pretty and JSON reports from serve runs using the shared report model.
 - [ ] Add the first negative-input serve cases, focusing on malformed payloads and safe error
   handling.
 - [ ] Add basic security assertions in serve mode, including secret redaction and env var

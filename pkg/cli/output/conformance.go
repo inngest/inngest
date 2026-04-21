@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	conf "github.com/inngest/inngest/pkg/conformance"
+	"github.com/inngest/inngest/pkg/conformance/runner/serve"
 )
 
 func TextConformanceCatalog(registry conf.Registry) error {
@@ -154,4 +155,91 @@ func TextConformanceConfigErrorHint(configPath string) error {
 		msg = fmt.Sprintf("Config loaded from %s.", configPath)
 	}
 	return TextConformanceStub("conformance", msg)
+}
+
+func TextConformanceDoctor(checks []serve.Check) error {
+	w := NewTextWriter()
+
+	root := NewOrderedMap()
+	for _, check := range checks {
+		status := "failed"
+		if check.Passed {
+			status = "passed"
+		}
+
+		root.Set(check.Name, OrderedData(
+			"Status", status,
+			"Message", check.Message,
+		))
+	}
+
+	if err := w.WriteOrdered(OrderedData("Checks", root), WithTextOptLeadSpace(true)); err != nil {
+		return err
+	}
+	return w.Flush()
+}
+
+func TextConformanceReport(report conf.Report) error {
+	w := NewTextWriter()
+
+	root := OrderedData(
+		"Schema Version", report.SchemaVersion,
+		"Transport", string(report.Transport),
+		"Compatibility", string(report.Compatibility),
+		"Case Count", len(report.Cases),
+		"Feature Count", len(report.Features),
+	)
+
+	caseResults := NewOrderedMap()
+	caseIDs := make([]string, 0, len(report.Cases))
+	caseByID := map[string]conf.CaseResult{}
+	for _, result := range report.Cases {
+		caseIDs = append(caseIDs, result.CaseID)
+		caseByID[result.CaseID] = result
+	}
+	sort.Strings(caseIDs)
+	for _, caseID := range caseIDs {
+		result := caseByID[caseID]
+		data := OrderedData(
+			"Suite", result.SuiteID,
+			"Status", string(result.Status),
+		)
+		if result.ReasonCode != "" {
+			data.Set("Reason Code", string(result.ReasonCode))
+		}
+		if result.Reason != "" {
+			data.Set("Reason", result.Reason)
+		}
+		caseResults.Set(caseID, data)
+	}
+	root.Set("Cases", caseResults)
+
+	featureResults := NewOrderedMap()
+	featureIDs := make([]string, 0, len(report.Features))
+	featureByID := map[string]conf.FeatureResult{}
+	for _, result := range report.Features {
+		featureIDs = append(featureIDs, result.FeatureID)
+		featureByID[result.FeatureID] = result
+	}
+	sort.Strings(featureIDs)
+	for _, featureID := range featureIDs {
+		result := featureByID[featureID]
+		data := OrderedData(
+			"Compatibility", string(result.Compatibility),
+			"Backing Cases", strings.Join(result.BackingCaseIDs, ", "),
+		)
+		if result.ReasonCode != "" {
+			data.Set("Reason Code", string(result.ReasonCode))
+		}
+		if result.Reason != "" {
+			data.Set("Reason", result.Reason)
+		}
+		featureResults.Set(featureID, data)
+	}
+	root.Set("Features", featureResults)
+
+	if err := w.WriteOrdered(root, WithTextOptLeadSpace(true)); err != nil {
+		return err
+	}
+	return w.Flush()
 }
