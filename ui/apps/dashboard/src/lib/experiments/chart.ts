@@ -1,11 +1,11 @@
 const MIN_CHART_HEIGHT = 120;
 const ROW_HEIGHT = 36;
 const MIN_Y_AXIS_WIDTH = 80;
-const MAX_Y_AXIS_WIDTH = 150;
+const MAX_Y_AXIS_WIDTH = 128;
 const CHAR_WIDTH_PX = 8;
 
 /** Maximum characters to render on a variant row label before truncating with a center ellipsis. */
-export const MAX_LABEL_LENGTH = 20;
+export const MAX_LABEL_LENGTH = 18;
 
 /**
  * Height and y-axis label width for horizontal bar charts whose rows are

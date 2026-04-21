@@ -17,7 +17,10 @@ import {
 } from 'recharts';
 
 import { computeChartSizing, truncateCenter } from '@/lib/experiments/chart';
-import { colorForVariant } from '@/lib/experiments/colors';
+import {
+  colorForVariant,
+  subtleColorForVariant,
+} from '@/lib/experiments/colors';
 import { findExtremum } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
 import { VariantAxisTick } from './VariantAxisTick';
@@ -31,6 +34,7 @@ type BarShapeProps = {
   width?: number;
   height?: number;
   fill?: string;
+  payload?: { variantIndex?: number };
 };
 
 function LineDotShape({
@@ -39,8 +43,13 @@ function LineDotShape({
   width = 0,
   height = 0,
   fill,
+  payload,
 }: BarShapeProps) {
   const cy = y + height / 2;
+  const dotFill =
+    payload?.variantIndex !== undefined
+      ? subtleColorForVariant(payload.variantIndex)
+      : 'rgb(var(--color-background-canvas-base))';
   return (
     <g>
       <rect
@@ -54,11 +63,29 @@ function LineDotShape({
         cx={x + width}
         cy={cy}
         r={DOT_RADIUS}
-        fill="rgb(var(--color-background-canvas-base))"
+        fill={dotFill}
         stroke={fill}
         strokeWidth={2}
       />
     </g>
+  );
+}
+
+function BackgroundLineShape({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+}: BarShapeProps) {
+  const cy = y + height / 2;
+  return (
+    <rect
+      x={x}
+      y={cy - 0.5}
+      width={width}
+      height={1}
+      fill="rgb(var(--color-border-subtle))"
+    />
   );
 }
 
@@ -110,7 +137,7 @@ export function MetricPanel({ metric, variants }: Props) {
 
   return (
     <Card className="overflow-visible" contentClassName="overflow-visible">
-      <Card.Header className="flex-row items-center justify-between rounded-t-md">
+      <Card.Header className="flex-row items-center justify-between rounded-t-md border-b-0 py-2 pl-3 pr-2">
         <span className="text-basis text-sm font-medium">
           {metric.displayName}
         </span>
@@ -125,13 +152,13 @@ export function MetricPanel({ metric, variants }: Props) {
           </Pill>
         )}
       </Card.Header>
-      <Card.Content className="flex items-center justify-center rounded-b-md pb-2 pl-2 pt-2">
+      <Card.Content className="flex items-center justify-center rounded-b-md px-2 py-0">
         <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
             data={rows}
             layout="vertical"
             barSize={DOT_RADIUS * 2}
-            margin={{ top: 8, right: DOT_RADIUS + 2, bottom: 4, left: 4 }}
+            margin={{ top: 0, right: DOT_RADIUS + 2, bottom: 0, left: 4 }}
           >
             <XAxis
               type="number"
@@ -158,6 +185,7 @@ export function MetricPanel({ metric, variants }: Props) {
               dataKey="value"
               name={metric.displayName}
               shape={<LineDotShape />}
+              background={<BackgroundLineShape />}
             >
               {rows.map((row) => (
                 <Cell
