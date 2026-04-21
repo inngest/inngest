@@ -33,7 +33,7 @@ type BaseTableProps<T> = {
   blankState?: React.ReactNode;
   cellClassName?: string;
   enableColumnSizing?: boolean;
-  minColumnWidth?: number;
+  enableColumnDynamicSizing?: boolean;
   selectedCell?: { rowIndex: number; columnId: string } | null;
   noHeader?: boolean;
 };
@@ -58,7 +58,7 @@ export function Table<T>({
   cellClassName,
   selectedCell,
   enableColumnSizing = false,
-  minColumnWidth,
+  enableColumnDynamicSizing = false,
   noHeader = false,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
@@ -101,9 +101,9 @@ export function Table<T>({
     },
   });
 
-  const tableStyles = enableColumnSizing ? 'table-fixed' : 'w-full overflow-x-auto';
+  const tableStyles = enableColumnSizing ? 'table-fixed' : 'w-full';
   const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
-  const tableColumnStyles = minColumnWidth ? `px-4 min-w-${minColumnWidth}` : 'px-4';
+  const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
 
@@ -137,6 +137,11 @@ export function Table<T>({
                               width: header.getSize(),
                               minWidth: header.getSize(),
                               maxWidth: header.getSize(),
+                            }
+                          : enableColumnDynamicSizing
+                          ? {
+                              minWidth: header.column.columnDef.minSize,
+                              maxWidth: header.column.columnDef.maxSize,
                             }
                           : undefined
                       }
@@ -238,6 +243,11 @@ export function Table<T>({
                                 width: cell.column.getSize(),
                                 minWidth: cell.column.getSize(),
                                 maxWidth: cell.column.getSize(),
+                              }
+                            : enableColumnDynamicSizing
+                            ? {
+                                minWidth: cell.column.columnDef.minSize,
+                                maxWidth: cell.column.columnDef.maxSize,
                               }
                             : undefined
                         }
