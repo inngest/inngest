@@ -317,6 +317,44 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 	assert.WithinDuration(t, finishedAt, got.FunctionFinish.CreatedAt.Time, time.Second)
 }
 
+// TestGetFunctionRunFinishesByRunIDsMultiple reproduces a sqlc slice-generation
+// bug on Postgres: the generated query at pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql.go
+// contains a literal "WHERE run_id IN ($1)" placeholder instead of the
+// "/*SLICE:run_ids*/?" marker, so the runtime parameter expansion is a no-op
+// and pgx rejects multi-ID calls with "mismatched param and argument count".
+// See GitHub issue #3551 — a sibling query (DeleteFunctionsByIDs) was previously
+// fixed via sqlc regeneration but this call site was missed.
+func TestGetFunctionRunFinishesByRunIDsMultiple(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	runIDs := []ulid.ULID{ulid.Make(), ulid.Make(), ulid.Make()}
+	for i, runID := range runIDs {
+		require.NoError(t, q.InsertFunctionFinish(ctx, db.InsertFunctionFinishParams{
+			RunID:              runID,
+			Status:             sql.NullString{String: "completed", Valid: true},
+			Output:             sql.NullString{String: fmt.Sprintf(`{"i":%d}`, i), Valid: true},
+			CompletedStepCount: sql.NullInt64{Int64: 1, Valid: true},
+			CreatedAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		}))
+	}
+
+	t.Run("single run id", func(t *testing.T) {
+		finishes, err := q.GetFunctionRunFinishesByRunIDs(ctx, []ulid.ULID{runIDs[0]})
+		require.NoError(t, err)
+		assert.Len(t, finishes, 1)
+	})
+
+	t.Run("multiple run ids", func(t *testing.T) {
+		finishes, err := q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+		require.NoError(t, err, "multi-id query must not fail on the sqlc slice expansion")
+		assert.Len(t, finishes, len(runIDs))
+	})
+}
+
 func TestEventBatchRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
@@ -721,6 +759,7 @@ func sqlitePrimaryKeyDuplicateCases() []struct {
 	}{
 		{name: "apps.id", tableName: "apps", values: specs["apps"]},
 		{name: "event_batches.id", tableName: "event_batches", values: specs["event_batches"]},
+		{name: "functions.id", tableName: "functions", values: specs["functions"]},
 		{name: "trace_runs.run_id", tableName: "trace_runs", values: specs["trace_runs"]},
 		{name: "queue_snapshot_chunks.snapshot_id_chunk_id", tableName: "queue_snapshot_chunks", values: specs["queue_snapshot_chunks"]},
 		{name: "worker_connections.id_app_name", tableName: "worker_connections", values: specs["worker_connections"]},
