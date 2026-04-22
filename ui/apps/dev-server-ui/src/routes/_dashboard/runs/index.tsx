@@ -250,6 +250,7 @@ function RunsComponent() {
         scope="env"
         totalCount={totalCount}
         searchError={searchError}
+        searchLimit={1000}
         infiniteScrollTrigger={(containerRef) => (
           <InfiniteScrollTrigger
             onIntersect={fetchNextPage}

@@ -55,6 +55,12 @@ type Props = {
   searchError?: Error;
   error?: Error | null;
   infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
+  // When set, the CEL search button is hidden once `totalCount` reaches this
+  // threshold (unless the user already has an active query, so they're not
+  // stranded without a "Hide search" toggle). Used by self-hosted deployments
+  // where CEL search against large result sets is prohibitively slow. Leave
+  // undefined to always show the button (cloud default).
+  searchLimit?: number;
 };
 
 export function RunsPage({
@@ -76,6 +82,7 @@ export function RunsPage({
   searchError,
   error,
   infiniteScrollTrigger,
+  searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -271,9 +278,14 @@ export function RunsPage({
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
         <div className="flex h-11 items-center justify-between gap-1.5 px-3">
           <div className="flex items-center gap-1.5">
-            {/* CEL search scans the returned run set and gets prohibitively slow on large pages,
-                so only offer it when the total is small or the user already has a query applied. */}
-            {(totalCount === undefined || totalCount < 1000 || !!search) && (
+            {/* CEL search scans the returned run set and gets prohibitively slow on large pages.
+                Callers can pass `searchLimit` to hide the button above that count; if `searchLimit`
+                is unset (cloud), the button always renders. An active query also keeps the button
+                visible so users are never stranded without a "Hide search" toggle. */}
+            {(searchLimit === undefined ||
+              totalCount === undefined ||
+              totalCount < searchLimit ||
+              !!search) && (
               <Button
                 icon={<RiSearchLine />}
                 size="small"
