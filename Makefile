@@ -59,8 +59,7 @@ protobuf: ## Generate protobuf files
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
 queries: ## Generate sqlc queries
-	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
-	sqlc generate
+	nix develop --command sqlc generate
 
 .PHONY: schema-dump
 schema-dump: ## Dump SQLite and Postgres schema files from migrations
