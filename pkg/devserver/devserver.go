@@ -616,8 +616,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Initialize metrics API for Prometheus-compatible metrics endpoint.
 	// This provides system queue depth metrics via /metrics endpoint.
 	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
-		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		QueueManager:   rq,
+		QueueManager: rq,
 	})
 	if err != nil {
 		return err
