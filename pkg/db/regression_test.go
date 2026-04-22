@@ -355,6 +355,89 @@ func TestGetFunctionRunFinishesByRunIDsMultiple(t *testing.T) {
 	})
 }
 
+// TestDeleteFunctionsByIDsHandlesDuplicateRows exercises the cross-product of
+// GitHub issues #3551 and #3556:
+//
+//   - #3556 left the functions table without a PRIMARY KEY on id, so duplicate
+//     rows can accumulate during repeated syncs on self-hosted deployments.
+//   - #3551 broke DeleteFunctionsByIDs whenever its input slice had more than
+//     one element — which is exactly what the sync loop in pkg/devserver/api.go
+//     produces when GetFunctionsByAppInternalID returns duplicate rows for the
+//     same id. PR #3614 fixed DeleteFunctionsByIDs on main by switching to
+//     ANY(@ids::text[]). This test guards that fix against regression and
+//     verifies the end-to-end archive semantics when duplicates exist.
+//
+// If a future migration adds PRIMARY KEY (id) to functions (#3556 fix), the
+// duplicate-row scenario becomes structurally unreachable; the test skips
+// itself in that case rather than failing.
+func TestDeleteFunctionsByIDsHandlesDuplicateRows(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	conn := adapter.Conn()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "dup-fn-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-dup",
+		Url:         "https://example.com/inngest",
+	})
+	require.NoError(t, err)
+
+	fnID := uuid.New()
+
+	// Seed two functions with the same id via raw SQL. This bypasses any
+	// future uniqueness constraints — legacy self-hosted deployments can
+	// already have duplicates from before #3556 is fixed.
+	var insertSQL string
+	switch adapter.Dialect() {
+	case db.DialectPostgres:
+		insertSQL = `INSERT INTO functions (id, app_id, name, slug, config) VALUES ($1, $2, $3, $4, $5)`
+	default:
+		insertSQL = `INSERT INTO functions (id, app_id, name, slug, config) VALUES (?, ?, ?, ?, ?)`
+	}
+
+	_, err = conn.ExecContext(ctx, insertSQL,
+		fnID.String(), appID.String(), "dup-a", "dup-slug", `{}`)
+	require.NoError(t, err, "first insert of the function must succeed")
+
+	_, err = conn.ExecContext(ctx, insertSQL,
+		fnID.String(), appID.String(), "dup-b", "dup-slug", `{}`)
+	if err != nil {
+		t.Skipf("functions table now enforces uniqueness on id; duplicate-row scenario is no longer reachable: %v", err)
+	}
+
+	// Sanity: two active rows exist for the same id.
+	active, err := q.GetAppFunctions(ctx, appID)
+	require.NoError(t, err)
+	dupCount := 0
+	for _, fn := range active {
+		if fn.ID == fnID {
+			dupCount++
+		}
+	}
+	require.Equal(t, 2, dupCount, "expected two duplicate rows to be seeded")
+
+	// Simulates the sync delete path in devserver/api.go. When rows duplicate,
+	// the deletes slice ends up with the same id listed multiple times —
+	// exactly the input that broke DeleteFunctionsByIDs pre-PR #3614.
+	require.NoError(t, q.DeleteFunctionsByIDs(ctx, []uuid.UUID{fnID, fnID}),
+		"delete must succeed when the slice contains duplicate ids matching multiple rows")
+
+	// All duplicates are archived.
+	active, err = q.GetAppFunctions(ctx, appID)
+	require.NoError(t, err)
+	for _, fn := range active {
+		assert.NotEqual(t, fnID, fn.ID, "found unarchived duplicate after delete")
+	}
+}
+
 func TestEventBatchRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
