@@ -286,7 +286,7 @@ export function RunsPage({
             <OptionalTooltip
               tooltip={
                 !!searchLimit && totalCount !== undefined && totalCount >= searchLimit && !search
-                  ? 'Search is unavailable for large result sets'
+                  ? `Search is limited to ${searchLimit} results`
                   : undefined
               }
             >
