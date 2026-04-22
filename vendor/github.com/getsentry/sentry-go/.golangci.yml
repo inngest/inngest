@@ -38,11 +38,7 @@ linters:
       - linters:
           - gosec
         path: _test\.go
-        text: "G306:"
-      - linters:
-          - staticcheck
-        path: _test\.go
-        text: "SA5011"
+        text: 'G306:'
       - linters:
           - unused
         path: errors_test\.go

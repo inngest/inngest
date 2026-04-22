@@ -5,6 +5,11 @@
 			"matchPackageNames": ["securego/gosec"],
 			"allowedVersions": "<=2.22.8 || >2.25.0",
 			"matchManagers": ["github-actions"]
+		},
+		{
+			"matchPackageNames": ["github.com/getsentry/sentry-go"],
+			"allowedVersions": "<0.46.0",
+			"description": "Pin below v0.46.0: it removes Event.Extra, which breaks vendored github.com/cockroachdb/errors/report (still references event.Extra as of v1.12.0)."
 		}
 	]
 }

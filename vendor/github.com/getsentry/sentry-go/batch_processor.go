@@ -49,7 +49,7 @@ func (p *batchProcessor[T]) Send(item T) bool {
 
 func (p *batchProcessor[T]) Start() {
 	p.startOnce.Do(func() {
-		ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is stored in p.cancel and called in Shutdown()
+		ctx, cancel := context.WithCancel(context.Background())
 		p.cancel = cancel
 		p.wg.Add(1)
 		go p.run(ctx)

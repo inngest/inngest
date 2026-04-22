@@ -16,7 +16,7 @@ type Scheduler struct {
 	buffers   map[ratelimit.Category]Buffer[protocol.TelemetryItem]
 	transport protocol.TelemetryTransport
 	dsn       *protocol.Dsn
-	sdkInfo   func() *protocol.SdkInfo
+	sdkInfo   *protocol.SdkInfo
 	recorder  report.ClientReportRecorder
 
 	currentCycle []ratelimit.Priority
@@ -36,14 +36,14 @@ func NewScheduler(
 	buffers map[ratelimit.Category]Buffer[protocol.TelemetryItem],
 	transport protocol.TelemetryTransport,
 	dsn *protocol.Dsn,
-	sdkInfo func() *protocol.SdkInfo,
+	sdkInfo *protocol.SdkInfo,
 	recorder report.ClientReportRecorder,
 ) *Scheduler {
 	if recorder == nil {
 		recorder = report.NoopRecorder()
 	}
 
-	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is stored in s.cancel and called in Shutdown()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	priorityWeights := map[ratelimit.Priority]int{
 		ratelimit.PriorityCritical: 5,
@@ -83,13 +83,6 @@ func NewScheduler(
 	s.cond = sync.NewCond(&s.mu)
 
 	return s
-}
-
-func (s *Scheduler) resolveSdkInfo() *protocol.SdkInfo {
-	if s.sdkInfo == nil {
-		return &protocol.SdkInfo{}
-	}
-	return s.sdkInfo()
 }
 
 func (s *Scheduler) Start() {
@@ -244,7 +237,10 @@ func (s *Scheduler) processItems(buffer Buffer[protocol.TelemetryItem], category
 	switch category {
 	case ratelimit.CategoryLog:
 		logs := protocol.Logs(items)
-		header := &protocol.EnvelopeHeader{EventID: protocol.GenerateEventID(), SentAt: time.Now(), Dsn: s.dsn, Sdk: s.resolveSdkInfo()}
+		header := &protocol.EnvelopeHeader{EventID: protocol.GenerateEventID(), SentAt: time.Now(), Sdk: s.sdkInfo}
+		if s.dsn != nil {
+			header.Dsn = s.dsn.String()
+		}
 		envelope := protocol.NewEnvelope(header)
 		item, err := logs.ToEnvelopeItem()
 		if err != nil {
@@ -258,7 +254,10 @@ func (s *Scheduler) processItems(buffer Buffer[protocol.TelemetryItem], category
 		return
 	case ratelimit.CategoryTraceMetric:
 		metrics := protocol.Metrics(items)
-		header := &protocol.EnvelopeHeader{EventID: protocol.GenerateEventID(), SentAt: time.Now(), Dsn: s.dsn, Sdk: s.resolveSdkInfo()}
+		header := &protocol.EnvelopeHeader{EventID: protocol.GenerateEventID(), SentAt: time.Now(), Sdk: s.sdkInfo}
+		if s.dsn != nil {
+			header.Dsn = s.dsn.String()
+		}
 		envelope := protocol.NewEnvelope(header)
 		item, err := metrics.ToEnvelopeItem()
 		if err != nil {
@@ -288,18 +287,19 @@ func (s *Scheduler) sendItem(item protocol.EnvelopeItemConvertible) {
 	header := &protocol.EnvelopeHeader{
 		EventID: item.GetEventID(),
 		SentAt:  time.Now(),
-		Dsn:     s.dsn,
 		Trace:   item.GetDynamicSamplingContext(),
-		Sdk:     s.resolveSdkInfo(),
+		Sdk:     s.sdkInfo,
 	}
 	if header.EventID == "" {
 		header.EventID = protocol.GenerateEventID()
+	}
+	if s.dsn != nil {
+		header.Dsn = s.dsn.String()
 	}
 	envelope := protocol.NewEnvelope(header)
 	envItem, err := item.ToEnvelopeItem()
 	if err != nil {
 		debuglog.Printf("error while converting to envelope item: %v", err)
-		s.recorder.RecordItem(report.ReasonInternalError, item)
 		return
 	}
 	envelope.AddItem(envItem)

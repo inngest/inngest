@@ -37,6 +37,7 @@ type Scope struct {
 	user        User
 	tags        map[string]string
 	contexts    map[string]Context
+	extra       map[string]interface{}
 	fingerprint []string
 	level       Level
 	request     *http.Request
@@ -63,6 +64,7 @@ func NewScope() *Scope {
 		attachments:        make([]*Attachment, 0),
 		tags:               make(map[string]string),
 		contexts:           make(map[string]Context),
+		extra:              make(map[string]interface{}),
 		fingerprint:        make([]string, 0),
 		propagationContext: NewPropagationContext(),
 	}
@@ -280,6 +282,44 @@ func (scope *Scope) RemoveContext(key string) {
 	delete(scope.contexts, key)
 }
 
+// SetExtra adds an extra to the current scope.
+//
+// Deprecated: Use [Scope.SetAttributes] instead, which attaches typed key-value
+// pairs to logs and metrics. Note that attributes do not attach to error events;
+// if you only capture errors, use [Scope.SetTag] or [Scope.SetContext] to enrich them.
+func (scope *Scope) SetExtra(key string, value interface{}) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+
+	scope.extra[key] = value
+}
+
+// SetExtras assigns multiple extras to the current scope.
+//
+// Deprecated: Use [Scope.SetAttributes] instead, which attaches typed key-value
+// pairs to logs and metrics. Note that attributes do not attach to error events;
+// if you only capture errors, use [Scope.SetTag] or [Scope.SetContext] to enrich them.
+func (scope *Scope) SetExtras(extra map[string]interface{}) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+
+	for k, v := range extra {
+		scope.extra[k] = v
+	}
+}
+
+// RemoveExtra removes a extra from the current scope.
+//
+// Deprecated: Use [Scope.RemoveAttribute] instead. Note that attributes only
+// attach to logs and metrics, not error events. If you only capture errors,
+// use [Scope.RemoveTag] or [Scope.RemoveContext] instead.
+func (scope *Scope) RemoveExtra(key string) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+
+	delete(scope.extra, key)
+}
+
 // SetFingerprint sets new fingerprint for the current scope.
 func (scope *Scope) SetFingerprint(fingerprint []string) {
 	scope.mu.Lock()
@@ -334,6 +374,7 @@ func (scope *Scope) Clone() *Scope {
 	clone.attributes = maps.Clone(scope.attributes)
 	clone.contexts = maps.Clone(scope.contexts)
 	clone.tags = maps.Clone(scope.tags)
+	clone.extra = maps.Clone(scope.extra)
 	clone.fingerprint = make([]string, len(scope.fingerprint))
 	copy(clone.fingerprint, scope.fingerprint)
 	clone.level = scope.level
@@ -443,6 +484,16 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint, client *Client) 
 		}
 	}
 
+	if len(scope.extra) > 0 {
+		if event.Extra == nil {
+			event.Extra = make(map[string]interface{}, len(scope.extra))
+		}
+
+		for key, value := range scope.extra {
+			event.Extra[key] = value
+		}
+	}
+
 	if event.User.IsEmpty() {
 		event.User = scope.user
 	}
@@ -465,7 +516,7 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint, client *Client) 
 		// invalid payloads that are more prone to leaking PII data.
 		//
 		// Users can still send more data along their events if they want to,
-		// for example using Event.Contexts.
+		// for example using Event.Extra.
 		if scope.requestBody != nil && !scope.requestBody.Overflow() {
 			event.Request.Data = string(scope.requestBody.Bytes())
 		}
