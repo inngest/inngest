@@ -5,6 +5,7 @@ import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
@@ -279,19 +280,25 @@ export function RunsPage({
         <div className="flex h-11 items-center justify-between gap-1.5 px-3">
           <div className="flex items-center gap-1.5">
             {/* CEL search scans the returned run set and gets prohibitively slow on large pages.
-                Callers can pass `searchLimit` to hide the button above that count; if `searchLimit`
-                is unset (cloud), the button always renders. An active query also keeps the button
-                visible so users are never stranded without a "Hide search" toggle. */}
-            {(searchLimit === undefined ||
-              totalCount === undefined ||
-              totalCount < searchLimit ||
-              !!search) && (
+                Callers can pass `searchLimit` to disable the button above that count. An active
+                query keeps the button enabled so users are never stranded without a "Hide search"
+                toggle. */}
+            <OptionalTooltip
+              tooltip={
+                !!searchLimit && totalCount !== undefined && totalCount > searchLimit && !search
+                  ? 'Search is unavailable for large result sets'
+                  : undefined
+              }
+            >
               <Button
                 icon={<RiSearchLine />}
                 size="small"
                 kind="secondary"
                 iconSide="left"
                 appearance="outlined"
+                disabled={
+                  !!searchLimit && totalCount !== undefined && totalCount > searchLimit && !search
+                }
                 label={showSearch ? 'Hide search' : 'Show search'}
                 onClick={() => setShowSearch((prev) => !prev)}
                 className={cn(
@@ -301,7 +308,7 @@ export function RunsPage({
                   'h-[26px] w-[103px] rounded'
                 )}
               />
-            )}
+            </OptionalTooltip>
             <SelectGroup>
               <TimeFieldFilter
                 selectedTimeField={timeField}
