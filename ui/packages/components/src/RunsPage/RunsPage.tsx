@@ -285,7 +285,7 @@ export function RunsPage({
                 toggle. */}
             <OptionalTooltip
               tooltip={
-                !!searchLimit && totalCount !== undefined && totalCount > searchLimit && !search
+                !!searchLimit && totalCount !== undefined && totalCount >= searchLimit && !search
                   ? 'Search is unavailable for large result sets'
                   : undefined
               }
@@ -297,7 +297,7 @@ export function RunsPage({
                 iconSide="left"
                 appearance="outlined"
                 disabled={
-                  !!searchLimit && totalCount !== undefined && totalCount > searchLimit && !search
+                  !!searchLimit && totalCount !== undefined && totalCount >= searchLimit && !search
                 }
                 label={showSearch ? 'Hide search' : 'Show search'}
                 onClick={() => setShowSearch((prev) => !prev)}
