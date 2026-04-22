@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.13
--- Dumped by pg_dump version 16.13
+-- Dumped from database version 16.12
+-- Dumped by pg_dump version 16.12
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -109,7 +109,7 @@ CREATE TABLE public.function_runs (
 --
 
 CREATE TABLE public.functions (
-    id character(36),
+    id character(36) NOT NULL,
     app_id character(36),
     name character varying NOT NULL,
     slug character varying NOT NULL,
@@ -315,6 +315,13 @@ ALTER TABLE ONLY public.apps
 
 ALTER TABLE ONLY public.event_batches
     ADD CONSTRAINT event_batches_pkey PRIMARY KEY (id);
+
+--
+-- Name: functions functions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.functions
+    ADD CONSTRAINT functions_pkey PRIMARY KEY (id);
 
 --
 -- Name: goose_db_version goose_db_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -

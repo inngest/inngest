@@ -535,7 +535,11 @@ func (q NormalizedQueries) GetFunctionRunsTimebound(ctx context.Context, params 
 }
 
 func (q NormalizedQueries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*sqlc_sqlite.FunctionFinish, error) {
-	finishes, err := q.db.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+	byteIDs := make([][]byte, len(runIDs))
+	for i, id := range runIDs {
+		byteIDs[i] = id[:]
+	}
+	finishes, err := q.db.GetFunctionRunFinishesByRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}

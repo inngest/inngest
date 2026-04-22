@@ -129,7 +129,7 @@ LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[]));
 
 -- name: GetFunctionRunFinishesByRunIDs :many
-SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
+SELECT * FROM function_finishes WHERE run_id = ANY($1::BYTEA[]);
 
 
 --

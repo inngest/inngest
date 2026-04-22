@@ -366,7 +366,12 @@ func (pq *pgQuerier) GetFunctionRunsTimebound(ctx context.Context, arg db.GetFun
 }
 
 func (pq *pgQuerier) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*db.FunctionFinish, error) {
-	rows, err := pq.q.GetFunctionRunFinishesByRunIDs(ctx, runIds)
+	// Postgres sqlc expects [][]byte for this query.
+	byteIDs := make([][]byte, len(runIds))
+	for i, id := range runIds {
+		byteIDs[i] = id[:]
+	}
+	rows, err := pq.q.GetFunctionRunFinishesByRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}
