@@ -19,7 +19,7 @@ This document outlines how to create a release of connect-go.
 
     *Make sure no new commits are merged until the release is complete.*
 
-5. Review all commits in the new release and for each PR check an appropriate label is used and edit the title to be meaninful to end users. This will help auto-generated release notes match the final notes as closely as possible.
+5. Review all commits in the new release and for each PR check an appropriate label is used and edit the title to be meaningful to end users. This will help auto-generated release notes match the final notes as closely as possible.
 
 6. Using the Github UI, create a new release.
     - Under “Choose a tag”, type in “vX.Y.Z” to create a new tag for the release upon publish.

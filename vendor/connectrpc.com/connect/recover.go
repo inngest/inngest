@@ -36,7 +36,7 @@ func (i *recoverHandlerInterceptor) WrapUnary(next UnaryFunc) UnaryFunc {
 		defer func() {
 			if r := recover(); r != nil {
 				// net/http checks for ErrAbortHandler with ==, so we should too.
-				if r == http.ErrAbortHandler { //nolint:errorlint,goerr113
+				if r == http.ErrAbortHandler { //nolint:errorlint,err113
 					panic(r) //nolint:forbidigo
 				}
 				retErr = i.handle(ctx, req.Spec(), req.Header(), r)
@@ -52,7 +52,7 @@ func (i *recoverHandlerInterceptor) WrapStreamingHandler(next StreamingHandlerFu
 		defer func() {
 			if r := recover(); r != nil {
 				// net/http checks for ErrAbortHandler with ==, so we should too.
-				if r == http.ErrAbortHandler { //nolint:errorlint,goerr113
+				if r == http.ErrAbortHandler { //nolint:errorlint,err113
 					panic(r) //nolint:forbidigo
 				}
 				retErr = i.handle(ctx, conn.Spec(), conn.RequestHeader(), r)

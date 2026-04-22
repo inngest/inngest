@@ -860,7 +860,7 @@ func (m *connectStreamingMarshaler) MarshalEndStream(err error, trailer http.Hea
 		return errorf(CodeInternal, "marshal end stream: %w", marshalErr)
 	}
 	raw := bytes.NewBuffer(data)
-	defer m.envelopeWriter.bufferPool.Put(raw)
+	defer m.bufferPool.Put(raw)
 	return m.Write(&envelope{
 		Data:  raw,
 		Flags: connectFlagEnvelopeEndStream,

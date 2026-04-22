@@ -24,6 +24,8 @@ import (
 //
 // It's constructed as part of [Handler] invocation, but doesn't currently have
 // an exported constructor.
+//
+// Receive is not safe to call concurrently.
 type ClientStream[Req any] struct {
 	conn        StreamingHandlerConn
 	initializer maybeInitializer
@@ -90,6 +92,8 @@ func (c *ClientStream[Req]) Conn() StreamingHandlerConn {
 //
 // It's constructed as part of [Handler] invocation, but doesn't currently have
 // an exported constructor.
+//
+// Send is not safe to call concurrently.
 type ServerStream[Res any] struct {
 	conn StreamingHandlerConn
 }
@@ -131,6 +135,9 @@ func (s *ServerStream[Res]) Conn() StreamingHandlerConn {
 //
 // It's constructed as part of [Handler] invocation, but doesn't currently have
 // an exported constructor.
+//
+// Send and Receive may be called from separate goroutines concurrently, but
+// neither may be called concurrently with itself.
 type BidiStream[Req, Res any] struct {
 	conn        StreamingHandlerConn
 	initializer maybeInitializer

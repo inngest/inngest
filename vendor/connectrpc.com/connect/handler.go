@@ -54,6 +54,10 @@ func NewUnaryHandler[Req, Res any](
 			// if we panic here instead, so we can include the procedure name.
 			panic(procedure + " returned nil *connect.Response and nil error") //nolint: forbidigo
 		}
+		if res == nil {
+			// Avoid returning a typed nil (*Response[Res]) as an AnyResponse interface value.
+			return nil, err
+		}
 		return res, err
 	})
 	config := newHandlerConfig(procedure, StreamTypeUnary, options)

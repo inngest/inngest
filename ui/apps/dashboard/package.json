@@ -90,7 +90,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@graphql-codegen/cli": "6.3.0",
+    "@graphql-codegen/cli": "6.3.1",
     "@graphql-codegen/client-preset": "5.3.0",
     "@types/mustache": "4.2.6",
     "@types/node": "24.12.2",

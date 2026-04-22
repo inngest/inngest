@@ -12,6 +12,7 @@ export GOBIN := $(abspath $(BIN))
 COPYRIGHT_YEARS := 2021-2025
 LICENSE_IGNORE := --ignore /testdata/
 BUF_VERSION := 1.50.1
+GOLANGCI_LINT_VERSION ?= v2.11.4
 
 .PHONY: help
 help: ## Describe useful make targets
@@ -112,7 +113,7 @@ $(BIN)/license-header: Makefile
 
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.7
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 $(BIN)/protoc-gen-go: Makefile go.mod
 	@mkdir -p $(@D)

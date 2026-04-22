@@ -63,10 +63,10 @@ type CallInfo interface {
 	internalOnly()
 }
 
-// Create a new client (i.e. outgoing) context for use from a client. When the
-// returned context is passed to RPCs, the returned call info can be used to set
-// request metadata before the RPC is invoked and to inspect response
-// metadata after the RPC completes.
+// NewClientContext creates a new client (i.e. outgoing) context for use from a
+// client. When the returned context is passed to RPCs, the returned call info
+// can be used to set request metadata before the RPC is invoked and to inspect
+// response metadata after the RPC completes.
 //
 // The returned context may be re-used across RPCs as long as they are
 // not concurrent. Results of all CallInfo methods other than
@@ -164,6 +164,7 @@ func (c *streamingHandlerCallInfo) internalOnly() {}
 // clientCallInfo is a CallInfo implementation used for clients.
 type clientCallInfo struct {
 	responseSource
+
 	spec          Spec
 	peer          Peer
 	method        string

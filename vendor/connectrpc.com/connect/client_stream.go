@@ -32,6 +32,8 @@ var (
 // exported constructor function.
 //
 // When using this stream, request headers should be set via the [ClientStreamForClient.RequestHeader] method.
+//
+// Send is not safe to call concurrently.
 type ClientStreamForClient[Req, Res any] struct {
 	conn        StreamingClientConn
 	initializer maybeInitializer
@@ -110,6 +112,8 @@ func (c *ClientStreamForClient[Req, Res]) Conn() (StreamingClientConn, error) {
 // In addition, the response returned by [ClientStreamForClientSimple.CloseAndReceive] is the response type defined for
 // the stream and _not_ a Connect [Response] wrapper type. As a result, response headers/trailers should be read from
 // the [CallInfo] object in context.
+//
+// Send is not safe to call concurrently.
 type ClientStreamForClientSimple[Req, Res any] struct {
 	stream *ClientStreamForClient[Req, Res]
 }
@@ -160,6 +164,8 @@ func (c *ClientStreamForClientSimple[Req, Res]) CloseAndReceive() (*Res, error) 
 //
 // It's returned from [Client].CallServerStream, but doesn't currently have an
 // exported constructor function.
+//
+// Receive is not safe to call concurrently.
 type ServerStreamForClient[Res any] struct {
 	conn        StreamingClientConn
 	initializer maybeInitializer
@@ -247,6 +253,9 @@ func (s *ServerStreamForClient[Res]) Conn() (StreamingClientConn, error) {
 //
 // It's returned from [Client].CallBidiStream, but doesn't currently have an
 // exported constructor function.
+//
+// Send and Receive may be called from separate goroutines concurrently, but
+// neither may be called concurrently with itself.
 type BidiStreamForClient[Req, Res any] struct {
 	conn        StreamingClientConn
 	initializer maybeInitializer
@@ -358,6 +367,9 @@ func (b *BidiStreamForClient[Req, Res]) Conn() (StreamingClientConn, error) {
 //
 // It's returned from [Client].CallBidiStream, but doesn't currently have an
 // exported constructor function.
+//
+// Send and Receive may be called from separate goroutines concurrently, but
+// neither may be called concurrently with itself.
 type BidiStreamForClientSimple[Req, Res any] struct {
 	stream *BidiStreamForClient[Req, Res]
 }

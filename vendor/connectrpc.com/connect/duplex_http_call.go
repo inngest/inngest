@@ -36,8 +36,9 @@ type duplexHTTPCall struct {
 	onRequestSend    func(*http.Request)
 	validateResponse func(*http.Response) *Error
 
-	// io.Pipe is used to implement the request body for client streaming calls.
-	// If the request is unary, requestBodyWriter is nil.
+	// requestBodyWriter streams the request body for client-streaming and bidi
+	// RPCs. Assigned once in newDuplexHTTPCall and never reassigned, so it is
+	// safe to read without synchronisation. Nil for unary and server-streaming.
 	requestBodyWriter *io.PipeWriter
 
 	// requestSent ensures we only send the request once.
@@ -81,13 +82,24 @@ func newDuplexHTTPCall(
 		GetBody:    getNoBody,
 		Host:       url.Host,
 	}).WithContext(ctx)
-	return &duplexHTTPCall{
+	duplex := &duplexHTTPCall{
 		ctx:           ctx,
 		httpClient:    httpClient,
 		streamType:    spec.StreamType,
 		request:       request,
 		responseReady: make(chan struct{}),
 	}
+	// Client-streaming and bidi RPCs stream the request body through an
+	// io.Pipe. Set it up here so requestBodyWriter is assigned once at
+	// construction and safe to read concurrently from Send and CloseWrite.
+	if spec.StreamType&StreamTypeClient != 0 {
+		pipeReader, pipeWriter := io.Pipe()
+		duplex.requestBodyWriter = pipeWriter
+		duplex.request.Body = pipeReader
+		duplex.request.GetBody = nil // GetBody is not supported for client streaming.
+		duplex.request.ContentLength = -1
+	}
+	return duplex
 }
 
 // Send sends a message to the server.
@@ -97,13 +109,9 @@ func (d *duplexHTTPCall) Send(payload messagePayload) (int64, error) {
 	}
 	isFirst := d.requestSent.CompareAndSwap(false, true)
 	if isFirst {
-		// This is the first time we're sending a message to the server.
-		// We need to send the request headers and start the request.
-		pipeReader, pipeWriter := io.Pipe()
-		d.requestBodyWriter = pipeWriter
-		d.request.Body = pipeReader
-		d.request.GetBody = nil // GetBody not supported for client streaming
-		d.request.ContentLength = -1
+		// This is the first time we're sending a message to the server. The
+		// request body pipe has already been set up by newDuplexHTTPCall, so
+		// we just kick off the HTTP request here.
 		go d.makeRequest() // concurrent request
 	}
 	if err := d.ctx.Err(); err != nil {
@@ -168,9 +176,6 @@ func (d *duplexHTTPCall) CloseWrite() error {
 	// response to read from.
 	if d.requestSent.CompareAndSwap(false, true) {
 		go d.makeRequest()
-		// We never setup a request body, so it's effectively already closed.
-		// So nothing else to do.
-		return nil
 	}
 	// The user calls CloseWrite to indicate that they're done sending data. It's
 	// safe to close the write side of the pipe while net/http is reading from
@@ -183,6 +188,11 @@ func (d *duplexHTTPCall) CloseWrite() error {
 	// forever. To make sure users don't have to worry about this, the generated
 	// code for unary, client streaming, and server streaming RPCs must call
 	// CloseWrite automatically rather than requiring the user to do it.
+	//
+	// For client-streaming and bidi RPCs requestBodyWriter is always non-nil
+	// (it is set in newDuplexHTTPCall); for unary and server-streaming RPCs
+	// it remains nil and we fall back to closing whatever request body was
+	// attached (typically http.NoBody or a payloadCloser set by sendUnary).
 	if d.requestBodyWriter != nil {
 		return d.requestBodyWriter.Close()
 	}
@@ -229,7 +239,7 @@ func (d *duplexHTTPCall) Read(data []byte) (int, error) {
 	n, err := d.response.Body.Read(data)
 	if err != nil && !errors.Is(err, io.EOF) {
 		err = wrapIfContextDone(d.ctx, err)
-		err = wrapIfRSTError(err)
+		err = wrapIfRSTError(d.ctx, err)
 	}
 	return n, err
 }
@@ -241,7 +251,7 @@ func (d *duplexHTTPCall) CloseRead() error {
 	}
 	err := d.response.Body.Close()
 	err = wrapIfContextDone(d.ctx, err)
-	return wrapIfRSTError(err)
+	return wrapIfRSTError(d.ctx, err)
 }
 
 // ResponseStatusCode is the response's HTTP status code.
@@ -310,7 +320,7 @@ func (d *duplexHTTPCall) makeRequest() {
 		err = wrapIfContextError(err)
 		err = wrapIfLikelyH2CNotConfiguredError(d.request, err)
 		err = wrapIfLikelyWithGRPCNotUsedError(err)
-		err = wrapIfRSTError(err)
+		err = wrapIfRSTError(d.ctx, err)
 		if _, ok := asError(err); !ok {
 			err = NewError(CodeUnavailable, err)
 		}

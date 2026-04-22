@@ -33,7 +33,7 @@ import (
 )
 
 // Version is the semantic version of the connect module.
-const Version = "1.19.1"
+const Version = "1.19.2"
 
 // These constants are used in compile-time handshakes with connect's generated
 // code.
@@ -87,14 +87,24 @@ func (s StreamType) String() string {
 // all returned errors can be cast to [*Error] using the standard library's
 // [errors.As].
 //
-// StreamingHandlerConn implementations do not need to be safe for concurrent use.
+// StreamingHandlerConn implementations provided by this module support limited
+// concurrent use: the read side (Receive, RequestHeader) may be called
+// concurrently with the write side (Send, ResponseHeader, ResponseTrailer), but
+// the read side must not be called concurrently with itself, and the write side
+// must not be called concurrently with itself.
 type StreamingHandlerConn interface {
 	Spec() Spec
 	Peer() Peer
 
+	// Receive and RequestHeader form the read side of the stream. They are not
+	// safe to call concurrently with each other, but may be called concurrently
+	// with Send, ResponseHeader, and ResponseTrailer.
 	Receive(any) error
 	RequestHeader() http.Header
 
+	// Send, ResponseHeader, and ResponseTrailer form the write side of the
+	// stream. They are not safe to call concurrently with each other, but may
+	// be called concurrently with Receive and RequestHeader.
 	Send(any) error
 	ResponseHeader() http.Header
 	ResponseTrailer() http.Header
@@ -120,22 +130,29 @@ type StreamingHandlerConn interface {
 // all returned errors can be cast to [*Error] using the standard library's
 // [errors.As].
 //
-// In order to support bidirectional streaming RPCs, all StreamingClientConn
-// implementations must support limited concurrent use. See the comments on
-// each group of methods for details.
+// StreamingClientConn implementations provided by this module support limited
+// concurrent use: the read side (Receive, ResponseHeader, ResponseTrailer,
+// CloseResponse) may be called concurrently with the write side (Send,
+// RequestHeader, CloseRequest), but the read side must not be called
+// concurrently with itself, and the write side must not be called concurrently
+// with itself.
 type StreamingClientConn interface {
-	// Spec and Peer must be safe to call concurrently with all other methods.
+	// Spec and Peer are safe to call concurrently with all other methods.
 	Spec() Spec
 	Peer() Peer
 
-	// Send, RequestHeader, and CloseRequest may race with each other, but must
-	// be safe to call concurrently with all other methods.
+	// Send, RequestHeader, and CloseRequest form the write side of the stream.
+	// They are not safe to call concurrently with each other, but may be called
+	// concurrently with Receive, ResponseHeader, ResponseTrailer, and
+	// CloseResponse.
 	Send(any) error
 	RequestHeader() http.Header
 	CloseRequest() error
 
-	// Receive, ResponseHeader, ResponseTrailer, and CloseResponse may race with
-	// each other, but must be safe to call concurrently with all other methods.
+	// Receive, ResponseHeader, ResponseTrailer, and CloseResponse form the read
+	// side of the stream. They are not safe to call concurrently with each
+	// other, but may be called concurrently with Send, RequestHeader, and
+	// CloseRequest.
 	Receive(any) error
 	ResponseHeader() http.Header
 	ResponseTrailer() http.Header
