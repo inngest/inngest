@@ -396,10 +396,12 @@ for i, value in ipairs(constraints) do
 		local throttleRemaining = throttleCheck["remaining"] or 0
 		usage["u"] = math.max(math.min(value.t.l - throttleRemaining, value.t.l or 0), 0)
 	elseif value.k == 4 then
-		-- semaphore
+		-- semaphore: read actual usage counter directly (not derived from slot count,
+		-- which has a unit mismatch for weight > 1)
+		local currentUsage = tonumber(call("GET", value.sem.k)) or 0
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
 		usage["l"] = capacity
-		usage["u"] = math.max(math.min(capacity - constraintCapacity, capacity), 0)
+		usage["u"] = math.max(math.min(currentUsage, capacity), 0)
 	end
 	table.insert(constraintUsage, usage)
 
