@@ -27,7 +27,9 @@ pkg/cqrs/                   interfaces, CQRS-facing types, history payload types
 pkg/cqrs/manager/           composite cqrs.Manager implementation over db.Adapter
 pkg/db/                     backend-neutral persistence contract
 pkg/db/sqlite/              SQLite adapter + SQLite bootstrap + SQLite migrations
+pkg/db/sqlite/sqlc/         SQLite SQL source and generated query code
 pkg/db/postgres/            Postgres adapter + Postgres bootstrap + Postgres migrations
+pkg/db/postgres/sqlc/       Postgres SQL source and generated query code
 #+end_example
 
 * Decisions
@@ -78,6 +80,14 @@ Implications:
 - deprecate =pkg/history_drivers= entirely
 - replace the devserver's parallel in-memory history store with CQRS-backed
   history as the single source of truth
+- define narrower history interfaces in =pkg/cqrs= and embed them in
+  =cqrs.Manager= rather than flattening all history methods directly into the
+  top-level manager declaration
+- keep only minimal temporary compatibility shims for =pkg/history_reader= and
+  =pkg/execution/history= during migration
+- mark every temporary shim as =DEPRECATED= and track it for fast-follow removal
+- have executor lifecycle code depend directly on the narrower CQRS history
+  interfaces in the end state
 
 ** Decision 4: bootstrap and migrations belong in each DB package
 
@@ -100,11 +110,29 @@ Dialect-specific bootstrap belongs in =pkg/db/{dialect}=.  App-level selection
 can remain in callers such as =pkg/devserver= or, if needed later, a thin
 factory package outside =pkg/cqrs=.
 
+Decision for first pass:
+
+- keep backend selection in callers
+- do not introduce =pkg/db/open= initially
+- revisit only if caller duplication becomes a concrete maintenance problem
+
 ** Decision 5: initial refactor is structural, not behavioral
 
 The first pass should preserve behavior.  We should not combine package moves
 with query rewrites, API changes, or storage model changes unless required to
 complete the move.
+
+** Decision 6: sqlc packages move with their dialect adapters
+
+Generated query packages and their SQL source should move out of
+=pkg/cqrs/base_cqrs/sqlc= and live with the dialect packages that own them.
+
+Reasoning:
+
+- the generated code is backend-specific, not CQRS contract code
+- colocating sqlc code with adapters makes dialect ownership explicit
+- removing =base_cqrs= should also remove its generated-code subtree
+- keeping sqlc under =base_cqrs= would preserve the wrong package boundary
 
 * Current State
 
@@ -194,6 +222,7 @@ Each dialect package owns:
 - connection opening helpers
 - migration execution
 - embedded migration files
+- sql source and generated query code
 - dialect-specific sqlc adaptation into =pkg/db= domain rows and params
 
 Possible API shape:
@@ -223,8 +252,9 @@ Action items:
 - [ ] add package docs stating the responsibility of each new package
 - [ ] add minimal constructors or placeholders so the packages compile
 - [ ] decide final constructor naming in =pkg/cqrs/manager=
-- [ ] decide whether history is embedded directly in =cqrs.Manager= or exposed
-  as narrower subinterfaces also embedded by =cqrs.Manager=
+- [ ] define =cqrs.HistoryReader=
+- [ ] define =cqrs.HistoryWriter=
+- [ ] define =cqrs.Manager= to embed those narrower interfaces
 - [ ] confirm this phase introduces no behavior changes
 
 Completion checklist:
@@ -247,6 +277,10 @@ Action items:
 - [ ] move Postgres connection opening into =pkg/db/postgres=
 - [ ] move goose migration wiring into each dialect package
 - [ ] move migration filesystem ownership fully into each dialect package
+- [ ] move SQLite sqlc package under =pkg/db/sqlite/sqlc=
+- [ ] move Postgres sqlc package under =pkg/db/postgres/sqlc=
+- [ ] update sqlc/codegen configuration to target the new package paths
+- [ ] update adapter imports to use dialect-local sqlc packages
 - [ ] decide whether =Open()= implicitly runs migrations or whether =Open()=
   and =Migrate()= remain separate calls
 - [ ] update devserver to stop calling =base_cqrs.New()=
@@ -277,6 +311,7 @@ Completion checklist:
 - [ ] no tests call =base_cqrs.New()=
 - [ ] migrations are run by the dialect package that owns them
 - [ ] no =pkg/cqrs= package owns connection opening or migration wiring
+- [ ] sqlc code no longer lives under =pkg/cqrs/base_cqrs/sqlc=
 
 ** Phase 3: move the composite manager
 
@@ -357,18 +392,23 @@ Action items:
 
 - [ ] define =cqrs.HistoryReader=
 - [ ] define =cqrs.HistoryWriter=
-- [ ] decide whether those interfaces are embedded directly in =cqrs.Manager=
-  or grouped through a history-specific subinterface
+- [ ] embed those interfaces in =cqrs.Manager=
 - [ ] move payload and result types currently owned by =pkg/history_reader=
   into =pkg/cqrs=
 - [ ] move payload types currently owned by =pkg/execution/history= into
   =pkg/cqrs=
+- [ ] add only minimal temporary compatibility shims where migration staging
+  requires them
+- [ ] mark compatibility shims as =DEPRECATED=
+- [ ] add explicit removal tasks for every temporary shim introduced
 - [ ] move supporting run and run-history mapping helpers into
   =pkg/cqrs/manager=
 - [ ] replace devserver's injected memory history reader with CQRS-backed
   history reads
 - [ ] replace devserver's memory history writer lifecycle sink with CQRS-backed
   history writes
+- [ ] update executor lifecycle code to depend directly on
+  =cqrs.HistoryWriter=
 - [ ] update =coreapi= to depend on CQRS for history access rather than a
   separately injected history reader
 - [ ] update GraphQL resolvers still using =HistoryReader= to use CQRS-owned
@@ -391,6 +431,7 @@ Completion checklist:
 - [ ] no caller depends on non-CQRS history contract packages for DAL access
 - [ ] history interfaces and payload types are owned by =pkg/cqrs=
 - [ ] history implementation lives in =pkg/cqrs/manager=
+- [ ] any temporary compatibility shims are explicitly deprecated
 - [ ] devserver has a single history backend
 - [ ] =pkg/history_drivers= is no longer required by runtime paths
 - [ ] naming no longer implies SQLite-first conversion
@@ -408,6 +449,7 @@ Action items:
 - [ ] remove devserver imports of =pkg/history_drivers/...=
 - [ ] remove any generated or hand-written API assumptions that require a
   separate memory-backed history reader
+- [ ] remove temporary =DEPRECATED= shims that are no longer needed
 - [ ] run targeted tests covering devserver run details, cancel-run, rerun, and
   history-backed GraphQL fields
 
@@ -416,6 +458,7 @@ Completion checklist:
 - [ ] =pkg/history_drivers= no longer exists
 - [ ] no runtime path depends on a parallel in-memory history store
 - [ ] CQRS-backed history is the only history backend in devserver
+- [ ] temporary compatibility shims introduced for migration are removed
 
 ** Phase 7: remove dead normalization leftovers
 
@@ -469,6 +512,7 @@ Expected primary consumers to update:
 - callers currently depending on =pkg/history_reader=
 - callers currently depending on =pkg/execution/history= contract types
 - callers currently depending on =pkg/history_drivers=
+- executor lifecycle code currently depending on =pkg/execution/history.Driver=
 - any helper harnesses initializing CQRS managers directly
 
 This is expected to be broad but shallow:
@@ -540,26 +584,6 @@ Mitigation:
 - align option and function naming where it makes sense
 - allow small differences where dialect needs actually differ
 
-* Open Questions
-
-- Should app-level backend selection stay in callers, or should there be a thin
-  =pkg/db/open= or similar convenience package?
-- Should history interfaces be embedded directly in =cqrs.Manager= or grouped
-  under a narrower =cqrs.HistoryStore= style interface that =Manager= embeds?
-- How much of the existing =pkg/history_reader= and =pkg/execution/history=
-  package surface should remain as temporary compatibility shims during
-  migration?
-- Should the executor lifecycle listener accept CQRS history interfaces
-  directly, or should there be a small adapter layer that keeps lifecycle code
-  decoupled from the full manager?
-- Should sqlc generated packages remain under =pkg/cqrs/base_cqrs/sqlc= during
-  the first pass, or should they move in the same effort?
-
-Recommendation:
-
-- do not move sqlc generated packages in the first pass unless the package name
-  becomes actively misleading to maintainers during the migration
-
 * Success Criteria
 
 - =pkg/cqrs/base_cqrs= no longer exists
@@ -569,6 +593,7 @@ Recommendation:
 - =pkg/history_drivers= no longer exists
 - devserver uses CQRS-backed history as its single history backend
 - SQLite and Postgres own their own bootstrap and migration entrypoints
+- SQLite and Postgres own their own sqlc source and generated query packages
 - runtime behavior remains unchanged through the structural move
 - stale SQLite-first normalization leftovers are deleted by the end
 
