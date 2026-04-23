@@ -1,0 +1,581 @@
+#+TITLE: Remove base_cqrs and Reframe CQRS/DB Package Boundaries
+#+AUTHOR: Darwin D. Wu
+#+DATE: 2026-04-22
+#+STATUS: Draft
+#+STARTUP: showall
+
+* Summary
+
+We want to remove =pkg/cqrs/base_cqrs= entirely.
+
+The current package mixes unrelated concerns:
+
+- CQRS manager composition
+- DB bootstrap and migrations
+- history reader/writer implementations
+- legacy conversion and normalization leftovers
+
+That boundary no longer matches the architecture introduced by Plan 001.  The
+actual backend boundary is now =pkg/db.Adapter= and =pkg/db.Querier=, not
+=base_cqrs=.
+
+The target shape is:
+
+#+begin_example
+pkg/cqrs/                   interfaces, CQRS-facing types, history payload types,
+                            query option structs
+pkg/cqrs/manager/           composite cqrs.Manager implementation over db.Adapter
+pkg/db/                     backend-neutral persistence contract
+pkg/db/sqlite/              SQLite adapter + SQLite bootstrap + SQLite migrations
+pkg/db/postgres/            Postgres adapter + Postgres bootstrap + Postgres migrations
+#+end_example
+
+* Decisions
+
+** Decision 1: remove =pkg/cqrs/base_cqrs= entirely
+
+We are not keeping a deprecated forwarding layer.  The package should disappear
+once the replacement packages exist and imports are updated.
+
+Reasoning:
+
+- the current package name no longer describes its responsibility
+- retaining forwarding wrappers would prolong the wrong abstraction boundary
+- import churn is manageable because external entrypoints are limited
+
+** Decision 2: CQRS manager belongs under =pkg/cqrs=
+
+The composite manager implementation should live in =pkg/cqrs/manager=.
+
+Reasoning:
+
+- =pkg/cqrs= already defines the public contracts
+- the manager implements CQRS behavior, not backend bootstrap
+- callers should think in terms of "CQRS manager over an adapter", not
+  "base cqrs"
+
+** Decision 3: CQRS owns history reads, writes, and payload types
+
+History is part of the data access layer.  Callers should not need to depend on
+separate reader or writer contract packages in order to access persistence.
+
+Reasoning:
+
+- CQRS is the caller-facing DAL boundary
+- history reads are just another DAL read surface
+- history writes are still persistence operations
+- callers should depend on =pkg/cqrs= contracts rather than implementation-side
+  or adjacent packages
+- CQRS should own the payload and result types used by those contracts
+
+Implications:
+
+- move the history read interfaces into =pkg/cqrs=
+- move the history write interfaces into =pkg/cqrs=
+- move payload and result types currently owned by =pkg/history_reader= and
+  =pkg/execution/history= into =pkg/cqrs=
+- make =pkg/cqrs/manager= implement the history read and write surfaces
+- deprecate =pkg/history_drivers= entirely
+- replace the devserver's parallel in-memory history store with CQRS-backed
+  history as the single source of truth
+
+** Decision 4: bootstrap and migrations belong in each DB package
+
+Bootstrap and migration ownership should move to =pkg/db/sqlite= and
+=pkg/db/postgres= instead of a CQRS package.
+
+Reasoning:
+
+- opening a SQLite connection is a SQLite concern
+- opening a Postgres connection is a Postgres concern
+- embedding and running migrations is dialect-specific
+- CQRS should accept an adapter and remain agnostic to connection lifecycle
+
+This separates two concerns:
+
+- dialect-specific bootstrap
+- app-level backend selection
+
+Dialect-specific bootstrap belongs in =pkg/db/{dialect}=.  App-level selection
+can remain in callers such as =pkg/devserver= or, if needed later, a thin
+factory package outside =pkg/cqrs=.
+
+** Decision 5: initial refactor is structural, not behavioral
+
+The first pass should preserve behavior.  We should not combine package moves
+with query rewrites, API changes, or storage model changes unless required to
+complete the move.
+
+* Current State
+
+Today =pkg/cqrs/base_cqrs= contains:
+
+- =base_cqrs.go=: DB opening + migration execution
+- =cqrs.go=: a ~3.3k-line composite manager implementing multiple CQRS domains
+- =history_driver.go=: =execution/history.Driver= implementation
+- =history_reader.go=: =history_reader.Reader= implementation
+- =sqlite_converter.go=: CQRS/domain conversion helpers with stale naming
+- =sqlc/postgres/db_normalization.go= and =sqlc/postgres/normalization.go=:
+  leftover SQLite-first normalization paths that no longer fit the intended
+  architecture
+
+The main public entrypoints in use are:
+
+- =base_cqrs.New()=
+- =base_cqrs.NewCQRS()=
+- =base_cqrs.NewHistoryDriver()=
+- =base_cqrs.NewHistoryReader()=
+
+This means the migration surface is broad in test imports but narrow in actual
+API shape.
+
+Related history state today is also split across multiple packages:
+
+- =pkg/history_drivers/memory_writer= stores execution history in an in-memory
+  singleton map
+- =pkg/history_drivers/memory_reader= reads from that same in-memory map
+- devserver currently wires both the CQRS-backed history driver and the memory
+  writer into the execution lifecycle listener
+- devserver injects the memory reader into =coreapi= for parts of the GraphQL
+  surface
+
+This means devserver currently maintains two history backends:
+
+- the normal CQRS-backed store
+- a dev-only in-memory mirror
+
+The target architecture should remove that duplication.
+
+* Target Package Responsibilities
+
+** =pkg/cqrs=
+
+Owns:
+
+- public interfaces
+- CQRS-facing structs returned to callers
+- history read interfaces
+- history write interfaces
+- history payload and result types
+- shared query and filter option types
+
+Does not own:
+
+- connection opening
+- migrations
+- dialect-specific sqlc usage
+
+** =pkg/cqrs/manager=
+
+Owns:
+
+- the composite implementation of =cqrs.Manager= and =cqrs.TxManager=
+- transaction scoping over =db.Adapter=
+- CQRS-side mapping from =pkg/db= domain rows into =pkg/cqrs= result types
+- domain-specific manager logic currently concentrated in =base_cqrs/cqrs.go=
+
+Suggested internal file split:
+
+- =manager.go=
+- =apps_functions.go=
+- =events.go=
+- =runs_history.go=
+- =queue_snapshots.go=
+- =traces.go=
+- =connect.go=
+- =convert.go=
+- =history.go=
+
+** =pkg/db/sqlite= and =pkg/db/postgres=
+
+Each dialect package owns:
+
+- adapter construction
+- connection opening helpers
+- migration execution
+- embedded migration files
+- dialect-specific sqlc adaptation into =pkg/db= domain rows and params
+
+Possible API shape:
+
+- =Open(ctx, opts) (*sql.DB, error)=
+- =Migrate(ctx, conn) error=
+- =New(conn) *Adapter=
+
+The exact API names can be decided during implementation, but ownership should
+remain dialect-local.
+
+* Migration Plan
+
+** Phase 1: establish new packages
+
+Goal:
+
+- create the destination packages before moving behavior into them
+
+Action items:
+
+- [ ] create =pkg/cqrs/manager=
+- [ ] expand =pkg/cqrs= contracts to include history reads, history writes, and
+  history payload/result types
+- [ ] mark =pkg/history_drivers= as deprecated in package docs or comments while
+  migration is in flight
+- [ ] add package docs stating the responsibility of each new package
+- [ ] add minimal constructors or placeholders so the packages compile
+- [ ] decide final constructor naming in =pkg/cqrs/manager=
+- [ ] decide whether history is embedded directly in =cqrs.Manager= or exposed
+  as narrower subinterfaces also embedded by =cqrs.Manager=
+- [ ] confirm this phase introduces no behavior changes
+
+Completion checklist:
+
+- [ ] new package destinations exist
+- [ ] new packages compile
+- [ ] responsibilities are documented
+- [ ] no runtime caller has migrated yet
+
+** Phase 2: move bootstrap and migrations out of CQRS
+
+Move the logic currently in =pkg/cqrs/base_cqrs/base_cqrs.go= into the dialect
+packages.
+
+Action items:
+
+- [ ] define SQLite bootstrap options in =pkg/db/sqlite=
+- [ ] define Postgres bootstrap options in =pkg/db/postgres=
+- [ ] move SQLite connection opening into =pkg/db/sqlite=
+- [ ] move Postgres connection opening into =pkg/db/postgres=
+- [ ] move goose migration wiring into each dialect package
+- [ ] move migration filesystem ownership fully into each dialect package
+- [ ] decide whether =Open()= implicitly runs migrations or whether =Open()=
+  and =Migrate()= remain separate calls
+- [ ] update devserver to stop calling =base_cqrs.New()=
+- [ ] update test helpers to stop calling =base_cqrs.New()=
+- [ ] update adapter integration tests to use dialect-local bootstrap
+- [ ] update regression tests to use dialect-local bootstrap
+- [ ] verify connection cleanup behavior is unchanged after the move
+
+Expected call-site shape after this phase:
+
+#+begin_src go
+conn, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+adapter := dbsqlite.New(conn)
+mgr := manager.New(adapter)
+#+end_src
+
+or
+
+#+begin_src go
+conn, err := dbpostgres.Open(ctx, dbpostgres.Options{URI: uri})
+adapter := dbpostgres.New(conn)
+mgr := manager.New(adapter)
+#+end_src
+
+Completion checklist:
+
+- [ ] no runtime code calls =base_cqrs.New()=
+- [ ] no tests call =base_cqrs.New()=
+- [ ] migrations are run by the dialect package that owns them
+- [ ] no =pkg/cqrs= package owns connection opening or migration wiring
+
+** Phase 3: move the composite manager
+
+Move =NewCQRS=, the =wrapper= type, and transaction logic into
+=pkg/cqrs/manager=.
+
+Action items:
+
+- [ ] move =NewCQRS= into =pkg/cqrs/manager=
+- [ ] rename the constructor if a better permanent name is chosen
+- [ ] move =wrapper= into =pkg/cqrs/manager=
+- [ ] move =adapterWithHelpers= into =pkg/cqrs/manager= or replace it with a
+  better-named local interface
+- [ ] move =WithTx()= intact before further cleanup
+- [ ] move =Commit()= and =Rollback()= intact before further cleanup
+- [ ] preserve =cqrs.Manager= conformance
+- [ ] preserve =cqrs.TxManager= conformance
+- [ ] preserve dependency on =pkg/db.Adapter= rather than dialect packages
+- [ ] update runtime call sites to construct managers from =pkg/cqrs/manager=
+- [ ] update tests that currently import =base_cqrs.NewCQRS()=
+- [ ] keep transaction tests green before any domain-level file splitting
+
+Completion checklist:
+
+- [ ] no runtime code calls =base_cqrs.NewCQRS()=
+- [ ] no tests call =base_cqrs.NewCQRS()=
+- [ ] =pkg/cqrs/manager= is the only composite manager package
+- [ ] transaction semantics are unchanged
+- [ ] history read and write interfaces are implemented from the same manager
+  package
+
+** Phase 4: split the manager by domain
+
+Break up the current monolithic =cqrs.go= by concern.
+
+Suggested split order:
+
+1. queue snapshots
+2. apps and functions
+3. events
+4. function runs and history-related CQRS methods
+5. connect worker connections
+6. traces and spans
+
+Reasoning:
+
+- trace/span logic is the densest and highest-risk section, so it should move
+  last after the package shape is stable
+
+Action items:
+
+- [ ] move queue snapshot methods into a dedicated file
+- [ ] move app and function methods into a dedicated file
+- [ ] move event methods into a dedicated file
+- [ ] move function run and CQRS-side history methods into a dedicated file
+- [ ] move history read and write implementation methods into a dedicated file
+- [ ] move connect worker connection methods into a dedicated file
+- [ ] move trace and span methods into dedicated files
+- [ ] move shared conversion helpers into =convert.go= or domain-local helper
+  files
+- [ ] move dynamic SQL builder helpers next to the domain that uses them
+- [ ] narrow helper visibility where possible during the split
+- [ ] avoid opportunistic behavior rewrites while splitting files
+- [ ] run relevant tests after each domain move, especially traces and history
+
+Completion checklist:
+
+- [ ] no single file in =pkg/cqrs/manager= remains a multi-thousand-line grab bag
+- [ ] manager files are organized by domain
+- [ ] helper placement is obvious to maintainers reading the tree
+
+** Phase 5: unify history under =pkg/cqrs=
+
+Move history read and write contracts, payload types, and implementations under
+=pkg/cqrs= and =pkg/cqrs/manager=.
+
+Action items:
+
+- [ ] define =cqrs.HistoryReader=
+- [ ] define =cqrs.HistoryWriter=
+- [ ] decide whether those interfaces are embedded directly in =cqrs.Manager=
+  or grouped through a history-specific subinterface
+- [ ] move payload and result types currently owned by =pkg/history_reader=
+  into =pkg/cqrs=
+- [ ] move payload types currently owned by =pkg/execution/history= into
+  =pkg/cqrs=
+- [ ] move supporting run and run-history mapping helpers into
+  =pkg/cqrs/manager=
+- [ ] replace devserver's injected memory history reader with CQRS-backed
+  history reads
+- [ ] replace devserver's memory history writer lifecycle sink with CQRS-backed
+  history writes
+- [ ] update =coreapi= to depend on CQRS for history access rather than a
+  separately injected history reader
+- [ ] update GraphQL resolvers still using =HistoryReader= to use CQRS-owned
+  history interfaces instead
+- [ ] update cancel-run flow to read run state from CQRS-backed history
+- [ ] remove dual-writing of history in devserver lifecycle wiring
+- [ ] implement history reads in =pkg/cqrs/manager=
+- [ ] implement history writes in =pkg/cqrs/manager=
+- [ ] rename stale helper names such as =sqlite_converter.go=
+- [ ] update callers to depend on =pkg/cqrs= instead of =pkg/history_reader=
+  or =pkg/execution/history= contracts
+- [ ] update devserver UI-facing API paths so they no longer depend on
+  =pkg/history_drivers=
+- [ ] update tests importing history implementations from =base_cqrs=
+- [ ] verify history read behavior remains unchanged
+- [ ] verify history write behavior remains unchanged
+
+Completion checklist:
+
+- [ ] no caller depends on non-CQRS history contract packages for DAL access
+- [ ] history interfaces and payload types are owned by =pkg/cqrs=
+- [ ] history implementation lives in =pkg/cqrs/manager=
+- [ ] devserver has a single history backend
+- [ ] =pkg/history_drivers= is no longer required by runtime paths
+- [ ] naming no longer implies SQLite-first conversion
+
+** Phase 6: deprecate and remove =pkg/history_drivers=
+
+Once CQRS-backed history fully replaces the in-memory mirror, remove the old
+history driver packages.
+
+Action items:
+
+- [ ] remove =pkg/history_drivers/memory_writer=
+- [ ] remove =pkg/history_drivers/memory_reader=
+- [ ] remove =pkg/history_drivers/memory_store=
+- [ ] remove devserver imports of =pkg/history_drivers/...=
+- [ ] remove any generated or hand-written API assumptions that require a
+  separate memory-backed history reader
+- [ ] run targeted tests covering devserver run details, cancel-run, rerun, and
+  history-backed GraphQL fields
+
+Completion checklist:
+
+- [ ] =pkg/history_drivers= no longer exists
+- [ ] no runtime path depends on a parallel in-memory history store
+- [ ] CQRS-backed history is the only history backend in devserver
+
+** Phase 7: remove dead normalization leftovers
+
+Delete the remaining legacy SQLite-first Postgres normalization files and any
+documentation that still describes SQLite as the canonical storage API.
+
+Action items:
+
+- [ ] delete =sqlc/postgres/db_normalization.go=
+- [ ] delete =sqlc/postgres/normalization.go=
+- [ ] delete normalization-specific tests that only cover dead compatibility
+  paths
+- [ ] remove stale README or docs language describing SQLite as the canonical
+  storage interface
+- [ ] remove stale helper names or comments that refer to SQLite normalization
+- [ ] confirm active CQRS flow only uses =pkg/db= domain rows and adapters
+
+Completion checklist:
+
+- [ ] no =NormalizedQueries= path remains
+- [ ] no =ToSQLite()= compatibility conversion path remains in active CQRS flow
+- [ ] repository docs describe the adapter-based architecture accurately
+
+** Phase 8: delete =pkg/cqrs/base_cqrs=
+
+Once imports are migrated and tests pass, delete the package entirely.
+
+Action items:
+
+- [ ] confirm there are no remaining repository imports of
+  =pkg/cqrs/base_cqrs=
+- [ ] delete the package directory
+- [ ] update docs or plans still referencing =base_cqrs= as a live package
+- [ ] run targeted tests for manager, db, devserver, and executor initialization
+- [ ] run a final repository search for stale symbols such as =BaseCQRSOptions=
+  and =NewCQRS=
+
+Completion checklist:
+
+- [ ] no repository imports of =pkg/cqrs/base_cqrs=
+- [ ] package directory removed
+- [ ] repository terminology reflects the new package boundaries
+
+* Call-Site Impact
+
+Expected primary consumers to update:
+
+- =pkg/devserver=
+- =pkg/db= integration and regression tests
+- =tests/execution/executor=
+- callers currently depending on =pkg/history_reader=
+- callers currently depending on =pkg/execution/history= contract types
+- callers currently depending on =pkg/history_drivers=
+- any helper harnesses initializing CQRS managers directly
+
+This is expected to be broad but shallow:
+
+- many import edits
+- few distinct constructor shapes
+
+* Risks
+
+** Transaction semantics regress
+
+Risk:
+
+- =WithTx()=, =Commit()=, and =Rollback()= behavior may drift during package
+  moves
+
+Mitigation:
+
+- move transaction code intact first
+- keep existing CQRS transaction tests green before deeper file splitting
+
+** Trace and span behavior regresses
+
+Risk:
+
+- trace/span logic is the most specialized and interdependent portion of the
+  manager
+
+Mitigation:
+
+- move traces last
+- preserve helper functions and tests before attempting local cleanup
+
+** History ownership becomes unclear
+
+Risk:
+
+- history read/write code could be added to =manager= in an ad hoc way and
+  recreate the same package bloat under a new name
+
+Mitigation:
+
+- keep history contracts and payload types in =pkg/cqrs=
+- keep history implementation isolated in dedicated manager files
+- avoid mixing history logic across unrelated domain files
+
+** Devserver history migration regresses UI behavior
+
+Risk:
+
+- devserver currently relies on a separate memory-backed history path for parts
+  of GraphQL and cancel-run behavior
+
+Mitigation:
+
+- switch devserver API reads to CQRS-backed history before removing
+  =pkg/history_drivers=
+- verify run-details, cancel-run, and rerun flows against the dev-server UI
+- remove dual-write only after CQRS-backed reads are confirmed equivalent
+
+** Dialect bootstrap APIs diverge too much
+
+Risk:
+
+- independent SQLite/Postgres bootstrap helpers may drift in ergonomics
+
+Mitigation:
+
+- align option and function naming where it makes sense
+- allow small differences where dialect needs actually differ
+
+* Open Questions
+
+- Should app-level backend selection stay in callers, or should there be a thin
+  =pkg/db/open= or similar convenience package?
+- Should history interfaces be embedded directly in =cqrs.Manager= or grouped
+  under a narrower =cqrs.HistoryStore= style interface that =Manager= embeds?
+- How much of the existing =pkg/history_reader= and =pkg/execution/history=
+  package surface should remain as temporary compatibility shims during
+  migration?
+- Should the executor lifecycle listener accept CQRS history interfaces
+  directly, or should there be a small adapter layer that keeps lifecycle code
+  decoupled from the full manager?
+- Should sqlc generated packages remain under =pkg/cqrs/base_cqrs/sqlc= during
+  the first pass, or should they move in the same effort?
+
+Recommendation:
+
+- do not move sqlc generated packages in the first pass unless the package name
+  becomes actively misleading to maintainers during the migration
+
+* Success Criteria
+
+- =pkg/cqrs/base_cqrs= no longer exists
+- CQRS manager implementation lives under =pkg/cqrs/manager=
+- history interfaces and payload types live under =pkg/cqrs=
+- history implementation lives under =pkg/cqrs/manager=
+- =pkg/history_drivers= no longer exists
+- devserver uses CQRS-backed history as its single history backend
+- SQLite and Postgres own their own bootstrap and migration entrypoints
+- runtime behavior remains unchanged through the structural move
+- stale SQLite-first normalization leftovers are deleted by the end
+
+* Out of Scope for Initial Refactor
+
+- redesigning CQRS interfaces
+- changing =pkg/db= adapter contracts unless the move reveals a real gap
+- rewriting SQL queries for style
+- unifying dialect bootstrap behind a new factory unless a caller strongly needs it
+- changing trace/run query behavior while moving files
