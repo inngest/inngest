@@ -19,7 +19,7 @@ import { AICell } from '../Table/Cell';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Actions } from './Actions';
-import { Nav } from './Nav';
+import { Nav } from '../RunDetails/shared/Nav';
 import { formatDuration } from './runDetailsUtils';
 
 type Props = {

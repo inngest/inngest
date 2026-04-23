@@ -20,12 +20,12 @@ import { isLazyDone, nullishToLazy } from '../utils/lazyLoad';
 // Import V4 components (decoupled from V3)
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
-import { Tabs } from './Tabs';
+import { Tabs } from '../RunDetails/shared/Tabs';
 // Import V4 Timeline
 import { Timeline } from './Timeline';
 import { TimelineLegend } from './TimelineLegend';
 import { TopInfo } from './TopInfo';
-import { Waiting } from './Waiting';
+import { Waiting } from '../RunDetails/shared/Waiting';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
 import type { Trace } from './types';
 import { traceToTimelineData } from './utils/traceConversion';

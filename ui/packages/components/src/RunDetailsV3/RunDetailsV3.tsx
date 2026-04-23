@@ -11,10 +11,10 @@ import { DragDivider } from '../icons/DragDivider';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { RunInfo as NewRunInfo, RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
-import { Tabs } from './Tabs';
+import { Tabs } from '../RunDetails/shared/Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
-import { Waiting } from './Waiting';
+import { Waiting } from '../RunDetails/shared/Waiting';
 import { useDynamicRunData, useStepSelection } from './utils';
 
 //

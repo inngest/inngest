@@ -64,11 +64,11 @@ vi.mock('../Rerun/RerunModal', () => ({
   RerunModal: () => null,
 }));
 
-vi.mock('./ErrorInfo', () => ({
+vi.mock('../RunDetails/shared/ErrorInfo', () => ({
   ErrorInfo: () => null,
 }));
 
-vi.mock('./IO', () => ({
+vi.mock('../RunDetails/shared/IO', () => ({
   IO: () => null,
 }));
 
@@ -80,7 +80,7 @@ vi.mock('./UserlandAttrs', () => ({
   UserlandAttrs: () => null,
 }));
 
-vi.mock('./Tabs', () => ({
+vi.mock('../RunDetails/shared/Tabs', () => ({
   Tabs: () => null,
 }));
 

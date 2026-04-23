@@ -20,10 +20,10 @@ import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
 import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
-import { ErrorInfo } from './ErrorInfo';
-import { IO } from './IO';
+import { ErrorInfo } from '../RunDetails/shared/ErrorInfo';
+import { IO } from '../RunDetails/shared/IO';
 import { MetadataAttrs } from './MetadataAttrs';
-import { Tabs } from './Tabs';
+import { Tabs } from '../RunDetails/shared/Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import {
   isStepInfoInvoke,

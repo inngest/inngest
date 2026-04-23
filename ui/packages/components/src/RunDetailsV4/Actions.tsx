@@ -8,7 +8,7 @@ import { useShared } from '../SharedContext/SharedContext';
 import { useCancelRun } from '../SharedContext/useCancelRun';
 import { useRerun } from '../SharedContext/useRerun';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
-import { CancelModal } from './CancelModal';
+import { CancelModal } from '../RunDetails/shared/CancelModal';
 
 export type RunActions = {
   allowCancel?: boolean;

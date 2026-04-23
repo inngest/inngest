@@ -21,10 +21,10 @@ import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
-import { ErrorInfo } from './ErrorInfo';
-import { IO } from './IO';
+import { ErrorInfo } from '../RunDetails/shared/ErrorInfo';
+import { IO } from '../RunDetails/shared/IO';
 import { MetadataAttrs } from './MetadataAttrs';
-import { Tabs } from './Tabs';
+import { Tabs } from '../RunDetails/shared/Tabs';
 import type { Trace } from './types';
 
 type TopInfoProps = {
