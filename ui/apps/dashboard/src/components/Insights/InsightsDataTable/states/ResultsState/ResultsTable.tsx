@@ -25,7 +25,6 @@ type InsightsTableProps = {
   data: InsightsEntry[];
   onCellClick?: (rowIndex: number, columnId: string, value: unknown) => void;
   selectedCell?: CellDetailData | null;
-  containerRef: React.RefObject<HTMLDivElement>;
 };
 
 function InsightsTable({
@@ -34,18 +33,13 @@ function InsightsTable({
   data,
   onCellClick,
   selectedCell,
-  containerRef,
 }: InsightsTableProps) {
-  const willOverflow =
-    columns.reduce((total, col) => total + (col.minSize ?? 0), 0) >
-    (containerRef.current?.clientWidth ?? 800);
   return (
     <Table<InsightsEntry>
       cellClassName={cellClassName}
       columns={columns}
       data={data}
-      enableColumnSizing={willOverflow}
-      enableColumnDynamicSizing={!willOverflow}
+      enableColumnDynamicSizing
       selectedCell={selectedCell}
       onCellClick={onCellClick}
     />
@@ -150,7 +144,6 @@ export function ResultsTable() {
           data={data.rows}
           onCellClick={handleCellClick}
           selectedCell={selectedCell}
-          containerRef={containerRef}
         />
       </div>
       <ResultsTableFooter />
