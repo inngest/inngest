@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
+import { TEMPLATES } from '@/components/Insights/InsightsTabManager/InsightsTabPanelTemplatesTab/templates';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 
 interface UseDeepLinkHandlerParams {
@@ -24,6 +25,7 @@ export function useDeepLinkHandler({
 }: UseDeepLinkHandlerParams) {
   const { queries, isSavedQueriesFetching } = useStoredQueries();
   const hasProcessedInitialQueryId = useRef(false);
+  const hasProcessedInitialTemplateId = useRef(false);
 
   // Handle initial page load with query_id parameter.
   // Gated on isHydrated to ensure tab state has been restored from localStorage
@@ -60,6 +62,39 @@ export function useDeepLinkHandler({
       );
     }
   }, [search, queries.data, isSavedQueriesFetching, actions, isHydrated]);
+
+  // Handle initial page load with template_id parameter.
+  // Opens a new tab seeded from a built-in template and strips the param from
+  // the URL so refresh/bookmark doesn't keep spawning duplicate tabs.
+  useEffect(() => {
+    if (hasProcessedInitialTemplateId.current) return;
+    if (!isHydrated) return;
+
+    const templateIdFromUrl =
+      typeof search.template_id === 'string' ? search.template_id : undefined;
+    if (!templateIdFromUrl) {
+      hasProcessedInitialTemplateId.current = true;
+      return;
+    }
+
+    hasProcessedInitialTemplateId.current = true;
+
+    const template = TEMPLATES.find((t) => t.id === templateIdFromUrl);
+    if (template) {
+      actions.createTabFromQuery(template);
+    } else {
+      toast.error('Unable to load template; it may no longer exist');
+    }
+
+    navigate({
+      search: (prev: Record<string, unknown>) => {
+        const next = { ...prev };
+        delete next.template_id;
+        return next;
+      },
+      replace: true,
+    });
+  }, [search, actions, isHydrated, navigate]);
 
   // Update URL when active tab changes
   useEffect(() => {
