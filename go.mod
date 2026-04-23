@@ -15,7 +15,7 @@ require (
 	github.com/VividCortex/ewma v1.2.0
 	github.com/alicebob/miniredis/v2 v2.37.0
 	github.com/aws/aws-lambda-go v1.54.0
-	github.com/aws/smithy-go v1.25.0
+	github.com/aws/smithy-go v1.25.1
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/coder/websocket v1.8.14
 	github.com/coocood/freecache v1.2.7
