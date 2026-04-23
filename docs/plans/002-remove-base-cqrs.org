@@ -313,6 +313,13 @@ Phase 1 verification notes:
   README references, and the deleted normalization test
 - the phase 1 contract moves were verified against both the SQLite package suite
   and the Postgres Docker-backed DAL baseline
+- GraphQL compatibility note: the legacy =pkg/history_reader= shim can preserve
+  the existing GraphQL model shape during migration, but gqlgen does not accept
+  pure =type X = otherpkg.Y= aliases for the bound history structs.  Keep those
+  GraphQL-bound shim types as real deprecated named structs until the GraphQL
+  layer is migrated directly to =pkg/cqrs= types.
+- This does not currently require a GraphQL schema shape change; the issue is
+  gqlgen's Go type binding behavior, not the public GraphQL contract itself.
 
 Completion checklist:
 
