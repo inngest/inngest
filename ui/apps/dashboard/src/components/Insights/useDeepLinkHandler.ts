@@ -80,11 +80,15 @@ export function useDeepLinkHandler({
     hasProcessedInitialTemplateId.current = true;
 
     const template = TEMPLATES.find((t) => t.id === templateIdFromUrl);
-    if (template) {
-      actions.createTabFromQuery(template, { runOnMount: true });
-    } else {
+    if (!template) {
+      // Keep the param in the URL so the bad link stays reproducible,
+      // matching the query_id branch's behavior. The ref above prevents
+      // the toast from firing more than once per mount.
       toast.error('Unable to load template; it may no longer exist');
+      return;
     }
+
+    actions.createTabFromQuery(template, { runOnMount: true });
 
     navigate({
       search: (prev: Record<string, unknown>) => {
