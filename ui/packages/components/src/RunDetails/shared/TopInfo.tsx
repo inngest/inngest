@@ -24,8 +24,10 @@ import { devServerURL, useDevServer } from '../../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
+import { TabLabelWithLoadedIndicator } from './TabLabelWithLoadedIndicator';
 import { Tabs } from './Tabs';
 import type { Trace } from './types';
+import { useJustFinishedLoading } from './useJustFinishedLoading';
 
 type TopInfoProps = {
   slug?: string;
@@ -131,6 +133,9 @@ export const TopInfo = ({
 
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
+
+  const traceLoading = isPending || !!resultLoading;
+  const justFinishedLoading = useJustFinishedLoading(traceLoading);
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -287,7 +292,12 @@ export const TopInfo = ({
             ...(prettyPayload || isPending || resultLoading
               ? [
                   {
-                    label: 'Input',
+                    label: (
+                      <TabLabelWithLoadedIndicator
+                        label="Input"
+                        justFinished={justFinishedLoading}
+                      />
+                    ),
                     id: 'input',
                     node: (
                       <IO
@@ -303,7 +313,12 @@ export const TopInfo = ({
             ...(prettyOutput || isPending || resultLoading
               ? [
                   {
-                    label: 'Output',
+                    label: (
+                      <TabLabelWithLoadedIndicator
+                        label="Output"
+                        justFinished={justFinishedLoading}
+                      />
+                    ),
                     id: 'output',
                     node: (
                       <IO title="Output" raw={prettyOutput} loading={isPending || resultLoading} />
@@ -314,7 +329,12 @@ export const TopInfo = ({
             ...(result?.error || isPending || resultLoading
               ? [
                   {
-                    label: 'Error details',
+                    label: (
+                      <TabLabelWithLoadedIndicator
+                        label="Error details"
+                        justFinished={justFinishedLoading}
+                      />
+                    ),
                     id: 'error',
                     node: (
                       <IO

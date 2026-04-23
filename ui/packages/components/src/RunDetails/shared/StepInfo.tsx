@@ -25,8 +25,10 @@ import { toMaybeDate } from '../../utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
+import { TabLabelWithLoadedIndicator } from './TabLabelWithLoadedIndicator';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
+import { useJustFinishedLoading } from './useJustFinishedLoading';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './utils';
 import {
   isExperimentMetadata,
@@ -213,6 +215,7 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
+  const justFinishedLoading = useJustFinishedLoading(loading);
   const showRerunFromStep =
     !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
 
@@ -428,7 +431,12 @@ export const StepInfo = ({
                   ...(prettyInput || loading
                     ? [
                         {
-                          label: 'Input',
+                          label: (
+                            <TabLabelWithLoadedIndicator
+                              label="Input"
+                              justFinished={justFinishedLoading}
+                            />
+                          ),
                           id: 'input',
                           node: <IO title="Step Input" raw={prettyInput} loading={loading} />,
                         },
@@ -437,7 +445,12 @@ export const StepInfo = ({
                   ...(prettyOutput || loading
                     ? [
                         {
-                          label: 'Output',
+                          label: (
+                            <TabLabelWithLoadedIndicator
+                              label="Output"
+                              justFinished={justFinishedLoading}
+                            />
+                          ),
                           id: 'output',
                           node: <IO title="Step Output" raw={prettyOutput} loading={loading} />,
                         },
@@ -446,7 +459,12 @@ export const StepInfo = ({
                   ...(result?.error || loading
                     ? [
                         {
-                          label: 'Error details',
+                          label: (
+                            <TabLabelWithLoadedIndicator
+                              label="Error details"
+                              justFinished={justFinishedLoading}
+                            />
+                          ),
                           id: 'error',
                           node: (
                             <IO
