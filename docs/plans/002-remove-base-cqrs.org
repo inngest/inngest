@@ -271,39 +271,58 @@ Goal:
 
 Action items:
 
-- [ ] create =pkg/cqrs/manager=
-- [ ] expand =pkg/cqrs= contracts to include history reads, history writes, and
+- [X] create =pkg/cqrs/manager=
+- [X] expand =pkg/cqrs= contracts to include history reads, history writes, and
   history payload/result types
-- [ ] mark =pkg/history_drivers= as deprecated in package docs or comments while
+- [X] mark =pkg/history_drivers= as deprecated in package docs or comments while
   migration is in flight
-- [ ] add package docs stating the responsibility of each new package
-- [ ] add minimal constructors or placeholders so the packages compile
-- [ ] decide final constructor naming in =pkg/cqrs/manager=
-- [ ] define =cqrs.HistoryReader=
-- [ ] define =cqrs.HistoryWriter=
-- [ ] define =cqrs.Manager= to embed those narrower interfaces
-- [ ] confirm this phase introduces no behavior changes
-- [ ] confirm the leftover Postgres normalization files are not part of any
+- [X] add package docs stating the responsibility of each new package
+- [X] add minimal constructors or placeholders so the packages compile
+- [X] decide final constructor naming in =pkg/cqrs/manager=
+- [X] define =cqrs.HistoryReader=
+- [X] define =cqrs.HistoryWriter=
+- [X] define =cqrs.Manager= to embed those narrower interfaces
+- [X] confirm this phase introduces no behavior changes
+- [X] confirm the leftover Postgres normalization files are not part of any
   active adapter-backed flow
-- [ ] remove dead Postgres normalization files if that confirmation holds
-- [ ] remove or update tests that only exist to cover those dead normalization
+- [X] remove dead Postgres normalization files if that confirmation holds
+- [X] remove or update tests that only exist to cover those dead normalization
   paths
-- [ ] identify the DAL-focused test suites that must stay green throughout the
+- [X] identify the DAL-focused test suites that must stay green throughout the
   refactor
-- [ ] document the minimum verification command set for CQRS, DB, and history
+- [X] document the minimum verification command set for CQRS, DB, and history
   paths
-- [ ] run the baseline DAL verification suite before starting package moves so
+- [X] run the baseline DAL verification suite before starting package moves so
   later regressions have a known reference point
+
+Verification command set recorded on 2026-04-23:
+
+- =GOCACHE=/tmp/codex-go-cache go test ./pkg/db/... -count=1=
+- =GOCACHE=/tmp/codex-go-cache go test ./pkg/cqrs/base_cqrs -count=1=
+- =TEST_DATABASE=postgres go test ./pkg/db -run 'TestSchemaColumnsMatchSqlc|TestCrossDialectSchemaParity' -count=1=
+- =TEST_DATABASE=postgres go test ./pkg/cqrs/base_cqrs -count=1=
+- =GOCACHE=/tmp/codex-go-cache go test ./pkg/cqrs ./pkg/cqrs/base_cqrs ./pkg/cqrs/manager ./pkg/history_reader ./pkg/history_drivers/... ./pkg/db/... -count=1=
+- =GOCACHE=/tmp/codex-go-cache go test ./pkg/coreapi/... ./pkg/devserver -count=1=
+
+Phase 1 verification notes:
+
+- no runtime caller has moved to =pkg/cqrs/manager= yet; the package exists only
+  as the destination boundary and placeholder constructor
+- no active call sites reference =NewNormalized=, =NormalizedQueries=, or the
+  Postgres =ToSQLite()= normalization helpers outside the deleted files, their
+  README references, and the deleted normalization test
+- the phase 1 contract moves were verified against both the SQLite package suite
+  and the Postgres Docker-backed DAL baseline
 
 Completion checklist:
 
-- [ ] new package destinations exist
-- [ ] new packages compile
-- [ ] responsibilities are documented
-- [ ] no runtime caller has migrated yet
-- [ ] the required DAL verification suite is defined for subsequent phases
-- [ ] baseline DAL verification results are recorded and green
-- [ ] dead Postgres normalization leftovers are removed or explicitly proven
+- [X] new package destinations exist
+- [X] new packages compile
+- [X] responsibilities are documented
+- [X] no runtime caller has migrated yet
+- [X] the required DAL verification suite is defined for subsequent phases
+- [X] baseline DAL verification results are recorded and green
+- [X] dead Postgres normalization leftovers are removed or explicitly proven
   still necessary
 
 ** Phase 2: move bootstrap and migrations out of CQRS
