@@ -283,6 +283,11 @@ Action items:
 - [ ] define =cqrs.HistoryWriter=
 - [ ] define =cqrs.Manager= to embed those narrower interfaces
 - [ ] confirm this phase introduces no behavior changes
+- [ ] confirm the leftover Postgres normalization files are not part of any
+  active adapter-backed flow
+- [ ] remove dead Postgres normalization files if that confirmation holds
+- [ ] remove or update tests that only exist to cover those dead normalization
+  paths
 - [ ] identify the DAL-focused test suites that must stay green throughout the
   refactor
 - [ ] document the minimum verification command set for CQRS, DB, and history
@@ -298,6 +303,8 @@ Completion checklist:
 - [ ] no runtime caller has migrated yet
 - [ ] the required DAL verification suite is defined for subsequent phases
 - [ ] baseline DAL verification results are recorded and green
+- [ ] dead Postgres normalization leftovers are removed or explicitly proven
+  still necessary
 
 ** Phase 2: move bootstrap and migrations out of CQRS
 
@@ -525,15 +532,15 @@ Completion checklist:
 - [ ] devserver history behavior is covered without memory-driver-specific tests
 - [ ] devserver history regression tests are green without memory drivers
 
-** Phase 7: remove dead normalization leftovers
+** Phase 7: remove any remaining dead normalization leftovers
 
-Delete the remaining legacy SQLite-first Postgres normalization files and any
-documentation that still describes SQLite as the canonical storage API.
+Delete any leftover legacy SQLite-first normalization code that was not already
+removed in phase 1, along with documentation that still describes SQLite as the
+canonical storage API.
 
 Action items:
 
-- [ ] delete =sqlc/postgres/db_normalization.go=
-- [ ] delete =sqlc/postgres/normalization.go=
+- [ ] delete any normalization leftovers that remained deferred from phase 1
 - [ ] delete normalization-specific tests that only cover dead compatibility
   paths
 - [ ] remove stale README or docs language describing SQLite as the canonical
