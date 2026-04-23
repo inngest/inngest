@@ -69,12 +69,19 @@ function saveTabsToStorage(tabs: Tab[], activeTabId: string) {
   } catch {}
 }
 
+export interface CreateTabFromQueryOptions {
+  // Auto-run the seeded query after the new tab mounts. Currently used by
+  // deep-link entry points (e.g. the Failed Functions -> Insights button).
+  runOnMount?: boolean;
+}
+
 export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
   createTabFromQuery: (
     query: InsightsQueryStatement | QuerySnapshot | QueryTemplate,
+    options?: CreateTabFromQueryOptions,
   ) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
@@ -205,18 +212,26 @@ export function useInsightsTabManager(
       },
       createTabFromQuery: (
         query: InsightsQueryStatement | QuerySnapshot | QueryTemplate,
+        options?: CreateTabFromQueryOptions,
       ) => {
+        const runOnMount = options?.runOnMount ? true : undefined;
+
         if (isQueryTemplate(query)) {
           createTabBase({
             ...makeEmptyUnsavedTab(),
             query: query.query,
             name: query.name,
+            runOnMount,
           });
           return;
         }
 
         if (isQuerySnapshot(query)) {
-          createTabBase({ ...makeEmptyUnsavedTab(), query: query.query });
+          createTabBase({
+            ...makeEmptyUnsavedTab(),
+            query: query.query,
+            runOnMount,
+          });
           return;
         }
 
@@ -233,6 +248,7 @@ export function useInsightsTabManager(
           name: query.name,
           query: query.sql,
           savedQueryId: query.id,
+          runOnMount,
         });
       },
       focusTab: setActiveTabId,
@@ -318,11 +334,15 @@ function SingleTabRenderer({
   return (
     <InsightsStateMachineContextProvider
       key={tab.id}
+      onAutoRunConsumed={() =>
+        actions.updateTab(tab.id, { runOnMount: undefined })
+      }
       onQueryChange={(query) => actions.updateTab(tab.id, { query })}
       onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
       query={tab.query}
       queryName={tab.name}
       renderChildren={isActive}
+      runOnMount={tab.runOnMount}
       tabId={tab.id}
     >
       <CellDetailProvider onOpenPanel={handleOpenCellDetailPanel}>

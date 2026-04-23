@@ -81,7 +81,7 @@ export function useDeepLinkHandler({
 
     const template = TEMPLATES.find((t) => t.id === templateIdFromUrl);
     if (template) {
-      actions.createTabFromQuery(template);
+      actions.createTabFromQuery(template, { runOnMount: true });
     } else {
       toast.error('Unable to load template; it may no longer exist');
     }
