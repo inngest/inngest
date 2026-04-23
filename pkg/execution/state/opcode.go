@@ -433,11 +433,7 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 		return time.Now(), nil
 	}
 
-	dur, err := str2duration.ParseDuration(w.Timeout)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return time.Now().Add(dur), nil
+	return parseTimeout(w.Timeout, time.Now)
 }
 
 // GatewayOpts returns the gateway options within the driver.
