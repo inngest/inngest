@@ -444,7 +444,7 @@ func (c CountActiveRunsOpts) Validate() error {
 	if c.WorkflowID == uuid.Nil {
 		return errors.New("workflow ID must be provided")
 	}
-	if c.LowerTime.IsZero() {
+	if c.LowerTime == nil || c.LowerTime.IsZero() {
 		return errors.New("lower time must be provided")
 	}
 	if c.UpperTime.IsZero() {
