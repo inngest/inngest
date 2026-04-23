@@ -447,17 +447,19 @@ func start(ctx context.Context, opts StartOpts) error {
 			return []byte(*opts.SigningKey), nil
 		}),
 		executor.WithLifecycleListeners(
-			history.NewLifecycleListener(
-				nil,
-				hd,
-				hmw,
-			),
-			Lifecycle{
-				Cqrs:       dbcqrs,
-				Pb:         pb,
-				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
-			},
-			run.NewTraceLifecycleListener(nil),
+			append([]execution.LifecycleListener{
+				history.NewLifecycleListener(
+					nil,
+					hd,
+					hmw,
+				),
+				Lifecycle{
+					Cqrs:       dbcqrs,
+					Pb:         pb,
+					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
+				},
+				run.NewTraceLifecycleListener(nil),
+			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
@@ -614,8 +616,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Initialize metrics API for Prometheus-compatible metrics endpoint.
 	// This provides system queue depth metrics via /metrics endpoint.
 	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
-		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		QueueManager:   rq,
+		QueueManager: rq,
 	})
 	if err != nil {
 		return err
