@@ -129,9 +129,7 @@ export function Table<T>({
                       className={cn(
                         isIconOnlyColumn ? '' : tableColumnStyles,
                         'text-muted text-nowrap text-left text-xs font-medium',
-                        enableColumnSizing || enableColumnDynamicSizing
-                          ? 'overflow-hidden text-ellipsis'
-                          : ''
+                        enableColumnSizing ? 'overflow-hidden text-ellipsis' : ''
                       )}
                       style={
                         enableColumnSizing
@@ -143,7 +141,10 @@ export function Table<T>({
                           : enableColumnDynamicSizing
                           ? {
                               minWidth: header.column.columnDef.minSize,
-                              maxWidth: table.getTotalSize() - header.getStart(),
+                              maxWidth:
+                                table.getTotalSize() -
+                                header.column.getStart() -
+                                header.column.getAfter(),
                             }
                           : undefined
                       }
@@ -249,7 +250,10 @@ export function Table<T>({
                             : enableColumnDynamicSizing
                             ? {
                                 minWidth: cell.column.columnDef.minSize,
-                                maxWidth: table.getTotalSize() - cell.column.getStart(),
+                                maxWidth:
+                                  table.getTotalSize() -
+                                  cell.column.getStart() -
+                                  cell.column.getAfter(),
                               }
                             : undefined
                         }
