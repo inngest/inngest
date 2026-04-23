@@ -34,7 +34,7 @@
     "env:rm": "npx vercel env rm"
   },
   "dependencies": {
-    "@clerk/tanstack-react-start": "^0.29.1",
+    "@clerk/tanstack-react-start": "^0.29.10",
     "@graphql-typed-document-node/core": "^3.2.0",
     "@headlessui/react": "^1.7.18",
     "@headlessui/tailwindcss": "^0.1.2",
