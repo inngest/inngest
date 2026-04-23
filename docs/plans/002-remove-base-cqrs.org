@@ -134,6 +134,33 @@ Reasoning:
 - removing =base_cqrs= should also remove its generated-code subtree
 - keeping sqlc under =base_cqrs= would preserve the wrong package boundary
 
+** Decision 7: data access changes must be backed by strong tests
+
+This refactor touches the persistence foundation of the system.  Every
+structural move should preserve or improve test coverage for the DAL so that
+callers can rely on this layer without re-litigating its correctness.
+
+Reasoning:
+
+- =pkg/cqrs= and =pkg/db= are foundational packages for higher layers
+- broad import churn increases regression risk even when behavior is intended to
+  stay the same
+- dialect parity, transaction semantics, and history correctness need explicit
+  coverage, not implicit confidence
+- the goal is for the DAL to be treated as reliable infrastructure, not a layer
+  that callers work around or distrust
+
+Testing requirements:
+
+- preserve existing DAL coverage while moving code
+- add targeted tests when a move changes constructor shape, ownership, or
+  package boundaries
+- run focused DAL and history regression tests after each migration phase
+- keep SQLite and Postgres behavior aligned through cross-dialect checks where
+  applicable
+- treat missing or weakened data-access coverage as a blocker for completing a
+  phase
+
 * Current State
 
 Today =pkg/cqrs/base_cqrs= contains:
@@ -256,6 +283,12 @@ Action items:
 - [ ] define =cqrs.HistoryWriter=
 - [ ] define =cqrs.Manager= to embed those narrower interfaces
 - [ ] confirm this phase introduces no behavior changes
+- [ ] identify the DAL-focused test suites that must stay green throughout the
+  refactor
+- [ ] document the minimum verification command set for CQRS, DB, and history
+  paths
+- [ ] run the baseline DAL verification suite before starting package moves so
+  later regressions have a known reference point
 
 Completion checklist:
 
@@ -263,6 +296,8 @@ Completion checklist:
 - [ ] new packages compile
 - [ ] responsibilities are documented
 - [ ] no runtime caller has migrated yet
+- [ ] the required DAL verification suite is defined for subsequent phases
+- [ ] baseline DAL verification results are recorded and green
 
 ** Phase 2: move bootstrap and migrations out of CQRS
 
@@ -288,6 +323,9 @@ Action items:
 - [ ] update adapter integration tests to use dialect-local bootstrap
 - [ ] update regression tests to use dialect-local bootstrap
 - [ ] verify connection cleanup behavior is unchanged after the move
+- [ ] add or update tests covering dialect-local bootstrap and migration wiring
+- [ ] keep SQLite and Postgres bootstrap test coverage at parity
+- [ ] run the bootstrap, migration, and adapter-focused DAL tests after the move
 
 Expected call-site shape after this phase:
 
@@ -312,6 +350,8 @@ Completion checklist:
 - [ ] migrations are run by the dialect package that owns them
 - [ ] no =pkg/cqrs= package owns connection opening or migration wiring
 - [ ] sqlc code no longer lives under =pkg/cqrs/base_cqrs/sqlc=
+- [ ] dialect-local bootstrap and migration tests are green
+- [ ] adapter-focused DAL verification is green after the package move
 
 ** Phase 3: move the composite manager
 
@@ -333,6 +373,10 @@ Action items:
 - [ ] update runtime call sites to construct managers from =pkg/cqrs/manager=
 - [ ] update tests that currently import =base_cqrs.NewCQRS()=
 - [ ] keep transaction tests green before any domain-level file splitting
+- [ ] add or update manager-construction tests if constructor or package shape
+  changes require it
+- [ ] run manager and transaction DAL tests immediately after moving the
+  composite manager
 
 Completion checklist:
 
@@ -342,6 +386,8 @@ Completion checklist:
 - [ ] transaction semantics are unchanged
 - [ ] history read and write interfaces are implemented from the same manager
   package
+- [ ] manager construction and transaction tests are green
+- [ ] manager-specific DAL verification is green after migration
 
 ** Phase 4: split the manager by domain
 
@@ -376,12 +422,18 @@ Action items:
 - [ ] narrow helper visibility where possible during the split
 - [ ] avoid opportunistic behavior rewrites while splitting files
 - [ ] run relevant tests after each domain move, especially traces and history
+- [ ] add targeted regression tests when a domain move exposes previously
+  untested manager behavior
+- [ ] run the affected domain-level DAL tests after each file split, not only
+  at the end of the phase
 
 Completion checklist:
 
 - [ ] no single file in =pkg/cqrs/manager= remains a multi-thousand-line grab bag
 - [ ] manager files are organized by domain
 - [ ] helper placement is obvious to maintainers reading the tree
+- [ ] domain-level manager behavior remains covered by focused tests
+- [ ] all manager-domain DAL tests are green after the split
 
 ** Phase 5: unify history under =pkg/cqrs=
 
@@ -425,6 +477,11 @@ Action items:
 - [ ] update tests importing history implementations from =base_cqrs=
 - [ ] verify history read behavior remains unchanged
 - [ ] verify history write behavior remains unchanged
+- [ ] add or update DAL tests covering CQRS-owned history interfaces and
+  payloads
+- [ ] add regression coverage for executor history writes and API history reads
+- [ ] run history-focused DAL tests after each call-site migration that changes
+  the active history path
 
 Completion checklist:
 
@@ -435,6 +492,8 @@ Completion checklist:
 - [ ] devserver has a single history backend
 - [ ] =pkg/history_drivers= is no longer required by runtime paths
 - [ ] naming no longer implies SQLite-first conversion
+- [ ] history DAL tests are green across the migrated call paths
+- [ ] executor and API history regressions are covered by green tests
 
 ** Phase 6: deprecate and remove =pkg/history_drivers=
 
@@ -452,6 +511,10 @@ Action items:
 - [ ] remove temporary =DEPRECATED= shims that are no longer needed
 - [ ] run targeted tests covering devserver run details, cancel-run, rerun, and
   history-backed GraphQL fields
+- [ ] confirm CQRS-backed history tests fully replace memory-history test
+  coverage
+- [ ] run devserver-oriented DAL and API tests after removing each memory
+  history dependency
 
 Completion checklist:
 
@@ -459,6 +522,8 @@ Completion checklist:
 - [ ] no runtime path depends on a parallel in-memory history store
 - [ ] CQRS-backed history is the only history backend in devserver
 - [ ] temporary compatibility shims introduced for migration are removed
+- [ ] devserver history behavior is covered without memory-driver-specific tests
+- [ ] devserver history regression tests are green without memory drivers
 
 ** Phase 7: remove dead normalization leftovers
 
@@ -475,12 +540,16 @@ Action items:
   storage interface
 - [ ] remove stale helper names or comments that refer to SQLite normalization
 - [ ] confirm active CQRS flow only uses =pkg/db= domain rows and adapters
+- [ ] keep normalization-removal tests focused on active adapter-backed flows
+- [ ] run normalization and schema-parity tests after deleting the leftover
+  compatibility paths
 
 Completion checklist:
 
 - [ ] no =NormalizedQueries= path remains
 - [ ] no =ToSQLite()= compatibility conversion path remains in active CQRS flow
 - [ ] repository docs describe the adapter-based architecture accurately
+- [ ] normalization-removal and schema-parity tests are green
 
 ** Phase 8: delete =pkg/cqrs/base_cqrs=
 
@@ -495,12 +564,18 @@ Action items:
 - [ ] run targeted tests for manager, db, devserver, and executor initialization
 - [ ] run a final repository search for stale symbols such as =BaseCQRSOptions=
   and =NewCQRS=
+- [ ] run the full DAL verification suite before considering the refactor done
+- [ ] add follow-up test gaps discovered during final verification before
+  closing the work
 
 Completion checklist:
 
 - [ ] no repository imports of =pkg/cqrs/base_cqrs=
 - [ ] package directory removed
 - [ ] repository terminology reflects the new package boundaries
+- [ ] DAL verification suite is green at the end-state package layout
+- [ ] final test coverage is sufficient for the DAL to serve as the trusted
+  foundation for higher layers
 
 * Call-Site Impact
 
@@ -584,6 +659,20 @@ Mitigation:
 - align option and function naming where it makes sense
 - allow small differences where dialect needs actually differ
 
+** Data access regressions slip through structural churn
+
+Risk:
+
+- package moves, constructor changes, and import rewrites can quietly weaken
+  DAL guarantees even when the refactor is intended to be behavior-preserving
+
+Mitigation:
+
+- define a DAL verification suite up front and keep it green throughout
+- add focused tests for transactions, history reads/writes, bootstrap, and
+  dialect parity as ownership moves
+- treat reduced coverage or unverified paths as blockers, not cleanup items
+
 * Success Criteria
 
 - =pkg/cqrs/base_cqrs= no longer exists
@@ -596,6 +685,10 @@ Mitigation:
 - SQLite and Postgres own their own sqlc source and generated query packages
 - runtime behavior remains unchanged through the structural move
 - stale SQLite-first normalization leftovers are deleted by the end
+- DAL-focused tests cover the new package layout and stay green throughout the
+  migration
+- the persistence layer has clear regression coverage for transactions,
+  history, bootstrap, and cross-dialect behavior
 
 * Out of Scope for Initial Refactor
 
