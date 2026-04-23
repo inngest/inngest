@@ -790,7 +790,7 @@ importers:
         version: 0.52.2
       next:
         specifier: ^14.2.30
-        version: 14.2.32(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       next-themes:
         specifier: ^0.4.4
         version: 0.4.4(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -815,9 +815,6 @@ importers:
       sonner:
         specifier: ^1.2.0
         version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      sql-formatter:
-        specifier: ^15.6.10
-        version: 15.7.1
       tailwind-merge:
         specifier: ^1.10.0
         version: 1.10.0
@@ -851,7 +848,7 @@ importers:
         version: 9.1.1(storybook@9.1.1(@testing-library/dom@10.4.0)(prettier@3.6.2)(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)))
       '@storybook/nextjs':
         specifier: ^9.1.1
-        version: 9.1.1(esbuild@0.25.2)(next@14.2.32(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(storybook@9.1.1(@testing-library/dom@10.4.0)(prettier@3.6.2)(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)))(type-fest@3.7.2)(typescript@5.1.3)(webpack-hot-middleware@2.26.1)(webpack@5.99.9(esbuild@0.25.2))
+        version: 9.1.1(esbuild@0.25.2)(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(storybook@9.1.1(@testing-library/dom@10.4.0)(prettier@3.6.2)(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)))(type-fest@3.7.2)(typescript@5.1.3)(webpack-hot-middleware@2.26.1)(webpack@5.99.9(esbuild@0.25.2))
       '@storybook/react':
         specifier: ^9.1.1
         version: 9.1.1(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(storybook@9.1.1(@testing-library/dom@10.4.0)(prettier@3.6.2)(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)))(typescript@5.1.3)
@@ -6516,6 +6513,7 @@ packages:
 
   '@team-plain/typescript-sdk@3.0.1':
     resolution: {integrity: sha512-zGuyPwrtljaKsNasu/zZ/AiBZ1OgCwqrItOmup5ohrmlXALLYbY01D8Nt5CHYICPNcQi+qKQbr9BE6rJ7s1/cg==}
+    deprecated: This package is now deprecated. Please use @team-plain/graphql, @team-plain/webhooks and @team-plain/ui-components (https://github.com/team-plain/sdk)
 
   '@testing-library/dom@10.4.0':
     resolution: {integrity: sha512-pemlzrSESWbdAloYml3bAJMEfNh1Z7EduzqPKprCH5S341frlpYnUEW0H72dLxa6IsYr+mPno20GiSm+h9dEdQ==}
@@ -20109,7 +20107,7 @@ snapshots:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
-  '@storybook/nextjs@9.1.1(esbuild@0.25.2)(next@14.2.32(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(storybook@9.1.1(@testing-library/dom@10.4.0)(prettier@3.6.2)(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)))(type-fest@3.7.2)(typescript@5.1.3)(webpack-hot-middleware@2.26.1)(webpack@5.99.9(esbuild@0.25.2))':
+  '@storybook/nextjs@9.1.1(esbuild@0.25.2)(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(storybook@9.1.1(@testing-library/dom@10.4.0)(prettier@3.6.2)(vite@7.1.12(@types/node@24.9.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.20.6)(yaml@2.8.0)))(type-fest@3.7.2)(typescript@5.1.3)(webpack-hot-middleware@2.26.1)(webpack@5.99.9(esbuild@0.25.2))':
     dependencies:
       '@babel/core': 7.27.4
       '@babel/plugin-syntax-bigint': 7.8.3(@babel/core@7.27.4)
@@ -20133,7 +20131,7 @@ snapshots:
       css-loader: 6.11.0(webpack@5.99.9(esbuild@0.25.2))
       image-size: 2.0.2
       loader-utils: 3.3.1
-      next: 14.2.32(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      next: 14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       node-polyfill-webpack-plugin: 2.0.1(webpack@5.99.9(esbuild@0.25.2))
       postcss: 8.5.6
       postcss-loader: 8.1.1(postcss@8.5.6)(typescript@5.1.3)(webpack@5.99.9(esbuild@0.25.2))
@@ -26504,7 +26502,7 @@ snapshots:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
-  next@14.2.32(@babel/core@7.27.4)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+  next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
       '@next/env': 14.2.32
       '@swc/helpers': 0.5.5
@@ -26514,7 +26512,7 @@ snapshots:
       postcss: 8.4.31
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
-      styled-jsx: 5.1.1(@babel/core@7.27.4)(react@18.2.0)
+      styled-jsx: 5.1.1(@babel/core@7.28.5)(react@18.2.0)
     optionalDependencies:
       '@next/swc-darwin-arm64': 14.2.32
       '@next/swc-darwin-x64': 14.2.32
@@ -28737,20 +28735,12 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.7
 
-  styled-jsx@5.1.1(@babel/core@7.27.4)(react@18.2.0):
-    dependencies:
-      client-only: 0.0.1
-      react: 18.2.0
-    optionalDependencies:
-      '@babel/core': 7.27.4
-
   styled-jsx@5.1.1(@babel/core@7.28.5)(react@18.2.0):
     dependencies:
       client-only: 0.0.1
       react: 18.2.0
     optionalDependencies:
       '@babel/core': 7.28.5
-    optional: true
 
   styled-jsx@5.1.1(@babel/core@7.29.0)(react@18.2.0):
     dependencies:

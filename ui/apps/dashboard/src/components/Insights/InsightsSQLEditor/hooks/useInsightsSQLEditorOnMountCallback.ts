@@ -60,7 +60,7 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
         },
       ]);
 
-      monaco.languages.registerDocumentFormattingEditProvider('sql', {
+      const formatterDisposable = monaco.languages.registerDocumentFormattingEditProvider('sql', {
         provideDocumentFormattingEdits: (model) => {
           return [
             {
@@ -81,6 +81,7 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
       return () => {
         shortcutsDisposable.dispose();
         markersDisposable.dispose();
+        formatterDisposable.dispose();
       };
     },
   );
