@@ -13,7 +13,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { TimeBrush } from './TimeBrush';
-import { formatDuration } from './runDetailsUtils';
+import { formatDuration } from '../RunDetails/shared/utils';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 type Props = {

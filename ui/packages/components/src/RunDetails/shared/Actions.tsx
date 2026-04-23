@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
-import { Button } from '../Button';
-import { Link } from '../Link';
-import { useShared } from '../SharedContext/SharedContext';
-import { useCancelRun } from '../SharedContext/useCancelRun';
-import { useRerun } from '../SharedContext/useRerun';
-import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
-import { CancelModal } from '../RunDetails/shared/CancelModal';
+import { Button } from '../../Button';
+import { Link } from '../../Link';
+import { useShared } from '../../SharedContext/SharedContext';
+import { useCancelRun } from '../../SharedContext/useCancelRun';
+import { useRerun } from '../../SharedContext/useRerun';
+import { OptionalTooltip } from '../../Tooltip/OptionalTooltip';
+import { CancelModal } from './CancelModal';
 
 export type RunActions = {
   allowCancel?: boolean;

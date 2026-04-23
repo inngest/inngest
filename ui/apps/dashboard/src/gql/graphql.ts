@@ -1,8 +1,8 @@
 /* eslint-disable */
 import type { InsightsDiagnosticCode } from '../components/Insights/InsightsStateMachineContext/types';
 import type { InsightsDiagnosticSeverity } from '../components/Insights/InsightsStateMachineContext/types';
-import type { SpanMetadataKind } from '@inngest/components/RunDetailsV3/types';
-import type { SpanMetadataScope } from '@inngest/components/RunDetailsV3/types';
+import type { SpanMetadataKind } from '@inngest/components/RunDetails/shared/types';
+import type { SpanMetadataScope } from '@inngest/components/RunDetails/shared/types';
 import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = T | null | undefined;

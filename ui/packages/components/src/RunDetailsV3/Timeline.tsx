@@ -4,7 +4,7 @@ import { max, min } from 'date-fns';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Trace } from './Trace';
-import { traceWalk } from './utils';
+import { traceWalk } from '../RunDetails/shared/utils';
 
 type Props = {
   runID: string;

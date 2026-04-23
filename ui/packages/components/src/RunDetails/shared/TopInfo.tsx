@@ -4,7 +4,7 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { Alert } from '../Alert';
+import { Alert } from '../../Alert';
 import {
   CodeElement,
   ElementWrapper,
@@ -12,19 +12,19 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
-import { ErrorCard } from '../Error/ErrorCard';
-import { InvokeModal } from '../InvokeButton';
-import type { TraceResult } from '../SharedContext/useGetTraceResult';
-import { useInvokeRun } from '../SharedContext/useInvokeRun';
-import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
-import { IconCloudArrowDown } from '../icons/CloudArrowDown';
-import { getCronTriggerMetadata } from '../utils/cronTrigger';
-import { devServerURL, useDevServer } from '../utils/useDevServer';
-import { ErrorInfo } from '../RunDetails/shared/ErrorInfo';
-import { IO } from '../RunDetails/shared/IO';
+} from '../../DetailsCard/Element';
+import { ErrorCard } from '../../Error/ErrorCard';
+import { InvokeModal } from '../../InvokeButton';
+import type { TraceResult } from '../../SharedContext/useGetTraceResult';
+import { useInvokeRun } from '../../SharedContext/useInvokeRun';
+import { usePrettyErrorBody, usePrettyJson } from '../../hooks/usePrettyJson';
+import { IconCloudArrowDown } from '../../icons/CloudArrowDown';
+import { getCronTriggerMetadata } from '../../utils/cronTrigger';
+import { devServerURL, useDevServer } from '../../utils/useDevServer';
+import { ErrorInfo } from './ErrorInfo';
+import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
-import { Tabs } from '../RunDetails/shared/Tabs';
+import { Tabs } from './Tabs';
 import type { Trace } from './types';
 
 type TopInfoProps = {

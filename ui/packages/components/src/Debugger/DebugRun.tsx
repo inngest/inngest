@@ -1,4 +1,4 @@
-import type { Trace as TraceType } from '../RunDetailsV3/types';
+import type { Trace as TraceType } from '../RunDetails/shared/types';
 import { toMaybeDate } from '../utils/date';
 import { DebugTrace } from './DebugTrace';
 

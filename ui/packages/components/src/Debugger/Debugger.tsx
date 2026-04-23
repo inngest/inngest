@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 
 import { Button } from '../Button';
 import { RerunModal } from '../Rerun/RerunModal';
-import { StepInfo } from '../RunDetailsV3/StepInfo';
-import { useStepSelection } from '../RunDetailsV3/utils';
+import { StepInfo } from '../RunDetails/shared/StepInfo';
+import { useStepSelection } from '../RunDetails/shared/utils';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
 import { useGetRunTrace } from '../SharedContext/useGetRunTrace';

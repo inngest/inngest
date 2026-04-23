@@ -1,8 +1,8 @@
 import { getStatusBackgroundClass, getStatusBorderClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
-import type { Trace } from './types';
-import { createSpanWidths } from './utils';
+import type { Trace } from '../RunDetails/shared/types';
+import { createSpanWidths } from '../RunDetails/shared/utils';
 
 type Props = {
   className?: string;

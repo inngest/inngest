@@ -9,13 +9,13 @@ import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { RunInfo as NewRunInfo, RunInfo } from './RunInfo';
-import { StepInfo } from './StepInfo';
+import { RunInfo as NewRunInfo, RunInfo } from '../RunDetails/shared/RunInfo';
+import { StepInfo } from '../RunDetails/shared/StepInfo';
 import { Tabs } from '../RunDetails/shared/Tabs';
 import { Timeline } from './Timeline';
-import { TopInfo } from './TopInfo';
+import { TopInfo } from '../RunDetails/shared/TopInfo';
 import { Waiting } from '../RunDetails/shared/Waiting';
-import { useDynamicRunData, useStepSelection } from './utils';
+import { useDynamicRunData, useStepSelection } from '../RunDetails/shared/utils';
 
 //
 // userland traces can land after the run is completed
@@ -287,7 +287,6 @@ export const RunDetailsV3 = ({
               selectedStep={selectedStep}
               pollInterval={pollInterval}
               tracesPreviewEnabled={tracesPreviewEnabled}
-              newStack={newStack}
             />
           ) : (
             <TopInfo

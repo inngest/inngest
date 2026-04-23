@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import { AITrace } from '../AI/AITrace';
-import { parseAIOutput } from '../AI/utils';
+import { AITrace } from '../../AI/AITrace';
+import { parseAIOutput } from '../../AI/utils';
 import {
   ElementWrapper,
   IDElement,
@@ -11,15 +11,15 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
-import type { Run as InitialRunData } from '../RunsPage/types';
-import type { TraceResult } from '../SharedContext/useGetTraceResult';
-import { usePathCreator } from '../SharedContext/usePathCreator';
-import { AICell } from '../Table/Cell';
-import { toMaybeDate } from '../utils/date';
-import { isLazyDone, type Lazy } from '../utils/lazyLoad';
+} from '../../DetailsCard/Element';
+import type { Run as InitialRunData } from '../../RunsPage/types';
+import type { TraceResult } from '../../SharedContext/useGetTraceResult';
+import { usePathCreator } from '../../SharedContext/usePathCreator';
+import { AICell } from '../../Table/Cell';
+import { toMaybeDate } from '../../utils/date';
+import { isLazyDone, type Lazy } from '../../utils/lazyLoad';
 import { Actions } from './Actions';
-import { Nav } from '../RunDetails/shared/Nav';
+import { Nav } from './Nav';
 import { formatDuration } from './utils';
 
 type Props = {
@@ -29,6 +29,7 @@ type Props = {
   run: Lazy<Run>;
   runID: string;
   result?: TraceResult;
+  isDurableEndpoint?: boolean;
 };
 
 type Run = {
@@ -54,7 +55,14 @@ type Run = {
   hasAI: boolean;
 };
 
-export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Props) => {
+export const RunInfo = ({
+  initialRunData,
+  run,
+  runID,
+  standalone,
+  result,
+  isDurableEndpoint,
+}: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
@@ -65,7 +73,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
       <div className="flex h-11 w-full flex-row items-center justify-between border-none">
         <div className="text-basis flex items-center justify-start gap-2">
           <div
-            className="flex  cursor-pointer items-center gap-2"
+            className="flex cursor-pointer items-center gap-2"
             onClick={() => setExpanded(!expanded)}
           >
             <RiArrowRightSLine
@@ -90,6 +98,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
             runID={runID}
             fnID={isLazyDone(run) ? run.fn.id : undefined}
             allowCancel={allowCancel}
+            isDurableEndpoint={isDurableEndpoint}
           />
         </div>
       </div>

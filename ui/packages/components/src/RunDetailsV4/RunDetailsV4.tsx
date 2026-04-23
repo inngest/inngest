@@ -18,16 +18,16 @@ import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { isLazyDone, nullishToLazy } from '../utils/lazyLoad';
 // Import V4 components (decoupled from V3)
-import { RunInfo } from './RunInfo';
-import { StepInfo } from './StepInfo';
+import { RunInfo } from '../RunDetails/shared/RunInfo';
+import { StepInfo } from '../RunDetails/shared/StepInfo';
 import { Tabs } from '../RunDetails/shared/Tabs';
 // Import V4 Timeline
 import { Timeline } from './Timeline';
 import { TimelineLegend } from './TimelineLegend';
-import { TopInfo } from './TopInfo';
+import { TopInfo } from '../RunDetails/shared/TopInfo';
 import { Waiting } from '../RunDetails/shared/Waiting';
-import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
-import type { Trace } from './types';
+import { traceWalk, useDynamicRunData, useStepSelection } from '../RunDetails/shared/utils';
+import type { Trace } from '../RunDetails/shared/types';
 import { traceToTimelineData } from './utils/traceConversion';
 
 // Residual poll interval for userland traces
