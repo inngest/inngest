@@ -215,6 +215,7 @@ export const RunDetailsV4 = ({
     data: resultData,
     error: resultError,
     refetch: refetchResult,
+    loading: resultLoading,
   } = useGetTraceResult({
     traceID: outputID,
     preview: tracesPreviewEnabled,
@@ -354,6 +355,7 @@ export const RunDetailsV4 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
+              resultLoading={resultLoading}
               trace={runData?.trace}
               isDurableEndpoint={runData?.isDurableEndpoint}
             />

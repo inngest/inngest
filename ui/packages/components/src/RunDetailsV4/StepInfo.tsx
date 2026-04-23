@@ -255,7 +255,7 @@ export const StepInfo = ({
 
   const experimentMetadata = experimentMetadataList?.[0];
 
-  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+  const hasNoData = !loading && !prettyInput && !prettyOutput && !result?.error;
 
   let emptyStateMessage = 'No output available';
   if (loading) {
@@ -425,7 +425,7 @@ export const StepInfo = ({
               <Tabs
                 defaultActive={result?.error ? 'error' : 'output'}
                 tabs={[
-                  ...(prettyInput
+                  ...(prettyInput || loading
                     ? [
                         {
                           label: 'Input',
@@ -434,7 +434,7 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(prettyOutput
+                  ...(prettyOutput || loading
                     ? [
                         {
                           label: 'Output',
@@ -443,7 +443,7 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(result?.error
+                  ...(result?.error || loading
                     ? [
                         {
                           label: 'Error details',

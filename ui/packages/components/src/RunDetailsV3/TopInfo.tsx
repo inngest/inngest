@@ -260,7 +260,7 @@ export const TopInfo = ({
         <Tabs
           defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
           tabs={[
-            ...(prettyPayload
+            ...(prettyPayload || isPending || resultLoading
               ? [
                   {
                     label: 'Input',
@@ -276,7 +276,7 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(prettyOutput
+            ...(prettyOutput || isPending || resultLoading
               ? [
                   {
                     label: 'Output',
@@ -287,7 +287,7 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(result?.error
+            ...(result?.error || isPending || resultLoading
               ? [
                   {
                     label: 'Error details',

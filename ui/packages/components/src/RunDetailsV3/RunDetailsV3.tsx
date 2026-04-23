@@ -160,6 +160,7 @@ export const RunDetailsV3 = ({
   const {
     data: resultData,
     error: resultError,
+    loading: resultLoading,
     refetch: refetchResult,
   } = useGetTraceResult({
     traceID: outputID,
@@ -294,6 +295,7 @@ export const RunDetailsV3 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
+              resultLoading={resultLoading}
               trace={runData?.trace}
             />
           )}
