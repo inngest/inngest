@@ -48,6 +48,29 @@ export type Scalars = {
   Upload: { input: unknown; output: unknown; }
 };
 
+export type ApiKey = {
+  __typename?: 'APIKey';
+  createdAt: Scalars['Time']['output'];
+  id: Scalars['UUID']['output'];
+  maskedKey: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  scopes: Array<ApiKeyScope>;
+  workspace: Workspace;
+};
+
+export type ApiKeyCreateResult = {
+  __typename?: 'APIKeyCreateResult';
+  apiKey: ApiKey;
+  plaintextKey: Scalars['String']['output'];
+};
+
+export type ApiKeyScope = {
+  __typename?: 'APIKeyScope';
+  allow: Array<Scalars['String']['output']>;
+  deny: Array<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+};
+
 export type AwsMarketplaceSetupInput = {
   awsAccountID: Scalars['String']['input'];
   customerID: Scalars['String']['input'];
@@ -63,6 +86,7 @@ export type Account = {
   __typename?: 'Account';
   activeBanners: Array<Banner>;
   addons: Addons;
+  apiKeys: Array<ApiKey>;
   appliedAddons: AppliedAddons;
   billingEmail: Scalars['String']['output'];
   constraintAPIEnrolled: Scalars['Boolean']['output'];
@@ -85,6 +109,11 @@ export type Account = {
   updatedAt: Scalars['Time']['output'];
   users: Array<User>;
   vercelIntegration: Maybe<VercelIntegration>;
+};
+
+
+export type AccountApiKeysArgs = {
+  workspaceID: InputMaybe<Scalars['UUID']['input']>;
 };
 
 
@@ -491,6 +520,11 @@ export type ConnectV1WorkerMetricsFilter = {
   instanceIDs?: InputMaybe<Array<Scalars['String']['input']>>;
   name: Scalars['String']['input'];
   until?: InputMaybe<Scalars['Time']['input']>;
+};
+
+export type CreateApiKeyInput = {
+  name: Scalars['String']['input'];
+  workspaceID: Scalars['UUID']['input'];
 };
 
 export type CreateCancellationInput = {
@@ -1223,6 +1257,7 @@ export type Mutation = {
   cdcTestSetup: CdcSetupResponse;
   completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
   confirmSubscriptionUpgrade: ConfirmSubscriptionUpgradeResponse;
+  createAPIKey: ApiKeyCreateResult;
   createCancellation: Cancellation;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
@@ -1234,6 +1269,7 @@ export type Mutation = {
   createWorkspace: Array<Maybe<Workspace>>;
   datadogOAuthCompleted: DatadogOrganization;
   datadogOAuthRedirectURL: Scalars['String']['output'];
+  deleteAPIKey: Scalars['Boolean']['output'];
   deleteCancellation: Scalars['ULID']['output'];
   deleteIngestKey: Maybe<DeleteResponse>;
   deleteSigningKey: SigningKey;
@@ -1259,6 +1295,7 @@ export type Mutation = {
   unarchiveApp: App;
   unarchiveEnvironment: Workspace;
   unpauseFunction: Workflow;
+  updateAPIKey: ApiKey;
   updateAccount: Account;
   updateAccountAddonQuantity: Addon;
   updateIngestKey: IngestKey;
@@ -1342,6 +1379,11 @@ export type MutationConfirmSubscriptionUpgradeArgs = {
 };
 
 
+export type MutationCreateApiKeyArgs = {
+  input: CreateApiKeyInput;
+};
+
+
 export type MutationCreateCancellationArgs = {
   input: CreateCancellationInput;
 };
@@ -1394,6 +1436,11 @@ export type MutationDatadogOAuthCompletedArgs = {
 export type MutationDatadogOAuthRedirectUrlArgs = {
   ddDomain: Scalars['String']['input'];
   ddSite: Scalars['String']['input'];
+};
+
+
+export type MutationDeleteApiKeyArgs = {
+  id: Scalars['UUID']['input'];
 };
 
 
@@ -1527,6 +1574,11 @@ export type MutationUnarchiveEnvironmentArgs = {
 
 export type MutationUnpauseFunctionArgs = {
   fnID: Scalars['ID']['input'];
+};
+
+
+export type MutationUpdateApiKeyArgs = {
+  input: UpdateApiKeyInput;
 };
 
 
@@ -2208,6 +2260,11 @@ export type TimeSeriesPoint = {
   value: Maybe<Scalars['Float']['output']>;
 };
 
+export type UpdateApiKeyInput = {
+  id: Scalars['UUID']['input'];
+  name: Scalars['String']['input'];
+};
+
 export type UpdateAccount = {
   billingEmail?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -2625,6 +2682,34 @@ export type WorkspaceWorkflowsArgs = {
   archived?: InputMaybe<Scalars['Boolean']['input']>;
   search: InputMaybe<Scalars['String']['input']>;
 };
+
+export type CreateApiKeyMutationVariables = Exact<{
+  input: CreateApiKeyInput;
+}>;
+
+
+export type CreateApiKeyMutation = { __typename?: 'Mutation', createAPIKey: { __typename?: 'APIKeyCreateResult', plaintextKey: string, apiKey: { __typename?: 'APIKey', id: string, name: string, createdAt: string, maskedKey: string, workspace: { __typename?: 'Workspace', id: string, name: string } } } };
+
+export type DeleteApiKeyMutationVariables = Exact<{
+  id: Scalars['UUID']['input'];
+}>;
+
+
+export type DeleteApiKeyMutation = { __typename?: 'Mutation', deleteAPIKey: boolean };
+
+export type UpdateApiKeyMutationVariables = Exact<{
+  input: UpdateApiKeyInput;
+}>;
+
+
+export type UpdateApiKeyMutation = { __typename?: 'Mutation', updateAPIKey: { __typename?: 'APIKey', id: string, name: string } };
+
+export type GetApiKeysQueryVariables = Exact<{
+  workspaceID: InputMaybe<Scalars['UUID']['input']>;
+}>;
+
+
+export type GetApiKeysQuery = { __typename?: 'Query', account: { __typename?: 'Account', apiKeys: Array<{ __typename?: 'APIKey', id: string, name: string, createdAt: string, maskedKey: string, workspace: { __typename?: 'Workspace', id: string, name: string, slug: string }, scopes: Array<{ __typename?: 'APIKeyScope', name: string, allow: Array<string>, deny: Array<string> }> }> } };
 
 export type AchiveAppMutationVariables = Exact<{
   appID: Scalars['UUID']['input'];
@@ -3719,6 +3804,10 @@ export type GetAccountSupportInfoQueryVariables = Exact<{ [key: string]: never; 
 export type GetAccountSupportInfoQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, plan: { __typename?: 'BillingPlan', id: string, name: string, amount: number, features: Record<string, unknown> } | null } };
 
 export const TraceDetailsFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"TraceDetails"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"RunTraceSpan"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"attempts"}},{"kind":"Field","name":{"kind":"Name","value":"queuedAt"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isRoot"}},{"kind":"Field","name":{"kind":"Name","value":"isUserland"}},{"kind":"Field","name":{"kind":"Name","value":"userlandSpan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"spanName"}},{"kind":"Field","name":{"kind":"Name","value":"spanKind"}},{"kind":"Field","name":{"kind":"Name","value":"serviceName"}},{"kind":"Field","name":{"kind":"Name","value":"scopeName"}},{"kind":"Field","name":{"kind":"Name","value":"scopeVersion"}},{"kind":"Field","name":{"kind":"Name","value":"spanAttrs"}},{"kind":"Field","name":{"kind":"Name","value":"resourceAttrs"}}]}},{"kind":"Field","name":{"kind":"Name","value":"metadata"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"scope"}},{"kind":"Field","name":{"kind":"Name","value":"values"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"outputID"}},{"kind":"Field","name":{"kind":"Name","value":"stepID"}},{"kind":"Field","name":{"kind":"Name","value":"spanID"}},{"kind":"Field","name":{"kind":"Name","value":"stepOp"}},{"kind":"Field","name":{"kind":"Name","value":"stepType"}},{"kind":"Field","name":{"kind":"Name","value":"stepInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"__typename"}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"InvokeStepInfo"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"triggeringEventID"}},{"kind":"Field","name":{"kind":"Name","value":"functionID"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}},{"kind":"Field","name":{"kind":"Name","value":"returnEventID"}},{"kind":"Field","name":{"kind":"Name","value":"runID"}},{"kind":"Field","name":{"kind":"Name","value":"timedOut"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SleepStepInfo"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sleepUntil"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"WaitForEventStepInfo"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"expression"}},{"kind":"Field","name":{"kind":"Name","value":"timeout"}},{"kind":"Field","name":{"kind":"Name","value":"foundEventID"}},{"kind":"Field","name":{"kind":"Name","value":"timedOut"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"response"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"statusCode"}},{"kind":"Field","name":{"kind":"Name","value":"headers"}}]}}]}}]} as unknown as DocumentNode<TraceDetailsFragment, unknown>;
+export const CreateApiKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateAPIKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateAPIKeyInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createAPIKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"plaintextKey"}},{"kind":"Field","name":{"kind":"Name","value":"apiKey"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"maskedKey"}},{"kind":"Field","name":{"kind":"Name","value":"workspace"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]}}]} as unknown as DocumentNode<CreateApiKeyMutation, CreateApiKeyMutationVariables>;
+export const DeleteApiKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteAPIKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteAPIKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteApiKeyMutation, DeleteApiKeyMutationVariables>;
+export const UpdateApiKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAPIKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateAPIKeyInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAPIKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<UpdateApiKeyMutation, UpdateApiKeyMutationVariables>;
+export const GetApiKeysDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAPIKeys"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"apiKeys"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"maskedKey"}},{"kind":"Field","name":{"kind":"Name","value":"workspace"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}},{"kind":"Field","name":{"kind":"Name","value":"scopes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"allow"}},{"kind":"Field","name":{"kind":"Name","value":"deny"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetApiKeysQuery, GetApiKeysQueryVariables>;
 export const AchiveAppDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AchiveApp"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"appID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveApp"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"appID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<AchiveAppMutation, AchiveAppMutationVariables>;
 export const UnachiveAppDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UnachiveApp"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"appID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unarchiveApp"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"appID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UnachiveAppMutation, UnachiveAppMutationVariables>;
 export const GetArchivedAppBannerDataDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetArchivedAppBannerData"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"externalAppID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"app"},"name":{"kind":"Name","value":"appByExternalID"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"externalID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"externalAppID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isArchived"}}]}}]}}]}}]} as unknown as DocumentNode<GetArchivedAppBannerDataQuery, GetArchivedAppBannerDataQueryVariables>;
