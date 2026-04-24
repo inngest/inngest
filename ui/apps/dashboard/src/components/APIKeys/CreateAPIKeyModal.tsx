@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -9,7 +9,9 @@ import { useMutation } from 'urql';
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries/environments';
 import { EnvironmentType } from '@/utils/environments';
+import { apiKeyErrorMessage } from './errorMessage';
 import { RevealKeyCard } from './RevealKeyCard';
+import { validateAPIKeyName } from './validation';
 
 const Mutation = graphql(`
   mutation CreateAPIKey($input: CreateAPIKeyInput!) {
@@ -41,44 +43,67 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Tracks whether the user closed the modal while a mutation was in flight,
+  // so we can drop the plaintext response on the floor instead of stashing it
+  // in state (which would leak the key into the next modal-open).
+  const cancelledRef = useRef(false);
+
   const [{ data: envs }] = useEnvironments();
   const [, create] = useMutation(Mutation);
 
-  const envOptions: Option[] = useMemo(
-    () =>
-      (envs ?? [])
-        // Branch parents are config envs that spawn branch children — keys
-        // bound to the parent would never authenticate against a real
-        // deployment, so hide them from the picker.
-        .filter((e) => !e.isArchived && e.type !== EnvironmentType.BranchParent)
-        .map((e) => ({ id: e.id, name: e.name })),
-    [envs],
-  );
+  // Pickable envs split by type so the picker can render Production / Test /
+  // Branches groups instead of one alphabetical blob. Branch parents are
+  // config envs (they spawn branch children) — keys bound to the parent would
+  // never authenticate against a real deployment, so we hide them.
+  const envGroups = useMemo(() => {
+    const production: Option[] = [];
+    const test: Option[] = [];
+    const branches: Option[] = [];
+    for (const e of envs ?? []) {
+      if (e.isArchived || e.type === EnvironmentType.BranchParent) continue;
+      const opt = { id: e.id, name: e.name };
+      if (e.type === EnvironmentType.Production) production.push(opt);
+      else if (e.type === EnvironmentType.BranchChild) branches.push(opt);
+      else test.push(opt);
+    }
+    return { production, test, branches };
+  }, [envs]);
+
+  // Pre-select Production when the modal opens so the common case is one
+  // click. We only auto-select if there's exactly one production env — if a
+  // user has multiple they should make an explicit choice.
+  useEffect(() => {
+    if (!isOpen || selectedEnv) return;
+    if (envGroups.production.length === 1) {
+      setSelectedEnv(envGroups.production[0] ?? null);
+    }
+  }, [isOpen, selectedEnv, envGroups.production]);
 
   async function submit() {
     setError(null);
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError('Name is required.');
-      return;
-    }
-    if (trimmed.length > 128) {
-      setError('Name must be 128 characters or fewer.');
+    const nameErr = validateAPIKeyName(name);
+    if (nameErr) {
+      setError(nameErr);
       return;
     }
     if (!selectedEnv) {
       setError('Select an environment.');
       return;
     }
+    const trimmed = name.trim();
 
+    cancelledRef.current = false;
     setIsSubmitting(true);
     try {
       const res = await create(
         { input: { name: trimmed, workspaceID: selectedEnv.id } },
         { additionalTypenames: ['APIKey'] },
       );
+      if (cancelledRef.current) {
+        return;
+      }
       if (res.error) {
-        setError(res.error.message);
+        setError(apiKeyErrorMessage(res.error, 'Could not create API key.'));
         return;
       }
       const pt = res.data?.createAPIKey?.plaintextKey;
@@ -88,15 +113,19 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
       }
       setPlaintextKey(pt);
     } finally {
-      setIsSubmitting(false);
+      if (!cancelledRef.current) {
+        setIsSubmitting(false);
+      }
     }
   }
 
   function close() {
+    cancelledRef.current = true;
     setName('');
     setSelectedEnv(null);
     setPlaintextKey(null);
     setError(null);
+    setIsSubmitting(false);
     onClose();
   }
 
@@ -119,10 +148,14 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
             </p>
 
             <div className="flex flex-col gap-2">
-              <label className="text-basis text-sm font-medium">
-                API Key Name
+              <label
+                htmlFor="api-key-name"
+                className="text-basis text-sm font-medium"
+              >
+                API key name
               </label>
               <Input
+                id="api-key-name"
                 placeholder="eg. my-api-key"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -148,11 +181,27 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
                   </span>
                 </Select.Button>
                 <Select.Options>
-                  {envOptions.map((opt) => (
-                    <Select.Option key={opt.id} option={opt}>
-                      {opt.name}
-                    </Select.Option>
-                  ))}
+                  {(
+                    [
+                      ['Production', envGroups.production],
+                      ['Test', envGroups.test],
+                      ['Branches', envGroups.branches],
+                    ] as const
+                  ).map(([label, opts], idx) =>
+                    opts.length === 0 ? null : (
+                      <div key={label}>
+                        {idx > 0 && <hr className="border-subtle my-1" />}
+                        <div className="text-light px-4 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide">
+                          {label}
+                        </div>
+                        {opts.map((opt) => (
+                          <Select.Option key={opt.id} option={opt}>
+                            {opt.name}
+                          </Select.Option>
+                        ))}
+                      </div>
+                    ),
+                  )}
                 </Select.Options>
               </Select>
             </div>

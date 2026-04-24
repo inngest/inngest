@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { AlertModal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import { apiKeyErrorMessage } from './errorMessage';
 
 const Mutation = graphql(`
   mutation DeleteAPIKey($id: UUID!) {
@@ -24,6 +25,13 @@ export function DeleteAPIKeyModal({ isOpen, onClose, keyID, keyName }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, del] = useMutation(Mutation);
 
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen, keyID]);
+
   async function submit() {
     if (!keyID) return;
     setError(null);
@@ -31,7 +39,7 @@ export function DeleteAPIKeyModal({ isOpen, onClose, keyID, keyName }: Props) {
     try {
       const res = await del({ id: keyID }, { additionalTypenames: ['APIKey'] });
       if (res.error) {
-        setError(res.error.message);
+        setError(apiKeyErrorMessage(res.error, 'Could not delete API key.'));
         return;
       }
       toast.success('API key deleted');

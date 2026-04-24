@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
+import { RiAddLine } from '@remixicon/react';
 import { createFileRoute } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
@@ -8,7 +10,6 @@ import {
   APIKeysTable,
   type APIKeyRow,
 } from '@/components/APIKeys/APIKeysTable';
-import { CreateAPIKeyButton } from '@/components/APIKeys/CreateAPIKeyButton';
 import { CreateAPIKeyModal } from '@/components/APIKeys/CreateAPIKeyModal';
 import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
@@ -54,13 +55,22 @@ function APIKeysPage() {
             API keys are shared credentials that allow your applications to
             authenticate with Inngest. They provide a secure way to connect, run
             functions, and manage workflows.{' '}
-            <Link href="https://www.inngest.com/docs" className="inline-flex">
+            <Link
+              href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys"
+              className="inline-flex"
+            >
               Learn more
             </Link>
           </p>
         </div>
         {keys.length > 0 && (
-          <CreateAPIKeyButton onClick={() => setCreateOpen(true)} />
+          <Button
+            kind="primary"
+            icon={<RiAddLine />}
+            iconSide="left"
+            label="Create API key"
+            onClick={() => setCreateOpen(true)}
+          />
         )}
       </div>
 

@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import { apiKeyErrorMessage } from './errorMessage';
+import { validateAPIKeyName } from './validation';
 
 const Mutation = graphql(`
   mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {
@@ -45,15 +47,12 @@ export function RenameAPIKeyModal({
   async function submit() {
     if (!keyID) return;
     setError(null);
+    const nameErr = validateAPIKeyName(name);
+    if (nameErr) {
+      setError(nameErr);
+      return;
+    }
     const trimmed = name.trim();
-    if (!trimmed) {
-      setError('Name is required.');
-      return;
-    }
-    if (trimmed.length > 128) {
-      setError('Name must be 128 characters or fewer.');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -62,7 +61,7 @@ export function RenameAPIKeyModal({
         { additionalTypenames: ['APIKey'] },
       );
       if (res.error) {
-        setError(res.error.message);
+        setError(apiKeyErrorMessage(res.error, 'Could not rename API key.'));
         return;
       }
       toast.success('API key renamed');
@@ -77,8 +76,14 @@ export function RenameAPIKeyModal({
       <Modal.Header>Rename API key</Modal.Header>
       <Modal.Body>
         <div className="flex flex-col gap-2">
-          <label className="text-basis text-sm font-medium">API Key Name</label>
+          <label
+            htmlFor="api-key-rename"
+            className="text-basis text-sm font-medium"
+          >
+            API key name
+          </label>
           <Input
+            id="api-key-rename"
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={isSubmitting}

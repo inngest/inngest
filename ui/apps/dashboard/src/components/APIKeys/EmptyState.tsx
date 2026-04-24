@@ -1,7 +1,5 @@
 import { Button } from '@inngest/components/Button';
-import { RiExchange2Line } from '@remixicon/react';
-
-import { CreateAPIKeyButton } from './CreateAPIKeyButton';
+import { RiAddLine, RiExchange2Line } from '@remixicon/react';
 
 type Props = {
   onCreate: () => void;
@@ -22,12 +20,18 @@ export function APIKeysEmptyState({ onCreate }: Props) {
         </p>
       </div>
       <div className="flex gap-3">
-        <CreateAPIKeyButton onClick={onCreate} />
+        <Button
+          kind="primary"
+          icon={<RiAddLine />}
+          iconSide="left"
+          label="Create API key"
+          onClick={onCreate}
+        />
         <Button
           kind="primary"
           appearance="outlined"
           label="Go to docs"
-          href="https://www.inngest.com/docs"
+          href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys-empty"
         />
       </div>
     </div>

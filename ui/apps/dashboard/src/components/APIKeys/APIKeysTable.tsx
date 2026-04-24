@@ -1,5 +1,6 @@
 import { Button } from '@inngest/components/Button';
 import { Table } from '@inngest/components/Table';
+import { Time } from '@inngest/components/Time';
 import { RiDeleteBin6Line, RiPencilLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
@@ -45,14 +46,16 @@ export function APIKeysTable({ keys, onRename, onDelete }: Props) {
     columnHelper.accessor('createdAt', {
       header: 'Created',
       cell: (info) => (
-        <span className="text-subtle text-sm">
-          {new Date(info.getValue()).toLocaleString()}
-        </span>
+        <Time
+          className="text-subtle text-sm"
+          format="relative"
+          value={info.getValue()}
+        />
       ),
     }),
     columnHelper.display({
       id: 'actions',
-      header: '',
+      header: () => <span className="sr-only">Actions</span>,
       cell: (info) => {
         const row = info.row.original;
         return (
