@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from '@inngest/components/Link';
 import { createFileRoute } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
@@ -53,14 +54,9 @@ function APIKeysPage() {
             API keys are shared credentials that allow your applications to
             authenticate with Inngest. They provide a secure way to connect, run
             functions, and manage workflows.{' '}
-            <a
-              className="text-link"
-              href="https://www.inngest.com/docs"
-              target="_blank"
-              rel="noreferrer"
-            >
+            <Link href="https://www.inngest.com/docs" className="inline-flex">
               Learn more
-            </a>
+            </Link>
           </p>
         </div>
         {keys.length > 0 && (

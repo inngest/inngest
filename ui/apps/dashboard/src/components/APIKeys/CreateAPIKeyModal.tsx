@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
+import { Select, type Option } from '@inngest/components/Select/Select';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
@@ -34,13 +35,21 @@ type Props = {
 
 export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   const [name, setName] = useState('');
-  const [workspaceID, setWorkspaceID] = useState<string>('');
+  const [selectedEnv, setSelectedEnv] = useState<Option | null>(null);
   const [plaintextKey, setPlaintextKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [{ data: envs }] = useEnvironments();
   const [, create] = useMutation(Mutation);
+
+  const envOptions: Option[] = useMemo(
+    () =>
+      (envs ?? [])
+        .filter((e) => !e.isArchived)
+        .map((e) => ({ id: e.id, name: e.name })),
+    [envs],
+  );
 
   async function submit() {
     setError(null);
@@ -53,15 +62,15 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
       setError('Name must be 128 characters or fewer.');
       return;
     }
-    if (!workspaceID) {
-      setError('Select a workspace.');
+    if (!selectedEnv) {
+      setError('Select an environment.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       const res = await create(
-        { input: { name: trimmed, workspaceID } },
+        { input: { name: trimmed, workspaceID: selectedEnv.id } },
         { additionalTypenames: ['APIKey'] },
       );
       if (res.error) {
@@ -81,7 +90,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
   function close() {
     setName('');
-    setWorkspaceID('');
+    setSelectedEnv(null);
     setPlaintextKey(null);
     setError(null);
     onClose();
@@ -119,25 +128,29 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
             <div className="flex flex-col gap-2">
               <label className="text-basis text-sm font-medium">
-                Workspace
+                Environment
               </label>
-              <select
-                className="border-muted text-basis bg-canvasBase focus:border-active h-8 rounded border px-2 text-sm outline-none"
-                value={workspaceID}
-                onChange={(e) => setWorkspaceID(e.target.value)}
-                disabled={isSubmitting}
+              <Select
+                label="Environment"
+                isLabelVisible={false}
+                value={selectedEnv}
+                onChange={(opt) => setSelectedEnv(opt)}
               >
-                <option value="" disabled>
-                  Select a workspace
-                </option>
-                {(envs ?? [])
-                  .filter((e) => !e.isArchived)
-                  .map((env) => (
-                    <option key={env.id} value={env.id}>
-                      {env.name}
-                    </option>
+                <Select.Button>
+                  <span
+                    className={selectedEnv ? 'text-basis' : 'text-disabled'}
+                  >
+                    {selectedEnv?.name ?? 'Select an environment'}
+                  </span>
+                </Select.Button>
+                <Select.Options>
+                  {envOptions.map((opt) => (
+                    <Select.Option key={opt.id} option={opt}>
+                      {opt.name}
+                    </Select.Option>
                   ))}
-              </select>
+                </Select.Options>
+              </Select>
             </div>
 
             {error && <Alert severity="error">{error}</Alert>}
