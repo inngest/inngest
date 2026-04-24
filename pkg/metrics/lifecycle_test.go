@@ -70,8 +70,8 @@ func TestPrometheusLifecycleListener_FunctionRun(t *testing.T) {
 	// Capture baselines (counters accumulate across tests in the same process).
 	baseScheduled := counterValue(t, "inngest_function_run_scheduled_total", labels)
 	baseStarted := counterValue(t, "inngest_function_run_started_total", labels)
-	baseCompleted := counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "Completed"})
-	baseFailed := counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "Failed"})
+	baseCompleted := counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "completed"})
+	baseFailed := counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "failed"})
 
 	l.OnFunctionScheduled(ctx, md, queue.Item{}, nil)
 	assert.Equal(t, baseScheduled+1, counterValue(t, "inngest_function_run_scheduled_total", labels))
@@ -81,12 +81,12 @@ func TestPrometheusLifecycleListener_FunctionRun(t *testing.T) {
 
 	// Completed
 	l.OnFunctionFinished(ctx, md, queue.Item{}, nil, statev1.DriverResponse{})
-	assert.Equal(t, baseCompleted+1, counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "Completed"}))
+	assert.Equal(t, baseCompleted+1, counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "completed"}))
 
 	// Failed
 	errStr := "something went wrong"
 	l.OnFunctionFinished(ctx, md, queue.Item{}, nil, statev1.DriverResponse{Err: &errStr})
-	assert.Equal(t, baseFailed+1, counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "Failed"}))
+	assert.Equal(t, baseFailed+1, counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "failed"}))
 }
 
 func TestPrometheusLifecycleListener_FunctionCancelled(t *testing.T) {
@@ -94,7 +94,7 @@ func TestPrometheusLifecycleListener_FunctionCancelled(t *testing.T) {
 	ctx := context.Background()
 	slug := "test-fn-cancel"
 	md := mdWithSlug(slug)
-	labels := map[string]string{"fn": slug, "status": "Cancelled"}
+	labels := map[string]string{"fn": slug, "status": "cancelled"}
 
 	base := counterValue(t, "inngest_function_run_ended_total", labels)
 	l.OnFunctionCancelled(ctx, md, execution.CancelRequest{}, nil)
