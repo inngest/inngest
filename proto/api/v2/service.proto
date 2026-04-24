@@ -921,7 +921,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Sync app"
-      description: "Performs an in-band sync of an app by pinging the provided URL. The SDK must support in-band sync; otherwise the request fails with 422 in_band_sync_not_supported."
+      description: "Sync an app at the provided URL."
       security: {
         security_requirement: {
           key: "BearerAuth"

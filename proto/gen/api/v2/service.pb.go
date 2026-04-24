@@ -2784,7 +2784,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\x91O\n" +
+	"\x04DENY\x10\x012\x8dN\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -3021,8 +3021,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}\x12\xc2\a\n" +
-	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x85\a\x92A\xe2\x06\x12\bSync app\x1a\xa3\x01Performs an in-band sync of an app by pinging the provided URL. The SDK must support in-band sync; otherwise the request fails with 422 in_band_sync_not_supported.JE\n" +
+	"/envs/{id}\x12\xbe\x06\n" +
+	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x81\x06\x92A\xde\x05\x12\bSync app\x1a Sync an app at the provided URL.JE\n" +
 	"\x03200\x12>\n" +
 	"\x17App synced successfully\x12#\n" +
 	"!\x1a\x1f#/definitions/v2SyncAppResponseJL\n" +
