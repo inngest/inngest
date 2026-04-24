@@ -8,6 +8,7 @@ import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries/environments';
+import { EnvironmentType } from '@/utils/environments';
 import { RevealKeyCard } from './RevealKeyCard';
 
 const Mutation = graphql(`
@@ -46,7 +47,10 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   const envOptions: Option[] = useMemo(
     () =>
       (envs ?? [])
-        .filter((e) => !e.isArchived)
+        // Branch parents are config envs that spawn branch children — keys
+        // bound to the parent would never authenticate against a real
+        // deployment, so hide them from the picker.
+        .filter((e) => !e.isArchived && e.type !== EnvironmentType.BranchParent)
         .map((e) => ({ id: e.id, name: e.name })),
     [envs],
   );
