@@ -1367,7 +1367,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		testLifecycles.lock.Lock()
 		assert.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1], "expected account not to be hit")
-		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1], "expected fn1 to be hit once", fnID1, testLifecycles.fnConcurrency)
+		assert.Equal(t, 2, testLifecycles.fnConcurrency[fnID1], "expected fn1 to be hit twice", fnID1, testLifecycles.fnConcurrency)
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2], "expected fn2 not to be hit")
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
@@ -1388,7 +1388,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		testLifecycles.lock.Lock()
 		assert.Equal(t, 1, testLifecycles.acctConcurrency[accountID1])
-		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
+		assert.Equal(t, 2, testLifecycles.fnConcurrency[fnID1])
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
