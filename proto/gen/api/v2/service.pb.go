@@ -2292,6 +2292,290 @@ func (x *InvokeFunctionData) GetError() string {
 	return ""
 }
 
+type SyncAppRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncAppRequest) Reset() {
+	*x = SyncAppRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncAppRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncAppRequest) ProtoMessage() {}
+
+func (x *SyncAppRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncAppRequest.ProtoReflect.Descriptor instead.
+func (*SyncAppRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *SyncAppRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *SyncAppRequest) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+type SyncAppResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *SyncAppData           `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncAppResponse) Reset() {
+	*x = SyncAppResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncAppResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncAppResponse) ProtoMessage() {}
+
+func (x *SyncAppResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncAppResponse.ProtoReflect.Descriptor instead.
+func (*SyncAppResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *SyncAppResponse) GetData() *SyncAppData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *SyncAppResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type SyncAppData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	LatestSync    *SyncAppLatestSync     `protobuf:"bytes,2,opt,name=latest_sync,json=latestSync,proto3" json:"latest_sync,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncAppData) Reset() {
+	*x = SyncAppData{}
+	mi := &file_api_v2_service_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncAppData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncAppData) ProtoMessage() {}
+
+func (x *SyncAppData) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncAppData.ProtoReflect.Descriptor instead.
+func (*SyncAppData) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *SyncAppData) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SyncAppData) GetLatestSync() *SyncAppLatestSync {
+	if x != nil {
+		return x.LatestSync
+	}
+	return nil
+}
+
+type SyncAppLatestSync struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	AppId         string                 `protobuf:"bytes,3,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Error         *SyncAppError          `protobuf:"bytes,4,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncAppLatestSync) Reset() {
+	*x = SyncAppLatestSync{}
+	mi := &file_api_v2_service_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncAppLatestSync) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncAppLatestSync) ProtoMessage() {}
+
+func (x *SyncAppLatestSync) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncAppLatestSync.ProtoReflect.Descriptor instead.
+func (*SyncAppLatestSync) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *SyncAppLatestSync) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SyncAppLatestSync) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *SyncAppLatestSync) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *SyncAppLatestSync) GetError() *SyncAppError {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+type SyncAppError struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          *structpb.Struct       `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncAppError) Reset() {
+	*x = SyncAppError{}
+	mi := &file_api_v2_service_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncAppError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncAppError) ProtoMessage() {}
+
+func (x *SyncAppError) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncAppError.ProtoReflect.Descriptor instead.
+func (*SyncAppError) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *SyncAppError) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *SyncAppError) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *SyncAppError) GetData() *structpb.Struct {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
@@ -2470,7 +2754,27 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_started_atB\x0f\n" +
 	"\r_completed_atB\t\n" +
 	"\a_resultB\b\n" +
-	"\x06_error*/\n" +
+	"\x06_error\"\xed\x01\n" +
+	"\x0eSyncAppRequest\x12H\n" +
+	"\x06app_id\x18\x01 \x01(\tB1\x92A.2\"The external ID of the app to syncJ\b\"my-app\"R\x05appId\x12\x90\x01\n" +
+	"\x03url\x18\x02 \x01(\tB~\x92A{2VThe URL of the app's serve handler. The server will ping this URL to perform the sync.J!\"https://example.com/api/inngest\"R\x03url\"p\n" +
+	"\x0fSyncAppResponse\x12'\n" +
+	"\x04data\x18\x01 \x01(\v2\x13.api.v2.SyncAppDataR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xad\x01\n" +
+	"\vSyncAppData\x12b\n" +
+	"\x02id\x18\x01 \x01(\tBR\x92AO2MApp UUID. Empty if no app was created (e.g. app-ID mismatch on initial sync).R\x02id\x12:\n" +
+	"\vlatest_sync\x18\x02 \x01(\v2\x19.api.v2.SyncAppLatestSyncR\n" +
+	"latestSync\"\xc5\x02\n" +
+	"\x11SyncAppLatestSync\x12 \n" +
+	"\x02id\x18\x01 \x01(\tB\x10\x92A\r2\vDeploy UUIDR\x02id\x12K\n" +
+	"\x06status\x18\x02 \x01(\tB3\x92A02.Deploy status (e.g. success, error, duplicate)R\x06status\x12B\n" +
+	"\x06app_id\x18\x03 \x01(\tB+\x92A(2&App external ID recorded on the deployR\x05appId\x12s\n" +
+	"\x05error\x18\x04 \x01(\v2\x14.api.v2.SyncAppErrorBB\x92A?2=Coded error when the sync failed. Populated on 422 responses.H\x00R\x05error\x88\x01\x01B\b\n" +
+	"\x06_error\"i\n" +
+	"\fSyncAppError\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12+\n" +
+	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -2480,7 +2784,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xccG\n" +
+	"\x04DENY\x10\x012\x8dN\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2717,7 +3021,32 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}\x12\xf1\v\n" +
+	"/envs/{id}\x12\xbe\x06\n" +
+	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x81\x06\x92A\xde\x05\x12\bSync app\x1a Sync an app at the provided URL.JE\n" +
+	"\x03200\x12>\n" +
+	"\x17App synced successfully\x12#\n" +
+	"!\x1a\x1f#/definitions/v2SyncAppResponseJL\n" +
+	"\x03400\x12E\n" +
+	" Bad Request - invalid input data\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJM\n" +
+	"\x03404\x12F\n" +
+	"!Not Found - environment not found\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ\xd0\x01\n" +
+	"\x03422\x12\xc8\x01\n" +
+	"\xa0\x01Unprocessable Entity - sync failed. The response body is still SyncAppResponse and includes the persisted deploy plus a coded error under data.latestSync.error.\x12#\n" +
+	"!\x1a\x1f#/definitions/v2SyncAppResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xf1\v\n" +
 	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\x9f\v\x92A\xe3\n" +
 	"\x12\x0fInvoke function\x1a\x81\x01Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request bodyJn\n" +
 	"\x03200\x12g\n" +
@@ -2774,7 +3103,7 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_api_v2_service_proto_goTypes = []any{
 	(EnvType)(0),                            // 0: api.v2.EnvType
 	(FilterType)(0),                         // 1: api.v2.FilterType
@@ -2815,41 +3144,46 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*InvokeFunctionRequest)(nil),           // 36: api.v2.InvokeFunctionRequest
 	(*InvokeFunctionResponse)(nil),          // 37: api.v2.InvokeFunctionResponse
 	(*InvokeFunctionData)(nil),              // 38: api.v2.InvokeFunctionData
-	(*timestamppb.Timestamp)(nil),           // 39: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                 // 40: google.protobuf.Struct
+	(*SyncAppRequest)(nil),                  // 39: api.v2.SyncAppRequest
+	(*SyncAppResponse)(nil),                 // 40: api.v2.SyncAppResponse
+	(*SyncAppData)(nil),                     // 41: api.v2.SyncAppData
+	(*SyncAppLatestSync)(nil),               // 42: api.v2.SyncAppLatestSync
+	(*SyncAppError)(nil),                    // 43: api.v2.SyncAppError
+	(*timestamppb.Timestamp)(nil),           // 44: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                 // 45: google.protobuf.Struct
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	5,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	8,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	6,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	39, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	39, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	44, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	44, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	14, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
 	8,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
 	13, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
 	8,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	0,  // 9: api.v2.Env.type:type_name -> api.v2.EnvType
-	39, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	39, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	39, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	44, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	44, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	44, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
 	18, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
 	8,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
 	18, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
 	8,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	39, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	39, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	44, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	44, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
 	22, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
 	8,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	39, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	44, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
 	13, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
 	8,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
 	27, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
 	8,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	39, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	44, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
 	30, // 31: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
 	33, // 32: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
 	8,  // 33: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -2858,47 +3192,54 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	8,  // 36: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
 	19, // 37: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
 	30, // 38: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	39, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	39, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	44, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	44, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
 	13, // 41: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
 	8,  // 42: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	40, // 43: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	45, // 43: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
 	38, // 44: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
 	8,  // 45: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	39, // 46: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	39, // 47: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	39, // 48: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
-	2,  // 49: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	2,  // 50: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	9,  // 51: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	11, // 52: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	15, // 53: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	3,  // 54: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	23, // 55: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	20, // 56: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	25, // 57: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	28, // 58: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	31, // 59: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	34, // 60: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	36, // 61: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	4,  // 62: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	7,  // 63: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	10, // 64: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	12, // 65: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	16, // 66: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	17, // 67: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	24, // 68: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	21, // 69: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	26, // 70: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	29, // 71: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	32, // 72: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	35, // 73: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	37, // 74: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	62, // [62:75] is the sub-list for method output_type
-	49, // [49:62] is the sub-list for method input_type
-	49, // [49:49] is the sub-list for extension type_name
-	49, // [49:49] is the sub-list for extension extendee
-	0,  // [0:49] is the sub-list for field type_name
+	44, // 46: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	44, // 47: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	44, // 48: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	41, // 49: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
+	8,  // 50: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
+	42, // 51: api.v2.SyncAppData.latest_sync:type_name -> api.v2.SyncAppLatestSync
+	43, // 52: api.v2.SyncAppLatestSync.error:type_name -> api.v2.SyncAppError
+	45, // 53: api.v2.SyncAppError.data:type_name -> google.protobuf.Struct
+	2,  // 54: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	2,  // 55: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	9,  // 56: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	11, // 57: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	15, // 58: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	3,  // 59: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	23, // 60: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	20, // 61: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	25, // 62: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	28, // 63: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	31, // 64: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	34, // 65: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	39, // 66: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	36, // 67: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	4,  // 68: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	7,  // 69: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	10, // 70: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	12, // 71: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	16, // 72: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	17, // 73: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	24, // 74: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	21, // 75: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	26, // 76: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	29, // 77: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	32, // 78: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	35, // 79: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	40, // 80: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	37, // 81: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	68, // [68:82] is the sub-list for method output_type
+	54, // [54:68] is the sub-list for method input_type
+	54, // [54:54] is the sub-list for extension type_name
+	54, // [54:54] is the sub-list for extension extendee
+	0,  // [0:54] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -2920,13 +3261,14 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[32].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[34].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[36].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[40].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   37,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

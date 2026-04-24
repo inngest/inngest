@@ -199,10 +199,13 @@ func TestErrorConstants(t *testing.T) {
 		"invalid_request":              ErrorInvalidRequest,
 		"missing_field":                ErrorMissingField,
 		"invalid_field_format":         ErrorInvalidFieldFormat,
+		"env_name_ambiguous":           ErrorEnvNameAmbiguous,
 		"authorization_header_missing": ErrorAuthorizationHeaderMissing,
 		"invalid_signing_key":          ErrorInvalidSigningKey,
+		"invalid_api_key":              ErrorInvalidAPIKey,
 		"access_denied":                ErrorAccessDenied,
 		"resource_already_exists":      ErrorResourceAlreadyExists,
+		"app_sync_failed":              ErrorAppSyncFailed,
 		"validation_error":             ErrorValidationError,
 		"not_implemented":              ErrorNotImplemented,
 	}
