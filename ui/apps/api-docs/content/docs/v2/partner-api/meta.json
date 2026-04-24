@@ -1,5 +1,8 @@
 {
   "title": "Partner A P I",
   "description": "Partner account management",
-  "pages": ["FetchPartnerAccounts", "CreatePartnerAccount"]
+  "pages": [
+    "FetchPartnerAccounts",
+    "CreatePartnerAccount"
+  ]
 }

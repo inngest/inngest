@@ -1,4 +1,8 @@
 {
   "title": "Function runs",
-  "pages": ["GetRun", "CancelRun", "GetRunJobs"]
+  "pages": [
+    "GetRun",
+    "CancelRun",
+    "GetRunJobs"
+  ]
 }

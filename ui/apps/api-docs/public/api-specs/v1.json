@@ -112,7 +112,9 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": ["array"],
+                      "type": [
+                        "array"
+                      ],
                       "items": {
                         "x-stoplight": {
                           "id": "na2zfnjuumzvu"
@@ -190,7 +192,10 @@
                             "description": "The `data` field specified in the event"
                           },
                           "user": {
-                            "type": ["object", "null"],
+                            "type": [
+                              "object",
+                              "null"
+                            ],
                             "x-stoplight": {
                               "id": "1rb5xbqsgrnb9"
                             },
@@ -204,7 +209,10 @@
                             "description": "The `ts` field specified in the event"
                           },
                           "v": {
-                            "type": ["string", "null"],
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "x-stoplight": {
                               "id": "pxxjlbk2u5dd2"
                             },
@@ -227,18 +235,26 @@
                     },
                     "metadata": {
                       "type": "object",
-                      "required": ["fetchedAt"],
+                      "required": [
+                        "fetchedAt"
+                      ],
                       "properties": {
                         "fetchedAt": {
                           "type": "string"
                         },
                         "cachedUntil": {
-                          "type": ["string", "null"]
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       }
                     }
                   },
-                  "required": ["data", "metadata"]
+                  "required": [
+                    "data",
+                    "metadata"
+                  ]
                 }
               }
             }
@@ -261,7 +277,11 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": ["object", "string", "null"]
+                      "type": [
+                        "object",
+                        "string",
+                        "null"
+                      ]
                     },
                     "status": {
                       "type": "integer"
@@ -275,7 +295,9 @@
         "x-stoplight": {
           "id": "nfmfrdo82llyz"
         },
-        "tags": ["Events"]
+        "tags": [
+          "Events"
+        ]
       },
       "parameters": []
     },
@@ -292,7 +314,9 @@
       ],
       "get": {
         "summary": "Get an event",
-        "tags": ["Events"],
+        "tags": [
+          "Events"
+        ],
         "responses": {
           "200": {
             "description": "The response when fetching an event",
@@ -378,7 +402,10 @@
                           "description": "The `data` field specified in the event"
                         },
                         "user": {
-                          "type": ["object", "null"],
+                          "type": [
+                            "object",
+                            "null"
+                          ],
                           "x-stoplight": {
                             "id": "1rb5xbqsgrnb9"
                           },
@@ -392,7 +419,10 @@
                           "description": "The `ts` field specified in the event"
                         },
                         "v": {
-                          "type": ["string", "null"],
+                          "type": [
+                            "string",
+                            "null"
+                          ],
                           "x-stoplight": {
                             "id": "pxxjlbk2u5dd2"
                           },
@@ -414,18 +444,26 @@
                     },
                     "metadata": {
                       "type": "object",
-                      "required": ["fetchedAt"],
+                      "required": [
+                        "fetchedAt"
+                      ],
                       "properties": {
                         "fetchedAt": {
                           "type": "string"
                         },
                         "cachedUntil": {
-                          "type": ["string", "null"]
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       }
                     }
                   },
-                  "required": ["data", "metadata"]
+                  "required": [
+                    "data",
+                    "metadata"
+                  ]
                 }
               }
             }
@@ -448,7 +486,11 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": ["object", "string", "null"]
+                      "type": [
+                        "object",
+                        "string",
+                        "null"
+                      ]
                     },
                     "status": {
                       "type": "integer"
@@ -490,7 +532,9 @@
       ],
       "get": {
         "summary": "List event function runs",
-        "tags": ["Events"],
+        "tags": [
+          "Events"
+        ],
         "responses": {
           "200": {
             "description": "The response when fetching function runs",
@@ -525,15 +569,30 @@
                             "description": "When the function run was scheduled"
                           },
                           "ended_at": {
-                            "type": ["string", "null"],
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "description": "If the function has ended, the end time.  A function has ended if the status is not Running."
                           },
                           "status": {
-                            "enum": ["Running", "Completed", "Failed", "Cancelled"],
+                            "enum": [
+                              "Running",
+                              "Completed",
+                              "Failed",
+                              "Cancelled"
+                            ],
                             "readOnly": true
                           },
                           "output": {
-                            "type": ["object", "array", "number", "string", "boolean", "null"],
+                            "type": [
+                              "object",
+                              "array",
+                              "number",
+                              "string",
+                              "boolean",
+                              "null"
+                            ],
                             "description": "Data returned from the function handler. The data structure returned will match what the function returns."
                           },
                           "function_id": {
@@ -549,25 +608,37 @@
                             }
                           },
                           "event_id": {
-                            "type": ["string", "null"],
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "description": "The internal ID of the triggering event, if the function was initialized via an event"
                           },
                           "batch_id": {
-                            "type": ["string", "null"],
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "x-stoplight": {
                               "id": "u5c5r2msk8gcy"
                             },
                             "description": "The ID of the batch, if this function was initialized via a batch of events"
                           },
                           "original_run_id": {
-                            "type": ["string", "null"],
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "x-stoplight": {
                               "id": "6en4jeah54ed6"
                             },
                             "description": "The run ID of the original run, if this is a replay"
                           },
                           "cron": {
-                            "type": ["string", "null"],
+                            "type": [
+                              "string",
+                              "null"
+                            ],
                             "x-stoplight": {
                               "id": "myxg3892c1xef"
                             },
@@ -579,18 +650,26 @@
                     },
                     "metadata": {
                       "type": "object",
-                      "required": ["fetchedAt"],
+                      "required": [
+                        "fetchedAt"
+                      ],
                       "properties": {
                         "fetchedAt": {
                           "type": "string"
                         },
                         "cachedUntil": {
-                          "type": ["string", "null"]
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       }
                     }
                   },
-                  "required": ["data", "metadata"]
+                  "required": [
+                    "data",
+                    "metadata"
+                  ]
                 }
               }
             }
@@ -613,7 +692,11 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": ["object", "string", "null"]
+                      "type": [
+                        "object",
+                        "string",
+                        "null"
+                      ]
                     },
                     "status": {
                       "type": "integer"
@@ -655,7 +738,9 @@
       ],
       "get": {
         "summary": "Get a function run",
-        "tags": ["Function runs"],
+        "tags": [
+          "Function runs"
+        ],
         "responses": {
           "200": {
             "description": "The response when fetching a function run",
@@ -688,15 +773,30 @@
                           "description": "When the function run was scheduled"
                         },
                         "ended_at": {
-                          "type": ["string", "null"],
+                          "type": [
+                            "string",
+                            "null"
+                          ],
                           "description": "If the function has ended, the end time.  A function has ended if the status is not Running."
                         },
                         "status": {
-                          "enum": ["Running", "Completed", "Failed", "Cancelled"],
+                          "enum": [
+                            "Running",
+                            "Completed",
+                            "Failed",
+                            "Cancelled"
+                          ],
                           "readOnly": true
                         },
                         "output": {
-                          "type": ["object", "array", "number", "string", "boolean", "null"],
+                          "type": [
+                            "object",
+                            "array",
+                            "number",
+                            "string",
+                            "boolean",
+                            "null"
+                          ],
                           "description": "Data returned from the function handler. The data structure returned will match what the function returns."
                         },
                         "function_id": {
@@ -712,25 +812,37 @@
                           }
                         },
                         "event_id": {
-                          "type": ["string", "null"],
+                          "type": [
+                            "string",
+                            "null"
+                          ],
                           "description": "The internal ID of the triggering event, if the function was initialized via an event"
                         },
                         "batch_id": {
-                          "type": ["string", "null"],
+                          "type": [
+                            "string",
+                            "null"
+                          ],
                           "x-stoplight": {
                             "id": "u5c5r2msk8gcy"
                           },
                           "description": "The ID of the batch, if this function was initialized via a batch of events"
                         },
                         "original_run_id": {
-                          "type": ["string", "null"],
+                          "type": [
+                            "string",
+                            "null"
+                          ],
                           "x-stoplight": {
                             "id": "6en4jeah54ed6"
                           },
                           "description": "The run ID of the original run, if this is a replay"
                         },
                         "cron": {
-                          "type": ["string", "null"],
+                          "type": [
+                            "string",
+                            "null"
+                          ],
                           "x-stoplight": {
                             "id": "myxg3892c1xef"
                           },
@@ -741,18 +853,26 @@
                     },
                     "metadata": {
                       "type": "object",
-                      "required": ["fetchedAt"],
+                      "required": [
+                        "fetchedAt"
+                      ],
                       "properties": {
                         "fetchedAt": {
                           "type": "string"
                         },
                         "cachedUntil": {
-                          "type": ["string", "null"]
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       }
                     }
                   },
-                  "required": ["data", "metadata"]
+                  "required": [
+                    "data",
+                    "metadata"
+                  ]
                 }
               }
             }
@@ -775,7 +895,11 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": ["object", "string", "null"]
+                      "type": [
+                        "object",
+                        "string",
+                        "null"
+                      ]
                     },
                     "status": {
                       "type": "integer"
@@ -818,7 +942,9 @@
           "id": "t0itnlacczppy"
         },
         "description": "Cancels a running function immediately.  No new steps will run after a function is cancelled.",
-        "tags": ["Function runs"],
+        "tags": [
+          "Function runs"
+        ],
         "parameters": [
           {
             "name": "x-inngest-env",
@@ -893,18 +1019,26 @@
                     },
                     "metadata": {
                       "type": "object",
-                      "required": ["fetchedAt"],
+                      "required": [
+                        "fetchedAt"
+                      ],
                       "properties": {
                         "fetchedAt": {
                           "type": "string"
                         },
                         "cachedUntil": {
-                          "type": ["string", "null"]
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       }
                     }
                   },
-                  "required": ["data", "metadata"]
+                  "required": [
+                    "data",
+                    "metadata"
+                  ]
                 }
               }
             }
@@ -915,7 +1049,9 @@
           "id": "fgnob41ksy695"
         },
         "description": "An endpoint to fetch a subset of the function run's jobs within the function_id queue, in order of earliest to latest. This primarily allows you to see the order of the run's jobs within the function queue.\n\nA single function enqueues all function run jobs wihtin the same queue.  This endpoint fetches a subset of jobs for a given function run.\n\nThis endpoint is rate limited and cached for 5 seconds.",
-        "tags": ["Function runs"],
+        "tags": [
+          "Function runs"
+        ],
         "parameters": [
           {
             "name": "x-inngest-env",
@@ -982,7 +1118,11 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": ["object", "string", "null"]
+                      "type": [
+                        "object",
+                        "string",
+                        "null"
+                      ]
                     },
                     "status": {
                       "type": "integer"
@@ -996,7 +1136,9 @@
         "x-stoplight": {
           "id": "9pde91ox9gjp0"
         },
-        "tags": ["Signals"],
+        "tags": [
+          "Signals"
+        ],
         "requestBody": {
           "description": "Resume a function which is awaiting a signal via the `WaitForSignal` step.  The function run will resume with the given data and signal.",
           "content": {
@@ -1015,7 +1157,14 @@
                     "x-stoplight": {
                       "id": "vrxi3ez5xv0kh"
                     },
-                    "type": ["object", "array", "integer", "number", "string", "boolean"],
+                    "type": [
+                      "object",
+                      "array",
+                      "integer",
+                      "number",
+                      "string",
+                      "boolean"
+                    ],
                     "description": "The data to be sent to the waiting function run."
                   }
                 }
@@ -1034,7 +1183,9 @@
     "/v1/cancellations": {
       "get": {
         "summary": "List cancellations",
-        "tags": ["Cancellations"],
+        "tags": [
+          "Cancellations"
+        ],
         "responses": {
           "200": {
             "description": "The response when listing cancellations",
@@ -1135,7 +1286,9 @@
       },
       "post": {
         "summary": "Create a cancellation",
-        "tags": ["Cancellations"],
+        "tags": [
+          "Cancellations"
+        ],
         "operationId": "CreateCancellation",
         "responses": {
           "200": {
@@ -1227,7 +1380,11 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["app_id", "function_id", "started_before"],
+                "required": [
+                  "app_id",
+                  "function_id",
+                  "started_before"
+                ],
                 "properties": {
                   "app_id": {
                     "type": "string",
@@ -1294,7 +1451,9 @@
       ],
       "delete": {
         "summary": "Delete a cancellation",
-        "tags": ["Cancellations"],
+        "tags": [
+          "Cancellations"
+        ],
         "responses": {
           "200": {
             "description": "Cancellation deleted"
@@ -1323,7 +1482,9 @@
         "operationId": "ListWebhooks",
         "summary": "Get webhooks",
         "description": "Get all webhook endpoints in the given environment.",
-        "tags": ["Webhooks"],
+        "tags": [
+          "Webhooks"
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1355,7 +1516,9 @@
         "operationId": "CreateWebhook",
         "summary": "Create webhook",
         "description": "Create a new webhook endpoint with the given configuration.",
-        "tags": ["Webhooks"],
+        "tags": [
+          "Webhooks"
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1407,7 +1570,9 @@
         "operationId": "GetWebhook",
         "summary": "Get webhook",
         "description": "Get a webhook endpoint's configuration",
-        "tags": ["Webhooks"],
+        "tags": [
+          "Webhooks"
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1437,7 +1602,9 @@
         "operationId": "UpdateWebhook",
         "summary": "Update webhook",
         "description": "Update a webhook endpoint's configuration",
-        "tags": ["Webhooks"],
+        "tags": [
+          "Webhooks"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1476,7 +1643,9 @@
         "operationId": "DeleteWebhook",
         "summary": "Delete webhook",
         "description": "Delete a webhook endpoint",
-        "tags": ["Webhooks"],
+        "tags": [
+          "Webhooks"
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1588,7 +1757,10 @@
             "description": "The `data` field specified in the event"
           },
           "user": {
-            "type": ["object", "null"],
+            "type": [
+              "object",
+              "null"
+            ],
             "x-stoplight": {
               "id": "1rb5xbqsgrnb9"
             },
@@ -1602,7 +1774,10 @@
             "description": "The `ts` field specified in the event"
           },
           "v": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "x-stoplight": {
               "id": "pxxjlbk2u5dd2"
             },
@@ -1646,15 +1821,30 @@
             "description": "When the function run was scheduled"
           },
           "ended_at": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "If the function has ended, the end time.  A function has ended if the status is not Running."
           },
           "status": {
-            "enum": ["Running", "Completed", "Failed", "Cancelled"],
+            "enum": [
+              "Running",
+              "Completed",
+              "Failed",
+              "Cancelled"
+            ],
             "readOnly": true
           },
           "output": {
-            "type": ["object", "array", "number", "string", "boolean", "null"],
+            "type": [
+              "object",
+              "array",
+              "number",
+              "string",
+              "boolean",
+              "null"
+            ],
             "description": "Data returned from the function handler. The data structure returned will match what the function returns."
           },
           "function_id": {
@@ -1670,25 +1860,37 @@
             }
           },
           "event_id": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "The internal ID of the triggering event, if the function was initialized via an event"
           },
           "batch_id": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "x-stoplight": {
               "id": "u5c5r2msk8gcy"
             },
             "description": "The ID of the batch, if this function was initialized via a batch of events"
           },
           "original_run_id": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "x-stoplight": {
               "id": "6en4jeah54ed6"
             },
             "description": "The run ID of the original run, if this is a replay"
           },
           "cron": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "x-stoplight": {
               "id": "myxg3892c1xef"
             },
@@ -1823,7 +2025,9 @@
               "type": "object",
               "properties": {
                 "data": {
-                  "type": ["array"],
+                  "type": [
+                    "array"
+                  ],
                   "items": {
                     "x-stoplight": {
                       "id": "na2zfnjuumzvu"
@@ -1901,7 +2105,10 @@
                         "description": "The `data` field specified in the event"
                       },
                       "user": {
-                        "type": ["object", "null"],
+                        "type": [
+                          "object",
+                          "null"
+                        ],
                         "x-stoplight": {
                           "id": "1rb5xbqsgrnb9"
                         },
@@ -1915,7 +2122,10 @@
                         "description": "The `ts` field specified in the event"
                       },
                       "v": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "x-stoplight": {
                           "id": "pxxjlbk2u5dd2"
                         },
@@ -1938,18 +2148,26 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "required": ["fetchedAt"],
+                  "required": [
+                    "fetchedAt"
+                  ],
                   "properties": {
                     "fetchedAt": {
                       "type": "string"
                     },
                     "cachedUntil": {
-                      "type": ["string", "null"]
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
               },
-              "required": ["data", "metadata"]
+              "required": [
+                "data",
+                "metadata"
+              ]
             }
           }
         }
@@ -1972,7 +2190,11 @@
                   "type": "string"
                 },
                 "data": {
-                  "type": ["object", "string", "null"]
+                  "type": [
+                    "object",
+                    "string",
+                    "null"
+                  ]
                 },
                 "status": {
                   "type": "integer"
@@ -2066,7 +2288,10 @@
                       "description": "The `data` field specified in the event"
                     },
                     "user": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "x-stoplight": {
                         "id": "1rb5xbqsgrnb9"
                       },
@@ -2080,7 +2305,10 @@
                       "description": "The `ts` field specified in the event"
                     },
                     "v": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "x-stoplight": {
                         "id": "pxxjlbk2u5dd2"
                       },
@@ -2102,18 +2330,26 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "required": ["fetchedAt"],
+                  "required": [
+                    "fetchedAt"
+                  ],
                   "properties": {
                     "fetchedAt": {
                       "type": "string"
                     },
                     "cachedUntil": {
-                      "type": ["string", "null"]
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
               },
-              "required": ["data", "metadata"]
+              "required": [
+                "data",
+                "metadata"
+              ]
             }
           }
         }
@@ -2149,15 +2385,30 @@
                       "description": "When the function run was scheduled"
                     },
                     "ended_at": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "description": "If the function has ended, the end time.  A function has ended if the status is not Running."
                     },
                     "status": {
-                      "enum": ["Running", "Completed", "Failed", "Cancelled"],
+                      "enum": [
+                        "Running",
+                        "Completed",
+                        "Failed",
+                        "Cancelled"
+                      ],
                       "readOnly": true
                     },
                     "output": {
-                      "type": ["object", "array", "number", "string", "boolean", "null"],
+                      "type": [
+                        "object",
+                        "array",
+                        "number",
+                        "string",
+                        "boolean",
+                        "null"
+                      ],
                       "description": "Data returned from the function handler. The data structure returned will match what the function returns."
                     },
                     "function_id": {
@@ -2173,25 +2424,37 @@
                       }
                     },
                     "event_id": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "description": "The internal ID of the triggering event, if the function was initialized via an event"
                     },
                     "batch_id": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "x-stoplight": {
                         "id": "u5c5r2msk8gcy"
                       },
                       "description": "The ID of the batch, if this function was initialized via a batch of events"
                     },
                     "original_run_id": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "x-stoplight": {
                         "id": "6en4jeah54ed6"
                       },
                       "description": "The run ID of the original run, if this is a replay"
                     },
                     "cron": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "x-stoplight": {
                         "id": "myxg3892c1xef"
                       },
@@ -2202,18 +2465,26 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "required": ["fetchedAt"],
+                  "required": [
+                    "fetchedAt"
+                  ],
                   "properties": {
                     "fetchedAt": {
                       "type": "string"
                     },
                     "cachedUntil": {
-                      "type": ["string", "null"]
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
               },
-              "required": ["data", "metadata"]
+              "required": [
+                "data",
+                "metadata"
+              ]
             }
           }
         }
@@ -2251,15 +2522,30 @@
                         "description": "When the function run was scheduled"
                       },
                       "ended_at": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "description": "If the function has ended, the end time.  A function has ended if the status is not Running."
                       },
                       "status": {
-                        "enum": ["Running", "Completed", "Failed", "Cancelled"],
+                        "enum": [
+                          "Running",
+                          "Completed",
+                          "Failed",
+                          "Cancelled"
+                        ],
                         "readOnly": true
                       },
                       "output": {
-                        "type": ["object", "array", "number", "string", "boolean", "null"],
+                        "type": [
+                          "object",
+                          "array",
+                          "number",
+                          "string",
+                          "boolean",
+                          "null"
+                        ],
                         "description": "Data returned from the function handler. The data structure returned will match what the function returns."
                       },
                       "function_id": {
@@ -2275,25 +2561,37 @@
                         }
                       },
                       "event_id": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "description": "The internal ID of the triggering event, if the function was initialized via an event"
                       },
                       "batch_id": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "x-stoplight": {
                           "id": "u5c5r2msk8gcy"
                         },
                         "description": "The ID of the batch, if this function was initialized via a batch of events"
                       },
                       "original_run_id": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "x-stoplight": {
                           "id": "6en4jeah54ed6"
                         },
                         "description": "The run ID of the original run, if this is a replay"
                       },
                       "cron": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "x-stoplight": {
                           "id": "myxg3892c1xef"
                         },
@@ -2305,18 +2603,26 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "required": ["fetchedAt"],
+                  "required": [
+                    "fetchedAt"
+                  ],
                   "properties": {
                     "fetchedAt": {
                       "type": "string"
                     },
                     "cachedUntil": {
-                      "type": ["string", "null"]
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
               },
-              "required": ["data", "metadata"]
+              "required": [
+                "data",
+                "metadata"
+              ]
             }
           }
         }
@@ -2368,18 +2674,26 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "required": ["fetchedAt"],
+                  "required": [
+                    "fetchedAt"
+                  ],
                   "properties": {
                     "fetchedAt": {
                       "type": "string"
                     },
                     "cachedUntil": {
-                      "type": ["string", "null"]
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
               },
-              "required": ["data", "metadata"]
+              "required": [
+                "data",
+                "metadata"
+              ]
             }
           }
         }

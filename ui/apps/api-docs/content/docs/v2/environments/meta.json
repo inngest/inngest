@@ -1,5 +1,9 @@
 {
   "title": "Environments",
   "description": "Create and manage environments",
-  "pages": ["FetchAccountEnvs", "CreateEnv", "PatchEnv"]
+  "pages": [
+    "FetchAccountEnvs",
+    "CreateEnv",
+    "PatchEnv"
+  ]
 }

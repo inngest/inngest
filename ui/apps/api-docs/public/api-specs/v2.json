@@ -39,7 +39,9 @@
       "protobufNullValue": {
         "default": "NULL_VALUE",
         "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\nThe JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value.",
-        "enum": ["NULL_VALUE"],
+        "enum": [
+          "NULL_VALUE"
+        ],
         "type": "string"
       },
       "rpcStatus": {
@@ -208,7 +210,11 @@
       },
       "v2EnvType": {
         "default": "PRODUCTION",
-        "enum": ["PRODUCTION", "TEST", "BRANCH"],
+        "enum": [
+          "PRODUCTION",
+          "TEST",
+          "BRANCH"
+        ],
         "type": "string"
       },
       "v2Error": {
@@ -237,7 +243,10 @@
         "properties": {
           "events": {
             "description": "Allow or deny specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied.",
-            "example": ["orders/payment.created", "orders/*"],
+            "example": [
+              "orders/payment.created",
+              "orders/*"
+            ],
             "items": {
               "type": "string"
             },
@@ -351,7 +360,10 @@
       },
       "v2FilterType": {
         "default": "ALLOW",
-        "enum": ["ALLOW", "DENY"],
+        "enum": [
+          "ALLOW",
+          "DENY"
+        ],
         "type": "string"
       },
       "v2HealthData": {
@@ -632,7 +644,9 @@
           }
         ],
         "summary": "Get account",
-        "tags": ["Account"]
+        "tags": [
+          "Account"
+        ]
       }
     },
     "/apps/{app_id}/functions/{function_id}/invoke": {
@@ -778,7 +792,9 @@
           }
         ],
         "summary": "Invoke function",
-        "tags": ["Functions"]
+        "tags": [
+          "Functions"
+        ]
       }
     },
     "/env/webhooks": {
@@ -872,7 +888,9 @@
           }
         ],
         "summary": "List webhooks",
-        "tags": ["Webhooks"]
+        "tags": [
+          "Webhooks"
+        ]
       },
       "post": {
         "description": "Creates a new webhook for receiving events",
@@ -977,7 +995,9 @@
           }
         ],
         "summary": "Create webhook",
-        "tags": ["Webhooks"]
+        "tags": [
+          "Webhooks"
+        ]
       }
     },
     "/envs": {
@@ -1129,7 +1149,9 @@
           }
         ],
         "summary": "List environments",
-        "tags": ["Environments"]
+        "tags": [
+          "Environments"
+        ]
       },
       "post": {
         "description": "Create custom environment",
@@ -1246,7 +1268,9 @@
           }
         ],
         "summary": "Create environment",
-        "tags": ["Environments"]
+        "tags": [
+          "Environments"
+        ]
       }
     },
     "/envs/{id}": {
@@ -1353,7 +1377,9 @@
           }
         ],
         "summary": "Update environment",
-        "tags": ["Environments"]
+        "tags": [
+          "Environments"
+        ]
       }
     },
     "/health": {
@@ -1428,7 +1454,9 @@
           }
         ],
         "summary": "Health check",
-        "tags": ["V2"]
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/keys/events": {
@@ -1591,7 +1619,9 @@
           }
         ],
         "summary": "List account event keys",
-        "tags": ["Keys"]
+        "tags": [
+          "Keys"
+        ]
       }
     },
     "/keys/signing": {
@@ -1747,7 +1777,9 @@
           }
         ],
         "summary": "List account signing keys",
-        "tags": ["Keys"]
+        "tags": [
+          "Keys"
+        ]
       }
     },
     "/partner/accounts": {
@@ -1901,7 +1933,9 @@
           }
         ],
         "summary": "List partner accounts",
-        "tags": ["Partner API"]
+        "tags": [
+          "Partner API"
+        ]
       },
       "post": {
         "description": "Creates a sub-account (if you have partner access)",
@@ -2051,7 +2085,9 @@
           }
         ],
         "summary": "Create partner account",
-        "tags": ["Partner API"]
+        "tags": [
+          "Partner API"
+        ]
       }
     }
   },

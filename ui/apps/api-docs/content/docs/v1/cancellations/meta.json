@@ -1,4 +1,8 @@
 {
   "title": "Cancellations",
-  "pages": ["ListCancellations", "CreateCancellation", "DeleteCancellation"]
+  "pages": [
+    "ListCancellations",
+    "CreateCancellation",
+    "DeleteCancellation"
+  ]
 }

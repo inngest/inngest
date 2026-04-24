@@ -1,4 +1,8 @@
 {
   "title": "Events",
-  "pages": ["ListEvents", "GetEvent", "ListEventRuns"]
+  "pages": [
+    "ListEvents",
+    "GetEvent",
+    "ListEventRuns"
+  ]
 }

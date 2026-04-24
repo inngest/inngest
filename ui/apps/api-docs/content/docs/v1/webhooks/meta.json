@@ -1,4 +1,10 @@
 {
   "title": "Webhooks",
-  "pages": ["ListWebhooks", "CreateWebhook", "GetWebhook", "DeleteWebhook", "UpdateWebhook"]
+  "pages": [
+    "ListWebhooks",
+    "CreateWebhook",
+    "GetWebhook",
+    "DeleteWebhook",
+    "UpdateWebhook"
+  ]
 }

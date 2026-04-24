@@ -3,12 +3,12 @@ x-stoplight:
   id: l4npshyzgv77t
 info:
   title: API v1
-  version: '1.0'
+  version: "1.0"
   contact:
     name: Inngest
-    url: 'https://www.inngest.com'
+    url: "https://www.inngest.com"
     email: hello@inngest.com
-  termsOfService: 'https://www.inngest.com/terms'
+  termsOfService: "https://www.inngest.com/terms"
   summary: The Inngest API
   description: |-
     Inngest is an event-driven durable workflow engine served in your own API, with zero new infrastructure. Learn more at https://www.inngest.com/
@@ -22,11 +22,11 @@ info:
     **Note**
 
     Trailing slashes on the URLs doesn't work.
-  license: 'Inngest, Inc.'
+  license: "Inngest, Inc."
 servers:
-  - url: 'https://api.inngest.com'
+  - url: "https://api.inngest.com"
     description: Production
-  - url: 'http://localhost:8288'
+  - url: "http://localhost:8288"
     description: Dev Server
 tags:
   - name: Events
@@ -47,7 +47,7 @@ paths:
           description: List events received before this RFC3339 timestamp
         - schema:
             type: string
-            default: '1H ago, as an RFC3339 timestamp'
+            default: "1H ago, as an RFC3339 timestamp"
           in: query
           description: List events received after this RFC3339 timestamp
           name: received_after
@@ -76,7 +76,7 @@ paths:
             type: string
       operationId: ListEvents
       responses:
-        '200':
+        "200":
           description: The response when listing events.
           content:
             application/json:
@@ -146,7 +146,7 @@ paths:
                         user:
                           type:
                             - object
-                            - 'null'
+                            - "null"
                           x-stoplight:
                             id: 1rb5xbqsgrnb9
                           description: The `user` field specified in the event
@@ -158,7 +158,7 @@ paths:
                         v:
                           type:
                             - string
-                            - 'null'
+                            - "null"
                           x-stoplight:
                             id: pxxjlbk2u5dd2
                           description: The `v` field specified in the event
@@ -183,11 +183,11 @@ paths:
                       cachedUntil:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                 required:
                   - data
                   - metadata
-        '401':
+        "401":
           description: An error from the API
           content:
             application/json:
@@ -195,7 +195,7 @@ paths:
                 type: object
                 x-examples:
                   Example 1:
-                    error: 'Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5'
+                    error: "Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5"
                     data: null
                     status: 500
                 properties:
@@ -205,7 +205,7 @@ paths:
                     type:
                       - object
                       - string
-                      - 'null'
+                      - "null"
                   status:
                     type: integer
       x-stoplight:
@@ -213,7 +213,7 @@ paths:
       tags:
         - Events
     parameters: []
-  '/v1/events/{internalID}':
+  "/v1/events/{internalID}":
     parameters:
       - schema:
           type: string
@@ -225,7 +225,7 @@ paths:
       tags:
         - Events
       responses:
-        '200':
+        "200":
           description: The response when fetching an event
           content:
             application/json:
@@ -292,7 +292,7 @@ paths:
                       user:
                         type:
                           - object
-                          - 'null'
+                          - "null"
                         x-stoplight:
                           id: 1rb5xbqsgrnb9
                         description: The `user` field specified in the event
@@ -304,7 +304,7 @@ paths:
                       v:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                         x-stoplight:
                           id: pxxjlbk2u5dd2
                         description: The `v` field specified in the event
@@ -329,11 +329,11 @@ paths:
                       cachedUntil:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                 required:
                   - data
                   - metadata
-        '404':
+        "404":
           description: An error from the API
           content:
             application/json:
@@ -341,7 +341,7 @@ paths:
                 type: object
                 x-examples:
                   Example 1:
-                    error: 'Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5'
+                    error: "Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5"
                     data: null
                     status: 500
                 properties:
@@ -351,13 +351,13 @@ paths:
                     type:
                       - object
                       - string
-                      - 'null'
+                      - "null"
                   status:
                     type: integer
       operationId: GetEvent
       x-stoplight:
         id: pswkqb7u3obet
-      description: 'Retrieve a single event within your environment, given its internal ID'
+      description: "Retrieve a single event within your environment, given its internal ID"
       requestBody:
         content: {}
       parameters:
@@ -367,7 +367,7 @@ paths:
           required: false
           schema:
             type: string
-  '/v1/events/{internalID}/runs':
+  "/v1/events/{internalID}/runs":
     parameters:
       - schema:
           type: string
@@ -379,7 +379,7 @@ paths:
       tags:
         - Events
       responses:
-        '200':
+        "200":
           description: The response when fetching function runs
           content:
             application/json:
@@ -410,8 +410,8 @@ paths:
                         ended_at:
                           type:
                             - string
-                            - 'null'
-                          description: 'If the function has ended, the end time.  A function has ended if the status is not Running.'
+                            - "null"
+                          description: "If the function has ended, the end time.  A function has ended if the status is not Running."
                         status:
                           enum:
                             - Running
@@ -426,7 +426,7 @@ paths:
                             - number
                             - string
                             - boolean
-                            - 'null'
+                            - "null"
                           description: Data returned from the function handler. The data structure returned will match what the function returns.
                         function_id:
                           type: string
@@ -439,29 +439,29 @@ paths:
                         event_id:
                           type:
                             - string
-                            - 'null'
-                          description: 'The internal ID of the triggering event, if the function was initialized via an event'
+                            - "null"
+                          description: "The internal ID of the triggering event, if the function was initialized via an event"
                         batch_id:
                           type:
                             - string
-                            - 'null'
+                            - "null"
                           x-stoplight:
                             id: u5c5r2msk8gcy
-                          description: 'The ID of the batch, if this function was initialized via a batch of events'
+                          description: "The ID of the batch, if this function was initialized via a batch of events"
                         original_run_id:
                           type:
                             - string
-                            - 'null'
+                            - "null"
                           x-stoplight:
                             id: 6en4jeah54ed6
-                          description: 'The run ID of the original run, if this is a replay'
+                          description: "The run ID of the original run, if this is a replay"
                         cron:
                           type:
                             - string
-                            - 'null'
+                            - "null"
                           x-stoplight:
                             id: myxg3892c1xef
-                          description: 'The cron used to initialize this scheduled function, if the function was initialized via a cron'
+                          description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
                       x-readme-ref-name: Function-run
                   metadata:
                     type: object
@@ -473,11 +473,11 @@ paths:
                       cachedUntil:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                 required:
                   - data
                   - metadata
-        '404':
+        "404":
           description: An error from the API
           content:
             application/json:
@@ -485,7 +485,7 @@ paths:
                 type: object
                 x-examples:
                   Example 1:
-                    error: 'Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5'
+                    error: "Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5"
                     data: null
                     status: 500
                 properties:
@@ -495,7 +495,7 @@ paths:
                     type:
                       - object
                       - string
-                      - 'null'
+                      - "null"
                   status:
                     type: integer
       operationId: ListEventRuns
@@ -511,7 +511,7 @@ paths:
           required: false
           schema:
             type: string
-  '/v1/runs/{runID}':
+  "/v1/runs/{runID}":
     parameters:
       - schema:
           type: string
@@ -523,7 +523,7 @@ paths:
       tags:
         - Function runs
       responses:
-        '200':
+        "200":
           description: The response when fetching a function run
           content:
             application/json:
@@ -552,8 +552,8 @@ paths:
                       ended_at:
                         type:
                           - string
-                          - 'null'
-                        description: 'If the function has ended, the end time.  A function has ended if the status is not Running.'
+                          - "null"
+                        description: "If the function has ended, the end time.  A function has ended if the status is not Running."
                       status:
                         enum:
                           - Running
@@ -568,7 +568,7 @@ paths:
                           - number
                           - string
                           - boolean
-                          - 'null'
+                          - "null"
                         description: Data returned from the function handler. The data structure returned will match what the function returns.
                       function_id:
                         type: string
@@ -581,29 +581,29 @@ paths:
                       event_id:
                         type:
                           - string
-                          - 'null'
-                        description: 'The internal ID of the triggering event, if the function was initialized via an event'
+                          - "null"
+                        description: "The internal ID of the triggering event, if the function was initialized via an event"
                       batch_id:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                         x-stoplight:
                           id: u5c5r2msk8gcy
-                        description: 'The ID of the batch, if this function was initialized via a batch of events'
+                        description: "The ID of the batch, if this function was initialized via a batch of events"
                       original_run_id:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                         x-stoplight:
                           id: 6en4jeah54ed6
-                        description: 'The run ID of the original run, if this is a replay'
+                        description: "The run ID of the original run, if this is a replay"
                       cron:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                         x-stoplight:
                           id: myxg3892c1xef
-                        description: 'The cron used to initialize this scheduled function, if the function was initialized via a cron'
+                        description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
                     x-readme-ref-name: Function-run
                   metadata:
                     type: object
@@ -615,11 +615,11 @@ paths:
                       cachedUntil:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                 required:
                   - data
                   - metadata
-        '404':
+        "404":
           description: An error from the API
           content:
             application/json:
@@ -627,7 +627,7 @@ paths:
                 type: object
                 x-examples:
                   Example 1:
-                    error: 'Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5'
+                    error: "Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5"
                     data: null
                     status: 500
                 properties:
@@ -637,7 +637,7 @@ paths:
                     type:
                       - object
                       - string
-                      - 'null'
+                      - "null"
                   status:
                     type: integer
       operationId: GetRun
@@ -655,9 +655,9 @@ paths:
       summary: Cancel a function run
       operationId: CancelRun
       responses:
-        '200':
+        "200":
           description: OK
-        '204':
+        "204":
           description: No Content
       x-stoplight:
         id: t0itnlacczppy
@@ -671,7 +671,7 @@ paths:
           required: false
           schema:
             type: string
-  '/v1/runs/{runID}/jobs':
+  "/v1/runs/{runID}/jobs":
     parameters:
       - schema:
           type: string
@@ -681,7 +681,7 @@ paths:
     get:
       summary: Fetch function run jobs
       responses:
-        '200':
+        "200":
           description: The response when fetching function runs
           content:
             application/json:
@@ -726,7 +726,7 @@ paths:
                       cachedUntil:
                         type:
                           - string
-                          - 'null'
+                          - "null"
                 required:
                   - data
                   - metadata
@@ -761,7 +761,7 @@ paths:
             type: string
       operationId: ResumeSignal
       responses:
-        '200':
+        "200":
           description: The run ID of the run resumed.
           content:
             application/json:
@@ -772,7 +772,7 @@ paths:
                     type: string
                     x-stoplight:
                       id: cm1htmo8psht0
-        '401':
+        "401":
           description: An error from the API
           content:
             application/json:
@@ -780,7 +780,7 @@ paths:
                 type: object
                 x-examples:
                   Example 1:
-                    error: 'Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5'
+                    error: "Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5"
                     data: null
                     status: 500
                 properties:
@@ -790,7 +790,7 @@ paths:
                     type:
                       - object
                       - string
-                      - 'null'
+                      - "null"
                   status:
                     type: integer
       x-stoplight:
@@ -808,7 +808,7 @@ paths:
                   type: string
                   x-stoplight:
                     id: rwhwsgponyuso
-                  description: 'The signal to resume.  This is a unique string, and represents a single run waiting for the signal via `step.waitForSignal`.'
+                  description: "The signal to resume.  This is a unique string, and represents a single run waiting for the signal via `step.waitForSignal`."
                 data:
                   x-stoplight:
                     id: vrxi3ez5xv0kh
@@ -829,7 +829,7 @@ paths:
       tags:
         - Cancellations
       responses:
-        '200':
+        "200":
           description: The response when listing cancellations
           content:
             application/json:
@@ -900,7 +900,7 @@ paths:
         - Cancellations
       operationId: CreateCancellation
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
@@ -956,7 +956,7 @@ paths:
                       id: 2iqq8aku7ia39
       x-stoplight:
         id: 8gh90chdy0gw4
-      description: 'Creates a bulk cancellation, cancelling all functions in the given time range matching an optional expression'
+      description: "Creates a bulk cancellation, cancelling all functions in the given time range matching an optional expression"
       requestBody:
         content:
           application/json:
@@ -998,7 +998,7 @@ paths:
           required: false
           schema:
             type: string
-  '/v1/cancellations/{id}':
+  "/v1/cancellations/{id}":
     parameters:
       - schema:
           type: string
@@ -1010,12 +1010,12 @@ paths:
       tags:
         - Cancellations
       responses:
-        '200':
+        "200":
           description: Cancellation deleted
       operationId: DeleteCancellation
       x-stoplight:
         id: ythdnvv40r4ar
-      description: 'Delete a cancellation, preventing the cancellation from stopping function runs between the given dates with a given expression.'
+      description: "Delete a cancellation, preventing the cancellation from stopping function runs between the given dates with a given expression."
       parameters:
         - name: x-inngest-env
           description: Branch environment name when using a branch signing key
@@ -1031,20 +1031,20 @@ paths:
       tags:
         - Webhooks
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/Webhook'
+                $ref: "#/components/responses/Webhook"
               examples:
                 clerk:
                   value:
                     data:
                       - id: 5e627760-ce58-4068-861e-bcfe5161382e
                         name: Clerk
-                        transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
-                        url: 'https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw'
+                        transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
+                        url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
     post:
       operationId: CreateWebhook
       summary: Create webhook
@@ -1052,26 +1052,26 @@ paths:
       tags:
         - Webhooks
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/Webhook'
+                $ref: "#/components/responses/Webhook"
               examples:
                 clerk:
                   value:
                     data:
                       id: 5e627760-ce58-4068-861e-bcfe5161382e
                       name: Clerk
-                      transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
-                      url: 'https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw'
+                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
+                      url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/requestBodies/CreateOrUpdateWebhook'
-  '/v1/webhooks/{id}':
+              $ref: "#/components/requestBodies/CreateOrUpdateWebhook"
+  "/v1/webhooks/{id}":
     parameters:
       - schema:
           type: string
@@ -1086,20 +1086,20 @@ paths:
       tags:
         - Webhooks
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/Webhook'
+                $ref: "#/components/responses/Webhook"
               examples:
                 clerk:
                   value:
                     data:
                       id: 5e627760-ce58-4068-861e-bcfe5161382e
                       name: Clerk
-                      transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
-                      url: 'https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw'
+                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
+                      url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
     put:
       operationId: UpdateWebhook
       summary: Update webhook
@@ -1110,22 +1110,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Webhook'
+              $ref: "#/components/schemas/Webhook"
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/Webhook'
+                $ref: "#/components/responses/Webhook"
               examples:
                 clerk:
                   value:
                     data:
                       id: 5e627760-ce58-4068-861e-bcfe5161382e
                       name: Clerk
-                      transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
-                      url: 'https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw'
+                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
+                      url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
     delete:
       operationId: DeleteWebhook
       summary: Delete webhook
@@ -1133,7 +1133,7 @@ paths:
       tags:
         - Webhooks
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
@@ -1212,7 +1212,7 @@ components:
         user:
           type:
             - object
-            - 'null'
+            - "null"
           x-stoplight:
             id: 1rb5xbqsgrnb9
           description: The `user` field specified in the event
@@ -1224,7 +1224,7 @@ components:
         v:
           type:
             - string
-            - 'null'
+            - "null"
           x-stoplight:
             id: pxxjlbk2u5dd2
           description: The `v` field specified in the event
@@ -1261,8 +1261,8 @@ components:
         ended_at:
           type:
             - string
-            - 'null'
-          description: 'If the function has ended, the end time.  A function has ended if the status is not Running.'
+            - "null"
+          description: "If the function has ended, the end time.  A function has ended if the status is not Running."
         status:
           enum:
             - Running
@@ -1277,7 +1277,7 @@ components:
             - number
             - string
             - boolean
-            - 'null'
+            - "null"
           description: Data returned from the function handler. The data structure returned will match what the function returns.
         function_id:
           type: string
@@ -1290,29 +1290,29 @@ components:
         event_id:
           type:
             - string
-            - 'null'
-          description: 'The internal ID of the triggering event, if the function was initialized via an event'
+            - "null"
+          description: "The internal ID of the triggering event, if the function was initialized via an event"
         batch_id:
           type:
             - string
-            - 'null'
+            - "null"
           x-stoplight:
             id: u5c5r2msk8gcy
-          description: 'The ID of the batch, if this function was initialized via a batch of events'
+          description: "The ID of the batch, if this function was initialized via a batch of events"
         original_run_id:
           type:
             - string
-            - 'null'
+            - "null"
           x-stoplight:
             id: 6en4jeah54ed6
-          description: 'The run ID of the original run, if this is a replay'
+          description: "The run ID of the original run, if this is a replay"
         cron:
           type:
             - string
-            - 'null'
+            - "null"
           x-stoplight:
             id: myxg3892c1xef
-          description: 'The cron used to initialize this scheduled function, if the function was initialized via a cron'
+          description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
       x-readme-ref-name: Function-run
     Job:
       title: Job
@@ -1395,7 +1395,7 @@ components:
           description: A JavaScript transform function that accepts the inbound request components and returns an object in the Inngest event payload format.
       examples:
         - name: Clerk
-          transform: 'function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }'
+          transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
   responses:
     Event-list:
       description: The response when listing events.
@@ -1467,7 +1467,7 @@ components:
                     user:
                       type:
                         - object
-                        - 'null'
+                        - "null"
                       x-stoplight:
                         id: 1rb5xbqsgrnb9
                       description: The `user` field specified in the event
@@ -1479,7 +1479,7 @@ components:
                     v:
                       type:
                         - string
-                        - 'null'
+                        - "null"
                       x-stoplight:
                         id: pxxjlbk2u5dd2
                       description: The `v` field specified in the event
@@ -1504,7 +1504,7 @@ components:
                   cachedUntil:
                     type:
                       - string
-                      - 'null'
+                      - "null"
             required:
               - data
               - metadata
@@ -1516,7 +1516,7 @@ components:
             type: object
             x-examples:
               Example 1:
-                error: 'Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5'
+                error: "Unable to load function run: 01HE8AM9DPK9N37V1RKY1DNQF5"
                 data: null
                 status: 500
             properties:
@@ -1526,7 +1526,7 @@ components:
                 type:
                   - object
                   - string
-                  - 'null'
+                  - "null"
               status:
                 type: integer
     Event:
@@ -1596,7 +1596,7 @@ components:
                   user:
                     type:
                       - object
-                      - 'null'
+                      - "null"
                     x-stoplight:
                       id: 1rb5xbqsgrnb9
                     description: The `user` field specified in the event
@@ -1608,7 +1608,7 @@ components:
                   v:
                     type:
                       - string
-                      - 'null'
+                      - "null"
                     x-stoplight:
                       id: pxxjlbk2u5dd2
                     description: The `v` field specified in the event
@@ -1633,7 +1633,7 @@ components:
                   cachedUntil:
                     type:
                       - string
-                      - 'null'
+                      - "null"
             required:
               - data
               - metadata
@@ -1666,8 +1666,8 @@ components:
                   ended_at:
                     type:
                       - string
-                      - 'null'
-                    description: 'If the function has ended, the end time.  A function has ended if the status is not Running.'
+                      - "null"
+                    description: "If the function has ended, the end time.  A function has ended if the status is not Running."
                   status:
                     enum:
                       - Running
@@ -1682,7 +1682,7 @@ components:
                       - number
                       - string
                       - boolean
-                      - 'null'
+                      - "null"
                     description: Data returned from the function handler. The data structure returned will match what the function returns.
                   function_id:
                     type: string
@@ -1695,29 +1695,29 @@ components:
                   event_id:
                     type:
                       - string
-                      - 'null'
-                    description: 'The internal ID of the triggering event, if the function was initialized via an event'
+                      - "null"
+                    description: "The internal ID of the triggering event, if the function was initialized via an event"
                   batch_id:
                     type:
                       - string
-                      - 'null'
+                      - "null"
                     x-stoplight:
                       id: u5c5r2msk8gcy
-                    description: 'The ID of the batch, if this function was initialized via a batch of events'
+                    description: "The ID of the batch, if this function was initialized via a batch of events"
                   original_run_id:
                     type:
                       - string
-                      - 'null'
+                      - "null"
                     x-stoplight:
                       id: 6en4jeah54ed6
-                    description: 'The run ID of the original run, if this is a replay'
+                    description: "The run ID of the original run, if this is a replay"
                   cron:
                     type:
                       - string
-                      - 'null'
+                      - "null"
                     x-stoplight:
                       id: myxg3892c1xef
-                    description: 'The cron used to initialize this scheduled function, if the function was initialized via a cron'
+                    description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
                 x-readme-ref-name: Function-run
               metadata:
                 type: object
@@ -1729,7 +1729,7 @@ components:
                   cachedUntil:
                     type:
                       - string
-                      - 'null'
+                      - "null"
             required:
               - data
               - metadata
@@ -1764,8 +1764,8 @@ components:
                     ended_at:
                       type:
                         - string
-                        - 'null'
-                      description: 'If the function has ended, the end time.  A function has ended if the status is not Running.'
+                        - "null"
+                      description: "If the function has ended, the end time.  A function has ended if the status is not Running."
                     status:
                       enum:
                         - Running
@@ -1780,7 +1780,7 @@ components:
                         - number
                         - string
                         - boolean
-                        - 'null'
+                        - "null"
                       description: Data returned from the function handler. The data structure returned will match what the function returns.
                     function_id:
                       type: string
@@ -1793,29 +1793,29 @@ components:
                     event_id:
                       type:
                         - string
-                        - 'null'
-                      description: 'The internal ID of the triggering event, if the function was initialized via an event'
+                        - "null"
+                      description: "The internal ID of the triggering event, if the function was initialized via an event"
                     batch_id:
                       type:
                         - string
-                        - 'null'
+                        - "null"
                       x-stoplight:
                         id: u5c5r2msk8gcy
-                      description: 'The ID of the batch, if this function was initialized via a batch of events'
+                      description: "The ID of the batch, if this function was initialized via a batch of events"
                     original_run_id:
                       type:
                         - string
-                        - 'null'
+                        - "null"
                       x-stoplight:
                         id: 6en4jeah54ed6
-                      description: 'The run ID of the original run, if this is a replay'
+                      description: "The run ID of the original run, if this is a replay"
                     cron:
                       type:
                         - string
-                        - 'null'
+                        - "null"
                       x-stoplight:
                         id: myxg3892c1xef
-                      description: 'The cron used to initialize this scheduled function, if the function was initialized via a cron'
+                      description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
                   x-readme-ref-name: Function-run
               metadata:
                 type: object
@@ -1827,7 +1827,7 @@ components:
                   cachedUntil:
                     type:
                       - string
-                      - 'null'
+                      - "null"
             required:
               - data
               - metadata
@@ -1876,7 +1876,7 @@ components:
                   cachedUntil:
                     type:
                       - string
-                      - 'null'
+                      - "null"
             required:
               - data
               - metadata
