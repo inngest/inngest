@@ -21,6 +21,7 @@ const (
 	// 401 Unauthorized errors
 	ErrorAuthorizationHeaderMissing = "authorization_header_missing"
 	ErrorInvalidSigningKey          = "invalid_signing_key"
+	ErrorInvalidAPIKey              = "invalid_api_key"
 
 	// 403 Forbidden errors
 	ErrorAccessDenied = "access_denied"
@@ -33,8 +34,10 @@ const (
 	ErrorRateLimited = "rate_limited"
 
 	// 422 Unprocessable Entity errors
-	ErrorFunctionDebounced = "function_debounced"
-	ErrorFunctionSkipped   = "function_skipped"
+	ErrorFunctionDebounced        = "function_debounced"
+	ErrorFunctionSkipped          = "function_skipped"
+	ErrorInBandSyncNotSupported   = "in_band_sync_not_supported"
+	ErrorAppSyncFailed            = "app_sync_failed"
 
 	// 404 Not Found errors
 	// ErrorNotFound is the generic not found error code used across multiple APIs.
