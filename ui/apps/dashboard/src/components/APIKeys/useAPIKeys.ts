@@ -9,7 +9,7 @@ const Query = graphql(`
         name
         createdAt
         maskedKey
-        workspace {
+        env {
           id
           name
           slug

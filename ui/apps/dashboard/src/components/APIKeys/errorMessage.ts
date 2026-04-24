@@ -9,7 +9,14 @@ export function apiKeyErrorMessage(
   fallback = 'Something went wrong. Please try again.',
 ): string {
   const gqlMsg = err.graphQLErrors?.[0]?.message?.trim();
-  if (gqlMsg) return gqlMsg;
+  if (gqlMsg) {
+    // Remap the backend's sanitized role-gate sentinel into product copy.
+    // Matches authz.ErrForbidden in the monorepo resolver.
+    if (gqlMsg.toLowerCase() === 'forbidden') {
+      return "You don't have permission to manage API keys. Ask an organization admin.";
+    }
+    return gqlMsg;
+  }
   if (err.networkError) return 'Network error. Please check your connection.';
   return fallback;
 }

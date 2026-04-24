@@ -9,18 +9,19 @@ export type APIKeyRow = {
   name: string;
   maskedKey: string;
   createdAt: string;
-  workspace: { id: string; name: string };
+  env: { id: string; name: string } | null;
 };
 
 type Props = {
   keys: APIKeyRow[];
+  canManage: boolean;
   onRename: (key: APIKeyRow) => void;
   onDelete: (key: APIKeyRow) => void;
 };
 
 const columnHelper = createColumnHelper<APIKeyRow>();
 
-export function APIKeysTable({ keys, onRename, onDelete }: Props) {
+export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
   const columns = [
     columnHelper.accessor('name', {
       header: 'Key',
@@ -36,11 +37,11 @@ export function APIKeysTable({ keys, onRename, onDelete }: Props) {
         );
       },
     }),
-    columnHelper.accessor('workspace.name', {
-      id: 'workspace',
+    columnHelper.accessor((row) => row.env?.name ?? null, {
+      id: 'env',
       header: 'Environment',
       cell: (info) => (
-        <span className="text-subtle text-sm">{info.getValue()}</span>
+        <span className="text-subtle text-sm">{info.getValue() ?? '—'}</span>
       ),
     }),
     columnHelper.accessor('createdAt', {
@@ -57,6 +58,7 @@ export function APIKeysTable({ keys, onRename, onDelete }: Props) {
       id: 'actions',
       header: () => <span className="sr-only">Actions</span>,
       cell: (info) => {
+        if (!canManage) return null;
         const row = info.row.original;
         return (
           <div className="flex justify-end gap-2">

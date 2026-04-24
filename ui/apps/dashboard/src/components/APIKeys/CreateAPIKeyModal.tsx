@@ -22,7 +22,7 @@ const Mutation = graphql(`
         name
         createdAt
         maskedKey
-        workspace {
+        env {
           id
           name
         }
@@ -52,18 +52,19 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   const [, create] = useMutation(Mutation);
 
   // Pickable envs split by type so the picker can render Production / Test /
-  // Branches groups instead of one alphabetical blob. Branch parents are
-  // config envs (they spawn branch children) — keys bound to the parent would
-  // never authenticate against a real deployment, so we hide them.
+  // Branches groups instead of one alphabetical blob. Keys for branch envs
+  // live on the parent (mirrors how signing and event keys work) — a
+  // parent-scoped key authenticates for every child beneath it, so we offer
+  // the parent and hide the programmatically-created children.
   const envGroups = useMemo(() => {
     const production: Option[] = [];
     const test: Option[] = [];
     const branches: Option[] = [];
     for (const e of envs ?? []) {
-      if (e.isArchived || e.type === EnvironmentType.BranchParent) continue;
+      if (e.isArchived || e.type === EnvironmentType.BranchChild) continue;
       const opt = { id: e.id, name: e.name };
       if (e.type === EnvironmentType.Production) production.push(opt);
-      else if (e.type === EnvironmentType.BranchChild) branches.push(opt);
+      else if (e.type === EnvironmentType.BranchParent) branches.push(opt);
       else test.push(opt);
     }
     return { production, test, branches };

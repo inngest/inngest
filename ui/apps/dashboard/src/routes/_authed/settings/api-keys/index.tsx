@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
+import { useOrganization } from '@clerk/tanstack-react-start';
 import { RiAddLine } from '@remixicon/react';
 import { createFileRoute } from '@tanstack/react-router';
 
@@ -19,8 +25,13 @@ export const Route = createFileRoute('/_authed/settings/api-keys/')({
   component: APIKeysPage,
 });
 
+const ADMIN_TOOLTIP = 'Only organization admins can manage API keys.';
+
 function APIKeysPage() {
   const res = useAPIKeys();
+  const { membership, isLoaded: orgLoaded } = useOrganization();
+  const isAdmin = membership?.role === 'org:admin';
+
   // Create modal state is owned here so it survives the empty->populated
   // transition that unmounts the EmptyState.
   const [createOpen, setCreateOpen] = useState(false);
@@ -30,7 +41,7 @@ function APIKeysPage() {
   if (res.error) {
     throw res.error;
   }
-  if (res.isLoading && !res.data) {
+  if ((res.isLoading && !res.data) || !orgLoaded) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />
@@ -43,8 +54,19 @@ function APIKeysPage() {
     name: k.name,
     maskedKey: k.maskedKey,
     createdAt: k.createdAt,
-    workspace: { id: k.workspace.id, name: k.workspace.name },
+    env: k.env ? { id: k.env.id, name: k.env.name } : null,
   }));
+
+  const createButton = (
+    <Button
+      kind="primary"
+      icon={<RiAddLine />}
+      iconSide="left"
+      label="Create API key"
+      onClick={() => setCreateOpen(true)}
+      disabled={!isAdmin}
+    />
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 py-8">
@@ -63,22 +85,28 @@ function APIKeysPage() {
             </Link>
           </p>
         </div>
-        {keys.length > 0 && (
-          <Button
-            kind="primary"
-            icon={<RiAddLine />}
-            iconSide="left"
-            label="Create API key"
-            onClick={() => setCreateOpen(true)}
-          />
+        {isAdmin ? (
+          createButton
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>{createButton}</span>
+            </TooltipTrigger>
+            <TooltipContent>{ADMIN_TOOLTIP}</TooltipContent>
+          </Tooltip>
         )}
       </div>
 
       {keys.length === 0 ? (
-        <APIKeysEmptyState onCreate={() => setCreateOpen(true)} />
+        <APIKeysEmptyState
+          onCreate={() => setCreateOpen(true)}
+          canCreate={isAdmin}
+          disabledTooltip={ADMIN_TOOLTIP}
+        />
       ) : (
         <APIKeysTable
           keys={keys}
+          canManage={isAdmin}
           onRename={setRenameTarget}
           onDelete={setDeleteTarget}
         />
