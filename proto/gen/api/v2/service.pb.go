@@ -2468,7 +2468,6 @@ type SyncAppError struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Data          *structpb.Struct       `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2515,13 +2514,6 @@ func (x *SyncAppError) GetMessage() string {
 		return x.Message
 	}
 	return ""
-}
-
-func (x *SyncAppError) GetData() *structpb.Struct {
-	if x != nil {
-		return x.Data
-	}
-	return nil
 }
 
 var File_api_v2_service_proto protoreflect.FileDescriptor
@@ -2714,11 +2706,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06status\x18\x02 \x01(\tB\v\x92A\b2\x06StatusR\x06status\x12\"\n" +
 	"\x06app_id\x18\x03 \x01(\tB\v\x92A\b2\x06App IDR\x05appId\x12Y\n" +
 	"\x05error\x18\x04 \x01(\v2\x14.api.v2.SyncAppErrorB(\x92A%2#Error, including a code and messageH\x00R\x05error\x88\x01\x01B\b\n" +
-	"\x06_error\"i\n" +
+	"\x06_error\"<\n" +
 	"\fSyncAppError\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12+\n" +
-	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data*/\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -3148,40 +3139,39 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	41, // 49: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
 	8,  // 50: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
 	42, // 51: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
-	44, // 52: api.v2.SyncAppError.data:type_name -> google.protobuf.Struct
-	2,  // 53: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	2,  // 54: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	9,  // 55: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	11, // 56: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	15, // 57: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	3,  // 58: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	23, // 59: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	20, // 60: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	25, // 61: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	28, // 62: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	31, // 63: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	34, // 64: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	39, // 65: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	36, // 66: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	4,  // 67: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	7,  // 68: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	10, // 69: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	12, // 70: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	16, // 71: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	17, // 72: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	24, // 73: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	21, // 74: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	26, // 75: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	29, // 76: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	32, // 77: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	35, // 78: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	40, // 79: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	37, // 80: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	67, // [67:81] is the sub-list for method output_type
-	53, // [53:67] is the sub-list for method input_type
-	53, // [53:53] is the sub-list for extension type_name
-	53, // [53:53] is the sub-list for extension extendee
-	0,  // [0:53] is the sub-list for field type_name
+	2,  // 52: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	2,  // 53: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	9,  // 54: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	11, // 55: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	15, // 56: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	3,  // 57: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	23, // 58: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	20, // 59: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	25, // 60: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	28, // 61: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	31, // 62: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	34, // 63: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	39, // 64: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	36, // 65: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	4,  // 66: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	7,  // 67: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	10, // 68: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	12, // 69: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	16, // 70: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	17, // 71: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	24, // 72: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	21, // 73: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	26, // 74: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	29, // 75: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	32, // 76: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	35, // 77: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	40, // 78: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	37, // 79: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	66, // [66:80] is the sub-list for method output_type
+	52, // [52:66] is the sub-list for method input_type
+	52, // [52:52] is the sub-list for extension type_name
+	52, // [52:52] is the sub-list for extension extendee
+	0,  // [0:52] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
