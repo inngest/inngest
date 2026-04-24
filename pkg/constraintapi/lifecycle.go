@@ -26,6 +26,9 @@ type OnCapacityLeaseAcquiredData struct {
 	ExhaustedConstraints []ConstraintItem
 	FairnessReduction    int
 	RetryAfter           time.Time
+
+	// Usage contains per-constraint capacity usage after this acquire operation.
+	Usage []ConstraintUsage
 }
 
 type OnCapacityLeaseExtendedData struct {

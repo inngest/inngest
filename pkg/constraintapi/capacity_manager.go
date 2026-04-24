@@ -180,6 +180,12 @@ type CapacityAcquireResponse struct {
 	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
 	FairnessReduction int
 
+	// Usage contains per-constraint capacity usage after this acquire operation.
+	// Each entry corresponds to a constraint in sorted execution order (not
+	// necessarily the caller's original slice order, as constraints are sorted
+	// before evaluation).
+	Usage []ConstraintUsage
+
 	RetryAfter time.Time
 
 	internalDebugState acquireScriptResponse

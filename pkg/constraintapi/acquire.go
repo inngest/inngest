@@ -166,6 +166,10 @@ type acquireScriptResponse struct {
 	RetryAt              int                 `json:"ra"`
 	Debug                flexibleStringArray `json:"d"`
 	CacheHit             int                 `json:"ch"`
+	ConstraintUsage      []struct {
+		Limit int `json:"l"`
+		Usage int `json:"u"`
+	} `json:"cu"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -411,6 +415,20 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		},
 	})
 
+	var constraintUsage []ConstraintUsage
+	if len(parsedResponse.ConstraintUsage) > 0 {
+		constraintUsage = make([]ConstraintUsage, 0, len(parsedResponse.ConstraintUsage))
+		for i, v := range parsedResponse.ConstraintUsage {
+			if i < len(sortedConstraints) {
+				constraintUsage = append(constraintUsage, ConstraintUsage{
+					Constraint: sortedConstraints[i],
+					Limit:      v.Limit,
+					Used:       v.Usage,
+				})
+			}
+		}
+	}
+
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
@@ -427,6 +445,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 				Duration:             req.Duration,
 				Source:               req.Source,
 				GrantedLeases:        leases,
+				Usage:                constraintUsage,
 			})
 			if err != nil {
 				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
@@ -512,6 +531,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			LimitingConstraints:  limitingConstraints,
 			ExhaustedConstraints: exhaustedConstraints,
 			FairnessReduction:    parsedResponse.FairnessReduction,
+			Usage:                constraintUsage,
 			RetryAfter:           retryAfter,
 			internalDebugState:   parsedResponse,
 		}, nil
@@ -531,6 +551,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			ExhaustedConstraints: exhaustedConstraints,
 			RetryAfter:           retryAfter,
 			FairnessReduction:    parsedResponse.FairnessReduction,
+			Usage:                constraintUsage,
 			internalDebugState:   parsedResponse,
 		}, nil
 
