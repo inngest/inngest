@@ -166,10 +166,36 @@ type acquireScriptResponse struct {
 	RetryAt              int                 `json:"ra"`
 	Debug                flexibleStringArray `json:"d"`
 	CacheHit             int                 `json:"ch"`
-	ConstraintUsage      []struct {
-		Limit int `json:"l"`
-		Usage int `json:"u"`
-	} `json:"cu"`
+	ConstraintUsage      []constraintUsageResponse `json:"cu"`
+}
+
+type constraintUsageResponse struct {
+	Limit int `json:"l"`
+	Usage int `json:"u"`
+}
+
+func buildConstraintUsage(
+	parsedUsage []constraintUsageResponse,
+	sortedConstraints []ConstraintItem,
+) ([]ConstraintUsage, error) {
+	if len(parsedUsage) == 0 {
+		return nil, nil
+	}
+
+	if len(parsedUsage) != len(sortedConstraints) {
+		return nil, fmt.Errorf("expected %d constraint usage entries, got %d", len(sortedConstraints), len(parsedUsage))
+	}
+
+	constraintUsage := make([]ConstraintUsage, 0, len(parsedUsage))
+	for i, v := range parsedUsage {
+		constraintUsage = append(constraintUsage, ConstraintUsage{
+			Constraint: sortedConstraints[i],
+			Limit:      v.Limit,
+			Used:       v.Usage,
+		})
+	}
+
+	return constraintUsage, nil
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -415,18 +441,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		},
 	})
 
-	var constraintUsage []ConstraintUsage
-	if len(parsedResponse.ConstraintUsage) > 0 {
-		constraintUsage = make([]ConstraintUsage, 0, len(parsedResponse.ConstraintUsage))
-		for i, v := range parsedResponse.ConstraintUsage {
-			if i < len(sortedConstraints) {
-				constraintUsage = append(constraintUsage, ConstraintUsage{
-					Constraint: sortedConstraints[i],
-					Limit:      v.Limit,
-					Used:       v.Usage,
-				})
-			}
-		}
+	constraintUsage, err := buildConstraintUsage(parsedResponse.ConstraintUsage, sortedConstraints)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "invalid constraint usage response: %w", err)
 	}
 
 	if len(r.lifecycles) > 0 {
