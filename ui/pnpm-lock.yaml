@@ -139,10 +139,10 @@ importers:
         version: 3.0.0
       '@stripe/react-stripe-js':
         specifier: ^6.0.0
-        version: 6.2.0(@stripe/stripe-js@9.2.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 6.2.0(@stripe/stripe-js@9.3.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@stripe/stripe-js':
         specifier: ^9.0.0
-        version: 9.2.0
+        version: 9.3.0
       '@tanstack/eslint-config':
         specifier: ^0.4.0
         version: 0.4.0(@typescript-eslint/utils@8.59.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
@@ -5021,8 +5021,8 @@ packages:
       react: '>=16.8.0 <20.0.0'
       react-dom: '>=16.8.0 <20.0.0'
 
-  '@stripe/stripe-js@9.2.0':
-    resolution: {integrity: sha512-YSzLC0t6VS9MDdPTynSMqU8IxrItFUjkDORALFT6sSMR/XZ5Vgm3RDp/Gk7z727MC4A9s4MFVel0gF0c7+kdrg==}
+  '@stripe/stripe-js@9.3.0':
+    resolution: {integrity: sha512-BPiTYrt8OEpvm5W/gyWUfGdHCk2L9DmZ2R8WmsNVhgjNCEl40CAYtyPHFQFic+j9rJbyjxifDkU+MO0sFUGkUQ==}
     engines: {node: '>=12.16'}
 
   '@stylistic/eslint-plugin@5.10.0':
@@ -16078,14 +16078,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@stripe/react-stripe-js@6.2.0(@stripe/stripe-js@9.2.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@stripe/react-stripe-js@6.2.0(@stripe/stripe-js@9.3.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@stripe/stripe-js': 9.2.0
+      '@stripe/stripe-js': 9.3.0
       prop-types: 15.8.1
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  '@stripe/stripe-js@9.2.0': {}
+  '@stripe/stripe-js@9.3.0': {}
 
   '@stylistic/eslint-plugin@5.10.0(eslint@9.39.4(jiti@1.21.7))':
     dependencies:
