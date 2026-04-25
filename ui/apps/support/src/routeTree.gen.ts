@@ -58,7 +58,7 @@ export interface FileRoutesByFullPath {
   '/new': typeof AuthedNewRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/case/$ticketId': typeof AuthedCaseTicketIdRoute
-  '/support': typeof AuthedSupportIndexRoute
+  '/support/': typeof AuthedSupportIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,7 +86,7 @@ export interface FileRouteTypes {
     | '/new'
     | '/sign-in/$'
     | '/case/$ticketId'
-    | '/support'
+    | '/support/'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/sign-out' | '/new' | '/sign-in/$' | '/case/$ticketId' | '/support'
   id:
@@ -119,7 +119,7 @@ declare module '@tanstack/react-router' {
     '/_authed': {
       id: '/_authed'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -147,7 +147,7 @@ declare module '@tanstack/react-router' {
     '/_authed/support/': {
       id: '/_authed/support/'
       path: '/support'
-      fullPath: '/support'
+      fullPath: '/support/'
       preLoaderRoute: typeof AuthedSupportIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
