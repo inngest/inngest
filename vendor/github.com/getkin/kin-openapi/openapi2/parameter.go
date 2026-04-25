@@ -2,6 +2,7 @@ package openapi2
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -45,9 +46,7 @@ func (parameter Parameter) MarshalJSON() ([]byte, error) {
 	}
 
 	m := make(map[string]any, 24+len(parameter.Extensions))
-	for k, v := range parameter.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, parameter.Extensions)
 
 	if x := parameter.In; x != "" {
 		m["in"] = x

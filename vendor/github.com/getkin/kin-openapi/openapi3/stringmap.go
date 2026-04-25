@@ -19,8 +19,8 @@ func unmarshalStringMapP[V any](data []byte) (map[string]*V, error) {
 	}
 
 	result := make(map[string]*V, len(m))
-	for k, v := range m {
-		value, err := deepCast[V](v)
+	for _, k := range componentNames(m) {
+		value, err := deepCast[V](m[k])
 		if err != nil {
 			return nil, err
 		}
@@ -38,8 +38,8 @@ func unmarshalStringMap[V any](data []byte) (map[string]V, error) {
 	}
 
 	result := make(map[string]V, len(m))
-	for k, v := range m {
-		value, err := deepCast[V](v)
+	for _, k := range componentNames(m) {
+		value, err := deepCast[V](m[k])
 		if err != nil {
 			return nil, err
 		}

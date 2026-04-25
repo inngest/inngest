@@ -23,7 +23,7 @@ type RefNameResolver func(*T, ComponentRef) string
 //   - Cutting the "#/components/<type>" part.
 //   - Cutting the file extensions (.yaml/.json) from documents.
 //   - Trimming the common directory with the root spec.
-//   - Replace invalid characters with with underscores.
+//   - Replace invalid characters with underscores.
 //
 // This is an injective mapping over a "reasonable" amount of the possible openapi
 // spec domain space but is not perfect. There might be edge cases.
@@ -34,7 +34,7 @@ func DefaultRefNameResolver(doc *T, ref ComponentRef) string {
 
 	name := ref.RefPath()
 
-	// If refering to a component in the root spec, no need to internalize just use
+	// If referring to a component in the root spec, no need to internalize just use
 	// the existing component.
 	// XXX(percivalalb): since this function call is iterating over components behind the
 	// scenes during an internalization call it actually starts interating over
@@ -63,7 +63,7 @@ func DefaultRefNameResolver(doc *T, ref ComponentRef) string {
 			filePath = ""
 		}
 
-		// Remove the path extentions to make this JSON/YAML agnostic.
+		// Remove the path extensions to make this JSON/YAML agnostic.
 		for ext := path.Ext(filePath); len(ext) > 0; ext = path.Ext(filePath) {
 			filePath = strings.TrimSuffix(filePath, ext)
 		}
@@ -112,7 +112,7 @@ func cutDirectories(p, dirs string) (string, bool) {
 
 	var sb strings.Builder
 	sb.Grow(len(ParameterInHeader))
-	for _, segments := range strings.Split(p, "/") {
+	for segments := range strings.SplitSeq(p, "/") {
 		sb.WriteString(segments)
 
 		if sb.String() == p {
@@ -348,7 +348,8 @@ func (doc *T) derefSchema(s *Schema, refNameResolver RefNameResolver, parentIsEx
 	// Discriminator mapping values are special cases since they are not full
 	// ref objects but are string references to schema objects.
 	if s.Discriminator != nil {
-		for k, mapRef := range s.Discriminator.Mapping {
+		for _, k := range componentNames(s.Discriminator.Mapping) {
+			mapRef := s.Discriminator.Mapping[k]
 			s2 := (*SchemaRef)(&mapRef)
 			isExternal := doc.addSchemaToSpec(s2, refNameResolver, parentIsExternal)
 			doc.derefSchema(s2.Value, refNameResolver, isExternal || parentIsExternal)

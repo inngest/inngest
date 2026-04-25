@@ -75,6 +75,6 @@
     "node": "24.x",
     "pnpm": "10.x"
   },
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.33.1",
   "private": true
 }

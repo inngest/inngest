@@ -30,7 +30,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@903f9c1a6ebcba6cf41d87230be49611ac97822e # v6
         with:
-          version: 10.33.0
+          version: 10.33.1
       - name: Set sha
         id: sha
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT

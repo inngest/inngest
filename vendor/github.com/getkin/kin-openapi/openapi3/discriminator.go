@@ -3,13 +3,14 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
+	"maps"
 )
 
 // Discriminator is specified by OpenAPI/Swagger standard version 3.
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#discriminator-object
 type Discriminator struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
+	Origin     *Origin        `json:"-" yaml:"-"`
 
 	PropertyName string                `json:"propertyName" yaml:"propertyName"` // required
 	Mapping      StringMap[MappingRef] `json:"mapping,omitempty" yaml:"mapping,omitempty"`
@@ -41,9 +42,7 @@ func (discriminator Discriminator) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Discriminator.
 func (discriminator Discriminator) MarshalYAML() (any, error) {
 	m := make(map[string]any, 2+len(discriminator.Extensions))
-	for k, v := range discriminator.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, discriminator.Extensions)
 	m["propertyName"] = discriminator.PropertyName
 	if x := discriminator.Mapping; len(x) != 0 {
 		m["mapping"] = x

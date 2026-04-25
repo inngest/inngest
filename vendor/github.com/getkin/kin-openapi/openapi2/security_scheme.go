@@ -2,6 +2,7 @@ package openapi2
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -31,9 +32,7 @@ func (securityScheme SecurityScheme) MarshalJSON() ([]byte, error) {
 	}
 
 	m := make(map[string]any, 10+len(securityScheme.Extensions))
-	for k, v := range securityScheme.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, securityScheme.Extensions)
 	if x := securityScheme.Description; x != "" {
 		m["description"] = x
 	}

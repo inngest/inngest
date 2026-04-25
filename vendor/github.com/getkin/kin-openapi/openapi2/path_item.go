@@ -3,6 +3,7 @@ package openapi2
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -30,9 +31,7 @@ func (pathItem PathItem) MarshalJSON() ([]byte, error) {
 	}
 
 	m := make(map[string]any, 8+len(pathItem.Extensions))
-	for k, v := range pathItem.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, pathItem.Extensions)
 	if x := pathItem.Delete; x != nil {
 		m["delete"] = x
 	}

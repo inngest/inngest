@@ -7,18 +7,19 @@ import (
 	"regexp"
 )
 
-type (
-	// FormatValidator is an interface for custom format validators.
-	FormatValidator[T any] interface {
-		Validate(value T) error
-	}
-	// StringFormatValidator is a type alias for FormatValidator[string]
-	StringFormatValidator = FormatValidator[string]
-	// NumberFormatValidator is a type alias for FormatValidator[float64]
-	NumberFormatValidator = FormatValidator[float64]
-	// IntegerFormatValidator is a type alias for FormatValidator[int64]
-	IntegerFormatValidator = FormatValidator[int64]
-)
+// FormatValidator is an interface for custom format validators.
+type FormatValidator[T any] interface {
+	Validate(value T) error
+}
+
+// StringFormatValidator is a type alias for FormatValidator[string]
+type StringFormatValidator = FormatValidator[string]
+
+// NumberFormatValidator is a type alias for FormatValidator[float64]
+type NumberFormatValidator = FormatValidator[float64]
+
+// IntegerFormatValidator is a type alias for FormatValidator[int64]
+type IntegerFormatValidator = FormatValidator[int64]
 
 var (
 	// SchemaStringFormats is a map of custom string format validators.

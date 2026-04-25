@@ -45,7 +45,7 @@ func (security SecurityRequirement) Authenticate(provider string, scopes ...stri
 
 // Validate returns an error if SecurityRequirement does not comply with the OpenAPI spec.
 func (security *SecurityRequirement) Validate(ctx context.Context, opts ...ValidationOption) error {
-	ctx = WithValidationOptions(ctx, opts...)
+	// ctx = WithValidationOptions(ctx, opts...)
 
 	return nil
 }

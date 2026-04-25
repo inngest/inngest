@@ -2,7 +2,6 @@ package openapi3
 
 import (
 	"context"
-	"slices"
 	"strings"
 )
 
@@ -10,7 +9,7 @@ import (
 type Content map[string]*MediaType
 
 func NewContent() Content {
-	return make(map[string]*MediaType)
+	return make(Content)
 }
 
 func NewContentWithSchema(schema *Schema, consumes []string) Content {
@@ -109,14 +108,8 @@ func (content Content) Get(mime string) *MediaType {
 func (content Content) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
 
-	keys := make([]string, 0, len(content))
-	for key := range content {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		v := content[k]
-		if err := v.Validate(ctx); err != nil {
+	for _, k := range componentNames(content) {
+		if err := content[k].Validate(ctx); err != nil {
 			return err
 		}
 	}

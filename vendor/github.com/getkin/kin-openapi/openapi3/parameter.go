@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
+	"maps"
 	"strconv"
 
 	"github.com/go-openapi/jsonpointer"
@@ -73,7 +73,7 @@ func (parameters Parameters) Validate(ctx context.Context, opts ...ValidationOpt
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#parameter-object
 type Parameter struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
+	Origin     *Origin        `json:"-" yaml:"-"`
 
 	Name            string     `json:"name,omitempty" yaml:"name,omitempty"`
 	In              string     `json:"in,omitempty" yaml:"in,omitempty"`
@@ -161,9 +161,7 @@ func (parameter Parameter) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Parameter.
 func (parameter Parameter) MarshalYAML() (any, error) {
 	m := make(map[string]any, 13+len(parameter.Extensions))
-	for k, v := range parameter.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, parameter.Extensions)
 
 	if x := parameter.Name; x != "" {
 		m["name"] = x
@@ -396,12 +394,7 @@ func (parameter *Parameter) Validate(ctx context.Context, opts ...ValidationOpti
 				return fmt.Errorf("invalid example: %w", err)
 			}
 		} else if examples := parameter.Examples; examples != nil {
-			names := make([]string, 0, len(examples))
-			for name := range examples {
-				names = append(names, name)
-			}
-			slices.Sort(names)
-			for _, k := range names {
+			for _, k := range componentNames(examples) {
 				v := examples[k]
 				if err := v.Validate(ctx); err != nil {
 					return fmt.Errorf("%s: %w", k, err)

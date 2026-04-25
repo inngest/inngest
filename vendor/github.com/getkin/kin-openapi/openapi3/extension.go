@@ -3,7 +3,6 @@ package openapi3
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -11,7 +10,7 @@ func validateExtensions(ctx context.Context, extensions map[string]any) error { 
 	allowed := getValidationOptions(ctx).extraSiblingFieldsAllowed
 
 	var unknowns []string
-	for k := range extensions {
+	for _, k := range componentNames(extensions) {
 		if strings.HasPrefix(k, "x-") {
 			continue
 		}
@@ -24,7 +23,6 @@ func validateExtensions(ctx context.Context, extensions map[string]any) error { 
 	}
 
 	if len(unknowns) != 0 {
-		slices.Sort(unknowns)
 		return fmt.Errorf("extra sibling fields: %+v", unknowns)
 	}
 

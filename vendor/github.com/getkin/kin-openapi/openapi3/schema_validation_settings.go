@@ -21,6 +21,7 @@ type schemaValidationSettings struct {
 	patternValidationDisabled   bool
 	readOnlyValidationDisabled  bool
 	writeOnlyValidationDisabled bool
+	useJSONSchema2020           bool // Use JSON Schema 2020-12 validator for OpenAPI 3.1
 
 	regexCompiler RegexCompilerFunc
 
@@ -149,6 +150,13 @@ func WithIntegerFormatValidator(name string, validator IntegerFormatValidator) S
 		}
 		s.integerFormats[name] = validator
 	}
+}
+
+// EnableJSONSchema2020 enables JSON Schema 2020-12 compliant validation.
+// This enables support for OpenAPI 3.1 and JSON Schema 2020-12 features.
+// When enabled, validation uses the jsonschema library instead of the built-in validator.
+func EnableJSONSchema2020() SchemaValidationOption {
+	return func(s *schemaValidationSettings) { s.useJSONSchema2020 = true }
 }
 
 func newSchemaValidationSettings(opts ...SchemaValidationOption) *schemaValidationSettings {

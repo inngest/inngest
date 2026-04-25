@@ -149,12 +149,11 @@ func applyOriginsToValue(val reflect.Value, tree *yaml.OriginTree) {
 func applyOriginsToStruct(val reflect.Value, ptr reflect.Value, tree *yaml.OriginTree) {
 	typ := val.Type()
 
-	// Set Origin field for structs whose Origin field has an __origin__ json tag (most types)
-	// or a "-" json tag (Response). Skip *Ref types whose Origin has no json tag.
+	// Set Origin field for structs whose Origin field has a "-" json tag.
 	if tree.Origin != nil {
 		if sf, ok := typ.FieldByName("Origin"); ok && sf.Type == originPtrType {
 			tag := sf.Tag.Get("json")
-			if strings.Contains(tag, originKey) || tag == "-" {
+			if tag == "-" {
 				if s, ok := tree.Origin.([]any); ok {
 					val.FieldByName("Origin").Set(reflect.ValueOf(originFromSeq(s)))
 				}
@@ -163,7 +162,7 @@ func applyOriginsToStruct(val reflect.Value, ptr reflect.Value, tree *yaml.Origi
 	}
 
 	// Recurse into exported struct fields using json tags
-	for i := 0; i < typ.NumField(); i++ {
+	for i := range typ.NumField() {
 		sf := typ.Field(i)
 		if !sf.IsExported() {
 			continue
@@ -180,7 +179,7 @@ func applyOriginsToStruct(val reflect.Value, ptr reflect.Value, tree *yaml.Origi
 
 	// Handle wrapper types whose inner struct has no json tag:
 	// - *Ref types (e.g. SchemaRef, ResponseRef) have a "Value" field
-	// - AdditionalProperties has a "Schema" field
+	// - BoolSchema (AdditionalProperties, UnevaluatedProperties, UnevaluatedItems) has a "Schema" field
 	// The origin tree data applies to the inner struct, not a sub-key.
 	for _, fieldName := range []string{"Value", "Schema"} {
 		vf := val.FieldByName(fieldName)
