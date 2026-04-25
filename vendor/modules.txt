@@ -171,7 +171,7 @@ cuelang.org/go/tools/flow
 # dario.cat/mergo v1.0.2
 ## explicit; go 1.13
 dario.cat/mergo
-# github.com/99designs/gqlgen v0.17.89
+# github.com/99designs/gqlgen v0.17.90
 ## explicit; go 1.25.0
 github.com/99designs/gqlgen
 github.com/99designs/gqlgen/api
@@ -1936,7 +1936,7 @@ modernc.org/mathutil
 # modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.49.1
+# modernc.org/sqlite v1.50.0
 ## explicit; go 1.25.0
 modernc.org/sqlite
 modernc.org/sqlite/lib

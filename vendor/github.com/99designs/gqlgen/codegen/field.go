@@ -123,7 +123,7 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 			// Filter out INPUT_OBJECT directives from type references - they should
 			// only be executed on the input object itself, not on fields that use the type.
 			// See: https://github.com/99designs/gqlgen/issues/2281
-			var filteredDirs []*Directive
+			filteredDirs := make([]*Directive, 0, len(dirs))
 			for _, dir := range dirs {
 				if !dir.IsLocation(ast.LocationInputObject) {
 					filteredDirs = append(filteredDirs, dir)
@@ -345,7 +345,7 @@ func (b *builder) findBindStructTagTarget(in types.Type, name string) (types.Obj
 		return b.findBindStructTagTarget(t.Underlying(), name)
 	case *types.Struct:
 		var found types.Object
-		for i := 0; i < t.NumFields(); i++ {
+		for i := range t.NumFields() {
 			field := t.Field(i)
 			if !field.Exported() || field.Embedded() {
 				continue
@@ -689,8 +689,20 @@ func (f *Field) FieldContextFunc() string {
 	return "fieldContext_" + f.Object.Name + "_" + f.Name
 }
 
+// ChildFieldContextFunc returns the fieldContext function name for a child field.
+// Callers must ensure TypeReference and Definition are non-nil (guaranteed by the
+// template rendering path, which only calls this for bound fields).
 func (f *Field) ChildFieldContextFunc(name string) string {
 	return "fieldContext_" + f.TypeReference.Definition.Name + "_" + name
+}
+
+// ChildFieldContextTypeName returns the GraphQL type name that this field
+// resolves to. Used by templates to reference shared childFields_* functions.
+func (f *Field) ChildFieldContextTypeName() string {
+	if f.TypeReference == nil || f.TypeReference.Definition == nil {
+		return ""
+	}
+	return f.TypeReference.Definition.Name
 }
 
 func (f *Field) ResolverType() string {
@@ -699,6 +711,13 @@ func (f *Field) ResolverType() string {
 	}
 
 	return fmt.Sprintf("%s().%s(%s)", f.Object.Name, f.GoFieldName, f.CallArgs())
+}
+
+// ZeroVal returns the Go declaration for the typed zero value of this field's
+// return type, suitable for use as an error-path return value inside a
+// directive closure.
+func (f *Field) ZeroVal() string {
+	return fmt.Sprintf("var zeroVal %s", templates.CurrentImports.LookupType(f.TypeReference.GO))
 }
 
 func (f *Field) IsInputObject() bool {

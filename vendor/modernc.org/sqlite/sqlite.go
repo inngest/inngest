@@ -898,3 +898,25 @@ func Limit(c *sql.Conn, id int, newVal int) (r int, err error) {
 	return r, err
 
 }
+
+// ColumnInfo describes one output column of a prepared SQL statement.
+//
+// See https://www.sqlite.org/c3ref/column_database_name.html for more details.
+type ColumnInfo struct {
+	// Name is the column's name, from sqlite3_column_name.
+	Name string
+	// DeclType is the declared column type, from sqlite3_column_decltype.
+	DeclType string
+	// DatabaseName is the name of the source database, from sqlite3_column_database_name.
+	// Empty if the column does not resolve to an unambiguous reference to a single database column,
+	// such as expressions, function calls, or constants.
+	DatabaseName string
+	// TableName is the name of the source table, from sqlite3_column_table_name.
+	// Empty if the column does not resolve to an unambiguous reference to a single database column,
+	// such as expressions, function calls, or constants.
+	TableName string
+	// OriginName is the name of the source column name, from sqlite3_column_origin_name.
+	// Empty if the column does not resolve to an unambiguous reference to a single database column,
+	// such as expressions, function calls, or constants.
+	OriginName string
+}

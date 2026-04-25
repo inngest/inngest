@@ -235,6 +235,71 @@ func (c *conn) columnName(pstmt uintptr, n int) (string, error) {
 	return libc.GoString(p), nil
 }
 
+// ColumnInfo returns column information for query.
+// It does not execute query.
+//
+// For output columns that are expressions, function calls, or constants —
+// or otherwise do not resolve to a single column — the DatabaseName,
+// TableName, and OriginName fields of the corresponding ColumnInfo are
+// empty, per the sqlite3 contract.
+//
+// Sample usage:
+//
+//	err := conn.Raw(func(driverConn any) error {
+//		ci, ok := driverConn.(interface{ ColumnInfo(query string) ([]sqlite.ColumnInfo, error) })
+//		if !ok {
+//			return fmt.Errorf("driver does not support ColumnInfo")
+//		}
+//		info, err := ci.ColumnInfo(query)
+//		if err != nil {
+//			return err
+//		}
+//		// use info
+//		return nil
+//	})
+func (c *conn) ColumnInfo(query string) (_ []ColumnInfo, err error) {
+	p, err := libc.CString(query)
+	if err != nil {
+		return nil, err
+	}
+	defer c.free(p)
+
+	psql := p
+	pstmt, err := c.prepareV2(&psql)
+	if err != nil {
+		return nil, err
+	}
+	if pstmt == 0 {
+		// Empty or comment-only query: no columns to describe.
+		return nil, nil
+	}
+	defer func() {
+		if e := c.finalize(pstmt); err == nil {
+			err = e
+		}
+	}()
+
+	n, err := c.columnCount(pstmt)
+	if err != nil {
+		return nil, err
+	}
+	info := make([]ColumnInfo, n)
+	for i := range n {
+		name, err := c.columnName(pstmt, i)
+		if err != nil {
+			return nil, err
+		}
+		info[i] = ColumnInfo{
+			Name:         name,
+			DeclType:     c.columnDeclType(pstmt, i),
+			DatabaseName: libc.GoString(sqlite3.Xsqlite3_column_database_name(c.tls, pstmt, int32(i))),
+			TableName:    libc.GoString(sqlite3.Xsqlite3_column_table_name(c.tls, pstmt, int32(i))),
+			OriginName:   libc.GoString(sqlite3.Xsqlite3_column_origin_name(c.tls, pstmt, int32(i))),
+		}
+	}
+	return info, nil
+}
+
 // C documentation
 //
 //	int sqlite3_column_count(sqlite3_stmt *pStmt);

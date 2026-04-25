@@ -8,7 +8,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.3
 	connectrpc.com/connect v1.19.2
 	cuelang.org/go v0.16.1
-	github.com/99designs/gqlgen v0.17.89
+	github.com/99designs/gqlgen v0.17.90
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
@@ -110,7 +110,7 @@ require (
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	lukechampine.com/frand v1.5.1
-	modernc.org/sqlite v1.49.1
+	modernc.org/sqlite v1.50.0
 )
 
 require (
