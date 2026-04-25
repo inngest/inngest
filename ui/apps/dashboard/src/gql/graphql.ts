@@ -48,6 +48,29 @@ export type Scalars = {
   Upload: { input: unknown; output: unknown; }
 };
 
+export type ApiKey = {
+  __typename?: 'APIKey';
+  createdAt: Scalars['Time']['output'];
+  env: Maybe<Workspace>;
+  id: Scalars['UUID']['output'];
+  maskedKey: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  scopes: Array<ApiKeyScope>;
+};
+
+export type ApiKeyCreateResult = {
+  __typename?: 'APIKeyCreateResult';
+  apiKey: ApiKey;
+  plaintextKey: Scalars['String']['output'];
+};
+
+export type ApiKeyScope = {
+  __typename?: 'APIKeyScope';
+  allow: Array<Scalars['String']['output']>;
+  deny: Array<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+};
+
 export type AwsMarketplaceSetupInput = {
   awsAccountID: Scalars['String']['input'];
   customerID: Scalars['String']['input'];
@@ -63,6 +86,7 @@ export type Account = {
   __typename?: 'Account';
   activeBanners: Array<Banner>;
   addons: Addons;
+  apiKeys: Array<ApiKey>;
   appliedAddons: AppliedAddons;
   billingEmail: Scalars['String']['output'];
   constraintAPIEnrolled: Scalars['Boolean']['output'];
@@ -85,6 +109,11 @@ export type Account = {
   updatedAt: Scalars['Time']['output'];
   users: Array<User>;
   vercelIntegration: Maybe<VercelIntegration>;
+};
+
+
+export type AccountApiKeysArgs = {
+  workspaceID: InputMaybe<Scalars['UUID']['input']>;
 };
 
 
@@ -491,6 +520,11 @@ export type ConnectV1WorkerMetricsFilter = {
   instanceIDs?: InputMaybe<Array<Scalars['String']['input']>>;
   name: Scalars['String']['input'];
   until?: InputMaybe<Scalars['Time']['input']>;
+};
+
+export type CreateApiKeyInput = {
+  name: Scalars['String']['input'];
+  workspaceID: Scalars['UUID']['input'];
 };
 
 export type CreateCancellationInput = {
@@ -1223,6 +1257,7 @@ export type Mutation = {
   cdcTestSetup: CdcSetupResponse;
   completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
   confirmSubscriptionUpgrade: ConfirmSubscriptionUpgradeResponse;
+  createAPIKey: ApiKeyCreateResult;
   createCancellation: Cancellation;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
@@ -1234,6 +1269,7 @@ export type Mutation = {
   createWorkspace: Array<Maybe<Workspace>>;
   datadogOAuthCompleted: DatadogOrganization;
   datadogOAuthRedirectURL: Scalars['String']['output'];
+  deleteAPIKey: Scalars['Boolean']['output'];
   deleteCancellation: Scalars['ULID']['output'];
   deleteIngestKey: Maybe<DeleteResponse>;
   deleteSigningKey: SigningKey;
@@ -1259,6 +1295,7 @@ export type Mutation = {
   unarchiveApp: App;
   unarchiveEnvironment: Workspace;
   unpauseFunction: Workflow;
+  updateAPIKey: ApiKey;
   updateAccount: Account;
   updateAccountAddonQuantity: Addon;
   updateIngestKey: IngestKey;
@@ -1342,6 +1379,11 @@ export type MutationConfirmSubscriptionUpgradeArgs = {
 };
 
 
+export type MutationCreateApiKeyArgs = {
+  input: CreateApiKeyInput;
+};
+
+
 export type MutationCreateCancellationArgs = {
   input: CreateCancellationInput;
 };
@@ -1394,6 +1436,11 @@ export type MutationDatadogOAuthCompletedArgs = {
 export type MutationDatadogOAuthRedirectUrlArgs = {
   ddDomain: Scalars['String']['input'];
   ddSite: Scalars['String']['input'];
+};
+
+
+export type MutationDeleteApiKeyArgs = {
+  id: Scalars['UUID']['input'];
 };
 
 
@@ -1527,6 +1574,11 @@ export type MutationUnarchiveEnvironmentArgs = {
 
 export type MutationUnpauseFunctionArgs = {
   fnID: Scalars['ID']['input'];
+};
+
+
+export type MutationUpdateApiKeyArgs = {
+  input: UpdateApiKeyInput;
 };
 
 
@@ -2206,6 +2258,11 @@ export type TimeSeriesPoint = {
   __typename?: 'TimeSeriesPoint';
   time: Scalars['Time']['output'];
   value: Maybe<Scalars['Float']['output']>;
+};
+
+export type UpdateApiKeyInput = {
+  id: Scalars['UUID']['input'];
+  name: Scalars['String']['input'];
 };
 
 export type UpdateAccount = {

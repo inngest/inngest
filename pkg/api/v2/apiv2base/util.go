@@ -86,6 +86,8 @@ func GRPCToHTTPStatus(code codes.Code) int {
 	switch code {
 	case codes.InvalidArgument:
 		return http.StatusBadRequest
+	case codes.FailedPrecondition:
+		return http.StatusUnprocessableEntity
 	case codes.Unauthenticated:
 		return http.StatusUnauthorized
 	case codes.PermissionDenied:

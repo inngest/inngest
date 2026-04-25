@@ -109,7 +109,7 @@ func httpToGRPCStatus(httpCode int) codes.Code {
 	case http.StatusConflict:
 		return codes.AlreadyExists
 	case http.StatusUnprocessableEntity:
-		return codes.InvalidArgument
+		return codes.FailedPrecondition
 	case http.StatusTooManyRequests:
 		return codes.ResourceExhausted
 	case http.StatusInternalServerError:
