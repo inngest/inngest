@@ -47,7 +47,6 @@ function RunComponent() {
           getTrigger={getTrigger}
           pollInterval={pollInterval}
           runID={runID}
-          newStack={true}
         />
       )}
     </div>
