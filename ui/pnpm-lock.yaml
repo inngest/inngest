@@ -399,7 +399,7 @@ importers:
         specifier: 4.0.1
         version: 4.0.1(@reduxjs/toolkit@1.9.7(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.5)(redux@4.2.1))(react@19.2.5))(graphql-request@7.4.0(graphql@16.13.2))(graphql-tag@2.12.6(graphql@16.13.2))(graphql@16.13.2)
       '@rsbuild/core':
-        specifier: ^2.0.0
+        specifier: 2.0.1
         version: 2.0.1
       '@tanstack/eslint-config':
         specifier: 0.4.0
