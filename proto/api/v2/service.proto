@@ -1507,13 +1507,13 @@ message InvokeFunctionData {
 message SyncAppRequest {
   string app_id = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "The external ID of the app to sync"
+      description: "App ID"
       example: "\"my-app\""
     }
   ];
   string url = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "The URL of the app's serve handler. The server will ping this URL to perform the sync."
+      description: "URL for the Inngest endpoint in the app"
       example: "\"https://example.com/api/inngest\""
     }
   ];
@@ -1527,31 +1527,22 @@ message SyncAppResponse {
 message SyncAppData {
   string id = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "App UUID. Empty if no app was created (e.g. app-ID mismatch on initial sync)."
-    }
-  ];
-  SyncAppLatestSync latest_sync = 2;
-}
-
-message SyncAppLatestSync {
-  string id = 1 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Deploy UUID"
+      description: "ID"
     }
   ];
   string status = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Deploy status (e.g. success, error, duplicate)"
+      description: "Status"
     }
   ];
   string app_id = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "App external ID recorded on the deploy"
+      description: "App ID"
     }
   ];
   optional SyncAppError error = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Coded error when the sync failed. Populated on 422 responses."
+      description: "Error, including a code and message"
     }
   ];
 }
@@ -1559,5 +1550,4 @@ message SyncAppLatestSync {
 message SyncAppError {
   string code = 1;
   string message = 2;
-  google.protobuf.Struct data = 3;
 }
