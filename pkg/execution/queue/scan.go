@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"sync"
@@ -61,8 +62,8 @@ LOOP:
 			}
 
 			if err = q.scan(ctx); err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					l.Warn("deadline exceeded scanning partition pointers")
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) {
+					l.Warn("transient error scanning partition pointers", "error", err)
 					<-time.After(backoff)
 
 					// Backoff doubles up to 3 seconds.
@@ -324,8 +325,8 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 			now := q.Clock().Now()
 			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
 			if err := q.ScanShadowPartitions(ctx, scanUntil, q.qspc); err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					l.Warn("deadline exceeded scanning shadow partitions")
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) {
+					l.Warn("transient error scanning shadow partitions", "error", err)
 					<-time.After(backoff)
 
 					// Backoff doubles up to 5 seconds

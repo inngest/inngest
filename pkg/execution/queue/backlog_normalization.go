@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"runtime"
 	"time"
@@ -71,8 +72,8 @@ func (q *queueProcessor) backlogNormalizationScan(ctx context.Context) error {
 			until := q.Clock().Now()
 
 			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					l.Warn("deadline exceeded scanning backlog normalization partition")
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) {
+					l.Warn("transient error scanning backlog normalization partition", "error", err)
 					<-time.After(backoff)
 
 					// Backoff doubles up to 5 seconds
