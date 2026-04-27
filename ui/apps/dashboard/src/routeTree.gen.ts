@@ -60,6 +60,7 @@ import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_auth
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
 import { Route as AuthedEnvEnvSlugInsightsIndexRouteImport } from './routes/_authed/env/$envSlug/insights/index'
 import { Route as AuthedEnvEnvSlugFunctionsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/index'
+import { Route as AuthedEnvEnvSlugExperimentsIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/index'
 import { Route as AuthedEnvEnvSlugEventsIndexRouteImport } from './routes/_authed/env/$envSlug/events/index'
 import { Route as AuthedEnvEnvSlugEventTypesIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/index'
 import { Route as AuthedEnvEnvSlugDebuggerIndexRouteImport } from './routes/_authed/env/$envSlug/debugger/index'
@@ -86,6 +87,7 @@ import { Route as AuthedEnvEnvSlugOnboardingStepIndexRouteImport } from './route
 import { Route as AuthedEnvEnvSlugManageSigningKeyIndexRouteImport } from './routes/_authed/env/$envSlug/manage/signing-key/index'
 import { Route as AuthedEnvEnvSlugManageIngestKeysIndexRouteImport } from './routes/_authed/env/$envSlug/manage/$ingestKeys/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/index'
+import { Route as AuthedEnvEnvSlugExperimentsExperimentNameIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/$experimentName/index'
 import { Route as AuthedEnvEnvSlugEventsEventIDIndexRouteImport } from './routes/_authed/env/$envSlug/events/$eventID/index'
 import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/$eventTypeName/index'
 import { Route as AuthedEnvEnvSlugDebuggerFunctionSlugIndexRouteImport } from './routes/_authed/env/$envSlug/debugger/$functionSlug/index'
@@ -380,6 +382,12 @@ const AuthedEnvEnvSlugFunctionsIndexRoute =
     path: '/functions/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugExperimentsIndexRoute =
+  AuthedEnvEnvSlugExperimentsIndexRouteImport.update({
+    id: '/experiments/',
+    path: '/experiments/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugEventsIndexRoute =
   AuthedEnvEnvSlugEventsIndexRouteImport.update({
     id: '/events/',
@@ -536,6 +544,12 @@ const AuthedEnvEnvSlugFunctionsSlugIndexRoute =
     path: '/',
     getParentRoute: () => AuthedEnvEnvSlugFunctionsSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute =
+  AuthedEnvEnvSlugExperimentsExperimentNameIndexRouteImport.update({
+    id: '/experiments/$experimentName/',
+    path: '/experiments/$experimentName/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugEventsEventIDIndexRoute =
   AuthedEnvEnvSlugEventsEventIDIndexRouteImport.update({
     id: '/events/$eventID/',
@@ -666,6 +680,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -683,6 +698,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/debugger/$functionSlug/': typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   '/env/$envSlug/event-types/$eventTypeName/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameIndexRoute
   '/env/$envSlug/events/$eventID/': typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
+  '/env/$envSlug/experiments/$experimentName/': typeof AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute
   '/env/$envSlug/functions/$slug/': typeof AuthedEnvEnvSlugFunctionsSlugIndexRoute
   '/env/$envSlug/manage/$ingestKeys/': typeof AuthedEnvEnvSlugManageIngestKeysIndexRoute
   '/env/$envSlug/manage/signing-key/': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
@@ -745,6 +761,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/debugger': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -762,6 +779,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/debugger/$functionSlug': typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   '/env/$envSlug/event-types/$eventTypeName': typeof AuthedEnvEnvSlugEventTypesEventTypeNameIndexRoute
   '/env/$envSlug/events/$eventID': typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
+  '/env/$envSlug/experiments/$experimentName': typeof AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute
   '/env/$envSlug/functions/$slug': typeof AuthedEnvEnvSlugFunctionsSlugIndexRoute
   '/env/$envSlug/manage/$ingestKeys': typeof AuthedEnvEnvSlugManageIngestKeysIndexRoute
   '/env/$envSlug/manage/signing-key': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
@@ -838,6 +856,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/_authed/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/_authed/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/_authed/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/_authed/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/_authed/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -855,6 +874,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/debugger/$functionSlug/': typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   '/_authed/env/$envSlug/event-types/$eventTypeName/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameIndexRoute
   '/_authed/env/$envSlug/events/$eventID/': typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
+  '/_authed/env/$envSlug/experiments/$experimentName/': typeof AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute
   '/_authed/env/$envSlug/functions/$slug/': typeof AuthedEnvEnvSlugFunctionsSlugIndexRoute
   '/_authed/env/$envSlug/manage/$ingestKeys/': typeof AuthedEnvEnvSlugManageIngestKeysIndexRoute
   '/_authed/env/$envSlug/manage/signing-key/': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
@@ -931,6 +951,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger/'
     | '/env/$envSlug/event-types/'
     | '/env/$envSlug/events/'
+    | '/env/$envSlug/experiments/'
     | '/env/$envSlug/functions/'
     | '/env/$envSlug/insights/'
     | '/env/$envSlug/manage/'
@@ -948,6 +969,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger/$functionSlug/'
     | '/env/$envSlug/event-types/$eventTypeName/'
     | '/env/$envSlug/events/$eventID/'
+    | '/env/$envSlug/experiments/$experimentName/'
     | '/env/$envSlug/functions/$slug/'
     | '/env/$envSlug/manage/$ingestKeys/'
     | '/env/$envSlug/manage/signing-key/'
@@ -1010,6 +1032,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger'
     | '/env/$envSlug/event-types'
     | '/env/$envSlug/events'
+    | '/env/$envSlug/experiments'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/insights'
     | '/env/$envSlug/manage'
@@ -1027,6 +1050,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger/$functionSlug'
     | '/env/$envSlug/event-types/$eventTypeName'
     | '/env/$envSlug/events/$eventID'
+    | '/env/$envSlug/experiments/$experimentName'
     | '/env/$envSlug/functions/$slug'
     | '/env/$envSlug/manage/$ingestKeys'
     | '/env/$envSlug/manage/signing-key'
@@ -1102,6 +1126,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/debugger/'
     | '/_authed/env/$envSlug/event-types/'
     | '/_authed/env/$envSlug/events/'
+    | '/_authed/env/$envSlug/experiments/'
     | '/_authed/env/$envSlug/functions/'
     | '/_authed/env/$envSlug/insights/'
     | '/_authed/env/$envSlug/manage/'
@@ -1119,6 +1144,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/debugger/$functionSlug/'
     | '/_authed/env/$envSlug/event-types/$eventTypeName/'
     | '/_authed/env/$envSlug/events/$eventID/'
+    | '/_authed/env/$envSlug/experiments/$experimentName/'
     | '/_authed/env/$envSlug/functions/$slug/'
     | '/_authed/env/$envSlug/manage/$ingestKeys/'
     | '/_authed/env/$envSlug/manage/signing-key/'
@@ -1523,6 +1549,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
+    '/_authed/env/$envSlug/experiments/': {
+      id: '/_authed/env/$envSlug/experiments/'
+      path: '/experiments'
+      fullPath: '/env/$envSlug/experiments/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugExperimentsIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
     '/_authed/env/$envSlug/events/': {
       id: '/_authed/env/$envSlug/events/'
       path: '/events'
@@ -1704,6 +1737,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/env/$envSlug/functions/$slug/'
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsSlugIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugFunctionsSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/experiments/$experimentName/': {
+      id: '/_authed/env/$envSlug/experiments/$experimentName/'
+      path: '/experiments/$experimentName'
+      fullPath: '/env/$envSlug/experiments/$experimentName/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugExperimentsExperimentNameIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/events/$eventID/': {
       id: '/_authed/env/$envSlug/events/$eventID/'
@@ -2110,12 +2150,14 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugDebuggerIndexRoute: typeof AuthedEnvEnvSlugDebuggerIndexRoute
   AuthedEnvEnvSlugEventTypesIndexRoute: typeof AuthedEnvEnvSlugEventTypesIndexRoute
   AuthedEnvEnvSlugEventsIndexRoute: typeof AuthedEnvEnvSlugEventsIndexRoute
+  AuthedEnvEnvSlugExperimentsIndexRoute: typeof AuthedEnvEnvSlugExperimentsIndexRoute
   AuthedEnvEnvSlugFunctionsIndexRoute: typeof AuthedEnvEnvSlugFunctionsIndexRoute
   AuthedEnvEnvSlugInsightsIndexRoute: typeof AuthedEnvEnvSlugInsightsIndexRoute
   AuthedEnvEnvSlugMetricsIndexRoute: typeof AuthedEnvEnvSlugMetricsIndexRoute
   AuthedEnvEnvSlugRunsIndexRoute: typeof AuthedEnvEnvSlugRunsIndexRoute
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute: typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   AuthedEnvEnvSlugEventsEventIDIndexRoute: typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
+  AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute: typeof AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute
   AuthedEnvEnvSlugRunsRunIDIndexRoute: typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
 }
 
@@ -2134,6 +2176,7 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugDebuggerIndexRoute: AuthedEnvEnvSlugDebuggerIndexRoute,
   AuthedEnvEnvSlugEventTypesIndexRoute: AuthedEnvEnvSlugEventTypesIndexRoute,
   AuthedEnvEnvSlugEventsIndexRoute: AuthedEnvEnvSlugEventsIndexRoute,
+  AuthedEnvEnvSlugExperimentsIndexRoute: AuthedEnvEnvSlugExperimentsIndexRoute,
   AuthedEnvEnvSlugFunctionsIndexRoute: AuthedEnvEnvSlugFunctionsIndexRoute,
   AuthedEnvEnvSlugInsightsIndexRoute: AuthedEnvEnvSlugInsightsIndexRoute,
   AuthedEnvEnvSlugMetricsIndexRoute: AuthedEnvEnvSlugMetricsIndexRoute,
@@ -2142,6 +2185,8 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
     AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute,
   AuthedEnvEnvSlugEventsEventIDIndexRoute:
     AuthedEnvEnvSlugEventsEventIDIndexRoute,
+  AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute:
+    AuthedEnvEnvSlugExperimentsExperimentNameIndexRoute,
   AuthedEnvEnvSlugRunsRunIDIndexRoute: AuthedEnvEnvSlugRunsRunIDIndexRoute,
 }
 
