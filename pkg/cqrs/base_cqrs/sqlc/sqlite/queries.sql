@@ -441,7 +441,7 @@ SELECT
   COALESCE(CAST(input AS TEXT), '') AS input,
   COALESCE(CAST(output AS TEXT), '') AS output
 FROM spans
-WHERE span_id IN (sqlc.slice('ids'))
+WHERE run_id = sqlc.arg(run_id) AND span_id IN (sqlc.slice('ids'))
 LIMIT 2;
 
 -- name: GetRunSpanByRunID :one
