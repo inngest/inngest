@@ -127,7 +127,7 @@ func TestBatchAppendIdempotence(t *testing.T) {
 }
 
 // When the same event is appended to different batches, we would end up processing the duplicate event a second time in the second batch.
-// Currently Idempotency for eventIDs are only tracked within a batch. When a batch is full and scheduled, we lose track of eventIDs already processed.
+// Per-event idempotence keys span across batches within their TTL window, so duplicates are rejected even after batch rotation.
 func TestBatchAppendIdempotenceDifferentBatches(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -230,24 +230,17 @@ func TestBatchCleanup(t *testing.T) {
 	require.True(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
-	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
+	// Per-event idempotence key exists instead of a single sorted set
 	require.Equal(t, 4, len(r.Keys()))
 
-	bm = NewRedisBatchManager(bc, nil, WithRedisBatchIdempotenceSetCleanupCutoff(200))
 	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
 	require.NoError(t, err)
 
 	require.False(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
-	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
+	// Per-event idem key + batch pointer remain
 	require.Equal(t, 2, len(r.Keys()))
-
-	bm = NewRedisBatchManager(bc, nil, WithRedisBatchIdempotenceSetCleanupCutoff(0))
-	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
-	require.NoError(t, err)
-	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
-	require.Equal(t, 1, len(r.Keys()))
 }
 
 func TestGetBatchInfo(t *testing.T) {
@@ -421,6 +414,130 @@ func strPtr(s string) *string {
 	return &s
 }
 
+// TestPerEventIdempotenceKeys verifies that per-event SET keys are used for dedup
+// instead of the legacy sorted set, and that they expire independently.
+func TestPerEventIdempotenceKeys(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchIdempotenceSetTTL(10))
+
+	fnId := uuid.New()
+	fn := inngest.Function{
+		ID: fnId,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 100,
+			Timeout: "60s",
+		},
+	}
+
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	bi := BatchItem{
+		AccountID:  uuid.New(),
+		FunctionID: fnId,
+		EventID:    eventID,
+		Event:      event.Event{ID: "test"},
+	}
+
+	// Append first event
+	res, err := bm.Append(context.Background(), bi, fn)
+	require.NoError(t, err)
+	require.Equal(t, enums.BatchNew, res.Status)
+
+	// Verify per-event idem key was created (not the legacy sorted set)
+	prefix := bc.KeyGenerator().QueuePrefix(context.Background(), fnId)
+	idemKey := prefix + ":batch_idem:" + eventID.String()
+	require.True(t, r.Exists(idemKey), "per-event idem key should exist")
+	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)), "legacy sorted set should NOT be created")
+
+	// Same event should be rejected as duplicate
+	res, err = bm.Append(context.Background(), bi, fn)
+	require.NoError(t, err)
+	require.Equal(t, enums.BatchNew, res.Status) // size == 1, so returns "new"
+
+	// Second event should work fine
+	bi2 := bi
+	bi2.EventID = ulid.MustNew(ulid.Now(), rand.Reader)
+	res, err = bm.Append(context.Background(), bi2, fn)
+	require.NoError(t, err)
+	require.Equal(t, enums.BatchAppend, res.Status)
+
+	// Per-event keys should expire independently
+	r.FastForward(11 * time.Second)
+	require.False(t, r.Exists(idemKey), "per-event idem key should have expired")
+
+	// After expiry, same event ID can be appended again (TTL window passed)
+	res, err = bm.Append(context.Background(), bi, fn)
+	require.NoError(t, err)
+	require.Equal(t, enums.BatchAppend, res.Status)
+}
+
+// TestPerEventIdempotenceBulkAppend verifies per-event dedup works in the bulk append path.
+func TestPerEventIdempotenceBulkAppend(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	mgr := NewRedisBatchManager(bc, nil, WithoutBuffer())
+	bm := mgr.(*redisBatchManager)
+
+	fnId := uuid.New()
+	fn := inngest.Function{
+		ID: fnId,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 100,
+			Timeout: "60s",
+		},
+	}
+
+	event1ID := ulid.MustNew(ulid.Now(), rand.Reader)
+	event2ID := ulid.MustNew(ulid.Now(), rand.Reader)
+	event3ID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	items := []BatchItem{
+		{AccountID: uuid.New(), FunctionID: fnId, EventID: event1ID, Event: event.Event{ID: "e1"}},
+		{AccountID: uuid.New(), FunctionID: fnId, EventID: event2ID, Event: event.Event{ID: "e2"}},
+		{AccountID: uuid.New(), FunctionID: fnId, EventID: event3ID, Event: event.Event{ID: "e3"}},
+	}
+
+	// Bulk append 3 events
+	res, err := bm.BulkAppend(context.Background(), items, fn)
+	require.NoError(t, err)
+	require.Equal(t, 3, res.Committed)
+	require.Equal(t, 0, res.Duplicates)
+
+	// Bulk append same 3 events again — all should be duplicates
+	res, err = bm.BulkAppend(context.Background(), items, fn)
+	require.NoError(t, err)
+	require.Equal(t, "itemexists", res.Status)
+	require.Equal(t, 0, res.Committed)
+	require.Equal(t, 3, res.Duplicates)
+
+	// Bulk append mix of new and duplicate
+	event4ID := ulid.MustNew(ulid.Now(), rand.Reader)
+	mixedItems := []BatchItem{
+		{AccountID: uuid.New(), FunctionID: fnId, EventID: event1ID, Event: event.Event{ID: "e1"}}, // dup
+		{AccountID: uuid.New(), FunctionID: fnId, EventID: event4ID, Event: event.Event{ID: "e4"}}, // new
+	}
+	res, err = bm.BulkAppend(context.Background(), mixedItems, fn)
+	require.NoError(t, err)
+	require.Equal(t, 1, res.Committed)
+	require.Equal(t, 1, res.Duplicates)
+}
+
 func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -432,10 +549,9 @@ func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	defer rc.Close()
 
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	// Set a large deletion cutoff to keep the eventIDs in the idempotence set.
-	// Set a 5s TLL to ensure that after 5s of inactivity, the key is cleared.
+	// Set a 5s TTL on per-event idem keys to ensure they expire after inactivity.
 	// Disable buffer to test direct append behavior.
-	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchIdempotenceSetTTL(5), WithRedisBatchIdempotenceSetCleanupCutoff(300))
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchIdempotenceSetTTL(5))
 
 	accountId := uuid.New()
 	fnId := uuid.New()
@@ -463,21 +579,21 @@ func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	require.True(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
-	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
+	// Per-event idem key: batch list + metadata + pointer + idem key = 4
 	require.Equal(t, 4, len(r.Keys()))
 
-	// DeleteKeys does not remove items from BatchIdempotenceKey sinc the cutoff is 5m.
+	// DeleteKeys removes batch list and metadata but not the per-event idem key (it has its own TTL).
 	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
 	require.NoError(t, err)
 	require.False(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
-	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
+	// pointer + per-event idem key remain
 	require.Equal(t, 2, len(r.Keys()))
 
-	// TTL is set to 5s on every append, and the key should be gone after that even without an explicit DeleteKeys call.
+	// Per-event idem key TTL is 5s, should expire after that.
 	r.FastForward(6 * time.Second)
-	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
+	// Only the batch pointer remains (no TTL on it)
 	require.Equal(t, 1, len(r.Keys()))
 }
 

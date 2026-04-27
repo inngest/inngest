@@ -1,6 +1,8 @@
 package httpdriver
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -14,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -242,4 +245,114 @@ func TestTiming(t *testing.T) {
 	require.True(t, result.ServerProcessing > time.Second)
 	require.True(t, result.Total > time.Second)
 	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), fmt.Sprintf("%s:%d", result.ConnectedTo.IP, result.ConnectedTo.Port))
+}
+
+func TestExecuteDriverRequest_DecodesBrotliGeneratorResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Encoding", "br")
+		w.Header().Set(headerSDK, "inngest-js:v3.35.1")
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write(brotliCompressedJSON(t, `[{"op":"StepRun","id":"step-id","name":"step"}]`))
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	dr, _, err := ExecuteDriverRequest(context.Background(), client, Request{
+		URL:     parseURL(ts.URL),
+		Headers: map[string]string{"Accept-Encoding": "br"},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, dr)
+	require.Len(t, dr.Generator, 1)
+	require.Equal(t, enums.OpcodeStepRun, dr.Generator[0].Op)
+	require.Equal(t, "step-id", dr.Generator[0].ID)
+}
+
+func TestHandleHttpResponse_DecompressesGzipBody(t *testing.T) {
+	r := require.New(t)
+
+	body := `{"result":"ok"}`
+	compressed := gzipCompressedJSON(t, body)
+
+	resp := &Response{
+		Body:       compressed,
+		StatusCode: 200,
+		IsSDK:      true,
+		Header:     http.Header{"Content-Encoding": []string{"gzip"}},
+	}
+
+	dr, err := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NoError(err)
+	r.NotNil(dr)
+
+	// The body should have been decompressed before parsing.
+	out, ok := dr.Output.(map[string]interface{})
+	r.True(ok, "expected parsed JSON map, got %T", dr.Output)
+	r.Equal("ok", out["result"])
+}
+
+func TestHandleHttpResponse_DecompressesBrotliBody(t *testing.T) {
+	r := require.New(t)
+
+	body := `[{"op":"StepRun","id":"step-id","name":"step"}]`
+	compressed := brotliCompressedJSON(t, body)
+
+	resp := &Response{
+		Body:       compressed,
+		StatusCode: 206,
+		IsSDK:      true,
+		Header:     http.Header{"Content-Encoding": []string{"br"}},
+	}
+
+	dr, err := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NoError(err)
+	r.NotNil(dr)
+	r.Len(dr.Generator, 1)
+	r.Equal(enums.OpcodeStepRun, dr.Generator[0].Op)
+}
+
+func TestHandleHttpResponse_NoDoubleDecompress(t *testing.T) {
+	r := require.New(t)
+
+	// Simulate the HTTP path: body is already decompressed, no Content-Encoding header.
+	body := `{"result":"ok"}`
+	resp := &Response{
+		Body:       []byte(body),
+		StatusCode: 200,
+		IsSDK:      true,
+		Header:     http.Header{},
+	}
+
+	dr, err := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NoError(err)
+	r.NotNil(dr)
+
+	out, ok := dr.Output.(map[string]interface{})
+	r.True(ok, "expected parsed JSON map, got %T", dr.Output)
+	r.Equal("ok", out["result"])
+}
+
+func brotliCompressedJSON(t *testing.T, input string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	writer := brotli.NewWriter(&buf)
+	_, err := writer.Write([]byte(input))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	return buf.Bytes()
+}
+
+func gzipCompressedJSON(t *testing.T, input string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	writer, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	_, err := writer.Write([]byte(input))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	return buf.Bytes()
 }

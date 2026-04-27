@@ -1,6 +1,7 @@
 package httpdriver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,9 @@ import (
 // an OpcodeStepError was raised with a NonRetriableError.
 func ParseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.GeneratorOpcode, error) {
 	generators, err := parseGenerator(ctx, byt, noRetry)
+	if err != nil {
+		return generators, err
+	}
 	for n, item := range generators {
 		// Ensure that we set no retries on the opcode error directly.
 		// This is needed for the executor to check how to handle the error.
@@ -36,9 +40,11 @@ func ParseGenerator(ctx context.Context, byt []byte, noRetry bool) ([]*state.Gen
 }
 
 func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state.GeneratorOpcode, err error) {
+	trimmed := bytes.TrimSpace(byt)
+
 	// When we return a 206, we always expect that this is a generator
 	// function.  Users SHOULD NOT return a 206 in any other circumstance.
-	if len(byt) == 0 {
+	if len(trimmed) == 0 {
 		err = ErrEmptyResponse
 		return
 	}
@@ -47,11 +53,11 @@ func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state
 	// parallelism was added as an incremental improvement.  It would have been
 	// nice to always return an array and we can enfore this as an SDK
 	// requirement in V1+
-	switch byt[0] {
+	switch trimmed[0] {
 	// 0.x.x SDKs return a single opcode.
 	case '{':
 		gen := &state.GeneratorOpcode{}
-		if err = json.Unmarshal(byt, gen); err != nil {
+		if err = json.Unmarshal(trimmed, gen); err != nil {
 			err = fmt.Errorf("error reading generator opcode response: %w", err)
 			return
 		}
@@ -59,11 +65,14 @@ func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state
 	// 1.x.x+ SDKs return an array of opcodes.
 	case '[':
 		gen := []*state.GeneratorOpcode{}
-		if err = json.Unmarshal(byt, &gen); err != nil {
+		if err = json.Unmarshal(trimmed, &gen); err != nil {
 			err = fmt.Errorf("error reading generator opcode response: %w", err)
 			return
 		}
 		ops = append(ops, gen...)
+	default:
+		err = fmt.Errorf("error reading generator opcode response: expected JSON object or array")
+		return
 	}
 
 	// Finally, if the length of resp.Generator == 0 then this is implicitly an
@@ -78,7 +87,11 @@ func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state
 
 	// Check every op we've parsed, making sure it adheres to any limits we're
 	// enforcing
-	for _, op := range ops {
+	for i, op := range ops {
+		if op == nil {
+			err = fmt.Errorf("error validating generator opcode %d: opcode cannot be null", i)
+			return
+		}
 		if err = op.Validate(); err != nil {
 			err = fmt.Errorf("error validating generator opcode %s: %w", op.ID, err)
 			return

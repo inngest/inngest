@@ -10,6 +10,7 @@ export type SpanMetadataKind =
   | typeof KindInngestHTTPTiming
   | typeof KindInngestResponseHeaders
   | typeof KindInngestTiming
+  | typeof KindInngestExperiment
   | typeof KindInngestWarnings
   | SpanMetadataKindUserland;
 
@@ -40,6 +41,20 @@ export interface AIMetadata {
   latency_ms?: number /* int64 */;
   total_tokens?: number /* int64 */;
   estimated_cost?: number /* float64 */;
+}
+/**
+ * From experiment.go
+ */
+export const KindInngestExperiment = 'inngest.experiment';
+/**
+ * From experiment.go
+ */
+export interface ExperimentMetadata {
+  experiment_name: string;
+  variant: string;
+  selection_strategy: string;
+  available_variants?: string[];
+  variant_weights?: { [key: string]: number /* float64 */ };
 }
 /**
  * From http.go

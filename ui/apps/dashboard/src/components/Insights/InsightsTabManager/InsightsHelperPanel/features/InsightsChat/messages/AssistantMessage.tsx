@@ -1,9 +1,10 @@
-import type { TextUIPart } from '@inngest/use-agent';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+import type { TextPart } from '../types';
+
 type AssistantMessageProps = {
-  part: TextUIPart;
+  part: TextPart;
 };
 
 export const AssistantMessage = ({ part }: AssistantMessageProps) => {

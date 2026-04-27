@@ -5,6 +5,7 @@ import type { SpanMetadata, SpanMetadataKind } from './types';
 
 const inngestKindLabels: Record<string, string> = {
   ai: 'AI Metadata',
+  experiment: 'Experiment',
   http: 'HTTP Metadata',
   response_headers: 'Response Headers',
   usage: 'Run Usage',
@@ -88,9 +89,11 @@ const MetadataAttrRow = ({
               <div className="text-muted w-48 shrink-0 text-sm font-normal leading-tight">
                 {key}
               </div>
-              <div className="text-basis min-w-0 break-all text-sm font-normal leading-tight [overflow-wrap:anywhere]">
+              <div className="text-basis min-w-0 whitespace-pre-wrap text-sm font-normal leading-tight [overflow-wrap:anywhere]">
                 {byteValueKeys.has(key) && typeof value === 'number'
                   ? formatBytes(value)
+                  : typeof value === 'object' && value !== null
+                  ? JSON.stringify(value, null, 2)
                   : String(value) || '--'}
               </div>
             </div>

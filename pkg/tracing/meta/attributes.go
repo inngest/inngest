@@ -91,6 +91,11 @@ var Attrs = struct {
 	// step.run attributes
 	StepRunType attr[*string]
 
+	// step.experiment attributes
+	ExperimentName    attr[*string]
+	ExperimentStepID  attr[*string]
+	ExperimentVariant attr[*string]
+
 	// Pause-related attributes
 	StepWaitExpired attr[*bool]
 	StepWaitExpiry  attr[*time.Time]
@@ -121,6 +126,7 @@ var Attrs = struct {
 	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
+	ResponseSteps      attr[*ResponseOps]
 
 	IsCheckpoint attr[*bool]
 
@@ -176,6 +182,7 @@ var Attrs = struct {
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
 	ResponseStatusCode:                 IntAttr("response.status_code"),
+	ResponseSteps:                      JsonAttr[ResponseOps]("response.step.ops"),
 	RunID:                              ULIDAttr("run.id"),
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
@@ -198,6 +205,9 @@ var Attrs = struct {
 	StepOutput:                         StringAttr("step.output"),
 	StepOutputRef:                      StringAttr("step.output_ref"),
 	StepRunType:                        StringAttr("step.run.type"),
+	ExperimentName:                     StringAttr("inngest.experiment.name"),
+	ExperimentStepID:                   StringAttr("inngest.experiment.step_id"),
+	ExperimentVariant:                  StringAttr("inngest.experiment.variant"),
 	StepSignalName:                     StringAttr("step.signal.name"),
 	StepSleepDuration:                  DurationAttr("step.sleep.duration"),
 	StepUserlandID:                     TruncatedStringAttr("step.userland.id", 256),
@@ -223,4 +233,18 @@ var Attrs = struct {
 	MetadataKind:  StringishAttr[metadata.Kind]("metadata.kind"),
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
+}
+
+type ResponseOps []ResponseOp
+
+// ResponseOp is an op tracked for each HTTP response
+type ResponseOp struct {
+	// Op represents the type of operation invoked in the function.
+	Op enums.Opcode `json:"op"`
+	// ID represents a hashed unique ID for the operation.  This acts
+	// as the generated step ID for the state store.
+	ID string `json:"id"`
+	// Name represents the name of the step, or the sleep duration for
+	// sleeps.
+	Name string `json:"name"`
 }

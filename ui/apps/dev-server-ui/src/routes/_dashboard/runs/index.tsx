@@ -1,6 +1,7 @@
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { client } from '@/store/baseApi';
+import { useInfoQuery } from '@/store/devApi';
 import {
   useGetAppsQuery,
   GetRunsQuery,
@@ -31,13 +32,22 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
-const pollInterval = 400;
+// Dev mode polls aggressively so iterations feel instant; serve (single-node
+// production) polls every 10s to keep query load off Postgres.
+const DEV_POLL_INTERVAL = 400;
+const SERVE_POLL_INTERVAL = 10_000;
 
 export const Route = createFileRoute('/_dashboard/runs/')({
   component: RunsComponent,
 });
 
 function RunsComponent() {
+  const { data: info } = useInfoQuery();
+  // While info is loading, default to the safer (slower) interval so we don't
+  // hammer a serve-mode deployment before we know which mode we're in.
+  const isDevMode = info !== undefined && !info.isSingleNodeService;
+  const pollInterval = isDevMode ? DEV_POLL_INTERVAL : SERVE_POLL_INTERVAL;
+
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
     'polling-disabled',
@@ -240,6 +250,7 @@ function RunsComponent() {
         scope="env"
         totalCount={totalCount}
         searchError={searchError}
+        searchLimit={1000}
         infiniteScrollTrigger={(containerRef) => (
           <InfiniteScrollTrigger
             onIntersect={fetchNextPage}

@@ -1730,6 +1730,37 @@ func TestCQRSGetSpan(t *testing.T) {
 		require.Len(t, result[0], 1, "Debug run group should have 1 root span")
 		assert.Len(t, result[0][0].Children, 1, "Root should have 1 child")
 	})
+
+	t.Run("by debug session ID keeps runs separate when dynamic span IDs collide", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		debugSessionID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		runIDOne := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		runIDTwo := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunIDOne := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunIDTwo := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:          runIDOne,
+			DynamicSpanID:  "dyn-root",
+			DebugRunID:     debugRunIDOne,
+			DebugSessionID: debugSessionID.String(),
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:          runIDTwo,
+			DynamicSpanID:  "dyn-root",
+			DebugRunID:     debugRunIDTwo,
+			DebugSessionID: debugSessionID.String(),
+		})
+
+		result, err := cm.GetSpansByDebugSessionID(t.Context(), debugSessionID)
+		require.NoError(t, err)
+		require.Len(t, result, 2, "separate runs in the same debug session must not collapse into one group")
+		require.Len(t, result[0], 1)
+		require.Len(t, result[1], 1)
+	})
 }
 
 // TestSpanWithAttributesAndOutput is a regression test ensuring that spans

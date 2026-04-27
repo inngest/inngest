@@ -163,6 +163,10 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("run-details-v4") == "" {
 		features["run-details-v4"] = true
 	}
+	// Enable step metadata (including experiments) by default in dev server.
+	if os.Getenv("enable-step-metadata") == "" {
+		features["enable-step-metadata"] = true
+	}
 
 	//
 	// inngest feature flags are a map of arbitrary key value

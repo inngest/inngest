@@ -1050,8 +1050,21 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	// now actually schedule the cron run
-	at := ci.ID.Timestamp()
+	// Compute fireAt from the live function config so jitter changes take effect
+	// immediately, rather than waiting for the next cron cycle.
+	scheduledAt := ci.ID.Timestamp()
+	jitter := conf.CronJitter(ci.Expression)
+	fireAt := scheduledAt
+	if jitter > 0 {
+		jobID := ci.JobID
+		if jobID == "" {
+			l.Error("CronItem.JobID is empty, using fallback seed for jitter")
+			jobID = fmt.Sprintf("%s:%s:%d", ci.FunctionID, ci.Expression, scheduledAt.UnixMilli())
+		}
+		fireAt = scheduledAt.Add(cron.DeterministicJitter(jobID, inngest.MinCronJitter, jitter))
+	}
+
+	l = l.With("jitter", jitter, "fireAt", fireAt)
 
 	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
@@ -1059,9 +1072,11 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		ID:   idempotencyKey,
 		Name: consts.FnCronName,
 		Data: map[string]any{
-			"cron": ci.Expression,
+			"cron":        ci.Expression,
+			"scheduledAt": scheduledAt.UTC().Format(time.RFC3339),
+			"fireAt":      fireAt.UTC().Format(time.RFC3339),
 		},
-		Timestamp: time.Now().UnixMilli(),
+		Timestamp: fireAt.UnixMilli(),
 	}, nil)
 
 	// publish cron event to pubsub
@@ -1094,7 +1109,8 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
 			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
 			attribute.String(consts.OtelSysCronExpr, ci.Expression),
-			attribute.Int64(consts.OtelSysCronTimestamp, at.UnixMilli()),
+			attribute.Int64(consts.OtelSysCronTimestamp, scheduledAt.UnixMilli()),
+			attribute.Int64(consts.OtelSysCronFireAt, fireAt.UnixMilli()),
 		),
 	)
 	defer span.End()
@@ -1108,7 +1124,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		AppID:          ci.AppID,
 		Function:       *conf,
 		Events:         []event.TrackedEvent{evt},
-		At:             &at,
+		At:             &fireAt,
 		IdempotencyKey: &idempotencyKey,
 	})
 

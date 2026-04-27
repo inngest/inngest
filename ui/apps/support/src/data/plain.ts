@@ -337,12 +337,7 @@ export type TimeLineEntryEdge = {
           __typename: "MachineUserActor";
           machineUser: { fullName: string };
         };
-    entry:
-      | EmailEntry
-      | CustomEntry
-      | SlackMessageEntry
-      | SlackReplyEntry
-      | ChatEntry;
+    entry: EmailEntry | CustomEntry | SlackMessageEntry | SlackReplyEntry;
   };
 };
 
@@ -450,13 +445,6 @@ type SlackReplyEntry = {
   lastEditedOnSlackAt: DateTime;
 };
 
-type ChatEntry = {
-  __typename: "ChatEntry";
-  chatId: string;
-  /** Aliased as `chatText` in the query to avoid GraphQL type conflict with Slack entries */
-  chatText: string;
-  attachments: Array<Attachment>;
-};
 export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .inputValidator((data: { ticketId: string }) => data)
@@ -562,14 +550,6 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
                           unixTimestamp
                         }
                       }
-                      ... on ChatEntry {
-                        chatId
-                        chatText: text
-                        attachments {
-                          id
-                          fileName
-                        }
-                      }
                     }
                   }
                 }
@@ -608,8 +588,7 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
               typename === "EmailEntry" ||
               typename === "SlackMessageEntry" ||
               // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-              typename === "SlackReplyEntry" ||
-              typename === "ChatEntry"
+              typename === "SlackReplyEntry"
             );
           })
           .sort(
@@ -1256,7 +1235,7 @@ export type AttachmentUploadUrlResult = {
   error?: string;
 };
 
-export type AttachmentUploadContext = "chat" | "customEntry";
+export type AttachmentUploadContext = "emailEntry" | "customEntry";
 
 export const getUploadUrl = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
@@ -1271,7 +1250,7 @@ export const getUploadUrl = createServerFn({ method: "POST" })
     try {
       const userEmail = context.userEmail;
       const { fileName, fileSizeBytes } = data;
-      const uploadContext = data.context || "chat";
+      const uploadContext = data.context || "emailEntry";
 
       // Server-side validation
       // We use a generic MIME check based on extension since we don't have the real MIME here
@@ -1303,7 +1282,7 @@ export const getUploadUrl = createServerFn({ method: "POST" })
       const attachmentType =
         uploadContext === "customEntry"
           ? AttachmentType.CustomTimelineEntry
-          : AttachmentType.Chat;
+          : AttachmentType.Email;
 
       const res = await plainClient.createAttachmentUploadUrl({
         customerId: customer.data.id,

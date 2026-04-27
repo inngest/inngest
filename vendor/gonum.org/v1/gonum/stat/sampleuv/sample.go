@@ -7,8 +7,7 @@ package sampleuv
 import (
 	"errors"
 	"math"
-
-	"golang.org/x/exp/rand"
+	"math/rand/v2"
 
 	"gonum.org/v1/gonum/stat/distuv"
 )
@@ -24,13 +23,6 @@ var (
 	_ WeightedSampler = SampleUniformWeighted{}
 	_ WeightedSampler = Importance{}
 )
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 // Sampler generates a batch of samples according to the rule specified by the
 // implementing type. The number of samples generated is equal to len(batch),

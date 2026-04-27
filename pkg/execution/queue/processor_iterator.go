@@ -55,13 +55,19 @@ type ProcessorIterator struct {
 	// to attempt to find other possible functions outside of the key(s) with issues.
 	// This field must be accessed atomically as it may be modified concurrently when Parallel=true.
 	IsCustomKeyLimitOnly atomic.Bool
+
+	// IsSemaphoreLimitOnly records whether all concurrency hits were from semaphore limits only.
+	// When true, we use a shorter partition requeue delay since semaphore-blocked items stay in
+	// the ready queue and can be picked up quickly once capacity is freed.
+	IsSemaphoreLimitOnly atomic.Bool
 }
 
 func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	var err error
 
-	// set flag to true to begin with
+	// set flags to true to begin with
 	p.IsCustomKeyLimitOnly.Store(true)
+	p.IsSemaphoreLimitOnly.Store(true)
 
 	eg := errgroup.Group{}
 	for _, i := range p.Items {
@@ -324,6 +330,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	switch cause {
 	case ErrQueueItemThrottled:
 		p.IsCustomKeyLimitOnly.Store(false)
+		p.IsSemaphoreLimitOnly.Store(false)
 
 		p.CtrRateLimit.Add(1)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
@@ -353,6 +360,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return nil
 	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
 		p.IsCustomKeyLimitOnly.Store(false)
+		p.IsSemaphoreLimitOnly.Store(false)
 
 		p.CtrConcurrency.Add(1)
 		// Since the queue is at capacity on a fn or account level, no
@@ -411,6 +419,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		return fmt.Errorf("concurrency hit: %w", ErrProcessStopIterator)
 	case ErrConcurrencyLimitCustomKey:
+		p.IsSemaphoreLimitOnly.Store(false)
 		p.CtrConcurrency.Add(1)
 
 		// For backwards compatibility, we report on the function level as well

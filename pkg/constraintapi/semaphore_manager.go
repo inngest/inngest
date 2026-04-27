@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/redis/rueidis"
 )
 
@@ -53,6 +54,8 @@ func semaphoreIdempotencyKey(accountID uuid.UUID, op, idempotencyKey string) str
 }
 
 func (m *redisSemaphoreManager) SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error {
+	start := time.Now()
+
 	keys := []string{
 		semaphoreCapacityKey(accountID, name),
 		semaphoreIdempotencyKey(accountID, "setcap", idempotencyKey),
@@ -62,10 +65,16 @@ func (m *redisSemaphoreManager) SetCapacity(ctx context.Context, accountID uuid.
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
 	}
 
-	return scripts["semaphore_set_capacity"].Exec(ctx, m.client, keys, args).Error()
+	err := scripts["semaphore_set_capacity"].Exec(ctx, m.client, keys, args).Error()
+
+	m.recordMetrics(ctx, "set_capacity", start, err)
+
+	return err
 }
 
 func (m *redisSemaphoreManager) AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) error {
+	start := time.Now()
+
 	keys := []string{
 		semaphoreCapacityKey(accountID, name),
 		semaphoreIdempotencyKey(accountID, "adjcap", idempotencyKey),
@@ -75,10 +84,16 @@ func (m *redisSemaphoreManager) AdjustCapacity(ctx context.Context, accountID uu
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
 	}
 
-	return scripts["semaphore_adjust_capacity"].Exec(ctx, m.client, keys, args).Error()
+	err := scripts["semaphore_adjust_capacity"].Exec(ctx, m.client, keys, args).Error()
+
+	m.recordMetrics(ctx, "adjust_capacity", start, err)
+
+	return err
 }
 
 func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.UUID, name, usageValue string) (int64, int64, error) {
+	start := time.Now()
+
 	capKey := semaphoreCapacityKey(accountID, name)
 	usageKey := semaphoreUsageKey(accountID, name, usageValue)
 
@@ -91,6 +106,7 @@ func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.
 	if rueidis.IsRedisNil(err) {
 		capacity = 0
 	} else if err != nil {
+		m.recordMetrics(ctx, "get_capacity", start, err)
 		return 0, 0, fmt.Errorf("could not get semaphore capacity: %w", err)
 	}
 
@@ -98,13 +114,18 @@ func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.
 	if rueidis.IsRedisNil(err) {
 		usage = 0
 	} else if err != nil {
+		m.recordMetrics(ctx, "get_capacity", start, err)
 		return 0, 0, fmt.Errorf("could not get semaphore usage: %w", err)
 	}
+
+	m.recordMetrics(ctx, "get_capacity", start, nil)
 
 	return capacity, usage, nil
 }
 
 func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, usageValue, idempotencyKey string, weight int64) error {
+	start := time.Now()
+
 	keys := []string{
 		semaphoreUsageKey(accountID, name, usageValue),
 		semaphoreIdempotencyKey(accountID, "rel", idempotencyKey),
@@ -114,5 +135,22 @@ func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID 
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
 	}
 
-	return scripts["semaphore_release"].Exec(ctx, m.client, keys, args).Error()
+	err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).Error()
+
+	m.recordMetrics(ctx, "release", start, err)
+
+	return err
+}
+
+func (m *redisSemaphoreManager) recordMetrics(ctx context.Context, operation string, start time.Time, err error) {
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	tags := map[string]any{
+		"operation": operation,
+		"status":    status,
+	}
+	metrics.IncrConstraintAPISemaphoreCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: tags})
+	metrics.HistogramConstraintAPISemaphoreDuration(ctx, time.Since(start), metrics.HistogramOpt{PkgName: pkgName, Tags: tags})
 }

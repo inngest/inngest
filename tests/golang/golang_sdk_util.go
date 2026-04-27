@@ -57,7 +57,13 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 		t.Helper()
 		req, err := http.NewRequest(http.MethodPut, server.LocalURL(), nil)
 		require.NoError(t, err)
-		resp, err := http.DefaultClient.Do(req)
+		req.Close = true
+		// Registration updates are infrequent and CI occasionally reuses a stale
+		// idle connection here. Use a one-off transport to avoid surfacing that
+		// socket reuse as a flaky test failure.
+		resp, err := (&http.Client{
+			Transport: &http.Transport{DisableKeepAlives: true},
+		}).Do(req)
 		require.NoError(t, err)
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)

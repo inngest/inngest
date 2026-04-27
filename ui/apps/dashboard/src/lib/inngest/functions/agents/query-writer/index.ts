@@ -1,17 +1,10 @@
-import {
-  anthropic,
-  createAgent,
-  createTool,
-  type AnyZodType,
-} from '@inngest/agent-kit';
 import Mustache from 'mustache';
 import { z } from 'zod';
 
-import { setObservability, OBSERVABILITY_LIMITS } from '../observability';
-import type { InsightsAgentState } from '../types';
 import systemPrompt from './system.md?raw';
 
-const GenerateSqlParams = z.object({
+// Zod schema for the generate_sql tool (structured output extraction)
+export const GenerateSqlParams = z.object({
   sql: z
     .string()
     .min(1)
@@ -30,98 +23,80 @@ const GenerateSqlParams = z.object({
     ),
 });
 
-export const generateSqlTool = createTool({
-  name: 'generate_sql',
+// Anthropic tool definition for step.ai.infer()
+export const generateSqlTool = {
+  name: 'generate_sql' as const,
   description:
     'Provide the final SQL SELECT statement for ClickHouse based on the selected events and schemas.',
-  parameters: GenerateSqlParams as unknown as AnyZodType, // (ted): need to update to latest version of zod + agent-kit
-  handler: (args: unknown, { network }) => {
-    const { sql, title, reasoning } = args as z.infer<typeof GenerateSqlParams>;
-
-    // Store output in observability format
-    setObservability(network, 'queryWriter', {
-      output: {
-        sql,
-        title,
-        reasoning,
-      },
-    });
-
-    return {
-      sql,
-      title,
-      reasoning,
-    };
+  input_schema: z.toJSONSchema(GenerateSqlParams) as {
+    type: 'object';
+    [k: string]: unknown;
   },
-});
+};
 
-export const queryWriterAgent = createAgent<InsightsAgentState>({
-  name: 'Insights Query Writer',
-  description:
-    'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
-  system: async ({ network }) => {
-    const selectedEvents =
-      network?.state.data.selectedEvents?.map(
-        (e: { event_name: string }) => e.event_name,
-      ) ?? [];
+/**
+ * Build the query writer system prompt by hydrating the Mustache template
+ * with selected events, schemas, optional current query, and user query.
+ */
+export function buildSystemPrompt(params: {
+  selectedEvents: { event_name: string; reason: string }[];
+  schemas: { name: string; schema: string }[];
+  currentQuery?: string;
+  query: string;
+}): string {
+  const selectedEventNames = params.selectedEvents.map((e) => e.event_name);
 
-    // Filter schemas to only include selected events
-    const allSchemas = network?.state.data.schemas ?? [];
-    const selectedSchemas = allSchemas
-      .filter((schema) => selectedEvents.includes(schema.name))
-      .map((schema) => ({
-        eventName: schema.name,
-        schema: schema.schema,
-      }));
+  // Filter schemas to only include selected events
+  const selectedSchemas = params.schemas
+    .filter((schema) => selectedEventNames.includes(schema.name))
+    .map((schema) => ({
+      eventName: schema.name,
+      schema: schema.schema,
+    }));
 
-    // Get current query if it exists
-    const currentQuery = network?.state.data.currentQuery;
+  const promptContext = {
+    hasSelectedEvents: selectedEventNames.length > 0,
+    selectedEvents: selectedEventNames.join(', '),
+    hasSchemas: selectedSchemas.length > 0,
+    schemas: selectedSchemas,
+    hasCurrentQuery: !!params.currentQuery,
+    currentQuery: params.currentQuery || '',
+    query: params.query || '',
+  };
 
-    // Get user query from state
-    const query = network?.state.data.query;
+  return Mustache.render(systemPrompt, promptContext);
+}
 
-    // Prepare context for system prompt hydration
-    const promptContext = {
-      hasSelectedEvents: selectedEvents.length > 0,
-      selectedEvents: selectedEvents.join(', '),
-      hasSchemas: selectedSchemas.length > 0,
-      schemas: selectedSchemas,
-      hasCurrentQuery: !!currentQuery,
-      currentQuery: currentQuery || '',
-      query: query || '',
-    };
+export type GenerateSqlResult = {
+  sql: string;
+  title?: string;
+  reasoning?: string;
+};
 
-    // Store prompt context in observability format with schemas
-    if (network?.state.data) {
-      setObservability(network, 'queryWriter', {
-        promptContext: {
-          selectedEventsCount: selectedEvents.length,
-          selectedEventNames: selectedEvents,
-          schemasCount: selectedSchemas.length,
-          schemaNames: selectedSchemas.map((s) => s.eventName),
-          // Include actual schemas (truncated for observability)
-          schemas: selectedSchemas.map((schema) => ({
-            eventName: schema.eventName,
-            schema: schema.schema.substring(
-              0,
-              OBSERVABILITY_LIMITS.SCHEMA_LENGTH,
-            ),
-            schemaLength: schema.schema.length,
-          })),
-          hasCurrentQuery: !!currentQuery,
-          currentQueryLength: currentQuery?.length || 0,
-        },
-      });
-    }
+/**
+ * Parse the Anthropic Messages API response to extract the generate_sql
+ * tool call result.
+ */
+export function parseToolResult(result: {
+  content: Array<{
+    type: string;
+    name?: string;
+    input?: unknown;
+  }>;
+}): GenerateSqlResult {
+  const toolUse = result.content.find(
+    (block) => block.type === 'tool_use' && block.name === 'generate_sql',
+  );
 
-    return Mustache.render(systemPrompt, promptContext);
-  },
-  model: anthropic({
-    model: 'claude-sonnet-4-5-20250929',
-    defaultParameters: {
-      max_tokens: 4096,
-    },
-  }),
-  tools: [generateSqlTool],
-  tool_choice: 'generate_sql',
-});
+  if (!toolUse || !('input' in toolUse)) {
+    throw new Error('Expected generate_sql tool call not found in response');
+  }
+
+  const input = toolUse.input as z.infer<typeof GenerateSqlParams>;
+
+  return {
+    sql: input.sql,
+    title: input.title,
+    reasoning: input.reasoning,
+  };
+}

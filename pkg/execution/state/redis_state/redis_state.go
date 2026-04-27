@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -906,20 +907,17 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	return nil
 }
 
-// ConsumePause consumes a pause, writing the consumed data to state.
+// ConsumePause consumes a pause, writing the consumed pause to run state
 func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
-	if opts.IdempotencyKey == "" {
-		return state.ConsumePauseResult{}, state.ErrConsumePauseKeyMissing
+	if p.DataKey == "" {
+		// Cancel pauses don't have a DataKey since they don't store data in
+		// run state — they only cancel the function. Skip the write.
+		return state.ConsumePauseResult{DidConsume: true}, nil
 	}
-
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConsumePause"), redis_telemetry.ScopePauses)
-
-	fnRunState := m.s.FunctionRunState()
-	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
 	var marshalledData []byte
 	if b, ok := opts.Data.([]byte); ok && json.Valid(b) {
-		// Already marshalled data we can just use it
+		// Already marshalled data, just use it
 		marshalledData = b
 	} else {
 		var err error
@@ -929,47 +927,25 @@ func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.
 		}
 	}
 
-	keys := []string{
-		fnRunState.kg.Actions(ctx, isSharded, p.Identifier.FunctionID, p.Identifier.RunID),
-		fnRunState.kg.Stack(ctx, isSharded, p.Identifier.RunID),
-		fnRunState.kg.RunMetadata(ctx, isSharded, p.Identifier.RunID),
-		fnRunState.kg.Pending(ctx, isSharded, state.Identifier{
-			RunID:      p.Identifier.RunID,
-			WorkflowID: p.Identifier.FunctionID,
-		}),
-		fnRunState.kg.PauseConsumeKey(ctx, isSharded, p.Identifier.RunID, p.ID),
+	id := state.Identifier{
+		RunID:      p.Identifier.RunID,
+		WorkflowID: p.Identifier.FunctionID,
+		AccountID:  p.Identifier.AccountID,
 	}
 
-	args, err := StrSlice([]any{
-		p.DataKey,
-		string(marshalledData),
-		opts.IdempotencyKey,
-		int64(consts.FunctionIdempotencyPeriod.Seconds()), // TTL in seconds for Garnet compatibility
-	})
-	if err != nil {
-		return state.ConsumePauseResult{}, err
-	}
-
-	status, err := retriableScripts["consumePause"].Exec(
-		redis_telemetry.WithScriptName(ctx, "consumePause"),
-		client,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
-	}
-
-	switch status {
-	case -1:
-		// This could be an ErrDuplicateResponse;  we're attempting to consume a pause twice.
+	hasPending, err := m.SaveResponse(ctx, id, p.DataKey, string(marshalledData))
+	switch {
+	case err == nil:
+		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: hasPending}, nil
+	case errors.Is(err, state.ErrIdempotentResponse):
+		// Same data already written ensures a safe retry after a transient failure,
+		// caller will likely try to resume a run again.
+		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: hasPending}, nil
+	case errors.Is(err, state.ErrDuplicateResponse):
+		// Different data already exists, this pause was consumed by a different event.
 		return state.ConsumePauseResult{}, nil
-	case 0:
-		return state.ConsumePauseResult{DidConsume: true}, nil
-	case 1:
-		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: true}, nil
 	default:
-		return state.ConsumePauseResult{}, fmt.Errorf("unknown response leasing pause: %d", status)
+		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
 	}
 }
 
