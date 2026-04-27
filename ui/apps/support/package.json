@@ -20,7 +20,7 @@
     "@tanstack/react-router": "1.168.23",
     "@tanstack/react-router-devtools": "1.166.13",
     "@tanstack/react-router-ssr-query": "1.166.11",
-    "@tanstack/react-start": "1.167.42",
+    "@tanstack/react-start": "1.167.43",
     "@team-plain/typescript-sdk": "^3.0.1",
     "@types/hast": "^3.0.4",
     "@unpic/react": "^1.0.1",
