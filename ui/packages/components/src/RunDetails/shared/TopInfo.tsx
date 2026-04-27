@@ -114,8 +114,6 @@ export const TopInfo = ({
     retry: 3,
   });
 
-  const metadataIsEnabled = true;
-
   const prettyPayload = useMemo(() => {
     try {
       const data = trigger?.payloads?.map((p) => JSON.parse(p));
@@ -347,7 +345,7 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(metadataIsEnabled && trace?.metadata?.length
+            ...(trace?.metadata?.length
               ? [
                   {
                     label: 'Metadata',

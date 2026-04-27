@@ -190,7 +190,6 @@ export const StepInfo = ({
     preview: tracesPreviewEnabled,
   });
 
-  const metadataIsEnabled = true;
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -246,15 +245,11 @@ export const StepInfo = ({
       ]
     : [];
 
-  const nonHeaderMetadata = metadataIsEnabled
-    ? trace.metadata?.filter(
-        (md) => md.kind !== 'inngest.response_headers' && !isExperimentMetadata(md)
-      )
-    : undefined;
+  const nonHeaderMetadata = trace.metadata?.filter(
+    (md) => md.kind !== 'inngest.response_headers' && !isExperimentMetadata(md)
+  );
 
-  const experimentMetadataList = metadataIsEnabled
-    ? trace.metadata?.filter(isExperimentMetadata)
-    : undefined;
+  const experimentMetadataList = trace.metadata?.filter(isExperimentMetadata);
 
   const experimentMetadata = experimentMetadataList?.[0];
 
