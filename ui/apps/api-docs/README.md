@@ -19,6 +19,12 @@ pnpm install
 pnpm run dev
 ```
 
+Generate the docs pages from the generated OpenAPI files: (generated w/ `make docs`)
+
+```
+pnpm generate
+```
+
 ## Release
 
 Requires the Vercel API and this directory linked to the `api-docs.inngest.com` project.

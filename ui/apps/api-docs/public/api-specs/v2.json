@@ -955,7 +955,8 @@
         "summary": "Sync app",
         "tags": [
           "Apps"
-        ]
+        ],
+        "x-beta": true
       }
     },
     "/env/webhooks": {

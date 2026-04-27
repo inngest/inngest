@@ -10,6 +10,7 @@ const repoRoot = resolve(appRoot, '../../..');
 type Operation = {
   requestBody?: { content?: Record<string, unknown> };
   tags?: string[];
+  [extension: `x-${string}`]: unknown;
 };
 
 type Tag = { name: string; 'x-displayName'?: string; summary?: string };
@@ -39,6 +40,36 @@ function hideTaggedOperations(doc: OpenAPIDocument): OpenAPIDocument {
     if (Object.keys(pathItem).length === 0) delete doc.paths![path];
   }
   if (doc.tags) doc.tags = doc.tags.filter((t) => !HIDDEN_TAGS.has(t.name));
+  return doc;
+}
+
+/**
+ * "Soft" tags that don't create a nav group. When an operation is tagged with
+ * one of these, the tag is removed from the operation and the corresponding
+ * `x-*` extension is set so renderers (e.g. our APIPage wrapper) can show a
+ * badge while the operation stays grouped under its primary tag.
+ *
+ * Add new entries here to introduce new badges (e.g. Preview → x-preview).
+ */
+const SOFT_TAGS: Record<string, `x-${string}`> = {
+  Beta: 'x-beta',
+};
+
+function applySoftTags(doc: OpenAPIDocument): OpenAPIDocument {
+  for (const pathItem of Object.values(doc.paths ?? {})) {
+    for (const method of HTTP_METHODS) {
+      const op = pathItem[method];
+      if (!op?.tags) continue;
+      const remaining: string[] = [];
+      for (const t of op.tags) {
+        const ext = SOFT_TAGS[t];
+        if (ext) op[ext] = true;
+        else remaining.push(t);
+      }
+      op.tags = remaining;
+    }
+  }
+  if (doc.tags) doc.tags = doc.tags.filter((t) => !(t.name in SOFT_TAGS));
   return doc;
 }
 
@@ -110,10 +141,16 @@ async function main() {
   const v2SpecPath = resolve(repoRoot, 'docs/openapi/v3/api/v2/service.swagger.json');
 
   const v1Doc = preserveSpacedTagDisplayNames(
-    hideTaggedOperations(cleanSpec(parseYaml(readFileSync(v1SpecPath, 'utf8')) as OpenAPIDocument))
+    applySoftTags(
+      hideTaggedOperations(
+        cleanSpec(parseYaml(readFileSync(v1SpecPath, 'utf8')) as OpenAPIDocument)
+      )
+    )
   );
   const v2Doc = preserveSpacedTagDisplayNames(
-    hideTaggedOperations(JSON.parse(readFileSync(v2SpecPath, 'utf8')) as OpenAPIDocument)
+    applySoftTags(
+      hideTaggedOperations(JSON.parse(readFileSync(v2SpecPath, 'utf8')) as OpenAPIDocument)
+    )
   );
 
   assertTagsDeclared(v1Doc, 'v1 spec');

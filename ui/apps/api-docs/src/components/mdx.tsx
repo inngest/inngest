@@ -1,10 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { createClientAPIPage, type ClientApiPagePayload } from 'fumadocs-openapi/ui/create-client';
+import { Callout, type CalloutType } from 'fumadocs-ui/components/callout';
 import * as TabsComponents from 'fumadocs-ui/components/tabs';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import type { MDXComponents } from 'mdx/types';
 
 const ClientAPIPage = createClientAPIPage();
+
+// Soft-tag extensions (set by scripts/generate-docs.ts) rendered as Callouts at
+// the top of an operation page. Add new entries to introduce additional badges.
+const OPERATION_CALLOUTS: { key: string; type: CalloutType; title: string; body: ReactNode }[] = [
+  {
+    key: 'x-beta',
+    type: 'warn',
+    title: 'Beta',
+    body: 'This endpoint is in Beta. Behavior and shape may change before general availability.',
+  },
+];
+
+function OperationCallouts({
+  bundled,
+  operations,
+}: {
+  bundled: ClientApiPagePayload['bundled'];
+  operations?: { path: string; method: string }[];
+}) {
+  if (!operations?.length) return null;
+  const paths = bundled?.paths as
+    | Record<string, Record<string, Record<string, unknown>>>
+    | undefined;
+  if (!paths) return null;
+  const active = OPERATION_CALLOUTS.filter(({ key }) =>
+    operations.some((op) => paths[op.path]?.[op.method.toLowerCase()]?.[key])
+  );
+  if (active.length === 0) return null;
+  return (
+    <>
+      {active.map(({ key, type, title, body }) => (
+        <Callout key={key} type={type} title={title}>
+          {body}
+        </Callout>
+      ))}
+    </>
+  );
+}
 
 // Simple cache so we don't refetch the same spec on every render
 const specCache = new Map<string, ClientApiPagePayload['bundled']>();
@@ -59,8 +98,13 @@ function APIPage({ document: documentUrl, ...rest }: APIPageProps) {
     return <div className="text-fd-muted-foreground p-4 text-sm">Loading API reference…</div>;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <ClientAPIPage payload={payload} {...(rest as any)} />;
+  return (
+    <>
+      <OperationCallouts bundled={payload.bundled} operations={rest.operations} />
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <ClientAPIPage payload={payload} {...(rest as any)} />
+    </>
+  );
 }
 
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
