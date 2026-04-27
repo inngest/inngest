@@ -14,6 +14,10 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
+    "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": typeof types.CreateApiKeyDocument,
+    "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": typeof types.DeleteApiKeyDocument,
+    "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": typeof types.UpdateApiKeyDocument,
+    "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": typeof types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.UnachiveAppDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": typeof types.GetArchivedAppBannerDataDocument,
@@ -154,6 +158,10 @@ type Documents = {
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": typeof types.GetAccountSupportInfoDocument,
 };
 const documents: Documents = {
+    "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": types.CreateApiKeyDocument,
+    "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": types.DeleteApiKeyDocument,
+    "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": types.UpdateApiKeyDocument,
+    "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": types.GetArchivedAppBannerDataDocument,
@@ -308,6 +316,22 @@ const documents: Documents = {
  */
 export function graphql(source: string): unknown;
 
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n"): (typeof documents)["\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n"): (typeof documents)["\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

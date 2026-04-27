@@ -10,6 +10,7 @@ const paths: [string, string][] = [
   ['/organization/organization-members', 'Members'],
   ['/user', 'Profile'],
   ['/user/security', 'Profile'],
+  ['/api-keys', 'API keys'],
 ];
 
 const defined = <T,>(value: T | undefined): value is T => value !== undefined;
