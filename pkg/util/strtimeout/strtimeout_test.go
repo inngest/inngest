@@ -1,9 +1,10 @@
-package state
+package strtimeout_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/util/strtimeout"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +49,7 @@ func TestParseTimeout(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			timeoutAt, err := parseTimeout(tc.input, nowFn)
+			timeoutAt, err := strtimeout.ParseTimeout(tc.input, nowFn)
 			if tc.wantErr {
 				require.Error(t, err)
 				if tc.errContains != "" {

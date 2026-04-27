@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngest/pkg/util/interval"
+	"github.com/inngest/inngest/pkg/util/strtimeout"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -433,7 +434,7 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 		return time.Now(), nil
 	}
 
-	return parseTimeout(w.Timeout, time.Now)
+	return strtimeout.ParseTimeout(w.Timeout, time.Now)
 }
 
 // GatewayOpts returns the gateway options within the driver.
