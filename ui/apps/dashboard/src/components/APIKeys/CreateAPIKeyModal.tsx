@@ -133,7 +133,11 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   const inRevealStep = plaintextKey !== null;
 
   return (
-    <Modal className="w-full max-w-xl" isOpen={isOpen} onClose={close}>
+    <Modal
+      className="w-full max-w-xl overflow-visible"
+      isOpen={isOpen}
+      onClose={close}
+    >
       <Modal.Header>
         {inRevealStep ? 'Copy your API key' : 'Create API key'}
       </Modal.Header>
