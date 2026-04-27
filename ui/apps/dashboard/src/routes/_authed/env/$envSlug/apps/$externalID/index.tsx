@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { AppGitCard } from '@/components/Apps/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/Apps/AppInfoCard/AppInfoCard';
+import { SyncErrorMessage } from '@/components/Apps/SyncErrorMessage';
 import { useApp } from '@/components/Apps/useApp';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import WorkersSection from '@/components/Workers/WorkersSection';
@@ -78,7 +79,7 @@ function AppPage() {
 
         {appRes.data.latestSync?.error && (
           <Alert className="mb-4" severity="error">
-            {appRes.data.latestSync.error}
+            <SyncErrorMessage error={appRes.data.latestSync.error} />
           </Alert>
         )}
 
