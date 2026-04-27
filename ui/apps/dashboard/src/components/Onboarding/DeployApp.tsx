@@ -366,7 +366,7 @@ export default function DeployApp() {
       <Card className="mt-6">
         <Card.Content className="text-sm">
           <p className="font-semibold">
-            Before you go live, review security best practices.{' '}
+            Before you go live, review security best practices.
           </p>
           <p>
             Covers signing keys, end-to-end encryption, IP allowlisting, and
