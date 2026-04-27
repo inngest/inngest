@@ -1,10 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { RiArrowRightSLine } from '@remixicon/react';
-import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
-
 import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import {
   CodeElement,
   ElementWrapper,
@@ -21,6 +17,10 @@ import { usePrettyErrorBody, usePrettyJson } from '@inngest/components/hooks/use
 import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
 import { getCronTriggerMetadata } from '@inngest/components/utils/cronTrigger';
 import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
+import { RiArrowRightSLine } from '@remixicon/react';
+import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';

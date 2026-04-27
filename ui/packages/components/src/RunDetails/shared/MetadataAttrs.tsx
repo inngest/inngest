@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
-
 import { ElementWrapper, TextElement, TimeElement } from '@inngest/components/DetailsCard/Element';
+
 import type { SpanMetadata, SpanMetadataKind } from './types';
 
 const inngestKindLabels: Record<string, string> = {
@@ -93,8 +93,8 @@ const MetadataAttrRow = ({
                 {byteValueKeys.has(key) && typeof value === 'number'
                   ? formatBytes(value)
                   : typeof value === 'object' && value !== null
-                    ? JSON.stringify(value, null, 2)
-                    : String(value) || '--'}
+                  ? JSON.stringify(value, null, 2)
+                  : String(value) || '--'}
               </div>
             </div>
           );

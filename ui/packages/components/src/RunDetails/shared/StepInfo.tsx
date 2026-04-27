@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { RiArrowRightSLine } from '@remixicon/react';
-
 import { AITrace } from '@inngest/components/AI/AITrace';
 import { parseAIOutput } from '@inngest/components/AI/utils';
 import { Button } from '@inngest/components/Button/Button';
@@ -17,19 +15,26 @@ import { RerunModal } from '@inngest/components/Rerun/RerunModal';
 import { useShared } from '@inngest/components/SharedContext/SharedContext';
 import { useGetTraceResult } from '@inngest/components/SharedContext/useGetTraceResult';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
-import { getStatusBackgroundClass, getStatusTextClass } from '@inngest/components/Status/statusClasses';
+import {
+  getStatusBackgroundClass,
+  getStatusTextClass,
+} from '@inngest/components/Status/statusClasses';
 import { Time } from '@inngest/components/Time';
 import type { SpanMetadataKind } from '@inngest/components/generated';
-import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '@inngest/components/hooks/usePrettyJson';
+import {
+  usePrettyErrorBody,
+  usePrettyJson,
+  usePrettyShortError,
+} from '@inngest/components/hooks/usePrettyJson';
 import { toMaybeDate } from '@inngest/components/utils/date';
+import { RiArrowRightSLine } from '@remixicon/react';
+
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { TabLabelWithLoadedIndicator } from './TabLabelWithLoadedIndicator';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
-import { useJustFinishedLoading } from './useJustFinishedLoading';
-import { formatDuration, maybeBooleanToString, type StepInfoType } from './utils';
 import {
   isExperimentMetadata,
   isStepInfoInvoke,
@@ -42,6 +47,8 @@ import {
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
+import { useJustFinishedLoading } from './useJustFinishedLoading';
+import { formatDuration, maybeBooleanToString, type StepInfoType } from './utils';
 
 const STEP_OP_LABELS: Record<string, string> = {
   RUN: 'step.run',
@@ -189,7 +196,6 @@ export const StepInfo = ({
     refetchInterval: pollInterval ? pollInterval : undefined,
     preview: tracesPreviewEnabled,
   });
-
 
   useEffect(() => {
     result && setPollInterval(undefined);

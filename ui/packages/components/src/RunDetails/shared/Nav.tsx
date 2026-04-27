@@ -1,6 +1,3 @@
-import { RiArrowDownSLine, RiExternalLinkLine, RiShareForward2Line } from '@remixicon/react';
-import { useRouter, type LinkComponentProps } from '@tanstack/react-router';
-
 import { Button } from '@inngest/components/Button';
 import { SplitButton } from '@inngest/components/Button/SplitButton';
 import {
@@ -13,6 +10,8 @@ import { Link } from '@inngest/components/Link';
 import { useShared } from '@inngest/components/SharedContext/SharedContext';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
+import { RiArrowDownSLine, RiExternalLinkLine, RiShareForward2Line } from '@remixicon/react';
+import { useRouter, type LinkComponentProps } from '@tanstack/react-router';
 
 type NavProps = {
   standalone: boolean;

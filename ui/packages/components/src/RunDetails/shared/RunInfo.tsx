@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { RiArrowRightSLine } from '@remixicon/react';
-
 import { AITrace } from '@inngest/components/AI/AITrace';
 import { parseAIOutput } from '@inngest/components/AI/utils';
 import {
@@ -18,6 +16,8 @@ import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator
 import { AICell } from '@inngest/components/Table/Cell';
 import { toMaybeDate } from '@inngest/components/utils/date';
 import { isLazyDone, type Lazy } from '@inngest/components/utils/lazyLoad';
+import { RiArrowRightSLine } from '@remixicon/react';
+
 import { Actions } from './Actions';
 import { Nav } from './Nav';
 import { formatDuration } from './utils';
