@@ -1,5 +1,5 @@
 {
-  "title": "Partner A P I",
+  "title": "Partner API",
   "description": "Partner account management",
   "pages": [
     "FetchPartnerAccounts",

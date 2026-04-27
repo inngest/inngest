@@ -27,6 +27,16 @@
         },
         "type": "object"
       },
+      "V2SyncAppBody": {
+        "properties": {
+          "url": {
+            "description": "URL for the Inngest endpoint in the app",
+            "example": "https://example.com/api/inngest",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "protobufAny": {
         "additionalProperties": {},
         "properties": {
@@ -507,6 +517,48 @@
         },
         "type": "object"
       },
+      "v2SyncAppData": {
+        "properties": {
+          "app_id": {
+            "description": "App ID",
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/v2SyncAppError"
+          },
+          "id": {
+            "description": "ID",
+            "type": "string"
+          },
+          "status": {
+            "description": "Status",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2SyncAppError": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2SyncAppResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2SyncAppData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
       "v2Webhook": {
         "properties": {
           "createdAt": {
@@ -794,6 +846,115 @@
         "summary": "Invoke function",
         "tags": [
           "Functions"
+        ]
+      }
+    },
+    "/apps/{app_id}/syncs": {
+      "post": {
+        "description": "Sync an app at the provided URL.",
+        "operationId": "V2_SyncApp",
+        "parameters": [
+          {
+            "description": "App ID",
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2SyncAppBody"
+              }
+            }
+          },
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2SyncAppResponse"
+                }
+              }
+            },
+            "description": "App synced successfully"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - invalid input data"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized - authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found - environment not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2SyncAppResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity - sync failed. The response body is still SyncAppResponse and includes the persisted deploy plus a coded error under data.latestSync.error."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Sync app",
+        "tags": [
+          "Apps"
         ]
       }
     },
@@ -1379,83 +1540,6 @@
         "summary": "Update environment",
         "tags": [
           "Environments"
-        ]
-      }
-    },
-    "/health": {
-      "get": {
-        "description": "Returns the health status of the API service",
-        "operationId": "V2_Health",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "examples": {
-                  "default": {
-                    "value": {
-                      "data": {
-                        "status": "ok"
-                      },
-                      "metadata": {
-                        "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
-                      }
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/v2HealthResponse"
-                }
-              }
-            },
-            "description": "A successful response."
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "examples": {
-                  "default": {
-                    "value": "Authentication failed"
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/v2ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized - authentication required"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "examples": {
-                  "default": {
-                    "value": {
-                      "errors": [
-                        {
-                          "code": "internal_error",
-                          "message": "Something went wrong"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/v2ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "summary": "Health check",
-        "tags": [
-          "V2"
         ]
       }
     },
@@ -2119,12 +2203,17 @@
       "name": "Webhooks"
     },
     {
+      "description": "Sync and manage",
+      "name": "Apps"
+    },
+    {
       "description": "Invoke and manage functions",
       "name": "Functions"
     },
     {
       "description": "Partner account management",
-      "name": "Partner API"
+      "name": "Partner API",
+      "x-displayName": "Partner API"
     },
     {
       "name": "V2"

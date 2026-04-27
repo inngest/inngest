@@ -31,7 +31,8 @@
       "name": "Events"
     },
     {
-      "name": "Function runs"
+      "name": "Function runs",
+      "x-displayName": "Function runs"
     },
     {
       "name": "Signals"

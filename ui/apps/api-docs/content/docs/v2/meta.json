@@ -4,15 +4,15 @@
     "...account",
     "---Functions---",
     "...functions",
+    "---Apps---",
+    "...apps",
     "---Webhooks---",
     "...webhooks",
     "---Environments---",
     "...environments",
-    "---V2---",
-    "...v2",
     "---Keys---",
     "...keys",
-    "---Partner A P I---",
+    "---Partner API---",
     "...partner-api"
   ],
   "title": "v2"

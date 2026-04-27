@@ -6,31 +6,41 @@ info:
   version: "1.0"
   contact:
     name: Inngest
-    url: "https://www.inngest.com"
+    url: https://www.inngest.com
     email: hello@inngest.com
-  termsOfService: "https://www.inngest.com/terms"
+  termsOfService: https://www.inngest.com/terms
   summary: The Inngest API
-  description: |-
-    Inngest is an event-driven durable workflow engine served in your own API, with zero new infrastructure. Learn more at https://www.inngest.com/
+  description: >-
+    Inngest is an event-driven durable workflow engine served in your own API,
+    with zero new infrastructure. Learn more at https://www.inngest.com/
 
-    This API is the V1 API for interacting with events, functions, and runs programmatically.
+
+    This API is the V1 API for interacting with events, functions, and runs
+    programmatically.
+
 
     **Authentication**
 
-    Use your environment's signing key as a bearer token.  You must an `Authorization` header with the value of `Bearer ${signing-key}` to authenticate.
+
+    Use your environment's signing key as a bearer token.  You must an
+    `Authorization` header with the value of `Bearer ${signing-key}` to
+    authenticate.
+
 
     **Note**
 
+
     Trailing slashes on the URLs doesn't work.
-  license: "Inngest, Inc."
+  license: Inngest, Inc.
 servers:
-  - url: "https://api.inngest.com"
+  - url: https://api.inngest.com
     description: Production
-  - url: "http://localhost:8288"
+  - url: http://localhost:8288
     description: Dev Server
 tags:
   - name: Events
   - name: Function runs
+    x-displayName: Function runs
   - name: Signals
   - name: Cancellations
   - name: Webhooks
@@ -47,7 +57,7 @@ paths:
           description: List events received before this RFC3339 timestamp
         - schema:
             type: string
-            default: "1H ago, as an RFC3339 timestamp"
+            default: 1H ago, as an RFC3339 timestamp
           in: query
           description: List events received after this RFC3339 timestamp
           name: received_after
@@ -67,7 +77,8 @@ paths:
             type: string
           in: query
           name: cursor
-          description: The internal event ID used as a cursor to paginate through events within your time range
+          description: The internal event ID used as a cursor to paginate through events
+            within your time range
         - name: x-inngest-env
           description: Branch environment name when using a branch signing key
           in: header
@@ -91,14 +102,16 @@ paths:
                         id: na2zfnjuumzvu
                       title: Event
                       type: object
-                      description: An event and metadata attached to the event returned from an API response
+                      description: An event and metadata attached to the event returned from an API
+                        response
                       properties:
                         internal_id:
                           type: string
                           x-stoplight:
                             id: 2i8hq1l4nvnm6
                           format: ulid
-                          description: Unique identifier used to represent this event internally and to the API.
+                          description: Unique identifier used to represent this event internally and to
+                            the API.
                         accountID:
                           type: string
                           x-stoplight:
@@ -115,7 +128,7 @@ paths:
                           type: string
                           x-stoplight:
                             id: ztu0nmbuwdqjs
-                          description: 'The origin of the event, eg. "key" for an event key.'
+                          description: The origin of the event, eg. "key" for an event key.
                         sourceID:
                           type: string
                           format: uuid
@@ -213,7 +226,7 @@ paths:
       tags:
         - Events
     parameters: []
-  "/v1/events/{internalID}":
+  /v1/events/{internalID}:
     parameters:
       - schema:
           type: string
@@ -237,14 +250,16 @@ paths:
                     type: object
                     x-stoplight:
                       id: vv6knflmo5s46
-                    description: An event and metadata attached to the event returned from an API response
+                    description: An event and metadata attached to the event returned from an API
+                      response
                     properties:
                       internal_id:
                         type: string
                         x-stoplight:
                           id: 2i8hq1l4nvnm6
                         format: ulid
-                        description: Unique identifier used to represent this event internally and to the API.
+                        description: Unique identifier used to represent this event internally and to
+                          the API.
                       accountID:
                         type: string
                         x-stoplight:
@@ -261,7 +276,7 @@ paths:
                         type: string
                         x-stoplight:
                           id: ztu0nmbuwdqjs
-                        description: 'The origin of the event, eg. "key" for an event key.'
+                        description: The origin of the event, eg. "key" for an event key.
                       sourceID:
                         type: string
                         format: uuid
@@ -357,9 +372,7 @@ paths:
       operationId: GetEvent
       x-stoplight:
         id: pswkqb7u3obet
-      description: "Retrieve a single event within your environment, given its internal ID"
-      requestBody:
-        content: {}
+      description: Retrieve a single event within your environment, given its internal ID
       parameters:
         - name: x-inngest-env
           description: Branch environment name when using a branch signing key
@@ -367,7 +380,7 @@ paths:
           required: false
           schema:
             type: string
-  "/v1/events/{internalID}/runs":
+  /v1/events/{internalID}/runs:
     parameters:
       - schema:
           type: string
@@ -411,7 +424,8 @@ paths:
                           type:
                             - string
                             - "null"
-                          description: "If the function has ended, the end time.  A function has ended if the status is not Running."
+                          description: If the function has ended, the end time.  A function has ended if
+                            the status is not Running.
                         status:
                           enum:
                             - Running
@@ -427,7 +441,8 @@ paths:
                             - string
                             - boolean
                             - "null"
-                          description: Data returned from the function handler. The data structure returned will match what the function returns.
+                          description: Data returned from the function handler. The data structure
+                            returned will match what the function returns.
                         function_id:
                           type: string
                         function_version:
@@ -440,28 +455,31 @@ paths:
                           type:
                             - string
                             - "null"
-                          description: "The internal ID of the triggering event, if the function was initialized via an event"
+                          description: The internal ID of the triggering event, if the function was
+                            initialized via an event
                         batch_id:
                           type:
                             - string
                             - "null"
                           x-stoplight:
                             id: u5c5r2msk8gcy
-                          description: "The ID of the batch, if this function was initialized via a batch of events"
+                          description: The ID of the batch, if this function was initialized via a batch
+                            of events
                         original_run_id:
                           type:
                             - string
                             - "null"
                           x-stoplight:
                             id: 6en4jeah54ed6
-                          description: "The run ID of the original run, if this is a replay"
+                          description: The run ID of the original run, if this is a replay
                         cron:
                           type:
                             - string
                             - "null"
                           x-stoplight:
                             id: myxg3892c1xef
-                          description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
+                          description: The cron used to initialize this scheduled function, if the
+                            function was initialized via a cron
                       x-readme-ref-name: Function-run
                   metadata:
                     type: object
@@ -502,8 +520,6 @@ paths:
       x-stoplight:
         id: yoyeen3mu7wj0
       description: Returns function runs initialized by the given event
-      requestBody:
-        content: {}
       parameters:
         - name: x-inngest-env
           description: Branch environment name when using a branch signing key
@@ -511,7 +527,7 @@ paths:
           required: false
           schema:
             type: string
-  "/v1/runs/{runID}":
+  /v1/runs/{runID}:
     parameters:
       - schema:
           type: string
@@ -553,7 +569,8 @@ paths:
                         type:
                           - string
                           - "null"
-                        description: "If the function has ended, the end time.  A function has ended if the status is not Running."
+                        description: If the function has ended, the end time.  A function has ended if
+                          the status is not Running.
                       status:
                         enum:
                           - Running
@@ -569,7 +586,8 @@ paths:
                           - string
                           - boolean
                           - "null"
-                        description: Data returned from the function handler. The data structure returned will match what the function returns.
+                        description: Data returned from the function handler. The data structure
+                          returned will match what the function returns.
                       function_id:
                         type: string
                       function_version:
@@ -582,28 +600,31 @@ paths:
                         type:
                           - string
                           - "null"
-                        description: "The internal ID of the triggering event, if the function was initialized via an event"
+                        description: The internal ID of the triggering event, if the function was
+                          initialized via an event
                       batch_id:
                         type:
                           - string
                           - "null"
                         x-stoplight:
                           id: u5c5r2msk8gcy
-                        description: "The ID of the batch, if this function was initialized via a batch of events"
+                        description: The ID of the batch, if this function was initialized via a batch
+                          of events
                       original_run_id:
                         type:
                           - string
                           - "null"
                         x-stoplight:
                           id: 6en4jeah54ed6
-                        description: "The run ID of the original run, if this is a replay"
+                        description: The run ID of the original run, if this is a replay
                       cron:
                         type:
                           - string
                           - "null"
                         x-stoplight:
                           id: myxg3892c1xef
-                        description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
+                        description: The cron used to initialize this scheduled function, if the
+                          function was initialized via a cron
                     x-readme-ref-name: Function-run
                   metadata:
                     type: object
@@ -661,7 +682,8 @@ paths:
           description: No Content
       x-stoplight:
         id: t0itnlacczppy
-      description: Cancels a running function immediately.  No new steps will run after a function is cancelled.
+      description: Cancels a running function immediately.  No new steps will run
+        after a function is cancelled.
       tags:
         - Function runs
       parameters:
@@ -671,7 +693,7 @@ paths:
           required: false
           schema:
             type: string
-  "/v1/runs/{runID}/jobs":
+  /v1/runs/{runID}/jobs:
     parameters:
       - schema:
           type: string
@@ -733,10 +755,15 @@ paths:
       operationId: GetRunJobs
       x-stoplight:
         id: fgnob41ksy695
-      description: |-
-        An endpoint to fetch a subset of the function run's jobs within the function_id queue, in order of earliest to latest. This primarily allows you to see the order of the run's jobs within the function queue.
+      description: >-
+        An endpoint to fetch a subset of the function run's jobs within the
+        function_id queue, in order of earliest to latest. This primarily allows
+        you to see the order of the run's jobs within the function queue.
 
-        A single function enqueues all function run jobs wihtin the same queue.  This endpoint fetches a subset of jobs for a given function run.
+
+        A single function enqueues all function run jobs wihtin the same
+        queue.  This endpoint fetches a subset of jobs for a given function run.
+
 
         This endpoint is rate limited and cached for 5 seconds.
       tags:
@@ -798,7 +825,9 @@ paths:
       tags:
         - Signals
       requestBody:
-        description: Resume a function which is awaiting a signal via the `WaitForSignal` step.  The function run will resume with the given data and signal.
+        description: Resume a function which is awaiting a signal via the
+          `WaitForSignal` step.  The function run will resume with the given
+          data and signal.
         content:
           application/json:
             schema:
@@ -808,7 +837,8 @@ paths:
                   type: string
                   x-stoplight:
                     id: rwhwsgponyuso
-                  description: "The signal to resume.  This is a unique string, and represents a single run waiting for the signal via `step.waitForSignal`."
+                  description: The signal to resume.  This is a unique string, and represents a
+                    single run waiting for the signal via `step.waitForSignal`.
                 data:
                   x-stoplight:
                     id: vrxi3ez5xv0kh
@@ -956,7 +986,8 @@ paths:
                       id: 2iqq8aku7ia39
       x-stoplight:
         id: 8gh90chdy0gw4
-      description: "Creates a bulk cancellation, cancelling all functions in the given time range matching an optional expression"
+      description: Creates a bulk cancellation, cancelling all functions in the given
+        time range matching an optional expression
       requestBody:
         content:
           application/json:
@@ -971,7 +1002,8 @@ paths:
                   type: string
                   x-stoplight:
                     id: 61tkp2slirya1
-                  description: 'The client ID specified via the SDK for the app, eg: `new Inngest({ id: "this-id" })`'
+                  description: 'The client ID specified via the SDK for the app, eg: `new
+                    Inngest({ id: "this-id" })`'
                 function_id:
                   type: string
                   x-stoplight:
@@ -998,7 +1030,7 @@ paths:
           required: false
           schema:
             type: string
-  "/v1/cancellations/{id}":
+  /v1/cancellations/{id}:
     parameters:
       - schema:
           type: string
@@ -1015,7 +1047,8 @@ paths:
       operationId: DeleteCancellation
       x-stoplight:
         id: ythdnvv40r4ar
-      description: "Delete a cancellation, preventing the cancellation from stopping function runs between the given dates with a given expression."
+      description: Delete a cancellation, preventing the cancellation from stopping
+        function runs between the given dates with a given expression.
       parameters:
         - name: x-inngest-env
           description: Branch environment name when using a branch signing key
@@ -1043,8 +1076,9 @@ paths:
                     data:
                       - id: 5e627760-ce58-4068-861e-bcfe5161382e
                         name: Clerk
-                        transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
-                        url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
+                        transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data:
+                          evt.data }; }"
+                        url: https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw
     post:
       operationId: CreateWebhook
       summary: Create webhook
@@ -1064,14 +1098,15 @@ paths:
                     data:
                       id: 5e627760-ce58-4068-861e-bcfe5161382e
                       name: Clerk
-                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
-                      url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
+                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data:
+                        evt.data }; }"
+                      url: https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/requestBodies/CreateOrUpdateWebhook"
-  "/v1/webhooks/{id}":
+  /v1/webhooks/{id}:
     parameters:
       - schema:
           type: string
@@ -1098,8 +1133,9 @@ paths:
                     data:
                       id: 5e627760-ce58-4068-861e-bcfe5161382e
                       name: Clerk
-                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
-                      url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
+                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data:
+                        evt.data }; }"
+                      url: https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw
     put:
       operationId: UpdateWebhook
       summary: Update webhook
@@ -1124,8 +1160,9 @@ paths:
                     data:
                       id: 5e627760-ce58-4068-861e-bcfe5161382e
                       name: Clerk
-                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
-                      url: "https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw"
+                      transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data:
+                        evt.data }; }"
+                      url: https://inn.gs/e/eRqRM2PcvLbQ8mwmnCq7SnjD3mclZrk5WGBpB-AbIkJY0cBZpiceni8ktSDF3WCjarOHOkciliKjrXLoi7fHqw
     delete:
       operationId: DeleteWebhook
       summary: Delete webhook
@@ -1164,7 +1201,8 @@ components:
           x-stoplight:
             id: 2i8hq1l4nvnm6
           format: ulid
-          description: Unique identifier used to represent this event internally and to the API.
+          description: Unique identifier used to represent this event internally and to
+            the API.
         accountID:
           type: string
           x-stoplight:
@@ -1181,7 +1219,7 @@ components:
           type: string
           x-stoplight:
             id: ztu0nmbuwdqjs
-          description: 'The origin of the event, eg. "key" for an event key.'
+          description: The origin of the event, eg. "key" for an event key.
         sourceID:
           type: string
           format: uuid
@@ -1262,7 +1300,8 @@ components:
           type:
             - string
             - "null"
-          description: "If the function has ended, the end time.  A function has ended if the status is not Running."
+          description: If the function has ended, the end time.  A function has ended if
+            the status is not Running.
         status:
           enum:
             - Running
@@ -1278,7 +1317,8 @@ components:
             - string
             - boolean
             - "null"
-          description: Data returned from the function handler. The data structure returned will match what the function returns.
+          description: Data returned from the function handler. The data structure
+            returned will match what the function returns.
         function_id:
           type: string
         function_version:
@@ -1291,28 +1331,31 @@ components:
           type:
             - string
             - "null"
-          description: "The internal ID of the triggering event, if the function was initialized via an event"
+          description: The internal ID of the triggering event, if the function was
+            initialized via an event
         batch_id:
           type:
             - string
             - "null"
           x-stoplight:
             id: u5c5r2msk8gcy
-          description: "The ID of the batch, if this function was initialized via a batch of events"
+          description: The ID of the batch, if this function was initialized via a batch
+            of events
         original_run_id:
           type:
             - string
             - "null"
           x-stoplight:
             id: 6en4jeah54ed6
-          description: "The run ID of the original run, if this is a replay"
+          description: The run ID of the original run, if this is a replay
         cron:
           type:
             - string
             - "null"
           x-stoplight:
             id: myxg3892c1xef
-          description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
+          description: The cron used to initialize this scheduled function, if the
+            function was initialized via a cron
       x-readme-ref-name: Function-run
     Job:
       title: Job
@@ -1392,10 +1435,13 @@ components:
           description: A custom descripter for the webhook endpoint
         transform:
           type: string
-          description: A JavaScript transform function that accepts the inbound request components and returns an object in the Inngest event payload format.
+          description: A JavaScript transform function that accepts the inbound request
+            components and returns an object in the Inngest event payload
+            format.
       examples:
         - name: Clerk
-          transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data: evt.data }; }"
+          transform: "function transform(evt) { return { name: `clerk/${evt.type}`, data:
+            evt.data }; }"
   responses:
     Event-list:
       description: The response when listing events.
@@ -1412,14 +1458,16 @@ components:
                     id: na2zfnjuumzvu
                   title: Event
                   type: object
-                  description: An event and metadata attached to the event returned from an API response
+                  description: An event and metadata attached to the event returned from an API
+                    response
                   properties:
                     internal_id:
                       type: string
                       x-stoplight:
                         id: 2i8hq1l4nvnm6
                       format: ulid
-                      description: Unique identifier used to represent this event internally and to the API.
+                      description: Unique identifier used to represent this event internally and to
+                        the API.
                     accountID:
                       type: string
                       x-stoplight:
@@ -1436,7 +1484,7 @@ components:
                       type: string
                       x-stoplight:
                         id: ztu0nmbuwdqjs
-                      description: 'The origin of the event, eg. "key" for an event key.'
+                      description: The origin of the event, eg. "key" for an event key.
                     sourceID:
                       type: string
                       format: uuid
@@ -1541,14 +1589,16 @@ components:
                 type: object
                 x-stoplight:
                   id: vv6knflmo5s46
-                description: An event and metadata attached to the event returned from an API response
+                description: An event and metadata attached to the event returned from an API
+                  response
                 properties:
                   internal_id:
                     type: string
                     x-stoplight:
                       id: 2i8hq1l4nvnm6
                     format: ulid
-                    description: Unique identifier used to represent this event internally and to the API.
+                    description: Unique identifier used to represent this event internally and to
+                      the API.
                   accountID:
                     type: string
                     x-stoplight:
@@ -1565,7 +1615,7 @@ components:
                     type: string
                     x-stoplight:
                       id: ztu0nmbuwdqjs
-                    description: 'The origin of the event, eg. "key" for an event key.'
+                    description: The origin of the event, eg. "key" for an event key.
                   sourceID:
                     type: string
                     format: uuid
@@ -1667,7 +1717,8 @@ components:
                     type:
                       - string
                       - "null"
-                    description: "If the function has ended, the end time.  A function has ended if the status is not Running."
+                    description: If the function has ended, the end time.  A function has ended if
+                      the status is not Running.
                   status:
                     enum:
                       - Running
@@ -1683,7 +1734,8 @@ components:
                       - string
                       - boolean
                       - "null"
-                    description: Data returned from the function handler. The data structure returned will match what the function returns.
+                    description: Data returned from the function handler. The data structure
+                      returned will match what the function returns.
                   function_id:
                     type: string
                   function_version:
@@ -1696,28 +1748,31 @@ components:
                     type:
                       - string
                       - "null"
-                    description: "The internal ID of the triggering event, if the function was initialized via an event"
+                    description: The internal ID of the triggering event, if the function was
+                      initialized via an event
                   batch_id:
                     type:
                       - string
                       - "null"
                     x-stoplight:
                       id: u5c5r2msk8gcy
-                    description: "The ID of the batch, if this function was initialized via a batch of events"
+                    description: The ID of the batch, if this function was initialized via a batch
+                      of events
                   original_run_id:
                     type:
                       - string
                       - "null"
                     x-stoplight:
                       id: 6en4jeah54ed6
-                    description: "The run ID of the original run, if this is a replay"
+                    description: The run ID of the original run, if this is a replay
                   cron:
                     type:
                       - string
                       - "null"
                     x-stoplight:
                       id: myxg3892c1xef
-                    description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
+                    description: The cron used to initialize this scheduled function, if the
+                      function was initialized via a cron
                 x-readme-ref-name: Function-run
               metadata:
                 type: object
@@ -1765,7 +1820,8 @@ components:
                       type:
                         - string
                         - "null"
-                      description: "If the function has ended, the end time.  A function has ended if the status is not Running."
+                      description: If the function has ended, the end time.  A function has ended if
+                        the status is not Running.
                     status:
                       enum:
                         - Running
@@ -1781,7 +1837,8 @@ components:
                         - string
                         - boolean
                         - "null"
-                      description: Data returned from the function handler. The data structure returned will match what the function returns.
+                      description: Data returned from the function handler. The data structure
+                        returned will match what the function returns.
                     function_id:
                       type: string
                     function_version:
@@ -1794,28 +1851,31 @@ components:
                       type:
                         - string
                         - "null"
-                      description: "The internal ID of the triggering event, if the function was initialized via an event"
+                      description: The internal ID of the triggering event, if the function was
+                        initialized via an event
                     batch_id:
                       type:
                         - string
                         - "null"
                       x-stoplight:
                         id: u5c5r2msk8gcy
-                      description: "The ID of the batch, if this function was initialized via a batch of events"
+                      description: The ID of the batch, if this function was initialized via a batch
+                        of events
                     original_run_id:
                       type:
                         - string
                         - "null"
                       x-stoplight:
                         id: 6en4jeah54ed6
-                      description: "The run ID of the original run, if this is a replay"
+                      description: The run ID of the original run, if this is a replay
                     cron:
                       type:
                         - string
                         - "null"
                       x-stoplight:
                         id: myxg3892c1xef
-                      description: "The cron used to initialize this scheduled function, if the function was initialized via a cron"
+                      description: The cron used to initialize this scheduled function, if the
+                        function was initialized via a cron
                   x-readme-ref-name: Function-run
               metadata:
                 type: object
@@ -1957,7 +2017,9 @@ components:
                     description: Unique URL endpoint
                   transform:
                     type: string
-                    description: A JavaScript transform function that accepts the inbound request components and returns an object in the Inngest event payload format.
+                    description: A JavaScript transform function that accepts the inbound request
+                      components and returns an object in the Inngest event
+                      payload format.
                   created_at:
                     type: string
                     format: date-time
@@ -2000,6 +2062,8 @@ components:
                     description: Unique URL endpoint
                   transform:
                     type: string
-                    description: A JavaScript transform function that accepts the inbound request components and returns an object in the Inngest event payload format.
+                    description: A JavaScript transform function that accepts the inbound request
+                      components and returns an object in the Inngest event
+                      payload format.
 security:
   - your-signing-key: []

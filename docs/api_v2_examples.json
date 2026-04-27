@@ -62,6 +62,31 @@
       }
     }
   },
+  "/apps/{app_id}/syncs": {
+    "post": {
+      "200": {
+        "// TODO": "Add example data for post /apps/{app_id}/syncs 200"
+      },
+      "400": {
+        "// TODO": "Add example data for post /apps/{app_id}/syncs 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /apps/{app_id}/syncs 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /apps/{app_id}/syncs 403"
+      },
+      "404": {
+        "// TODO": "Add example data for post /apps/{app_id}/syncs 404"
+      },
+      "422": {
+        "// TODO": "Add example data for post /apps/{app_id}/syncs 422"
+      },
+      "500": {
+        "// TODO": "Add example data for post /apps/{app_id}/syncs 500"
+      }
+    }
+  },
   "/env/webhooks": {
     "get": {
       "200": {

@@ -33,6 +33,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Environments" description: "Create and manage environments" }
   tags: { name: "Keys"         description: "Manage event and signing keys" }
   tags: { name: "Webhooks"     description: "Create and manage inbound webhooks" }
+  tags: { name: "Apps"         description: "Sync and manage" }
   tags: { name: "Functions"    description: "Invoke and manage functions" }
   tags: { name: "Partner API"  description: "Partner account management" }
 };
@@ -45,6 +46,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Health check"
+      tags: "Internal"
       description: "Returns the health status of the API service"
       security: {
         security_requirement: {
@@ -76,7 +78,7 @@ service V2 {
       }
     };
   }
-  
+
   // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
   // The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
   // in the swagger definitions. This path is stripped by the convert-openapi tool.
@@ -85,7 +87,7 @@ service V2 {
       get: "/_internal/schema-only"
     };
   }
-  
+
   rpc CreatePartnerAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
       post: "/partner/accounts",
@@ -943,6 +945,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Sync app"
+      tags: "Apps"
       description: "Sync an app at the provided URL."
       security: {
         security_requirement: {
