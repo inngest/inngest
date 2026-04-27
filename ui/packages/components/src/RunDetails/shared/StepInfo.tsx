@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import { AITrace } from '../../AI/AITrace';
-import { parseAIOutput } from '../../AI/utils';
-import { Button } from '../../Button/Button';
+import { AITrace } from '@inngest/components/AI/AITrace';
+import { parseAIOutput } from '@inngest/components/AI/utils';
+import { Button } from '@inngest/components/Button/Button';
 import {
   CodeElement,
   ElementWrapper,
@@ -11,17 +11,17 @@ import {
   LinkElement,
   TextElement,
   TimeElement,
-} from '../../DetailsCard/Element';
-import { Pill } from '../../Pill/Pill';
-import { RerunModal } from '../../Rerun/RerunModal';
-import { useShared } from '../../SharedContext/SharedContext';
-import { useGetTraceResult } from '../../SharedContext/useGetTraceResult';
-import { usePathCreator } from '../../SharedContext/usePathCreator';
-import { getStatusBackgroundClass, getStatusTextClass } from '../../Status/statusClasses';
-import { Time } from '../../Time';
-import type { SpanMetadataKind } from '../../generated';
-import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../../hooks/usePrettyJson';
-import { toMaybeDate } from '../../utils/date';
+} from '@inngest/components/DetailsCard/Element';
+import { Pill } from '@inngest/components/Pill/Pill';
+import { RerunModal } from '@inngest/components/Rerun/RerunModal';
+import { useShared } from '@inngest/components/SharedContext/SharedContext';
+import { useGetTraceResult } from '@inngest/components/SharedContext/useGetTraceResult';
+import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
+import { getStatusBackgroundClass, getStatusTextClass } from '@inngest/components/Status/statusClasses';
+import { Time } from '@inngest/components/Time';
+import type { SpanMetadataKind } from '@inngest/components/generated';
+import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '@inngest/components/hooks/usePrettyJson';
+import { toMaybeDate } from '@inngest/components/utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
@@ -451,7 +451,7 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(result?.error || loading
+                  ...(result?.error
                     ? [
                         {
                           label: (

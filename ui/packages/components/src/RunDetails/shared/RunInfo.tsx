@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import { AITrace } from '../../AI/AITrace';
-import { parseAIOutput } from '../../AI/utils';
+import { AITrace } from '@inngest/components/AI/AITrace';
+import { parseAIOutput } from '@inngest/components/AI/utils';
 import {
   ElementWrapper,
   IDElement,
@@ -11,13 +11,13 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../../DetailsCard/Element';
-import type { Run as InitialRunData } from '../../RunsPage/types';
-import type { TraceResult } from '../../SharedContext/useGetTraceResult';
-import { usePathCreator } from '../../SharedContext/usePathCreator';
-import { AICell } from '../../Table/Cell';
-import { toMaybeDate } from '../../utils/date';
-import { isLazyDone, type Lazy } from '../../utils/lazyLoad';
+} from '@inngest/components/DetailsCard/Element';
+import type { Run as InitialRunData } from '@inngest/components/RunsPage/types';
+import type { TraceResult } from '@inngest/components/SharedContext/useGetTraceResult';
+import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
+import { AICell } from '@inngest/components/Table/Cell';
+import { toMaybeDate } from '@inngest/components/utils/date';
+import { isLazyDone, type Lazy } from '@inngest/components/utils/lazyLoad';
 import { Actions } from './Actions';
 import { Nav } from './Nav';
 import { formatDuration } from './utils';

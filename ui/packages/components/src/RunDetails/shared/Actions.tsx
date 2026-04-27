@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
-import { Button } from '../../Button';
-import { Link } from '../../Link';
-import { useShared } from '../../SharedContext/SharedContext';
-import { useCancelRun } from '../../SharedContext/useCancelRun';
-import { useRerun } from '../../SharedContext/useRerun';
-import { OptionalTooltip } from '../../Tooltip/OptionalTooltip';
+import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
+import { useShared } from '@inngest/components/SharedContext/SharedContext';
+import { useCancelRun } from '@inngest/components/SharedContext/useCancelRun';
+import { useRerun } from '@inngest/components/SharedContext/useRerun';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { CancelModal } from './CancelModal';
 
 export type RunActions = {

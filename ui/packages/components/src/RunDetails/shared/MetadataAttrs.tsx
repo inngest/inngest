@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 
-import { ElementWrapper, TextElement, TimeElement } from '../../DetailsCard/Element';
+import { ElementWrapper, TextElement, TimeElement } from '@inngest/components/DetailsCard/Element';
 import type { SpanMetadata, SpanMetadataKind } from './types';
 
 const inngestKindLabels: Record<string, string> = {

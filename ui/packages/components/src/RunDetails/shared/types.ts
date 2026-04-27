@@ -2,7 +2,7 @@ import type {
   SpanMetadataKind as GeneratedSpanMetadataKind,
   SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
   Warnings,
-} from '../../generated/index';
+} from '@inngest/components/generated/index';
 
 export type Trace = {
   attempts: number | null;
@@ -24,7 +24,7 @@ export type Trace = {
   debugRunID?: string | null;
   debugSessionID?: string | null;
   metadata?: SpanMetadata[];
-  response?: ResponseInfo;
+  response?: ResponseInfo | null;
 };
 
 export type ResponseInfo = {
