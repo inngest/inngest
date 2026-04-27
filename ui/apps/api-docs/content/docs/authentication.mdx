@@ -3,68 +3,65 @@ title: Authentication
 description: How to authenticate with the Inngest REST API.
 ---
 
-The Inngest API uses **Bearer token authentication** via your environment's signing key.
+The Inngest API uses **Bearer token authentication** using your environment's signing key or an API key.
 
-## Getting Your Signing Key
+* [Signing keys](https://www.inngest.com/docs/platform/signing-keys) area an ideal method of authentication if you are making requests from an app or context that already has the signing key.
+* [API keys](https://www.inngest.com/docs/platform/api-keys) are ideal for making requests for all other contexts, like CI/CD pipelines, scripts, AI tools, or similar.
 
-You can find your signing key in the Inngest dashboard under your environment's settings. The signing key begins with `signkey-`.
+## Keys
+
+### Signing key authentication
+
+You can find your signing key in the Inngest dashboard under your environment's settings. The signing key begins with `signkey-` ([learn more](https://www.inngest.com/docs/platform/signing-keys)). When self-hosting Inngest, you'll have configured the signing key for your server via environment variable or configuration file.
+
+Each environment has it's own signing key. Ensure that you are always using the correct key for the environment that you are managing.
+
+### API Key authentication (v2 endpoints only)
+
+Inngest cloud allows organization admins to create and manage API keys within the Inngest dashboard. You can create one in [the API key management panel](https://app.inngest.com/settings/api-keys).
 
 ## Making Authenticated Requests
 
-Include the signing key as a `Bearer` token in the `Authorization` header of every request.
+Include the api key or signing key as a `Bearer` token in the `Authorization` header of every request.
 
+<Tabs items={['Signing key', 'API Key']}>
+<Tab value="Signing key">
 ```http
 Authorization: Bearer signkey-prod-xxxxxxxxxxxxxxxxxxxx
 ```
-
-### Examples
-
-<Tabs items={['curl', 'TypeScript', 'Python']}>
-<Tab value="curl">
-```bash
-curl https://api.inngest.com/v1/events \
-  -H "Authorization: Bearer signkey-prod-xxxxxxxxxxxxxxxxxxxx"
-```
 </Tab>
-<Tab value="TypeScript">
-```ts
-const response = await fetch('https://api.inngest.com/v1/events', {
-  headers: {
-    Authorization: `Bearer ${process.env.INNGEST_SIGNING_KEY}`,
-  },
-});
-const data = await response.json();
-```
-</Tab>
-<Tab value="Python">
-```python
-import os
-import requests
-
-response = requests.get(
-    "https://api.inngest.com/v1/events",
-    headers={"Authorization": f"Bearer {os.environ['INNGEST_SIGNING_KEY']}"},
-)
-data = response.json()
+<Tab value="API Key">
+```http
+Authorization: Bearer <api-key>
 ```
 </Tab>
 </Tabs>
 
-## Environments
+### Examples
 
-Each Inngest environment (production, branch, etc.) has its own signing key. Ensure you use the signing key that corresponds to the environment you want to interact with.
-
-## Error Responses
-
-If authentication fails, the API returns a `401 Unauthorized` response:
-
-```json
-{
-  "error": "unauthorized"
-}
+<Tabs items={['curl', 'TypeScript']}>
+<Tab value="curl">
+```bash
+curl -X POST "https://api.inngest.com/v2/apps/demo-app/functions/backfill-data/invoke" \
+  -H "Authorization: Bearer sk-inn-apixxxxxxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{ "data": { "test": "invoke-a-fn!" } }'
 ```
+</Tab>
+<Tab value="TypeScript">
+```ts
+const appId = "demo-app";
+const fnId = "backfill-data";
+const response = await fetch(`https://api.inngest.com/v2/apps/${appId}/functions/${fnId}/invoke`, {
+  method: "post"
+  headers: {
+    Authorization: `Bearer ${process.env.INNGEST_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ data: { test: "invoke-a-fn!" } }),
+});
+const data = await response.json();
+```
+</Tab>
+</Tabs>
 
-## Notes
-
-- Trailing slashes on URLs are not supported — omit them from all requests.
-- All requests should use HTTPS in production.
