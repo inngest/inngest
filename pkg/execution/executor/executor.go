@@ -3168,6 +3168,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	nonLazy := nonLazyOpCount(resp.Generator)
+
 	{
 		// The following code helps with parallelism and the V2 -> V3 executor changes
 		var update *sv2.MutableConfig
@@ -3180,7 +3182,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 				StartedAt:      i.md.Config.StartedAt,
 			}
 		}
-		if nonLazyOpCount(resp.Generator) > 1 {
+		if nonLazy > 1 {
 			if !i.md.Config.ForceStepPlan {
 				// With parallelism, we currently instruct the SDK to disable immediate execution,
 				// enforcing that every step becomes pre-planned.
@@ -3239,13 +3241,17 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// When this happens, we ALWAYS need to create a trace for each step.
 	//
 	// We pass this down in context, unfortunately.
-	if nonLazyOpCount(resp.Generator) > 1 {
+	if nonLazy > 1 {
 		for _, op := range resp.Generator {
 			if op.Op == enums.OpcodeStepRun {
 				ctx = setEmitCheckpointTraces(ctx)
 				break
 			}
 		}
+	}
+
+	if nonLazy > 0 {
+		ctx = setLazyOpHasHost(ctx)
 	}
 
 	for _, group := range groups.All() {
@@ -3480,7 +3486,13 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 		return fmt.Errorf("error saving defer: %w", err)
 	}
 
-	// continue execution, re-enqueue the discovery step
+	if lazyOpHasHost(ctx) {
+		return nil
+	}
+
+	// Bare DeferAdd shouldn't happen — the SDK piggybacks it onto a host op.
+	// Log and enqueue discovery as a fallback so the run can progress.
+	e.log.Error("DeferAdd received without a host op; enqueuing discovery as fallback", "step_id", gen.ID)
 	groupID := uuid.New().String()
 	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
 }
@@ -3509,6 +3521,13 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
 
+	if lazyOpHasHost(ctx) {
+		return nil
+	}
+
+	// Bare DeferCancel shouldn't happen — the SDK piggybacks it onto a host op.
+	// Log and enqueue discovery as a fallback so the run can progress.
+	e.log.Error("DeferCancel received without a host op; enqueuing discovery as fallback", "step_id", gen.ID)
 	groupID := uuid.New().String()
 	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
 }
@@ -5506,6 +5525,22 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
+	return ok
+}
+
+// Lazy ops piggyback on a host op that drives discovery; this flag tells lazy
+// handlers to skip their own enqueue. See enums.OpcodeIsLazy.
+
+type lazyOpHasHostValT struct{}
+
+var lazyOpHasHostVal = lazyOpHasHostValT{}
+
+func setLazyOpHasHost(ctx context.Context) context.Context {
+	return context.WithValue(ctx, lazyOpHasHostVal, true)
+}
+
+func lazyOpHasHost(ctx context.Context) bool {
+	ok, _ := ctx.Value(lazyOpHasHostVal).(bool)
 	return ok
 }
 
