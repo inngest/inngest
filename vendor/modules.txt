@@ -612,20 +612,8 @@ github.com/distribution/reference
 # github.com/dmarkham/enumer v1.6.3
 ## explicit; go 1.24.1
 github.com/dmarkham/enumer
-# github.com/docker/docker v28.5.2+incompatible
-## explicit
-github.com/docker/docker/api/types/blkiodev
-github.com/docker/docker/api/types/common
-github.com/docker/docker/api/types/container
-github.com/docker/docker/api/types/filters
-github.com/docker/docker/api/types/mount
-github.com/docker/docker/api/types/network
-github.com/docker/docker/api/types/storage
-github.com/docker/docker/api/types/strslice
-github.com/docker/docker/api/types/versions
 # github.com/docker/go-connections v0.6.0
 ## explicit; go 1.18
-github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
