@@ -1,6 +1,7 @@
 import { Card } from '@inngest/components/Card';
 import { Pill } from '@inngest/components/Pill';
 import {
+  formatVariantWeight,
   isActive,
   type ExperimentDetail,
   type ExperimentVariantMetrics,
@@ -206,7 +207,7 @@ function VariantsSection({
               )}
               {weight != null && (
                 <span className="text-basis font-mono text-sm tabular-nums">
-                  {weight.weight}
+                  {formatVariantWeight(weight.weight)}
                 </span>
               )}
             </div>

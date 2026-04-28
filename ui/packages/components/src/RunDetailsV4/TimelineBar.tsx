@@ -27,6 +27,7 @@ import {
 } from '@remixicon/react';
 import { format } from 'date-fns';
 
+import { formatVariantWeight } from '../Experiments/format';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -554,7 +555,7 @@ function ExperimentHoverCardContent({
             </span>
             {variantWeights && variantWeights[variantSelected] != null && (
               <span className="text-basis font-medium tabular-nums">
-                {variantWeights[variantSelected]}
+                {formatVariantWeight(variantWeights[variantSelected]!)}
               </span>
             )}
           </div>
@@ -567,7 +568,9 @@ function ExperimentHoverCardContent({
             >
               <span className="text-light ml-4">{variant}</span>
               {variantWeights && variantWeights[variant] != null && (
-                <span className="text-light tabular-nums">{variantWeights[variant]}</span>
+                <span className="text-light tabular-nums">
+                  {formatVariantWeight(variantWeights[variant]!)}
+                </span>
               )}
             </div>
           ))}
