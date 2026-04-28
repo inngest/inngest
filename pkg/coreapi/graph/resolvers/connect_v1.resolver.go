@@ -1,8 +1,8 @@
 package resolvers
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -10,79 +10,74 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/oklog/ulid/v2"
 )
 
 const (
-	pkgName = "coreapi.graph.resolvers"
-
-	defaultPageSize        = 40
-	defaultRunItems        = 40
-	maxRunItems            = 400
 	defaultConnectionItems = 40
 	maxConnectionItems     = 400
 )
 
-type EventsV2ConnectionCursor struct {
-	ID string
+func (r *connectV1workerConnectionConnResolver) App(ctx context.Context, obj *models.ConnectV1WorkerConnection) (*cqrs.App, error) {
+	if obj.AppID == nil {
+		return nil, nil
+	}
+
+	return r.Data.GetAppByID(ctx, *obj.AppID)
 }
 
-func (c *EventsV2ConnectionCursor) Decode(val string) error {
-	byt, err := base64.StdEncoding.DecodeString(val)
+func (r *connectV1workerConnectionResolver) TotalCount(ctx context.Context, obj *models.WorkerConnectionsConnection) (int, error) {
+	opts := toWorkerConnectionsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter)
+	count, err := r.Data.GetWorkerConnectionsCount(ctx, opts)
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("error retrieving count for worker connections: %w", err)
 	}
-	return json.Unmarshal(byt, c)
+
+	return count, nil
 }
 
-func cqrsEventToGQLEvent(e *cqrs.Event) *models.EventV2 {
-	eventV2 := models.EventV2{
-		EnvID:          e.WorkspaceID,
-		ID:             e.InternalID(),
-		IdempotencyKey: &e.EventID,
-		Name:           e.EventName,
-		OccurredAt:     time.UnixMilli(e.EventTS),
-		ReceivedAt:     e.ReceivedAt,
-		Version:        &e.EventVersion,
+func (qr *queryResolver) WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.WorkerConnectionsConnection, error) {
+	opts := toWorkerConnectionsQueryOpt(first, after, orderBy, filter)
+	workerConns, err := qr.Data.GetWorkerConnections(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving worker connections: %w", err)
 	}
 
-	if e.SourceID != nil {
-		eventV2.Source = &models.EventSource{
-			ID:         e.SourceID.String(),
-			Name:       &e.Source,
-			SourceKind: "TODO",
+	var (
+		scursor *string
+		ecursor *string
+	)
+
+	edges := []*models.ConnectV1WorkerConnectionEdge{}
+	total := len(workerConns)
+	for i, conn := range workerConns {
+		c := conn.Cursor
+		if i == 0 {
+			scursor = &c // start cursor
 		}
+		if i == total-1 {
+			ecursor = &c // end cursor
+		}
+
+		edges = append(edges, &models.ConnectV1WorkerConnectionEdge{
+			Node:   connToNode(conn),
+			Cursor: conn.Cursor,
+		})
 	}
 
-	return &eventV2
-}
-
-func marshalRaw(e *cqrs.Event) (string, error) {
-	data := e.EventData
-	if data == nil {
-		data = make(map[string]any)
+	pageInfo := &models.PageInfo{
+		HasNextPage: total == int(opts.Items),
+		StartCursor: scursor,
+		EndCursor:   ecursor,
 	}
 
-	var version *string
-	if len(e.EventVersion) > 0 {
-		version = &e.EventVersion
-	}
-
-	id := e.InternalID().String()
-	if len(e.EventID) > 0 {
-		id = e.EventID
-	}
-
-	byt, err := json.Marshal(map[string]any{
-		"data": data,
-		"id":   id,
-		"name": e.EventName,
-		"ts":   e.EventTS,
-		"v":    version,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(byt), nil
+	return &models.WorkerConnectionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfo,
+		After:    after,
+		Filter:   filter,
+		OrderBy:  orderBy,
+	}, nil
 }
 
 func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
@@ -145,6 +140,19 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 	}
 
 	return node
+}
+
+func (qr *queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
+	conn, err := qr.Data.GetWorkerConnection(ctx, cqrs.WorkerConnectionIdentifier{
+		AccountID:    consts.DevServerAccountID,
+		WorkspaceID:  consts.DevServerEnvID,
+		ConnectionID: connectionID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving worker connection: %w", err)
+	}
+
+	return connToNode(conn), nil
 }
 
 func toWorkerConnectionsQueryOpt(
@@ -247,110 +255,5 @@ func toWorkerConnectionsQueryOpt(
 		Order:  orderBy,
 		Cursor: cursor,
 		Items:  uint(items),
-	}
-}
-
-func toRunsQueryOpt(
-	first int,
-	after *string,
-	order []*models.RunsV2OrderBy,
-	filter models.RunsFilterV2,
-	preview *bool,
-) cqrs.GetTraceRunOpt {
-	tsfield := enums.TraceRunTimeQueuedAt
-	switch *filter.TimeField {
-	case models.RunsV2OrderByFieldStartedAt:
-		tsfield = enums.TraceRunTimeStartedAt
-	case models.RunsV2OrderByFieldEndedAt:
-		tsfield = enums.TraceRunTimeEndedAt
-	}
-
-	statuses := []enums.RunStatus{}
-	if len(filter.Status) > 0 {
-		for _, s := range filter.Status {
-			var status enums.RunStatus
-			switch s {
-			case models.FunctionRunStatusQueued:
-				status = enums.RunStatusScheduled
-			case models.FunctionRunStatusRunning:
-				status = enums.RunStatusRunning
-			case models.FunctionRunStatusCompleted:
-				status = enums.RunStatusCompleted
-			case models.FunctionRunStatusCancelled:
-				status = enums.RunStatusCancelled
-			case models.FunctionRunStatusFailed:
-				status = enums.RunStatusFailed
-			default:
-				// unknown status
-				continue
-			}
-			statuses = append(statuses, status)
-		}
-	}
-
-	orderBy := []cqrs.GetTraceRunOrder{}
-	for _, o := range order {
-		var (
-			field enums.TraceRunTime
-			dir   enums.TraceRunOrder
-		)
-
-		switch o.Field {
-		case models.RunsV2OrderByFieldQueuedAt:
-			field = enums.TraceRunTimeQueuedAt
-		case models.RunsV2OrderByFieldStartedAt:
-			field = enums.TraceRunTimeStartedAt
-		case models.RunsV2OrderByFieldEndedAt:
-			field = enums.TraceRunTimeEndedAt
-		default: // unknown, skip
-			continue
-		}
-
-		switch o.Direction {
-		case models.RunsOrderByDirectionAsc:
-			dir = enums.TraceRunOrderAsc
-		case models.RunsOrderByDirectionDesc:
-			dir = enums.TraceRunOrderDesc
-		default: // unknown, skip
-			continue
-		}
-
-		orderBy = append(orderBy, cqrs.GetTraceRunOrder{Field: field, Direction: dir})
-	}
-
-	var cursor string
-	if after != nil {
-		cursor = *after
-	}
-
-	var cel string
-	if filter.Query != nil {
-		cel = *filter.Query
-	}
-
-	until := time.Now()
-	if filter.Until != nil {
-		until = *filter.Until
-	}
-
-	items := defaultRunItems
-	if first > 0 && first < maxRunItems {
-		items = first
-	}
-
-	return cqrs.GetTraceRunOpt{
-		Filter: cqrs.GetTraceRunFilter{
-			AppID:      filter.AppIDs,
-			FunctionID: filter.FunctionIDs,
-			TimeField:  tsfield,
-			From:       filter.From,
-			Until:      until,
-			Status:     statuses,
-			CEL:        cel,
-		},
-		Order:   orderBy,
-		Cursor:  cursor,
-		Items:   uint(items),
-		Preview: preview == nil || *preview,
 	}
 }
