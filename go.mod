@@ -22,6 +22,7 @@ require (
 	github.com/coocood/freecache v1.2.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dmarkham/enumer v1.5.8
+	github.com/docker/docker v28.3.3+incompatible
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/eko/gocache/lib/v4 v4.1.5
@@ -60,7 +61,6 @@ require (
 	github.com/lmittmann/tint v1.1.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/moby/moby/api v1.54.2
 	github.com/modelcontextprotocol/go-sdk v1.0.0
 	github.com/nats-io/nats.go v1.37.0
 	github.com/oklog/ulid/v2 v2.1.1
@@ -174,7 +174,6 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v28.3.3+incompatible // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
