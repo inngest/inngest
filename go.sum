@@ -342,8 +342,8 @@ github.com/inngest/expr v0.0.0-20260415034537-bf445b64ed41 h1:aD+TD2Cs1ZUYsUAOtZ
 github.com/inngest/expr v0.0.0-20260415034537-bf445b64ed41/go.mod h1:fwLYQ2NlzdevRRQoldvMrMvCicAG6X3NaONAtxuiT8k=
 github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48 h1:8NwXUrQTQjWrfGj99JgesfTbCYujtnLHusePp7YyFU8=
 github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48/go.mod h1:7SNLkGaD+tiTey1IF9WUNDNurTfqNZqjbdPZo3CmLW4=
-github.com/inngest/inngestgo v0.15.2-0.20260416001842-8bbfe3c34af0 h1:c3/4VMegD1RLYStKt9Sj+v/s/4z6QG5yN9ZTRhVxXRQ=
-github.com/inngest/inngestgo v0.15.2-0.20260416001842-8bbfe3c34af0/go.mod h1:2Qm4ULk506Zwt8MJXHfTZ4lthY1WTpYksXK1z6lEM/U=
+github.com/inngest/inngestgo v0.15.2-0.20260415054726-69077fdc83bc h1:QGuy+16SAwkoXucsY65TIgcYsHTL47bm9ZMdY+IrAfQ=
+github.com/inngest/inngestgo v0.15.2-0.20260415054726-69077fdc83bc/go.mod h1:2Qm4ULk506Zwt8MJXHfTZ4lthY1WTpYksXK1z6lEM/U=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
 github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
 github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=
