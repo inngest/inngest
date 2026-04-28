@@ -1,2 +1,0 @@
-DROP INDEX IF EXISTS idx_spans_run_id;
-DROP TABLE IF EXISTS spans;

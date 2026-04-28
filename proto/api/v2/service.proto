@@ -930,6 +930,100 @@ service V2 {
     };
   }
 
+  rpc SyncApp(SyncAppRequest) returns (SyncAppResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/syncs",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync app"
+      description: "Sync an app at the provided URL."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "App synced successfully"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2SyncAppResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - environment not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "422"
+        value: {
+          description: "Unprocessable Entity - sync failed. The response body is still SyncAppResponse and includes the persisted deploy plus a coded error under data.latestSync.error."
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2SyncAppResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc GetFunctionTrace(GetFunctionTraceRequest) returns (GetFunctionTraceResponse) {
     option (google.api.http) = {
       get: "/runs/{run_id}/trace"
@@ -1578,4 +1672,52 @@ message InvokeFunctionData {
       description: "Error message if the function execution failed"
     }
   ];
+}
+
+message SyncAppRequest {
+  string app_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App ID"
+      example: "\"my-app\""
+    }
+  ];
+  string url = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "URL for the Inngest endpoint in the app"
+      example: "\"https://example.com/api/inngest\""
+    }
+  ];
+}
+
+message SyncAppResponse {
+  SyncAppData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message SyncAppData {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "ID"
+    }
+  ];
+  string status = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Status"
+    }
+  ];
+  string app_id = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App ID"
+    }
+  ];
+  optional SyncAppError error = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Error, including a code and message"
+    }
+  ];
+}
+
+message SyncAppError {
+  string code = 1;
+  string message = 2;
 }

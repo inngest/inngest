@@ -1389,6 +1389,7 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 func TestCapacityAcquireRequestConversion(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
+	appID := uuid.New()
 	functionID := uuid.New()
 	currentTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	kindConcurrency := ConstraintKindConcurrency
@@ -1404,6 +1405,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "test-key-123",
 				AccountID:      accountID,
 				EnvID:          envID,
+				AppID:          appID,
 				FunctionID:     functionID,
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
@@ -1442,6 +1444,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "test-key-123",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
+				AppId:          appID.String(),
 				FunctionId:     functionID.String(),
 				Configuration: &pb.ConstraintConfig{
 					FunctionVersion: 1,
@@ -1483,6 +1486,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "minimal",
 				AccountID:      accountID,
 				EnvID:          envID,
+				AppID:          appID,
 				FunctionID:     functionID,
 				Configuration: ConstraintConfig{
 					RateLimit: []RateLimitConfig{},
@@ -1499,6 +1503,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "minimal",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
+				AppId:          appID.String(),
 				FunctionId:     functionID.String(),
 				Configuration: &pb.ConstraintConfig{
 					FunctionVersion: 0,
@@ -1679,6 +1684,57 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 				LimitingConstraints:  []*pb.ConstraintItem{},
 				ExhaustedConstraints: []*pb.ConstraintItem{},
 				RetryAfter:           timestamppb.New(time.Time{}),
+			},
+		},
+		{
+			name: "response with usage",
+			input: &CapacityAcquireResponse{
+				Leases: []CapacityLease{
+					{
+						LeaseID:        leaseID1,
+						IdempotencyKey: "lease-key-1",
+					},
+				},
+				LimitingConstraints:  []ConstraintItem{},
+				ExhaustedConstraints: []ConstraintItem{},
+				RetryAfter:           time.Time{},
+				Usage: []ConstraintUsage{
+					{
+						Constraint: ConstraintItem{
+							Kind: ConstraintKindConcurrency,
+							Concurrency: &ConcurrencyConstraint{
+								Mode:  enums.ConcurrencyModeStep,
+								Scope: enums.ConcurrencyScopeFn,
+							},
+						},
+						Used:  5,
+						Limit: 10,
+					},
+				},
+			},
+			expected: &pb.CapacityAcquireResponse{
+				Leases: []*pb.CapacityLease{
+					{
+						LeaseId:        leaseID1.String(),
+						IdempotencyKey: "lease-key-1",
+					},
+				},
+				LimitingConstraints:  []*pb.ConstraintItem{},
+				ExhaustedConstraints: []*pb.ConstraintItem{},
+				RetryAfter:           timestamppb.New(time.Time{}),
+				Usage: []*pb.ConstraintUsage{
+					{
+						Constraint: &pb.ConstraintItem{
+							Kind: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY,
+							Concurrency: &pb.ConcurrencyConstraint{
+								Mode:  pb.ConstraintApiConcurrencyMode_CONSTRAINT_API_CONCURRENCY_MODE_STEP,
+								Scope: pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION,
+							},
+						},
+						Used:  5,
+						Limit: 10,
+					},
+				},
 			},
 		},
 		{

@@ -51,10 +51,10 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
+	"github.com/inngest/inngest/pkg/util/strtimeout"
 	"github.com/inngest/inngestgo"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
-	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
@@ -593,11 +593,11 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 	for _, c := range req.Function.Cancel {
 		expires := e.now().Add(consts.CancelTimeout)
 		if c.Timeout != nil {
-			dur, err := str2duration.ParseDuration(*c.Timeout)
+			parsedExpires, err := strtimeout.ParseTimeout(*c.Timeout, e.now)
 			if err != nil {
-				return fmt.Errorf("error parsing cancel duration: %w", err)
+				return fmt.Errorf("error parsing cancel timeout: %w", err)
 			}
-			expires = e.now().Add(dur)
+			expires = parsedExpires
 		}
 
 		// The triggering event ID should be the first ID in the batch.
@@ -2677,8 +2677,7 @@ func (e *executor) handlePause(
 			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 			// NOTE: cleanup closure is ignored here since there's already another one that will be called
 			_, _, err = e.pm.ConsumePause(context.Background(), e.smv2, *pause, state.ConsumePauseOpts{
-				IdempotencyKey: evtID.String(),
-				Data:           nil,
+				Data: nil,
 			})
 			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 				atomic.AddInt32(&res[1], 1)
@@ -3001,8 +3000,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
 			_, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
-				IdempotencyKey: r.IdempotencyKey,
-				Data:           nil,
+				Data: nil,
 			})
 			switch err {
 			case nil, state.ErrPauseNotFound: // no-op
@@ -3014,8 +3012,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		consumeResult, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
-			IdempotencyKey: r.IdempotencyKey,
-			Data:           r.With,
+			Data: r.With,
 		})
 		if err != nil {
 			return fmt.Errorf("error consuming pause via event: %w", err)
@@ -3490,6 +3487,18 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 				e.log.Warn("error creating AI output metadata span", "error", err)
 			}
 		}
+
+		// Extract experiment metadata from opcode opts. The SDK spreads
+		// group.experiment() variant context (experimentName, variant,
+		// selectionStrategy) onto variant sub-steps' opts; landing the
+		// same data as a step-scoped metadata span means ClickHouse
+		// can aggregate variant output metrics in a single-row query.
+		//
+		// Performing this emission server-side (rather than via an SDK
+		// addMetadata() call) means clients receive experiment data
+		// without needing to upgrade their SDK, and keeps the metadata
+		// contract consistent across SDK languages.
+		e.emitExperimentMetadataFromOpts(ctx, runCtx, gen.Opts)
 	}
 
 	// Persist the cumulative metadata size delta alongside the step output.
@@ -5437,6 +5446,37 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
+}
+
+// emitExperimentMetadataFromOpts extracts experiment context from an opcode's
+// opts (populated by the SDK inside group.experiment() variant callbacks) and,
+// if present, writes a step-scoped inngest.experiment metadata span. This is
+// the executor-owned replacement for the SDK-side addMetadata() call that
+// earlier drafts of inngest-js PR #1458 introduced — performing it here keeps
+// the emission consistent across SDK languages and removes the requirement
+// that end users upgrade their SDK to receive experiment observability.
+//
+// Errors are logged and swallowed: failing to attach experiment metadata must
+// not interrupt step execution.
+func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx execution.RunContext, opts any) {
+	expMd, err := extractors.ExtractExperimentOptsMetadata(opts)
+	if err != nil {
+		e.log.Warn("error extracting experiment opts metadata", "error", err)
+		return
+	}
+	if expMd == nil {
+		return
+	}
+
+	if _, err := e.createMetadataSpan(
+		ctx,
+		runCtx,
+		"executor.handleGeneratorStep.experiment",
+		expMd,
+		enums.MetadataScopeStep,
+	); err != nil {
+		e.log.Warn("error creating experiment metadata span", "error", err)
+	}
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {

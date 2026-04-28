@@ -200,6 +200,10 @@ func (m *mockShardForIterator) RemoveQueueItem(ctx context.Context, partitionID 
 	return nil
 }
 
+func (m *mockShardForIterator) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64, error) {
+	return 0, nil
+}
+
 func (m *mockShardForIterator) LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error) {
 	return nil, nil
 }

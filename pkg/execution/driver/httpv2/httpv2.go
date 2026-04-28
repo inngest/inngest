@@ -1,6 +1,7 @@
 package httpv2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -66,12 +67,6 @@ func (d httpv2) Do(ctx context.Context, sl sv2.StateLoader, opts driver.V2Reques
 	return d.async(ctx, opts)
 }
 
-// sync re-enters synchronous functions, allowing regular API endpoints to be resumed as if they're
-// generic async functions.
-//
-// sync entry is relatively simple: we re-execute a specific API request, and we add Inngest-specific
-// headers to the request.  The SDK will then fetch the requisite function state such that it can resume
-// where it left off.
 // loadHTTPRequestEvent attempts to load the triggering event from state and parse
 // it as an HTTP request event. Returns nil if loading fails, the event name doesn't
 // match, or the event can't be parsed.
@@ -94,6 +89,12 @@ func loadHTTPRequestEvent(ctx context.Context, sl sv2.StateLoader, id sv2.ID) *i
 	return evt
 }
 
+// sync re-enters synchronous functions, allowing regular API endpoints to be resumed as if they're
+// generic async functions.
+//
+// sync entry is relatively simple: we re-execute a specific API request, and we add Inngest-specific
+// headers to the request.  The SDK will then fetch the requisite function state such that it can resume
+// where it left off.
 func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
 	method := http.MethodPost
 	if m, _ := opts.Fn.Driver.Metadata["method"].(string); m != "" {
@@ -238,8 +239,13 @@ func (d httpv2) async(ctx context.Context, opts driver.V2RequestOpts) (*state.Dr
 }
 
 func parseOpcodes(byt []byte, status int) ([]*state.GeneratorOpcode, errs.UserError) {
+	trimmed := bytes.TrimSpace(byt)
+	if len(trimmed) == 0 || trimmed[0] != '[' {
+		return nil, NewNonGeneratorError(byt, status)
+	}
+
 	gen := []*state.GeneratorOpcode{}
-	if err := json.Unmarshal(byt, &gen); err != nil {
+	if err := json.Unmarshal(trimmed, &gen); err != nil {
 		// TODO: ADD UNIT TESTS ASSERTING THAT THE USER ERROR CONTAINS OUR RESPONSE BODY.
 		return nil, NewNonGeneratorError(byt, status)
 	}
@@ -257,6 +263,10 @@ func parseOpcodes(byt []byte, status int) ([]*state.GeneratorOpcode, errs.UserEr
 	// Check every op we've parsed, making sure it adheres to any limits we're
 	// enforcing
 	for _, op := range gen {
+		if op == nil {
+			return nil, NewNonGeneratorError(byt, status)
+		}
+
 		if err := op.Validate(); err != nil {
 			err = fmt.Errorf("error validating generator opcode %s: %w", op.ID, err)
 			return nil, errs.WrapUser(0, false, "invalid opcode: %w", err)

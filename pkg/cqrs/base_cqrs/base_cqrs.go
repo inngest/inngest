@@ -4,25 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"embed"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/inngest/inngest/pkg/consts"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/oklog/ulid/v2"
+	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
 
@@ -131,85 +127,27 @@ func New(ctx context.Context, opts BaseCQRSOptions) (*sql.DB, error) {
 	return db, err
 }
 
-// FS contains the filesystem of the stdlib, containing all migrations in subdirs
-// relative to this package.
-//
-//go:embed **/**/*.sql
-var FS embed.FS
-
 func up(db *sql.DB, opts BaseCQRSOptions) error {
-	var (
-		err    error
-		src    source.Driver
-		driver database.Driver
-		dbName string
-	)
-
-	// Grab the migration driver.
-	if opts.PostgresURI != "" {
-		src, err = iofs.New(FS, path.Join("migrations", "postgres"))
-		if err != nil {
-			return err
-		}
-
-		dbName = "postgres"
-		parsedURL, err := url.Parse(opts.PostgresURI)
-		if err != nil {
-			return fmt.Errorf("error parsing postgres URI to retrieve DB name: invalid format")
-		}
-
-		if parsedURL.Path != "" && parsedURL.Path != "/" {
-			// Remove the leading slash
-			dbName = parsedURL.Path[1:]
-		}
-
-		driver, err = postgres.WithInstance(db, &postgres.Config{
-			MigrationsTable: "migrations",
-			DatabaseName:    dbName,
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		src, err = iofs.New(FS, path.Join("migrations", "sqlite"))
-		if err != nil {
-			return err
-		}
-
-		driver, err = sqlite.WithInstance(db, &sqlite.Config{
-			MigrationsTable: "migrations",
-			NoTxWrap:        true,
-		})
-		if err != nil {
-			return err
-		}
-
-		dbName = "file:inngest?mode=memory&cache=shared"
-		if opts.Persist {
-			dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
-		}
-	}
-
-	m, err := migrate.NewWithInstance("iofs", src, dbName, driver)
+	dialect, migrationsFS, err := gooseConfig(opts)
 	if err != nil {
 		return err
 	}
 
-	v, dirty, err := m.Version()
-	if err != migrate.ErrNilVersion && err != nil {
+	provider, err := goose.NewProvider(dialect, db, migrationsFS)
+	if err != nil {
 		return err
 	}
 
-	if dirty {
-		if err = m.Migrate(v); err != nil {
-			return fmt.Errorf("error migrating to version %d resetting dirty: %w", v, err)
-		}
-	}
-
-	err = m.Up()
-	if err == migrate.ErrNoChange {
-		return nil
-	}
-
+	_, err = provider.Up(context.Background())
 	return err
+}
+
+func gooseConfig(opts BaseCQRSOptions) (goose.Dialect, fs.FS, error) {
+	if opts.PostgresURI != "" {
+		migrationsFS, err := fs.Sub(dbpostgres.MigrationsFS, "migrations")
+		return goose.DialectPostgres, migrationsFS, err
+	}
+
+	migrationsFS, err := fs.Sub(dbsqlite.MigrationsFS, "migrations")
+	return goose.DialectSQLite3, migrationsFS, err
 }

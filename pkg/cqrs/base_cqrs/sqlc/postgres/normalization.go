@@ -58,12 +58,12 @@ func (e *Event) ToSQLite() (*sqlc.Event, error) {
 
 func (eb *EventBatch) ToSQLite() (*sqlc.EventBatch, error) {
 	return &sqlc.EventBatch{
-		ID:          eb.ID,
+		ID:          eb.ID.ULID(),
 		AccountID:   eb.AccountID,
 		WorkspaceID: eb.WorkspaceID,
 		AppID:       eb.AppID,
 		WorkflowID:  eb.WorkflowID,
-		RunID:       eb.RunID,
+		RunID:       eb.RunID.ULID(),
 		StartedAt:   eb.StartedAt,
 		ExecutedAt:  eb.ExecutedAt,
 		EventIds:    eb.EventIds,
@@ -243,7 +243,14 @@ func (r *GetFunctionRunRow) ToSQLite() (*sqlc.GetFunctionRunRow, error) {
 		return nil, err
 	}
 
-	finish, err := r.FunctionFinish.ToSQLite()
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +267,14 @@ func (r *GetFunctionRunsTimeboundRow) ToSQLite() (*sqlc.GetFunctionRunsTimebound
 		return nil, err
 	}
 
-	finish, err := r.FunctionFinish.ToSQLite()
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +291,14 @@ func (r *GetFunctionRunsRow) ToSQLite() (*sqlc.GetFunctionRunsRow, error) {
 		return nil, err
 	}
 
-	finish, err := r.FunctionFinish.ToSQLite()
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
 	if err != nil {
 		return nil, err
 	}
@@ -427,18 +448,14 @@ func (r *GetSpanBySpanIDRow) ToSQLite() (*sqlc.GetSpanBySpanIDRow, error) {
 }
 
 func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
-	var input, output interface{}
+	var input, output json.RawMessage
 
 	if r.Input.Valid {
-		if err := json.Unmarshal(r.Input.RawMessage, &input); err != nil {
-			return nil, err
-		}
+		input = json.RawMessage(r.Input.RawMessage)
 	}
 
 	if r.Output.Valid {
-		if err := json.Unmarshal(r.Output.RawMessage, &output); err != nil {
-			return nil, err
-		}
+		output = json.RawMessage(r.Output.RawMessage)
 	}
 
 	return &sqlc.GetSpanOutputRow{
@@ -448,6 +465,25 @@ func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
 }
 
 func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
+	switch value := v.(type) {
+	case sql.NullString:
+		if !value.Valid || value.String == "" {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(value.String),
+			Valid:      true,
+		}
+	case *sql.NullString:
+		if value == nil || !value.Valid || value.String == "" {
+			return pqtype.NullRawMessage{Valid: false}
+		}
+		return pqtype.NullRawMessage{
+			RawMessage: json.RawMessage(value.String),
+			Valid:      true,
+		}
+	}
+
 	data, err := json.Marshal(v)
 	if err != nil {
 		return pqtype.NullRawMessage{Valid: false}

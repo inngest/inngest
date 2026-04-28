@@ -26,16 +26,16 @@ type Adapter struct {
 func New(conn *sql.DB) *Adapter {
 	return &Adapter{
 		conn: conn,
-		q:    &pgQuerier{q: sqlc.New(conn)},
+		q:    &pgQuerier{db: conn, q: sqlc.New(conn)},
 		h:    &helpers{},
 	}
 }
 
 func (a *Adapter) Dialect() db.Dialect                { return db.DialectPostgres }
 func (a *Adapter) Q() db.Querier                      { return a.q }
-func (a *Adapter) Helpers() driverhelp.DialectHelpers  { return a.h }
-func (a *Adapter) Conn() *sql.DB                       { return a.conn }
-func (a *Adapter) Close() error                        { return a.conn.Close() }
+func (a *Adapter) Helpers() driverhelp.DialectHelpers { return a.h }
+func (a *Adapter) Conn() *sql.DB                      { return a.conn }
+func (a *Adapter) Close() error                       { return a.conn.Close() }
 
 func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	tx, err := a.conn.BeginTx(ctx, nil)
@@ -45,7 +45,7 @@ func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	return &TxAdapter{
 		Adapter: Adapter{
 			conn: a.conn,
-			q:    &pgQuerier{q: sqlc.New(tx)},
+			q:    &pgQuerier{db: tx, q: sqlc.New(tx)},
 			h:    a.h,
 		},
 		tx: tx,
