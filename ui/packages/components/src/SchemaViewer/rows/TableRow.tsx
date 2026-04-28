@@ -1,11 +1,3 @@
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@inngest/components/Tooltip';
-import { RiInformationLine } from '@remixicon/react';
-
 import { cn } from '../../utils/classNames';
 import { useRenderAdornment } from '../AdornmentContext';
 import { useExpansion } from '../ExpansionContext';
