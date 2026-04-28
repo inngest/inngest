@@ -24,9 +24,11 @@ type OpcodeGroup struct {
 	ShouldStartHistoryGroup bool
 }
 
-// OpcodeGroups are groups opcodes by their type, helping to run `waitForEvent`
-// opcodes first. This is used to ensure that we save wait triggers as soon as
-// possible, as well as capturing expression errors early.
+// OpcodeGroups groups opcodes by processing priority. The priority group runs
+// first so waitForEvent triggers are saved immediately (capturing expression
+// errors early) and lazy ops like DeferAdd/DeferCancel — which the SDK
+// piggybacks onto other ops — drain before RunComplete can finalize and delete
+// state.
 type OpcodeGroups struct {
 	// PriorityGroup is a group of opcodes that should be processed first.
 	PriorityGroup OpcodeGroup
@@ -52,9 +54,10 @@ func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
 	}
 
 	for _, op := range opcodes {
-		if op.Op == enums.OpcodeWaitForEvent {
+		switch op.Op {
+		case enums.OpcodeWaitForEvent, enums.OpcodeDeferAdd, enums.OpcodeDeferCancel:
 			groups.PriorityGroup.Opcodes = append(groups.PriorityGroup.Opcodes, op)
-		} else {
+		default:
 			groups.OtherGroup.Opcodes = append(groups.OtherGroup.Opcodes, op)
 		}
 	}

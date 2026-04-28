@@ -143,3 +143,142 @@ func TestOpcodeGroupsAllWithEmptyInput(t *testing.T) {
 
 	require.EqualValues(t, expected, actual)
 }
+
+// TestOpGroups_DeferOpsArePriority asserts that DeferAdd and DeferCancel are
+// routed into the priority group so they drain before non-lazy ops in the same
+// SDK response — fixing the [DeferAdd, RunComplete] race where Finalize would
+// delete state before SaveDefer ran.
+func TestOpGroups_DeferOpsArePriority(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    []*state.GeneratorOpcode
+		expected OpcodeGroups
+	}{
+		{
+			name: "lone DeferAdd",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeDeferAdd, ID: "1"},
+			},
+			expected: OpcodeGroups{
+				PriorityGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeDeferAdd, ID: "1"},
+					},
+					ShouldStartHistoryGroup: false,
+				},
+				OtherGroup: OpcodeGroup{
+					Opcodes:                 []*state.GeneratorOpcode{},
+					ShouldStartHistoryGroup: false,
+				},
+			},
+		},
+		{
+			name: "StepRun with DeferAdd piggyback",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeStepRun, ID: "1"},
+				{Op: enums.OpcodeDeferAdd, ID: "2"},
+			},
+			expected: OpcodeGroups{
+				PriorityGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeDeferAdd, ID: "2"},
+					},
+					ShouldStartHistoryGroup: true,
+				},
+				OtherGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeStepRun, ID: "1"},
+					},
+					ShouldStartHistoryGroup: true,
+				},
+			},
+		},
+		{
+			name: "DeferAdd before RunComplete",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeDeferAdd, ID: "1"},
+				{Op: enums.OpcodeRunComplete, ID: "2"},
+			},
+			expected: OpcodeGroups{
+				PriorityGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeDeferAdd, ID: "1"},
+					},
+					ShouldStartHistoryGroup: true,
+				},
+				OtherGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeRunComplete, ID: "2"},
+					},
+					ShouldStartHistoryGroup: true,
+				},
+			},
+		},
+		{
+			name: "WaitForEvent and DeferAdd both priority",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeWaitForEvent, ID: "1"},
+				{Op: enums.OpcodeDeferAdd, ID: "2"},
+			},
+			expected: OpcodeGroups{
+				PriorityGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeWaitForEvent, ID: "1"},
+						{Op: enums.OpcodeDeferAdd, ID: "2"},
+					},
+					ShouldStartHistoryGroup: true,
+				},
+				OtherGroup: OpcodeGroup{
+					Opcodes:                 []*state.GeneratorOpcode{},
+					ShouldStartHistoryGroup: true,
+				},
+			},
+		},
+		{
+			name: "lone DeferCancel",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeDeferCancel, ID: "1"},
+			},
+			expected: OpcodeGroups{
+				PriorityGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeDeferCancel, ID: "1"},
+					},
+					ShouldStartHistoryGroup: false,
+				},
+				OtherGroup: OpcodeGroup{
+					Opcodes:                 []*state.GeneratorOpcode{},
+					ShouldStartHistoryGroup: false,
+				},
+			},
+		},
+		{
+			name: "StepRun with DeferCancel piggyback",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeStepRun, ID: "1"},
+				{Op: enums.OpcodeDeferCancel, ID: "2"},
+			},
+			expected: OpcodeGroups{
+				PriorityGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeDeferCancel, ID: "2"},
+					},
+					ShouldStartHistoryGroup: true,
+				},
+				OtherGroup: OpcodeGroup{
+					Opcodes: []*state.GeneratorOpcode{
+						{Op: enums.OpcodeStepRun, ID: "1"},
+					},
+					ShouldStartHistoryGroup: true,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := opGroups(tc.input)
+			require.EqualValues(t, tc.expected, actual)
+		})
+	}
+}
