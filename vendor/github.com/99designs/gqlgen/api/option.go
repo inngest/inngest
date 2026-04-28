@@ -29,20 +29,19 @@ func PrependPlugin(p plugin.Plugin) Option {
 // ReplacePlugin replaces any existing plugin with a matching plugin name
 func ReplacePlugin(p plugin.Plugin) Option {
 	return func(cfg *config.Config, plugins *[]plugin.Plugin) {
-		if plugins == nil {
-			return
-		}
-		found := false
-		ps := *plugins
-		for i, o := range ps {
-			if p.Name() == o.Name() {
-				ps[i] = p
-				found = true
+		if plugins != nil {
+			found := false
+			ps := *plugins
+			for i, o := range ps {
+				if p.Name() == o.Name() {
+					ps[i] = p
+					found = true
+				}
 			}
+			if !found {
+				ps = append(ps, p)
+			}
+			*plugins = ps
 		}
-		if !found {
-			ps = append(ps, p)
-		}
-		*plugins = ps
 	}
 }

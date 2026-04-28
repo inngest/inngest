@@ -67,6 +67,11 @@ var (
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
+
+	// ErrSemaphoreLimit represents a semaphore capacity limit for a specific queue item.
+	// Unlike partition/account limits, this is per-item (only start jobs carry semaphores),
+	// so the iterator should skip the item and continue scanning.
+	ErrSemaphoreLimit = fmt.Errorf("at semaphore capacity limit")
 )
 
 var (

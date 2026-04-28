@@ -67,6 +67,7 @@ overrides:
   srvx@<=0.11.13: 0.11.15
   protobufjs@<=8.0.1: 8.0.1
   uuid@<14.0.0: 14.0.0
+  '@clerk/shared@<3.47.4': 3.47.4
 
 importers:
 
@@ -110,7 +111,7 @@ importers:
         version: 0.2.2(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.3))
       '@inngest/agent-kit':
         specifier: ^0.13.2
-        version: 0.13.2(inngest@3.54.0(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(typescript@5.9.3)(zod@4.3.6))(zod@4.3.6)
+        version: 0.13.2(inngest@4.2.4(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3)(zod@4.3.6))(zod@4.3.6)
       '@inngest/realtime':
         specifier: 0.4.7
         version: 0.4.7(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3)(zod@4.3.6)
@@ -202,8 +203,8 @@ importers:
         specifier: ^7.0.0
         version: 7.4.0(graphql@16.13.2)
       inngest:
-        specifier: ^3.48.0
-        version: 3.54.0(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(typescript@5.9.3)(zod@4.3.6)
+        specifier: ^4.2.0
+        version: 4.2.4(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3)(zod@4.3.6)
       ky:
         specifier: ^2.0.0
         version: 2.0.2
@@ -246,6 +247,9 @@ importers:
       sql-formatter:
         specifier: ^15.7.1
         version: 15.7.3
+      srvx:
+        specifier: 0.11.15
+        version: 0.11.15
       ulid:
         specifier: ^3.0.0
         version: 3.0.2
@@ -382,6 +386,9 @@ importers:
       sonner:
         specifier: ^2.0.0
         version: 2.0.7(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      srvx:
+        specifier: 0.11.15
+        version: 0.11.15
       zod:
         specifier: ^3.22.4
         version: 3.25.76
@@ -533,6 +540,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      srvx:
+        specifier: 0.11.15
+        version: 0.11.15
       unified:
         specifier: ^11.0.5
         version: 11.0.5
@@ -8077,6 +8087,46 @@ packages:
       typescript:
         optional: true
 
+  inngest@4.2.4:
+    resolution: {integrity: sha512-MBFcRhhQ+dcGHLYCbIcMYxiAZCxzfAx0+3b/euYQKc7MK3rOnNHaNHuF2e0WsT13oWJiGzjuC3T4Nocggmh5WQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@sveltejs/kit': '>=1.27.3'
+      '@vercel/node': '>=2.15.9'
+      aws-lambda: '>=1.0.7'
+      express: '>=4.19.2'
+      fastify: '>=4.21.0'
+      h3: '>=2.0.1-rc.18 <3'
+      hono: '>=4.2.7'
+      koa: '>=2.14.2'
+      next: '>=12.0.0'
+      react: '>=18.0.0'
+      typescript: '>=5.8.0'
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@sveltejs/kit':
+        optional: true
+      '@vercel/node':
+        optional: true
+      aws-lambda:
+        optional: true
+      express:
+        optional: true
+      fastify:
+        optional: true
+      h3:
+        optional: true
+      hono:
+        optional: true
+      koa:
+        optional: true
+      next:
+        optional: true
+      react:
+        optional: true
+      typescript:
+        optional: true
+
   internal-slot@1.1.0:
     resolution: {integrity: sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw==}
     engines: {node: '>= 0.4'}
@@ -11219,7 +11269,7 @@ packages:
   vite-tsconfig-paths@6.1.1:
     resolution: {integrity: sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg==}
     peerDependencies:
-      vite: '>=4.5.11'
+      vite: '>=6.2.7'
 
   vite@8.0.10:
     resolution: {integrity: sha512-rZuUu9j6J5uotLDs+cAA4O5H4K1SfPliUlQwqa6YEwSrWDZzP4rhm00oJR5snMewjxF5V/K3D4kctsUTsIU9Mw==}
@@ -13322,14 +13372,14 @@ snapshots:
   '@img/sharp-win32-x64@0.34.5':
     optional: true
 
-  '@inngest/agent-kit@0.13.2(inngest@3.54.0(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(typescript@5.9.3)(zod@4.3.6))(zod@4.3.6)':
+  '@inngest/agent-kit@0.13.2(inngest@4.2.4(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3)(zod@4.3.6))(zod@4.3.6)':
     dependencies:
       '@dmitryrechkin/json-schema-to-zod': 1.0.1
       '@inngest/ai': 0.1.6
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.3.6)
       eventsource: 3.0.7
       express: 4.22.1
-      inngest: 3.54.0(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(typescript@5.9.3)(zod@4.3.6)
+      inngest: 4.2.4(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3)(zod@4.3.6)
       xxhashjs: 0.2.2
       zod: 4.3.6
     transitivePeerDependencies:
@@ -19969,6 +20019,44 @@ snapshots:
       h3: 2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15))
       hono: 4.12.15
       next: 16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - '@opentelemetry/core'
+      - encoding
+      - supports-color
+
+  inngest@4.2.4(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.15)(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)(typescript@5.9.3)(zod@4.3.6):
+    dependencies:
+      '@bufbuild/protobuf': 2.12.0
+      '@inngest/ai': 0.1.7
+      '@jpwilliams/waitgroup': 2.1.1
+      '@opentelemetry/api': 1.9.1
+      '@opentelemetry/auto-instrumentations-node': 0.73.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))
+      '@opentelemetry/context-async-hooks': 2.7.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/exporter-trace-otlp-http': 0.215.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/instrumentation': 0.215.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-trace-base': 2.7.0(@opentelemetry/api@1.9.1)
+      '@standard-schema/spec': 1.1.0
+      '@traceloop/instrumentation-anthropic': 0.20.0
+      '@types/debug': 4.1.13
+      '@types/ms': 2.1.0
+      canonicalize: 1.0.8
+      cross-fetch: 4.1.0
+      debug: 4.4.3(supports-color@5.5.0)
+      hash.js: 1.1.7
+      json-stringify-safe: 5.0.1
+      ms: 2.1.3
+      serialize-error-cjs: 0.1.4
+      temporal-polyfill: 0.2.5
+      ulid: 2.4.0
+      zod: 4.3.6
+    optionalDependencies:
+      express: 5.2.1
+      h3: 2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15))
+      hono: 4.12.15
+      next: 16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      react: 19.2.5
       typescript: 5.9.3
     transitivePeerDependencies:
       - '@opentelemetry/core'

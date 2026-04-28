@@ -5,54 +5,15 @@ import (
 	"regexp"
 	"syscall"
 
-	"golang.org/x/tools/imports"
-
 	"github.com/99designs/gqlgen/codegen"
 	"github.com/99designs/gqlgen/codegen/config"
-	"github.com/99designs/gqlgen/internal/code"
 	"github.com/99designs/gqlgen/plugin"
 	"github.com/99designs/gqlgen/plugin/federation"
 	"github.com/99designs/gqlgen/plugin/modelgen"
 	"github.com/99designs/gqlgen/plugin/resolvergen"
 )
 
-var (
-	urlRegex = regexp.MustCompile(
-		`(?s)@link.*\(.*url:\s*?"(.*?)"[^)]+\)`,
-	) // regex to grab the url of a link directive, should it exist
-	versionRegex = regexp.MustCompile(
-		`v(\d+).(\d+)$`,
-	) // regex to grab the version number from a url
-)
-
-// Generate generates GraphQL code based on the provided config.
 func Generate(cfg *config.Config, option ...Option) error {
-	return generate(cfg, nil, option...)
-}
-
-// GenerateIncremental generates code only for schemas affected by changes.
-// changedSchemas should contain paths to schema files that have changed
-// (e.g., from git diff). If empty, performs full generation.
-// Use verbose to enable detailed logging of what's being regenerated.
-func GenerateIncremental(
-	cfg *config.Config,
-	changedSchemas []string,
-	verbose bool,
-	option ...Option,
-) error {
-	return generate(cfg, &codegen.IncrementalOptions{
-		ChangedSchemas: changedSchemas,
-		Verbose:        verbose,
-	}, option...)
-}
-
-// generate is the shared implementation for both Generate and GenerateIncremental.
-// If incrementalOpts is nil, performs full generation. Otherwise, uses incremental generation.
-func generate(
-	cfg *config.Config,
-	incrementalOpts *codegen.IncrementalOptions,
-	option ...Option,
-) error {
 	_ = syscall.Unlink(cfg.Exec.Filename)
 	if cfg.Model.IsDefined() {
 		_ = syscall.Unlink(cfg.Model.Filename)
@@ -65,49 +26,30 @@ func generate(
 	plugins = append(plugins, resolvergen.New())
 	if cfg.Federation.IsDefined() {
 		if cfg.Federation.Version == 0 { // default to using the user's choice of version, but if unset, try to sort out which federation version to use
-			// check the sources, and if one is marked as federation v2, we mark the entirety to be
-			// generated using that format
+			urlRegex := regexp.MustCompile(`(?s)@link.*\(.*url:.*?"(.*?)"[^)]+\)`) // regex to grab the url of a link directive, should it exist
+
+			// check the sources, and if one is marked as federation v2, we mark the entirety to be generated using that format
 			for _, v := range cfg.Sources {
 				cfg.Federation.Version = 1
 				urlString := urlRegex.FindStringSubmatch(v.Input)
-				// e.g. urlString[1] == "https://specs.apollo.dev/federation/v2.7"
-				if urlString != nil {
-					matches := versionRegex.FindStringSubmatch(urlString[1])
-					if matches[1] == "2" {
-						cfg.Federation.Version = 2
-						break
-					}
+				if urlString != nil && urlString[1] == "https://specs.apollo.dev/federation/v2.0" {
+					cfg.Federation.Version = 2
+					break
 				}
 			}
 		}
-		federationPlugin, err := federation.New(cfg.Federation.Version, cfg)
-		if err != nil {
-			return fmt.Errorf("failed to construct the Federation plugin: %w", err)
-		}
-		plugins = append([]plugin.Plugin{federationPlugin}, plugins...)
+		plugins = append([]plugin.Plugin{federation.New(cfg.Federation.Version)}, plugins...)
 	}
 
 	for _, o := range option {
 		o(cfg, &plugins)
 	}
 
-	if cfg.LocalPrefix != "" {
-		imports.LocalPrefix = cfg.LocalPrefix
-	}
-
 	for _, p := range plugins {
-		//nolint:staticcheck // for backwards compatibility only
 		if inj, ok := p.(plugin.EarlySourceInjector); ok {
 			if s := inj.InjectSourceEarly(); s != nil {
 				cfg.Sources = append(cfg.Sources, s)
 			}
-		}
-		if inj, ok := p.(plugin.EarlySourcesInjector); ok {
-			s, err := inj.InjectSourcesEarly()
-			if err != nil {
-				return fmt.Errorf("%s: %w", p.Name(), err)
-			}
-			cfg.Sources = append(cfg.Sources, s...)
 		}
 	}
 
@@ -121,13 +63,6 @@ func generate(
 				cfg.Sources = append(cfg.Sources, s)
 			}
 		}
-		if inj, ok := p.(plugin.LateSourcesInjector); ok {
-			s, err := inj.InjectSourcesLate(cfg.Schema)
-			if err != nil {
-				return fmt.Errorf("%s: %w", p.Name(), err)
-			}
-			cfg.Sources = append(cfg.Sources, s...)
-		}
 	}
 
 	// LoadSchema again now we have everything
@@ -135,22 +70,8 @@ func generate(
 		return fmt.Errorf("failed to load schema: %w", err)
 	}
 
-	codegen.ClearInlineArgsMetadata()
-	if err := codegen.ExpandInlineArguments(cfg.Schema); err != nil {
-		return fmt.Errorf("failed to expand inline arguments: %w", err)
-	}
-
 	if err := cfg.Init(); err != nil {
 		return fmt.Errorf("generating core failed: %w", err)
-	}
-
-	for _, p := range plugins {
-		if mut, ok := p.(plugin.SchemaMutator); ok {
-			err := mut.MutateSchema(cfg.Schema)
-			if err != nil {
-				return fmt.Errorf("%s: %w", p.Name(), err)
-			}
-		}
 	}
 
 	for _, p := range plugins {
@@ -161,15 +82,24 @@ func generate(
 			}
 		}
 	}
-
 	// Merge again now that the generated models have been injected into the typemap
-	dataPlugins := make([]any, len(plugins))
+	data_plugins := make([]interface{}, len(plugins))
 	for index := range plugins {
-		dataPlugins[index] = plugins[index]
+		data_plugins[index] = plugins[index]
 	}
-	data, err := codegen.BuildData(cfg, dataPlugins...)
+	data, err := codegen.BuildData(cfg, data_plugins...)
 	if err != nil {
 		return fmt.Errorf("merging type systems failed: %w", err)
+	}
+
+	if err = codegen.GenerateCode(data); err != nil {
+		return fmt.Errorf("generating core failed: %w", err)
+	}
+
+	if !cfg.SkipModTidy {
+		if err = cfg.Packages.ModTidy(); err != nil {
+			return fmt.Errorf("tidy failed: %w", err)
+		}
 	}
 
 	for _, p := range plugins {
@@ -181,22 +111,10 @@ func generate(
 		}
 	}
 
-	// Use incremental generation if options provided, otherwise full generation
-	if incrementalOpts != nil {
-		if err = codegen.GenerateCodeIncremental(data, *incrementalOpts); err != nil {
-			return fmt.Errorf("generating core failed: %w", err)
-		}
-	} else {
-		if err = codegen.GenerateCode(data); err != nil {
-			return fmt.Errorf("generating core failed: %w", err)
-		}
+	if err = codegen.GenerateCode(data); err != nil {
+		return fmt.Errorf("generating core failed: %w", err)
 	}
 
-	if !cfg.SkipModTidy {
-		if err = cfg.Packages.ModTidy(); err != nil {
-			return fmt.Errorf("tidy failed: %w", err)
-		}
-	}
 	if !cfg.SkipValidation {
 		if err := validate(cfg); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
@@ -207,29 +125,19 @@ func generate(
 }
 
 func validate(cfg *config.Config) error {
-	roots := []string{withSubpackages(cfg.Exec.ImportPath())}
+	roots := []string{cfg.Exec.ImportPath()}
 	if cfg.Model.IsDefined() {
-		roots = append(roots, withSubpackages(cfg.Model.ImportPath()))
+		roots = append(roots, cfg.Model.ImportPath())
 	}
+
 	if cfg.Resolver.IsDefined() {
-		roots = append(roots, withSubpackages(cfg.Resolver.ImportPath()))
+		roots = append(roots, cfg.Resolver.ImportPath())
 	}
 
-	// Use go build for validation instead of packages.Load with NeedTypes.
-	// go build benefits from incremental compilation - only changed files
-	// are recompiled. Since we use content-based file writing, unchanged
-	// generated files keep their mtime, so go build skips them.
-	//
-	// FastValidation uses -gcflags="-N -l" to disable compiler
-	// optimizations, making cold cache validation ~2x faster.
-	return code.ValidateWithBuild(cfg.GetFastValidation(), roots...)
-}
-
-// subpackagesWildcard is the Go tooling pattern for "this package and all subpackages".
-// Used by go build, go test, etc. (e.g., "go build ./...")
-const subpackagesWildcard = "/..."
-
-// withSubpackages appends the Go wildcard pattern to include all subpackages.
-func withSubpackages(importPath string) string {
-	return importPath + subpackagesWildcard
+	cfg.Packages.LoadAll(roots...)
+	errs := cfg.Packages.Errors()
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
 }

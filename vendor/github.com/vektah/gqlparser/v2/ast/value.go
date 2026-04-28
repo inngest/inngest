@@ -25,24 +25,23 @@ type Value struct {
 	Raw      string
 	Children ChildValueList
 	Kind     ValueKind
-	Position *Position `dump:"-" json:"-"`
+	Position *Position `dump:"-"`
 	Comment  *CommentGroup
 
 	// Require validation
-	Definition             *Definition
-	VariableDefinition     *VariableDefinition
-	ExpectedType           *Type
-	ExpectedTypeHasDefault bool
+	Definition         *Definition
+	VariableDefinition *VariableDefinition
+	ExpectedType       *Type
 }
 
 type ChildValue struct {
 	Name     string
 	Value    *Value
-	Position *Position `dump:"-" json:"-"`
+	Position *Position `dump:"-"`
 	Comment  *CommentGroup
 }
 
-func (v *Value) Value(vars map[string]any) (any, error) {
+func (v *Value) Value(vars map[string]interface{}) (interface{}, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -66,7 +65,7 @@ func (v *Value) Value(vars map[string]any) (any, error) {
 	case NullValue:
 		return nil, nil
 	case ListValue:
-		var val []any
+		var val []interface{}
 		for _, elem := range v.Children {
 			elemVal, err := elem.Value.Value(vars)
 			if err != nil {
@@ -76,7 +75,7 @@ func (v *Value) Value(vars map[string]any) (any, error) {
 		}
 		return val, nil
 	case ObjectValue:
-		val := map[string]any{}
+		val := map[string]interface{}{}
 		for _, elem := range v.Children {
 			elemVal, err := elem.Value.Value(vars)
 			if err != nil {

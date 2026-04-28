@@ -37,7 +37,10 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	dbpkg "github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/devutil"
@@ -180,7 +183,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	services := []service.Service{}
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{
 		Persist:     opts.Persist,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
@@ -194,22 +197,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	if opts.PostgresURI != "" || azure.IsAzureAuthEnabled() {
-		dbDriver = "postgres"
+	var adapter interface {
+		dbpkg.Adapter
+		Helpers() driverhelp.DialectHelpers
 	}
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	})
-	hd := base_cqrs.NewHistoryDriver(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	})
+	if opts.PostgresURI != "" || azure.IsAzureAuthEnabled() {
+		adapter = dbpostgres.New(db)
+	} else {
+		adapter = dbsqlite.New(db)
+	}
+	dbcqrs := base_cqrs.NewCQRS(adapter)
+	hd := base_cqrs.NewHistoryDriver(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
@@ -333,7 +331,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		Continuations: true,
 	}
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
-	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") == "true"
+	// Step metadata is enabled by default in the dev server; set EXPERIMENTAL_STEP_METADATA=false to disable.
+	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") != "false"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
@@ -347,6 +346,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
 
 	// Instantiate Constraint API
+	semaphores := constraintapi.NewRedisSemaphoreManager(unshardedRc)
 	cm, err := constraintapi.NewRedisCapacityManager(
 		constraintapi.WithClock(clockwork.NewRealClock()),
 		constraintapi.WithShardName("default"),
@@ -390,6 +390,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		queue.WithConditionalTracer(conditionalQueueTracer),
 		queue.WithCapacityManager(cm),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		queue.WithCapacityManager(cm),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 	}
 
 	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
@@ -401,20 +403,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return queueShard, nil
-	}
-
-	queueShards := map[string]queue.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
 	}
 
 	rq, err := queue.New(
 		ctx,
 		"queue",
 		queueShard,
-		queueShards,
+		map[string]queue.QueueShard{
+			consts.DefaultQueueShardName: queueShard,
+		},
 		shardSelector,
 		queueOpts...,
 	)
@@ -493,12 +492,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
-	tp := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	}))
+	tp := tracing.NewSqlcTracerProvider(adapter.Q())
 
 	url := opts.Config.CoreAPI.Addr
 	if url == "0.0.0.0" {
@@ -570,8 +564,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-
 		executor.WithCapacityManager(cm),
+		executor.WithSemaphoreManager(semaphores),
 		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return true
 		}),
@@ -622,6 +616,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
+	ds.SemaphoreManager = semaphores
 	ds.CronSyncer = croner
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
@@ -710,6 +705,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{
 				lifecycles.NewHistoryLifecycle(dbcqrs),
+				lifecycles.NewSemaphoreLifecycleListener(semaphores, time.Time{}),
 			}),
 	)
 
@@ -1050,6 +1046,11 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 				Period:                    int(fn.Throttle.Period.Seconds()),
 			}
 		}
+
+		// NOTE: Manual-release semaphores (fn concurrency) are NOT added to the partition config.
+		// They are only embedded on the start job's queue item. Subsequent steps don't need them —
+		// the semaphore is already held for the run and released on finalization.
+		// Worker concurrency (auto-release) would go here when implemented.
 
 		return constraints
 	}

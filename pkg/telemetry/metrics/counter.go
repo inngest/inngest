@@ -935,3 +935,12 @@ func IncrConnectProxyLeaseExpiredCount(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConstraintAPISemaphoreCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_semaphore_total",
+		Description: "Total semaphore manager operations",
+		Tags:        opts.Tags,
+	})
+}

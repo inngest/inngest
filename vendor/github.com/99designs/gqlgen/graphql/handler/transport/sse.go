@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,26 +8,13 @@ import (
 	"mime"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/99designs/gqlgen/graphql"
 )
 
-type (
-	SSE struct {
-		KeepAlivePingInterval time.Duration
-	}
-
-	sseConnection struct {
-		ctx             context.Context
-		mu              sync.Mutex
-		f               http.Flusher
-		keepAliveTicker *time.Ticker
-	}
-)
+type SSE struct{}
 
 var _ graphql.Transport = SSE{}
 
@@ -50,13 +36,7 @@ func (t SSE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 		SendErrorf(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
-
-	c := &sseConnection{
-		ctx: ctx,
-		f:   flusher,
-	}
-
-	defer c.flush()
+	defer flusher.Flush()
 
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -64,6 +44,11 @@ func (t SSE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 
 	params := &graphql.RawParams{}
 	start := graphql.Now()
+	params.Headers = r.Header
+	params.ReadTime = graphql.TraceTiming{
+		Start: start,
+		End:   graphql.Now(),
+	}
 
 	bodyString, err := getRequestBody(r)
 	if err != nil {
@@ -75,7 +60,7 @@ func (t SSE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	}
 
 	bodyReader := io.NopCloser(strings.NewReader(bodyString))
-	if err = jsonDecode(bodyReader, params); err != nil {
+	if err = jsonDecode(bodyReader, &params); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		gqlErr := gqlerror.Errorf(
 			"json request body could not be decoded: %+v body:%s",
@@ -88,73 +73,32 @@ func (t SSE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 		return
 	}
 
-	params.Headers = r.Header
-	params.ReadTime = graphql.TraceTiming{
-		Start: start,
-		End:   graphql.Now(),
+	rc, OpErr := exec.CreateOperationContext(ctx, params)
+	if OpErr != nil {
+		w.WriteHeader(statusFor(OpErr))
+		resp := exec.DispatchError(graphql.WithOperationContext(ctx, rc), OpErr)
+		writeJson(w, resp)
+		return
 	}
 
-	rc, opErr := exec.CreateOperationContext(ctx, params)
 	ctx = graphql.WithOperationContext(ctx, rc)
-	c.ctx = ctx
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	fmt.Fprint(w, ":\n\n")
-	c.flush()
+	flusher.Flush()
 
-	if t.KeepAlivePingInterval > 0 {
-		c.mu.Lock()
-		c.keepAliveTicker = time.NewTicker(t.KeepAlivePingInterval)
-		c.mu.Unlock()
+	responses, ctx := exec.DispatchOperation(ctx, rc)
 
-		go c.keepAlive(w)
-	}
-
-	if opErr != nil {
-		resp := exec.DispatchError(ctx, opErr)
-		writeJsonWithSSE(w, resp)
-	} else {
-		responses, ctx := exec.DispatchOperation(ctx, rc)
-		for {
-			response := responses(ctx)
-			if response == nil {
-				break
-			}
-			writeJsonWithSSE(w, response)
-			c.flush()
-
-			c.resetTicker(t.KeepAlivePingInterval)
+	for {
+		response := responses(ctx)
+		if response == nil {
+			break
 		}
+		writeJsonWithSSE(w, response)
+		flusher.Flush()
 	}
 
 	fmt.Fprint(w, "event: complete\n\n")
-}
-
-func (c *sseConnection) resetTicker(interval time.Duration) {
-	if interval != 0 {
-		c.mu.Lock()
-		c.keepAliveTicker.Reset(interval)
-		c.mu.Unlock()
-	}
-}
-
-func (c *sseConnection) keepAlive(w io.Writer) {
-	for {
-		select {
-		case <-c.ctx.Done():
-			c.keepAliveTicker.Stop()
-			return
-		case <-c.keepAliveTicker.C:
-			fmt.Fprintf(w, ": ping\n\n")
-			c.flush()
-		}
-	}
-}
-
-func (c *sseConnection) flush() {
-	c.mu.Lock()
-	c.f.Flush()
-	c.mu.Unlock()
 }
 
 func writeJsonWithSSE(w io.Writer, response *graphql.Response) {

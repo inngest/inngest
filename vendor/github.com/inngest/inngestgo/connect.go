@@ -9,10 +9,12 @@ import (
 	"github.com/inngest/inngestgo/connect"
 	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
-	"github.com/inngest/inngestgo/pkg/env"
 )
 
+// ConnectOpts
 type ConnectOpts struct {
+	// Apps represents the apps being served by Connect.  Each app is defined by clients;
+	// to create an app, create a new Client via [NewClient].
 	Apps []Client
 
 	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
@@ -37,7 +39,6 @@ type ConnectOpts struct {
 }
 
 func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
-
 	connectPlaceholder := url.URL{
 		Scheme: "ws",
 		Host:   "connect",
@@ -106,9 +107,8 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		HashedSigningKeyFallback: hashedFallbackKey,
 		MaxWorkerConcurrency:     opts.MaxWorkerConcurrency,
 		MessageReadLimit:         opts.MessageReadLimit,
-		APIBaseUrl:               defaultClient.h.GetAPIBaseURL(),
+		APIBaseURL:               defaultClient.h.GetAPIBaseURL(),
 		IsDev:                    defaultClient.h.isDev(),
-		DevServerUrl:             env.DevServerURL(),
 		InstanceID:               opts.InstanceID,
 		Platform:                 Ptr(platform()),
 		SDKVersion:               SDKVersion,

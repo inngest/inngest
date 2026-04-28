@@ -56,8 +56,10 @@ func getConstraintKindPriority(kind ConstraintKind) int {
 		return 2
 	case ConstraintKindConcurrency:
 		return 3
+	case ConstraintKindSemaphore:
+		return 4
 	default:
-		return 4 // Unknown constraints come last
+		return 5 // Unknown constraints come last
 	}
 }
 
@@ -104,6 +106,9 @@ func getConstraintScopePriority(constraint ConstraintItem) int {
 				return 4
 			}
 		}
+	case ConstraintKindSemaphore:
+		// Semaphores don't have scope; sort stably by returning a fixed priority.
+		return 1
 	}
 	return 4 // Default case for invalid/nil constraints
 }
@@ -122,6 +127,11 @@ func getConstraintKeyExpressionHash(constraint ConstraintItem) string {
 	case ConstraintKindConcurrency:
 		if constraint.Concurrency != nil {
 			return constraint.Concurrency.KeyExpressionHash
+		}
+	case ConstraintKindSemaphore:
+		// Use name for tertiary sort ordering among semaphores.
+		if constraint.Semaphore != nil {
+			return constraint.Semaphore.ID
 		}
 	}
 	return ""

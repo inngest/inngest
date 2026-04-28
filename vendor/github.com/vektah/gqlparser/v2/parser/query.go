@@ -1,8 +1,9 @@
 package parser
 
 import (
-	. "github.com/vektah/gqlparser/v2/ast" //nolint:staticcheck // bad, yeah
 	"github.com/vektah/gqlparser/v2/lexer"
+	//nolint:revive
+	. "github.com/vektah/gqlparser/v2/ast"
 )
 
 func ParseQuery(source *Source) (*QueryDocument, error) {
@@ -258,12 +259,7 @@ func (p *parser) parseValueLiteral(isConst bool) *Value {
 			p.unexpectedError()
 			return nil
 		}
-		return &Value{
-			Position: &token.Pos,
-			Comment:  p.comment,
-			Raw:      p.parseVariable(),
-			Kind:     Variable,
-		}
+		return &Value{Position: &token.Pos, Comment: p.comment, Raw: p.parseVariable(), Kind: Variable}
 	case lexer.Int:
 		kind = IntValue
 	case lexer.Float:

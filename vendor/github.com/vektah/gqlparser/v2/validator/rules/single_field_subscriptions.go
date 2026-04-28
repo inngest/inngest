@@ -1,17 +1,17 @@
-package rules
+package validator
 
 import (
 	"strconv"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
-	//nolint:staticcheck // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator/core"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator"
 )
 
-var SingleFieldSubscriptionsRule = Rule{
-	Name: "SingleFieldSubscriptions",
-	RuleFunc: func(observers *Events, addError AddErrFunc) {
+func init() {
+	AddRule("SingleFieldSubscriptions", func(observers *Events, addError AddErrFunc) {
 		observers.OnOperation(func(walker *Walker, operation *ast.OperationDefinition) {
 			if walker.Schema.Subscription == nil || operation.Operation != ast.Subscription {
 				return
@@ -40,7 +40,7 @@ var SingleFieldSubscriptionsRule = Rule{
 				}
 			}
 		})
-	},
+	})
 }
 
 type topField struct {

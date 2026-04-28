@@ -441,8 +441,6 @@ function TimelineEntry({
       ? entry.node.entry.components
           .map((component) => component.text)
           .join("\n")
-      : entry.node.entry.__typename === "ChatEntry"
-      ? entry.node.entry.chatText || ""
       : entry.node.entry.text || "";
 
   return (
@@ -517,8 +515,7 @@ function TimelineEntry({
 
         {(entry.node.entry.__typename === "EmailEntry" ||
           entry.node.entry.__typename === "SlackMessageEntry" ||
-          entry.node.entry.__typename === "SlackReplyEntry" ||
-          entry.node.entry.__typename === "ChatEntry") &&
+          entry.node.entry.__typename === "SlackReplyEntry") &&
           entry.node.entry.attachments.length > 0 && (
             <div className="flex flex-row flex-wrap gap-1">
               {entry.node.entry.attachments.map((attachment) => (

@@ -1,18 +1,13 @@
 package sdk
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -146,65 +141,6 @@ func (f RegisterRequest) IsConnect() bool {
 	return f.Capabilities.Connect == ConnectV1 && f.DeployType == DeployTypeConnect
 }
 
-// Parse parses the incoming
-func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error) {
-	// Ensure that there are no functions with the same ID.
-	if len(f.Functions) == 0 {
-		return nil, ErrNoFunctions
-	}
-
-	// err is a multierror which stores all function and validation errors for easy
-	// reporting and debugging.
-	var err error
-
-	funcs := make([]*inngest.Function, len(f.Functions))
-
-	for n, sdkFn := range f.Functions {
-		var ferr error
-		if len(sdkFn.Steps) == 0 {
-			err = multierror.Append(err, fmt.Errorf("Function has no steps: %s", sdkFn.Name))
-			continue
-		}
-
-		fn, ferr := sdkFn.Function()
-		if ferr != nil {
-			err = multierror.Append(err, ferr)
-			continue
-		}
-		funcs[n] = fn
-
-		if ferr := fn.Validate(ctx); ferr != nil {
-			err = multierror.Append(err, ferr)
-		}
-
-		for n, step := range fn.Steps {
-			uri, ferr := url.Parse(step.URI)
-			if ferr != nil {
-				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
-			}
-			switch uri.Scheme {
-			case "http", "https", "ws", "wss":
-				// noop
-			default:
-				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
-				continue
-			}
-			fn.Steps[n] = step
-		}
-	}
-
-	if err != nil {
-		data := syscode.DataMultiErr{}
-		data.Append(err)
-
-		return nil, &syscode.Error{
-			Code: syscode.CodeConfigInvalid,
-			Data: data,
-		}
-	}
-
-	return funcs, err
-}
 
 func (f *RegisterRequest) normalize(forceHTTPS bool) error {
 	f.URL = util.NormalizeAppURL(f.URL, forceHTTPS)

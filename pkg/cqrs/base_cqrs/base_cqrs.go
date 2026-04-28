@@ -1,29 +1,27 @@
 package base_cqrs
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"database/sql"
-	"embed"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/inngest/inngest/pkg/azure"
 	"github.com/inngest/inngest/pkg/consts"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/oklog/ulid/v2"
+	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
 
@@ -49,8 +47,45 @@ type BaseCQRSOptions struct {
 	Directory string
 }
 
-func New(opts BaseCQRSOptions) (*sql.DB, error) {
+// openAzurePostgres creates a *sql.DB using Azure Workload Identity authentication.
+func openAzurePostgres() (*sql.DB, error) {
+	cfg, err := azure.LoadAzurePostgresConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	connConfig, err := pgx.ParseConfig("")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create base pgx config: %w", err)
+	}
+	connConfig.Host = cfg.Host
+	connConfig.Port = cfg.Port
+	connConfig.Database = cfg.Database
+	connConfig.User = cfg.User
+	connConfig.TLSConfig = &tls.Config{
+		ServerName: cfg.Host,
+		MinVersion: tls.VersionTLS12,
+	}
+
+	if cfg.Schema != "" {
+		if connConfig.RuntimeParams == nil {
+			connConfig.RuntimeParams = make(map[string]string)
+		}
+		connConfig.RuntimeParams["search_path"] = cfg.Schema
+	}
+
+	beforeConnect, err := azure.NewBeforeConnectHook()
+	if err != nil {
+		return nil, err
+	}
+
+	return stdlib.OpenDB(*connConfig, stdlib.OptionBeforeConnect(beforeConnect)), nil
+}
+
+func New(ctx context.Context, opts BaseCQRSOptions) (*sql.DB, error) {
 	var err error
+
+	l := logger.StdlibLogger(ctx)
 
 	azureAuth := azure.IsAzureAuthEnabled()
 
@@ -59,8 +94,6 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 	}
 
 	if azureAuth {
-		// Azure Workload Identity authentication: build connection from
-		// individual env vars and use a BeforeConnect hook to inject tokens.
 		if opts.ForTest {
 			db, err = openAzurePostgres()
 		} else {
@@ -68,6 +101,7 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 				db, err = openAzurePostgres()
 			})
 		}
+		l = l.With("db", "postgres", "auth", "azure-workload-identity")
 	} else if opts.PostgresURI != "" {
 		if !strings.HasPrefix(opts.PostgresURI, "postgres://") && !strings.HasPrefix(opts.PostgresURI, "postgresql://") {
 			if u, parseErr := url.Parse(opts.PostgresURI); parseErr == nil {
@@ -84,6 +118,7 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 				db, err = sql.Open("pgx", opts.PostgresURI)
 			})
 		}
+		l = l.With("db", "postgres")
 	} else if opts.Persist {
 		o.Do(func() {
 			// make the dir if it doesn't exist
@@ -111,6 +146,7 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 
 			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
 		})
+		l = l.With("db", "sqlite", "mode", "persisted")
 	} else {
 		// In-memory
 		if opts.ForTest {
@@ -123,7 +159,9 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
 			})
 		}
+		l = l.With("db", "sqlite", "mode", "memory")
 	}
+	l.Info("initialized database")
 
 	if err != nil {
 		return nil, err
@@ -137,138 +175,32 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 	if err := up(db, opts); err != nil {
 		return nil, err
 	}
+	l.Info("ran database migrations")
 
 	return db, err
 }
 
-// FS contains the filesystem of the stdlib, containing all migrations in subdirs
-// relative to this package.
-//
-//go:embed **/**/*.sql
-var FS embed.FS
-
-// openAzurePostgres creates a *sql.DB using Azure Workload Identity authentication.
-// It reads connection parameters from AZURE_POSTGRESQL_* env vars and uses the
-// pgx stdlib OpenDB with a BeforeConnect hook that injects Azure AD tokens.
-func openAzurePostgres() (*sql.DB, error) {
-	cfg, err := azure.LoadAzurePostgresConfig()
+func up(db *sql.DB, opts BaseCQRSOptions) error {
+	dialect, migrationsFS, err := gooseConfig(opts)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// Build pgx ConnConfig by assigning struct fields directly instead of
-	// interpolating into a DSN string, avoiding escaping issues with special
-	// characters in host/database/user values.
-	connConfig, err := pgx.ParseConfig("")
+	provider, err := goose.NewProvider(dialect, db, migrationsFS)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create base pgx config: %w", err)
-	}
-	connConfig.Host = cfg.Host
-	connConfig.Port = cfg.Port
-	connConfig.Database = cfg.Database
-	connConfig.User = cfg.User
-	connConfig.TLSConfig = &tls.Config{
-		ServerName: cfg.Host,
-		MinVersion: tls.VersionTLS12,
+		return err
 	}
 
-	// Set search_path if schema is specified
-	if cfg.Schema != "" {
-		if connConfig.RuntimeParams == nil {
-			connConfig.RuntimeParams = make(map[string]string)
-		}
-		connConfig.RuntimeParams["search_path"] = cfg.Schema
-	}
-
-	beforeConnect, err := azure.NewBeforeConnectHook()
-	if err != nil {
-		return nil, err
-	}
-
-	return stdlib.OpenDB(*connConfig, stdlib.OptionBeforeConnect(beforeConnect)), nil
+	_, err = provider.Up(context.Background())
+	return err
 }
 
-func up(db *sql.DB, opts BaseCQRSOptions) error {
-	var (
-		err    error
-		src    source.Driver
-		driver database.Driver
-		dbName string
-	)
-
-	// Grab the migration driver.
+func gooseConfig(opts BaseCQRSOptions) (goose.Dialect, fs.FS, error) {
 	if opts.PostgresURI != "" || azure.IsAzureAuthEnabled() {
-		src, err = iofs.New(FS, path.Join("migrations", "postgres"))
-		if err != nil {
-			return err
-		}
-
-		dbName = "postgres"
-		if opts.PostgresURI != "" {
-			parsedURL, parseErr := url.Parse(opts.PostgresURI)
-			if parseErr != nil {
-				return fmt.Errorf("error parsing postgres URI to retrieve DB name: invalid format")
-			}
-			if parsedURL.Path != "" && parsedURL.Path != "/" {
-				dbName = parsedURL.Path[1:]
-			}
-		} else if azure.IsAzureAuthEnabled() {
-			azCfg, cfgErr := azure.LoadAzurePostgresConfig()
-			if cfgErr != nil {
-				return fmt.Errorf("error loading Azure PostgreSQL config for migration DB name: %w", cfgErr)
-			}
-			// Database is guaranteed non-empty here because
-			// LoadAzurePostgresConfig validates it as a required field.
-			dbName = azCfg.Database
-		}
-
-		driver, err = postgres.WithInstance(db, &postgres.Config{
-			MigrationsTable: "migrations",
-			DatabaseName:    dbName,
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		src, err = iofs.New(FS, path.Join("migrations", "sqlite"))
-		if err != nil {
-			return err
-		}
-
-		driver, err = sqlite.WithInstance(db, &sqlite.Config{
-			MigrationsTable: "migrations",
-			NoTxWrap:        true,
-		})
-		if err != nil {
-			return err
-		}
-
-		dbName = "file:inngest?mode=memory&cache=shared"
-		if opts.Persist {
-			dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
-		}
+		migrationsFS, err := fs.Sub(dbpostgres.MigrationsFS, "migrations")
+		return goose.DialectPostgres, migrationsFS, err
 	}
 
-	m, err := migrate.NewWithInstance("iofs", src, dbName, driver)
-	if err != nil {
-		return err
-	}
-
-	v, dirty, err := m.Version()
-	if err != migrate.ErrNilVersion && err != nil {
-		return err
-	}
-
-	if dirty {
-		if err = m.Migrate(v); err != nil {
-			return fmt.Errorf("error migrating to version %d resetting dirty: %w", v, err)
-		}
-	}
-
-	err = m.Up()
-	if err == migrate.ErrNoChange {
-		return nil
-	}
-
-	return err
+	migrationsFS, err := fs.Sub(dbsqlite.MigrationsFS, "migrations")
+	return goose.DialectSQLite3, migrationsFS, err
 }

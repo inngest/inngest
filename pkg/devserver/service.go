@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
@@ -84,13 +85,14 @@ type devserver struct {
 	stateSizeLimitOverrides map[string]int
 
 	// Runner stores the Runner
-	Runner      runner.Runner
-	State       state.Manager
-	Queue       queue.Queue
-	Executor    execution.Executor
-	publisher   pubsub.Publisher
-	CronSyncer  cron.CronSyncer
-	redisClient rueidis.Client
+	Runner           runner.Runner
+	State            state.Manager
+	Queue            queue.Queue
+	Executor         execution.Executor
+	SemaphoreManager constraintapi.SemaphoreManager
+	publisher        pubsub.Publisher
+	CronSyncer       cron.CronSyncer
+	redisClient      rueidis.Client
 
 	Apiservice service.Service
 

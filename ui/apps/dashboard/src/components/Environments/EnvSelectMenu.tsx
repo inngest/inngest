@@ -32,7 +32,7 @@ export default function EnvSelectMenu({
   className,
 }: EnvSelectMenuProps) {
   const [{ data: envs = [], error }] = useEnvironments();
-  const [selection, setSelection] = useState<Environment | undefined>(undefined);
+  const [selection, setSelection] = useState<Environment | null>(null);
 
   if (error) {
     console.error('error fetching envs', error);
@@ -66,7 +66,7 @@ export default function EnvSelectMenu({
     setSelection(env);
   };
 
-  if (selection === undefined && defaultEnvironment) {
+  if (selection === null && defaultEnvironment) {
     internalOnSelect(defaultEnvironment);
   }
 
@@ -108,7 +108,7 @@ export default function EnvSelectMenu({
   );
 }
 
-const SelectedDisplay = ({ env }: { env: Environment | undefined }) => (
+const SelectedDisplay = ({ env }: { env: Environment | null }) => (
   <span className="flex min-w-0 flex-row items-center truncate">
     {env ? (
       <span className="block">{env.name}</span>

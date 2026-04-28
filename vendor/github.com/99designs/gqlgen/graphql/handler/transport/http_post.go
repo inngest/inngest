@@ -1,12 +1,11 @@
 package transport
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
-	"sync"
+	"strings"
 
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
@@ -15,16 +14,7 @@ import (
 
 // POST implements the POST side of the default HTTP transport
 // defined in https://github.com/APIs-guru/graphql-over-http#post
-type POST struct {
-	// Map of all headers that are added to graphql response. If not
-	// set, only one header: Content-Type: application/graphql-response+json will be set.
-	ResponseHeaders map[string][]string
-
-	// UseGrapQLResponseJsonByDefault determines whether to use 'application/graphql-response+json'
-	// as the response content type
-	// when the Accept header is empty or 'application/*' or '*/*'.
-	UseGrapQLResponseJsonByDefault bool
-}
+type POST struct{}
 
 var _ graphql.Transport = POST{}
 
@@ -38,7 +28,7 @@ func (h POST) Supports(r *http.Request) bool {
 		return false
 	}
 
-	return r.Method == http.MethodPost && mediaType == "application/json"
+	return r.Method == "POST" && mediaType == "application/json"
 }
 
 func getRequestBody(r *http.Request) (string, error) {
@@ -52,74 +42,42 @@ func getRequestBody(r *http.Request) (string, error) {
 	return string(body), nil
 }
 
-var pool = sync.Pool{
-	New: func() any {
-		return &graphql.RawParams{}
-	},
-}
-
 func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecutor) {
 	ctx := r.Context()
-	contentType := determineResponseContentType(
-		h.ResponseHeaders,
-		r,
-		h.UseGrapQLResponseJsonByDefault,
-	)
-	responseHeaders := mergeHeaders(
-		map[string][]string{
-			"Content-Type": {contentType},
-		},
-		h.ResponseHeaders,
-	)
-	writeHeaders(w, responseHeaders)
-	params := pool.Get().(*graphql.RawParams)
-	defer func() {
-		params.Headers = nil
-		params.ReadTime = graphql.TraceTiming{}
-		params.Extensions = nil
-		params.OperationName = ""
-		params.Query = ""
-		params.Variables = nil
-
-		pool.Put(params)
-	}()
+	w.Header().Set("Content-Type", "application/json")
+	params := &graphql.RawParams{}
 	start := graphql.Now()
-
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		gqlErr := gqlerror.Errorf("could not read request body: %+v", err)
-		resp := exec.DispatchError(ctx, gqlerror.List{gqlErr})
-		writeJson(w, resp)
-		return
-	}
-
-	bodyReader := bytes.NewReader(bodyBytes)
-	if err := jsonDecode(bodyReader, params); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		gqlErr := gqlerror.Errorf(
-			"json request body could not be decoded: %+v body:%s",
-			err,
-			string(bodyBytes),
-		)
-		resp := exec.DispatchError(ctx, gqlerror.List{gqlErr})
-		writeJson(w, resp)
-		return
-	}
-
 	params.Headers = r.Header
 	params.ReadTime = graphql.TraceTiming{
 		Start: start,
 		End:   graphql.Now(),
 	}
 
-	rc, opErr := exec.CreateOperationContext(ctx, params)
-	if opErr != nil {
-		if contentType == acceptApplicationGraphqlResponseJson {
-			w.WriteHeader(statusForGraphQLResponse(opErr))
-		} else {
-			w.WriteHeader(statusFor(opErr))
-		}
-		resp := exec.DispatchError(graphql.WithOperationContext(ctx, rc), opErr)
+	bodyString, err := getRequestBody(r)
+	if err != nil {
+		gqlErr := gqlerror.Errorf("could not get json request body: %+v", err)
+		resp := exec.DispatchError(ctx, gqlerror.List{gqlErr})
+		writeJson(w, resp)
+		return
+	}
+
+	bodyReader := io.NopCloser(strings.NewReader(bodyString))
+	if err = jsonDecode(bodyReader, &params); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		gqlErr := gqlerror.Errorf(
+			"json request body could not be decoded: %+v body:%s",
+			err,
+			bodyString,
+		)
+		resp := exec.DispatchError(ctx, gqlerror.List{gqlErr})
+		writeJson(w, resp)
+		return
+	}
+
+	rc, OpErr := exec.CreateOperationContext(ctx, params)
+	if OpErr != nil {
+		w.WriteHeader(statusFor(OpErr))
+		resp := exec.DispatchError(graphql.WithOperationContext(ctx, rc), OpErr)
 		writeJson(w, resp)
 		return
 	}

@@ -2,13 +2,12 @@ package extension
 
 import (
 	"context"
-	"errors"
-
-	"github.com/vektah/gqlparser/v2/gqlerror"
+	"fmt"
 
 	"github.com/99designs/gqlgen/complexity"
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/errcode"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 const errComplexityLimit = "COMPLEXITY_LIMIT_EXCEEDED"
@@ -17,10 +16,9 @@ const errComplexityLimit = "COMPLEXITY_LIMIT_EXCEEDED"
 //
 // If a query is submitted that exceeds the limit, a 422 status code will be returned.
 type ComplexityLimit struct {
-	Func func(ctx context.Context, opCtx *graphql.OperationContext) int
+	Func func(ctx context.Context, rc *graphql.OperationContext) int
 
-	es   graphql.ExecutableSchema
-	opts []complexity.Option
+	es graphql.ExecutableSchema
 }
 
 var _ interface {
@@ -39,12 +37,11 @@ type ComplexityStats struct {
 }
 
 // FixedComplexityLimit sets a complexity limit that does not change
-func FixedComplexityLimit(limit int, opts ...complexity.Option) *ComplexityLimit {
+func FixedComplexityLimit(limit int) *ComplexityLimit {
 	return &ComplexityLimit{
-		Func: func(ctx context.Context, opCtx *graphql.OperationContext) int {
+		Func: func(ctx context.Context, rc *graphql.OperationContext) int {
 			return limit
 		},
-		opts: opts,
 	}
 }
 
@@ -54,32 +51,25 @@ func (c ComplexityLimit) ExtensionName() string {
 
 func (c *ComplexityLimit) Validate(schema graphql.ExecutableSchema) error {
 	if c.Func == nil {
-		return errors.New("ComplexityLimit func can not be nil")
+		return fmt.Errorf("ComplexityLimit func can not be nil")
 	}
 	c.es = schema
 	return nil
 }
 
-func (c ComplexityLimit) MutateOperationContext(
-	ctx context.Context,
-	opCtx *graphql.OperationContext,
-) *gqlerror.Error {
-	op := opCtx.Doc.Operations.ForName(opCtx.OperationName)
-	complexityCalcs := complexity.Calculate(ctx, c.es, op, opCtx.Variables, c.opts...)
+func (c ComplexityLimit) MutateOperationContext(ctx context.Context, rc *graphql.OperationContext) *gqlerror.Error {
+	op := rc.Doc.Operations.ForName(rc.OperationName)
+	complexity := complexity.Calculate(c.es, op, rc.Variables)
 
-	limit := c.Func(ctx, opCtx)
+	limit := c.Func(ctx, rc)
 
-	opCtx.Stats.SetExtension(complexityExtension, &ComplexityStats{
-		Complexity:      complexityCalcs,
+	rc.Stats.SetExtension(complexityExtension, &ComplexityStats{
+		Complexity:      complexity,
 		ComplexityLimit: limit,
 	})
 
-	if complexityCalcs > limit {
-		err := gqlerror.Errorf(
-			"operation has complexity %d, which exceeds the limit of %d",
-			complexityCalcs,
-			limit,
-		)
+	if complexity > limit {
+		err := gqlerror.Errorf("operation has complexity %d, which exceeds the limit of %d", complexity, limit)
 		errcode.Set(err, errComplexityLimit)
 		return err
 	}
@@ -88,11 +78,11 @@ func (c ComplexityLimit) MutateOperationContext(
 }
 
 func GetComplexityStats(ctx context.Context) *ComplexityStats {
-	opCtx := graphql.GetOperationContext(ctx)
-	if opCtx == nil {
+	rc := graphql.GetOperationContext(ctx)
+	if rc == nil {
 		return nil
 	}
 
-	s, _ := opCtx.Stats.GetExtension(complexityExtension).(*ComplexityStats)
+	s, _ := rc.Stats.GetExtension(complexityExtension).(*ComplexityStats)
 	return s
 }

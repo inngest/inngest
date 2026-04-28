@@ -436,45 +436,39 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				LeaseID:    resp.Leases[0].LeaseID,
 				IssuedAtMS: clock.Now().UnixMilli(),
 			},
-			}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
-				// Use a channel to stop clock advances before releasing the capacity lease.
-				// This avoids a race condition where the extend ticker fires at the exact
-				// moment the release cleans up Redis state (Go's select randomly picks
-				// between simultaneously ready channels).
-				stopAdvance := make(chan struct{})
-				go func() {
-					for {
-						select {
-						case <-ctx.Done():
-							return
-						case <-stopAdvance:
-							return
-						case <-time.After(time.Second):
-							// Ensure we tick the extend at least once
-							clock.Advance(time.Second)
-						}
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			released := make(chan struct{})
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-released:
+						return
+					case <-time.After(time.Second):
+						// Ensure we tick the extend at least once
+						clock.Advance(time.Second)
 					}
-				}()
+				}
+			}()
 
-				<-time.After(3 * time.Second)
+			<-time.After(3 * time.Second)
 
-				// Stop clock advances and let any in-flight extends finish
-				// before releasing, to prevent the extend from racing with
-				// the release's Redis cleanup.
-				close(stopAdvance)
-				<-time.After(200 * time.Millisecond)
+			// Release the capacity early
+			require.NotNil(t, ri.CapacityLease)
 
-				// Release the capacity early
-				require.NotNil(t, ri.CapacityLease)
+			err := ri.CapacityLease.Release()
+			require.NoError(t, err)
+			close(released) // stop clock advances after release
 
-				err := ri.CapacityLease.Release()
-				require.NoError(t, err)
+			// Give the extend goroutine time to observe the cancelled context
+			<-time.After(50 * time.Millisecond)
 
-				// And do some more processing before returning
-				<-time.After(3 * time.Second)
-				atomic.AddInt64(&counter, 1)
-				return osqueue.RunResult{}, nil
-			})
+			// And do some more processing before returning
+			<-time.After(500 * time.Millisecond)
+			atomic.AddInt64(&counter, 1)
+			return osqueue.RunResult{}, nil
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, 1, int(counter))
@@ -1175,27 +1169,11 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		// remaining items are still in partition
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
-		// The constraint API may respond with 1 or 2 acquire calls depending on timing:
-		//  - 1 call:  the pre-leased item skips acquire; the second call both grants a
-		//             lease and reports the concurrency limit in a single response.
-		//  - 2 calls: each item triggers a separate acquire; the first grants a lease,
-		//             the second is denied with a concurrency limit.
-		require.True(t, len(cmLifecycles.AcquireCalls) == 1 || len(cmLifecycles.AcquireCalls) == 2,
-			"expected 1 or 2 acquire calls, got %d", len(cmLifecycles.AcquireCalls))
-
-		// The first call always grants exactly one lease.
+		// expect 1 successful and 1 failed calls to constraintapi
+		require.Len(t, cmLifecycles.AcquireCalls, 2)
 		require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
-
-		// The last call always reports the concurrency limit (it may be the same
-		// call as the first when only 1 acquire is made).
-		lastCall := cmLifecycles.AcquireCalls[len(cmLifecycles.AcquireCalls)-1]
-		require.NotEmpty(t, lastCall.LimitingConstraints)
-		require.Equal(t, lastCall.LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
-
-		// When there are 2 calls, the second grants no leases.
-		if len(cmLifecycles.AcquireCalls) == 2 {
-			require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
-		}
+		require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
+		require.Equal(t, cmLifecycles.AcquireCalls[1].LimitingConstraints[0].Kind, constraintapi.ConstraintKindConcurrency)
 
 		// partition was requeued
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))

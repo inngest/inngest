@@ -1,7 +1,6 @@
 package playground
 
 import (
-	"encoding/json"
 	"html/template"
 	"net/http"
 )
@@ -56,9 +55,8 @@ var altairPage = template.Must(template.New("altair").Parse(`<!doctype html>
         endpointURL: url,
         subscriptionsEndpoint: subscriptionUrl,
     };
-	var options = {...altairOptions, ...JSON.parse({{.options}})};
     window.addEventListener("load", function() {
-      AltairGraphQL.init(options);
+      AltairGraphQL.init(altairOptions);
     });
   </script>
 </body>
@@ -66,24 +64,18 @@ var altairPage = template.Must(template.New("altair").Parse(`<!doctype html>
 </html>`))
 
 // AltairHandler responsible for setting up the altair playground
-func AltairHandler(title, endpoint string, options map[string]any) http.HandlerFunc {
-	jsonOptions, err := json.Marshal(options)
-	if err != nil {
-		jsonOptions = []byte("{}")
-	}
-
+func AltairHandler(title, endpoint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := altairPage.Execute(w, map[string]any{
+		err := altairPage.Execute(w, map[string]interface{}{
 			"title":                title,
 			"endpoint":             endpoint,
 			"endpointIsAbsolute":   endpointHasScheme(endpoint),
 			"subscriptionEndpoint": getSubscriptionEndpoint(endpoint),
-			"version":              "8.1.3",
-			"cssSRI":               "sha256-aYcodhWPcqIHh2lLDWeoq+irtg7qkWLLLK30gjQJZc8=",
-			"mainSRI":              "sha256-bjpcMy7w3aaX8Cjuyv5hPE9FlkJRys0kxooPRtbGd8c=",
-			"polyfillsSRI":         "sha256-+hQzPqfWEkAfOfKytrW7hLceq0mUR3pHXn+UzwhrWQ0=",
-			"runtimeSRI":           "sha256-2SHK1nFbucnnM02VXrl4CAKDYQbJEF9HVZstRkVbkJM=",
-			"options":              string(jsonOptions),
+			"version":              "5.0.5",
+			"cssSRI":               "sha256-kZ35e5mdMYN5ALEbnsrA2CLn85Oe4hBodfsih9BqNxs=",
+			"mainSRI":              "sha256-nWdVTcGTlBDV1L04UQnqod+AJedzBCnKHv6Ct65liHE=",
+			"polyfillsSRI":         "sha256-1aVEg2sROcCQ/RxU3AlcPaRZhZdIWA92q2M+mdd/R4c=",
+			"runtimeSRI":           "sha256-cK2XhXqQr0WS1Z5eKNdac0rJxTD6miC3ubd+aEVMQDk=",
 		})
 		if err != nil {
 			panic(err)

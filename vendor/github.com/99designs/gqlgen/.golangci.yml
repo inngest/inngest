@@ -1,191 +1,39 @@
-# All settings can be found here https://github.com/golangci/golangci-lint/blob/HEAD/.golangci.reference.yml
-version: "2"
 run:
-  concurrency: 8
-  modules-download-mode: readonly
-  issues-exit-code: 1
   tests: true
-  allow-parallel-runners: false
-issues:
-  # Maximum count of issues with the same text.
-  # Set to 0 to disable.
-  # Default: 3
-  max-issues-per-linter: 0
-  max-same-issues: 0
-  new: false
-formatters:
-  exclusions:
-    paths:
-        - codegen/testserver/followschema/resolver.go
-        - codegen/testserver/singlefile/resolver.go
-        - codegen/testserver/usefunctionsyntaxforexecutioncontext/resolver.go
-        - generated
-  enable:
-    - golines
-    - gofumpt
-    - gci
-  settings:
-    gci:
-      sections:
-        - standard
-        - default
-        - prefix(github.com/99designs/gqlgen)
-    golines:
-      # Target maximum line length.
-      # Default: 100
-      max-len: 100
+  skip-dirs:
+    - bin
+
+linters-settings:
+  errcheck:
+    ignore: fmt:.*,[rR]ead|[wW]rite|[cC]lose,io:Copy
+
 linters:
-  default: none
+  disable-all: true
   enable:
-    - asasalint
-    - asciicheck
-    - bidichk
     - bodyclose
-    - copyloopvar
+    - deadcode
+    - depguard
     - dupl
-    - dupword
-    - durationcheck
     - errcheck
     - gocritic
+    - gofmt
+    - goimports
+    - gosimple
     - govet
     - ineffassign
     - misspell
-    - modernize
     - nakedret
-    - nolintlint
-    - perfsprint
-    - reassign
-    - revive
+    - prealloc
     - staticcheck
-    - testableexamples
-    - testifylint
+    - structcheck
+    - typecheck
     - unconvert
-    - unparam
     - unused
-    - usestdlibvars
-    - usetesting
-    - wastedassign
-#    - prealloc # disabled because it is a huge pain
-  settings:
-    errcheck:
-      exclude-functions:
-        - (io.Writer).Write
-        - (http.ResponseWriter).Write
-        - (*bytes.Buffer).WriteByte
-        - (*strings.Builder).WriteByte
-        - (*strings.Builder).WriteString
-        - io.Copy
-        - io.WriteString
-        - fmt.Fprintln
-    gocritic:
-      enabled-checks:
-        - emptyStringTest
-        - equalFold
-        - httpNoBody
-        - nilValReturn
-        - paramTypeCombine
-        - preferFprint
-        - yodaStyleExpr
-    govet:
-      disable:
-        - fieldalignment
-        - shadow
-        - unusedwrite
-      enable-all: true
-    modernize:
-      disable:
-        - any
-    perfsprint:
-      int-conversion: false
-      err-error: false
-      errorf: true
-      sprintf1: false
-      strconcat: false
-    revive:
-      enable-all-rules: false
-      rules:
-        - name: empty-lines
-        - name: use-any
-        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#struct-tag
-        - name: struct-tag
-          exclude: ["**/*_go124_test.go"]
-        - name: blank-imports
-        - name: context-as-argument
-        - name: context-keys-type
-        - name: error-return
-        - name: error-naming
-        - name: exported
-          disabled: true
-        - name: if-return
-        - name: increment-decrement
-        - name: var-declaration
-        - name: package-comments
-          disabled: true
-        - name: range
-        - name: receiver-naming
-        - name: time-naming
-        - name: unexported-return
-        - name: indent-error-flow
-        - name: errorf
-        - name: superfluous-else
-        - name: unused-parameter
-          disabled: true
-        - name: unreachable-code
-        - name: redefines-builtin-id
-    testifylint:
-      disable-all: true
-      enable:
-        - blank-import
-        - bool-compare
-        - compares
-        - empty
-        - encoded-compare
-        - error-is-as
-        - error-nil
-        - expected-actual
-        - float-compare
-        - go-require
-        - len
-        - negative-positive
-        - nil-compare
-        - require-error
-        - useless-assert
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    rules:
-      - linters:
-          - dupl
-          - errcheck
-        path: _test\.go
-      - linters:
-          - gocritic
-        path: codegen/testserver/.*/resolver\.go
-      - linters:
-          - gocritic
-        path: _examples/federation/products/graph/entity.resolvers.go
-      # revive.use-any causes problems in some generated files
-      - path: graphql/map.go
-        text: 'use-any'
-      - path: codegen/testserver/followschema/resolver.go
-        text: 'use-any'
-      - path: codegen/testserver/singlefile/resolver.go
-        text: 'use-any'
-      - linters:
-          - staticcheck
-        path: codegen/testserver/generated_test.go
-        text: SA1019
-      - linters:
-          - staticcheck
-        path: plugin/modelgen/models_test.go
-        text: SA1019
-    paths:
-      - bin
-      - third_party$
-      - builtin$
-      - examples$
-      - generated$
+    - varcheck
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - dupl

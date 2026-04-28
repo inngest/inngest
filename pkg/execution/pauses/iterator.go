@@ -319,15 +319,21 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 
 	block, err := d.blockReader.ReadBlock(ctx, d.idx, id)
 	// TODO: Maybe we should retry if it's a retriable error
-	if err != nil && d.err == nil {
-		d.l.Lock()
-		d.err = err
-		d.l.Unlock()
+	if err != nil {
+		if d.err == nil {
+			d.l.Lock()
+			d.err = err
+			d.l.Unlock()
+		}
 
 		metrics.HistogramPauseBlockFetchLatency(ctx, time.Since(start), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"success": false},
 		})
+		return
+	}
+
+	if block == nil {
 		return
 	}
 

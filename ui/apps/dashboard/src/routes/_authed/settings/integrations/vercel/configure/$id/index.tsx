@@ -63,7 +63,9 @@ function VercelConfigure() {
   const [project, setProject] = useState<VercelProject>();
   const [updated, setUpdated] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [paths, setPaths] = useState<ServePathRow[]>([createServePathRow(defaultPath)]);
+  const [paths, setPaths] = useState<ServePathRow[]>([
+    createServePathRow(defaultPath),
+  ]);
 
   //
   // For tracking loading states since urql does not offer that on mutations
@@ -83,7 +85,7 @@ function VercelConfigure() {
       setPaths(
         p.servePath
           ? p.servePath.split(',').map((path) => createServePathRow(path))
-          : [createServePathRow(defaultPath)]
+          : [createServePathRow(defaultPath)],
       );
       setOriginalProject(p);
       setNotFound(false);
@@ -101,7 +103,11 @@ function VercelConfigure() {
   }, [project]);
 
   useEffect(() => {
-    project && setProject({ ...project, servePath: paths.map((path) => path.value).join(',') });
+    project &&
+      setProject({
+        ...project,
+        servePath: paths.map((path) => path.value).join(','),
+      });
   }, [paths]);
 
   const submit = useCallback(async () => {
@@ -279,8 +285,8 @@ function VercelConfigure() {
                         onChange={({ target: { value } }) => {
                           setPaths((prevPaths) =>
                             prevPaths.map((currentPath, n) =>
-                              i === n ? { ...currentPath, value } : currentPath
-                            )
+                              i === n ? { ...currentPath, value } : currentPath,
+                            ),
                           );
                         }}
                       />
@@ -293,7 +299,9 @@ function VercelConfigure() {
                         icon={<RiDeleteBinLine className="h-5 w-5" />}
                         className="h-10 w-10"
                         onClick={() =>
-                          setPaths((prevPaths) => prevPaths.filter((_, n) => n !== i))
+                          setPaths((prevPaths) =>
+                            prevPaths.filter((_, n) => n !== i),
+                          )
                         }
                       />
                     )}
@@ -306,7 +314,12 @@ function VercelConfigure() {
                     iconSide="left"
                     label="Add new path"
                     className="mt-3"
-                    onClick={() => setPaths((prevPaths) => [...prevPaths, createServePathRow('')])}
+                    onClick={() =>
+                      setPaths((prevPaths) => [
+                        ...prevPaths,
+                        createServePathRow(''),
+                      ])
+                    }
                   />
                 </div>
               </div>

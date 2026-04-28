@@ -3,7 +3,6 @@ package transport
 import (
 	"encoding/json"
 	"errors"
-	"slices"
 
 	"github.com/gorilla/websocket"
 )
@@ -79,6 +78,16 @@ func (t messageType) String() string {
 	return text
 }
 
+func contains(list []string, elem string) bool {
+	for _, e := range list {
+		if e == elem {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (t *Websocket) injectGraphQLWSSubprotocols() {
 	// the list of subprotocols is specified by the consumer of the Websocket struct,
 	// in order to preserve backward compatibility, we inject the graphql specific subprotocols
@@ -89,7 +98,7 @@ func (t *Websocket) injectGraphQLWSSubprotocols() {
 		}()
 
 		for _, subprotocol := range supportedSubprotocols {
-			if !slices.Contains(t.Upgrader.Subprotocols, subprotocol) {
+			if !contains(t.Upgrader.Subprotocols, subprotocol) {
 				t.Upgrader.Subprotocols = append(t.Upgrader.Subprotocols, subprotocol)
 			}
 		}

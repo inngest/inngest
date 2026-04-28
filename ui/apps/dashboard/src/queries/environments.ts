@@ -23,7 +23,7 @@ export function useDefaultEnvironment(): UseQueryResponse<Environment> {
     return workspaceToEnvironment(data.defaultEnv as Workspace);
   }, [data?.defaultEnv]);
 
-  return [{ data: environment, fetching, error, stale, hasNext: false }, refetch];
+  return [{ data: environment, fetching, error, stale }, refetch];
 }
 
 const GetEnvironmentsDocument = graphql(`
@@ -89,7 +89,7 @@ export const useEnvironments = (): UseQueryResponse<Environment[]> => {
     return workspacesToEnvironments(data?.workspaces ?? []);
   }, [data?.workspaces]);
 
-  return [{ data: environments, fetching, error, stale, hasNext: false }, refetch];
+  return [{ data: environments, fetching, error, stale }, refetch];
 };
 
 export const useEnvironment = (
@@ -109,5 +109,5 @@ export const useEnvironment = (
     return workspaceToEnvironment(data.envBySlug as Workspace);
   }, [data?.envBySlug]);
 
-  return [{ data: environment, fetching, error, stale, hasNext: false }, refetch];
+  return [{ data: environment, fetching, error, stale }, refetch];
 };

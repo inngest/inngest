@@ -70,6 +70,7 @@ type UpdateSpanOptions struct {
 	Attributes         *meta.SerializableAttrs
 	Debug              *SpanDebugData
 	EndTime            time.Time
+	EndTimeOffset      time.Duration
 	Metadata           *statev2.Metadata
 	QueueItem          *queue.Item
 	RawOtelSpanOptions []trace.SpanStartOption
@@ -341,10 +342,12 @@ func (tp *otelTracerProvider) UpdateSpan(
 		attrs = attrs.Merge(opts.Attributes)
 	}
 
+	tsWithOffset := ts.Add(opts.EndTimeOffset)
+
 	spanOpts := append(
 		[]trace.SpanStartOption{
 			trace.WithAttributes(attrs.Serialize()...),
-			trace.WithTimestamp(ts),
+			trace.WithTimestamp(tsWithOffset),
 		},
 		opts.RawOtelSpanOptions...,
 	)
@@ -352,7 +355,7 @@ func (tp *otelTracerProvider) UpdateSpan(
 	tracer := tp.getTracer(opts.Metadata)
 	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)
 
-	span.End()
+	span.End(trace.WithTimestamp(tsWithOffset))
 	return nil
 }
 

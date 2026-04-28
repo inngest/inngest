@@ -1,7 +1,6 @@
 package codegen
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,8 +12,7 @@ import (
 	"github.com/99designs/gqlgen/codegen/config"
 )
 
-// Data is a unified model of the code to be generated. Plugins may modify this structure to do
-// things like implement
+// Data is a unified model of the code to be generated. Plugins may modify this structure to do things like implement
 // resolvers or directives automatically (eg grpc, validation)
 type Data struct {
 	Config *config.Config
@@ -36,7 +34,7 @@ type Data struct {
 	MutationRoot     *Object
 	SubscriptionRoot *Object
 	AugmentedSources []AugmentedSource
-	Plugins          []any
+	Plugins          []interface{}
 }
 
 func (d *Data) HasEmbeddableSources() bool {
@@ -49,62 +47,7 @@ func (d *Data) HasEmbeddableSources() bool {
 	return hasEmbeddableSources
 }
 
-func (d *Data) HasBatchResolverFields() bool {
-	for _, obj := range d.Objects {
-		if obj.Root {
-			continue
-		}
-		for _, field := range obj.Fields {
-			if field.IsBatch() {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// ChildFieldType represents a unique object type referenced as a return type
-// from fields across all objects. Used to generate shared childFields_*
-// functions that deduplicate the repeated switch statements in fieldContext_*.
-type ChildFieldType struct {
-	TypeName   string
-	Definition *ast.Definition
-}
-
-// UniqueChildFieldTypes collects all unique OBJECT types that appear as return
-// types from fields. Each type appears once, enabling generation of a shared
-// childFields_* lookup function instead of inlining the switch in every
-// fieldContext_* function.
-func (d *Data) UniqueChildFieldTypes() []*ChildFieldType {
-	seen := map[string]bool{}
-	var result []*ChildFieldType
-	for _, obj := range d.Objects {
-		for _, field := range obj.Fields {
-			if field.TypeReference == nil || field.TypeReference.Definition == nil {
-				continue
-			}
-			def := field.TypeReference.Definition
-			if def.Kind != ast.Object || len(def.Fields) == 0 {
-				continue
-			}
-			if seen[def.Name] {
-				continue
-			}
-			seen[def.Name] = true
-			result = append(result, &ChildFieldType{
-				TypeName:   def.Name,
-				Definition: def,
-			})
-		}
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].TypeName < result[j].TypeName
-	})
-	return result
-}
-
-// AugmentedSource contains extra information about graphql schema files which is not known directly
-// from the Config.Sources data
+// AugmentedSource contains extra information about graphql schema files which is not known directly from the Config.Sources data
 type AugmentedSource struct {
 	// path relative to Config.Exec.Filename
 	RelativePath string
@@ -118,30 +61,6 @@ type builder struct {
 	Schema     *ast.Schema
 	Binder     *config.Binder
 	Directives map[string]*Directive
-}
-
-// Get only the directives which should have a user provided definition on server instantiation
-func (d *Data) UserDirectives() DirectiveList {
-	res := DirectiveList{}
-	directives := d.Directives()
-	for k, directive := range directives {
-		if directive.Implementation == nil {
-			res[k] = directive
-		}
-	}
-	return res
-}
-
-// Get only the directives which should have a statically provided definition
-func (d *Data) BuiltInDirectives() DirectiveList {
-	res := DirectiveList{}
-	directives := d.Directives()
-	for k, directive := range directives {
-		if directive.Implementation != nil {
-			res[k] = directive
-		}
-	}
-	return res
 }
 
 // Get only the directives which are defined in the config's sources.
@@ -158,124 +77,8 @@ func (d *Data) Directives() DirectiveList {
 	return res
 }
 
-// FuncReceiver returns the receiver clause for a generated function declaration.
-//
-//	function syntax:  ""
-//	receiver syntax:  "(ec *executionContext) "
-func (d *Data) FuncReceiver() string {
-	if d.Config.UseFunctionSyntaxForExecutionContext {
-		return ""
-	}
-	return "(ec *executionContext) "
-}
-
-// ECFuncParam returns the ec parameter in a generated function declaration.
-//
-//	function syntax:  "ec *executionContext, "
-//	receiver syntax:  ""
-func (d *Data) ECFuncParam() string {
-	if d.Config.UseFunctionSyntaxForExecutionContext {
-		return "ec *executionContext, "
-	}
-	return ""
-}
-
-// ECDot returns the call-site prefix for a generated function call.
-//
-//	function syntax:  ""
-//	receiver syntax:  "ec."
-func (d *Data) ECDot() string {
-	if d.Config.UseFunctionSyntaxForExecutionContext {
-		return ""
-	}
-	return "ec."
-}
-
-// ECArg returns the ec argument at a generated call site.
-//
-//	function syntax:  "ec, "
-//	receiver syntax:  ""
-func (d *Data) ECArg() string {
-	if d.Config.UseFunctionSyntaxForExecutionContext {
-		return "ec, "
-	}
-	return ""
-}
-
-// ImplDirectivesField is the subset of Field and FieldArgument needed by the
-// implDirectives template.
-type ImplDirectivesField interface {
-	DirectiveObjName() string
-	ImplDirectives() []*Directive
-	ZeroVal() string
-}
-
-// ImplDirectivesContext is the typed context passed to the implDirectives template.
-// ErrVal is the Go variable name to return on error ("zeroVal" for the standard
-// case, or the partially-built struct variable for INPUT_OBJECT directives).
-// ErrWrap controls whether the error is wrapped in graphql.ErrorOnPath(ctx, err).
-type ImplDirectivesContext struct {
-	Field   ImplDirectivesField
-	Data    *Data
-	ErrVal  string
-	ErrWrap bool
-}
-
-// QueryDirectivesContext is the typed context passed to the queryDirectives template.
-type QueryDirectivesContext struct {
-	DirectiveList DirectiveList
-	Data          *Data
-}
-
-// ImplDirectivesCtx returns a context for the implDirectives template suitable
-// for field and argument directive processing (ErrVal="zeroVal", ErrWrap=false).
-func (d *Data) ImplDirectivesCtx(f ImplDirectivesField) ImplDirectivesContext {
-	return ImplDirectivesContext{Field: f, Data: d, ErrVal: "zeroVal", ErrWrap: false}
-}
-
-// QueryDirectivesCtx returns a context for the queryDirectives template.
-func (d *Data) QueryDirectivesCtx(dl DirectiveList) QueryDirectivesContext {
-	return QueryDirectivesContext{DirectiveList: dl, Data: d}
-}
-
-// inputObjectImplDirectivesField adapts an *Object for use as an ImplDirectivesField
-// in INPUT_OBJECT-level directive processing, where the directive receiver is the
-// map representation of the input rather than a typed struct field.
-type inputObjectImplDirectivesField struct {
-	object *Object
-}
-
-func (f *inputObjectImplDirectivesField) DirectiveObjName() string { return "asMap" }
-func (f *inputObjectImplDirectivesField) ImplDirectives() []*Directive {
-	return f.object.InputObjectDirectives()
-}
-func (f *inputObjectImplDirectivesField) ZeroVal() string { return "" } // unused when ErrWrap=true
-
-// InputObjectImplDirectivesCtx returns a context for the implDirectives template
-// for INPUT_OBJECT-level directive processing. errVal is the Go variable name to
-// return on error (e.g., "it" or "&it").
-func (d *Data) InputObjectImplDirectivesCtx(obj *Object, errVal string) ImplDirectivesContext {
-	return ImplDirectivesContext{
-		Field:   &inputObjectImplDirectivesField{object: obj},
-		Data:    d,
-		ErrVal:  errVal,
-		ErrWrap: true,
-	}
-}
-
-// ErrReturn returns the Go statements for the error path inside a directive
-// closure. When ErrWrap is true the error is wrapped in
-// graphql.ErrorOnPath; when false the typed zero value is declared before
-// the plain error return. errExpr is the Go error expression to return
-// (e.g. "err" or `errors.New("not implemented")`).
-func (c ImplDirectivesContext) ErrReturn(errExpr string) string {
-	if c.ErrWrap {
-		return fmt.Sprintf("return %s, graphql.ErrorOnPath(ctx, %s)", c.ErrVal, errExpr)
-	}
-	return c.Field.ZeroVal() + "\nreturn " + c.ErrVal + ", " + errExpr
-}
-
-func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
+func BuildData(cfg *config.Config, plugins ...interface{}) (*Data, error) {
+	// We reload all packages to allow packages to be compared correctly.
 	cfg.ReloadAllPackages()
 
 	b := builder{
@@ -293,7 +96,7 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 
 	dataDirectives := make(map[string]*Directive)
 	for name, d := range b.Directives {
-		if !d.SkipRuntime {
+		if !d.Builtin {
 			dataDirectives[name] = d
 		}
 	}
@@ -334,7 +137,7 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 	if s.Schema.Query != nil {
 		s.QueryRoot = s.Objects.ByName(s.Schema.Query.Name)
 	} else {
-		return nil, errors.New("query entry point missing")
+		return nil, fmt.Errorf("query entry point missing")
 	}
 
 	if s.Schema.Mutation != nil {
@@ -352,11 +155,11 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 	s.ReferencedTypes = b.buildTypes()
 
 	sort.Slice(s.Objects, func(i, j int) bool {
-		return s.Objects[i].Name < s.Objects[j].Name
+		return s.Objects[i].Definition.Name < s.Objects[j].Definition.Name
 	})
 
 	sort.Slice(s.Inputs, func(i, j int) bool {
-		return s.Inputs[i].Name < s.Inputs[j].Name
+		return s.Inputs[i].Definition.Name < s.Inputs[j].Definition.Name
 	})
 
 	if b.Binder.SawInvalid {
@@ -367,18 +170,10 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 		}
 
 		// otherwise show a generic error message
-		return nil, errors.New(
-			"invalid types were encountered while traversing the go source code, this probably means the invalid code generated isnt correct. add try adding -v to debug",
-		)
+		return nil, fmt.Errorf("invalid types were encountered while traversing the go source code, this probably means the invalid code generated isnt correct. add try adding -v to debug")
 	}
-	var sources []*ast.Source
-	sources, err = SerializeTransformedSchema(cfg.Schema, cfg.Sources)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize transformed schema: %w", err)
-	}
-
 	aSources := []AugmentedSource{}
-	for _, s := range sources {
+	for _, s := range cfg.Sources {
 		wd, err := os.Getwd()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get working directory: %w", err)
@@ -387,12 +182,7 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 		sourcePath := filepath.Join(wd, s.Name)
 		relative, err := filepath.Rel(outputDir, sourcePath)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"failed to compute path of %s relative to %s: %w",
-				sourcePath,
-				outputDir,
-				err,
-			)
+			return nil, fmt.Errorf("failed to compute path of %s relative to %s: %w", sourcePath, outputDir, err)
 		}
 		relative = filepath.ToSlash(relative)
 		embeddable := true
@@ -414,7 +204,7 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 func (b *builder) injectIntrospectionRoots(s *Data) error {
 	obj := s.Objects.ByName(b.Schema.Query.Name)
 	if obj == nil {
-		return errors.New("root query type must be defined")
+		return fmt.Errorf("root query type must be defined")
 	}
 
 	__type, err := b.buildField(obj, &ast.FieldDefinition{

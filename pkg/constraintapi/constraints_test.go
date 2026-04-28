@@ -1420,6 +1420,50 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Equal(t, 0, resp.AvailableCapacity)
 			},
 		},
+
+		{
+			name: "semaphore auto release",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Semaphores: []Semaphore{
+					{ID: "app:test-sem", Weight: 1, Release: SemaphoreReleaseAuto},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindSemaphore,
+					Semaphore: &SemaphoreConstraint{
+						ID:      "app:test-sem",
+						Weight:  1,
+						Release: SemaphoreReleaseAuto,
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set semaphore capacity to 5
+				sem := deps.constraints[0].Semaphore
+				capKey := sem.CapacityKey(accountID)
+				require.NoError(t, deps.r.Set(capKey, "5"))
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// Semaphore usage should be 1
+				sem := deps.constraints[0].Semaphore
+				usageKey := sem.UsageKey(accountID)
+				val, err := deps.r.Get(usageKey)
+				require.NoError(t, err)
+				require.Equal(t, "1", val)
+			},
+			afterRelease: func(t *testing.T, deps *deps, resp *CapacityReleaseResponse) {
+				// After release, semaphore usage should be decremented (auto-release)
+				sem := deps.constraints[0].Semaphore
+				usageKey := sem.UsageKey(accountID)
+				val, err := deps.r.Get(usageKey)
+				require.NoError(t, err)
+				require.Equal(t, "0", val)
+			},
+		},
 	}
 
 	for _, test := range testCases {

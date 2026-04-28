@@ -1,6 +1,9 @@
 package db
 
-import "context"
+import (
+	"context"
+	"database/sql"
+)
 
 // Dialect identifies a database backend.
 type Dialect string
@@ -26,6 +29,9 @@ type Adapter interface {
 
 	// WithTx creates a new adapter scoped to a database transaction.
 	WithTx(ctx context.Context) (TxAdapter, error)
+
+	// Conn returns the underlying *sql.DB for raw queries (e.g. goqu dynamic SQL).
+	Conn() *sql.DB
 
 	// Close releases any resources held by the adapter.
 	Close() error

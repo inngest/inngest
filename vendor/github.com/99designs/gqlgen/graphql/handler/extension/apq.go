@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
+	"fmt"
 
-	"github.com/go-viper/mapstructure/v2"
+	"github.com/99designs/gqlgen/graphql/errcode"
+
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/99designs/gqlgen/graphql"
-	"github.com/99designs/gqlgen/graphql/errcode"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -18,13 +19,12 @@ const (
 	errPersistedQueryNotFoundCode = "PERSISTED_QUERY_NOT_FOUND"
 )
 
-// AutomaticPersistedQuery saves client upload by optimistically sending only the hashes of queries,
-// if the server does not yet know what the query is for the hash it will respond telling the client
-// to send the query along with the
+// AutomaticPersistedQuery saves client upload by optimistically sending only the hashes of queries, if the server
+// does not yet know what the query is for the hash it will respond telling the client to send the query along with the
 // hash in the next request.
 // see https://github.com/apollographql/apollo-link-persisted-queries
 type AutomaticPersistedQuery struct {
-	Cache graphql.Cache[string]
+	Cache graphql.Cache
 }
 
 type ApqStats struct {
@@ -48,15 +48,12 @@ func (a AutomaticPersistedQuery) ExtensionName() string {
 
 func (a AutomaticPersistedQuery) Validate(schema graphql.ExecutableSchema) error {
 	if a.Cache == nil {
-		return errors.New("AutomaticPersistedQuery.Cache can not be nil")
+		return fmt.Errorf("AutomaticPersistedQuery.Cache can not be nil")
 	}
 	return nil
 }
 
-func (a AutomaticPersistedQuery) MutateOperationParameters(
-	ctx context.Context,
-	rawParams *graphql.RawParams,
-) *gqlerror.Error {
+func (a AutomaticPersistedQuery) MutateOperationParameters(ctx context.Context, rawParams *graphql.RawParams) *gqlerror.Error {
 	if rawParams.Extensions["persistedQuery"] == nil {
 		return nil
 	}
@@ -76,14 +73,14 @@ func (a AutomaticPersistedQuery) MutateOperationParameters(
 
 	fullQuery := false
 	if rawParams.Query == "" {
-		var ok bool
 		// client sent optimistic query hash without query string, get it from the cache
-		rawParams.Query, ok = a.Cache.Get(ctx, extension.Sha256)
+		query, ok := a.Cache.Get(ctx, extension.Sha256)
 		if !ok {
 			err := gqlerror.Errorf(errPersistedQueryNotFound)
 			errcode.Set(err, errPersistedQueryNotFoundCode)
 			return err
 		}
+		rawParams.Query = query.(string)
 	} else {
 		// client sent optimistic query hash with query string, verify and store it
 		if computeQueryHash(rawParams.Query) != extension.Sha256 {
@@ -102,12 +99,12 @@ func (a AutomaticPersistedQuery) MutateOperationParameters(
 }
 
 func GetApqStats(ctx context.Context) *ApqStats {
-	opCtx := graphql.GetOperationContext(ctx)
-	if opCtx == nil {
+	rc := graphql.GetOperationContext(ctx)
+	if rc == nil {
 		return nil
 	}
 
-	s, _ := opCtx.Stats.GetExtension(apqExtension).(*ApqStats)
+	s, _ := rc.Stats.GetExtension(apqExtension).(*ApqStats)
 	return s
 }
 

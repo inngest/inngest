@@ -126,7 +126,7 @@ export const getInvokeFunctionLookups = async (envSlug: string) => {
       return results;
     }
 
-    for (let p = 1; p <= totalPages; p++) {
+    for (let p = 2; p <= totalPages; p++) {
       const pageResult = await fetchLookups({ envSlug, page: p, pageSize });
       results.envBySlug.workflows.data = [
         ...results.envBySlug.workflows.data,

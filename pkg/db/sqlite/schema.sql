@@ -1,0 +1,212 @@
+CREATE TABLE goose_db_version (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		version_id INTEGER NOT NULL,
+		is_applied INTEGER NOT NULL,
+		tstamp TIMESTAMP DEFAULT (datetime('now'))
+	);
+CREATE TABLE migrations (version uint64,dirty bool);
+CREATE UNIQUE INDEX version_unique ON migrations (version);
+CREATE TABLE apps (
+	id CHAR(36) PRIMARY KEY,
+	name VARCHAR NOT NULL,
+	sdk_language VARCHAR NOT NULL,
+	sdk_version VARCHAR NOT NULL,
+	framework VARCHAR,
+	metadata VARCHAR DEFAULT '{}' NOT NULL,
+	status VARCHAR NOT NULL,
+	error TEXT,
+	checksum VARCHAR NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	archived_at TIMESTAMP,
+	url VARCHAR NOT NULL
+, "method" VARCHAR(32) NOT NULL DEFAULT 'serve', "app_version" VARCHAR);
+CREATE TABLE functions (
+	-- id CHAR(36) PRIMARY KEY, -- ADD this when https://github.com/duckdb/duckdb/issues/1631 is fixed.
+	id CHAR(36),
+	app_id CHAR(36),
+	name VARCHAR NOT NULL,
+	slug VARCHAR NOT NULL,
+	config VARCHAR NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+, archived_at TIMESTAMP);
+CREATE TABLE events (
+	internal_id BLOB,
+	-- cannot use CHAR(26) for ulids, nor primary keys for null ter
+	account_id CHAR(36),
+	workspace_id CHAR(36),
+	source VARCHAR(255),
+	source_id CHAR(35),
+	received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	event_id VARCHAR NOT NULL,
+	event_name VARCHAR NOT NULL,
+	event_data VARCHAR DEFAULT '{}' NOT NULL,
+	event_user VARCHAR DEFAULT '{}' NOT NULL,
+	event_v VARCHAR,
+	event_ts TIMESTAMP NOT NULL
+);
+CREATE TABLE function_runs (
+	run_id BLOB NOT NULL,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	function_id CHAR(36),
+	function_version INT NOT NULL,
+	trigger_type VARCHAR NOT NULL DEFAULT 'event',
+	-- or 'cron' if this is a cron-based function.
+	event_id BLOB NOT NULL,
+	batch_id BLOB,
+	original_run_id BLOB,
+	cron VARCHAR
+, workspace_id UUID);
+CREATE TABLE function_finishes (
+	run_id BLOB,
+	status VARCHAR NOT NULL,
+	output VARCHAR NOT NULL DEFAULT '{}',
+	completed_step_count INT NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE history (
+	id BLOB,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	function_id CHAR(36),
+	function_version INT NOT NULL,
+	run_id BLOB NOT NULL,
+	event_id BLOB NOT NULL,
+	batch_id BLOB,
+	group_id VARCHAR,
+	idempotency_key VARCHAR NOT NULL,
+	type VARCHAR NOT NULL,
+	attempt INT NOT NULL,
+	latency_ms INT,
+	step_name VARCHAR,
+	step_id VARCHAR,
+	url VARCHAR,
+	cancel_request VARCHAR,
+	sleep VARCHAR,
+	wait_for_event VARCHAR,
+	wait_result VARCHAR,
+	invoke_function VARCHAR,
+	invoke_function_result VARCHAR,
+	result VARCHAR
+, step_type VARCHAR);
+CREATE TABLE event_batches (
+	id CHAR(26) PRIMARY KEY,
+	account_id UUID,
+	workspace_id UUID,
+	app_id UUID,
+	workflow_id UUID,
+	run_id CHAR(26) NOT NULL,
+	started_at TIMESTAMP NOT NULL,
+	executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	event_ids BLOB NOT NULL
+);
+CREATE TABLE traces (
+	timestamp TIMESTAMP NOT NULL,
+	timestamp_unix_ms INT NOT NULL,
+	trace_id VARCHAR NOT NULL,
+	span_id VARCHAR NOT NULL,
+	parent_span_id VARCHAR,
+	trace_state VARCHAR,
+	span_name VARCHAR NOT NULL,
+	span_kind VARCHAR NOT NULL,
+	service_name VARCHAR NOT NULL,
+	resource_attributes BLOB NOT NULL,
+	scope_name VARCHAR NOT NULL,
+	scope_version VARCHAR NOT NULL,
+	span_attributes BLOB NOT NULL,
+	duration INT NOT NULL, -- duration in milli
+	status_code VARCHAR NOT NULL,
+	status_message TEXT,
+	events BLOB NOT NULL, -- list of events
+	links BLOB NOT NULL,  -- list of links
+	run_id CHAR(26)
+);
+CREATE TABLE trace_runs (
+	run_id CHAR(26) PRIMARY KEY,
+
+	account_id CHAR(36) NOT NULL,
+	workspace_id CHAR(36) NOT NULL,
+	app_id CHAR(36) NOT NULL,
+	function_id CHAR(36) NOT NULL,
+	trace_id BLOB NOT NULL,
+
+	queued_at INT NOT NULL,
+	started_at INT NOT NULL,
+	ended_at INT NOT NULL,
+
+	status INT NOT NULL, -- more like enum values
+	source_id VARCHAR NOT NULL,
+	trigger_ids BLOB NOT NULL,
+	output BLOB,
+	is_debounce BOOLEAN NOT NULL,
+	batch_id BLOB,
+	cron_schedule TEXT
+, has_ai BOOLEAN NOT NULL DEFAULT FALSE);
+CREATE TABLE queue_snapshot_chunks (
+    snapshot_id CHAR(26) NOT NULL,
+    chunk_id INT NOT NULL,
+    data BLOB,
+    PRIMARY KEY (snapshot_id, chunk_id)
+);
+CREATE TABLE spans (
+  -- otel
+  span_id TEXT NOT NULL,
+  trace_id TEXT NOT NULL,
+  parent_span_id TEXT,
+  name TEXT NOT NULL,
+  start_time DATETIME NOT NULL,
+  end_time DATETIME NOT NULL,
+  attributes JSON,
+  links JSON,
+
+  -- custom
+  dynamic_span_id TEXT,
+  account_id TEXT NOT NULL,
+  app_id TEXT NOT NULL,
+  function_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  env_id TEXT NOT NULL,
+  output JSON, debug_run_id CHAR(36), debug_session_id CHAR(36), status TEXT, input JSON, event_ids JSON,
+
+  PRIMARY KEY (trace_id, span_id)
+);
+CREATE INDEX idx_spans_run_id ON spans(run_id);
+CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
+CREATE INDEX idx_spans_status ON spans(status);
+CREATE INDEX idx_spans_run_status ON spans(run_id, status);
+CREATE INDEX idx_spans_account_status_time ON spans(account_id, status, start_time);
+CREATE TABLE worker_connections (
+    account_id CHAR(36) NOT NULL,
+    workspace_id CHAR(36) NOT NULL,
+
+    app_name VARCHAR NOT NULL,
+    app_id CHAR(36),
+
+    id CHAR(26) NOT NULL,
+    gateway_id CHAR(26) NOT NULL,
+    instance_id VARCHAR NOT NULL,
+    status INT NOT NULL,
+    worker_ip VARCHAR NOT NULL,
+    max_worker_concurrency INT NOT NULL DEFAULT 0,
+
+    connected_at INT NOT NULL,
+    last_heartbeat_at INT,
+    disconnected_at INT,
+    recorded_at INT NOT NULL,
+    inserted_at INT NOT NULL,
+
+    disconnect_reason VARCHAR,
+
+    group_hash BLOB NOT NULL,
+    sdk_lang VARCHAR NOT NULL,
+    sdk_version VARCHAR NOT NULL,
+    sdk_platform VARCHAR NOT NULL,
+    sync_id CHAR(36),
+    app_version VARCHAR,
+    function_count INT NOT NULL,
+
+    cpu_cores INT NOT NULL,
+    mem_bytes INT NOT NULL,
+    os VARCHAR NOT NULL,
+
+    PRIMARY KEY(id, app_name)
+);

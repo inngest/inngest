@@ -56,6 +56,9 @@ type ExtractedValues struct {
 	StepUserlandID *string
 	StepUserlandIndex *int
 	StepRunType *string
+	ExperimentName *string
+	ExperimentStepID *string
+	ExperimentVariant *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time
 	StepInvokeFunctionID *string
@@ -73,6 +76,7 @@ type ExtractedValues struct {
 	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	ResponseSteps *ResponseOps
 	IsCheckpoint *bool
 	IsUserland *bool
 	UserlandSpanID *string

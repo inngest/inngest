@@ -1,7 +1,6 @@
 package templates
 
 import (
-	"errors"
 	"fmt"
 	"go/types"
 	"strconv"
@@ -23,7 +22,7 @@ type Imports struct {
 }
 
 func (i *Import) String() string {
-	if strings.HasSuffix(i.Path, i.Alias) && i.Alias == i.Name {
+	if strings.HasSuffix(i.Path, i.Alias) {
 		return strconv.Quote(i.Path)
 	}
 
@@ -32,14 +31,12 @@ func (i *Import) String() string {
 
 func (s *Imports) String() string {
 	res := ""
-	var resSb35 strings.Builder
 	for i, imp := range s.imports {
 		if i != 0 {
-			resSb35.WriteString("\n")
+			res += "\n"
 		}
-		resSb35.WriteString(imp.String())
+		res += imp.String()
 	}
-	res += resSb35.String()
 	return res
 }
 
@@ -65,11 +62,11 @@ func (s *Imports) Reserve(path string, aliases ...string) (string, error) {
 		if existing.Alias == alias {
 			return "", nil
 		}
-		return "", errors.New("ambient import already exists")
+		return "", fmt.Errorf("ambient import already exists")
 	}
 
 	if alias := s.findByAlias(alias); alias != nil {
-		return "", errors.New("ambient import collides on an alias")
+		return "", fmt.Errorf("ambient import collides on an alias")
 	}
 
 	s.imports = append(s.imports, &Import{

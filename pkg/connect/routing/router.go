@@ -413,7 +413,7 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 	// Ensure gateway is healthy
 	gw, err := stateManager.GetGateway(ctx, gatewayId)
 	if err != nil {
-		log.Error("could not get gateway", "gateway_id", gatewayId.String())
+		log.Error("could not get gateway from store", "gateway_id", gatewayId.String())
 
 		return isHealthyRes{
 			shouldDeleteUnhealthyConnection: true,

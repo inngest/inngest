@@ -84,6 +84,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			ReplayID:              s.Metadata.Config.ReplayID,
 			PriorityFactor:        s.Metadata.Config.PriorityFactor,
 			CustomConcurrencyKeys: s.Metadata.Config.CustomConcurrencyKeys,
+			Semaphores:            s.Metadata.Config.Semaphores,
 			BatchID:               s.Metadata.Config.BatchID,
 		},
 		EventBatchData: batchData,
@@ -172,6 +173,9 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		Tags: map[string]any{
 			"account_id": s.Metadata.ID.Tenant.AccountID,
 		},
+	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(stateSize), metrics.HistogramOpt{
+		PkgName: "redis_state",
 	})
 
 	steps := make(map[string]json.RawMessage)
@@ -289,6 +293,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			OriginalRunID:         md.Identifier.OriginalRunID,
 			PriorityFactor:        md.Identifier.PriorityFactor,
 			CustomConcurrencyKeys: md.Identifier.CustomConcurrencyKeys,
+			Semaphores:            md.Identifier.Semaphores,
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
 			HasAI:                 md.HasAI,
@@ -400,6 +405,9 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		Tags: map[string]any{
 			"account_id": id.Tenant.AccountID,
 		},
+	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(len(data)), metrics.HistogramOpt{
+		PkgName: "redis_state",
 	})
 
 	return hasPending, err

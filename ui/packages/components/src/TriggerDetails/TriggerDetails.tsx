@@ -19,6 +19,7 @@ import {
 import { ErrorCard } from '../Error/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { cn } from '../utils/classNames';
+import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
@@ -78,6 +79,11 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
       return '';
     }
   }, [trigger?.payloads]);
+
+  const cronMetadata = useMemo(
+    () => getCronTriggerMetadata(trigger?.payloads),
+    [trigger?.payloads]
+  );
 
   let type = 'EVENT';
   if (trigger?.isBatch) {
@@ -207,6 +213,24 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
                             <TimeElement date={new Date(trigger.timestamp)} />
                           )}
                         </ElementWrapper>
+                        {cronMetadata.scheduledAt && (
+                          <ElementWrapper label="Scheduled for">
+                            {isPending ? (
+                              <SkeletonElement />
+                            ) : (
+                              <TimeElement date={cronMetadata.scheduledAt} />
+                            )}
+                          </ElementWrapper>
+                        )}
+                        {cronMetadata.fireAt && (
+                          <ElementWrapper label="Fired at">
+                            {isPending ? (
+                              <SkeletonElement />
+                            ) : (
+                              <TimeElement date={cronMetadata.fireAt} />
+                            )}
+                          </ElementWrapper>
+                        )}
                       </>
                     )}
                     {type === 'BATCH' && (
@@ -237,12 +261,16 @@ export function TriggerDetails({ className, getTrigger, runID }: Props) {
                   </dl>
                 </div>
               </Card.Content>
-              {trigger?.payloads && type !== 'CRON' && (
+              {trigger?.payloads && (
                 <div className="border-muted border-t">
                   <CodeBlock
                     actions={codeBlockActions}
                     header={{
-                      title: trigger.isBatch ? 'Batch' : 'Event payload',
+                      title: trigger.isBatch
+                        ? 'Batch'
+                        : trigger.cron
+                        ? 'Cron payload'
+                        : 'Event payload',
                     }}
                     tab={{
                       content: prettyPayload ?? 'Unknown',

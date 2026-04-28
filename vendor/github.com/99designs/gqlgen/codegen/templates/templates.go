@@ -2,17 +2,14 @@ package templates
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"go/types"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"runtime"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,12 +18,12 @@ import (
 	"unicode"
 
 	"github.com/99designs/gqlgen/internal/code"
+
 	"github.com/99designs/gqlgen/internal/imports"
 )
 
-// CurrentImports keeps track of all the import declarations that are needed during the execution of
-// a plugin. this is done with a global because subtemplates currently get called in functions. Lets
-// aim to remove this eventually.
+// CurrentImports keeps track of all the import declarations that are needed during the execution of a plugin.
+// this is done with a global because subtemplates currently get called in functions. Lets aim to remove this eventually.
 var CurrentImports *Imports
 
 // Options specify various parameters to rendering a template.
@@ -56,14 +53,11 @@ type Options struct {
 	// FileNotice is notice written below the package line
 	FileNotice string
 	// Data will be passed to the template execution.
-	Data  any
+	Data  interface{}
 	Funcs template.FuncMap
 
 	// Packages cache, you can find me on config.Config
 	Packages *code.Packages
-
-	// PruneOptions configures import pruning and formatting behavior.
-	PruneOptions imports.PruneOptions
 }
 
 var (
@@ -78,12 +72,14 @@ var (
 // files inside the directory where you wrote the plugin.
 func Render(cfg Options) error {
 	if CurrentImports != nil {
-		panic(errors.New("recursive or concurrent call to RenderToFile detected"))
+		panic(fmt.Errorf("recursive or concurrent call to RenderToFile detected"))
 	}
 	CurrentImports = &Imports{packages: cfg.Packages, destDir: filepath.Dir(cfg.Filename)}
 
 	funcs := Funcs()
-	maps.Copy(funcs, cfg.Funcs)
+	for n, f := range cfg.Funcs {
+		funcs[n] = f
+	}
 
 	t := template.New("").Funcs(funcs)
 	t, err := parseTemplates(cfg, t)
@@ -91,41 +87,27 @@ func Render(cfg Options) error {
 		return err
 	}
 
-	var roots []string
-	if cfg.Template != "" {
-		// When a primary Template string is provided, only execute it.
-		// TemplateFS files are parsed solely to make their named templates available
-		// (e.g. callDirective, queryDirectives from directives.gotpl) but must
-		// not be executed as additional roots.
-		roots = []string{"template.gotpl"}
-	} else {
-		roots = make([]string, 0, len(t.Templates()))
-		for _, templ := range t.Templates() {
-			name := templ.Name()
-			// templates that end with _.gotpl are special files we don't want to include
-			if strings.HasSuffix(name, "_.gotpl") ||
-				// filter out templates added with {{ template xxx }} syntax inside the template file
-				!strings.HasSuffix(name, ".gotpl") {
-				continue
-			}
-			roots = append(roots, name)
+	roots := make([]string, 0, len(t.Templates()))
+	for _, template := range t.Templates() {
+		// templates that end with _.gotpl are special files we don't want to include
+		if strings.HasSuffix(template.Name(), "_.gotpl") ||
+			// filter out templates added with {{ template xxx }} syntax inside the template file
+			!strings.HasSuffix(template.Name(), ".gotpl") {
+			continue
 		}
+
+		roots = append(roots, template.Name())
 	}
 
 	// then execute all the important looking ones in order, adding them to the same file
-	sort.SliceStable(roots, func(i, j int) bool {
+	sort.Slice(roots, func(i, j int) bool {
 		// important files go first
-		if strings.HasSuffix(roots[i], "!.gotpl") &&
-			!strings.HasSuffix(roots[j], "!.gotpl") {
+		if strings.HasSuffix(roots[i], "!.gotpl") {
 			return true
 		}
-		if strings.HasSuffix(roots[j], "!.gotpl") &&
-			!strings.HasSuffix(roots[i], "!.gotpl") {
+		if strings.HasSuffix(roots[j], "!.gotpl") {
 			return false
 		}
-		// files that have identical names are sorted dependent on input order
-		// so we rely on SliceStable here to ensure deterministic results
-		// to avoid test failures
 		return roots[i] < roots[j]
 	})
 
@@ -166,7 +148,8 @@ func Render(cfg Options) error {
 	}
 	CurrentImports = nil
 
-	if err = write(cfg.Filename, result.Bytes(), cfg.Packages, cfg.PruneOptions); err != nil {
+	err = write(cfg.Filename, result.Bytes(), cfg.Packages)
+	if err != nil {
 		return err
 	}
 
@@ -181,15 +164,6 @@ func parseTemplates(cfg Options, t *template.Template) (*template.Template, erro
 		if err != nil {
 			return nil, fmt.Errorf("error with provided template: %w", err)
 		}
-		// Also parse TemplateFS so that named templates defined there (e.g.
-		// callDirective, queryDirectives from directives.gotpl) are available
-		// to the primary template. Render only executes "template.gotpl", so
-		// the TemplateFS files contribute named templates but no top-level output.
-		if cfg.TemplateFS != nil {
-			if t, err = t.ParseFS(cfg.TemplateFS, "*.gotpl"); err != nil {
-				return nil, fmt.Errorf("locating templates: %w", err)
-			}
-		}
 		return t, nil
 	}
 
@@ -198,7 +172,7 @@ func parseTemplates(cfg Options, t *template.Template) (*template.Template, erro
 		fileSystem = cfg.TemplateFS
 	} else {
 		// load path relative to calling source file
-		_, callerFile, _, _ := runtime.Caller(2)
+		_, callerFile, _, _ := runtime.Caller(1)
 		rootDir := filepath.Dir(callerFile)
 		fileSystem = os.DirFS(rootDir)
 	}
@@ -211,7 +185,7 @@ func parseTemplates(cfg Options, t *template.Template) (*template.Template, erro
 	return t, nil
 }
 
-func center(width int, pad, s string) string {
+func center(width int, pad string, s string) string {
 	if len(s)+2 > width {
 		return s
 	}
@@ -228,13 +202,10 @@ func Funcs() template.FuncMap {
 		"rawQuote":           rawQuote,
 		"dump":               Dump,
 		"ref":                ref,
-		"obj":                obj,
 		"ts":                 TypeIdentifier,
 		"call":               Call,
-		"dict":               dict,
 		"prefixLines":        prefixLines,
 		"notNil":             notNil,
-		"strSplit":           StrSplit,
 		"reserveImport":      CurrentImports.Reserve,
 		"lookupImport":       CurrentImports.Lookup,
 		"go":                 ToGo,
@@ -244,7 +215,7 @@ func Funcs() template.FuncMap {
 		"add": func(a, b int) int {
 			return a + b
 		},
-		"render": func(filename string, tpldata any) (*bytes.Buffer, error) {
+		"render": func(filename string, tpldata interface{}) (*bytes.Buffer, error) {
 			return render(resolveName(filename, 0), tpldata)
 		},
 	}
@@ -274,31 +245,45 @@ func isDelimiter(c rune) bool {
 }
 
 func ref(p types.Type) string {
-	typeString := CurrentImports.LookupType(p)
-	// TODO(steve): figure out why this is needed
-	// otherwise inconsistent sometimes
-	// see https://github.com/99designs/gqlgen/issues/3414#issuecomment-2822856422
-	if typeString == "interface{}" {
-		return "any"
-	}
-	if typeString == "map[string]interface{}" {
-		return "map[string]any"
-	}
-	// assuming that some other container interface{} type
-	// like []interface{} or something needs coercion to any
-	if strings.Contains(typeString, "interface{}") {
-		return strings.ReplaceAll(typeString, "interface{}", "any")
-	}
-	return typeString
+	return CurrentImports.LookupType(p)
 }
 
-func obj(obj types.Object) string {
-	pkg := CurrentImports.Lookup(obj.Pkg().Path())
-	if pkg != "" {
-		pkg += "."
-	}
+var pkgReplacer = strings.NewReplacer(
+	"/", "ᚋ",
+	".", "ᚗ",
+	"-", "ᚑ",
+	"~", "א",
+)
 
-	return pkg + obj.Name()
+func TypeIdentifier(t types.Type) string {
+	res := ""
+	for {
+		switch it := t.(type) {
+		case *types.Pointer:
+			t.Underlying()
+			res += "ᚖ"
+			t = it.Elem()
+		case *types.Slice:
+			res += "ᚕ"
+			t = it.Elem()
+		case *types.Named:
+			res += pkgReplacer.Replace(it.Obj().Pkg().Path())
+			res += "ᚐ"
+			res += it.Obj().Name()
+			return res
+		case *types.Basic:
+			res += it.Name()
+			return res
+		case *types.Map:
+			res += "map"
+			return res
+		case *types.Interface:
+			res += "interface"
+			return res
+		default:
+			panic(fmt.Errorf("unexpected type %T", it))
+		}
+	}
 }
 
 func Call(p *types.Func) string {
@@ -314,21 +299,6 @@ func Call(p *types.Func) string {
 	}
 
 	return pkg + p.Name()
-}
-
-func dict(values ...any) (map[string]any, error) {
-	if len(values)%2 != 0 {
-		return nil, errors.New("invalid dict call: arguments must be key-value pairs")
-	}
-	m := make(map[string]any, len(values)/2)
-	for i := 0; i < len(values); i += 2 {
-		key, ok := values[i].(string)
-		if !ok {
-			return nil, errors.New("dict keys must be strings")
-		}
-		m[key] = values[i+1]
-	}
-	return m, nil
 }
 
 func resetModelNames() {
@@ -360,27 +330,27 @@ func goModelName(primaryToGoFunc func(string) string, parts []string) string {
 		}
 
 		applyToGoFunc = func(parts []string) string {
+			var out string
 			switch len(parts) {
 			case 0:
 				return ""
 			case 1:
 				return primaryToGoFunc(parts[0])
 			default:
-				var out strings.Builder
-				out.WriteString(primaryToGoFunc(parts[0]))
-				for _, p := range parts[1:] {
-					out.WriteString(ToGo(p))
-				}
-				return out.String()
+				out = primaryToGoFunc(parts[0])
 			}
+			for _, p := range parts[1:] {
+				out = fmt.Sprintf("%s%s", out, ToGo(p))
+			}
+			return out
 		}
 
 		applyValidGoName = func(parts []string) string {
-			var out strings.Builder
+			var out string
 			for _, p := range parts {
-				out.WriteString(replaceInvalidCharacters(p))
+				out = fmt.Sprintf("%s%s", out, replaceInvalidCharacters(p))
 			}
-			return out.String()
+			return out
 		}
 	)
 
@@ -533,42 +503,21 @@ func wordWalker(str string, f func(*wordInfo)) {
 		}
 		i++
 
-		initialisms := GetInitialisms()
 		// [w,i) is a word.
 		word := string(runes[w:i])
-		if !eow && initialisms[word] && !unicode.IsLower(runes[i]) {
+		if !eow && commonInitialisms[word] && !unicode.IsLower(runes[i]) {
 			// through
 			// split IDFoo → ID, Foo
 			// but URLs → URLs
 		} else if !eow {
-			if initialisms[word] {
+			if commonInitialisms[word] {
 				hasCommonInitial = true
 			}
 			continue
 		}
 
 		matchCommonInitial := false
-		upperWord := strings.ToUpper(word)
-		if initialisms[upperWord] {
-			// If the uppercase word (string(runes[w:i]) is "ID" or "IP"
-			// AND
-			// the word is the first two characters of the current word
-			// AND
-			// that is not the end of the word
-			// AND
-			// the length of the remaining string is greater than 3
-			// AND
-			// the third rune is an uppercase one
-			// THEN
-			// do NOT count this as an initialism.
-			switch upperWord {
-			case "ID", "IP":
-				if remainingRunes := runes[w:]; word == string(remainingRunes[:2]) && !eow &&
-					len(remainingRunes) > 3 &&
-					unicode.IsUpper(remainingRunes[3]) {
-					continue
-				}
-			}
+		if commonInitialisms[strings.ToUpper(word)] {
 			hasCommonInitial = true
 			matchCommonInitial = true
 		}
@@ -616,174 +565,18 @@ var keywords = []string{
 
 // sanitizeKeywords prevents collisions with go keywords for arguments to resolver functions
 func sanitizeKeywords(name string) string {
-	if slices.Contains(keywords, name) {
-		return name + "Arg"
+	for _, k := range keywords {
+		if name == k {
+			return name + "Arg"
+		}
 	}
 	return name
 }
 
-func rawQuote(s string) string {
-	return "`" + strings.ReplaceAll(s, "`", "`+\"`\"+`") + "`"
-}
-
-func notNil(field string, data any) bool {
-	v := reflect.ValueOf(data)
-
-	if v.Kind() == reflect.Pointer {
-		v = v.Elem()
-	}
-	if v.Kind() != reflect.Struct {
-		return false
-	}
-	val := v.FieldByName(field)
-
-	return val.IsValid() && !val.IsNil()
-}
-
-func StrSplit(s, sep string) []string {
-	return strings.Split(s, sep)
-}
-
-func Dump(val any) string {
-	switch val := val.(type) {
-	case int:
-		return strconv.Itoa(val)
-	case int64:
-		return strconv.FormatInt(val, 10)
-	case float64:
-		return fmt.Sprintf("%f", val)
-	case string:
-		return strconv.Quote(val)
-	case bool:
-		return strconv.FormatBool(val)
-	case nil:
-		return "nil"
-	case []any:
-		var parts []string
-		for _, part := range val {
-			parts = append(parts, Dump(part))
-		}
-		return "[]any{" + strings.Join(parts, ",") + "}"
-	case map[string]any:
-		buf := bytes.Buffer{}
-		buf.WriteString("map[string]any{")
-		var keys []string
-		for key := range val {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-
-		for _, key := range keys {
-			data := val[key]
-
-			buf.WriteString(strconv.Quote(key))
-			buf.WriteString(":")
-			buf.WriteString(Dump(data))
-			buf.WriteString(",")
-		}
-		buf.WriteString("}")
-		return buf.String()
-	default:
-		panic(fmt.Errorf("unsupported type %T", val))
-	}
-}
-
-func prefixLines(prefix, s string) string {
-	return prefix + strings.ReplaceAll(s, "\n", "\n"+prefix)
-}
-
-func resolveName(name string, skip int) string {
-	if name[0] == '.' {
-		// load path relative to calling source file
-		_, callerFile, _, _ := runtime.Caller(skip + 1)
-		return filepath.Join(filepath.Dir(callerFile), name[1:])
-	}
-
-	// load path relative to this directory
-	_, callerFile, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(callerFile), name)
-}
-
-func render(filename string, tpldata any) (*bytes.Buffer, error) {
-	t := template.New("").Funcs(Funcs())
-
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	t, err = t.New(filepath.Base(filename)).Parse(string(b))
-	if err != nil {
-		panic(err)
-	}
-
-	buf := &bytes.Buffer{}
-	return buf, t.Execute(buf, tpldata)
-}
-
-func write(filename string, b []byte, packages *code.Packages, opts imports.PruneOptions) error {
-	err := os.MkdirAll(filepath.Dir(filename), 0o755)
-	if err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	formatted, err := imports.Prune(filename, b, packages, opts)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "gofmt failed on %s: %s\n", filepath.Base(filename), err.Error())
-		formatted = b
-	}
-
-	// Skip write if content is unchanged - preserves mtime for Go build cache
-	existing, readErr := os.ReadFile(filename)
-	if readErr == nil && bytes.Equal(existing, formatted) {
-		return nil
-	}
-
-	return os.WriteFile(filename, formatted, 0o644)
-}
-
-var pkgReplacer = strings.NewReplacer(
-	"/", "ᚋ",
-	".", "ᚗ",
-	"-", "ᚑ",
-	"~", "א",
-)
-
-func TypeIdentifier(t types.Type) string {
-	res := ""
-	for {
-		switch it := code.Unalias(t).(type) {
-		case *types.Pointer:
-			t.Underlying()
-			res += "ᚖ"
-			t = it.Elem()
-		case *types.Slice:
-			res += "ᚕ"
-			t = it.Elem()
-		case *types.Named:
-			res += pkgReplacer.Replace(it.Obj().Pkg().Path())
-			res += "ᚐ"
-			res += it.Obj().Name()
-			return res
-		case *types.Basic:
-			res += it.Name()
-			return res
-		case *types.Map:
-			res += "map"
-			return res
-		case *types.Interface:
-			res += "interface"
-			return res
-		default:
-			panic(fmt.Errorf("unexpected type %T", it))
-		}
-	}
-}
-
-// CommonInitialisms is a set of common initialisms.
+// commonInitialisms is a set of common initialisms.
 // Only add entries that are highly unlikely to be non-initialisms.
 // For instance, "ID" is fine (Freudian code is rare), but "AND" is not.
-var CommonInitialisms = map[string]bool{
+var commonInitialisms = map[string]bool{
 	"ACL":   true,
 	"API":   true,
 	"ASCII": true,
@@ -829,12 +622,119 @@ var CommonInitialisms = map[string]bool{
 	"XMPP":  true,
 	"XSRF":  true,
 	"XSS":   true,
-	"AWS":   true,
-	"GCP":   true,
 }
 
-// GetInitialisms returns the initialisms to capitalize in Go names. If unchanged, default
-// initialisms will be returned
-var GetInitialisms = func() map[string]bool {
-	return CommonInitialisms
+func rawQuote(s string) string {
+	return "`" + strings.ReplaceAll(s, "`", "`+\"`\"+`") + "`"
+}
+
+func notNil(field string, data interface{}) bool {
+	v := reflect.ValueOf(data)
+
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return false
+	}
+	val := v.FieldByName(field)
+
+	return val.IsValid() && !val.IsNil()
+}
+
+func Dump(val interface{}) string {
+	switch val := val.(type) {
+	case int:
+		return strconv.Itoa(val)
+	case int64:
+		return fmt.Sprintf("%d", val)
+	case float64:
+		return fmt.Sprintf("%f", val)
+	case string:
+		return strconv.Quote(val)
+	case bool:
+		return strconv.FormatBool(val)
+	case nil:
+		return "nil"
+	case []interface{}:
+		var parts []string
+		for _, part := range val {
+			parts = append(parts, Dump(part))
+		}
+		return "[]interface{}{" + strings.Join(parts, ",") + "}"
+	case map[string]interface{}:
+		buf := bytes.Buffer{}
+		buf.WriteString("map[string]interface{}{")
+		var keys []string
+		for key := range val {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			data := val[key]
+
+			buf.WriteString(strconv.Quote(key))
+			buf.WriteString(":")
+			buf.WriteString(Dump(data))
+			buf.WriteString(",")
+		}
+		buf.WriteString("}")
+		return buf.String()
+	default:
+		panic(fmt.Errorf("unsupported type %T", val))
+	}
+}
+
+func prefixLines(prefix, s string) string {
+	return prefix + strings.ReplaceAll(s, "\n", "\n"+prefix)
+}
+
+func resolveName(name string, skip int) string {
+	if name[0] == '.' {
+		// load path relative to calling source file
+		_, callerFile, _, _ := runtime.Caller(skip + 1)
+		return filepath.Join(filepath.Dir(callerFile), name[1:])
+	}
+
+	// load path relative to this directory
+	_, callerFile, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(callerFile), name)
+}
+
+func render(filename string, tpldata interface{}) (*bytes.Buffer, error) {
+	t := template.New("").Funcs(Funcs())
+
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err = t.New(filepath.Base(filename)).Parse(string(b))
+	if err != nil {
+		panic(err)
+	}
+
+	buf := &bytes.Buffer{}
+	return buf, t.Execute(buf, tpldata)
+}
+
+func write(filename string, b []byte, packages *code.Packages) error {
+	err := os.MkdirAll(filepath.Dir(filename), 0o755)
+	if err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	formatted, err := imports.Prune(filename, b, packages)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gofmt failed on %s: %s\n", filepath.Base(filename), err.Error())
+		formatted = b
+	}
+
+	err = os.WriteFile(filename, formatted, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to write %s: %w", filename, err)
+	}
+
+	return nil
 }

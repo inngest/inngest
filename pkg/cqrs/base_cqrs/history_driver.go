@@ -6,25 +6,24 @@ import (
 	"encoding/json"
 	"strings"
 
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewHistoryDriver(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) history.Driver {
+func NewHistoryDriver(adapter dbpkg.Adapter) history.Driver {
 	return historyDriver{
-		q: NewQueries(db, driver, o),
+		q: adapter.Q(),
 	}
 }
 
 type historyDriver struct {
-	q sqlc.Querier
+	q dbpkg.Querier
 }
 
 func (d historyDriver) Write(ctx context.Context, h history.History) (err error) {
-	params := sqlc.InsertHistoryParams{
+	params := dbpkg.InsertHistoryParams{
 		ID:              h.ID,
 		CreatedAt:       ulid.Time(h.ID.Time()),
 		RunStartedAt:    ulid.Time(h.RunID.Time()),
@@ -121,7 +120,7 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 		}
 
 		// Add a function ends row.
-		end := sqlc.InsertFunctionFinishParams{
+		end := dbpkg.InsertFunctionFinishParams{
 			RunID:     h.RunID,
 			Status:    sql.NullString{String: status.String(), Valid: true},
 			CreatedAt: sql.NullTime{Time: h.CreatedAt, Valid: true},

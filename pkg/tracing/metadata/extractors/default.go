@@ -6,4 +6,5 @@ var DefaultSpanExtractors = metadata.SpanExtractors{
 	NewAIMetadataExtractor(),
 	NewHTTPMetadataExtractor(),
 	NewResponseHeaderMetadataExtractor(),
+	NewExperimentMetadataExtractor(),
 }

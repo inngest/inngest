@@ -12,6 +12,7 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
+import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 
 type Props = {
@@ -70,6 +71,11 @@ export const TriggerInfo = ({ className, getTrigger, runID }: Props) => {
       return '';
     }
   }, [trigger?.payloads]);
+
+  const cronMetadata = useMemo(
+    () => getCronTriggerMetadata(trigger?.payloads),
+    [trigger?.payloads]
+  );
 
   let type = 'EVENT';
   if (trigger?.isBatch) {
@@ -150,6 +156,16 @@ export const TriggerInfo = ({ className, getTrigger, runID }: Props) => {
             <ElementWrapper label="Triggered at">
               {isPending ? <SkeletonElement /> : <TimeElement date={new Date(trigger.timestamp)} />}
             </ElementWrapper>
+            {cronMetadata.scheduledAt && (
+              <ElementWrapper label="Scheduled for">
+                {isPending ? <SkeletonElement /> : <TimeElement date={cronMetadata.scheduledAt} />}
+              </ElementWrapper>
+            )}
+            {cronMetadata.fireAt && (
+              <ElementWrapper label="Fired at">
+                {isPending ? <SkeletonElement /> : <TimeElement date={cronMetadata.fireAt} />}
+              </ElementWrapper>
+            )}
           </>
         )}
         {type === 'BATCH' && (
@@ -171,12 +187,12 @@ export const TriggerInfo = ({ className, getTrigger, runID }: Props) => {
         )}
       </dl>
 
-      {trigger?.payloads && type !== 'CRON' && (
+      {trigger?.payloads && (
         <div className="border-muted border-t">
           <CodeBlock
             actions={codeBlockActions}
             header={{
-              title: trigger.isBatch ? 'Batch' : 'Event payload',
+              title: trigger.isBatch ? 'Batch' : trigger.cron ? 'Cron payload' : 'Event payload',
             }}
             tab={{
               content: prettyPayload ?? 'Unknown',

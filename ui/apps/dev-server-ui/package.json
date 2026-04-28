@@ -42,6 +42,7 @@
     "react-dom": "^19.2.4",
     "react-redux": "^9.0.0",
     "sonner": "^2.0.0",
+    "srvx": "0.11.13",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -50,7 +51,6 @@
     "@graphql-codegen/typescript-operations": "5.1.0",
     "@graphql-codegen/typescript-rtk-query": "4.0.1",
     "@inngest/components": "workspace:*",
-    "@rsbuild/core": "2.0.1",
     "@tanstack/eslint-config": "0.4.0",
     "@types/node": "24.12.2",
     "@types/react": "19.2.14",
@@ -70,12 +70,13 @@
     "typescript-eslint": "8.59.0",
     "vite": "8.0.10",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "4.1.5"
+    "vitest": "4.1.5",
+    "@rsbuild/core": "2.0.1"
   },
   "engines": {
-    "node": "24.x",
+    "node": "20.x",
     "pnpm": "10.x"
   },
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@10.18.2",
   "private": true
 }

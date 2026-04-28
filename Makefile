@@ -43,7 +43,7 @@ e2e-golang: ## Run Go SDK e2e tests
 .PHONY: gen
 gen: ## Run all code generators
 	go generate ./...
-	make gql queries constraintapi-snapshots tygo
+	make gql schema-dump queries constraintapi-snapshots tygo
 
 .PHONY: protobuf
 protobuf: ## Generate protobuf files
@@ -53,6 +53,8 @@ protobuf: ## Generate protobuf files
 	buf generate --path proto/debug/v1 --template proto/debug/v1/buf.gen.yaml
 	buf generate --path proto/state/v2 --template proto/state/v2/buf.gen.yaml
 	buf generate --path proto/constraintapi/v1 --template proto/constraintapi/v1/buf.gen.yaml
+	go generate ./...
+	go mod tidy
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
@@ -62,6 +64,10 @@ queries: ## Generate sqlc queries
 	# header in the generated files under pkg/cqrs/base_cqrs/sqlc/**.
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.29.0
 	sqlc generate
+
+.PHONY: schema-dump
+schema-dump: ## Dump SQLite and Postgres schema files from migrations
+	go run ./tools/schema-dump
 
 .PHONY: snapshot
 snapshot: ## Build release snapshot

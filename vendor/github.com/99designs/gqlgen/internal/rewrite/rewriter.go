@@ -10,9 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/tools/go/packages"
-
 	"github.com/99designs/gqlgen/internal/code"
+	"golang.org/x/tools/go/packages"
 )
 
 type Rewriter struct {
@@ -63,12 +62,13 @@ func (r *Rewriter) getFile(filename string) string {
 		}
 
 		r.files[filename] = string(b)
+
 	}
 
 	return r.files[filename]
 }
 
-func (r *Rewriter) GetPrevDecl(structname, methodname string) *ast.FuncDecl {
+func (r *Rewriter) GetPrevDecl(structname string, methodname string) *ast.FuncDecl {
 	for _, f := range r.pkg.Syntax {
 		for _, d := range f.Decls {
 			d, isFunc := d.(*ast.FuncDecl)
@@ -99,33 +99,15 @@ func (r *Rewriter) GetPrevDecl(structname, methodname string) *ast.FuncDecl {
 	return nil
 }
 
-func (r *Rewriter) GetMethodComment(structname, methodname string) string {
+func (r *Rewriter) GetMethodComment(structname string, methodname string) string {
 	d := r.GetPrevDecl(structname, methodname)
-	if d != nil && d.Doc != nil {
-		comments := make([]string, len(d.Doc.List))
-
-		for i := range d.Doc.List {
-			c := d.Doc.List[i].Text
-
-			switch c[1] {
-			case '/':
-				//-style comment (no newline at the end)
-				c = c[2:]
-			case '*':
-				/*-style comment */
-				c = c[2 : len(c)-2]
-			}
-
-			comments[i] = c
-		}
-
-		return strings.Join(comments, "\n")
+	if d != nil {
+		return d.Doc.Text()
 	}
-
 	return ""
 }
 
-func (r *Rewriter) GetMethodBody(structname, methodname string) string {
+func (r *Rewriter) GetMethodBody(structname string, methodname string) string {
 	d := r.GetPrevDecl(structname, methodname)
 	if d != nil {
 		return r.getSource(d.Body.Pos()+1, d.Body.End()-1)

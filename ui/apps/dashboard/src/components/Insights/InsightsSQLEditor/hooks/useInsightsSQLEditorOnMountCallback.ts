@@ -61,7 +61,7 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
       ]);
 
       monaco.languages.registerDocumentFormattingEditProvider('sql', {
-        provideDocumentFormattingEdits: (model: { getFullModelRange: () => any; getValue: () => string }) => {
+        provideDocumentFormattingEdits: (model) => {
           return [
             {
               range: model.getFullModelRange(),

@@ -18,15 +18,14 @@ type FieldContext struct {
 	Parent *FieldContext
 	// The name of the type this field belongs to
 	Object string
-	// These are the args after processing, they can be mutated in middleware to change what the
-	// resolver will get.
-	Args map[string]any
+	// These are the args after processing, they can be mutated in middleware to change what the resolver will get.
+	Args map[string]interface{}
 	// The raw field
 	Field CollectedField
 	// The index of array in path.
 	Index *int
 	// The result object of resolver
-	Result any
+	Result interface{}
 	// IsMethod indicates if the resolver is a method
 	IsMethod bool
 	// IsResolver indicates if the field has a user-specified resolver
@@ -35,16 +34,16 @@ type FieldContext struct {
 	// Note that, the returned child FieldContext represents the context as it was
 	// before the execution of the field resolver. For example:
 	//
-	//	srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (any, error) {
+	//	srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (interface{}, error) {
 	//		fc := graphql.GetFieldContext(ctx)
-	//		opCtx := graphql.GetOperationContext(ctx)
+	//		op := graphql.GetOperationContext(ctx)
 	//		collected := graphql.CollectFields(opCtx, fc.Field.Selections, []string{"User"})
 	//
 	//		child, err := fc.Child(ctx, collected[0])
 	//		if err != nil {
 	//			return nil, err
 	//		}
-	//		fmt.Printf("child context %q with args: %v\n", child.Field.Name, child.Args)
+	//		fmt.Println("child context %q with args: %v", child.Field.Name, child.Args)
 	//
 	//		return next(ctx)
 	//	})
@@ -99,31 +98,12 @@ func WithFieldContext(ctx context.Context, rc *FieldContext) context.Context {
 	return context.WithValue(ctx, resolverCtx, rc)
 }
 
-// NewScalarFieldContext creates a FieldContext for scalar or enum fields that
-// have no child fields. The returned Child callback always returns (nil, childErr).
-func NewScalarFieldContext(
-	objectName string,
-	field CollectedField,
-	isMethod, isResolver bool,
-	childErr error,
-) (*FieldContext, error) {
-	return &FieldContext{
-		Object:     objectName,
-		Field:      field,
-		IsMethod:   isMethod,
-		IsResolver: isResolver,
-		Child: func(ctx context.Context, field CollectedField) (*FieldContext, error) {
-			return nil, childErr
-		},
-	}, nil
-}
-
-func equalPath(a, b ast.Path) bool {
+func equalPath(a ast.Path, b ast.Path) bool {
 	if len(a) != len(b) {
 		return false
 	}
 
-	for i := range a {
+	for i := 0; i < len(a); i++ {
 		if a[i] != b[i] {
 			return false
 		}

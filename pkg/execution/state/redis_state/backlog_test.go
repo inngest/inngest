@@ -1109,7 +1109,7 @@ func TestBacklogsByPartition(t *testing.T) {
 	defer rc.Close()
 
 	ctx := context.Background()
-	clock := clockwork.NewFakeClock()
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -1141,7 +1141,7 @@ func TestBacklogsByPartition(t *testing.T) {
 			from:          clock.Now(),
 			until:         clock.Now().Add(7 * time.Second).Truncate(time.Second),
 			interval:      time.Second,
-			expectedItems: 7,
+			expectedItems: 8,
 		},
 		{
 			name:          "with batch size",

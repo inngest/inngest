@@ -33,7 +33,7 @@ type UseAttachmentUploadOptions = {
 };
 
 export function useAttachmentUpload({
-  context = "chat",
+  context = "emailEntry",
   onError,
 }: UseAttachmentUploadOptions) {
   const getUploadUrlFn = useServerFn(getUploadUrl);

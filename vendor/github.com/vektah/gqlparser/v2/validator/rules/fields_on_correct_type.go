@@ -1,64 +1,40 @@
-package rules
+package validator
 
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
-	//nolint:staticcheck // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator/core"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator"
 )
 
-func ruleFuncFieldsOnCorrectType(observers *Events, addError AddErrFunc, disableSuggestion bool) {
-	observers.OnField(func(walker *Walker, field *ast.Field) {
-		if field.ObjectDefinition == nil || field.Definition != nil {
-			return
-		}
+func init() {
+	AddRule("FieldsOnCorrectType", func(observers *Events, addError AddErrFunc) {
+		observers.OnField(func(walker *Walker, field *ast.Field) {
+			if field.ObjectDefinition == nil || field.Definition != nil {
+				return
+			}
 
-		message := fmt.Sprintf(
-			`Cannot query field "%s" on type "%s".`,
-			field.Name,
-			field.ObjectDefinition.Name,
-		)
+			message := fmt.Sprintf(`Cannot query field "%s" on type "%s".`, field.Name, field.ObjectDefinition.Name)
 
-		if !disableSuggestion {
-			if suggestedTypeNames := getSuggestedTypeNames(
-				walker,
-				field.ObjectDefinition,
-				field.Name,
-			); suggestedTypeNames != nil {
-				message += " Did you mean to use an inline fragment on " + QuotedOrList(
-					suggestedTypeNames...) + "?"
-			} else if suggestedFieldNames := getSuggestedFieldNames(
-				field.ObjectDefinition,
-				field.Name,
-			); suggestedFieldNames != nil {
+			if suggestedTypeNames := getSuggestedTypeNames(walker, field.ObjectDefinition, field.Name); suggestedTypeNames != nil {
+				message += " Did you mean to use an inline fragment on " + QuotedOrList(suggestedTypeNames...) + "?"
+			} else if suggestedFieldNames := getSuggestedFieldNames(field.ObjectDefinition, field.Name); suggestedFieldNames != nil {
 				message += " Did you mean " + QuotedOrList(suggestedFieldNames...) + "?"
 			}
-		}
 
-		addError(
-			Message("%s", message),
-			At(field.Position),
-		)
+			addError(
+				Message(message),
+				At(field.Position),
+			)
+		})
 	})
 }
 
-var FieldsOnCorrectTypeRule = Rule{
-	Name: "FieldsOnCorrectType",
-	RuleFunc: func(observers *Events, addError AddErrFunc) {
-		ruleFuncFieldsOnCorrectType(observers, addError, false)
-	},
-}
-
-var FieldsOnCorrectTypeRuleWithoutSuggestions = Rule{
-	Name: "FieldsOnCorrectTypeWithoutSuggestions",
-	RuleFunc: func(observers *Events, addError AddErrFunc) {
-		ruleFuncFieldsOnCorrectType(observers, addError, true)
-	},
-}
-
-// Go through all the implementations of type, as well as the interfaces
+// Go through all of the implementations of type, as well as the interfaces
 // that they implement. If any of those types include the provided field,
 // suggest them, sorted by how often the type is referenced,  starting
 // with Interfaces.
@@ -99,7 +75,7 @@ func getSuggestedTypeNames(walker *Walker, parent *ast.Definition, name string) 
 		if diff != 0 {
 			return diff < 0
 		}
-		return typeA < typeB
+		return strings.Compare(typeA, typeB) < 0
 	})
 
 	return suggestedTypes
@@ -109,8 +85,8 @@ func getSuggestedTypeNames(walker *Walker, parent *ast.Definition, name string) 
 // where max is set to the slice’s length,
 // we ensure that appending elements results
 // in a slice backed by a distinct array.
-// This method prevents the shared array issue.
-func concatSlice(first, second []string) []string {
+// This method prevents the shared array issue
+func concatSlice(first []string, second []string) []string {
 	n := len(first)
 	return append(first[:n:n], second...)
 }

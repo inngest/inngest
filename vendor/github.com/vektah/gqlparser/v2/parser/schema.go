@@ -1,7 +1,8 @@
 package parser
 
 import (
-	. "github.com/vektah/gqlparser/v2/ast" //nolint:staticcheck // bad, yeah
+	//nolint:revive
+	. "github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/lexer"
 )
 
@@ -231,6 +232,7 @@ func (p *parser) parseFieldsDefinition() (FieldList, *CommentGroup) {
 
 func (p *parser) parseFieldDefinition() *FieldDefinition {
 	var def FieldDefinition
+	def.Position = p.peekPos()
 
 	desc := p.parseDescription()
 	if desc.text != "" {
@@ -240,7 +242,6 @@ func (p *parser) parseFieldDefinition() *FieldDefinition {
 
 	p.peek() // peek to set p.comment
 	def.AfterDescriptionComment = p.comment
-	def.Position = p.peekPos()
 	def.Name = p.parseName()
 	def.Arguments = p.parseArgumentDefs()
 	p.expect(lexer.Colon)
@@ -260,6 +261,7 @@ func (p *parser) parseArgumentDefs() ArgumentDefinitionList {
 
 func (p *parser) parseArgumentDef() *ArgumentDefinition {
 	var def ArgumentDefinition
+	def.Position = p.peekPos()
 
 	desc := p.parseDescription()
 	if desc.text != "" {
@@ -269,7 +271,6 @@ func (p *parser) parseArgumentDef() *ArgumentDefinition {
 
 	p.peek() // peek to set p.comment
 	def.AfterDescriptionComment = p.comment
-	def.Position = p.peekPos()
 	def.Name = p.parseName()
 	p.expect(lexer.Colon)
 	def.Type = p.parseTypeReference()
@@ -282,6 +283,7 @@ func (p *parser) parseArgumentDef() *ArgumentDefinition {
 
 func (p *parser) parseInputValueDef() *FieldDefinition {
 	var def FieldDefinition
+	def.Position = p.peekPos()
 
 	desc := p.parseDescription()
 	if desc.text != "" {
@@ -291,7 +293,6 @@ func (p *parser) parseInputValueDef() *FieldDefinition {
 
 	p.peek() // peek to set p.comment
 	def.AfterDescriptionComment = p.comment
-	def.Position = p.peekPos()
 	def.Name = p.parseName()
 	p.expect(lexer.Colon)
 	def.Type = p.parseTypeReference()
@@ -372,6 +373,7 @@ func (p *parser) parseEnumValuesDefinition() (EnumValueList, *CommentGroup) {
 
 func (p *parser) parseEnumValueDefinition() *EnumValueDefinition {
 	var def EnumValueDefinition
+	def.Position = p.peekPos()
 	desc := p.parseDescription()
 	if desc.text != "" {
 		def.BeforeDescriptionComment = desc.comment
@@ -380,7 +382,7 @@ func (p *parser) parseEnumValueDefinition() *EnumValueDefinition {
 
 	p.peek() // peek to set p.comment
 	def.AfterDescriptionComment = p.comment
-	def.Position = p.peekPos()
+
 	def.Name = p.parseName()
 	def.Directives = p.parseDirectives(true)
 

@@ -47,11 +47,13 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency",
-			Concurrency: []inngestgo.ConfigStepConcurrency{
-				{
-					Limit: 1,
-					Scope: enums.ConcurrencyScopeAccount,
-					Key:   inngestgo.StrPtr("'global'"),
+			Concurrency: &inngestgo.ConfigConcurrency{
+				Step: []inngestgo.ConfigStepConcurrency{
+					{
+						Limit: 1,
+						Scope: enums.ConcurrencyScopeAccount,
+						Key:   inngestgo.StrPtr("'global'"),
+					},
 				},
 			},
 		},
@@ -63,11 +65,13 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency-v2",
-			Concurrency: []inngestgo.ConfigStepConcurrency{
-				{
-					Limit: 1,
-					Scope: enums.ConcurrencyScopeAccount,
-					Key:   inngestgo.StrPtr("'global'"),
+			Concurrency: &inngestgo.ConfigConcurrency{
+				Step: []inngestgo.ConfigStepConcurrency{
+					{
+						Limit: 1,
+						Scope: enums.ConcurrencyScopeAccount,
+						Key:   inngestgo.StrPtr("'global'"),
+					},
 				},
 			},
 		},
