@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"go/types"
 	"path/filepath"
@@ -20,12 +19,6 @@ type ExecConfig struct {
 	// Only for follow-schema layout:
 	FilenameTemplate string `yaml:"filename_template,omitempty"` // String template with {name} as placeholder for base name.
 	DirName          string `yaml:"dir"`
-
-	// Maximum number of goroutines in concurrency to use when running multiple child resolvers
-	// Suppressing the number of goroutines generated can reduce memory consumption per request,
-	// but processing time may increase due to the reduced number of concurrences
-	// Default: 0 (unlimited)
-	WorkerLimit uint `yaml:"worker_limit"`
 }
 
 type ExecLayout string
@@ -33,8 +26,7 @@ type ExecLayout string
 var (
 	// Write all generated code to a single file.
 	ExecLayoutSingleFile ExecLayout = "single-file"
-	// Write generated code to a directory, generating one Go source file for each GraphQL schema
-	// file.
+	// Write generated code to a directory, generating one Go source file for each GraphQL schema file.
 	ExecLayoutFollowSchema ExecLayout = "follow-schema"
 )
 
@@ -46,17 +38,15 @@ func (r *ExecConfig) Check() error {
 	switch r.Layout {
 	case ExecLayoutSingleFile:
 		if r.Filename == "" {
-			return errors.New("filename must be specified when using single-file layout")
+			return fmt.Errorf("filename must be specified when using single-file layout")
 		}
 		if !strings.HasSuffix(r.Filename, ".go") {
-			return errors.New(
-				"filename should be path to a go source file when using single-file layout",
-			)
+			return fmt.Errorf("filename should be path to a go source file when using single-file layout")
 		}
 		r.Filename = abs(r.Filename)
 	case ExecLayoutFollowSchema:
 		if r.DirName == "" {
-			return errors.New("dir must be specified when using follow-schema layout")
+			return fmt.Errorf("dir must be specified when using follow-schema layout")
 		}
 		r.DirName = abs(r.DirName)
 	default:
@@ -64,9 +54,7 @@ func (r *ExecConfig) Check() error {
 	}
 
 	if strings.ContainsAny(r.Package, "./\\") {
-		return errors.New(
-			"package should be the output package name only, do not include the output filename",
-		)
+		return fmt.Errorf("package should be the output package name only, do not include the output filename")
 	}
 
 	if r.Package == "" && r.Dir() != "" {

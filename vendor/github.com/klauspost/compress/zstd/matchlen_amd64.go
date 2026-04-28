@@ -1,4 +1,5 @@
 //go:build amd64 && !appengine && !noasm && gc
+// +build amd64,!appengine,!noasm,gc
 
 // Copyright 2019+ Klaus Post. All rights reserved.
 // License information can be found in the LICENSE file.

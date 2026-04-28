@@ -16,6 +16,7 @@ package protobuf
 
 import (
 	"fmt"
+	"text/scanner"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/parser"
@@ -83,11 +84,11 @@ var (
 	importStruct = ast.NewImport(nil, "struct")
 )
 
-func (p *protoConverter) mapBuiltinPackage(file string) (found bool) {
+func (p *protoConverter) mapBuiltinPackage(pos scanner.Position, file string, required bool) (generate bool) {
 	// Map some builtin types to their JSON/CUE mappings.
 	switch file {
-	case "cue/cue.proto":
-		return true
+	case "gogoproto/gogo.proto":
+
 	case "google/protobuf/struct.proto":
 		p.setBuiltin("google.protobuf.Struct", func() ast.Expr {
 			return ast.NewStruct()
@@ -117,7 +118,7 @@ func (p *protoConverter) mapBuiltinPackage(file string) (found bool) {
 			return predeclared("number")
 		}, nil)
 
-		return true
+		return false
 
 	case "google/protobuf/empty.proto":
 		f := func() ast.Expr {
@@ -128,7 +129,7 @@ func (p *protoConverter) mapBuiltinPackage(file string) (found bool) {
 			)
 		}
 		p.setBuiltin("google.protobuf.Empty", f, pkgStruct)
-		return true
+		return false
 
 	case "google/protobuf/duration.proto":
 		f := func() ast.Expr {
@@ -136,7 +137,7 @@ func (p *protoConverter) mapBuiltinPackage(file string) (found bool) {
 			return ast.NewSel(time, "Duration")
 		}
 		p.setBuiltin("google.protobuf.Duration", f, pkgTime)
-		return true
+		return false
 
 	case "google/protobuf/timestamp.proto":
 		f := func() ast.Expr {
@@ -144,7 +145,7 @@ func (p *protoConverter) mapBuiltinPackage(file string) (found bool) {
 			return ast.NewSel(time, "Time")
 		}
 		p.setBuiltin("google.protobuf.Timestamp", f, pkgTime)
-		return true
+		return false
 
 	case "google/protobuf/any.proto":
 		// TODO: technically, the value should be `_` (anything), but that
@@ -159,7 +160,7 @@ func (p *protoConverter) mapBuiltinPackage(file string) (found bool) {
 	// The remaining fields of this object correspond to fields of the proto messsage. If the embedded message is well-known and has a custom JSON representation, that representation is assigned to the 'value' field.
 	"@type": string,
 }`, nil)
-		return true
+		return false
 
 	case "google/protobuf/wrappers.proto":
 		p.setBuiltinParse("google.protobuf.DoubleValue", `null | float`, nil)
@@ -171,12 +172,17 @@ func (p *protoConverter) mapBuiltinPackage(file string) (found bool) {
 		p.setBuiltinParse("google.protobuf.BoolValue", `null | bool`, nil)
 		p.setBuiltinParse("google.protobuf.StringValue", `null | string`, nil)
 		p.setBuiltinParse("google.protobuf.BytesValue", `null | bytes`, nil)
-		return true
+		return false
 
-		// case "google/protobuf/field_mask.proto":
-		// 	p.setBuiltin("google.protobuf.FieldMask", "protobuf.FieldMask", nil)
+	// case "google/protobuf/field_mask.proto":
+	// 	p.setBuiltin("google.protobuf.FieldMask", "protobuf.FieldMask", nil)
 
-		// 	protobuf.Any
+	// 	protobuf.Any
+
+	default:
+		if required {
+			failf(pos, "import %q not found", file)
+		}
 	}
-	return false
+	return true
 }

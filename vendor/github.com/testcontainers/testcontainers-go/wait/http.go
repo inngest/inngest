@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moby/moby/api/types/network"
+	"github.com/docker/go-connections/nat"
 )
 
 // Implement interface
@@ -28,7 +28,7 @@ type HTTPStrategy struct {
 	timeout *time.Duration
 
 	// additional properties
-	Port                   network.Port
+	Port                   nat.Port
 	Path                   string
 	StatusCodeMatcher      func(status int) bool
 	ResponseMatcher        func(body io.Reader) bool
@@ -44,10 +44,10 @@ type HTTPStrategy struct {
 	ForceIPv4LocalHost     bool
 }
 
-// NewHTTPStrategy constructs an HTTP strategy waiting on port 80 and status code 200
+// NewHTTPStrategy constructs a HTTP strategy waiting on port 80 and status code 200
 func NewHTTPStrategy(path string) *HTTPStrategy {
 	return &HTTPStrategy{
-		Port:                   network.Port{},
+		Port:                   "",
 		Path:                   path,
 		StatusCodeMatcher:      defaultStatusCodeMatcher,
 		ResponseMatcher:        func(_ io.Reader) bool { return true },
@@ -78,10 +78,8 @@ func (ws *HTTPStrategy) WithStartupTimeout(timeout time.Duration) *HTTPStrategy 
 
 // WithPort set the port to wait for.
 // Default is the lowest numbered port.
-func (ws *HTTPStrategy) WithPort(port string) *HTTPStrategy {
-	if p, err := network.ParsePort(port); err == nil {
-		ws.Port = p
-	}
+func (ws *HTTPStrategy) WithPort(port nat.Port) *HTTPStrategy {
+	ws.Port = port
 	return ws
 }
 
@@ -156,21 +154,6 @@ func (ws *HTTPStrategy) Timeout() *time.Duration {
 	return ws.timeout
 }
 
-// String returns a human-readable description of the wait strategy.
-func (ws *HTTPStrategy) String() string {
-	proto := "HTTP"
-	if ws.UseTLS {
-		proto = "HTTPS"
-	}
-
-	port := "default"
-	if !ws.Port.IsZero() {
-		port = ws.Port.Port()
-	}
-
-	return fmt.Sprintf("%s %s request on port %s path %q", proto, ws.Method, port, ws.Path)
-}
-
 // WaitUntilReady implements Strategy.WaitUntilReady
 func (ws *HTTPStrategy) WaitUntilReady(ctx context.Context, target StrategyTarget) error {
 	timeout := defaultStartupTimeout()
@@ -190,9 +173,8 @@ func (ws *HTTPStrategy) WaitUntilReady(ctx context.Context, target StrategyTarge
 		ipAddress = strings.Replace(ipAddress, "localhost", "127.0.0.1", 1)
 	}
 
-	var mappedPort network.Port
-	if ws.Port.IsZero() {
-		// No specific port requested; inspect container to find lowest exposed TCP port.
+	var mappedPort nat.Port
+	if ws.Port == "" {
 		// We wait one polling interval before we grab the ports
 		// otherwise they might not be bound yet on startup.
 		select {
@@ -212,29 +194,28 @@ func (ws *HTTPStrategy) WaitUntilReady(ctx context.Context, target StrategyTarge
 		}
 
 		// Find the lowest numbered exposed tcp port.
-		var lowestPort network.Port
+		var lowestPort nat.Port
 		var hostPort string
 		for port, bindings := range inspect.NetworkSettings.Ports {
 			if len(bindings) == 0 || port.Proto() != "tcp" {
 				continue
 			}
 
-			if lowestPort.IsZero() || port.Num() < lowestPort.Num() {
+			if lowestPort == "" || port.Int() < lowestPort.Int() {
 				lowestPort = port
 				hostPort = bindings[0].HostPort
 			}
 		}
 
-		if lowestPort.IsZero() {
+		if lowestPort == "" {
 			return errors.New("no exposed tcp ports or mapped ports - cannot wait for status")
 		}
 
-		hPort, _ := strconv.ParseUint(hostPort, 10, 16)
-		mappedPort, _ = network.PortFrom(uint16(hPort), lowestPort.Proto())
+		mappedPort, _ = nat.NewPort(lowestPort.Proto(), hostPort)
 	} else {
-		// Specific port requested; use MappedPort to resolve it.
-		mappedPort, err = target.MappedPort(ctx, ws.Port.String())
-		for mappedPort.IsZero() {
+		mappedPort, err = target.MappedPort(ctx, ws.Port)
+
+		for mappedPort == "" {
 			select {
 			case <-ctx.Done():
 				return fmt.Errorf("%w: %w", ctx.Err(), err)
@@ -243,7 +224,7 @@ func (ws *HTTPStrategy) WaitUntilReady(ctx context.Context, target StrategyTarge
 					return err
 				}
 
-				mappedPort, err = target.MappedPort(ctx, ws.Port.String())
+				mappedPort, err = target.MappedPort(ctx, ws.Port)
 			}
 		}
 
@@ -293,7 +274,7 @@ func (ws *HTTPStrategy) WaitUntilReady(ctx context.Context, target StrategyTarge
 	}
 
 	client := http.Client{Transport: tripper, Timeout: time.Second}
-	address := net.JoinHostPort(ipAddress, mappedPort.Port())
+	address := net.JoinHostPort(ipAddress, strconv.Itoa(mappedPort.Int()))
 
 	endpoint, err := url.Parse(ws.Path)
 	if err != nil {

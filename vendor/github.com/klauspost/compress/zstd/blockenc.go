@@ -78,7 +78,6 @@ func (b *blockEnc) initNewEncode() {
 	b.recentOffsets = [3]uint32{1, 4, 8}
 	b.litEnc.Reuse = huff0.ReusePolicyNone
 	b.coders.setPrev(nil, nil, nil)
-	b.dictLitEnc = nil
 }
 
 // reset will reset the block for a new encode, but in the same stream,

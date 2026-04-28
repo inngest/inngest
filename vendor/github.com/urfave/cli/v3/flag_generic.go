@@ -17,8 +17,10 @@ func (f genericValue) Create(val Value, p *Value, c NoConfig) Value {
 }
 
 func (f genericValue) ToString(b Value) string {
-	f.val = b
-	return f.String()
+	if b != nil {
+		return b.String()
+	}
+	return ""
 }
 
 // Below functions are to satisfy the flag.Value interface

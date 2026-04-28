@@ -3,17 +3,13 @@ package executor
 import (
 	"context"
 
+	"github.com/99designs/gqlgen/graphql"
+	"github.com/99designs/gqlgen/graphql/errcode"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"github.com/vektah/gqlparser/v2/parser"
 	"github.com/vektah/gqlparser/v2/validator"
-	"github.com/vektah/gqlparser/v2/validator/rules"
-
-	"github.com/99designs/gqlgen/graphql"
-	"github.com/99designs/gqlgen/graphql/errcode"
 )
-
-const parserTokenNoLimit = 0
 
 // Executor executes graphql queries against a schema.
 type Executor struct {
@@ -23,11 +19,7 @@ type Executor struct {
 
 	errorPresenter graphql.ErrorPresenterFunc
 	recoverFunc    graphql.RecoverFunc
-	queryCache     graphql.Cache[*ast.QueryDocument]
-
-	parserTokenLimit  int
-	disableSuggestion bool
-	defaultRulesFn    func() *rules.Rules
+	queryCache     graphql.Cache
 }
 
 var _ graphql.GraphExecutor = &Executor{}
@@ -36,26 +28,20 @@ var _ graphql.GraphExecutor = &Executor{}
 // recovery callbacks, and no query cache or extensions.
 func New(es graphql.ExecutableSchema) *Executor {
 	e := &Executor{
-		es:               es,
-		errorPresenter:   graphql.DefaultErrorPresenter,
-		recoverFunc:      graphql.DefaultRecover,
-		queryCache:       graphql.NoCache[*ast.QueryDocument]{},
-		ext:              processExtensions(nil),
-		parserTokenLimit: parserTokenNoLimit,
+		es:             es,
+		errorPresenter: graphql.DefaultErrorPresenter,
+		recoverFunc:    graphql.DefaultRecover,
+		queryCache:     graphql.NoCache{},
+		ext:            processExtensions(nil),
 	}
 	return e
-}
-
-// SetDefaultRulesFn is to customize the Default GraphQL Validation Rules
-func (e *Executor) SetDefaultRulesFn(f func() *rules.Rules) {
-	e.defaultRulesFn = f
 }
 
 func (e *Executor) CreateOperationContext(
 	ctx context.Context,
 	params *graphql.RawParams,
 ) (*graphql.OperationContext, gqlerror.List) {
-	opCtx := &graphql.OperationContext{
+	rc := &graphql.OperationContext{
 		DisableIntrospection:   true,
 		RecoverFunc:            e.recoverFunc,
 		ResolverMiddleware:     e.ext.fieldMiddleware,
@@ -65,63 +51,60 @@ func (e *Executor) CreateOperationContext(
 			OperationStart: graphql.GetStartTime(ctx),
 		},
 	}
-	ctx = graphql.WithOperationContext(ctx, opCtx)
+	ctx = graphql.WithOperationContext(ctx, rc)
 
 	for _, p := range e.ext.operationParameterMutators {
 		if err := p.MutateOperationParameters(ctx, params); err != nil {
-			return opCtx, gqlerror.List{err}
+			return rc, gqlerror.List{err}
 		}
 	}
 
-	opCtx.RawQuery = params.Query
-	opCtx.OperationName = params.OperationName
-	opCtx.Extensions = params.Extensions
-	opCtx.Headers = params.Headers
+	rc.RawQuery = params.Query
+	rc.OperationName = params.OperationName
+	rc.Headers = params.Headers
 
 	var listErr gqlerror.List
-	opCtx.Doc, listErr = e.parseQuery(ctx, &opCtx.Stats, params.Query)
+	rc.Doc, listErr = e.parseQuery(ctx, &rc.Stats, params.Query)
 	if len(listErr) != 0 {
-		return opCtx, listErr
+		return rc, listErr
 	}
 
-	opCtx.Operation = opCtx.Doc.Operations.ForName(params.OperationName)
-	if opCtx.Operation == nil {
+	rc.Operation = rc.Doc.Operations.ForName(params.OperationName)
+	if rc.Operation == nil {
 		err := gqlerror.Errorf("operation %s not found", params.OperationName)
 		errcode.Set(err, errcode.ValidationFailed)
-		return opCtx, gqlerror.List{err}
+		return rc, gqlerror.List{err}
 	}
 
 	var err error
-	opCtx.Variables, err = validator.VariableValues(
-		e.es.Schema(),
-		opCtx.Operation,
-		params.Variables,
-	)
+	rc.Variables, err = validator.VariableValues(e.es.Schema(), rc.Operation, params.Variables)
+
 	if err != nil {
 		gqlErr, ok := err.(*gqlerror.Error)
 		if ok {
 			errcode.Set(gqlErr, errcode.ValidationFailed)
-			return opCtx, gqlerror.List{gqlErr}
+			return rc, gqlerror.List{gqlErr}
 		}
 	}
-	opCtx.Stats.Validation.End = graphql.Now()
+	rc.Stats.Validation.End = graphql.Now()
 
 	for _, p := range e.ext.operationContextMutators {
-		if err := p.MutateOperationContext(ctx, opCtx); err != nil {
-			return opCtx, gqlerror.List{err}
+		if err := p.MutateOperationContext(ctx, rc); err != nil {
+			return rc, gqlerror.List{err}
 		}
 	}
 
-	return opCtx, nil
+	return rc, nil
 }
 
 func (e *Executor) DispatchOperation(
 	ctx context.Context,
-	opCtx *graphql.OperationContext,
+	rc *graphql.OperationContext,
 ) (graphql.ResponseHandler, context.Context) {
-	innerCtx := graphql.WithOperationContext(ctx, opCtx)
+	ctx = graphql.WithOperationContext(ctx, rc)
 
-	res := e.ext.operationMiddleware(innerCtx, func(ctx context.Context) graphql.ResponseHandler {
+	var innerCtx context.Context
+	res := e.ext.operationMiddleware(ctx, func(ctx context.Context) graphql.ResponseHandler {
 		innerCtx = ctx
 
 		tmpResponseContext := graphql.WithResponseContext(ctx, e.errorPresenter, e.recoverFunc)
@@ -169,11 +152,11 @@ func (e *Executor) DispatchError(ctx context.Context, list gqlerror.List) *graph
 	return resp
 }
 
-func (e *Executor) PresentRecoveredError(ctx context.Context, err any) error {
+func (e *Executor) PresentRecoveredError(ctx context.Context, err interface{}) error {
 	return e.errorPresenter(ctx, e.recoverFunc(ctx, err))
 }
 
-func (e *Executor) SetQueryCache(cache graphql.Cache[*ast.QueryDocument]) {
+func (e *Executor) SetQueryCache(cache graphql.Cache) {
 	e.queryCache = cache
 }
 
@@ -183,14 +166,6 @@ func (e *Executor) SetErrorPresenter(f graphql.ErrorPresenterFunc) {
 
 func (e *Executor) SetRecoverFunc(f graphql.RecoverFunc) {
 	e.recoverFunc = f
-}
-
-func (e *Executor) SetParserTokenLimit(limit int) {
-	e.parserTokenLimit = limit
-}
-
-func (e *Executor) SetDisableSuggestion(value bool) {
-	e.disableSuggestion = value
 }
 
 // parseQuery decodes the incoming query and validates it, pulling from cache if present.
@@ -210,10 +185,10 @@ func (e *Executor) parseQuery(
 
 		stats.Parsing.End = now
 		stats.Validation.Start = now
-		return doc, nil
+		return doc.(*ast.QueryDocument), nil
 	}
 
-	doc, err := parser.ParseQueryWithTokenLimit(&ast.Source{Input: query}, e.parserTokenLimit)
+	doc, err := parser.ParseQuery(&ast.Source{Input: query})
 	if err != nil {
 		gqlErr, ok := err.(*gqlerror.Error)
 		if ok {
@@ -225,34 +200,14 @@ func (e *Executor) parseQuery(
 
 	stats.Validation.Start = graphql.Now()
 
-	if doc == nil || len(doc.Operations) == 0 {
+	if len(doc.Operations) == 0 {
 		err = gqlerror.Errorf("no operation provided")
 		gqlErr, _ := err.(*gqlerror.Error)
 		errcode.Set(err, errcode.ValidationFailed)
 		return nil, gqlerror.List{gqlErr}
 	}
 
-	var currentRules *rules.Rules
-	if e.defaultRulesFn == nil {
-		currentRules = rules.NewDefaultRules()
-	} else {
-		currentRules = e.defaultRulesFn()
-	}
-	// Customise rules as required
-	// TODO(steve): consider currentRules.RemoveRule(rules.MaxIntrospectionDepth.Name)
-
-	// swap out the FieldsOnCorrectType rule with one that doesn't provide suggestions
-	if e.disableSuggestion {
-		currentRules.RemoveRule("FieldsOnCorrectType")
-		rule := rules.FieldsOnCorrectTypeRuleWithoutSuggestions
-		currentRules.AddRule(rule.Name, rule.RuleFunc)
-	} else { // or vice versa
-		currentRules.RemoveRule("FieldsOnCorrectTypeWithoutSuggestions")
-		rule := rules.FieldsOnCorrectTypeRule
-		currentRules.AddRule(rule.Name, rule.RuleFunc)
-	}
-
-	listErr := validator.ValidateWithRules(e.es.Schema(), doc, currentRules)
+	listErr := validator.Validate(e.es.Schema(), doc)
 	if len(listErr) != 0 {
 		for _, e := range listErr {
 			errcode.Set(e, errcode.ValidationFailed)

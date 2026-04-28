@@ -15,18 +15,20 @@
 package textproto
 
 import (
-	"strconv"
+	"fmt"
 	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/encoding/protobuf/pbinternal"
 
+	"github.com/protocolbuffers/txtpbfmt/ast"
 	pbast "github.com/protocolbuffers/txtpbfmt/ast"
 	"github.com/protocolbuffers/txtpbfmt/parser"
 )
 
 // Encoder marshals CUE into text proto.
+//
 type Encoder struct {
 	// Schema
 }
@@ -45,6 +47,7 @@ func NewEncoder(options ...Option) *Encoder {
 //   - it is explicitly required that only fields with an attribute are exported
 //   - a struct represents a Protobuf map
 //   - custom naming
+//
 func (e *Encoder) Encode(v cue.Value, options ...Option) ([]byte, error) {
 	n := &pbast.Node{}
 	enc := &encoder{}
@@ -118,11 +121,11 @@ func (e *encoder) encodeMsg(parent *pbast.Node, v cue.Value) {
 				var key *pbast.Node
 				switch info.KeyType {
 				case pbinternal.String, pbinternal.Bytes:
-					key = pbast.StringNode("key", i.Selector().Unquoted())
+					key = pbast.StringNode("key", i.Label())
 				default:
 					key = &pbast.Node{
 						Name:   "key",
-						Values: []*pbast.Value{{Value: i.Selector().Unquoted()}},
+						Values: []*ast.Value{{Value: i.Label()}},
 					}
 				}
 				n.Children = append(n.Children, key)
@@ -150,7 +153,7 @@ func (e *encoder) encodeMsg(parent *pbast.Node, v cue.Value) {
 func copyMeta(x *pbast.Node, v cue.Value) {
 	for _, doc := range v.Doc() {
 		s := strings.TrimRight(doc.Text(), "\n")
-		for c := range strings.SplitSeq(s, "\n") {
+		for _, c := range strings.Split(s, "\n") {
 			x.PreComments = append(x.PreComments, "# "+c)
 		}
 	}
@@ -179,11 +182,7 @@ func (e *encoder) encodeValue(n *pbast.Node, v cue.Value) {
 		n.Values = append(n.Values, sn.Values...)
 
 	case cue.BoolKind:
-		t, err := v.Bool()
-		if err != nil {
-			e.addErr(err)
-		}
-		value = strconv.FormatBool(t)
+		value = fmt.Sprint(v)
 		n.Values = append(n.Values, &pbast.Value{Value: value})
 
 	case cue.IntKind, cue.FloatKind, cue.NumberKind:

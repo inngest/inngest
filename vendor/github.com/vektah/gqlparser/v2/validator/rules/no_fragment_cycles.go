@@ -1,17 +1,17 @@
-package rules
+package validator
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
-	//nolint:staticcheck // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator/core"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator"
 )
 
-var NoFragmentCyclesRule = Rule{
-	Name: "NoFragmentCycles",
-	RuleFunc: func(observers *Events, addError AddErrFunc) {
+func init() {
+	AddRule("NoFragmentCycles", func(observers *Events, addError AddErrFunc) {
 		visitedFrags := make(map[string]bool)
 
 		observers.OnFragment(func(walker *Walker, fragment *ast.FragmentDefinition) {
@@ -54,11 +54,7 @@ var NoFragmentCyclesRule = Rule{
 							via = fmt.Sprintf(" via %s", strings.Join(fragmentNames, ", "))
 						}
 						addError(
-							Message(
-								`Cannot spread fragment "%s" within itself%s.`,
-								spreadName,
-								via,
-							),
+							Message(`Cannot spread fragment "%s" within itself%s.`, spreadName, via),
 							At(spreadNode.Position),
 						)
 					}
@@ -71,7 +67,7 @@ var NoFragmentCyclesRule = Rule{
 
 			recursive(fragment)
 		})
-	},
+	})
 }
 
 func getFragmentSpreads(node ast.SelectionSet) []*ast.FragmentSpread {

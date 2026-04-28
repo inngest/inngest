@@ -15,7 +15,7 @@
 package compile
 
 import (
-	"github.com/cockroachdb/apd/v3"
+	"github.com/cockroachdb/apd/v2"
 	"golang.org/x/text/unicode/norm"
 
 	"cuelang.org/go/cue/ast"
@@ -44,7 +44,7 @@ func (c *compiler) label(n ast.Node) adt.Feature {
 				return adt.InvalidLabel
 			}
 
-			i := index.StringToIndex(norm.NFC.String(s))
+			i := int64(index.StringToIndex(norm.NFC.String(s)))
 			f, err := adt.MakeLabel(n, i, adt.StringLabel)
 			if err != nil {
 				c.errf(n, msg, err)
@@ -119,7 +119,7 @@ func (l *fieldLabel) labelString() string {
 	case *ast.BasicLit:
 		if x.Kind == token.STRING {
 			s, err := literal.Unquote(x.Value)
-			if err == nil && !ast.StringLabelNeedsQuoting(s) {
+			if err == nil && ast.IsValidIdent(s) {
 				return s
 			}
 		}
@@ -147,11 +147,4 @@ type letScope ast.LetClause
 func (l *letScope) labelString() string {
 	// TODO: include more info in square brackets.
 	return "let[]"
-}
-
-type tryScope ast.TryClause
-
-func (t *tryScope) labelString() string {
-	// TODO: include more info in square brackets.
-	return "try[]"
 }

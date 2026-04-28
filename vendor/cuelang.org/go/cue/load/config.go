@@ -15,13 +15,12 @@
 package load
 
 import (
-	"context"
-	"fmt"
 	"io"
-	"io/fs"
 	"os"
+	pathpkg "path"
 	"path/filepath"
-	"runtime"
+	goruntime "runtime"
+	"strings"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
@@ -29,16 +28,16 @@ import (
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal"
-	"cuelang.org/go/internal/mod/modpkgload"
-	"cuelang.org/go/mod/modconfig"
-	"cuelang.org/go/mod/modfile"
-	"cuelang.org/go/mod/module"
+	"cuelang.org/go/internal/core/compile"
+	"cuelang.org/go/internal/core/eval"
+	"cuelang.org/go/internal/core/runtime"
 )
 
 const (
 	cueSuffix  = ".cue"
 	modDir     = "cue.mod"
-	moduleFile = "module.cue"
+	configFile = "module.cue"
+	pkgDir     = "pkg"
 )
 
 // FromArgsUsage is a partial usage message that applications calling
@@ -104,7 +103,7 @@ const FromArgsUsage = `
    selects all packages named foo in the any subdirectory of the current
    working directory.
 
-3. An import path referring to a directory within the current module
+   3. An import path referring to a directory within the current module
 
    All CUE files in that directory, and all the ancestor directories up to the
    module root (if applicable), with a package name corresponding to the base
@@ -112,7 +111,7 @@ const FromArgsUsage = `
    a single instance.
 
    Examples, assume a module name of acme.org/root:
-      mod.test/foo   package in cue.mod
+      example.com/foo   package in cue.mod
       ./foo             package corresponding to foo directory
       .:bar             package in current directory with package name bar
 `
@@ -129,34 +128,21 @@ type Config struct {
 	// packages at loading time.
 
 	// Context specifies the context for the load operation.
+	// If the context is cancelled, the loader may stop early
+	// and return an ErrCancelled error.
+	// If Context is nil, the load cannot be cancelled.
 	Context *build.Context
 
-	// ModuleRoot is the directory that contains the cue.mod directory
-	// as well as all the packages which form part of the module being loaded.
-	//
-	// If left as the empty string, a module root is found by walking parent directories
-	// starting from [Config.Dir] until one is found containing a cue.mod directory.
-	// If it is a relative path, it will be interpreted relative to [Config.Dir].
+	loader *loader
+
+	// A Module is a collection of packages and instances that are within the
+	// directory hierarchy rooted at the module root. The module root can be
+	// marked with a cue.mod file.
 	ModuleRoot string
 
 	// Module specifies the module prefix. If not empty, this value must match
 	// the module field of an existing cue.mod file.
 	Module string
-
-	// AcceptLegacyModules causes the module resolution code
-	// to accept module files that lack a language.version field.
-	AcceptLegacyModules bool
-
-	// modFile holds the contents of the module file, or nil
-	// if no module file was present. If non-nil, then
-	// after calling Config.complete, modFile.Module will be
-	// equal to Module.
-	modFile *modfile.File
-
-	// parserConfig holds the configuration that will be passed
-	// when parsing CUE files. It includes the version from
-	// the module file.
-	parserConfig parser.Config
 
 	// Package defines the name of the package to be loaded. If this is not set,
 	// the package must be uniquely defined from its context. Special values:
@@ -165,15 +151,9 @@ type Config struct {
 	//         in the _ package.
 	Package string
 
-	// Dir is the base directory for import path resolution.
-	// For example, it is used to determine the main module,
-	// and rooted import paths starting with "./" are relative to it.
-	// If Dir is empty, the current directory is used.
-	//
-	// When using an Overlay with file entries such as "/foo/bar/baz.cue",
-	// you can use an absolute path that is a parent of one of the overlaid files,
-	// such as in this case "/foo" or "/foo/bar", even if these directories
-	// do not exist in the host filesystem.
+	// Dir is the directory in which to run the build system's query tool
+	// that provides information about the packages.
+	// If Dir is empty, the tool is run in the current directory.
 	Dir string
 
 	// Tags defines boolean tags or key-value pairs to select files to build
@@ -250,6 +230,10 @@ type Config struct {
 	// Include all files, regardless of tags.
 	AllCUEFiles bool
 
+	// Deprecated: use Tags
+	BuildTags   []string
+	releaseTags []string
+
 	// If Tests is set, the loader includes not just the packages
 	// matching a particular pattern but also any related test packages.
 	Tests bool
@@ -258,16 +242,18 @@ type Config struct {
 	// a package.
 	Tools bool
 
-	// SkipImports causes the loading to ignore all imports and dependencies.
-	// The registry will never be consulted. Any external package paths
-	// mentioned on the command line will result in an error.
-	// The [cue/build.Instance.Imports] field will be empty.
-	SkipImports bool
+	// filesMode indicates that files are specified
+	// explicitly on the command line.
+	filesMode bool
 
 	// If DataFiles is set, the loader includes entries for directories that
 	// have no CUE files, but have recognized data files that could be converted
 	// to CUE.
 	DataFiles bool
+
+	// StdRoot specifies an alternative directory for standard libaries.
+	// This is mostly used for bootstrapping.
+	StdRoot string
 
 	// ParseFile is called to read and parse each file when preparing a
 	// package's syntax tree. It must be safe to call ParseFile simultaneously
@@ -280,40 +266,20 @@ type Config struct {
 	// An application may supply a custom implementation of ParseFile to change
 	// the effective file contents or the behavior of the parser, or to modify
 	// the syntax tree.
-	ParseFile func(name string, src interface{}, cfg parser.Config) (*ast.File, error)
+	ParseFile func(name string, src interface{}) (*ast.File, error)
 
-	// Overlay provides a mapping of absolute file paths to file contents,
-	// which are overlaid on top of the host operating system when loading files.
-	//
-	// If an overlaid file already exists in the host filesystem,
-	// the overlaid file contents will be used in its place.
-	// If an overlaid file does not exist in the host filesystem,
-	// the loader behaves as if the overlaid file exists with its contents,
-	// and that that all of its parent directories exist too.
+	// Overlay provides a mapping of absolute file paths to file contents.  If
+	// the file with the given path already exists, the parser will use the
+	// alternative file contents provided by the map.
 	Overlay map[string]Source
 
 	// Stdin defines an alternative for os.Stdin for the file "-". When used,
 	// the corresponding build.File will be associated with the full buffer.
 	Stdin io.Reader
 
-	// Registry is used to fetch CUE module dependencies.
-	//
-	// When nil, [modconfig.NewRegistry] will be used to create a
-	// registry instance using the variables set in [Config.Env]
-	// as documented in `[cue help registryconfig]`.
-	//
-	// THIS IS EXPERIMENTAL. API MIGHT CHANGE.
-	//
-	// [cue help registryconfig]: https://cuelang.org/docs/reference/command/cue-help-registryconfig/
-	Registry modconfig.Registry
+	fileSystem
 
-	// Env provides environment variables for use in the configuration.
-	// Currently this is only used in the construction of the Registry
-	// value (see above). If this is nil, the current process's environment
-	// will be used.
-	Env []string
-
-	fileSystem *fileSystem
+	loadFunc build.LoadFunc
 }
 
 func (c *Config) stdin() io.Reader {
@@ -323,37 +289,210 @@ func (c *Config) stdin() io.Reader {
 	return c.Stdin
 }
 
+func (c *Config) newInstance(pos token.Pos, p importPath) *build.Instance {
+	dir, name, err := c.absDirFromImportPath(pos, p)
+	i := c.Context.NewInstance(dir, c.loadFunc)
+	i.Dir = dir
+	i.PkgName = name
+	i.DisplayPath = string(p)
+	i.ImportPath = string(p)
+	i.Root = c.ModuleRoot
+	i.Module = c.Module
+	i.Err = errors.Append(i.Err, err)
+
+	return i
+}
+
+func (c *Config) newRelInstance(pos token.Pos, path, pkgName string) *build.Instance {
+	fs := c.fileSystem
+
+	var err errors.Error
+	dir := path
+
+	p := c.Context.NewInstance(path, c.loadFunc)
+	p.PkgName = pkgName
+	p.DisplayPath = filepath.ToSlash(path)
+	// p.ImportPath = string(dir) // compute unique ID.
+	p.Root = c.ModuleRoot
+	p.Module = c.Module
+
+	if isLocalImport(path) {
+		if c.Dir == "" {
+			err = errors.Append(err, errors.Newf(pos, "cwd unknown"))
+		}
+		dir = filepath.Join(c.Dir, filepath.FromSlash(path))
+	}
+
+	if path == "" {
+		err = errors.Append(err, errors.Newf(pos,
+			"import %q: invalid import path", path))
+	} else if path != cleanImport(path) {
+		err = errors.Append(err, c.loader.errPkgf(nil,
+			"non-canonical import path: %q should be %q", path, pathpkg.Clean(path)))
+	}
+
+	if importPath, e := c.importPathFromAbsDir(fsPath(dir), path); e != nil {
+		// Detect later to keep error messages consistent.
+	} else {
+		p.ImportPath = string(importPath)
+	}
+
+	p.Dir = dir
+
+	if fs.isAbsPath(path) || strings.HasPrefix(path, "/") {
+		err = errors.Append(err, errors.Newf(pos,
+			"absolute import path %q not allowed", path))
+	}
+	if err != nil {
+		p.Err = errors.Append(p.Err, err)
+		p.Incomplete = true
+	}
+
+	return p
+}
+
+func (c Config) newErrInstance(pos token.Pos, path importPath, err error) *build.Instance {
+	i := c.newInstance(pos, path)
+	i.Err = errors.Promote(err, "instance")
+	return i
+}
+
+func toImportPath(dir string) importPath {
+	return importPath(filepath.ToSlash(dir))
+}
+
 type importPath string
 
-func addImportQualifier(pkg importPath, name string) (importPath, error) {
+type fsPath string
+
+func (c *Config) importPathFromAbsDir(absDir fsPath, key string) (importPath, errors.Error) {
+	if c.ModuleRoot == "" {
+		return "", errors.Newf(token.NoPos,
+			"cannot determine import path for %q (root undefined)", key)
+	}
+
+	dir := filepath.Clean(string(absDir))
+	if !strings.HasPrefix(dir, c.ModuleRoot) {
+		return "", errors.Newf(token.NoPos,
+			"cannot determine import path for %q (dir outside of root)", key)
+	}
+
+	pkg := filepath.ToSlash(dir[len(c.ModuleRoot):])
+	switch {
+	case strings.HasPrefix(pkg, "/cue.mod/"):
+		pkg = pkg[len("/cue.mod/"):]
+		if pkg == "" {
+			return "", errors.Newf(token.NoPos,
+				"invalid package %q (root of %s)", key, modDir)
+		}
+
+		// TODO(legacy): remove.
+	case strings.HasPrefix(pkg, "/pkg/"):
+		pkg = pkg[len("/pkg/"):]
+		if pkg == "" {
+			return "", errors.Newf(token.NoPos,
+				"invalid package %q (root of %s)", key, pkgDir)
+		}
+
+	case c.Module == "":
+		return "", errors.Newf(token.NoPos,
+			"cannot determine import path for %q (no module)", key)
+	default:
+		pkg = c.Module + pkg
+	}
+
+	name := c.Package
+	switch name {
+	case "_", "*":
+		name = ""
+	}
+
+	return addImportQualifier(importPath(pkg), name)
+}
+
+func addImportQualifier(pkg importPath, name string) (importPath, errors.Error) {
+	if name != "" {
+		s := string(pkg)
+		if i := strings.LastIndexByte(s, '/'); i >= 0 {
+			s = s[i+1:]
+		}
+		if i := strings.LastIndexByte(s, ':'); i >= 0 {
+			// should never happen, but just in case.
+			s = s[i+1:]
+			if s != name {
+				return "", errors.Newf(token.NoPos,
+					"non-matching package names (%s != %s)", s, name)
+			}
+		} else if s != name {
+			pkg += importPath(":" + name)
+		}
+	}
+
+	return pkg, nil
+}
+
+// absDirFromImportPath converts a giving import path to an absolute directory
+// and a package name. The root directory must be set.
+//
+// The returned directory may not exist.
+func (c *Config) absDirFromImportPath(pos token.Pos, p importPath) (absDir, name string, err errors.Error) {
+	if c.ModuleRoot == "" {
+		return "", "", errors.Newf(pos, "cannot import %q (root undefined)", p)
+	}
+
+	// Extract the package name.
+
+	name = string(p)
+	switch i := strings.LastIndexAny(name, "/:"); {
+	case i < 0:
+	case p[i] == ':':
+		name = string(p[i+1:])
+		p = p[:i]
+
+	default: // p[i] == '/'
+		name = string(p[i+1:])
+	}
+
+	// TODO: fully test that name is a valid identifier.
 	if name == "" {
-		return pkg, nil
+		err = errors.Newf(pos, "empty package name in import path %q", p)
+	} else if strings.IndexByte(name, '.') >= 0 {
+		err = errors.Newf(pos,
+			"cannot determine package name for %q (set explicitly with ':')", p)
 	}
-	ip := ast.ParseImportPath(string(pkg))
-	if ip.Qualifier == "_" {
-		return "", fmt.Errorf("invalid import qualifier _ in %q", pkg)
+
+	// Determine the directory.
+
+	sub := filepath.FromSlash(string(p))
+	switch hasPrefix := strings.HasPrefix(string(p), c.Module); {
+	case hasPrefix && len(sub) == len(c.Module):
+		absDir = c.ModuleRoot
+
+	case hasPrefix && p[len(c.Module)] == '/':
+		absDir = filepath.Join(c.ModuleRoot, sub[len(c.Module)+1:])
+
+	default:
+		absDir = filepath.Join(GenPath(c.ModuleRoot), sub)
 	}
-	if ip.ExplicitQualifier && ip.Qualifier != name {
-		return "", fmt.Errorf("non-matching package names (%s != %s)", ip.Qualifier, name)
-	}
-	ip.Qualifier = name
-	return importPath(ip.String()), nil
+
+	return absDir, name, err
 }
 
 // Complete updates the configuration information. After calling complete,
 // the following invariants hold:
-//   - c.Dir is an absolute path.
-//   - c.ModuleRoot is an absolute path
-//   - c.Module is set to the module import prefix if there is a cue.mod file
-//     with the module property.
-//   - c.loader != nil
-//   - c.cache != ""
-//
-// It does not initialize c.Context, because that requires the
-// loader in order to use for build.Loader.
+//  - c.ModuleRoot != ""
+//  - c.Module is set to the module import prefix if there is a cue.mod file
+//    with the module property.
+//  - c.loader != nil
+//  - c.cache != ""
 func (c Config) complete() (cfg *Config, err error) {
-	// Ensure [Config.Dir] is a clean and absolute path,
-	// necessary for matching directory prefixes later.
+	// Each major CUE release should add a tag here.
+	// Old tags should not be removed. That is, the cue1.x tag is present
+	// in all releases >= CUE 1.x. Code that requires CUE 1.x or later should
+	// say "+build cue1.x", and code that should only be built before CUE 1.x
+	// (perhaps it is the stub to use in that case) should say "+build !cue1.x".
+	c.releaseTags = []string{"cue0.1"}
+
 	if c.Dir == "" {
 		c.Dir, err = os.Getwd()
 		if err != nil {
@@ -362,149 +501,106 @@ func (c Config) complete() (cfg *Config, err error) {
 	} else if c.Dir, err = filepath.Abs(c.Dir); err != nil {
 		return nil, err
 	}
-	if modpkgload.InsideCueMod(c.Dir) {
-		return nil, fmt.Errorf("cannot load packages inside the %s directory", modDir)
-	}
 
 	// TODO: we could populate this already with absolute file paths,
 	// but relative paths cannot be added. Consider what is reasonable.
-	fsys, err := newFileSystem(&c)
-	if err != nil {
+	if err := c.fileSystem.init(&c); err != nil {
 		return nil, err
 	}
-	c.fileSystem = fsys
 
-	// Ensure [Config.ModuleRoot] is a clean and absolute path,
-	// necessary for matching directory prefixes later.
-	//
 	// TODO: determine root on a package basis. Maybe we even need a
 	// pkgname.cue.mod
 	// Look to see if there is a cue.mod.
-	//
-	// TODO(mvdan): note that setting Config.ModuleRoot to a directory
-	// without a cue.mod file does not result in any error, which is confusing
-	// or can lead to not using the right CUE module silently.
 	if c.ModuleRoot == "" {
 		// Only consider the current directory by default
 		c.ModuleRoot = c.Dir
-		if root := c.findModRoot(c.Dir); root != "" {
+		if root := c.findRoot(c.Dir); root != "" {
 			c.ModuleRoot = root
 		}
-	} else if !filepath.IsAbs(c.ModuleRoot) {
-		c.ModuleRoot = filepath.Join(c.Dir, c.ModuleRoot)
-	} else {
-		c.ModuleRoot = filepath.Clean(c.ModuleRoot)
 	}
-	if c.SkipImports {
-		// We should never use the registry in SkipImports mode
-		// but make it always return an error just to be sure.
-		c.Registry = errorRegistry{errors.New("unexpected use of registry in SkipImports mode")}
-	} else if c.Registry == nil {
-		registry, err := modconfig.NewRegistry(&modconfig.Config{
-			Env: c.Env,
-		})
-		if err != nil {
-			// If there's an error in the registry configuration,
-			// don't error immediately, but only when we actually
-			// need to resolve modules.
-			registry = errorRegistry{err}
+
+	c.loader = &loader{
+		cfg:       &c,
+		buildTags: make(map[string]bool),
+	}
+
+	// TODO: also make this work if run from outside the module?
+	switch {
+	case true:
+		mod := filepath.Join(c.ModuleRoot, modDir)
+		info, cerr := c.fileSystem.stat(mod)
+		if cerr != nil {
+			break
 		}
-		c.Registry = registry
+		if info.IsDir() {
+			mod = filepath.Join(mod, configFile)
+		}
+		f, cerr := c.fileSystem.openFile(mod)
+		if cerr != nil {
+			break
+		}
+
+		// TODO: move to full build again
+		file, err := parser.ParseFile("load", f)
+		if err != nil {
+			return nil, errors.Wrapf(err, token.NoPos, "invalid cue.mod file")
+		}
+
+		r := runtime.New()
+		v, err := compile.Files(nil, r, "_", file)
+		if err != nil {
+			return nil, errors.Wrapf(err, token.NoPos, "invalid cue.mod file")
+		}
+		ctx := eval.NewContext(r, v)
+		v.Finalize(ctx)
+		prefix := v.Lookup(ctx.StringLabel("module"))
+		if prefix != nil {
+			name := ctx.StringValue(prefix.Value())
+			if err := ctx.Err(); err != nil {
+				return &c, err.Err
+			}
+			pos := token.NoPos
+			src := prefix.Value().Source()
+			if src != nil {
+				pos = src.Pos()
+			}
+			if c.Module != "" && c.Module != name {
+				return &c, errors.Newf(pos, "inconsistent modules: got %q, want %q", name, c.Module)
+			}
+			c.Module = name
+		}
 	}
-	c.parserConfig = parser.NewConfig(parser.ParseComments)
-	if err := c.loadModule(); err != nil {
-		return nil, err
+
+	c.loadFunc = c.loader.loadFunc()
+
+	if c.Context == nil {
+		c.Context = build.NewContext(
+			build.Loader(c.loadFunc),
+			build.ParseFile(c.loader.cfg.ParseFile),
+		)
 	}
+
 	return &c, nil
 }
 
-func (c *Config) languageVersion() string {
-	if c.modFile == nil || c.modFile.Language == nil {
-		return ""
-	}
-	return c.modFile.Language.Version
-}
-
-// loadModule loads the module file, resolves and downloads module
-// dependencies. It sets c.Module if it's empty or checks it for
-// consistency with the module file otherwise.
-//
-// Note that this function is a no-op if a module file does not exist,
-// as it is still possible to load CUE without a module.
-func (c *Config) loadModule() error {
-	// TODO: also make this work if run from outside the module?
-	modDir := filepath.Join(c.ModuleRoot, modDir)
-	modFile := filepath.Join(modDir, moduleFile)
-	f, cerr := c.fileSystem.openFile(modFile)
-	if cerr != nil {
-		// If we could not load cue.mod/module.cue, check whether the reason was
-		// a legacy cue.mod file and give the user a clear error message.
-		//
-		// Common case: the file does not exist. Avoid an extra stat
-		// syscall using the error code when we can.
-		//
-		// TODO(mvdan): we can remove this in mid 2026, once we can safely assume that
-		// practically all cue.mod files have vanished.
-		if errors.Is(cerr, fs.ErrNotExist) && runtime.GOOS != "windows" {
-			// The file definitely does not exist. On Windows unfortunately due
-			// to https://github.com/golang/go/issues/46734
-			// we can't tell the difference between "does not exist"
-			// and "is not a directory", hence the special casing.
-			return nil
-		}
-		info, cerr2 := c.fileSystem.stat(modDir)
-		if cerr2 == nil && !info.IsDir() {
-			return fmt.Errorf("cue.mod files are no longer supported; use cue.mod/module.cue")
-		}
-		return nil
-	}
-	defer f.Close()
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return err
-	}
-	parseModFile := modfile.ParseNonStrict
-	if c.Registry == nil {
-		parseModFile = modfile.ParseLegacy
-	} else if c.AcceptLegacyModules {
-		// Note: technically this does not support all legacy module
-		// files because some old module files might contain non-concrete
-		// data, but that seems like an OK restriction for now at least,
-		// given that no actual instances of non-concrete data in
-		// module files have been discovered in the wild.
-		parseModFile = modfile.FixLegacy
-	}
-	mf, err := parseModFile(data, modFile)
-	if err != nil {
-		return err
-	}
-	c.modFile = mf
-	if mf.QualifiedModule() == "" {
-		// Backward compatibility: allow empty module.cue file.
-		// TODO maybe check that the rest of the fields are empty too?
-		return nil
-	}
-	if c.Module != "" && c.Module != mf.Module {
-		return errors.Newf(token.NoPos, "inconsistent modules: got %q, want %q", mf.Module, c.Module)
-	}
-	c.Module = mf.QualifiedModule()
-	// Set the default version for CUE files without a module.
-	c.parserConfig = c.parserConfig.Apply(parser.Version(c.modFile.Language.Version))
-	return nil
-}
-
-func (c Config) isModRoot(dir string) bool {
+func (c Config) isRoot(dir string) bool {
+	fs := &c.fileSystem
 	// Note: cue.mod used to be a file. We still allow both to match.
-	_, err := c.fileSystem.stat(filepath.Join(dir, modDir))
+	_, err := fs.stat(filepath.Join(dir, modDir))
 	return err == nil
 }
 
-// findModRoot returns the module root that's ancestor
-// of the given absolute directory path, or "" if none was found.
-func (c Config) findModRoot(absDir string) string {
+// findRoot returns the module root or "" if none was found.
+func (c Config) findRoot(dir string) string {
+	fs := &c.fileSystem
+
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return ""
+	}
 	abs := absDir
 	for {
-		if c.isModRoot(abs) {
+		if c.isRoot(abs) {
 			return abs
 		}
 		d := filepath.Dir(abs)
@@ -514,34 +610,32 @@ func (c Config) findModRoot(absDir string) string {
 			return ""
 		}
 		if len(d) >= len(abs) {
-			return "" // reached top of file system, no cue.mod
+			break // reached top of file system, no cue.mod
+		}
+		abs = d
+	}
+	abs = absDir
+
+	// TODO(legacy): remove this capability at some point.
+	for {
+		info, err := fs.stat(filepath.Join(abs, pkgDir))
+		if err == nil && info.IsDir() {
+			return abs
+		}
+		d := filepath.Dir(abs)
+		if len(d) >= len(abs) {
+			return "" // reached top of file system, no pkg dir.
 		}
 		abs = d
 	}
 }
 
-func (c *Config) newErrInstance(err error) *build.Instance {
-	i := c.Context.NewInstance("", nil)
-	i.Root = c.ModuleRoot
-	i.Module = c.Module
-	i.ModuleFile = c.modFile
-	i.Err = errors.Promote(err, "")
-	return i
-}
-
-// errorRegistry implements [modconfig.Registry] by returning err from all methods.
-type errorRegistry struct {
-	err error
-}
-
-func (r errorRegistry) Requirements(ctx context.Context, m module.Version) ([]module.Version, error) {
-	return nil, r.err
-}
-
-func (r errorRegistry) Fetch(ctx context.Context, m module.Version) (module.SourceLoc, error) {
-	return module.SourceLoc{}, r.err
-}
-
-func (r errorRegistry) ModuleVersions(ctx context.Context, mpath string) ([]string, error) {
-	return nil, r.err
+func home() string {
+	env := "HOME"
+	if goruntime.GOOS == "windows" {
+		env = "USERPROFILE"
+	} else if goruntime.GOOS == "plan9" {
+		env = "home"
+	}
+	return os.Getenv(env)
 }

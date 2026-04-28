@@ -28,7 +28,7 @@ type Marshaler interface {
 }
 
 type Unmarshaler interface {
-	UnmarshalGQL(v any) error
+	UnmarshalGQL(v interface{}) error
 }
 
 type ContextMarshaler interface {
@@ -36,7 +36,7 @@ type ContextMarshaler interface {
 }
 
 type ContextUnmarshaler interface {
-	UnmarshalGQLContext(ctx context.Context, v any) error
+	UnmarshalGQLContext(ctx context.Context, v interface{}) error
 }
 
 type contextMarshalerAdapter struct {

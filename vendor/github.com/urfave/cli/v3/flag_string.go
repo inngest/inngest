@@ -30,8 +30,10 @@ func (s stringValue) Create(val string, p *string, c StringConfig) Value {
 }
 
 func (s stringValue) ToString(val string) string {
-	s.destination = &val
-	return s.String()
+	if val == "" {
+		return val
+	}
+	return fmt.Sprintf("%q", val)
 }
 
 // Below functions are to satisfy the flag.Value interface
@@ -47,8 +49,8 @@ func (s *stringValue) Set(val string) error {
 func (s *stringValue) Get() any { return *s.destination }
 
 func (s *stringValue) String() string {
-	if s.destination != nil && *s.destination != "" {
-		return fmt.Sprintf("%q", *s.destination)
+	if s.destination != nil {
+		return *s.destination
 	}
 	return ""
 }

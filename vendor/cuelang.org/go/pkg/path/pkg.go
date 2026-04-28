@@ -16,11 +16,11 @@ package path
 
 import (
 	"cuelang.org/go/internal/core/adt"
-	"cuelang.org/go/internal/pkg"
+	"cuelang.org/go/pkg/internal"
 )
 
 func init() {
-	pkg.Register("path", p)
+	internal.Register("path", pkg)
 }
 
 var _ = adt.TopKind // in case the adt package isn't used
@@ -38,20 +38,20 @@ var (
 	// windowsDefault is the default for VolumeName.
 	windowsDefault = &adt.Disjunction{
 		NumDefaults: 1,
-		Values: append([]adt.Value{
+		Values: append([]*adt.Vertex{
 			newStr("windows"),
 			newStr("unix"),
 			newStr("plan9")}, unixOS...),
 	}
 
-	allOS = append([]adt.Value{
+	allOS = append([]*adt.Vertex{
 		newStr("unix"),
 		newStr("windows"),
 		newStr("plan9"),
 	}, unixOS...)
 
 	// These all fall back to unix
-	unixOS = []adt.Value{
+	unixOS = []*adt.Vertex{
 		newStr("aix"),
 		newStr("android"),
 		newStr("darwin"),
@@ -70,24 +70,26 @@ var (
 	}
 )
 
-func newStr(s string) adt.Value {
-	return &adt.String{Str: s}
+func newStr(s string) *adt.Vertex {
+	v := &adt.Vertex{}
+	v.SetValue(nil, adt.Finalized, &adt.String{Str: s})
+	return v
 }
 
-var p = &pkg.Package{
+var pkg = &internal.Package{
 	CUE: `{
 		Unix:    "unix"
 		Windows: "windows"
 		Plan9:   "plan9"
 	}`,
-	Native: []*pkg.Builtin{{
+	Native: []*internal.Builtin{{
 		Name: "Split",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.ListKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = Split(path, OS(os))
@@ -95,12 +97,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "SplitList",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: osRequired},
 		},
 		Result: adt.ListKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = SplitList(path, OS(os))
@@ -108,12 +110,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Join",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.ListKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			list, os := c.StringList(0), c.String(1)
 			if c.Do() {
 				c.Ret = Join(list, OS(os))
@@ -121,13 +123,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Match",
-		Params: []pkg.Param{
-			{Kind: adt.StringKind},
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.BoolKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			pattern, name, os := c.String(0), c.String(1), c.String(2)
 			if c.Do() {
 				c.Ret, c.Err = Match(pattern, name, OS(os))
@@ -135,12 +136,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Clean",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = Clean(path, OS(os))
@@ -148,12 +149,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "ToSlash",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: osRequired},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = ToSlash(path, OS(os))
@@ -161,12 +162,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "FromSlash",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: osRequired},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = FromSlash(path, OS(os))
@@ -174,12 +175,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Ext",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = Ext(path, OS(os))
@@ -187,13 +188,13 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Resolve",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			dir, sub, os := c.String(0), c.String(1), c.String(2)
 			if c.Do() {
 				c.Ret = Resolve(dir, sub, OS(os))
@@ -201,13 +202,13 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Rel",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			base, target, os := c.String(0), c.String(1), c.String(2)
 			if c.Do() {
 				c.Ret, c.Err = Rel(base, target, OS(os))
@@ -215,12 +216,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Base",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = Base(path, OS(os))
@@ -228,12 +229,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "Dir",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = Dir(path, OS(os))
@@ -241,12 +242,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "IsAbs",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: unixDefault},
 		},
 		Result: adt.BoolKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = IsAbs(path, OS(os))
@@ -254,12 +255,12 @@ var p = &pkg.Package{
 		},
 	}, {
 		Name: "VolumeName",
-		Params: []pkg.Param{
+		Params: []internal.Param{
 			{Kind: adt.StringKind},
 			{Kind: adt.StringKind, Value: windowsDefault},
 		},
 		Result: adt.StringKind,
-		Func: func(c *pkg.CallCtxt) {
+		Func: func(c *internal.CallCtxt) {
 			path, os := c.String(0), c.String(1)
 			if c.Do() {
 				c.Ret = VolumeName(path, OS(os))

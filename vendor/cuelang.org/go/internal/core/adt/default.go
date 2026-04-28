@@ -14,10 +14,6 @@
 
 package adt
 
-import (
-	"slices"
-)
-
 // Default returns the default value or itself if there is no default.
 func Default(v Value) Value {
 	switch x := v.(type) {
@@ -49,7 +45,6 @@ func (d *Disjunction) Default() Value {
 //
 // It also closes a list, representing its default value.
 func (v *Vertex) Default() *Vertex {
-	v = v.DerefValue()
 	switch d := v.BaseValue.(type) {
 	default:
 		return v
@@ -61,15 +56,7 @@ func (v *Vertex) Default() *Vertex {
 		case 0:
 			return v
 		case 1:
-			w = ToVertex(Default(d.Values[0]))
-			// If w already has conjuncts, return as-is to avoid race.
-			if w.Conjuncts != nil {
-				return w
-			}
-			// Make a copy before modifying to avoid racing on shared vertex.
-			x := *w
-			x.state = nil
-			w = &x
+			w = d.Values[0].Default()
 		default:
 			x := *v
 			x.state = nil
@@ -79,21 +66,19 @@ func (v *Vertex) Default() *Vertex {
 				NumDefaults: 0,
 			}
 			w = &x
+			w.Conjuncts = nil
 		}
 
-		// w is now a fresh copy, safe to modify without race.
-		w.Conjuncts = make([]Conjunct, 0, len(v.Conjuncts))
-		for _, c := range v.Conjuncts {
-			node := stripNonDefaultsNode(c)
-			w.Conjuncts = append(w.Conjuncts, MakeRootConjunct(c.Env, node))
+		if w.Conjuncts == nil {
+			for _, c := range v.Conjuncts {
+				// TODO: preserve field information.
+				expr, _ := stripNonDefaults(c.Expr())
+				w.Conjuncts = append(w.Conjuncts, MakeRootConjunct(c.Env, expr))
+			}
 		}
 		return w
 
 	case *ListMarker:
-		if !d.IsOpen {
-			// If the list is already closed, avoid the copies below.
-			return v
-		}
 		m := *d
 		m.IsOpen = false
 
@@ -104,16 +89,8 @@ func (v *Vertex) Default() *Vertex {
 	}
 }
 
-// stripNonDefaults removes non-default values from disjunctions in the given
-// expression. It returns the modified expression and whether any stripping
-// occurred. For example, `*1 | 2 | 3` becomes `1`.
-//
 // TODO: this should go: record preexpanded disjunctions in Vertex.
-func stripNonDefaults(elem Elem) (r Elem, stripped bool) {
-	expr, ok := elem.(Expr)
-	if !ok {
-		return elem, false
-	}
+func stripNonDefaults(expr Expr) (r Expr, stripped bool) {
 	switch x := expr.(type) {
 	case *DisjunctionExpr:
 		if !x.HasDefaults {
@@ -139,80 +116,13 @@ func stripNonDefaults(elem Elem) (r Elem, stripped bool) {
 		b, sb := stripNonDefaults(x.Y)
 		if sa || sb {
 			bin := *x
-			bin.X = a.(Expr)
-			bin.Y = b.(Expr)
+			bin.X = a
+			bin.Y = b
 			return &bin, true
 		}
 		return x, false
 
-	case *ConjunctGroup:
-		// NOTE: this code requires allocations unconditional. This should be
-		// mitigated once we optimize conjunct groupings.
-		isNew := false
-		a := slices.Clone(*x)
-		for i, c := range a {
-			a[i].x, ok = stripNonDefaults(c.Elem())
-			if ok {
-				isNew = true
-			}
-		}
-		if isNew {
-			return &a, true
-		}
-		return x, false
-
 	default:
 		return x, false
-	}
-}
-
-// stripNonDefaultsNode is like stripNonDefaults but operates on a Conjunct
-// and preserves field wrappers (Field, LetField, etc.) so that field metadata
-// is retained when computing defaults.
-func stripNonDefaultsNode(c Conjunct) Node {
-	switch x := c.x.(type) {
-	case *Field:
-		if expr, stripped := stripNonDefaults(x.Value); stripped {
-			f := *x
-			f.Value = expr.(Expr)
-			return &f
-		}
-		return x
-	case *LetField:
-		if expr, stripped := stripNonDefaults(x.Value); stripped {
-			f := *x
-			f.Value = expr.(Expr)
-			return &f
-		}
-		return x
-	case *BulkOptionalField:
-		if expr, stripped := stripNonDefaults(x.Value); stripped {
-			f := *x
-			f.Value = expr.(Expr)
-			return &f
-		}
-		return x
-	case *DynamicField:
-		if expr, stripped := stripNonDefaults(x.Value); stripped {
-			f := *x
-			f.Value = expr.(Expr)
-			return &f
-		}
-		return x
-	case *Ellipsis:
-		if x.Value == nil {
-			return x
-		}
-		if expr, stripped := stripNonDefaults(x.Value); stripped {
-			e := *x
-			e.Value = expr.(Expr)
-			return &e
-		}
-		return x
-	default:
-		if elem, stripped := stripNonDefaults(c.Elem()); stripped {
-			return elem
-		}
-		return c.x
 	}
 }

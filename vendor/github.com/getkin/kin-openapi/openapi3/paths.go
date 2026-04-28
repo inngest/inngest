@@ -1,10 +1,9 @@
 package openapi3
 
 import (
-	"cmp"
 	"context"
 	"fmt"
-	"slices"
+	"sort"
 	"strings"
 )
 
@@ -12,7 +11,7 @@ import (
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#paths-object
 type Paths struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"-" yaml:"-"`
+	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
 
 	m map[string]*PathItem
 }
@@ -44,7 +43,12 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 
 	normalizedPaths := make(map[string]string, paths.Len())
 
-	for _, path := range paths.Keys() {
+	keys := make([]string, 0, paths.Len())
+	for key := range paths.Map() {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, path := range keys {
 		pathItem := paths.Value(path)
 		if path == "" || path[0] != '/' {
 			return fmt.Errorf("path %q does not start with a forward slash (/)", path)
@@ -70,7 +74,12 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 			}
 		}
 		operations := pathItem.Operations()
-		for _, method := range componentNames(operations) {
+		methods := make([]string, 0, len(operations))
+		for method := range operations {
+			methods = append(methods, method)
+		}
+		sort.Strings(methods)
+		for _, method := range methods {
 			operation := operations[method]
 			var setParams []string
 			for _, parameterRef := range operation.Parameters {
@@ -92,14 +101,23 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 						missing[name] = struct{}{}
 					}
 				}
-				for _, name := range componentNames(varsInPath) {
-					if slices.Contains(definedParams, name) {
-						break
+				for name := range varsInPath {
+					got := false
+					for _, othername := range definedParams {
+						if othername == name {
+							got = true
+							break
+						}
 					}
-					missing[name] = struct{}{}
+					if !got {
+						missing[name] = struct{}{}
+					}
 				}
 				if len(missing) != 0 {
-					missings := componentNames(missing)
+					missings := make([]string, 0, len(missing))
+					for name := range missing {
+						missings = append(missings, name)
+					}
 					return fmt.Errorf("operation %s %s must define exactly all path parameters (missing: %v)", method, path, missings)
 				}
 			}
@@ -141,7 +159,7 @@ func (paths *Paths) InMatchingOrder() []string {
 	ordered := make([]string, 0, paths.Len())
 	for c := 0; c <= max; c++ {
 		if ps, ok := vars[c]; ok {
-			slices.SortFunc(ps, func(a, b string) int { return cmp.Compare(b, a) })
+			sort.Sort(sort.Reverse(sort.StringSlice(ps)))
 			ordered = append(ordered, ps...)
 		}
 	}
@@ -168,11 +186,10 @@ func (paths *Paths) Find(key string) *PathItem {
 	}
 
 	normalizedPath, expected, _ := normalizeTemplatedPath(key)
-	pathsMap := paths.Map()
-	for _, path := range componentNames(pathsMap) {
+	for path, pathItem := range paths.Map() {
 		pathNormalized, got, _ := normalizeTemplatedPath(path)
 		if got == expected && pathNormalized == normalizedPath {
-			return pathsMap[path]
+			return pathItem
 		}
 	}
 	return nil
@@ -180,15 +197,11 @@ func (paths *Paths) Find(key string) *PathItem {
 
 func (paths *Paths) validateUniqueOperationIDs() error {
 	operationIDs := make(map[string]string)
-	pathsMap := paths.Map()
-	for _, urlPath := range componentNames(pathsMap) {
-		pathItem := pathsMap[urlPath]
+	for urlPath, pathItem := range paths.Map() {
 		if pathItem == nil {
 			continue
 		}
-		operations := pathItem.Operations()
-		for _, httpMethod := range componentNames(operations) {
-			operation := operations[httpMethod]
+		for httpMethod, operation := range pathItem.Operations() {
 			if operation == nil || operation.OperationID == "" {
 				continue
 			}

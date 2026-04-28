@@ -18,7 +18,7 @@ var luaRedisConstants = map[string]lua.LValue{
 	"LOG_WARNING": lua.LNumber(3),
 }
 
-func mkLua(srv *server.Server, c *server.Peer, sha string, readOnly bool) (map[string]lua.LGFunction, map[string]lua.LValue) {
+func mkLua(srv *server.Server, c *server.Peer, sha string) (map[string]lua.LGFunction, map[string]lua.LValue) {
 	mkCall := func(failFast bool) func(l *lua.LState) int {
 		// one server.Ctx for a single Lua run
 		pCtx := &connCtx{}
@@ -52,20 +52,6 @@ func mkLua(srv *server.Server, c *server.Peer, sha string, readOnly bool) (map[s
 				return 0
 			}
 
-			if readOnly && len(args) > 0 {
-				if srv.IsRegisteredCommand(args[0]) && !srv.IsReadOnlyCommand(args[0]) {
-					if failFast {
-						l.Error(lua.LString("Write commands are not allowed in read-only scripts"), 1)
-						return 0
-					}
-					// pcall() mode - return error table
-					res := &lua.LTable{}
-					res.RawSetString("err", lua.LString("Write commands are not allowed in read-only scripts"))
-					l.Push(res)
-					return 1
-				}
-			}
-
 			buf := &bytes.Buffer{}
 			wr := bufio.NewWriter(buf)
 			peer := server.NewPeer(wr)
@@ -85,13 +71,7 @@ func mkLua(srv *server.Server, c *server.Peer, sha string, readOnly bool) (map[s
 					return 0
 				}
 				// pcall() mode
-				res := &lua.LTable{}
-				if strings.Contains(err.Error(), "ERR unknown command") {
-					res.RawSetString("err", lua.LString("ERR Unknown Redis command called from script"))
-				} else {
-					res.RawSetString("err", lua.LString(err.Error()))
-				}
-				l.Push(res)
+				l.Push(lua.LNil)
 				return 1
 			}
 
@@ -178,8 +158,7 @@ func mkLua(srv *server.Server, c *server.Peer, sha string, readOnly bool) (map[s
 			return 1
 		},
 		"replicate_commands": func(l *lua.LState) int {
-			// always succeeds since 7.0.0
-			l.Push(lua.LTrue)
+			// ignored
 			return 1
 		},
 		"set_repl": func(l *lua.LState) int {
@@ -190,21 +169,6 @@ func mkLua(srv *server.Server, c *server.Peer, sha string, readOnly bool) (map[s
 			}
 			// ignored
 			return 1
-		},
-		"setresp": func(l *lua.LState) int {
-			level := l.CheckInt(1)
-			toresp3 := false
-			switch level {
-			case 2:
-				toresp3 = false
-			case 3:
-				toresp3 = true
-			default:
-				l.Error(lua.LString("RESP version must be 2 or 3"), 1)
-				return 0
-			}
-			c.SwitchResp3 = &toresp3
-			return 0
 		},
 	}, luaRedisConstants
 }
@@ -262,7 +226,7 @@ func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 			luaToRedis(l, c, r)
 		}
 	default:
-		panic(fmt.Sprintf("wat: %T", t))
+		panic("....")
 	}
 }
 
@@ -298,15 +262,4 @@ func luaStatusReply(msg string) *lua.LTable {
 	tab := &lua.LTable{}
 	tab.RawSetString("ok", lua.LString(msg))
 	return tab
-}
-
-// Our very minimal "os." lua lib.
-func mkLuaOS() map[string]lua.LGFunction {
-	return map[string]lua.LGFunction{
-		// > Returns an approximation of the amount in seconds of CPU time used by the program
-		"clock": func(l *lua.LState) int {
-			l.Push(lua.LNumber(42))
-			return 1
-		},
-	}
 }

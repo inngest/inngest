@@ -30,10 +30,8 @@ type jcsData struct {
 }
 
 // JSON standard escapes (modulo \u)
-var (
-	asciiEscapes  = []byte{'\\', '"', 'b', 'f', 'n', 'r', 't'}
-	binaryEscapes = []byte{'\\', '"', '\b', '\f', '\n', '\r', '\t'}
-)
+var asciiEscapes = []byte{'\\', '"', 'b', 'f', 'n', 'r', 't'}
+var binaryEscapes = []byte{'\\', '"', '\b', '\f', '\n', '\r', '\t'}
 
 // JSON literals
 var literals = []string{"true", "false", "null"}
@@ -49,7 +47,7 @@ func Transform(jsonData []byte) ([]byte, error) {
 	jd.jsonData = jsonData
 	j := &jd
 
-	transformed, err := j.parseEntry()
+	transformed, err := j.parseElement()
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +77,7 @@ func (j *jcsData) nextChar() (byte, error) {
 	return 0, errors.New("Unexpected EOF reached")
 }
 
-// scan advances index on jsonData to the first non whitespace character and returns it.
+//scan advances index on jsonData to the first non whitespace character and returns it.
 func (j *jcsData) scan() (byte, error) {
 	for {
 		c, err := j.nextChar()
@@ -147,28 +145,6 @@ CoreLoop:
 	quotedString.WriteByte('"')
 
 	return quotedString.String()
-}
-
-// parseEntry is the entrypoint into the parsing control flow
-func (j *jcsData) parseEntry() (string, error) {
-	c, err := j.scan()
-	if err != nil {
-		return "", err
-	}
-	j.index--
-
-	switch c {
-	case '{', '"', '[':
-		return j.parseElement()
-	default:
-		value, err := parseLiteral(string(j.jsonData))
-		if err != nil {
-			return "", err
-		}
-
-		j.index = len(j.jsonData)
-		return value, nil
-	}
 }
 
 func (j *jcsData) parseQuotedString() (string, error) {
@@ -261,10 +237,9 @@ func (j *jcsData) parseSimpleType() (string, error) {
 	var token strings.Builder
 
 	j.index--
-
-	// no condition is needed here.
-	// if the buffer reaches EOF scan returns an error, or we terminate because the
-	// json simple type terminates
+	//no condition is needed here.
+	//if the buffer reaches EOF scan returns an error, or we terminate because the
+	//json simple type terminates
 	for {
 		c, err := j.scan()
 		if err != nil {
@@ -283,10 +258,7 @@ func (j *jcsData) parseSimpleType() (string, error) {
 		return "", errors.New("Missing argument")
 	}
 
-	return parseLiteral(token.String())
-}
-
-func parseLiteral(value string) (string, error) {
+	value := token.String()
 	// Is it a JSON literal?
 	for _, literal := range literals {
 		if literal == value {
@@ -419,7 +391,7 @@ CoreLoop:
 		}
 
 		if c == '}' {
-			// advance index because of peeked '}'
+			//advance index because of peeked '}'
 			j.index++
 			break
 		}

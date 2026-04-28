@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"sync"
 )
@@ -80,7 +79,7 @@ func ReadFromFile(loader *Loader, location *url.URL) ([]byte, error) {
 	if !is_file(location) {
 		return nil, ErrURINotSupported
 	}
-	return os.ReadFile(path.Clean(filepath.FromSlash(location.Path)))
+	return os.ReadFile(filepath.FromSlash(location.Path))
 }
 
 // URIMapCache returns a ReadFromURIFunc that caches the contents read from URI

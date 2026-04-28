@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"slices"
 	"unicode"
 )
@@ -91,17 +92,12 @@ outer:
 // definitions and the matching Action functions are run.
 func (cmd *Command) Run(ctx context.Context, osArgs []string) (deferErr error) {
 	_, deferErr = cmd.run(ctx, osArgs)
-	return deferErr
+	return
 }
 
 func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context, deferErr error) {
 	tracef("running with arguments %[1]q (cmd=%[2]q)", osArgs, cmd.Name)
 	cmd.setupDefaults(osArgs)
-
-	// Validate StopOnNthArg
-	if cmd.StopOnNthArg != nil && *cmd.StopOnNthArg < 0 {
-		return ctx, fmt.Errorf("StopOnNthArg must be non-negative, got %d", *cmd.StopOnNthArg)
-	}
 
 	if v, ok := ctx.Value(commandContextKey).(*Command); ok {
 		tracef("setting parent (cmd=%[1]q) command from context.Context value (cmd=%[2]q)", v.Name, cmd.Name)
@@ -139,20 +135,13 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 	}
 
 	var rargs Args = &stringSliceArgs{v: osArgs}
-	var args Args = &stringSliceArgs{rargs.Tail()}
-
-	if cmd.isCompletionCommand || cmd.Name == helpName {
-		tracef("special command detected, skipping pre-parse (cmd=%[1]q)", cmd.Name)
-		cmd.parsedArgs = args
-		return ctx, cmd.Action(ctx, cmd)
-	}
-
 	for _, f := range cmd.allFlags() {
 		if err := f.PreParse(); err != nil {
 			return ctx, err
 		}
 	}
 
+	var args Args = &stringSliceArgs{rargs.Tail()}
 	var err error
 
 	if cmd.SkipFlagParsing {
@@ -186,9 +175,9 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 		}
 		if !cmd.hideHelp() {
 			if cmd.parent == nil {
-				tracef("running ShowRootCommandHelp")
-				if err := ShowRootCommandHelp(cmd); err != nil {
-					tracef("SILENTLY IGNORING ERROR running ShowRootCommandHelp %[1]v (cmd=%[2]q)", err, cmd.Name)
+				tracef("running ShowAppHelp")
+				if err := ShowAppHelp(cmd); err != nil {
+					tracef("SILENTLY IGNORING ERROR running ShowAppHelp %[1]v (cmd=%[2]q)", err, cmd.Name)
 				}
 			} else {
 				tracef("running ShowCommandHelp with %[1]q", cmd.Name)
@@ -213,13 +202,8 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 	}
 
 	for _, flag := range cmd.allFlags() {
-		isSet := flag.IsSet()
 		if err := flag.PostParse(); err != nil {
 			return ctx, err
-		}
-		// add env set flags here
-		if !isSet && flag.IsSet() {
-			cmd.setFlags[flag] = struct{}{}
 		}
 	}
 
@@ -237,18 +221,14 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 		}()
 	}
 
-	// Walk the parent chain to check mutually exclusive flag groups
-	// defined on ancestor commands, since persistent flags are inherited.
-	for pCmd := cmd; pCmd != nil; pCmd = pCmd.parent {
-		for _, grp := range pCmd.MutuallyExclusiveFlags {
-			if err := grp.check(cmd); err != nil {
-				if cmd.OnUsageError != nil {
-					err = cmd.OnUsageError(ctx, cmd, err, cmd.parent != nil)
-				} else {
-					_ = ShowSubcommandHelp(cmd)
-				}
-				return ctx, err
+	for _, grp := range cmd.MutuallyExclusiveFlags {
+		if err := grp.check(cmd); err != nil {
+			if cmd.OnUsageError != nil {
+				err = cmd.OnUsageError(ctx, cmd, err, cmd.parent != nil)
+			} else {
+				_ = ShowSubcommandHelp(cmd)
 			}
+			return ctx, err
 		}
 	}
 
@@ -262,7 +242,6 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 
 		if cmd.SuggestCommandFunc != nil && name != "--" {
 			name = cmd.SuggestCommandFunc(cmd.Commands, name)
-			tracef("suggested command name=%1[q] (cmd=%[2]q)", name, cmd.Name)
 		}
 		subCmd = cmd.Command(name)
 		if subCmd == nil {
@@ -274,13 +253,14 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 			}
 
 			if isFlagName || hasDefault {
-				argsWithDefault := cmd.argsWithDefaultCommand(cmd.parsedArgs)
+				argsWithDefault := cmd.argsWithDefaultCommand(args)
 				tracef("using default command args=%[1]q (cmd=%[2]q)", argsWithDefault, cmd.Name)
-				subCmd = cmd.Command(argsWithDefault.First())
-				cmd.parsedArgs = argsWithDefault
+				if !reflect.DeepEqual(args, argsWithDefault) {
+					subCmd = cmd.Command(argsWithDefault.First())
+				}
 			}
 		}
-	} else if cmd.DefaultCommand != "" {
+	} else if cmd.parent == nil && cmd.DefaultCommand != "" {
 		tracef("no positional args present; checking default command %[1]q (cmd=%[2]q)", cmd.DefaultCommand, cmd.Name)
 
 		if dc := cmd.Command(cmd.DefaultCommand); dc != cmd {
@@ -334,11 +314,7 @@ func (cmd *Command) run(ctx context.Context, osArgs []string) (_ context.Context
 
 	if err := cmd.checkAllRequiredFlags(); err != nil {
 		cmd.isInError = true
-		if cmd.OnUsageError != nil {
-			err = cmd.OnUsageError(ctx, cmd, err, cmd.parent != nil)
-		} else {
-			_ = ShowSubcommandHelp(cmd)
-		}
+		_ = ShowSubcommandHelp(cmd)
 		return ctx, err
 	}
 

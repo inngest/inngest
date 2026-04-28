@@ -118,7 +118,7 @@ func (a *ArgumentBase[T, C, VC]) Parse(s []string) ([]string, error) {
 	tracef("attempting arg%[1] parse", &a.Name)
 	if len(s) > 0 {
 		if err := value.Set(s[0]); err != nil {
-			return s, fmt.Errorf("invalid value %q for argument %s: %v", s[0], a.Name, err)
+			return s, err
 		}
 		*a.value = value.Get().(T)
 		tracef("set arg%[1] one value", a.Name, *a.value)
@@ -180,10 +180,12 @@ func (a *ArgumentsBase[T, C, VC]) Usage() string {
 func (a *ArgumentsBase[T, C, VC]) Parse(s []string) ([]string, error) {
 	tracef("calling arg%[1] parse with args %[2]", &a.Name, s)
 	if a.Max == 0 {
-		return s, fmt.Errorf("args %s has max 0, not parsing argument", a.Name)
+		fmt.Printf("WARNING args %s has max 0, not parsing argument\n", a.Name)
+		return s, nil
 	}
 	if a.Max != -1 && a.Min > a.Max {
-		return s, fmt.Errorf("args %s has min[%d] > max[%d], not parsing argument", a.Name, a.Min, a.Max)
+		fmt.Printf("WARNING args %s has min[%d] > max[%d], not parsing argument\n", a.Name, a.Min, a.Max)
+		return s, nil
 	}
 
 	count := 0
@@ -195,7 +197,7 @@ func (a *ArgumentsBase[T, C, VC]) Parse(s []string) ([]string, error) {
 	tracef("attempting arg%[1] parse", &a.Name)
 	for _, arg := range s {
 		if err := value.Set(arg); err != nil {
-			return s, fmt.Errorf("invalid value %q for argument %s: %v", arg, a.Name, err)
+			return s, err
 		}
 		tracef("set arg%[1] one value", &a.Name, value.Get().(T))
 		a.values = append(a.values, value.Get().(T))

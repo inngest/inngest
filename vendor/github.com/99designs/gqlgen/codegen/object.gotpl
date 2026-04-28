@@ -3,134 +3,108 @@
 var {{ $object.Name|lcFirst}}Implementors = {{$object.Implementors}}
 
 {{- if .Stream }}
-func {{$.FuncReceiver}}_{{$object.Name}}(ctx context.Context, {{$.ECFuncParam}}sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, {{$object.Name|lcFirst}}Implementors)
 	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
 		Object: {{$object.Name|quote}},
 	})
 	if len(fields) != 1 {
-		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		ec.Errorf(ctx, "must subscribe to exactly one stream")
 		return nil
 	}
 
 	switch fields[0].Name {
 	{{- range $field := $object.Fields }}
 	case "{{$field.Name}}":
-		return {{$.ECDot}}_{{$object.Name}}_{{$field.Name}}(ctx, {{$.ECArg}}fields[0])
+		return ec._{{$object.Name}}_{{$field.Name}}(ctx, fields[0])
 	{{- end }}
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
 }
 {{- else }}
-
-func {{$.FuncReceiver}}_{{$object.Name}}(ctx context.Context, {{$.ECFuncParam}}sel ast.SelectionSet{{ if not $object.Root }},obj {{$object.Reference | ref }}{{ end }}) graphql.Marshaler {
+func (ec *executionContext) _{{$object.Name}}(ctx context.Context, sel ast.SelectionSet{{ if not $object.Root }},obj {{$object.Reference | ref }}{{ end }}) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, {{$object.Name|lcFirst}}Implementors)
-	{{- if $object.Root }}
-		ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
-			Object: {{$object.Name|quote}},
-		})
-	{{end}}
-
+    {{- if $object.Root }}
+        ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+            Object: {{$object.Name|quote}},
+        })
+    {{end}}
 	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
+	var invalids uint32
 	for i, field := range fields {
-		{{- if $object.Root }}
-			innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
-				Object: field.Name,
-				Field: field,
-			})
-		{{end}}
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString({{$object.Name|quote}})
-		{{- range $field := $object.Fields }}
-		case "{{$field.Name}}":
-			{{- if $field.IsConcurrent }}
-				field := field
+        {{- if $object.Root }}
+            innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
+                Object: field.Name,
+                Field: field,
+            })
+        {{end}}
+        switch field.Name {
+        case "__typename":
+            out.Values[i] = graphql.MarshalString({{$object.Name|quote}})
+        {{- range $field := $object.Fields }}
+        case "{{$field.Name}}":
+            {{- if $field.IsConcurrent }}
+                field := field
 
-				innerFunc := func(ctx context.Context, {{ if $field.TypeReference.GQL.NonNull }}fs{{ else }}_{{ end }} *graphql.FieldSet) (res graphql.Marshaler) {
-					{{- if not $.Config.OmitPanicHandler }}
-					defer func() {
-						if r := recover(); r != nil {
-							ec.Error(ctx, ec.Recover(ctx, r))
-						}
-					}()
-					{{- end }}
-					res = {{$.ECDot}}_{{$object.Name}}_{{$field.Name}}(ctx, {{$.ECArg}}field{{if not $object.Root}}, obj{{end}})
-					{{- if $field.TypeReference.GQL.NonNull }}
-						if res == graphql.Null { {{ $object.InvalidsIncrement "fs" }} }
-					{{- end }}
-					return res
-				}
+                innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+                    defer func() {
+                        if r := recover(); r != nil {
+                            ec.Error(ctx, ec.Recover(ctx, r))
+                        }
+                    }()
+                    res = ec._{{$object.Name}}_{{$field.Name}}(ctx, field{{if not $object.Root}}, obj{{end}})
+                    {{- if $field.TypeReference.GQL.NonNull }}
+                        if res == graphql.Null {
+                            {{- if $object.IsConcurrent }}
+                                atomic.AddUint32(&invalids, 1)
+                            {{- else }}
+                                invalids++
+                            {{- end }}
+                        }
+                    {{- end }}
+                    return res
+                }
 
-				{{if $object.Root}}
-					rrm := func(ctx context.Context) graphql.Marshaler {
-						return ec.OperationContext.RootResolverMiddleware(ctx,
-							func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-					}
-				{{end}}
+                {{if $object.Root}}
+                    rrm := func(ctx context.Context) graphql.Marshaler {
+                        return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+                    }
+                {{end}}
 
-				{{if not $object.Root}}
-					if field.Deferrable != nil {
-						dfs, ok := deferred[field.Deferrable.Label]
-						di := 0
-						if ok {
-							dfs.AddField(field)
-							di = len(dfs.Values) - 1
-						} else {
-							dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-							deferred[field.Deferrable.Label] = dfs
-						}
-						dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-							return innerFunc(ctx, dfs)
-						})
+                out.Concurrently(i, func() graphql.Marshaler {
+                    {{- if $object.Root -}}
+                        return rrm(innerCtx)
+                    {{- else -}}
+                        return innerFunc(ctx)
+                    {{end}}
+                })
+            {{- else }}
+                {{if $object.Root}}
+                    out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+                        return ec._{{$object.Name}}_{{$field.Name}}(ctx, field)
+                    })
+                {{else}}
+                    out.Values[i] = ec._{{$object.Name}}_{{$field.Name}}(ctx, field, obj)
+                {{end}}
 
-						// don't run the out.Concurrently() call below
-						out.Values[i] = graphql.Null
-						continue
-					}
-				{{end}}
-
-				out.Concurrently(i, func(ctx context.Context) graphql.Marshaler {
-					{{- if $object.Root -}}
-						return rrm(innerCtx)
-					{{- else -}}
-						return innerFunc(ctx, out)
-					{{- end -}}
-				})
-			{{- else }}
-				{{- if $object.Root -}}
-					out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-						return {{$.ECDot}}_{{$object.Name}}_{{$field.Name}}(ctx, {{$.ECArg}}field)
-					})
-				{{- else -}}
-					out.Values[i] = {{$.ECDot}}_{{$object.Name}}_{{$field.Name}}(ctx, {{$.ECArg}}field, obj)
-				{{- end -}}
-
-				{{- if $field.TypeReference.GQL.NonNull }}
-					if out.Values[i] == graphql.Null { {{ $object.InvalidsIncrement "out" }} }
-				{{- end }}
-			{{- end }}
-		{{- end }}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
+                {{- if $field.TypeReference.GQL.NonNull }}
+                    if out.Values[i] == graphql.Null {
+                        {{- if $object.IsConcurrent }}
+                            atomic.AddUint32(&invalids, 1)
+                        {{- else }}
+                            invalids++
+                        {{- end }}
+                    }
+                {{- end }}
+            {{- end }}
+        {{- end }}
+        default:
+            panic("unknown field " + strconv.Quote(field.Name))
+        }
 	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 { return graphql.Null }
-
-	atomic.AddInt32(&ec.Deferred, int32(min(len(deferred), math.MaxInt32)))
-
-	for label, dfs := range deferred {
-		ec.ProcessDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
+	out.Dispatch()
+	if invalids > 0 { return graphql.Null }
 	return out
 }
 {{- end }}

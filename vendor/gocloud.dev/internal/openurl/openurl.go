@@ -23,10 +23,9 @@ import (
 )
 
 // SchemeMap maps URL schemes to values. The zero value is an empty map, ready for use.
-// All schemes are stored and compared case-insensitively.
 type SchemeMap struct {
 	api string
-	m   map[string]any
+	m   map[string]interface{}
 }
 
 // Register registers scheme for value; subsequent calls to FromString or
@@ -35,9 +34,9 @@ type SchemeMap struct {
 // be passed. It should be in all lowercase.
 // typ is the portable type (e.g., "Bucket").
 // Register panics if scheme has already been registered.
-func (m *SchemeMap) Register(api, typ, scheme string, value any) {
+func (m *SchemeMap) Register(api, typ, scheme string, value interface{}) {
 	if m.m == nil {
-		m.m = map[string]any{}
+		m.m = map[string]interface{}{}
 	}
 	if api != strings.ToLower(api) {
 		panic(fmt.Errorf("api should be lowercase: %q", api))
@@ -47,7 +46,6 @@ func (m *SchemeMap) Register(api, typ, scheme string, value any) {
 	} else if m.api != api {
 		panic(fmt.Errorf("previously registered using api %q (now %q)", m.api, api))
 	}
-	scheme = strings.ToLower(scheme)
 	if _, exists := m.m[scheme]; exists {
 		panic(fmt.Errorf("scheme %q already registered for %s.%s", scheme, api, typ))
 	}
@@ -55,7 +53,7 @@ func (m *SchemeMap) Register(api, typ, scheme string, value any) {
 }
 
 // FromString parses urlstr as an URL and looks up the value for the URL's scheme.
-func (m *SchemeMap) FromString(typ, urlstr string) (any, *url.URL, error) {
+func (m *SchemeMap) FromString(typ, urlstr string) (interface{}, *url.URL, error) {
 	u, err := url.Parse(urlstr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open %s.%s: %v", m.api, typ, err)
@@ -68,8 +66,8 @@ func (m *SchemeMap) FromString(typ, urlstr string) (any, *url.URL, error) {
 }
 
 // FromURL looks up the value for u's scheme.
-func (m *SchemeMap) FromURL(typ string, u *url.URL) (any, error) {
-	scheme := strings.ToLower(u.Scheme)
+func (m *SchemeMap) FromURL(typ string, u *url.URL) (interface{}, error) {
+	scheme := u.Scheme
 	if scheme == "" {
 		return nil, fmt.Errorf("open %s.%s: no scheme in URL %q", m.api, typ, u)
 	}
@@ -98,6 +96,10 @@ func (m *SchemeMap) Schemes() []string {
 
 // ValidScheme returns true iff scheme has been registered.
 func (m *SchemeMap) ValidScheme(scheme string) bool {
-	_, exists := m.m[strings.ToLower(scheme)]
-	return exists
+	for s := range m.m {
+		if scheme == s {
+			return true
+		}
+	}
+	return false
 }

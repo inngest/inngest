@@ -92,7 +92,6 @@ type Decoder struct {
 	parser      *parser
 	knownFields bool
 	origin      bool
-	file        string
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -113,9 +112,8 @@ func (dec *Decoder) KnownFields(enable bool) {
 
 // Origin enables the recording of the line and column of the
 // decoded values in the YAML content.
-func (dec *Decoder) Origin(enable bool, file string) {
+func (dec *Decoder) Origin(enable bool) {
 	dec.origin = enable
-	dec.file = file
 }
 
 // Decode reads the next YAML-encoded value from its input
@@ -127,7 +125,6 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 	d := newDecoder()
 	d.knownFields = dec.knownFields
 	d.origin = dec.origin
-	d.file = dec.file
 	defer handleErr(&err)
 	node := dec.parser.parse()
 	if node == nil {

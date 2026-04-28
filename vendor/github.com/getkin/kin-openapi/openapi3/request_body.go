@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"maps"
 )
 
 // RequestBody is specified by OpenAPI/Swagger 3.0 standard.
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#request-body-object
 type RequestBody struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"-" yaml:"-"`
+	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
 
 	Description string  `json:"description,omitempty" yaml:"description,omitempty"`
 	Required    bool    `json:"required,omitempty" yaml:"required,omitempty"`
@@ -87,7 +86,9 @@ func (requestBody RequestBody) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of RequestBody.
 func (requestBody RequestBody) MarshalYAML() (any, error) {
 	m := make(map[string]any, 3+len(requestBody.Extensions))
-	maps.Copy(m, requestBody.Extensions)
+	for k, v := range requestBody.Extensions {
+		m[k] = v
+	}
 	if x := requestBody.Description; x != "" {
 		m["description"] = requestBody.Description
 	}
@@ -108,6 +109,7 @@ func (requestBody *RequestBody) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
+	delete(x.Extensions, originKey)
 	delete(x.Extensions, "description")
 	delete(x.Extensions, "required")
 	delete(x.Extensions, "content")
@@ -139,6 +141,6 @@ func (requestBody *RequestBody) Validate(ctx context.Context, opts ...Validation
 
 // UnmarshalJSON sets RequestBodies to a copy of data.
 func (requestBodies *RequestBodies) UnmarshalJSON(data []byte) (err error) {
-	*requestBodies, err = unmarshalStringMapP[RequestBodyRef](data)
+	*requestBodies, _, err = unmarshalStringMapP[RequestBodyRef](data)
 	return
 }

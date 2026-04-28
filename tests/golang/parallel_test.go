@@ -3,7 +3,6 @@ package golang
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -32,9 +31,9 @@ func TestParallelSteps(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngestgo.ConfigStepConcurrency{
+		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
-		}},
+		}}},
 		inngestgo.EventTrigger("test/parallel", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -85,33 +84,26 @@ func TestParallelSteps(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("verify in-progress", func(t *testing.T) {
-		// Poll until at least 2 steps have started (concurrency limit = 2).
-		// Under CI load, step scheduling can be slower than the 5s step duration.
-		require.EventuallyWithT(t, func(ct *assert.CollectT) {
-			assert.GreaterOrEqual(ct, atomic.LoadInt32(&counter), int32(2),
-				"expected at least 2 steps to have started")
-		}, 15*time.Second, 500*time.Millisecond)
+		<-time.After(2 * time.Second)
+		require.Equal(t, int32(2), atomic.LoadInt32(&counter))
 
 		_ = c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusRunning,
 			ChildSpanCount: 2,
-			Timeout:        10 * time.Second,
-			Interval:       500 * time.Millisecond,
+			Timeout:        2 * time.Second,
+			Interval:       200 * time.Millisecond,
 		})
 	})
 
 	t.Run("verify completion", func(t *testing.T) {
-		// Poll until all 4 steps have completed instead of using a fixed sleep.
-		require.EventuallyWithT(t, func(ct *assert.CollectT) {
-			assert.Equal(ct, int32(4), atomic.LoadInt32(&counter),
-				"expected all 4 parallel steps to have executed")
-		}, 30*time.Second, 500*time.Millisecond)
+		<-time.After(10 * time.Second)
+		require.Equal(t, int32(4), atomic.LoadInt32(&counter))
 
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusCompleted,
 			ChildSpanCount: 4,
-			Timeout:        15 * time.Second,
-			Interval:       500 * time.Millisecond,
+			Timeout:        5 * time.Second,
+			Interval:       250 * time.Millisecond,
 		})
 
 		// check on spans
@@ -259,8 +251,7 @@ func TestParallelSequential(t *testing.T) {
 		counterA2 int32
 		counterB1 int32
 		counterB2 int32
-		stepOrder   []string
-		stepOrderMu sync.Mutex
+		stepOrder []string
 	)
 	rid := NewRunID()
 	_, err := inngestgo.CreateFunction(
@@ -274,9 +265,7 @@ func TestParallelSequential(t *testing.T) {
 				func(ctx context.Context) (any, error) {
 					_, err := step.Run(ctx, "a1", func(ctx context.Context) (any, error) {
 						atomic.AddInt32(&counterA1, 1)
-						stepOrderMu.Lock()
 						stepOrder = append(stepOrder, "a1")
-						stepOrderMu.Unlock()
 						return nil, nil
 					})
 					if err != nil {
@@ -285,9 +274,7 @@ func TestParallelSequential(t *testing.T) {
 
 					_, err = step.Run(ctx, "a2", func(ctx context.Context) (any, error) {
 						atomic.AddInt32(&counterA2, 1)
-						stepOrderMu.Lock()
 						stepOrder = append(stepOrder, "a2")
-						stepOrderMu.Unlock()
 						return nil, nil
 					})
 					return nil, err
@@ -296,9 +283,7 @@ func TestParallelSequential(t *testing.T) {
 					_, err := step.Run(ctx, "b1", func(ctx context.Context) (any, error) {
 						atomic.AddInt32(&counterB1, 1)
 						time.Sleep(2 * time.Second)
-						stepOrderMu.Lock()
 						stepOrder = append(stepOrder, "b1")
-						stepOrderMu.Unlock()
 						return nil, nil
 					})
 					if err != nil {
@@ -308,18 +293,14 @@ func TestParallelSequential(t *testing.T) {
 					_, err = step.Run(ctx, "b2", func(ctx context.Context) (any, error) {
 						atomic.AddInt32(&counterB2, 1)
 						time.Sleep(2 * time.Second)
-						stepOrderMu.Lock()
 						stepOrder = append(stepOrder, "b2")
-						stepOrderMu.Unlock()
 						return nil, nil
 					})
 					return nil, err
 				},
 			)
 
-			stepOrderMu.Lock()
 			stepOrder = append(stepOrder, "end")
-			stepOrderMu.Unlock()
 			return res, nil
 		},
 	)
@@ -338,13 +319,12 @@ func TestParallelSequential(t *testing.T) {
 	r.Equal(int32(1), atomic.LoadInt32(&counterB2))
 
 	// a2 completes after b1 because "optimized parallelism" doesn't continue
-	// until all parallel steps end.
-	// The function may be re-invoked after all steps complete, appending "end"
-	// more than once, so we verify the step prefix and that all trailing entries are "end".
+	// until all parallel steps end.  The trailing "end" evaluation can replay
+	// during discovery, so only the step ordering itself is stable.
 	r.GreaterOrEqual(len(stepOrder), 5)
 	r.Equal([]string{"a1", "b1", "a2", "b2"}, stepOrder[:4])
-	for _, s := range stepOrder[4:] {
-		r.Equal("end", s)
+	for _, item := range stepOrder[4:] {
+		r.Equal("end", item)
 	}
 }
 
@@ -563,9 +543,7 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
 	defer server.Close()
 
-	var (
-		counter int32
-	)
+	var counter int32
 	rid := NewRunID()
 	eventName := randomSuffix("event")
 	_, err := inngestgo.CreateFunction(
@@ -626,23 +604,9 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 
 	_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 	r.NoError(err)
-
-	// Wait for any terminal status. In race mode with Retries: 0, the run
-	// may legitimately reach FAILED under CI load (e.g. when a race branch
-	// cancellation propagates as an error). The core assertion is counter == 1
-	// (no duplicate step execution), not the specific terminal status.
-	runID := rid.Wait(t)
-	var terminalStatus string
-	require.EventuallyWithT(t, func(ct *assert.CollectT) {
-		run, err := c.TryRun(ctx, runID)
-		if !assert.NoError(ct, err) {
-			return
-		}
-		terminalStatus = run.Status
-		assert.True(ct, run.Status == "COMPLETED" || run.Status == "FAILED",
-			"expected terminal status, got %s (runID: %s)", run.Status, runID)
-	}, 30*time.Second, 500*time.Millisecond)
-	t.Logf("run %s reached terminal status: %s", runID, terminalStatus)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t), client.WaitForRunStatusOpts{
+		Timeout: 10 * time.Second,
+	})
 
 	r.Equal(1, int(atomic.LoadInt32(&counter)))
 }

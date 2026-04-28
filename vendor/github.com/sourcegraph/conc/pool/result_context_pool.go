@@ -20,10 +20,11 @@ type ResultContextPool[T any] struct {
 // Go submits a task to the pool. If all goroutines in the pool
 // are busy, a call to Go() will block until the task can be started.
 func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {
-	idx := p.agg.nextIndex()
 	p.contextPool.Go(func(ctx context.Context) error {
 		res, err := f(ctx)
-		p.agg.save(idx, res, err != nil)
+		if err == nil || p.collectErrored {
+			p.agg.add(res)
+		}
 		return err
 	})
 }
@@ -32,9 +33,7 @@ func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {
 // returns an error if any of the tasks errored.
 func (p *ResultContextPool[T]) Wait() ([]T, error) {
 	err := p.contextPool.Wait()
-	results := p.agg.collect(p.collectErrored)
-	p.agg = resultAggregator[T]{}
-	return results, err
+	return p.agg.results, err
 }
 
 // WithCollectErrored configures the pool to still collect the result of a task
@@ -60,15 +59,6 @@ func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {
 func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {
 	p.panicIfInitialized()
 	p.contextPool.WithCancelOnError()
-	return p
-}
-
-// WithFailFast is an alias for the combination of WithFirstError and
-// WithCancelOnError. By default, the errors from all tasks are returned and
-// the pool's context is not canceled until the parent context is canceled.
-func (p *ResultContextPool[T]) WithFailFast() *ResultContextPool[T] {
-	p.panicIfInitialized()
-	p.contextPool.WithFailFast()
 	return p
 }
 

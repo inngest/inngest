@@ -35,7 +35,6 @@ import (
 	"github.com/google/s2a-go/internal/tokenmanager"
 	"github.com/google/s2a-go/internal/v2"
 	"github.com/google/s2a-go/retry"
-	"github.com/google/s2a-go/stream"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/protobuf/proto"
@@ -331,7 +330,6 @@ func NewTLSClientConfigFactory(opts *ClientOptions) (TLSClientConfigFactory, err
 			tokenManager:              nil,
 			verificationMode:          getVerificationMode(opts.VerificationMode),
 			serverAuthorizationPolicy: opts.serverAuthorizationPolicy,
-			getStream:                 opts.getS2AStream,
 		}, nil
 	}
 	return &s2aTLSClientConfigFactory{
@@ -340,7 +338,6 @@ func NewTLSClientConfigFactory(opts *ClientOptions) (TLSClientConfigFactory, err
 		tokenManager:              tokenManager,
 		verificationMode:          getVerificationMode(opts.VerificationMode),
 		serverAuthorizationPolicy: opts.serverAuthorizationPolicy,
-		getStream:                 opts.getS2AStream,
 	}, nil
 }
 
@@ -350,7 +347,6 @@ type s2aTLSClientConfigFactory struct {
 	tokenManager              tokenmanager.AccessTokenManager
 	verificationMode          s2av2pb.ValidatePeerCertificateChainReq_VerificationMode
 	serverAuthorizationPolicy []byte
-	getStream                 stream.GetS2AStream
 }
 
 func (f *s2aTLSClientConfigFactory) Build(
@@ -359,7 +355,7 @@ func (f *s2aTLSClientConfigFactory) Build(
 	if opts != nil && opts.ServerName != "" {
 		serverName = opts.ServerName
 	}
-	return v2.NewClientTLSConfig(ctx, f.s2av2Address, f.transportCreds, f.tokenManager, f.verificationMode, serverName, f.serverAuthorizationPolicy, f.getStream)
+	return v2.NewClientTLSConfig(ctx, f.s2av2Address, f.transportCreds, f.tokenManager, f.verificationMode, serverName, f.serverAuthorizationPolicy)
 }
 
 func getVerificationMode(verificationMode VerificationModeType) s2av2pb.ValidatePeerCertificateChainReq_VerificationMode {
@@ -374,8 +370,6 @@ func getVerificationMode(verificationMode VerificationModeType) s2av2pb.Validate
 		return s2av2pb.ValidatePeerCertificateChainReq_RESERVED_CUSTOM_VERIFICATION_MODE_4
 	case ReservedCustomVerificationMode5:
 		return s2av2pb.ValidatePeerCertificateChainReq_RESERVED_CUSTOM_VERIFICATION_MODE_5
-	case ReservedCustomVerificationMode6:
-		return s2av2pb.ValidatePeerCertificateChainReq_RESERVED_CUSTOM_VERIFICATION_MODE_6
 	default:
 		return s2av2pb.ValidatePeerCertificateChainReq_UNSPECIFIED
 	}

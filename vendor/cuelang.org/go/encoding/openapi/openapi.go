@@ -15,6 +15,7 @@
 package openapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -23,7 +24,6 @@ import (
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 	cuejson "cuelang.org/go/encoding/json"
-	internaljson "cuelang.org/go/internal/encoding/json"
 )
 
 // A Config defines options for converting CUE to and from OpenAPI.
@@ -36,15 +36,10 @@ type Config struct {
 	// Info may be a *ast.StructLit or any type that marshals to JSON.
 	Info interface{}
 
-	// NameFunc allows users to specify an alternative representation
-	// for references. It is called with the value passed to the top level
-	// method or function and the path to the entity being generated.
-	// If it returns an empty string the generator will  expand the type
+	// ReferenceFunc allows users to specify an alternative representation
+	// for references. An empty string tells the generator to expand the type
 	// in place and, if applicable, not generate a schema for that entity.
-	//
-	// Note: this only returns the final element of the /-separated
-	// reference.
-	NameFunc func(val cue.Value, path cue.Path) string
+	ReferenceFunc func(inst *cue.Instance, path []string) string
 
 	// DescriptionFunc allows rewriting a description associated with a certain
 	// field. A typical implementation compiles the description from the
@@ -71,44 +66,28 @@ type Config struct {
 	// OpenAPI Schema. It is an error for an CUE value to refer to itself
 	// if this option is used.
 	ExpandReferences bool
-
-	// StrictFeatures reports an error for features that are known
-	// to be unsupported.
-	StrictFeatures bool
-
-	// StrictKeywords reports an error when unknown keywords
-	// are encountered. For OpenAPI 3.0, this is implicitly always
-	// true, as that specification explicitly prohibits unknown keywords
-	// other than "x-" prefixed keywords.
-	StrictKeywords bool
 }
 
 type Generator = Config
 
 // Gen generates the set OpenAPI schema for all top-level types of the
 // given instance.
-//
-// Deprecated: use [Generate].
-func Gen(inst cue.InstanceOrValue, c *Config) ([]byte, error) {
-	f, err := Generate(inst, c)
+func Gen(inst *cue.Instance, c *Config) ([]byte, error) {
+	if c == nil {
+		c = defaultConfig
+	}
+	all, err := c.All(inst)
 	if err != nil {
 		return nil, err
 	}
-	topValue := inst.Value().Context().BuildFile(f)
-	if err := topValue.Err(); err != nil {
-		return nil, err
-	}
-	return internaljson.Marshal(topValue)
+	return json.Marshal(all)
 }
 
 // Generate generates the set of OpenAPI schema for all top-level types of the
 // given instance.
 //
 // Note: only a limited number of top-level types are supported so far.
-func Generate(inst cue.InstanceOrValue, c *Config) (*ast.File, error) {
-	if c == nil {
-		c = defaultConfig
-	}
+func Generate(inst *cue.Instance, c *Config) (*ast.File, error) {
 	all, err := schemas(c, inst)
 	if err != nil {
 		return nil, err
@@ -120,14 +99,25 @@ func Generate(inst cue.InstanceOrValue, c *Config) (*ast.File, error) {
 	return &ast.File{Decls: top.Elts}, nil
 }
 
+// All generates an OpenAPI definition from the given instance.
+//
+// Note: only a limited number of top-level types are supported so far.
+// Deprecated: use Generate
+func (g *Generator) All(inst *cue.Instance) (*OrderedMap, error) {
+	all, err := schemas(g, inst)
+	if err != nil {
+		return nil, err
+	}
+	top, err := g.compose(inst, all)
+	return (*OrderedMap)(top), err
+}
+
 func toCUE(name string, x interface{}) (v ast.Expr, err error) {
-	b, err := internaljson.Marshal(x)
+	b, err := json.Marshal(x)
 	if err == nil {
 		v, err = cuejson.Extract(name, b)
 	}
 	if err != nil {
-		// TODO(pkg):  wrapping may cause issues in the builtin package. Seems
-		// fine for now though.
 		return nil, errors.Wrapf(err, token.NoPos,
 			"openapi: could not encode %s", name)
 	}
@@ -135,15 +125,18 @@ func toCUE(name string, x interface{}) (v ast.Expr, err error) {
 
 }
 
-func (c *Config) compose(inst cue.InstanceOrValue, schemas *ast.StructLit) (x *ast.StructLit, err error) {
-	val := inst.Value()
+func (c *Config) compose(inst *cue.Instance, schemas *ast.StructLit) (x *ast.StructLit, err error) {
+
 	var errs errors.Error
 
 	var title, version string
 	var info *ast.StructLit
 
-	for i, _ := val.Fields(); i.Next(); {
-		label := i.Selector().Unquoted()
+	for i, _ := inst.Value().Fields(cue.Definitions(true)); i.Next(); {
+		if i.IsDefinition() {
+			continue
+		}
+		label := i.Label()
 		attr := i.Value().Attribute("openapi")
 		if s, _ := attr.String(0); s != "" {
 			label = s
@@ -157,8 +150,8 @@ func (c *Config) compose(inst cue.InstanceOrValue, schemas *ast.StructLit) (x *a
 				errs = errors.Append(errs, errors.Newf(i.Value().Pos(),
 					"info must be a struct"))
 			}
-			title, _ = i.Value().LookupPath(cue.MakePath(cue.Str("title"))).String()
-			version, _ = i.Value().LookupPath(cue.MakePath(cue.Str("version"))).String()
+			title, _ = i.Value().Lookup("title").String()
+			version, _ = i.Value().Lookup("version").String()
 
 		default:
 			errs = errors.Append(errs, errors.Newf(i.Value().Pos(),
@@ -166,18 +159,22 @@ func (c *Config) compose(inst cue.InstanceOrValue, schemas *ast.StructLit) (x *a
 		}
 	}
 
+	// Support of OrderedMap is mostly for backwards compatibility.
 	switch x := c.Info.(type) {
 	case nil:
 		if title == "" {
 			title = "Generated by cue."
-			for _, d := range val.Doc() {
+			for _, d := range inst.Doc() {
 				title = strings.TrimSpace(d.Text())
 				break
+			}
+			if p := inst.ImportPath; title == "" && p != "" {
+				title = fmt.Sprintf("Generated by cue from package %q", p)
 			}
 		}
 
 		if version == "" {
-			version, _ = val.LookupPath(cue.MakePath(cue.Str("$version"))).String()
+			version, _ = inst.Lookup("$version").String()
 			if version == "" {
 				version = "no version"
 			}
@@ -189,24 +186,25 @@ func (c *Config) compose(inst cue.InstanceOrValue, schemas *ast.StructLit) (x *a
 				"version", ast.NewString(version),
 			)
 		} else {
-			m := (*orderedMap)(info)
-			m.setExpr("title", ast.NewString(title))
-			m.setExpr("version", ast.NewString(version))
+			m := (*OrderedMap)(info)
+			m.Set("title", ast.NewString(title))
+			m.Set("version", ast.NewString(version))
 		}
 
 	case *ast.StructLit:
 		info = x
+	case *OrderedMap:
+		info = (*ast.StructLit)(x)
+	case OrderedMap:
+		info = (*ast.StructLit)(&x)
 	default:
 		x, err := toCUE("info section", x)
 		if err != nil {
 			return nil, err
 		}
-		var ok bool
-		info, ok = x.(*ast.StructLit)
-		if !ok {
-			errs = errors.Append(errs, errors.Newf(token.NoPos,
-				"Info field supplied must marshal to a struct but got %s", fmt.Sprintf("%T", x)))
-		}
+		info, _ = x.(*ast.StructLit)
+		errs = errors.Append(errs, errors.Newf(token.NoPos,
+			"Info field supplied must be an *ast.StructLit"))
 	}
 
 	return ast.NewStruct(
@@ -215,6 +213,15 @@ func (c *Config) compose(inst cue.InstanceOrValue, schemas *ast.StructLit) (x *a
 		"paths", ast.NewStruct(),
 		"components", ast.NewStruct("schemas", schemas),
 	), errs
+}
+
+// Schemas extracts component/schemas from the CUE top-level types.
+func (g *Generator) Schemas(inst *cue.Instance) (*OrderedMap, error) {
+	comps, err := schemas(g, inst)
+	if err != nil {
+		return nil, err
+	}
+	return (*OrderedMap)(comps), err
 }
 
 var defaultConfig = &Config{}

@@ -25,8 +25,7 @@ func (f floatValue[T]) Create(val T, p *T, c NoConfig) Value {
 }
 
 func (f floatValue[T]) ToString(b T) string {
-	f.val = &b
-	return f.String()
+	return strconv.FormatFloat(float64(b), 'g', -1, int(unsafe.Sizeof(T(0))*8))
 }
 
 // Below functions are to satisfy the flag.Value interface

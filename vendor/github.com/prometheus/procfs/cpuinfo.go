@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2019 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -12,6 +12,7 @@
 // limitations under the License.
 
 //go:build linux
+// +build linux
 
 package procfs
 
@@ -501,7 +502,7 @@ func parseCPUInfoRISCV(info []byte) ([]CPUInfo, error) {
 	return cpuinfo, nil
 }
 
-func parseCPUInfoDummy(_ []byte) ([]CPUInfo, error) { //nolint:unused
+func parseCPUInfoDummy(_ []byte) ([]CPUInfo, error) { // nolint:unused,deadcode
 	return nil, errors.New("not implemented")
 }
 

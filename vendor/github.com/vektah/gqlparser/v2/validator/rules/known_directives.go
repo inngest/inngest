@@ -1,16 +1,14 @@
-package rules
+package validator
 
 import (
-	"slices"
-
 	"github.com/vektah/gqlparser/v2/ast"
-	//nolint:staticcheck // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator/core"
+
+	//nolint:revive // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator"
 )
 
-var KnownDirectivesRule = Rule{
-	Name: "KnownDirectives",
-	RuleFunc: func(observers *Events, addError AddErrFunc) {
+func init() {
+	AddRule("KnownDirectives", func(observers *Events, addError AddErrFunc) {
 		type mayNotBeUsedDirective struct {
 			Name   string
 			Line   int
@@ -26,8 +24,10 @@ var KnownDirectivesRule = Rule{
 				return
 			}
 
-			if slices.Contains(directive.Definition.Locations, directive.Location) {
-				return
+			for _, loc := range directive.Definition.Locations {
+				if loc == directive.Location {
+					return
+				}
 			}
 
 			// position must be exists if directive.Definition != nil
@@ -39,15 +39,11 @@ var KnownDirectivesRule = Rule{
 
 			if !seen[tmp] {
 				addError(
-					Message(
-						`Directive "@%s" may not be used on %s.`,
-						directive.Name,
-						directive.Location,
-					),
+					Message(`Directive "@%s" may not be used on %s.`, directive.Name, directive.Location),
 					At(directive.Position),
 				)
 				seen[tmp] = true
 			}
 		})
-	},
+	})
 }

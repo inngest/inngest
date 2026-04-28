@@ -71,7 +71,6 @@ func RegisterMethod(method string) {
 	}
 	mt := methodTyp(2 << n)
 	methodMap[method] = mt
-	reverseMethodMap[mt] = method
 	mALL |= mt
 }
 
@@ -329,7 +328,7 @@ func (n *node) replaceChild(label, tail byte, child *node) {
 
 func (n *node) getEdge(ntyp nodeTyp, label, tail byte, prefix string) *node {
 	nds := n.children[ntyp]
-	for i := range nds {
+	for i := 0; i < len(nds); i++ {
 		if nds[i].label == label && nds[i].tail == tail {
 			if ntyp == ntRegexp && nds[i].prefix != prefix {
 				continue
@@ -430,7 +429,9 @@ func (n *node) findRoute(rctx *Context, method methodTyp, path string) *node {
 			}
 
 			// serially loop through each node grouped by the tail delimiter
-			for _, xn = range nds {
+			for idx := 0; idx < len(nds); idx++ {
+				xn = nds[idx]
+
 				// label for param nodes is the delimiter byte
 				p := strings.IndexByte(xsearch, xn.tail)
 
@@ -649,9 +650,11 @@ func (n *node) routes() []Route {
 				if h.handler == nil {
 					continue
 				}
-				if m, ok := reverseMethodMap[mt]; ok {
-					hs[m] = h.handler
+				m := methodTypString(mt)
+				if m == "" {
+					continue
 				}
+				hs[m] = h.handler
 			}
 
 			rt := Route{subroutes, hs, p}
@@ -769,14 +772,29 @@ func patParamKeys(pattern string) []string {
 	}
 }
 
-// longestPrefix finds the length of the shared prefix of two strings
-func longestPrefix(k1, k2 string) (i int) {
-	for i = 0; i < min(len(k1), len(k2)); i++ {
+// longestPrefix finds the length of the shared prefix
+// of two strings
+func longestPrefix(k1, k2 string) int {
+	max := len(k1)
+	if l := len(k2); l < max {
+		max = l
+	}
+	var i int
+	for i = 0; i < max; i++ {
 		if k1[i] != k2[i] {
 			break
 		}
 	}
-	return
+	return i
+}
+
+func methodTypString(method methodTyp) string {
+	for s, t := range methodMap {
+		if method == t {
+			return s
+		}
+	}
+	return ""
 }
 
 type nodes []*node

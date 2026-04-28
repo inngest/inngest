@@ -2,8 +2,9 @@ package pool
 
 import (
 	"context"
-	"errors"
 	"sync"
+
+	"github.com/sourcegraph/conc/internal/multierror"
 )
 
 // ErrorPool is a pool that runs tasks that may return an error.
@@ -19,7 +20,7 @@ type ErrorPool struct {
 	onlyFirstError bool
 
 	mu   sync.Mutex
-	errs []error
+	errs error
 }
 
 // Go submits a task to the pool. If all goroutines in the pool
@@ -34,17 +35,7 @@ func (p *ErrorPool) Go(f func() error) {
 // returning any errors from tasks.
 func (p *ErrorPool) Wait() error {
 	p.pool.Wait()
-
-	errs := p.errs
-	p.errs = nil // reset errs
-
-	if len(errs) == 0 {
-		return nil
-	} else if p.onlyFirstError {
-		return errs[0]
-	} else {
-		return errors.Join(errs...)
-	}
+	return p.errs
 }
 
 // WithContext converts the pool to a ContextPool for tasks that should
@@ -94,7 +85,13 @@ func (p *ErrorPool) panicIfInitialized() {
 func (p *ErrorPool) addErr(err error) {
 	if err != nil {
 		p.mu.Lock()
-		p.errs = append(p.errs, err)
+		if p.onlyFirstError {
+			if p.errs == nil {
+				p.errs = err
+			}
+		} else {
+			p.errs = multierror.Join(p.errs, err)
+		}
 		p.mu.Unlock()
 	}
 }

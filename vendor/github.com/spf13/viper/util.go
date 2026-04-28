@@ -12,7 +12,6 @@ package viper
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -32,18 +31,13 @@ func (pe ConfigParseError) Error() string {
 	return fmt.Sprintf("While parsing config: %s", pe.err.Error())
 }
 
-// Unwrap returns the wrapped error.
-func (pe ConfigParseError) Unwrap() error {
-	return pe.err
-}
-
 // toCaseInsensitiveValue checks if the value is a  map;
 // if so, create a copy and lower-case the keys recursively.
-func toCaseInsensitiveValue(value any) any {
+func toCaseInsensitiveValue(value interface{}) interface{} {
 	switch v := value.(type) {
-	case map[any]any:
+	case map[interface{}]interface{}:
 		value = copyAndInsensitiviseMap(cast.ToStringMap(v))
-	case map[string]any:
+	case map[string]interface{}:
 		value = copyAndInsensitiviseMap(v)
 	}
 
@@ -52,15 +46,15 @@ func toCaseInsensitiveValue(value any) any {
 
 // copyAndInsensitiviseMap behaves like insensitiviseMap, but creates a copy of
 // any map it makes case insensitive.
-func copyAndInsensitiviseMap(m map[string]any) map[string]any {
-	nm := make(map[string]any)
+func copyAndInsensitiviseMap(m map[string]interface{}) map[string]interface{} {
+	nm := make(map[string]interface{})
 
 	for key, val := range m {
 		lkey := strings.ToLower(key)
 		switch v := val.(type) {
-		case map[any]any:
+		case map[interface{}]interface{}:
 			nm[lkey] = copyAndInsensitiviseMap(cast.ToStringMap(v))
-		case map[string]any:
+		case map[string]interface{}:
 			nm[lkey] = copyAndInsensitiviseMap(v)
 		default:
 			nm[lkey] = v
@@ -70,25 +64,18 @@ func copyAndInsensitiviseMap(m map[string]any) map[string]any {
 	return nm
 }
 
-func insensitiviseVal(val any) any {
-	switch v := val.(type) {
-	case map[any]any:
-		// nested map: cast and recursively insensitivise
-		val = cast.ToStringMap(val)
-		insensitiviseMap(val.(map[string]any))
-	case map[string]any:
-		// nested map: recursively insensitivise
-		insensitiviseMap(v)
-	case []any:
-		// nested array: recursively insensitivise
-		insensitiveArray(v)
-	}
-	return val
-}
-
-func insensitiviseMap(m map[string]any) {
+func insensitiviseMap(m map[string]interface{}) {
 	for key, val := range m {
-		val = insensitiviseVal(val)
+		switch val.(type) {
+		case map[interface{}]interface{}:
+			// nested map: cast and recursively insensitivise
+			val = cast.ToStringMap(val)
+			insensitiviseMap(val.(map[string]interface{}))
+		case map[string]interface{}:
+			// nested map: recursively insensitivise
+			insensitiviseMap(val.(map[string]interface{}))
+		}
+
 		lower := strings.ToLower(key)
 		if key != lower {
 			// remove old key (not lower-cased)
@@ -99,13 +86,7 @@ func insensitiviseMap(m map[string]any) {
 	}
 }
 
-func insensitiveArray(a []any) {
-	for i, val := range a {
-		a[i] = insensitiviseVal(val)
-	}
-}
-
-func absPathify(logger *slog.Logger, inPath string) string {
+func absPathify(logger Logger, inPath string) string {
 	logger.Info("trying to resolve absolute path", "path", inPath)
 
 	if inPath == "$HOME" || strings.HasPrefix(inPath, "$HOME"+string(os.PathSeparator)) {
@@ -128,6 +109,15 @@ func absPathify(logger *slog.Logger, inPath string) string {
 	return ""
 }
 
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
 func userHomeDir() string {
 	if runtime.GOOS == "windows" {
 		home := os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
@@ -147,7 +137,7 @@ func safeMul(a, b uint) uint {
 	return c
 }
 
-// parseSizeInBytes converts strings like 1GB or 12 mb into an unsigned integer number of bytes.
+// parseSizeInBytes converts strings like 1GB or 12 mb into an unsigned integer number of bytes
 func parseSizeInBytes(sizeStr string) uint {
 	sizeStr = strings.TrimSpace(sizeStr)
 	lastChar := len(sizeStr) - 1
@@ -174,7 +164,10 @@ func parseSizeInBytes(sizeStr string) uint {
 		}
 	}
 
-	size := max(cast.ToInt(sizeStr), 0)
+	size := cast.ToInt(sizeStr)
+	if size < 0 {
+		size = 0
+	}
 
 	return safeMul(uint(size), multiplier)
 }
@@ -186,22 +179,22 @@ func parseSizeInBytes(sizeStr string) uint {
 // In case intermediate keys do not exist, or map to a non-map value,
 // a new map is created and inserted, and the search continues from there:
 // the initial map "m" may be modified!
-func deepSearch(m map[string]any, path []string) map[string]any {
+func deepSearch(m map[string]interface{}, path []string) map[string]interface{} {
 	for _, k := range path {
 		m2, ok := m[k]
 		if !ok {
 			// intermediate key does not exist
 			// => create it and continue from there
-			m3 := make(map[string]any)
+			m3 := make(map[string]interface{})
 			m[k] = m3
 			m = m3
 			continue
 		}
-		m3, ok := m2.(map[string]any)
+		m3, ok := m2.(map[string]interface{})
 		if !ok {
 			// intermediate key is a value
 			// => replace with a new map
-			m3 = make(map[string]any)
+			m3 = make(map[string]interface{})
 			m[k] = m3
 		}
 		// continue search from here

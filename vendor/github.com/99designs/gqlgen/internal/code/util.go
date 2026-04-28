@@ -36,8 +36,7 @@ func NormalizeVendor(pkg string) string {
 // github.com/99designs/gqlgen/graphql becomes
 // github.com/foo/vendor/github.com/99designs/gqlgen/graphql
 //
-// x/tools/packages only supports 'qualified package paths' so this will need to be done prior to
-// calling it
+// x/tools/packages only supports 'qualified package paths' so this will need to be done prior to calling it
 // See https://github.com/golang/go/issues/30289
 func QualifyPackagePath(importPath string) string {
 	wd, _ := os.Getwd()
@@ -55,7 +54,7 @@ func QualifyPackagePath(importPath string) string {
 	return pkg.ImportPath
 }
 
-var invalidPackageNameChar = regexp.MustCompile(`\W`)
+var invalidPackageNameChar = regexp.MustCompile(`[^\w]`)
 
 func SanitizePackageName(pkg string) string {
 	return invalidPackageNameChar.ReplaceAllLiteralString(filepath.Base(pkg), "_")

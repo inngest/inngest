@@ -3,7 +3,7 @@ package openapi2
 import (
 	"encoding/json"
 	"net/url"
-	"slices"
+	"sort"
 	"strings"
 
 	"github.com/go-openapi/jsonpointer"
@@ -26,6 +26,8 @@ type SchemaRef struct {
 
 var _ jsonpointer.JSONPointable = (*SchemaRef)(nil)
 
+func (x *SchemaRef) isEmpty() bool { return x == nil || x.Ref == "" && x.Value == nil }
+
 // RefString returns the $ref value.
 func (x *SchemaRef) RefString() string { return x.Ref }
 
@@ -34,6 +36,16 @@ func (x *SchemaRef) CollectionName() string { return "schemas" }
 
 // RefPath returns the path of the $ref relative to the root document.
 func (x *SchemaRef) RefPath() *url.URL { return copyURI(x.refPath) }
+
+func (x *SchemaRef) setRefPath(u *url.URL) {
+	// Once the refPath is set don't override. References can be loaded
+	// multiple times not all with access to the correct path info.
+	if x.refPath != nil {
+		return
+	}
+
+	x.refPath = copyURI(u)
+}
 
 // MarshalYAML returns the YAML encoding of SchemaRef.
 func (x SchemaRef) MarshalYAML() (any, error) {
@@ -62,7 +74,7 @@ func (x *SchemaRef) UnmarshalJSON(data []byte) error {
 			for key := range extra {
 				x.extra = append(x.extra, key)
 			}
-			slices.Sort(x.extra)
+			sort.Strings(x.extra)
 			for k := range extra {
 				if !strings.HasPrefix(k, "x-") {
 					delete(extra, k)

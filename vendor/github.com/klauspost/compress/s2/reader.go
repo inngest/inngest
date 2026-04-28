@@ -1046,7 +1046,7 @@ func (r *Reader) ReadByte() (byte, error) {
 		return c, nil
 	}
 	var tmp [1]byte
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		n, err := r.Read(tmp[:])
 		if err != nil {
 			return 0, err

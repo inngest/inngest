@@ -1,4 +1,4 @@
-// Copyright 2021-2025 The Connect Authors
+// Copyright 2021-2024 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -185,11 +185,11 @@ type Option interface {
 }
 
 // WithSchema provides a parsed representation of the schema for an RPC to a
-// client or handler. The supplied schema is exposed as [Spec].Schema. This
+// client or handler. The supplied schema is exposed as [Spec.Schema]. This
 // option is typically added by generated code.
 //
 // For services using protobuf schemas, the supplied schema should be a
-// [google.golang.org/protobuf/reflect/protoreflect.MethodDescriptor].
+// [protoreflect.MethodDescriptor].
 func WithSchema(schema any) Option {
 	return &schemaOption{Schema: schema}
 }
@@ -237,8 +237,8 @@ func WithCodec(codec Codec) Option {
 // The default minimum is zero. Setting a minimum compression threshold may
 // improve overall performance, because the CPU cost of compressing very small
 // messages usually isn't worth the small reduction in network I/O.
-func WithCompressMinBytes(minBytes int) Option {
-	return &compressMinBytesOption{Min: minBytes}
+func WithCompressMinBytes(min int) Option {
+	return &compressMinBytesOption{Min: min}
 }
 
 // WithReadMaxBytes limits the performance impact of pathologically large
@@ -254,8 +254,8 @@ func WithCompressMinBytes(minBytes int) Option {
 // HTTP request stream (rather than the per-message size). Connect handles
 // [http.MaxBytesError] specially, so clients still receive errors with the
 // appropriate error code and informative messages.
-func WithReadMaxBytes(maxBytes int) Option {
-	return &readMaxBytesOption{Max: maxBytes}
+func WithReadMaxBytes(max int) Option {
+	return &readMaxBytesOption{Max: max}
 }
 
 // WithSendMaxBytes prevents sending messages too large for the client/handler
@@ -266,8 +266,8 @@ func WithReadMaxBytes(maxBytes int) Option {
 //
 // Setting WithSendMaxBytes to zero allows any message size. Both clients and
 // handlers default to allowing any message size.
-func WithSendMaxBytes(maxBytes int) Option {
-	return &sendMaxBytesOption{Max: maxBytes}
+func WithSendMaxBytes(max int) Option {
+	return &sendMaxBytesOption{Max: max}
 }
 
 // WithIdempotency declares the idempotency of the procedure. This can determine

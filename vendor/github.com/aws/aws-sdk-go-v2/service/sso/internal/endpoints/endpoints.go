@@ -87,7 +87,6 @@ func New() *Resolver {
 var partitionRegexp = struct {
 	Aws      *regexp.Regexp
 	AwsCn    *regexp.Regexp
-	AwsEusc  *regexp.Regexp
 	AwsIso   *regexp.Regexp
 	AwsIsoB  *regexp.Regexp
 	AwsIsoE  *regexp.Regexp
@@ -95,9 +94,8 @@ var partitionRegexp = struct {
 	AwsUsGov *regexp.Regexp
 }{
 
-	Aws:      regexp.MustCompile("^(us|eu|ap|sa|ca|me|af|il|mx)\\-\\w+\\-\\d+$"),
+	Aws:      regexp.MustCompile("^(us|eu|ap|sa|ca|me|af|il)\\-\\w+\\-\\d+$"),
 	AwsCn:    regexp.MustCompile("^cn\\-\\w+\\-\\d+$"),
-	AwsEusc:  regexp.MustCompile("^eusc\\-(de)\\-\\w+\\-\\d+$"),
 	AwsIso:   regexp.MustCompile("^us\\-iso\\-\\w+\\-\\d+$"),
 	AwsIsoB:  regexp.MustCompile("^us\\-isob\\-\\w+\\-\\d+$"),
 	AwsIsoE:  regexp.MustCompile("^eu\\-isoe\\-\\w+\\-\\d+$"),
@@ -230,17 +228,6 @@ var defaultPartitions = endpoints.Partitions{
 				},
 			},
 			endpoints.EndpointKey{
-				Region: "ap-southeast-5",
-			}: endpoints.Endpoint{
-				Hostname: "portal.sso.ap-southeast-5.amazonaws.com",
-				CredentialScope: endpoints.CredentialScope{
-					Region: "ap-southeast-5",
-				},
-			},
-			endpoints.EndpointKey{
-				Region: "ap-southeast-7",
-			}: endpoints.Endpoint{},
-			endpoints.EndpointKey{
 				Region: "ca-central-1",
 			}: endpoints.Endpoint{
 				Hostname: "portal.sso.ca-central-1.amazonaws.com",
@@ -345,9 +332,6 @@ var defaultPartitions = endpoints.Partitions{
 				},
 			},
 			endpoints.EndpointKey{
-				Region: "mx-central-1",
-			}: endpoints.Endpoint{},
-			endpoints.EndpointKey{
 				Region: "sa-east-1",
 			}: endpoints.Endpoint{
 				Hostname: "portal.sso.sa-east-1.amazonaws.com",
@@ -441,41 +425,6 @@ var defaultPartitions = endpoints.Partitions{
 				},
 			},
 		},
-	},
-	{
-		ID: "aws-eusc",
-		Defaults: map[endpoints.DefaultKey]endpoints.Endpoint{
-			{
-				Variant: endpoints.DualStackVariant,
-			}: {
-				Hostname:          "portal.sso.{region}.api.amazonwebservices.eu",
-				Protocols:         []string{"https"},
-				SignatureVersions: []string{"v4"},
-			},
-			{
-				Variant: endpoints.FIPSVariant,
-			}: {
-				Hostname:          "portal.sso-fips.{region}.amazonaws.eu",
-				Protocols:         []string{"https"},
-				SignatureVersions: []string{"v4"},
-			},
-			{
-				Variant: endpoints.FIPSVariant | endpoints.DualStackVariant,
-			}: {
-				Hostname:          "portal.sso-fips.{region}.api.amazonwebservices.eu",
-				Protocols:         []string{"https"},
-				SignatureVersions: []string{"v4"},
-			},
-			{
-				Variant: 0,
-			}: {
-				Hostname:          "portal.sso.{region}.amazonaws.eu",
-				Protocols:         []string{"https"},
-				SignatureVersions: []string{"v4"},
-			},
-		},
-		RegionRegex:    partitionRegexp.AwsEusc,
-		IsRegionalized: true,
 	},
 	{
 		ID: "aws-iso",

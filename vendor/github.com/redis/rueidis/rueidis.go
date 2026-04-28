@@ -93,10 +93,6 @@ var (
 	DisableClientSetInfo = make([]string, 0)
 )
 
-// Define distinct types for safety.
-type ReadNodeSelectorFunc func(slot uint16, nodes []NodeInfo) int
-type ReplicaSelectorFunc func(slot uint16, replicas []NodeInfo) int
-
 // ClientOption should be passed to NewClient to construct a Client
 type ClientOption struct {
 	TLSConfig *tls.Config
@@ -139,7 +135,7 @@ type ClientOption struct {
 	// Each ReplicaInfo must not be modified.
 	// NOTE: This function can't be used with ReplicaOnly option.
 	// NOTE: This function must be used with the SendToReplicas function.
-	ReplicaSelector ReplicaSelectorFunc
+	ReplicaSelector func(slot uint16, replicas []NodeInfo) int
 
 	// ReadNodeSelector returns index of node selected for a read only command.
 	// If set, ReadNodeSelector is prioritized over ReplicaSelector.
@@ -147,7 +143,7 @@ type ClientOption struct {
 	// The function is called only when SendToReplicas returns true.
 	// Each NodeInfo must not be modified.
 	// NOTE: This function can't be used with ReplicaSelector option.
-	ReadNodeSelector ReadNodeSelectorFunc
+	ReadNodeSelector func(slot uint16, nodes []NodeInfo) int
 
 	// Sentinel options, including MasterSet and Auth options
 	Sentinel SentinelOption
@@ -281,10 +277,6 @@ type ClientOption struct {
 	// EnableReplicaAZInfo enables the client to load the replica node's availability zone.
 	// If true, the client will set the `AZ` field in `ReplicaInfo`.
 	EnableReplicaAZInfo bool
-
-	// AZFromInfo forces the `availability_zone` field to be taken from an INFO command instead of HELLO.
-	// Primarily used for AWS MemoryDB.
-	AZFromInfo bool
 }
 
 // SentinelOption contains MasterSet,
@@ -309,12 +301,6 @@ type ClusterOption struct {
 	// If the value is zero, refreshment will be disabled.
 	// Cluster topology cache refresh happens always in the background after a successful scan.
 	ShardsRefreshInterval time.Duration
-
-	// MaxMovedRedirections is the maximum number of times to retry a command when receiving MOVED|ASK responses.
-	// If set to 0 (default), MOVED|ASK retries will continue until the context timeout.
-	// If set to a positive value, the client will return an error after that many MOVED|ASK redirects.
-	// This helps prevent infinite redirect loops in case of cluster misconfiguration.
-	MaxMovedRedirections int
 }
 
 // StandaloneOption is the options for the standalone client.
@@ -413,19 +399,6 @@ type DedicatedClient interface {
 	// and has at most one error describing the reason why the hooks will not be called anymore.
 	// Users can use the error channel to detect disconnection.
 	SetPubSubHooks(hooks PubSubHooks) <-chan error
-
-	// SetOnInvalidations is an alternative way to receive client-side caching invalidation messages
-	// on a dedicated connection instead of using the OnInvalidations callback in ClientOption.
-	// This is useful when using CLIENT TRACKING on a dedicated connection.
-	// Existing PubSubHooks set via SetPubSubHooks are preserved; only the invalidation callback is replaced.
-	// Note that fn will be called sequentially but in another goroutine.
-	// The return value will be either:
-	//   1. an error channel, if the resulting hook set is non-zero, or
-	//   2. nil, if clearing fn leaves no hooks installed.
-	// In the former case, the error channel is guaranteed to be closed when fn will not be called anymore.
-	// When the dedicated connection is returned to the pool, CLIENT TRACKING OFF is sent automatically
-	// so that no tracking state is retained across reuse.
-	SetOnInvalidations(fn func([]RedisMessage)) <-chan error
 }
 
 // CoreClient is the minimum interface shared by the Client and the DedicatedClient.

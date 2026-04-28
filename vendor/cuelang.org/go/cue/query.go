@@ -15,8 +15,6 @@
 package cue
 
 import (
-	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
 )
 
@@ -37,10 +35,6 @@ func getScopePrefix(v Value, p Path) Value {
 }
 
 // LookupPath reports the value for path p relative to v.
-//
-// Use [AnyString] and [AnyIndex] to find the value of undefined element types
-// for structs and lists respectively, for example for the patterns in
-// `{[string]: int}` and `[...string]`.
 func (v Value) LookupPath(p Path) Value {
 	if v.v == nil {
 		return Value{}
@@ -51,35 +45,21 @@ func (v Value) LookupPath(p Path) Value {
 
 outer:
 	for _, sel := range p.path {
-		if _, ok := sel.sel.(patternSelector); ok {
-			// It's not possible to look up pattern constraints.
-			// TODO: could potentially relax that restriction.
-			err := errors.Newf(
-				token.NoPos,
-				"cannot look up pattern constraints other than AnyString or AnyIndex",
-			)
-			return newErrValue(makeValue(v.idx, n, parent), &adt.Bottom{Err: err})
-		}
 		f := sel.sel.feature(v.idx)
-		deref := n.DerefValue()
-		for _, a := range deref.Arcs {
+		for _, a := range n.Arcs {
 			if a.Label == f {
-				if a.IsConstraint() && !sel.sel.isConstraint() {
-					break
-				}
-				a.Finalize(ctx)
 				parent = linkParent(parent, n, a)
 				n = a
 				continue outer
 			}
 		}
-		if sel.sel.isConstraint() {
+		if sel.sel.optional() {
 			x := &adt.Vertex{
 				Parent: n,
 				Label:  sel.sel.feature(ctx),
 			}
-			deref.MatchAndInsert(ctx, x)
-			if x.HasConjuncts() {
+			n.MatchAndInsert(ctx, x)
+			if len(x.Conjuncts) > 0 {
 				x.Finalize(ctx)
 				parent = linkParent(parent, n, x)
 				n = x
@@ -91,11 +71,8 @@ outer:
 		if err, ok := sel.sel.(pathError); ok {
 			x = &adt.Bottom{Err: err.Error}
 		} else {
-			x = mkErr(n, adt.EvalError, "field not found: %v", sel.sel)
-			if n.Accept(ctx, f) {
-				x.Code = adt.IncompleteError
-			}
-			x.NotExists = true
+			// TODO: better message.
+			x = mkErr(v.idx, n, adt.NotExistError, "field %q not found", sel.sel)
 		}
 		v := makeValue(v.idx, n, parent)
 		return newErrValue(v, x)

@@ -25,6 +25,7 @@ package proto
 
 // Visitor is for dispatching Proto elements.
 type Visitor interface {
+	//VisitProto(p *Proto)
 	VisitMessage(m *Message)
 	VisitService(v *Service)
 	VisitSyntax(s *Syntax)
@@ -43,8 +44,6 @@ type Visitor interface {
 	// proto2
 	VisitGroup(g *Group)
 	VisitExtensions(e *Extensions)
-	// edition (proto3+), v2
-	// VisitEdition(e *Edition)
 }
 
 // Visitee is implemented by all Proto elements.

@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"path"
+	"net/url"
 	"time"
 
 	"dario.cat/mergo"
-	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/network"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/internal/core"
@@ -196,7 +196,12 @@ func (c CustomHubSubstitutor) Substitute(image string) (string, error) {
 		}
 	}
 
-	return path.Join(c.hub, image), nil
+	result, err := url.JoinPath(c.hub, image)
+	if err != nil {
+		return "", err
+	}
+
+	return result, nil
 }
 
 // prependHubRegistry represents a way to prepend a custom Hub registry to the image name,
@@ -239,7 +244,12 @@ func (p prependHubRegistry) Substitute(image string) (string, error) {
 		}
 	}
 
-	return path.Join(p.prefix, image), nil
+	result, err := url.JoinPath(p.prefix, image)
+	if err != nil {
+		return "", err
+	}
+
+	return result, nil
 }
 
 // WithImageSubstitutors sets the image substitutors for a container
@@ -343,7 +353,7 @@ func WithStartupCommand(execs ...Executable) CustomizeRequestOption {
 // is ready.
 func WithAfterReadyCommand(execs ...Executable) CustomizeRequestOption {
 	return func(req *GenericContainerRequest) error {
-		postReadiesHook := make([]ContainerHook, 0, len(execs))
+		postReadiesHook := []ContainerHook{}
 
 		for _, exec := range execs {
 			execFn := func(ctx context.Context, c Container) error {

@@ -10,12 +10,10 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/cpuguy83/dockercfg"
-	"github.com/moby/moby/api/types/registry"
-	"github.com/moby/moby/client"
+	"github.com/docker/docker/api/types/registry"
 
 	"github.com/testcontainers/testcontainers-go/internal/core"
 )
@@ -43,13 +41,6 @@ func DockerImageAuth(ctx context.Context, image string) (string, registry.AuthCo
 func dockerImageAuth(ctx context.Context, image string, configs map[string]registry.AuthConfig) (string, registry.AuthConfig, error) {
 	defaultRegistry := defaultRegistryFn(ctx)
 	reg := core.ExtractRegistry(image, defaultRegistry)
-
-	// Normalize Docker Hub aliases for credential lookup
-	if strings.EqualFold(reg, "docker.io") ||
-		strings.EqualFold(reg, "registry.hub.docker.com") ||
-		strings.EqualFold(reg, "registry-1.docker.io") {
-		reg = defaultRegistry // This is https://index.docker.io/v1/
-	}
 
 	if cfg, ok := getRegistryAuth(reg, configs); ok {
 		return reg, cfg, nil
@@ -88,18 +79,18 @@ func getRegistryAuth(reg string, cfgs map[string]registry.AuthConfig) (registry.
 // It will use the docker daemon to get the default registry, returning "https://index.docker.io/v1/" if
 // it fails to get the information from the daemon
 func defaultRegistry(ctx context.Context) string {
-	apiClient, err := NewDockerClientWithOpts(ctx)
+	client, err := NewDockerClientWithOpts(ctx)
 	if err != nil {
 		return core.IndexDockerIO
 	}
-	defer apiClient.Close()
+	defer client.Close()
 
-	info, err := apiClient.Info(ctx, client.InfoOptions{})
+	info, err := client.Info(ctx)
 	if err != nil {
 		return core.IndexDockerIO
 	}
 
-	return info.Info.IndexServerAddress
+	return info.IndexServerAddress
 }
 
 // authConfigResult is a result looking up auth details for key.
@@ -206,6 +197,7 @@ func getDockerAuthConfigs() (map[string]registry.AuthConfig, error) {
 
 			ac := registry.AuthConfig{
 				Auth:          v.Auth,
+				Email:         v.Email,
 				IdentityToken: v.IdentityToken,
 				Password:      v.Password,
 				RegistryToken: v.RegistryToken,

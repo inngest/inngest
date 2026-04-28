@@ -2,6 +2,7 @@ package openapi3
 
 import (
 	"context"
+	"sort"
 	"strings"
 )
 
@@ -9,7 +10,7 @@ import (
 type Content map[string]*MediaType
 
 func NewContent() Content {
-	return make(Content)
+	return make(map[string]*MediaType)
 }
 
 func NewContentWithSchema(schema *Schema, consumes []string) Content {
@@ -108,8 +109,14 @@ func (content Content) Get(mime string) *MediaType {
 func (content Content) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
 
-	for _, k := range componentNames(content) {
-		if err := content[k].Validate(ctx); err != nil {
+	keys := make([]string, 0, len(content))
+	for key := range content {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := content[k]
+		if err := v.Validate(ctx); err != nil {
 			return err
 		}
 	}
@@ -118,6 +125,6 @@ func (content Content) Validate(ctx context.Context, opts ...ValidationOption) e
 
 // UnmarshalJSON sets Content to a copy of data.
 func (content *Content) UnmarshalJSON(data []byte) (err error) {
-	*content, err = unmarshalStringMapP[MediaType](data)
+	*content, _, err = unmarshalStringMapP[MediaType](data)
 	return
 }

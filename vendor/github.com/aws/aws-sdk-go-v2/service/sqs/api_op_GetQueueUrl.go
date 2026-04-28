@@ -10,17 +10,15 @@ import (
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// The GetQueueUrl API returns the URL of an existing Amazon SQS queue. This is
-// useful when you know the queue's name but need to retrieve its URL for further
-// operations.
+// Returns the URL of an existing Amazon SQS queue.
 //
-// To access a queue owned by another Amazon Web Services account, use the
+// To access a queue that belongs to another AWS account, use the
 // QueueOwnerAWSAccountId parameter to specify the account ID of the queue's owner.
-// Note that the queue owner must grant you the necessary permissions to access the
-// queue. For more information about accessing shared queues, see the AddPermissionAPI or [Allow developers to write messages to a shared queue] in
-// the Amazon SQS Developer Guide.
+// The queue's owner must grant you permission to access the queue. For more
+// information about shared queue access, see AddPermissionor see [Allow Developers to Write Messages to a Shared Queue] in the Amazon SQS Developer
+// Guide.
 //
-// [Allow developers to write messages to a shared queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-writing-an-sqs-policy.html#write-messages-to-shared-queue
+// [Allow Developers to Write Messages to a Shared Queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-writing-an-sqs-policy.html#write-messages-to-shared-queue
 func (c *Client) GetQueueUrl(ctx context.Context, params *GetQueueUrlInput, optFns ...func(*Options)) (*GetQueueUrlOutput, error) {
 	if params == nil {
 		params = &GetQueueUrlInput{}
@@ -36,20 +34,17 @@ func (c *Client) GetQueueUrl(ctx context.Context, params *GetQueueUrlInput, optF
 	return out, nil
 }
 
-// Retrieves the URL of an existing queue based on its name and, optionally, the
-// Amazon Web Services account ID.
 type GetQueueUrlInput struct {
 
-	// (Required) The name of the queue for which you want to fetch the URL. The name
-	// can be up to 80 characters long and can include alphanumeric characters, hyphens
-	// (-), and underscores (_). Queue URLs and names are case-sensitive.
+	// The name of the queue whose URL must be fetched. Maximum 80 characters. Valid
+	// values: alphanumeric characters, hyphens ( - ), and underscores ( _ ).
+	//
+	// Queue URLs and names are case-sensitive.
 	//
 	// This member is required.
 	QueueName *string
 
-	// (Optional) The Amazon Web Services account ID of the account that created the
-	// queue. This is only required when you are attempting to access a queue owned by
-	// another Amazon Web Services account.
+	// The Amazon Web Services account ID of the account that created the queue.
 	QueueOwnerAWSAccountId *string
 
 	noSmithyDocumentSerde
@@ -112,9 +107,6 @@ func (c *Client) addOperationGetQueueUrlMiddlewares(stack *middleware.Stack, opt
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -131,9 +123,6 @@ func (c *Client) addOperationGetQueueUrlMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
-		return err
-	}
-	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetQueueUrlValidationMiddleware(stack); err != nil {
@@ -155,15 +144,6 @@ func (c *Client) addOperationGetQueueUrlMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

@@ -1,0 +1,9 @@
+language: go
+
+go:
+  - "1.10"
+  - "1.11"
+  - "1.12"
+  - "1.13"
+
+script: go get github.com/coocood/freecache && go test -race

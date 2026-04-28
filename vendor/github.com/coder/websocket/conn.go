@@ -1,4 +1,5 @@
 //go:build !js
+// +build !js
 
 package websocket
 
@@ -51,8 +52,9 @@ type Conn struct {
 	br             *bufio.Reader
 	bw             *bufio.Writer
 
-	readTimeoutStop  atomic.Pointer[func() bool]
-	writeTimeoutStop atomic.Pointer[func() bool]
+	readTimeout     chan context.Context
+	writeTimeout    chan context.Context
+	timeoutLoopDone chan struct{}
 
 	// Read state.
 	readMu         *mu
@@ -67,25 +69,17 @@ type Conn struct {
 	writeHeaderBuf [8]byte
 	writeHeader    header
 
-	// Close handshake state.
-	closeStateMu     sync.RWMutex
-	closeReceivedErr error
-	closeSentErr     error
-
-	// CloseRead state.
 	closeReadMu   sync.Mutex
 	closeReadCtx  context.Context
 	closeReadDone chan struct{}
 
-	closing atomic.Bool
-	closeMu sync.Mutex // Protects following.
 	closed  chan struct{}
+	closeMu sync.Mutex
+	closing bool
 
-	pingCounter    atomic.Int64
-	activePingsMu  sync.Mutex
-	activePings    map[string]chan<- struct{}
-	onPingReceived func(context.Context, []byte) bool
-	onPongReceived func(context.Context, []byte)
+	pingCounter   int32
+	activePingsMu sync.Mutex
+	activePings   map[string]chan<- struct{}
 }
 
 type connConfig struct {
@@ -94,8 +88,6 @@ type connConfig struct {
 	client         bool
 	copts          *compressionOptions
 	flateThreshold int
-	onPingReceived func(context.Context, []byte) bool
-	onPongReceived func(context.Context, []byte)
 
 	br *bufio.Reader
 	bw *bufio.Writer
@@ -112,10 +104,12 @@ func newConn(cfg connConfig) *Conn {
 		br: cfg.br,
 		bw: cfg.bw,
 
-		closed:         make(chan struct{}),
-		activePings:    make(map[string]chan<- struct{}),
-		onPingReceived: cfg.onPingReceived,
-		onPongReceived: cfg.onPongReceived,
+		readTimeout:     make(chan context.Context),
+		writeTimeout:    make(chan context.Context),
+		timeoutLoopDone: make(chan struct{}),
+
+		closed:      make(chan struct{}),
+		activePings: make(map[string]chan<- struct{}),
 	}
 
 	c.readMu = newMu(c)
@@ -138,6 +132,8 @@ func newConn(cfg connConfig) *Conn {
 	runtime.SetFinalizer(c, func(c *Conn) {
 		c.close()
 	})
+
+	go c.timeoutLoop()
 
 	return c
 }
@@ -168,34 +164,27 @@ func (c *Conn) close() error {
 	return err
 }
 
-func (c *Conn) setupWriteTimeout(ctx context.Context) {
-	stop := context.AfterFunc(ctx, func() {
-		c.clearWriteTimeout()
-		c.close()
-	})
-	swapTimeoutStop(&c.writeTimeoutStop, &stop)
-}
+func (c *Conn) timeoutLoop() {
+	defer close(c.timeoutLoopDone)
 
-func (c *Conn) clearWriteTimeout() {
-	swapTimeoutStop(&c.writeTimeoutStop, nil)
-}
+	readCtx := context.Background()
+	writeCtx := context.Background()
 
-func (c *Conn) setupReadTimeout(ctx context.Context) {
-	stop := context.AfterFunc(ctx, func() {
-		c.clearReadTimeout()
-		c.close()
-	})
-	swapTimeoutStop(&c.readTimeoutStop, &stop)
-}
+	for {
+		select {
+		case <-c.closed:
+			return
 
-func (c *Conn) clearReadTimeout() {
-	swapTimeoutStop(&c.readTimeoutStop, nil)
-}
+		case writeCtx = <-c.writeTimeout:
+		case readCtx = <-c.readTimeout:
 
-func swapTimeoutStop(p *atomic.Pointer[func() bool], newStop *func() bool) {
-	oldStop := p.Swap(newStop)
-	if oldStop != nil {
-		(*oldStop)()
+		case <-readCtx.Done():
+			c.close()
+			return
+		case <-writeCtx.Done():
+			c.close()
+			return
+		}
 	}
 }
 
@@ -211,9 +200,9 @@ func (c *Conn) flate() bool {
 //
 // TCP Keepalives should suffice for most use cases.
 func (c *Conn) Ping(ctx context.Context) error {
-	p := c.pingCounter.Add(1)
+	p := atomic.AddInt32(&c.pingCounter, 1)
 
-	err := c.ping(ctx, strconv.FormatInt(p, 10))
+	err := c.ping(ctx, strconv.Itoa(int(p)))
 	if err != nil {
 		return fmt.Errorf("failed to ping: %w", err)
 	}

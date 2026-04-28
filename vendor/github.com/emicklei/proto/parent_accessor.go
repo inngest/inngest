@@ -85,7 +85,4 @@ func (p *parentAccessor) VisitGroup(g *Group) {
 func (p *parentAccessor) VisitExtensions(e *Extensions) {
 	p.parent = e.Parent
 }
-func (p *parentAccessor) VisitEdition(e *Edition) {
-	p.parent = e.Parent
-}
 func (p *parentAccessor) VisitProto(*Proto) {}

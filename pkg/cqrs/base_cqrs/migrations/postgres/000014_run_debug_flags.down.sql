@@ -1,1 +1,0 @@
-ALTER TABLE spans DROP COLUMN debug_session_id, debug_run_id;

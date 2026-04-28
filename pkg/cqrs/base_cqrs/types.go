@@ -1,13 +1,13 @@
 package base_cqrs
 
 import (
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/jinzhu/copier"
 )
 
-func convertHistoryToWriter(h history.History) (*sqlc.InsertHistoryParams, error) {
-	to := sqlc.InsertHistoryParams{}
+func convertHistoryToWriter(h history.History) (*dbpkg.InsertHistoryParams, error) {
+	to := dbpkg.InsertHistoryParams{}
 	if err := copier.CopyWithOption(&to, h, copier.Option{DeepCopy: true}); err != nil {
 		return nil, err
 	}

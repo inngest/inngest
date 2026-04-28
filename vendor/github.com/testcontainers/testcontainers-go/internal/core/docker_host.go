@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/moby/moby/client"
+	"github.com/docker/docker/client"
 
 	"github.com/testcontainers/testcontainers-go/internal/config"
 )
@@ -31,9 +31,8 @@ var (
 )
 
 var (
-	dockerHostCache    string
-	dockerHostErrCache error
-	dockerHostOnce     sync.Once
+	dockerHostCache string
+	dockerHostOnce  sync.Once
 )
 
 var (
@@ -60,13 +59,13 @@ func DefaultGatewayIP() (string, error) {
 // dockerHostCheck Use a vanilla Docker client to check if the Docker host is reachable.
 // It will avoid recursive calls to this function.
 var dockerHostCheck = func(ctx context.Context, host string) error {
-	cli, err := client.New(client.FromEnv, client.WithHost(host))
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithHost(host), client.WithAPIVersionNegotiation())
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
 	}
 	defer cli.Close()
 
-	_, err = cli.Info(ctx, client.InfoOptions{})
+	_, err = cli.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("docker info: %w", err)
 	}
@@ -86,18 +85,16 @@ var dockerHostCheck = func(ctx context.Context, host string) error {
 //  6. Rootless docker socket path.
 //  7. Else, because the Docker host is not set, it panics.
 func MustExtractDockerHost(ctx context.Context) string {
-	host, err := ExtractDockerHost(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return host
-}
-
-func ExtractDockerHost(ctx context.Context) (string, error) {
 	dockerHostOnce.Do(func() {
-		dockerHostCache, dockerHostErrCache = extractDockerHost(ctx)
+		cache, err := extractDockerHost(ctx)
+		if err != nil {
+			panic(err)
+		}
+
+		dockerHostCache = cache
 	})
-	return dockerHostCache, dockerHostErrCache
+
+	return dockerHostCache
 }
 
 // MustExtractDockerSocket Extracts the docker socket from the different alternatives, removing the socket schema and
@@ -201,13 +198,13 @@ func extractDockerSocketFromClient(ctx context.Context, cli client.APIClient) st
 		return checkDockerSocketFn(testcontainersDockerSocket)
 	}
 
-	info, err := cli.Info(ctx, client.InfoOptions{})
+	info, err := cli.Info(ctx)
 	if err != nil {
 		panic(err) // Docker Info is required to get the Operating System
 	}
 
 	// Because Docker Desktop runs in a VM, we need to use the default docker path for rootless docker
-	if info.Info.OperatingSystem == "Docker Desktop" {
+	if info.OperatingSystem == "Docker Desktop" {
 		if IsWindows() {
 			return WindowsDockerSocketPath
 		}

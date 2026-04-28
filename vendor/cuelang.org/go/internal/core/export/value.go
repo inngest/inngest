@@ -16,7 +16,6 @@ package export
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"cuelang.org/go/cue/ast"
@@ -48,15 +47,15 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 		attrs = ExtractDeclAttrs(n)
 	}
 
-	s, saved := e.pushFrame(n, n.Conjuncts)
+	s, saved := e.pushFrame(n.Conjuncts)
 	e.top().upCount++
 	defer func() {
 		e.top().upCount--
 		e.popFrame(saved)
 	}()
 
-	for c := range n.LeafConjuncts() {
-		e.markLets(c.Expr().Source(), s)
+	for _, c := range n.Conjuncts {
+		e.markLets(c.Expr().Source())
 	}
 
 	switch x := n.BaseValue.(type) {
@@ -74,9 +73,6 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 
 	case *adt.Bottom:
 		switch {
-		case n.ArcType == adt.ArcOptional:
-			// Optional fields may always be the original value.
-
 		case e.cfg.ShowErrors && x.ChildError:
 			// TODO(perf): use precompiled arc statistics
 			if len(n.Arcs) > 0 && n.Arcs[0].Label.IsInt() && !e.showArcs(n) && attrs == nil {
@@ -85,7 +81,7 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 				result = e.structComposite(n, attrs)
 			}
 
-		case !x.IsIncomplete() || !n.HasConjuncts() || e.cfg.Final:
+		case !x.IsIncomplete() || len(n.Conjuncts) == 0 || e.cfg.Final:
 			result = e.bottom(x)
 		}
 
@@ -101,28 +97,39 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 	}
 	if result == nil {
 		// fall back to expression mode
-		// Use stable sort to ensure that tie breaks (for instance if elements
-		// are not associated with a position) are deterministic.
-		a := slices.SortedStableFunc(n.LeafConjuncts(), cmpConjuncts)
-
-		exprs := make([]ast.Expr, 0, len(a))
-		for _, c := range a {
-			if x := e.expr(c.Env, c.Elem()); x != dummyTop {
-				exprs = append(exprs, x)
-			}
+		a := []ast.Expr{}
+		for _, c := range n.Conjuncts {
+			a = append(a, e.expr(c.Expr()))
 		}
-
-		result = ast.NewBinExpr(token.AND, exprs...)
+		result = ast.NewBinExpr(token.AND, a...)
 	}
 
-	filterUnusedLets(s)
+	if len(s.Elts) > 0 {
+		filterUnusedLets(s)
+	}
 	if result != s && len(s.Elts) > 0 {
 		// There are used let expressions within a non-struct.
 		// For now we just fall back to the original expressions.
-		result = e.adt(nil, n)
+		result = e.adt(n, n.Conjuncts)
 	}
 
 	return result
+}
+
+// TODO: do something more principled. Best would be to have a similar
+// mechanism in ast.Ident as others do.
+func stripRefs(x ast.Expr) ast.Expr {
+	ast.Walk(x, nil, func(n ast.Node) {
+		switch x := n.(type) {
+		case *ast.Ident:
+			switch x.Node.(type) {
+			case *ast.ImportSpec:
+			default:
+				x.Node = nil
+			}
+		}
+	})
+	return x
 }
 
 func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
@@ -178,7 +185,7 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 			return ast.NewIdent("_")
 		case 1:
 			if e.cfg.Simplify {
-				return e.expr(nil, x.Values[0])
+				return e.expr(x.Values[0])
 			}
 			return e.bareValue(x.Values[0])
 		}
@@ -196,21 +203,18 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 			a = x.Values
 		}
 
-		slices.SortStableFunc(a, cmpLeafNodes)
-
 		for _, x := range a {
 			result = wrapBin(result, e.bareValue(x), adt.AndOp)
 		}
 
 	case *adt.Disjunction:
 		a := []ast.Expr{}
-
 		for i, v := range x.Values {
 			var expr ast.Expr
 			if e.cfg.Simplify {
 				expr = e.bareValue(v)
 			} else {
-				expr = e.expr(nil, v)
+				expr = e.expr(v)
 			}
 			if i < x.NumDefaults {
 				expr = &ast.UnaryExpr{Op: token.MUL, X: expr}
@@ -218,9 +222,6 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 			a = append(a, expr)
 		}
 		result = ast.NewBinExpr(token.OR, a...)
-
-	case *adt.NodeLink:
-		return e.value(x.Node, a...)
 
 	default:
 		panic(fmt.Sprintf("unsupported type %T", x))
@@ -236,7 +237,7 @@ func (e *exporter) bottom(n *adt.Bottom) *ast.BottomLit {
 	if x := n.Err; x != nil {
 		msg := x.Error()
 		comment := &ast.Comment{Text: "// " + msg}
-		ast.AddComment(err, &ast.CommentGroup{
+		err.AddComment(&ast.CommentGroup{
 			Line:     true,
 			Position: 2,
 			List:     []*ast.Comment{comment},
@@ -254,8 +255,8 @@ func (e *exporter) bool(n *adt.Bool) (b *ast.BasicLit) {
 }
 
 func extractBasic(a []adt.Conjunct) *ast.BasicLit {
-	for c := range adt.ConjunctsSeq(a) {
-		if b, ok := c.Source().(*ast.BasicLit); ok {
+	for _, v := range a {
+		if b, ok := v.Source().(*ast.BasicLit); ok {
 			return &ast.BasicLit{Kind: b.Kind, Value: b.Value}
 		}
 	}
@@ -338,10 +339,8 @@ func (e *exporter) listComposite(v *adt.Vertex) ast.Expr {
 		}
 		elem := e.vertex(a)
 
-		if e.cfg.ShowDocs {
-			docs := ExtractDoc(a)
-			ast.SetComments(elem, docs)
-		}
+		docs := ExtractDoc(a)
+		ast.SetComments(elem, docs)
 
 		l.Elts = append(l.Elts, elem)
 	}
@@ -416,7 +415,7 @@ func (e *exporter) structComposite(v *adt.Vertex, attrs []*ast.Attribute) ast.Ex
 	}
 
 	p := e.cfg
-	for _, label := range VertexFeatures(e.ctx, v) {
+	for _, label := range VertexFeatures(v) {
 		show := false
 		switch label.Typ() {
 		case adt.StringLabel:
@@ -440,21 +439,29 @@ func (e *exporter) structComposite(v *adt.Vertex, attrs []*ast.Attribute) ast.Ex
 			e.inDefinition++
 		}
 
-		arc := v.LookupRaw(label)
-		if arc == nil {
-			continue
+		arc := v.Lookup(label)
+		switch {
+		case arc == nil:
+			if !p.ShowOptional {
+				continue
+			}
+			f.Optional = token.NoSpace.Pos()
+
+			arc = &adt.Vertex{Label: label}
+			v.MatchAndInsert(e.ctx, arc)
+			if len(arc.Conjuncts) == 0 {
+				continue
+			}
+
+			// fall back to expression mode.
+			f.Value = stripRefs(e.expr(arc))
+
+			// TODO: remove use of stripRefs.
+			// f.Value = e.expr(arc)
+
+		default:
+			f.Value = e.vertex(arc)
 		}
-
-		if arc.ArcType == adt.ArcOptional && !p.ShowOptional {
-			continue
-		}
-		// TODO: report an error for required fields in Final mode?
-		// This package typically does not create errors that did not result
-		// from evaluation already.
-
-		f.Constraint = arc.ArcType.Token()
-
-		f.Value = e.vertex(arc.DerefValue())
 
 		if label.IsDef() {
 			e.inDefinition--

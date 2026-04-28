@@ -21,57 +21,17 @@ import (
 	"os/user"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal"
-	"cuelang.org/go/internal/buildattr"
 	"cuelang.org/go/internal/cli"
 )
-
-type tagger struct {
-	cfg *Config
-	// tagMap holds true for all the tags in cfg.Tags that
-	// are not associated with a value.
-	tagMap map[string]bool
-	// tags keeps a record of all the @tag attibutes found in files.
-	tags         []*tag // tags found in files
-	replacements map[ast.Node]ast.Node
-
-	// mu guards the usedTags map.
-	mu sync.Mutex
-	// usedTags keeps a record of all the tag attributes found in files.
-	usedTags map[string]bool
-}
-
-func newTagger(c *Config) *tagger {
-	tagMap := map[string]bool{}
-	for _, t := range c.Tags {
-		if !strings.ContainsRune(t, '=') {
-			tagMap[t] = true
-		}
-	}
-	return &tagger{
-		cfg:      c,
-		tagMap:   tagMap,
-		usedTags: make(map[string]bool),
-	}
-}
-
-// tagIsSet reports whether the tag with the given key
-// is enabled. It also updates t.usedTags to
-// reflect that the tag has been seen.
-func (tg *tagger) tagIsSet(key string) bool {
-	tg.mu.Lock()
-	tg.usedTags[key] = true
-	tg.mu.Unlock()
-	return tg.tagMap[key]
-}
 
 // A TagVar represents an injection variable.
 type TagVar struct {
@@ -83,22 +43,19 @@ type TagVar struct {
 	Description string
 }
 
+const rfc3339 = "2006-01-02T15:04:05.999999999Z"
+
 // DefaultTagVars creates a new map with a set of supported injection variables.
 func DefaultTagVars() map[string]TagVar {
 	return map[string]TagVar{
 		"now": {
 			Func: func() (ast.Expr, error) {
-				return ast.NewString(time.Now().UTC().Format(time.RFC3339Nano)), nil
+				return ast.NewString(time.Now().UTC().Format(rfc3339)), nil
 			},
 		},
 		"os": {
 			Func: func() (ast.Expr, error) {
 				return ast.NewString(runtime.GOOS), nil
-			},
-		},
-		"arch": {
-			Func: func() (ast.Expr, error) {
-				return ast.NewString(runtime.GOARCH), nil
 			},
 		},
 		"cwd": {
@@ -109,10 +66,7 @@ func DefaultTagVars() map[string]TagVar {
 		"username": {
 			Func: func() (ast.Expr, error) {
 				u, err := user.Current()
-				if err != nil {
-					return nil, err
-				}
-				return ast.NewString(u.Username), nil
+				return varToString(u.Username, err)
 			},
 		},
 		"hostname": {
@@ -123,7 +77,10 @@ func DefaultTagVars() map[string]TagVar {
 		"rand": {
 			Func: func() (ast.Expr, error) {
 				var b [16]byte
-				rand.Read(b[:])
+				_, err := rand.Read(b[:])
+				if err != nil {
+					return nil, err
+				}
 				var hx [34]byte
 				hx[0] = '0'
 				hx[1] = 'x'
@@ -138,14 +95,14 @@ func varToString(s string, err error) (ast.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ast.NewString(s), nil
+	x := ast.NewString(s)
+	return x, nil
 }
 
 // A tag binds an identifier to a field to allow passing command-line values.
 //
 // A tag is of the form
-//
-//	@tag(<name>,[type=(string|int|number|bool)][,short=<shorthand>+])
+//     @tag(<name>,[type=(string|int|number|bool)][,short=<shorthand>+])
 //
 // The name is mandatory and type defaults to string. Tags are set using the -t
 // option on the command line. -t name=value will parse value for the type
@@ -195,7 +152,7 @@ func parseTag(pos token.Pos, body string) (t *tag, err errors.Error) {
 	}
 
 	if s, ok, _ := a.Lookup(1, "short"); ok {
-		for s := range strings.SplitSeq(s, "|") {
+		for _, s := range strings.Split(s, "|") {
 			if !ast.IsValidIdent(t.key) {
 				return t, errors.Newf(pos, "invalid identifier %q", s)
 			}
@@ -210,21 +167,18 @@ func parseTag(pos token.Pos, body string) (t *tag, err errors.Error) {
 	return t, nil
 }
 
-func (t *tag) inject(value string, tg *tagger) errors.Error {
+func (t *tag) inject(value string, l *loader) errors.Error {
 	e, err := cli.ParseValue(token.NoPos, t.key, value, t.kind)
-	if err != nil {
-		return err
-	}
-	t.injectValue(e, tg)
-	return nil
+	t.injectValue(e, l)
+	return err
 }
 
-func (t *tag) injectValue(x ast.Expr, tg *tagger) {
+func (t *tag) injectValue(x ast.Expr, l *loader) {
 	injected := ast.NewBinExpr(token.AND, t.field.Value, x)
-	if tg.replacements == nil {
-		tg.replacements = make(map[ast.Node]ast.Node)
+	if l.replacements == nil {
+		l.replacements = map[ast.Node]ast.Node{}
 	}
-	tg.replacements[t.field.Value] = injected
+	l.replacements[t.field.Value] = injected
 	t.field.Value = injected
 	t.hasReplacement = true
 }
@@ -238,7 +192,7 @@ func findTags(b *build.Instance) (tags []*tag, errs errors.Error) {
 			if f, ok := n.(*ast.Field); ok {
 				for _, a := range f.Attrs {
 					if key, _ := a.Split(); key == "tag" {
-						errs = errors.Append(errs, errors.Newf(a.Pos(), "%s", msg))
+						errs = errors.Append(errs, errors.Newf(a.Pos(), msg))
 						// TODO: add position of x.
 					}
 				}
@@ -259,8 +213,8 @@ func findTags(b *build.Instance) (tags []*tag, errs errors.Error) {
 			case *ast.Field:
 				// TODO: allow optional fields?
 				_, _, err := ast.LabelName(x.Label)
-				if err != nil || x.Constraint != token.ILLEGAL {
-					findInvalidTags(n, "@tag not allowed within field constraint")
+				if err != nil || x.Optional != token.NoPos {
+					findInvalidTags(n, "@tag not allowed within optional fields")
 					return false
 				}
 
@@ -284,29 +238,29 @@ func findTags(b *build.Instance) (tags []*tag, errs errors.Error) {
 	return tags, errs
 }
 
-func (tg *tagger) injectTags(tags []string) errors.Error {
+func injectTags(tags []string, l *loader) errors.Error {
 	// Parses command line args
 	for _, s := range tags {
-		name, val, ok := strings.Cut(s, "=")
-		found := tg.usedTags[s]
-		if ok { // key-value
-			for _, t := range tg.tags {
-				if t.key == name {
+		p := strings.Index(s, "=")
+		found := l.buildTags[s]
+		if p > 0 { // key-value
+			for _, t := range l.tags {
+				if t.key == s[:p] {
 					found = true
-					if err := t.inject(val, tg); err != nil {
+					if err := t.inject(s[p+1:], l); err != nil {
 						return err
 					}
 				}
 			}
 			if !found {
-				return errors.Newf(token.NoPos, "no tag for %q", name)
+				return errors.Newf(token.NoPos, "no tag for %q", s[:p])
 			}
 		} else { // shorthand
-			for _, t := range tg.tags {
+			for _, t := range l.tags {
 				for _, sh := range t.shorthands {
 					if sh == s {
 						found = true
-						if err := t.inject(s, tg); err != nil {
+						if err := t.inject(s, l); err != nil {
 							return err
 						}
 					}
@@ -318,17 +272,17 @@ func (tg *tagger) injectTags(tags []string) errors.Error {
 		}
 	}
 
-	if tg.cfg.TagVars != nil {
+	if l.cfg.TagVars != nil {
 		vars := map[string]ast.Expr{}
 
 		// Inject tag variables if the tag wasn't already set.
-		for _, t := range tg.tags {
+		for _, t := range l.tags {
 			if t.hasReplacement || t.vars == "" {
 				continue
 			}
 			x, ok := vars[t.vars]
 			if !ok {
-				tv, ok := tg.cfg.TagVars[t.vars]
+				tv, ok := l.cfg.TagVars[t.vars]
 				if !ok {
 					return errors.Newf(token.NoPos,
 						"tag variable '%s' not found", t.vars)
@@ -342,24 +296,109 @@ func (tg *tagger) injectTags(tags []string) errors.Error {
 				vars[t.vars] = tag
 			}
 			if x != nil {
-				t.injectValue(x, tg)
+				t.injectValue(x, l)
 			}
 		}
 	}
 	return nil
 }
 
-func shouldBuildFile(f *ast.File, tagIsSet func(key string) bool) errors.Error {
-	ok, attr, err := buildattr.ShouldBuildFile(f, tagIsSet)
-	if err != nil {
-		return err
+// shouldBuildFile determines whether a File should be included based on its
+// attributes.
+func shouldBuildFile(f *ast.File, fp *fileProcessor) errors.Error {
+	tags := fp.c.Tags
+
+	a, errs := getBuildAttr(f)
+	if errs != nil {
+		return errs
 	}
-	if ok {
+	if a == nil {
 		return nil
 	}
-	if key, body := attr.Split(); key == "if" {
-		return excludeError{errors.Newf(attr.Pos(), "@if(%s) did not match", body)}
-	} else {
-		return excludeError{errors.Newf(attr.Pos(), "@ignore() attribute found")}
+
+	_, body := a.Split()
+
+	expr, err := parser.ParseExpr("", body)
+	if err != nil {
+		return errors.Promote(err, "")
+	}
+
+	tagMap := map[string]bool{}
+	for _, t := range tags {
+		tagMap[t] = !strings.ContainsRune(t, '=')
+	}
+
+	c := checker{tags: tagMap, loader: fp.c.loader}
+	include := c.shouldInclude(expr)
+	if c.err != nil {
+		return c.err
+	}
+	if !include {
+		return excludeError{errors.Newf(a.Pos(), "@if(%s) did not match", body)}
+	}
+	return nil
+}
+
+func getBuildAttr(f *ast.File) (*ast.Attribute, errors.Error) {
+	var a *ast.Attribute
+	for _, d := range f.Decls {
+		switch x := d.(type) {
+		case *ast.Attribute:
+			key, _ := x.Split()
+			if key != "if" {
+				continue
+			}
+			if a != nil {
+				err := errors.Newf(d.Pos(), "multiple @if attributes")
+				err = errors.Append(err,
+					errors.Newf(a.Pos(), "previous declaration here"))
+				return nil, err
+			}
+			a = x
+
+		case *ast.Package:
+			break
+		}
+	}
+	return a, nil
+}
+
+type checker struct {
+	loader *loader
+	tags   map[string]bool
+	err    errors.Error
+}
+
+func (c *checker) shouldInclude(expr ast.Expr) bool {
+	switch x := expr.(type) {
+	case *ast.Ident:
+		c.loader.buildTags[x.Name] = true
+		return c.tags[x.Name]
+
+	case *ast.BinaryExpr:
+		switch x.Op {
+		case token.LAND:
+			return c.shouldInclude(x.X) && c.shouldInclude(x.Y)
+
+		case token.LOR:
+			return c.shouldInclude(x.X) || c.shouldInclude(x.Y)
+
+		default:
+			c.err = errors.Append(c.err, errors.Newf(token.NoPos,
+				"invalid operator %v", x.Op))
+			return false
+		}
+
+	case *ast.UnaryExpr:
+		if x.Op != token.NOT {
+			c.err = errors.Append(c.err, errors.Newf(token.NoPos,
+				"invalid operator %v", x.Op))
+		}
+		return !c.shouldInclude(x.X)
+
+	default:
+		c.err = errors.Append(c.err, errors.Newf(token.NoPos,
+			"invalid type %T in build attribute", expr))
+		return false
 	}
 }

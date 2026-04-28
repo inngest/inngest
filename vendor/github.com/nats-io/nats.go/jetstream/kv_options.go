@@ -29,7 +29,7 @@ func (opt watchOptFn) configureWatcher(opts *watchOpts) error {
 func IncludeHistory() WatchOpt {
 	return watchOptFn(func(opts *watchOpts) error {
 		if opts.updatesOnly {
-			return fmt.Errorf("%w: include history cannot be used with updates only", ErrInvalidOption)
+			return fmt.Errorf("%w: include history can not be used with updates only", ErrInvalidOption)
 		}
 		opts.includeHistory = true
 		return nil
@@ -41,14 +41,14 @@ func IncludeHistory() WatchOpt {
 func UpdatesOnly() WatchOpt {
 	return watchOptFn(func(opts *watchOpts) error {
 		if opts.includeHistory {
-			return fmt.Errorf("%w: updates only cannot be used with include history", ErrInvalidOption)
+			return fmt.Errorf("%w: updates only can not be used with include history", ErrInvalidOption)
 		}
 		opts.updatesOnly = true
 		return nil
 	})
 }
 
-// IgnoreDeletes will prevent the key watcher from passing any deleted keys.
+// IgnoreDeletes will have the key watcher not pass any deleted keys.
 func IgnoreDeletes() WatchOpt {
 	return watchOptFn(func(opts *watchOpts) error {
 		opts.ignoreDeletes = true
@@ -56,7 +56,7 @@ func IgnoreDeletes() WatchOpt {
 	})
 }
 
-// MetaOnly instructs the key watcher to retrieve only the entry metadata, not
+// MetaOnly instructs the key watcher to retrieve only the entry meta data, not
 // the entry value.
 func MetaOnly() WatchOpt {
 	return watchOptFn(func(opts *watchOpts) error {
@@ -98,34 +98,6 @@ func (opt deleteOptFn) configureDelete(opts *deleteOpts) error {
 func LastRevision(revision uint64) KVDeleteOpt {
 	return deleteOptFn(func(opts *deleteOpts) error {
 		opts.revision = revision
-		return nil
-	})
-}
-
-// PurgeTTL sets the TTL for the purge operation.
-// After the TTL expires, the delete markers will be removed.
-// This requires LimitMarkerTTL to be enabled on the bucket.
-// Note that this is not the same as the TTL for the key itself, which is set
-// using the KeyTTL option when creating the key.
-func PurgeTTL(ttl time.Duration) KVDeleteOpt {
-	return deleteOptFn(func(opts *deleteOpts) error {
-		opts.ttl = ttl
-		return nil
-	})
-}
-
-type createOptFn func(opts *createOpts) error
-
-func (opt createOptFn) configureCreate(opts *createOpts) error {
-	return opt(opts)
-}
-
-// KeyTTL sets the TTL for the key. This is the time after which the key will be
-// automatically deleted. The TTL is set when the key is created and cannot be
-// changed later. This requires LimitMarkerTTL to be enabled on the bucket.
-func KeyTTL(ttl time.Duration) KVCreateOpt {
-	return createOptFn(func(opts *createOpts) error {
-		opts.ttl = ttl
 		return nil
 	})
 }

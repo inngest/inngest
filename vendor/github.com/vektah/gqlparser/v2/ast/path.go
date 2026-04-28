@@ -27,7 +27,7 @@ func (path Path) String() string {
 	for i, v := range path {
 		switch v := v.(type) {
 		case PathIndex:
-			fmt.Fprintf(&str, "[%d]", v)
+			str.WriteString(fmt.Sprintf("[%d]", v))
 		case PathName:
 			if i != 0 {
 				str.WriteByte('.')
@@ -41,7 +41,7 @@ func (path Path) String() string {
 }
 
 func (path *Path) UnmarshalJSON(b []byte) error {
-	var vs []any
+	var vs []interface{}
 	err := json.Unmarshal(b, &vs)
 	if err != nil {
 		return err

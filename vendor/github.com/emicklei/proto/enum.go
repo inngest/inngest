@@ -72,7 +72,6 @@ func (e *Enum) parse(p *Parser) error {
 		}
 	}
 	e.Name = lit
-	consumeCommentFor(p, e)
 	_, tok, lit = p.next()
 	if tok != tLEFTCURLY {
 		return p.unexpected(lit, "enum opening {", e)
@@ -138,18 +137,6 @@ type EnumField struct {
 	Elements      []Visitee // such as Option and Comment
 	InlineComment *Comment
 	Parent        Visitee
-}
-
-// elements is part of elementContainer
-func (f *EnumField) elements() []Visitee {
-	return f.Elements
-}
-
-// takeLastComment is part of elementContainer
-// removes and returns the last element of the list if it is a Comment.
-func (f *EnumField) takeLastComment(expectedOnLine int) (last *Comment) {
-	last, f.Elements = takeLastCommentIfEndsOnLine(f.Elements, expectedOnLine)
-	return
 }
 
 // Accept dispatches the call to the visitor.
@@ -219,15 +206,3 @@ func (f *EnumField) addElement(v Visitee) {
 }
 
 func (f *EnumField) parent(v Visitee) { f.Parent = v }
-
-// IsDeprecated returns true if the option "deprecated" is set with value "true".
-func (f *EnumField) IsDeprecated() bool {
-	for _, each := range f.Elements {
-		if opt, ok := each.(*Option); ok {
-			if opt.Name == optionNameDeprecated {
-				return opt.Constant.Source == "true"
-			}
-		}
-	}
-	return false
-}

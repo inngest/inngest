@@ -2,6 +2,8 @@
 package exechttp
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -14,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime"
@@ -130,10 +133,26 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 		return nil, fmt.Errorf("nil response received from URL: %s", r.URL)
 	}
 
+	body, bodyEncoding, bodyCloser, err := decodeResponseBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	if bodyEncoding != "" {
+		// Clear the Content-Encoding header after decompression so that
+		// downstream consumers (e.g. HandleHttpResponse) know the body is
+		// already decoded and don't attempt to decompress again.
+		resp.Header.Del("Content-Encoding")
+	}
+	if bodyCloser != nil {
+		defer func() {
+			_ = bodyCloser.Close()
+		}()
+	}
+
 	// We're going to reassign this to use a LimitReader, ensuring we don't read an infinite amount
 	// of data from the request.  We need to do this so that we can continue to close resp.Body to
 	// release the underlying conn in the above dever.
-	body := io.LimitReader(resp.Body, consts.MaxSDKResponseBodySize+1)
+	body = io.LimitReader(body, consts.MaxSDKResponseBodySize+1)
 
 	if e.publish && r.Publish.ShouldPublish() {
 		rdr, err := realtime.TeeStreamReaderToAPI(body, r.Publish.PublishURL, realtime.TeeStreamOptions{
@@ -170,6 +189,9 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	// Read 1 extra byte above the max so that we can check if the response is too large
 	byt, err := io.ReadAll(body)
 	if err != nil {
+		if bodyEncoding != "" {
+			return nil, fmt.Errorf("error decoding %s response body: %w", bodyEncoding, err)
+		}
 		return nil, ErrUnexpectedEnd
 	}
 
@@ -191,6 +213,77 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	// parse errors into common responses
 	err = CommonHTTPErrors(err)
 	return out, err
+}
+
+// normalizeEncoding validates and normalizes a Content-Encoding header value.
+// Returns the lowercase encoding name, or an error for unsupported/multi-valued encodings.
+// An empty input returns "" with no error.
+func normalizeEncoding(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	normalized := strings.ToLower(trimmed)
+	if strings.Contains(normalized, ",") {
+		return "", fmt.Errorf("unsupported content encoding: %q", raw)
+	}
+
+	switch normalized {
+	case "gzip", "br":
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("unsupported content encoding: %q", raw)
+	}
+}
+
+// DecompressBody decompresses body bytes based on a Content-Encoding value.
+// Returns the bytes unchanged if contentEncoding is empty.
+func DecompressBody(data []byte, contentEncoding string) ([]byte, error) {
+	enc, err := normalizeEncoding(contentEncoding)
+	if err != nil {
+		return nil, err
+	}
+	if enc == "" {
+		return data, nil
+	}
+
+	switch enc {
+	case "gzip":
+		reader, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("error creating gzip decoder: %w", err)
+		}
+		defer reader.Close()
+		return io.ReadAll(reader)
+	case "br":
+		return io.ReadAll(brotli.NewReader(bytes.NewReader(data)))
+	default:
+		return nil, fmt.Errorf("unsupported content encoding: %q", contentEncoding)
+	}
+}
+
+func decodeResponseBody(resp *http.Response) (io.Reader, string, io.Closer, error) {
+	enc, err := normalizeEncoding(resp.Header.Get("Content-Encoding"))
+	if err != nil {
+		return nil, "", nil, err
+	}
+	if enc == "" {
+		return resp.Body, "", nil, nil
+	}
+
+	switch enc {
+	case "gzip":
+		reader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("error creating gzip decoder: %w", err)
+		}
+		return reader, enc, reader, nil
+	case "br":
+		return brotli.NewReader(resp.Body), enc, nil, nil
+	default:
+		return nil, "", nil, fmt.Errorf("unsupported content encoding: %q", enc)
+	}
 }
 
 type Response struct {

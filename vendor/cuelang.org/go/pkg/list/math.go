@@ -17,14 +17,14 @@ package list
 import (
 	"fmt"
 
-	"github.com/cockroachdb/apd/v3"
+	"github.com/cockroachdb/apd/v2"
 
 	"cuelang.org/go/internal"
 )
 
 // Avg returns the average value of a non empty list xs.
 func Avg(xs []*internal.Decimal) (*internal.Decimal, error) {
-	if len(xs) == 0 {
+	if 0 == len(xs) {
 		return nil, fmt.Errorf("empty list")
 	}
 
@@ -47,13 +47,13 @@ func Avg(xs []*internal.Decimal) (*internal.Decimal, error) {
 
 // Max returns the maximum value of a non empty list xs.
 func Max(xs []*internal.Decimal) (*internal.Decimal, error) {
-	if len(xs) == 0 {
+	if 0 == len(xs) {
 		return nil, fmt.Errorf("empty list")
 	}
 
 	max := xs[0]
 	for _, x := range xs[1:] {
-		if max.Cmp(x) == -1 {
+		if -1 == max.Cmp(x) {
 			max = x
 		}
 	}
@@ -62,13 +62,13 @@ func Max(xs []*internal.Decimal) (*internal.Decimal, error) {
 
 // Min returns the minimum value of a non empty list xs.
 func Min(xs []*internal.Decimal) (*internal.Decimal, error) {
-	if len(xs) == 0 {
+	if 0 == len(xs) {
 		return nil, fmt.Errorf("empty list")
 	}
 
 	min := xs[0]
 	for _, x := range xs[1:] {
-		if min.Cmp(x) == +1 {
+		if +1 == min.Cmp(x) {
 			min = x
 		}
 	}
@@ -92,32 +92,33 @@ func Product(xs []*internal.Decimal) (*internal.Decimal, error) {
 //
 // For instance:
 //
-//	Range(0, 5, 2)
+//    Range(0, 5, 2)
 //
 // results in
 //
-//	[0, 2, 4]
+//    [0, 2, 4]
+//
 func Range(start, limit, step *internal.Decimal) ([]*internal.Decimal, error) {
 	if step.IsZero() {
 		return nil, fmt.Errorf("step must be non zero")
 	}
 
-	if !step.Negative && start.Cmp(limit) == +1 {
+	if !step.Negative && +1 == start.Cmp(limit) {
 		return nil, fmt.Errorf("end must be greater than start when step is positive")
 	}
 
-	if step.Negative && start.Cmp(limit) == -1 {
+	if step.Negative && -1 == start.Cmp(limit) {
 		return nil, fmt.Errorf("end must be less than start when step is negative")
 	}
 
 	var vals []*internal.Decimal
 	num := start
 	for {
-		if !step.Negative && num.Cmp(limit) != -1 {
+		if !step.Negative && -1 != num.Cmp(limit) {
 			break
 		}
 
-		if step.Negative && num.Cmp(limit) != +1 {
+		if step.Negative && +1 != num.Cmp(limit) {
 			break
 		}
 

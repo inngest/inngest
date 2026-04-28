@@ -47,7 +47,7 @@ func writeQuotedString(w io.Writer, s string) {
 	io.WriteString(w, `"`)
 }
 
-func UnmarshalString(v any) (string, error) {
+func UnmarshalString(v interface{}) (string, error) {
 	switch v := v.(type) {
 	case string:
 		return v, nil
@@ -60,9 +60,13 @@ func UnmarshalString(v any) (string, error) {
 	case json.Number:
 		return string(v), nil
 	case bool:
-		return strconv.FormatBool(v), nil
+		if v {
+			return "true", nil
+		} else {
+			return "false", nil
+		}
 	case nil:
-		return "", nil
+		return "null", nil
 	default:
 		return "", fmt.Errorf("%T is not a string", v)
 	}

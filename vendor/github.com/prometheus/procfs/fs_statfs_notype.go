@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2018 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -12,11 +12,12 @@
 // limitations under the License.
 
 //go:build !freebsd && !linux
+// +build !freebsd,!linux
 
 package procfs
 
 // isRealProc returns true on architectures that don't have a Type argument
-// in their Statfs_t struct.
-func isRealProc(_ string) (bool, error) {
+// in their Statfs_t struct
+func isRealProc(mountPoint string) (bool, error) {
 	return true, nil
 }

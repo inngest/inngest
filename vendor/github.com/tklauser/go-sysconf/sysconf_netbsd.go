@@ -25,13 +25,10 @@ const (
 	_POSIX2_UPE       = -1
 )
 
-var clktck = sync.OnceValue(func() int64 {
-	ci, err := unix.SysctlClockinfo("kern.clockrate")
-	if err != nil {
-		return -1
-	}
-	return int64(ci.Hz)
-})
+var (
+	clktck     int64
+	clktckOnce sync.Once
+)
 
 func sysconfPOSIX(name int) (int64, error) {
 	// NetBSD does not define all _POSIX_* values used in sysconf_posix.go
@@ -45,6 +42,7 @@ func sysconf(name int) (int64, error) {
 	// Duplicate the relevant values here.
 
 	switch name {
+
 	// 1003.1
 	case SC_ARG_MAX:
 		return sysctl32("kern.argmax"), nil
@@ -57,7 +55,13 @@ func sysconf(name int) (int64, error) {
 		}
 		return -1, nil
 	case SC_CLK_TCK:
-		return clktck(), nil
+		clktckOnce.Do(func() {
+			clktck = -1
+			if ci, err := unix.SysctlClockinfo("kern.clockrate"); err == nil {
+				clktck = int64(ci.Hz)
+			}
+		})
+		return clktck, nil
 	case SC_NGROUPS_MAX:
 		return sysctl32("kern.ngroups"), nil
 	case SC_JOB_CONTROL:

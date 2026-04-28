@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file.
 
 //go:build (!amd64 && !arm64) || appengine || !gc || noasm
+// +build !amd64,!arm64 appengine !gc noasm
 
 package s2
 

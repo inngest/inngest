@@ -133,12 +133,11 @@ func (x *Context) RoutePattern() string {
 	return routePattern
 }
 
-// replaceWildcards takes a route pattern and replaces all occurrences of
-// "/*/" with "/". It iteratively runs until no wildcards remain to
-// correctly handle consecutive wildcards.
+// replaceWildcards takes a route pattern and recursively replaces all
+// occurrences of "/*/" to "/".
 func replaceWildcards(p string) string {
-	for strings.Contains(p, "/*/") {
-		p = strings.ReplaceAll(p, "/*/", "/")
+	if strings.Contains(p, "/*/") {
+		return replaceWildcards(strings.Replace(p, "/*/", "/", -1))
 	}
 	return p
 }

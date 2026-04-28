@@ -7,11 +7,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/vektah/gqlparser/v2/ast"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
-	"github.com/99designs/gqlgen/codegen/config"
 )
 
 type GoFieldType int
@@ -26,15 +25,15 @@ const (
 type Object struct {
 	*ast.Definition
 
-	Type                     types.Type
-	ResolverInterface        types.Type
-	Root                     bool
-	Fields                   []*Field
-	Implements               []*ast.Definition
-	DisableConcurrency       bool
-	Stream                   bool
-	Directives               []*Directive
-	PointersInUnmarshalInput bool
+	Type                    types.Type
+	ResolverInterface       types.Type
+	Root                    bool
+	Fields                  []*Field
+	Implements              []*ast.Definition
+	DisableConcurrency      bool
+	Stream                  bool
+	Directives              []*Directive
+	PointersInUmarshalInput bool
 }
 
 func (b *builder) buildObject(typ *ast.Definition) (*Object, error) {
@@ -44,12 +43,12 @@ func (b *builder) buildObject(typ *ast.Definition) (*Object, error) {
 	}
 	caser := cases.Title(language.English, cases.NoLower)
 	obj := &Object{
-		Definition:               typ,
-		Root:                     b.Config.IsRoot(typ),
-		DisableConcurrency:       typ == b.Schema.Mutation,
-		Stream:                   typ == b.Schema.Subscription,
-		Directives:               dirs,
-		PointersInUnmarshalInput: b.Config.ReturnPointersInUnmarshalInput,
+		Definition:              typ,
+		Root:                    b.Schema.Query == typ || b.Schema.Mutation == typ || b.Schema.Subscription == typ,
+		DisableConcurrency:      typ == b.Schema.Mutation,
+		Stream:                  typ == b.Schema.Subscription,
+		Directives:              dirs,
+		PointersInUmarshalInput: b.Config.ReturnPointersInUmarshalInput,
 		ResolverInterface: types.NewNamed(
 			types.NewTypeName(0, b.Config.Exec.Pkg(), caser.String(typ.Name)+"Resolver", nil),
 			nil,
@@ -97,17 +96,15 @@ type Objects []*Object
 
 func (o *Object) Implementors() string {
 	satisfiedBy := strconv.Quote(o.Name)
-	var satisfiedBySb100 strings.Builder
 	for _, s := range o.Implements {
-		satisfiedBySb100.WriteString(", " + strconv.Quote(s.Name))
+		satisfiedBy += ", " + strconv.Quote(s.Name)
 	}
-	satisfiedBy += satisfiedBySb100.String()
 	return "[]string{" + satisfiedBy + "}"
 }
 
 func (o *Object) HasResolvers() bool {
 	for _, f := range o.Fields {
-		if f.IsResolver || f.IsBatch() {
+		if f.IsResolver {
 			return true
 		}
 	}
@@ -115,11 +112,11 @@ func (o *Object) HasResolvers() bool {
 }
 
 func (o *Object) HasUnmarshal() bool {
-	if o.IsMap() {
-		return false
+	if o.Type == config.MapType {
+		return true
 	}
-	for method := range o.Type.(*types.Named).Methods() {
-		if method.Name() == "UnmarshalGQL" {
+	for i := 0; i < o.Type.(*types.Named).NumMethods(); i++ {
+		if o.Type.(*types.Named).Method(i).Name() == "UnmarshalGQL" {
 			return true
 		}
 	}
@@ -139,23 +136,6 @@ func (o *Object) HasDirectives() bool {
 	return false
 }
 
-// InputObjectDirectives returns directives that should be executed at the INPUT_OBJECT level.
-// This is used for input types to execute @directives placed on the input object itself,
-// after all fields have been unmarshaled.
-// See: https://github.com/99designs/gqlgen/issues/2281
-func (o *Object) InputObjectDirectives() []*Directive {
-	if o.Kind != ast.InputObject {
-		return nil
-	}
-	var d []*Directive
-	for _, dir := range o.Directives {
-		if !dir.SkipRuntime && dir.IsLocation(ast.LocationInputObject) {
-			d = append(d, dir)
-		}
-	}
-	return d
-}
-
 func (o *Object) IsConcurrent() bool {
 	for _, f := range o.Fields {
 		if f.IsConcurrent() {
@@ -165,22 +145,8 @@ func (o *Object) IsConcurrent() bool {
 	return false
 }
 
-// InvalidsIncrement returns the Go statement that increments the invalids
-// counter for this object's field set. Concurrent objects require atomic
-// access; sequential objects use a plain increment.
-func (o *Object) InvalidsIncrement(fieldSetVar string) string {
-	if o.IsConcurrent() {
-		return fmt.Sprintf("atomic.AddUint32(&%s.Invalids, 1)", fieldSetVar)
-	}
-	return fieldSetVar + ".Invalids++"
-}
-
 func (o *Object) IsReserved() bool {
-	return strings.HasPrefix(o.Name, "__")
-}
-
-func (o *Object) IsMap() bool {
-	return o.Type == config.MapType
+	return strings.HasPrefix(o.Definition.Name, "__")
 }
 
 func (o *Object) Description() string {
@@ -199,7 +165,7 @@ func (o *Object) HasField(name string) bool {
 
 func (os Objects) ByName(name string) *Object {
 	for i, o := range os {
-		if strings.EqualFold(o.Name, name) {
+		if strings.EqualFold(o.Definition.Name, name) {
 			return os[i]
 		}
 	}

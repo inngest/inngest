@@ -8,7 +8,7 @@ import (
 	"text/template"
 )
 
-// ToFishCompletion creates a fish completion string for the `*Command`
+// ToFishCompletion creates a fish completion string for the `*App`
 // The function errors if either parsing or writing of the string fails.
 func (cmd *Command) ToFishCompletion() (string, error) {
 	var w bytes.Buffer
@@ -33,18 +33,6 @@ func (cmd *Command) writeFishCompletionTemplate(w io.Writer) error {
 
 	// Add global flags
 	completions := prepareFishFlags(cmd.Name, cmd)
-
-	if cmd.ShellComplete != nil {
-		var completion strings.Builder
-		fmt.Fprintf(&completion,
-			"complete -c %s -n '%s' -xa '(%s %s 2>/dev/null)'",
-			cmd.Name,
-			fishFlagHelper(cmd.Name, cmd),
-			cmd.Name,
-			completionFlag,
-		)
-		completions = append(completions, completion.String())
-	}
 
 	// Add commands and their flags
 	completions = append(
@@ -84,26 +72,6 @@ func prepareFishCommands(binary string, parent *Command) []string {
 			}
 			completions = append(completions, completion.String())
 		}
-
-		if command.ShellComplete != nil {
-			var completion strings.Builder
-			var path []string
-			lineage := command.Lineage()
-			for i := len(lineage) - 2; i >= 0; i-- {
-				path = append(path, lineage[i].Name)
-			}
-
-			fmt.Fprintf(&completion,
-				"complete -c %s -n '%s' -xa '(%s %s %s 2>/dev/null)'",
-				binary,
-				fishFlagHelper(binary, command),
-				binary,
-				strings.Join(path, " "),
-				completionFlag,
-			)
-			completions = append(completions, completion.String())
-		}
-
 		completions = append(
 			completions,
 			prepareFishFlags(binary, command)...,

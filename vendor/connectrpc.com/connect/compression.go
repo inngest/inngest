@@ -1,4 +1,4 @@
-// Copyright 2021-2025 The Connect Authors
+// Copyright 2021-2024 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import (
 	"errors"
 	"io"
 	"math"
-	"net/http"
 	"strings"
 	"sync"
 )
@@ -148,7 +147,7 @@ func (c *compressionPool) putDecompressor(decompressor Decompressor) error {
 	// know the compression format, we can't provide a valid header. Since we
 	// also reset the decompressor when it's pulled out of the pool, we can
 	// ignore errors here.
-	_ = decompressor.Reset(http.NoBody)
+	_ = decompressor.Reset(strings.NewReader(""))
 	c.decompressors.Put(decompressor)
 	return nil
 }

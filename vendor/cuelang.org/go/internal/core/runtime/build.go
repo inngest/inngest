@@ -15,13 +15,14 @@
 package runtime
 
 import (
-	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/cue/stats"
+	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/compile"
 )
@@ -30,8 +31,6 @@ type Config struct {
 	Runtime    *Runtime
 	Filename   string
 	ImportPath string
-
-	Counts *stats.Counts
 
 	compile.Config
 }
@@ -57,12 +56,15 @@ func (x *Runtime) Build(cfg *Config, b *build.Instance) (v *adt.Vertex, errs err
 
 	// Build transitive dependencies.
 	for _, file := range b.Files {
-		for s := range file.ImportSpecs() {
-			errs = errors.Append(errs, x.buildSpec(cfg, b, s))
-		}
+		file.VisitImports(func(d *ast.ImportDecl) {
+			for _, s := range d.Specs {
+				errs = errors.Append(errs, x.buildSpec(cfg, b, s))
+			}
+		})
 	}
 
-	errs = errors.Append(errs, b.ResolutionErr)
+	err := x.ResolveFiles(b)
+	errs = errors.Append(errs, err)
 
 	var cc *compile.Config
 	if cfg != nil {
@@ -70,22 +72,22 @@ func (x *Runtime) Build(cfg *Config, b *build.Instance) (v *adt.Vertex, errs err
 	}
 	if cfg != nil && cfg.ImportPath != "" {
 		b.ImportPath = cfg.ImportPath
-		b.PkgName = ast.ParseImportPath(b.ImportPath).Qualifier
+		b.PkgName = astutil.ImportPathName(b.ImportPath)
 	}
-	v, err := compile.Instance(cc, x, b)
+	v, err = compile.Files(cc, x, b.ID(), b.Files...)
 	errs = errors.Append(errs, err)
-
-	errs = errors.Append(errs, x.InjectImplementations(b, v))
 
 	if errs != nil {
 		v = adt.ToVertex(&adt.Bottom{Err: errs})
 		b.Err = errs
 	}
 
-	x.AddInst(v, b)
+	x.AddInst(b.ImportPath, v, b)
 
 	return v, errs
 }
+
+func dummyLoad(token.Pos, string) *build.Instance { return nil }
 
 func (r *Runtime) Compile(cfg *Config, source interface{}) (*adt.Vertex, *build.Instance) {
 	ctx := build.NewContext()
@@ -93,7 +95,7 @@ func (r *Runtime) Compile(cfg *Config, source interface{}) (*adt.Vertex, *build.
 	if cfg != nil && cfg.Filename != "" {
 		filename = cfg.Filename
 	}
-	p := ctx.NewInstance(filename, nil)
+	p := ctx.NewInstance(filename, dummyLoad)
 	if err := p.AddFile(filename, source); err != nil {
 		return nil, p
 	}
@@ -107,31 +109,31 @@ func (r *Runtime) CompileFile(cfg *Config, file *ast.File) (*adt.Vertex, *build.
 	if cfg != nil && cfg.Filename != "" {
 		filename = cfg.Filename
 	}
-	p := ctx.NewInstance(filename, nil)
+	p := ctx.NewInstance(filename, dummyLoad)
 	err := p.AddSyntax(file)
 	if err != nil {
 		return nil, p
 	}
-	p.PkgName = file.PackageName()
+	_, p.PkgName, _ = internal.PackageInfo(file)
 	v, _ := r.Build(cfg, p)
 	return v, p
 }
 
 func (x *Runtime) buildSpec(cfg *Config, b *build.Instance, spec *ast.ImportSpec) (errs errors.Error) {
-	path, err := strconv.Unquote(spec.Path.Value)
+	info, err := astutil.ParseImportSpec(spec)
 	if err != nil {
 		return errors.Promote(err, "invalid import path")
 	}
 
-	pkg := b.LookupImport(path)
+	pkg := b.LookupImport(info.ID)
 	if pkg == nil {
-		if strings.Contains(path, ".") {
+		if strings.Contains(info.ID, ".") {
 			return errors.Newf(spec.Pos(),
 				"package %q imported but not defined in %s",
-				path, b.ImportPath)
-		} else if x.index.builtins == nil || x.index.builtins.importPaths[path] == nil {
+				info.ID, b.ImportPath)
+		} else if x.index.builtinPaths[info.ID] == nil {
 			return errors.Newf(spec.Pos(),
-				"builtin package %q undefined", path)
+				"builtin package %q undefined", info.ID)
 		}
 		return nil
 	}

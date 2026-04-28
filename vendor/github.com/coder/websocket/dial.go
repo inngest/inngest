@@ -1,4 +1,5 @@
 //go:build !js
+// +build !js
 
 package websocket
 
@@ -47,22 +48,6 @@ type DialOptions struct {
 	// Defaults to 512 bytes for CompressionNoContextTakeover and 128 bytes
 	// for CompressionContextTakeover.
 	CompressionThreshold int
-
-	// OnPingReceived is an optional callback invoked synchronously when a ping frame is received.
-	//
-	// The payload contains the application data of the ping frame.
-	// If the callback returns false, the subsequent pong frame will not be sent.
-	// To avoid blocking, any expensive processing should be performed asynchronously using a goroutine.
-	OnPingReceived func(ctx context.Context, payload []byte) bool
-
-	// OnPongReceived is an optional callback invoked synchronously when a pong frame is received.
-	//
-	// The payload contains the application data of the pong frame.
-	// To avoid blocking, any expensive processing should be performed asynchronously using a goroutine.
-	//
-	// Unlike OnPingReceived, this callback does not return a value because a pong frame
-	// is a response to a ping and does not trigger any further frame transmission.
-	OnPongReceived func(ctx context.Context, payload []byte)
 }
 
 func (opts *DialOptions) cloneWithDefaults(ctx context.Context) (context.Context, context.CancelFunc, *DialOptions) {
@@ -178,8 +163,6 @@ func dial(ctx context.Context, urls string, opts *DialOptions, rand io.Reader) (
 		client:         true,
 		copts:          copts,
 		flateThreshold: opts.CompressionThreshold,
-		onPingReceived: opts.OnPingReceived,
-		onPongReceived: opts.OnPongReceived,
 		br:             getBufioReader(rwc),
 		bw:             getBufioWriter(rwc),
 	}), resp, nil

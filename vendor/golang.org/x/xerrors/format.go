@@ -20,10 +20,10 @@ type Formatter interface {
 // typically provide their own implementations.
 type Printer interface {
 	// Print appends args to the message output.
-	Print(args ...any)
+	Print(args ...interface{})
 
 	// Printf writes a formatted string.
-	Printf(format string, args ...any)
+	Printf(format string, args ...interface{})
 
 	// Detail reports whether error detail is requested.
 	// After the first call to Detail, all text written to the Printer

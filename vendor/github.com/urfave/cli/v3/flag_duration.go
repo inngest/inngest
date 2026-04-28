@@ -18,8 +18,7 @@ func (d durationValue) Create(val time.Duration, p *time.Duration, c NoConfig) V
 }
 
 func (d durationValue) ToString(val time.Duration) string {
-	d = durationValue(val)
-	return d.String()
+	return fmt.Sprintf("%v", val)
 }
 
 // Below functions are to satisfy the flag.Value interface
@@ -35,9 +34,7 @@ func (d *durationValue) Set(s string) error {
 
 func (d *durationValue) Get() any { return time.Duration(*d) }
 
-func (d *durationValue) String() string {
-	return fmt.Sprintf("%v", time.Duration(*d))
-}
+func (d *durationValue) String() string { return (*time.Duration)(d).String() }
 
 func (cmd *Command) Duration(name string) time.Duration {
 	if v, ok := cmd.Value(name).(time.Duration); ok {
@@ -45,6 +42,6 @@ func (cmd *Command) Duration(name string) time.Duration {
 		return v
 	}
 
-	tracef("duration NOT available for flag name %[1]q (cmd=%[2]q)", name, cmd.Name)
+	tracef("bool NOT available for flag name %[1]q (cmd=%[2]q)", name, cmd.Name)
 	return 0
 }

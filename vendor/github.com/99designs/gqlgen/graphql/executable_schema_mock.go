@@ -19,7 +19,7 @@ var _ ExecutableSchema = &ExecutableSchemaMock{}
 //
 //		// make and configure a mocked ExecutableSchema
 //		mockedExecutableSchema := &ExecutableSchemaMock{
-//			ComplexityFunc: func(ctx context.Context, typeName string, fieldName string, childComplexity int, args map[string]any) (int, bool) {
+//			ComplexityFunc: func(typeName string, fieldName string, childComplexity int, args map[string]interface{}) (int, bool) {
 //				panic("mock out the Complexity method")
 //			},
 //			ExecFunc: func(ctx context.Context) ResponseHandler {
@@ -36,7 +36,7 @@ var _ ExecutableSchema = &ExecutableSchemaMock{}
 //	}
 type ExecutableSchemaMock struct {
 	// ComplexityFunc mocks the Complexity method.
-	ComplexityFunc func(ctx context.Context, typeName string, fieldName string, childComplexity int, args map[string]any) (int, bool)
+	ComplexityFunc func(typeName string, fieldName string, childComplexity int, args map[string]interface{}) (int, bool)
 
 	// ExecFunc mocks the Exec method.
 	ExecFunc func(ctx context.Context) ResponseHandler
@@ -48,8 +48,6 @@ type ExecutableSchemaMock struct {
 	calls struct {
 		// Complexity holds details about calls to the Complexity method.
 		Complexity []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
 			// TypeName is the typeName argument value.
 			TypeName string
 			// FieldName is the fieldName argument value.
@@ -57,7 +55,7 @@ type ExecutableSchemaMock struct {
 			// ChildComplexity is the childComplexity argument value.
 			ChildComplexity int
 			// Args is the args argument value.
-			Args map[string]any
+			Args map[string]interface{}
 		}
 		// Exec holds details about calls to the Exec method.
 		Exec []struct {
@@ -74,18 +72,16 @@ type ExecutableSchemaMock struct {
 }
 
 // Complexity calls ComplexityFunc.
-func (mock *ExecutableSchemaMock) Complexity(ctx context.Context, typeName string, fieldName string, childComplexity int, args map[string]any) (int, bool) {
+func (mock *ExecutableSchemaMock) Complexity(typeName string, fieldName string, childComplexity int, args map[string]interface{}) (int, bool) {
 	if mock.ComplexityFunc == nil {
 		panic("ExecutableSchemaMock.ComplexityFunc: method is nil but ExecutableSchema.Complexity was just called")
 	}
 	callInfo := struct {
-		Ctx             context.Context
 		TypeName        string
 		FieldName       string
 		ChildComplexity int
-		Args            map[string]any
+		Args            map[string]interface{}
 	}{
-		Ctx:             ctx,
 		TypeName:        typeName,
 		FieldName:       fieldName,
 		ChildComplexity: childComplexity,
@@ -94,7 +90,7 @@ func (mock *ExecutableSchemaMock) Complexity(ctx context.Context, typeName strin
 	mock.lockComplexity.Lock()
 	mock.calls.Complexity = append(mock.calls.Complexity, callInfo)
 	mock.lockComplexity.Unlock()
-	return mock.ComplexityFunc(ctx, typeName, fieldName, childComplexity, args)
+	return mock.ComplexityFunc(typeName, fieldName, childComplexity, args)
 }
 
 // ComplexityCalls gets all the calls that were made to Complexity.
@@ -102,18 +98,16 @@ func (mock *ExecutableSchemaMock) Complexity(ctx context.Context, typeName strin
 //
 //	len(mockedExecutableSchema.ComplexityCalls())
 func (mock *ExecutableSchemaMock) ComplexityCalls() []struct {
-	Ctx             context.Context
 	TypeName        string
 	FieldName       string
 	ChildComplexity int
-	Args            map[string]any
+	Args            map[string]interface{}
 } {
 	var calls []struct {
-		Ctx             context.Context
 		TypeName        string
 		FieldName       string
 		ChildComplexity int
-		Args            map[string]any
+		Args            map[string]interface{}
 	}
 	mock.lockComplexity.RLock()
 	calls = mock.calls.Complexity

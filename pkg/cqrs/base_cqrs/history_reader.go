@@ -10,8 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/history_reader"
@@ -19,14 +18,14 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewHistoryReader(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) history_reader.Reader {
+func NewHistoryReader(adapter dbpkg.Adapter) history_reader.Reader {
 	return &reader{
-		q: NewQueries(db, driver, o),
+		q: adapter.Q(),
 	}
 }
 
 type reader struct {
-	q sqlc.Querier
+	q dbpkg.Querier
 }
 
 func (r *reader) CountRuns(
@@ -246,7 +245,7 @@ func (r *reader) CountActiveRuns(
 	return 0, errors.New("not implemented")
 }
 
-func sqlToRun(item *sqlc.FunctionRun, finish *sqlc.FunctionFinish) (*history_reader.Run, error) {
+func sqlToRun(item *dbpkg.FunctionRun, finish *dbpkg.FunctionFinish) (*history_reader.Run, error) {
 	if item == nil {
 		return nil, history_reader.ErrNotFound
 	}
@@ -295,7 +294,7 @@ func sqlToRun(item *sqlc.FunctionRun, finish *sqlc.FunctionFinish) (*history_rea
 	}, nil
 }
 
-func sqlToRunHistory(item *sqlc.History) (*history_reader.RunHistory, error) {
+func sqlToRunHistory(item *dbpkg.History) (*history_reader.RunHistory, error) {
 	historyType, err := enums.HistoryTypeString(item.Type)
 	if err != nil {
 		return nil, fmt.Errorf("invalid history type: %w", err)

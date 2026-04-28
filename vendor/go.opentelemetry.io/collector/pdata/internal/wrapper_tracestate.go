@@ -3,29 +3,35 @@
 
 package internal // import "go.opentelemetry.io/collector/pdata/internal"
 
-type TraceStateWrapper struct {
+type TraceState struct {
 	orig  *string
 	state *State
 }
 
-func GetTraceStateOrig(ms TraceStateWrapper) *string {
+func GetOrigTraceState(ms TraceState) *string {
 	return ms.orig
 }
 
-func GetTraceStateState(ms TraceStateWrapper) *State {
+func GetTraceStateState(ms TraceState) *State {
 	return ms.state
 }
 
-func NewTraceStateWrapper(orig *string, state *State) TraceStateWrapper {
-	return TraceStateWrapper{orig: orig, state: state}
+func NewTraceState(orig *string, state *State) TraceState {
+	return TraceState{orig: orig, state: state}
 }
 
-func GenTestTraceStateWrapper() TraceStateWrapper {
-	return NewTraceStateWrapper(GenTestTraceState(), NewState())
+func CopyOrigTraceState(dest, src *string) {
+	*dest = *src
 }
 
-func GenTestTraceState() *string {
-	orig := new(string)
-	*orig = "rojo=00f067aa0ba902b7"
-	return orig
+func GenerateTestTraceState() TraceState {
+	var orig string
+	state := StateMutable
+	ms := NewTraceState(&orig, &state)
+	FillTestTraceState(ms)
+	return ms
+}
+
+func FillTestTraceState(dest TraceState) {
+	*dest.orig = "rojo=00f067aa0ba902b7"
 }

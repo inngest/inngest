@@ -24,6 +24,23 @@ import (
 	"cuelang.org/go/cue/token"
 )
 
+func lastError(p *build.Instance) *PackageError {
+	if p == nil {
+		return nil
+	}
+	switch v := p.Err.(type) {
+	case *PackageError:
+		return v
+	}
+	return nil
+}
+
+func report(p *build.Instance, err *PackageError) {
+	if err != nil {
+		p.ReportError(err)
+	}
+}
+
 // A PackageError describes an error loading information about a package.
 type PackageError struct {
 	ImportStack    []string  // shortest path from package named on command line to this one
@@ -36,6 +53,15 @@ func (p *PackageError) Position() token.Pos         { return p.Pos }
 func (p *PackageError) InputPositions() []token.Pos { return nil }
 func (p *PackageError) Path() []string              { return p.ImportStack }
 
+func (l *loader) errPkgf(importPos []token.Pos, format string, args ...interface{}) *PackageError {
+	err := &PackageError{
+		ImportStack: l.stk.Copy(),
+		Message:     errors.NewMessage(format, args),
+	}
+	err.fillPos(l.cfg.Dir, importPos)
+	return err
+}
+
 func (p *PackageError) fillPos(cwd string, positions []token.Pos) {
 	if len(positions) > 0 && !p.Pos.IsValid() {
 		p.Pos = positions[0]
@@ -43,7 +69,6 @@ func (p *PackageError) fillPos(cwd string, positions []token.Pos) {
 }
 
 // TODO(localize)
-
 func (p *PackageError) Error() string {
 	// Import cycles deserve special treatment.
 	if p.IsImportCycle {
@@ -66,7 +91,7 @@ func (p *PackageError) Error() string {
 type NoFilesError struct {
 	Package *build.Instance
 
-	ignored bool // whether any CUE files were ignored due to build tags
+	ignored bool // whether any Go files were ignored due to build tags
 }
 
 func (e *NoFilesError) Position() token.Pos         { return token.NoPos }
@@ -74,8 +99,10 @@ func (e *NoFilesError) InputPositions() []token.Pos { return nil }
 func (e *NoFilesError) Path() []string              { return nil }
 
 // TODO(localize)
+func (e *NoFilesError) Msg() (string, []interface{}) { return e.Error(), nil }
 
-func (e *NoFilesError) Msg() (string, []interface{}) {
+// TODO(localize)
+func (e *NoFilesError) Error() string {
 	// Count files beginning with _, which we will pretend don't exist at all.
 	dummy := 0
 	for _, f := range e.Package.IgnoredFiles {
@@ -89,19 +116,19 @@ func (e *NoFilesError) Msg() (string, []interface{}) {
 
 	if len(e.Package.IgnoredFiles) > dummy {
 		b := strings.Builder{}
-		var args []any
-		b.WriteString("build constraints exclude all CUE files in %s:")
-		args = append(args, token.Position{Filename: path})
+		b.WriteString("build constraints exclude all CUE files in ")
+		b.WriteString(path)
+		b.WriteString(":")
 		// CUE files exist, but they were ignored due to build constraints.
 		for _, f := range e.Package.IgnoredFiles {
-			b.WriteString("\n    %s")
-			args = append(args, token.Position{Filename: f.Filename})
+			b.WriteString("\n    ")
+			b.WriteString(filepath.ToSlash(e.Package.RelPath(f)))
 			if f.ExcludeReason != nil {
-				b.WriteString(": %v")
-				args = append(args, f.ExcludeReason)
+				b.WriteString(": ")
+				b.WriteString(f.ExcludeReason.Error())
 			}
 		}
-		return b.String(), args
+		return b.String()
 	}
 	// if len(e.Package.TestCUEFiles) > 0 {
 	// 	// Test CUE files exist, but we're not interested in them.
@@ -109,12 +136,7 @@ func (e *NoFilesError) Msg() (string, []interface{}) {
 	// 	// to appear at the end of error message.
 	// 	return "no non-test CUE files in " + e.Package.Dir
 	// }
-	return "no CUE files in %s", []any{path}
-}
-
-func (e *NoFilesError) Error() string {
-	format, args := e.Msg()
-	return fmt.Sprintf(format, args...)
+	return "no CUE files in " + path
 }
 
 // MultiplePackageError describes an attempt to build a package composed of
@@ -130,14 +152,12 @@ func (e *MultiplePackageError) InputPositions() []token.Pos { return nil }
 func (e *MultiplePackageError) Path() []string              { return nil }
 
 func (e *MultiplePackageError) Msg() (string, []interface{}) {
-	return "found packages %q (%s) and %q (%s) in %q", []interface{}{
+	return "found packages %q (%s) and %s (%s) in %q", []interface{}{
 		e.Packages[0],
 		e.Files[0],
 		e.Packages[1],
 		e.Files[1],
-		// To make sure [cue/errors] prints this directory name as relative,
-		// use a [token.Position] even though it's really only meant for regular source files.
-		token.Position{Filename: e.Dir},
+		e.Dir,
 	}
 }
 

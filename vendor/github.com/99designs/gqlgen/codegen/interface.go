@@ -3,7 +3,6 @@ package codegen
 import (
 	"fmt"
 	"go/types"
-	"sort"
 
 	"github.com/vektah/gqlparser/v2/ast"
 
@@ -41,20 +40,7 @@ func (b *builder) buildInterface(typ *ast.Definition) (*Interface, error) {
 		return nil, fmt.Errorf("%s is not an interface", i.Type)
 	}
 
-	// Sort so that more specific types are evaluated first.
-	implementors := b.Schema.GetPossibleTypes(typ)
-
-	sort.SliceStable(implementors, func(i, j int) bool {
-		if len(implementors[i].Interfaces) != len(implementors[j].Interfaces) {
-			return len(implementors[i].Interfaces) > len(implementors[j].Interfaces)
-		}
-		// if they have the same name, they probably ARE the same
-		// so we need to rely on SliceStable or else order is
-		// non-deterministic and causes test failures
-		return implementors[i].Name > implementors[j].Name
-	})
-
-	for _, implementor := range implementors {
+	for _, implementor := range b.Schema.GetPossibleTypes(typ) {
 		obj, err := b.Binder.DefaultUserObject(implementor.Name)
 		if err != nil {
 			return nil, fmt.Errorf("%s has no backing go type", implementor.Name)
@@ -89,11 +75,7 @@ func (b *builder) buildInterface(typ *ast.Definition) (*Interface, error) {
 		}
 
 		if !anyValid {
-			return nil, fmt.Errorf(
-				"%s does not satisfy the interface %s",
-				implementorType.String(),
-				i.Type.String(),
-			)
+			return nil, fmt.Errorf("%s does not satisfy the interface %s", implementorType.String(), i.Type.String())
 		}
 	}
 

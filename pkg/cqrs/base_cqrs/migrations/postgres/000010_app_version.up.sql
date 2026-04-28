@@ -1,1 +1,0 @@
-ALTER TABLE "apps" ADD COLUMN IF NOT EXISTS "app_version" VARCHAR(128);

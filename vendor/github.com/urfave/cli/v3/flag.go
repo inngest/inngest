@@ -3,20 +3,24 @@ package cli
 import (
 	"context"
 	"fmt"
-	"slices"
+	"regexp"
 	"strings"
 	"time"
 )
 
 const defaultPlaceholder = "value"
 
-const (
+var (
 	defaultSliceFlagSeparator       = ","
 	defaultMapFlagKeyValueSeparator = "="
 	disableSliceFlagSeparator       = false
 )
 
-var slPfx = fmt.Sprintf("sl:::%d:::", time.Now().UTC().UnixNano())
+var (
+	slPfx = fmt.Sprintf("sl:::%d:::", time.Now().UTC().UnixNano())
+
+	commaWhitespace = regexp.MustCompile("[, ]+.*")
+)
 
 // GenerateShellCompletionFlag enables shell completion
 var GenerateShellCompletionFlag Flag = &BoolFlag{
@@ -73,6 +77,11 @@ func (f FlagsByName) Len() int {
 }
 
 func (f FlagsByName) Less(i, j int) bool {
+	if len(f[j].Names()) == 0 {
+		return false
+	} else if len(f[i].Names()) == 0 {
+		return true
+	}
 	return lexicographicLess(f[i].Names()[0], f[j].Names()[0])
 }
 
@@ -197,27 +206,26 @@ func FlagNames(name string, aliases []string) []string {
 		// Strip off anything after the first found comma or space, which
 		// *hopefully* makes it a tiny bit more obvious that unexpected behavior is
 		// caused by using the v1 form of stringly typed "Name".
-		if i := strings.IndexAny(part, ", "); i >= 0 {
-			ret = append(ret, part[:i])
-		} else {
-			ret = append(ret, part)
-		}
+		ret = append(ret, commaWhitespace.ReplaceAllString(part, ""))
 	}
 
 	return ret
 }
 
 func hasFlag(flags []Flag, fl Flag) bool {
-	return slices.Contains(flags, fl)
+	for _, existing := range flags {
+		if fl == existing {
+			return true
+		}
+	}
+
+	return false
 }
 
-func flagSplitMultiValues(val string, sliceSeparator string, disableSliceSeparator bool) []string {
-	if disableSliceSeparator {
+func flagSplitMultiValues(val string) []string {
+	if disableSliceFlagSeparator {
 		return []string{val}
 	}
 
-	if len(sliceSeparator) == 0 {
-		sliceSeparator = defaultSliceFlagSeparator
-	}
-	return strings.Split(val, sliceSeparator)
+	return strings.Split(val, defaultSliceFlagSeparator)
 }

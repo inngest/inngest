@@ -220,28 +220,33 @@ func mutexEnter(tls *libc.TLS, m uintptr) {
 		return
 	}
 
-	// Non-recursive mutex: Standard Go lock
 	if !(*mutex)(unsafe.Pointer(m)).recursive {
 		(*mutex)(unsafe.Pointer(m)).Lock()
-		atomic.StoreInt32(&(*mutex)(unsafe.Pointer(m)).id, tls.ID)
+		(*mutex)(unsafe.Pointer(m)).id = tls.ID
 		return
 	}
 
-	// Recursive mutex: Check if we already own it (Fast Path)
-	// We can safely read ptr.id without a lock here because if it equals tls.ID,
-	// WE are the writer, so no other thread can be changing it.
-	if atomic.LoadInt32(&(*mutex)(unsafe.Pointer(m)).id) == tls.ID {
+	id := tls.ID
+	if atomic.CompareAndSwapInt32(&(*mutex)(unsafe.Pointer(m)).id, 0, id) {
+		(*mutex)(unsafe.Pointer(m)).cnt = 1
+		(*mutex)(unsafe.Pointer(m)).Lock()
+		return
+	}
+
+	if atomic.LoadInt32(&(*mutex)(unsafe.Pointer(m)).id) == id {
 		(*mutex)(unsafe.Pointer(m)).cnt++
 		return
 	}
 
-	// We don't own it. Acquire physical lock (Slow Path).
-	// This blocks until the mutex is free.
-	(*mutex)(unsafe.Pointer(m)).Lock()
+	for {
+		(*mutex)(unsafe.Pointer(m)).Lock()
+		if atomic.CompareAndSwapInt32(&(*mutex)(unsafe.Pointer(m)).id, 0, id) {
+			(*mutex)(unsafe.Pointer(m)).cnt = 1
+			return
+		}
 
-	// Now that we have the lock, claim ownership.
-	atomic.StoreInt32(&(*mutex)(unsafe.Pointer(m)).id, tls.ID)
-	(*mutex)(unsafe.Pointer(m)).cnt = 1
+		(*mutex)(unsafe.Pointer(m)).Unlock()
+	}
 }
 
 // int (*xMutexTry)(sqlite3_mutex *);
@@ -250,27 +255,10 @@ func mutexTry(tls *libc.TLS, m uintptr) int32 {
 		return SQLITE_OK
 	}
 
-	// Non-recursive mutex
 	if !(*mutex)(unsafe.Pointer(m)).recursive {
 		if (*mutex)(unsafe.Pointer(m)).TryLock() {
-			atomic.StoreInt32(&(*mutex)(unsafe.Pointer(m)).id, tls.ID)
 			return SQLITE_OK
 		}
-
-		return SQLITE_BUSY
-	}
-
-	// Recursive mutex: Check if we already own it (Fast Path)
-	if atomic.LoadInt32(&(*mutex)(unsafe.Pointer(m)).id) == tls.ID {
-		(*mutex)(unsafe.Pointer(m)).cnt++
-		return SQLITE_OK
-	}
-
-	// Try to acquire physical lock
-	if (*mutex)(unsafe.Pointer(m)).TryLock() {
-		atomic.StoreInt32(&(*mutex)(unsafe.Pointer(m)).id, tls.ID)
-		(*mutex)(unsafe.Pointer(m)).cnt = 1
-		return SQLITE_OK
 	}
 
 	return SQLITE_BUSY
@@ -282,18 +270,13 @@ func mutexLeave(tls *libc.TLS, m uintptr) {
 		return
 	}
 
-	// Non-recursive mutex
 	if !(*mutex)(unsafe.Pointer(m)).recursive {
-		atomic.StoreInt32(&(*mutex)(unsafe.Pointer(m)).id, 0)
+		(*mutex)(unsafe.Pointer(m)).id = 0
 		(*mutex)(unsafe.Pointer(m)).Unlock()
 		return
 	}
 
-	// Recursive mutex: Decrement count
-	(*mutex)(unsafe.Pointer(m)).cnt--
-
-	// If count reaches zero, we are fully releasing the mutex.
-	if (*mutex)(unsafe.Pointer(m)).cnt == 0 {
+	if atomic.AddInt32(&(*mutex)(unsafe.Pointer(m)).cnt, -1) == 0 {
 		atomic.StoreInt32(&(*mutex)(unsafe.Pointer(m)).id, 0)
 		(*mutex)(unsafe.Pointer(m)).Unlock()
 	}
@@ -329,8 +312,6 @@ func mutexHeld(tls *libc.TLS, m uintptr) int32 {
 		return 1
 	}
 
-	// atomic.Load is required because we might be checking a mutex
-	// that we do not own (and thus another thread might be writing to).
 	return libc.Bool32(atomic.LoadInt32(&(*mutex)(unsafe.Pointer(m)).id) == tls.ID)
 }
 
@@ -340,6 +321,5 @@ func mutexNotheld(tls *libc.TLS, m uintptr) int32 {
 		return 1
 	}
 
-	// Returns True if ID is Zero (unheld) OR ID is some other thread's ID.
 	return libc.Bool32(atomic.LoadInt32(&(*mutex)(unsafe.Pointer(m)).id) != tls.ID)
 }

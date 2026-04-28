@@ -2,7 +2,8 @@ package main
 
 import "fmt"
 
-// Arguments to format are: [1]: type name [2]: complete error expression
+// Arguments to format are:
+//	[1]: type name
 const stringNameToValueMethod = `// %[1]sString retrieves an enum value from the enum constants string name.
 // Throws an error if the param is not part of the enum.
 func %[1]sString(s string) (%[1]s, error) {
@@ -13,18 +14,20 @@ func %[1]sString(s string) (%[1]s, error) {
 	if val, ok := _%[1]sNameToValueMap[strings.ToLower(s)]; ok {
 		return val, nil
 	}
-	return 0, %[2]s
+	return 0, fmt.Errorf("%%s does not belong to %[1]s values", s)
 }
 `
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const stringValuesMethod = `// %[1]sValues returns all values of the enum
 func %[1]sValues() []%[1]s {
 	return _%[1]sValues
 }
 `
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const stringsMethod = `// %[1]sStrings returns a slice of all String values of the enum
 func %[1]sStrings() []string {
 	strs := make([]string, len(_%[1]sNames))
@@ -33,7 +36,8 @@ func %[1]sStrings() []string {
 }
 `
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const stringBelongsMethodLoop = `// IsA%[1]s returns "true" if the value is listed in the enum definition. "false" otherwise
 func (i %[1]s) IsA%[1]s() bool {
 	for _, v := range _%[1]sValues {
@@ -45,7 +49,8 @@ func (i %[1]s) IsA%[1]s() bool {
 }
 `
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const stringBelongsMethodSet = `// IsA%[1]s returns "true" if the value is listed in the enum definition. "false" otherwise
 func (i %[1]s) IsA%[1]s() bool {
 	_, ok := _%[1]sMap[i] 
@@ -53,7 +58,8 @@ func (i %[1]s) IsA%[1]s() bool {
 }
 `
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const altStringValuesMethod = `func (%[1]s) Values() []string {
 	return %[1]sStrings()
 }
@@ -64,7 +70,7 @@ func (g *Generator) buildAltStringValuesMethod(typeName string) {
 	g.Printf(altStringValuesMethod, typeName)
 }
 
-func (g *Generator) buildBasicExtras(runs [][]Value, typeName string, runsThreshold int, useTypedErrors bool) {
+func (g *Generator) buildBasicExtras(runs [][]Value, typeName string, runsThreshold int) {
 	// At this moment, either "g.declareIndexAndNameVars()" or "g.declareNameVars()" has been called
 
 	// Print the slice of values
@@ -83,13 +89,7 @@ func (g *Generator) buildBasicExtras(runs [][]Value, typeName string, runsThresh
 	g.printNamesSlice(runs, typeName, runsThreshold)
 
 	// Print the basic extra methods
-	var errorCode string
-	if useTypedErrors {
-		errorCode = fmt.Sprintf(`errors.Join(enumerrs.ErrValueInvalid, fmt.Errorf("%%s does not belong to %s values", s))`, typeName)
-	} else {
-		errorCode = fmt.Sprintf(`fmt.Errorf("%%s does not belong to %s values", s)`, typeName)
-	}
-	g.Printf(stringNameToValueMethod, typeName, errorCode)
+	g.Printf(stringNameToValueMethod, typeName)
 	g.Printf(stringValuesMethod, typeName)
 	g.Printf(stringsMethod, typeName)
 	if len(runs) <= runsThreshold {
@@ -143,7 +143,8 @@ func (g *Generator) printNamesSlice(runs [][]Value, typeName string, runsThresho
 	g.Printf("}\n\n")
 }
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const jsonMethods = `
 // MarshalJSON implements the json.Marshaler interface for %[1]s
 func (i %[1]s) MarshalJSON() ([]byte, error) {
@@ -163,13 +164,12 @@ func (i *%[1]s) UnmarshalJSON(data []byte) error {
 }
 `
 
-func (g *Generator) buildJSONMethods(runs [][]Value, typeName string, runsThreshold int, useTypedErrors bool) {
-	// For now, just use the standard template
-	// We rely on the %[1]sString method to provide typed errors when enabled
+func (g *Generator) buildJSONMethods(runs [][]Value, typeName string, runsThreshold int) {
 	g.Printf(jsonMethods, typeName)
 }
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const textMethods = `
 // MarshalText implements the encoding.TextMarshaler interface for %[1]s
 func (i %[1]s) MarshalText() ([]byte, error) {
@@ -184,13 +184,12 @@ func (i *%[1]s) UnmarshalText(text []byte) error {
 }
 `
 
-func (g *Generator) buildTextMethods(runs [][]Value, typeName string, runsThreshold int, useTypedErrors bool) {
-	// For now, just use the standard template
-	// We rely on the %[1]sString method to provide typed errors when enabled
+func (g *Generator) buildTextMethods(runs [][]Value, typeName string, runsThreshold int) {
 	g.Printf(textMethods, typeName)
 }
 
-// Arguments to format are: [1]: type name
+// Arguments to format are:
+//	[1]: type name
 const yamlMethods = `
 // MarshalYAML implements a YAML Marshaler for %[1]s
 func (i %[1]s) MarshalYAML() (interface{}, error) {
@@ -210,35 +209,6 @@ func (i *%[1]s) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 `
 
-func (g *Generator) buildYAMLMethods(runs [][]Value, typeName string, runsThreshold int, useTypedErrors bool) {
-	// For now, just use the standard template
-	// We rely on the %[1]sString method to provide typed errors when enabled
+func (g *Generator) buildYAMLMethods(runs [][]Value, typeName string, runsThreshold int) {
 	g.Printf(yamlMethods, typeName)
-}
-
-// Arguments to format are: [1]: type name
-const flagValueMethodSet = `
-// Set allows flag and pflag libraries to set a value dynamically.
-func (i *%[1]s) Set(value string) error {
-	var err error
-	*i, err = %[1]sString(value)
-	return err
-}
-`
-
-// Arguments to format are:	[1]: type name
-const pflagValueMethodType = `
-// Type returns a string that represents all possible values to this type joined by '|'.
-func (%[1]s) Type() string {
-	return strings.Join(_%[1]sNames, "|")
-}
-`
-
-func (g *Generator) buildFlagMethods(runs [][]Value, typeName string, runsThreshold int) {
-	g.Printf(flagValueMethodSet, typeName)
-}
-
-func (g *Generator) buildPflagMethods(runs [][]Value, typeName string, runsThreshold int) {
-	g.Printf(flagValueMethodSet, typeName)
-	g.Printf(pflagValueMethodType, typeName)
 }

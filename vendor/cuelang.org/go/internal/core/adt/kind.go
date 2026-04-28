@@ -16,14 +16,13 @@ package adt
 
 import (
 	"fmt"
-	"iter"
 	"math/bits"
 	"strings"
 )
 
 // Concreteness is a measure of the level of concreteness of a value, where
 // lower values mean more concrete.
-type Concreteness uint8
+type Concreteness int
 
 const (
 	BottomLevel Concreteness = iota
@@ -54,26 +53,6 @@ func IsConcrete(v Value) bool {
 	return v.Concreteness() <= Concrete
 }
 
-// IsRecursivelyConcrete checks that v is a scalar or that all regular fields
-// have concrete values, recursively.
-func IsRecursivelyConcrete(v *Vertex) bool {
-	for _, a := range v.Arcs {
-		if !a.Label.IsRegular() {
-			continue
-		}
-		switch a.ArcType {
-		case ArcMember:
-		case ArcRequired:
-			return false
-		}
-
-		if !IsRecursivelyConcrete(a) {
-			return false
-		}
-	}
-	return v.IsConcrete()
-}
-
 // Kind reports the Value kind.
 type Kind uint16
 
@@ -92,14 +71,14 @@ const (
 
 	_numberKind
 
+	NumberKind = IntKind | FloatKind
+
 	BottomKind Kind = 0
 
-	NumberKind       = IntKind | FloatKind
+	NumKind          = IntKind | FloatKind
 	TopKind     Kind = (allKinds - 1) // all kinds, but not references
 	ScalarKinds      = NullKind | BoolKind |
 		IntKind | FloatKind | StringKind | BytesKind
-
-	CompositeKind = StructKind | ListKind
 )
 
 func kind(v Value) Kind {
@@ -134,35 +113,10 @@ func (k Kind) String() string {
 	return toString(k, kindStrs)
 }
 
-// TypeString is like [Kind.String],
-// but returns a string representation of a valid CUE type.
+// TypeString is like String, but returns a string representation of a valid
+// CUE type.
 func (k Kind) TypeString() string {
 	return toString(k, typeStrs)
-}
-
-// Kinds returns an iterator over all the individual
-// Kinds in k. There will be k.Count() items in the sequence.
-func (k Kind) Kinds() iter.Seq[Kind] {
-	return func(yield func(Kind) bool) {
-		k := k
-		for count := 0; ; count++ {
-			n := bits.TrailingZeros(uint(k))
-			if n == bits.UintSize {
-				break
-			}
-			bit := Kind(1 << uint(n))
-			k &^= bit
-			if !yield(bit) {
-				return
-			}
-		}
-	}
-}
-
-// Count returns the number of individual Kinds
-// making up k.
-func (k Kind) Count() int {
-	return bits.OnesCount(uint(k))
 }
 
 func toString(k Kind, m map[Kind]string) string {
@@ -176,21 +130,25 @@ func toString(k Kind, m map[Kind]string) string {
 		k = (k &^ NumberKind) | _numberKind
 	}
 	var buf strings.Builder
-	multiple := k.Count() > 1
+	multiple := bits.OnesCount(uint(k)) > 1
 	if multiple {
 		buf.WriteByte('(')
 	}
-	count := 0
-	for bit := range k.Kinds() {
+	for count := 0; ; count++ {
+		n := bits.TrailingZeros(uint(k))
+		if n == bits.UintSize {
+			break
+		}
+		bit := Kind(1 << uint(n))
+		k &^= bit
 		s, ok := m[bit]
 		if !ok {
-			s = fmt.Sprintf("bad(%d)", bits.TrailingZeros(uint(bit)))
+			s = fmt.Sprintf("bad(%d)", n)
 		}
 		if count > 0 {
 			buf.WriteByte('|')
 		}
 		buf.WriteString(s)
-		count++
 	}
 	if multiple {
 		buf.WriteByte(')')

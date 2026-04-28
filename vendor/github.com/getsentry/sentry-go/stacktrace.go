@@ -4,7 +4,6 @@ import (
 	"go/build"
 	"reflect"
 	"runtime"
-	"slices"
 	"strings"
 )
 
@@ -278,7 +277,12 @@ func extractFrames(pcs []uintptr) []runtime.Frame {
 		}
 	}
 
-	slices.Reverse(frames)
+	// TODO don't append and reverse, put in the right place from the start.
+	// reverse
+	for i, j := 0, len(frames)-1; i < j; i, j = i+1, j-1 {
+		frames[i], frames[j] = frames[j], frames[i]
+	}
+
 	return frames
 }
 
@@ -303,9 +307,6 @@ func createFrames(frames []runtime.Frame) []Frame {
 		}
 	}
 
-	// Fix issues grouping errors with the new fully qualified function names
-	// introduced from Go 1.21
-	result = cleanupFunctionNamePrefix(result)
 	return result
 }
 
@@ -332,10 +333,12 @@ func shouldSkipFrame(module string) bool {
 var goRoot = strings.ReplaceAll(build.Default.GOROOT, "\\", "/")
 
 func setInAppFrame(frame *Frame) {
-	frame.InApp = true
-	if strings.HasPrefix(frame.AbsPath, goRoot) || strings.Contains(frame.Module, "vendor") ||
+	if strings.HasPrefix(frame.AbsPath, goRoot) ||
+		strings.Contains(frame.Module, "vendor") ||
 		strings.Contains(frame.Module, "third_party") {
 		frame.InApp = false
+	} else {
+		frame.InApp = true
 	}
 }
 
@@ -375,33 +378,4 @@ func baseName(name string) string {
 		return name[i+1:]
 	}
 	return name
-}
-
-func isCompilerGeneratedSymbol(name string) bool {
-	// In versions of Go 1.20 and above a prefix of "type:" and "go:" is a
-	// compiler-generated symbol that doesn't belong to any package.
-	// See variable reservedimports in cmd/compile/internal/gc/subr.go
-	if strings.HasPrefix(name, "go:") || strings.HasPrefix(name, "type:") {
-		return true
-	}
-	return false
-}
-
-// Walk backwards through the results and for the current function name
-// remove it's parent function's prefix, leaving only it's actual name. This
-// fixes issues grouping errors with the new fully qualified function names
-// introduced from Go 1.21.
-func cleanupFunctionNamePrefix(f []Frame) []Frame {
-	for i := len(f) - 1; i > 0; i-- {
-		name := f[i].Function
-		parentName := f[i-1].Function + "."
-
-		if !strings.HasPrefix(name, parentName) {
-			continue
-		}
-
-		f[i].Function = name[len(parentName):]
-	}
-
-	return f
 }

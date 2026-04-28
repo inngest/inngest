@@ -83,14 +83,316 @@ import (
 //     - So only need to check exact labels for vertices.
 
 type envDisjunct struct {
-	env     *Environment
-	cloneID CloseInfo
-	holeID  int
+	env         *Environment
+	cloneID     CloseInfo
+	expr        *DisjunctionExpr
+	value       *Disjunction
+	hasDefaults bool
 
-	// TODO: src is set but never used. It seems like it should be used
-	// in either [nodeContext.crossProduct] or [nodeContext.collectErrors]?
-	src       Node
-	disjuncts []disjunct
+	// These are used for book keeping, tracking whether any of the
+	// disjuncts marked with a default marker remains after unification.
+	// If no default is used, all other elements are treated as "maybeDefault".
+	// Otherwise, elements are treated as is.
+	parentDefaultUsed bool
+	childDefaultUsed  bool
+}
+
+func (n *nodeContext) addDisjunction(env *Environment, x *DisjunctionExpr, cloneID CloseInfo) {
+
+	// TODO: precompute
+	numDefaults := 0
+	for _, v := range x.Values {
+		isDef := v.Default // || n.hasDefaults(env, v.Val)
+		if isDef {
+			numDefaults++
+		}
+	}
+
+	n.disjunctions = append(n.disjunctions,
+		envDisjunct{env, cloneID, x, nil, numDefaults > 0, false, false})
+}
+
+func (n *nodeContext) addDisjunctionValue(env *Environment, x *Disjunction, cloneID CloseInfo) {
+	n.disjunctions = append(n.disjunctions,
+		envDisjunct{env, cloneID, nil, x, x.HasDefaults, false, false})
+
+}
+
+func (n *nodeContext) expandDisjuncts(
+	state VertexStatus,
+	parent *nodeContext,
+	parentMode defaultMode, // default mode of this disjunct
+	recursive, last bool) {
+
+	n.ctx.stats.DisjunctCount++
+
+	node := n.node
+	defer func() {
+		n.node = node
+	}()
+
+	for n.expandOne() {
+	}
+
+	// save node to snapShot in nodeContex
+	// save nodeContext.
+
+	if recursive || len(n.disjunctions) > 0 {
+		n.snapshot = clone(*n.node)
+	} else {
+		n.snapshot = *n.node
+	}
+
+	defaultOffset := len(n.usedDefault)
+
+	switch {
+	default: // len(n.disjunctions) == 0
+		m := *n
+		n.postDisjunct(state)
+
+		switch {
+		case n.hasErr():
+			// TODO: consider finalizing the node thusly:
+			// if recursive {
+			// 	n.node.Finalize(n.ctx)
+			// }
+			x := n.node
+			err, ok := x.BaseValue.(*Bottom)
+			if !ok {
+				err = n.getErr()
+			}
+			if err == nil {
+				// TODO(disjuncts): Is this always correct? Especially for partial
+				// evaluation it is okay for child errors to have incomplete errors.
+				// Perhaps introduce an Err() method.
+				err = x.ChildErrors
+			}
+			if err.IsIncomplete() {
+				break
+			}
+			if err != nil {
+				parent.disjunctErrs = append(parent.disjunctErrs, err)
+			}
+			if recursive {
+				n.free()
+			}
+			return
+		}
+
+		if recursive {
+			*n = m
+			n.result = *n.node // XXX: n.result = snapshotVertex(n.node)?
+			n.node = &n.result
+			n.disjuncts = append(n.disjuncts, n)
+		}
+		if n.node.BaseValue == nil {
+			n.node.BaseValue = n.getValidators()
+		}
+
+		n.usedDefault = append(n.usedDefault, defaultInfo{
+			parentMode: parentMode,
+			nestedMode: parentMode,
+			origMode:   parentMode,
+		})
+
+	case len(n.disjunctions) > 0:
+		// Process full disjuncts to ensure that erroneous disjuncts are
+		// eliminated as early as possible.
+		state = Finalized
+
+		n.disjuncts = append(n.disjuncts, n)
+
+		n.refCount++
+		defer n.free()
+
+		for i, d := range n.disjunctions {
+			a := n.disjuncts
+			n.disjuncts = n.buffer[:0]
+			n.buffer = a[:0]
+
+			last := i+1 == len(n.disjunctions)
+			skipNonMonotonicChecks := i+1 < len(n.disjunctions)
+			if skipNonMonotonicChecks {
+				n.ctx.inDisjunct++
+			}
+
+			for _, dn := range a {
+				switch {
+				case d.expr != nil:
+					for _, v := range d.expr.Values {
+						cn := dn.clone()
+						*cn.node = clone(dn.snapshot)
+						cn.node.state = cn
+
+						c := MakeConjunct(d.env, v.Val, d.cloneID)
+						cn.addExprConjunct(c)
+
+						newMode := mode(d.hasDefaults, v.Default)
+
+						cn.expandDisjuncts(state, n, newMode, true, last)
+					}
+
+				case d.value != nil:
+					for i, v := range d.value.Values {
+						cn := dn.clone()
+						*cn.node = clone(dn.snapshot)
+						cn.node.state = cn
+
+						cn.addValueConjunct(d.env, v, d.cloneID)
+
+						newMode := mode(d.hasDefaults, i < d.value.NumDefaults)
+
+						cn.expandDisjuncts(state, n, newMode, true, last)
+					}
+				}
+			}
+
+			if skipNonMonotonicChecks {
+				n.ctx.inDisjunct--
+			}
+
+			if len(n.disjuncts) == 0 {
+				n.makeError()
+			}
+
+			if recursive || i > 0 {
+				for _, x := range a {
+					x.free()
+				}
+			}
+
+			if len(n.disjuncts) == 0 {
+				break
+			}
+		}
+
+		// Annotate disjunctions with whether any of the default disjunctions
+		// was used.
+		for _, d := range n.disjuncts {
+			for i, info := range d.usedDefault[defaultOffset:] {
+				if info.parentMode == isDefault {
+					n.disjunctions[i].parentDefaultUsed = true
+				}
+				if info.origMode == isDefault {
+					n.disjunctions[i].childDefaultUsed = true
+				}
+			}
+		}
+
+		// Combine parent and child default markers, considering that a parent
+		// "notDefault" is treated as "maybeDefault" if none of the disjuncts
+		// marked as default remain.
+		//
+		// NOTE for a parent marked as "notDefault", a child is *never*
+		// considered as default. It may either be "not" or "maybe" default.
+		//
+		// The result for each disjunction is conjoined into a single value.
+		for _, d := range n.disjuncts {
+			m := maybeDefault
+			orig := maybeDefault
+			for i, info := range d.usedDefault[defaultOffset:] {
+				parent := info.parentMode
+
+				used := n.disjunctions[i].parentDefaultUsed
+				childUsed := n.disjunctions[i].childDefaultUsed
+				hasDefaults := n.disjunctions[i].hasDefaults
+
+				orig = combineDefault(orig, info.parentMode)
+				orig = combineDefault(orig, info.nestedMode)
+
+				switch {
+				case childUsed:
+					// One of the children used a default. This is "normal"
+					// mode. This may also happen when we are in
+					// hasDefaults/notUsed mode. Consider
+					//
+					//      ("a" | "b") & (*(*"a" | string) | string)
+					//
+					// Here the doubly nested default is called twice, once
+					// for "a" and then for "b", where the second resolves to
+					// not using a default. The first does, however, and on that
+					// basis the "ot default marker cannot be overridden.
+					m = combineDefault(m, info.parentMode)
+					m = combineDefault(m, info.origMode)
+
+				case !hasDefaults, used:
+					m = combineDefault(m, info.parentMode)
+					m = combineDefault(m, info.nestedMode)
+
+				case hasDefaults && !used:
+					Assertf(parent == notDefault, "unexpected default mode")
+				}
+			}
+			d.defaultMode = m
+
+			d.usedDefault = d.usedDefault[:defaultOffset]
+			d.usedDefault = append(d.usedDefault, defaultInfo{
+				parentMode: parentMode,
+				nestedMode: m,
+				origMode:   orig,
+			})
+
+		}
+
+		// TODO: this is an old trick that seems no longer necessary for the new
+		// implementation. Keep around until we finalize the semantics for
+		// defaults, though. The recursion of nested defaults is not entirely
+		// proper yet.
+		//
+		// A better approach, that avoids the need for recursion (semantically),
+		// would be to only consider default usage for one level, but then to
+		// also allow a default to be passed if only one value is remaining.
+		// This means that a nested subsumption would first have to be evaluated
+		// in isolation, however, to determine that it is not previous
+		// disjunctions that cause the disambiguation.
+		//
+		// HACK alert: this replaces the hack of the previous algorithm with a
+		// slightly less worse hack: instead of dropping the default info when
+		// the value was scalar before, we drop this information when there is
+		// only one disjunct, while not discarding hard defaults. TODO: a more
+		// principled approach would be to recognize that there is only one
+		// default at a point where this does not break commutativity. if
+		// if len(n.disjuncts) == 1 && n.disjuncts[0].defaultMode != isDefault {
+		// 	n.disjuncts[0].defaultMode = maybeDefault
+		// }
+	}
+
+	// Compare to root, but add to this one.
+	switch p := parent; {
+	case p != n:
+		p.disjunctErrs = append(p.disjunctErrs, n.disjunctErrs...)
+		n.disjunctErrs = n.disjunctErrs[:0]
+
+	outer:
+		for _, d := range n.disjuncts {
+			for k, v := range p.disjuncts {
+				if !d.done() || !v.done() {
+					break
+				}
+				flags := CheckStructural
+				if last {
+					flags |= IgnoreOptional
+				}
+				if Equal(n.ctx, &v.result, &d.result, flags) {
+					m := maybeDefault
+					for _, u := range d.usedDefault {
+						m = combineDefault(m, u.nestedMode)
+					}
+					if m == isDefault {
+						p.disjuncts[k] = d
+						v.free()
+					} else {
+						d.free()
+					}
+					continue outer
+				}
+			}
+
+			p.disjuncts = append(p.disjuncts, d)
+		}
+
+		n.disjuncts = n.disjuncts[:0]
+	}
 }
 
 func (n *nodeContext) makeError() {
@@ -108,9 +410,8 @@ func (n *nodeContext) makeError() {
 	b := &Bottom{
 		Code: code,
 		Err:  n.disjunctError(),
-		Node: n.node,
 	}
-	n.node.SetValue(n.ctx, b)
+	n.node.SetValue(n.ctx, Finalized, b)
 }
 
 func mode(hasDefault, marked bool) defaultMode {
@@ -124,6 +425,49 @@ func mode(hasDefault, marked bool) defaultMode {
 		mode = notDefault
 	}
 	return mode
+}
+
+// clone makes a shallow copy of a Vertex. The purpose is to create different
+// disjuncts from the same Vertex under computation. This allows the conjuncts
+// of an arc to be reset to a previous position and the reuse of earlier
+// computations.
+//
+// Notes: only Arcs need to be copied recursively. Either the arc is finalized
+// and can be used as is, or Structs is assumed to not yet be computed at the
+// time that a clone is needed and must be nil. Conjuncts no longer needed and
+// can become nil. All other fields can be copied shallowly.
+func clone(v Vertex) Vertex {
+	v.state = nil
+	if a := v.Arcs; len(a) > 0 {
+		v.Arcs = make([]*Vertex, len(a))
+		for i, arc := range a {
+			switch arc.status {
+			case Finalized:
+				v.Arcs[i] = arc
+
+			case 0:
+				a := *arc
+				v.Arcs[i] = &a
+
+				a.Conjuncts = make([]Conjunct, len(arc.Conjuncts))
+				copy(a.Conjuncts, arc.Conjuncts)
+
+			default:
+				a := *arc
+				a.state = arc.state.clone()
+				a.state.node = &a
+				a.state.snapshot = clone(a)
+				v.Arcs[i] = &a
+			}
+		}
+	}
+
+	if a := v.Structs; len(a) > 0 {
+		v.Structs = make([]*StructInfo, len(a))
+		copy(v.Structs, a)
+	}
+
+	return v
 }
 
 // Default rules from spec:
@@ -149,7 +493,7 @@ func mode(hasDefault, marked bool) defaultMode {
 // not + maybe -> def
 // not + def   -> def
 
-type defaultMode uint8
+type defaultMode int
 
 const (
 	maybeDefault defaultMode = iota
@@ -174,40 +518,23 @@ func combineDefault(a, b defaultMode) defaultMode {
 //
 // TODO(perf): the set of errors is now computed during evaluation. Eventually,
 // this could be done lazily.
-func (n *nodeContext) disjunctError() errors.Error {
+func (n *nodeContext) disjunctError() (errs errors.Error) {
 	ctx := n.ctx
 
 	disjuncts := selectErrors(n.disjunctErrs)
-	var pos errors.Error
-
-	if len(n.userErrs) > 0 {
-		pos = disjuncts
-		disjuncts = selectErrors(n.userErrs)
-	}
 
 	if disjuncts == nil {
-		return ctx.Newf("empty disjunction") // XXX: add space to sort first
+		errs = ctx.Newf("empty disjunction") // XXX: add space to sort first
+	} else {
+		disjuncts = errors.Sanitize(disjuncts)
+		k := len(errors.Errors(disjuncts))
+		// prefix '-' to sort to top
+		errs = ctx.Newf("%d errors in empty disjunction:", k)
 	}
-	disjuncts = errors.Sanitize(disjuncts)
-	k := len(errors.Errors(disjuncts))
-	if k == 1 {
-		if pos != nil {
-			addDisjunctPositions(disjuncts.(*ValueError), pos)
-		}
-		return disjuncts
-	}
-	// prefix '-' to sort to top
-	err := ctx.Newf("%d errors in empty disjunction:", k)
-	if pos != nil {
-		addDisjunctPositions(err, pos)
-	}
-	return errors.Append(err, disjuncts)
-}
 
-func addDisjunctPositions(dst *ValueError, src errors.Error) {
-	for _, p := range src.InputPositions() {
-		dst.AddPos(p)
-	}
+	errs = errors.Append(errs, disjuncts)
+
+	return errs
 }
 
 func selectErrors(a []*Bottom) (errs errors.Error) {

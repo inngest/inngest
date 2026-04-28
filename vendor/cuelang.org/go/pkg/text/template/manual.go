@@ -15,7 +15,7 @@
 package template
 
 import (
-	"strings"
+	"bytes"
 	"text/template"
 
 	"cuelang.org/go/cue"
@@ -31,9 +31,9 @@ func Execute(templ string, data cue.Value) (string, error) {
 	if err := data.Decode(&x); err != nil {
 		return "", err
 	}
-	var b strings.Builder
-	if err := t.Execute(&b, x); err != nil {
+	buf := &bytes.Buffer{}
+	if err := t.Execute(buf, x); err != nil {
 		return "", err
 	}
-	return b.String(), nil
+	return buf.String(), nil
 }

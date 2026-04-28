@@ -127,7 +127,8 @@ func (v *Record) readFrom(src []byte, unsafe bool) error {
 	{
 		v := s.Headers
 		a := v
-		l := b.VarintArrayLen()
+		var l int32
+		l = b.VarintArrayLen()
 		if !b.Ok() {
 			return b.Complete()
 		}
@@ -161,7 +162,7 @@ func (v *Record) readFrom(src []byte, unsafe bool) error {
 
 // Default sets any default fields. Calling this allows for future compatibility
 // if new fields are added to Record.
-func (*Record) Default() {
+func (v *Record) Default() {
 }
 
 // NewRecord returns a default Record

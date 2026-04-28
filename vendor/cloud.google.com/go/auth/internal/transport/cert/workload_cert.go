@@ -37,36 +37,6 @@ type certificateConfig struct {
 	CertConfigs certConfigs `json:"cert_configs"`
 }
 
-// getconfigFilePath determines the path to the certificate configuration file.
-// It first checks for the presence of an environment variable that specifies
-// the file path. If the environment variable is not set, it falls back to
-// a default configuration file path.
-func getconfigFilePath() string {
-	envFilePath := util.GetConfigFilePathFromEnv()
-	if envFilePath != "" {
-		return envFilePath
-	}
-	return util.GetDefaultConfigFilePath()
-
-}
-
-// GetCertificatePath retrieves the certificate file path from the provided
-// configuration file. If the configFilePath is empty, it attempts to load
-// the configuration from a well-known gcloud location.
-// This function is exposed to allow other packages, such as the
-// externalaccount package, to retrieve the certificate path without needing
-// to load the entire certificate configuration.
-func GetCertificatePath(configFilePath string) (string, error) {
-	if configFilePath == "" {
-		configFilePath = getconfigFilePath()
-	}
-	certFile, _, err := getCertAndKeyFiles(configFilePath)
-	if err != nil {
-		return "", err
-	}
-	return certFile, nil
-}
-
 // NewWorkloadX509CertProvider creates a certificate source
 // that reads a certificate and private key file from the local file system.
 // This is intended to be used for workload identity federation.
@@ -77,8 +47,14 @@ func GetCertificatePath(configFilePath string) (string, error) {
 // a well-known gcloud location.
 func NewWorkloadX509CertProvider(configFilePath string) (Provider, error) {
 	if configFilePath == "" {
-		configFilePath = getconfigFilePath()
+		envFilePath := util.GetConfigFilePathFromEnv()
+		if envFilePath != "" {
+			configFilePath = envFilePath
+		} else {
+			configFilePath = util.GetDefaultConfigFilePath()
+		}
 	}
+
 	certFile, keyFile, err := getCertAndKeyFiles(configFilePath)
 	if err != nil {
 		return nil, err
@@ -106,7 +82,10 @@ func (s *workloadSource) getClientCertificate(info *tls.CertificateRequestInfo) 
 func getCertAndKeyFiles(configFilePath string) (string, string, error) {
 	jsonFile, err := os.Open(configFilePath)
 	if err != nil {
-		return "", "", errSourceUnavailable
+		if errors.Is(err, os.ErrNotExist) {
+			return "", "", errSourceUnavailable
+		}
+		return "", "", err
 	}
 
 	byteValue, err := io.ReadAll(jsonFile)

@@ -27,21 +27,25 @@ func Features(x adt.Expr, f func(label adt.Feature, src adt.Node)) {
 	w := Visitor{
 		Feature: f,
 	}
-	w.Elem(x)
+	w.Expr(x)
 }
 
-// A Visitor walks over all elements in an ADT, recursively.
 type Visitor struct {
-	// Feature is invoked for all field names.
-	Feature func(f adt.Feature, src adt.Node)
+	// TODO: lets really should be special fields
+	letDone map[adt.Expr]bool
 
-	// Before is invoked for all nodes in pre-order traversal.
-	// Returning false prevents the visitor from visiting the node's
-	// children.
-	Before func(adt.Node) bool
+	Feature func(f adt.Feature, src adt.Node)
+	Before  func(adt.Node) bool
 }
 
-func (w *Visitor) Elem(x adt.Elem) {
+func (w *Visitor) init() {
+	if w.letDone == nil {
+		w.letDone = map[adt.Expr]bool{}
+	}
+}
+
+func (w *Visitor) Expr(x adt.Expr) {
+	w.init()
 	w.node(x)
 }
 
@@ -61,11 +65,6 @@ func (w *Visitor) node(n adt.Node) {
 
 	// TODO: special-case Vertex?
 	case adt.Value:
-
-	case *adt.ConjunctGroup:
-		for _, x := range *x {
-			w.Elem(x.Elem())
-		}
 
 	case *adt.ListLit:
 		for _, x := range x.Elems {
@@ -93,6 +92,13 @@ func (w *Visitor) node(n adt.Node) {
 
 	case *adt.LetReference:
 		w.feature(x.Label, x)
+		if w.letDone == nil {
+			w.letDone = map[adt.Expr]bool{}
+		}
+		if !w.letDone[x.X] {
+			w.letDone[x.X] = true
+			w.node(x.X)
+		}
 
 	case *adt.SelectorExpr:
 		w.node(x.X)
@@ -123,9 +129,6 @@ func (w *Visitor) node(n adt.Node) {
 		w.node(x.X)
 		w.node(x.Y)
 
-	case *adt.OpenExpr:
-		w.node(x.X)
-
 	case *adt.CallExpr:
 		w.node(x.Fun)
 		for _, arg := range x.Args {
@@ -148,7 +151,7 @@ func (w *Visitor) node(n adt.Node) {
 		w.feature(x.Label, x)
 		w.node(x.Value)
 
-	case *adt.LetField:
+	case *adt.OptionalField:
 		w.feature(x.Label, x)
 		w.node(x.Value)
 
@@ -162,35 +165,22 @@ func (w *Visitor) node(n adt.Node) {
 
 	// Yielders
 
-	case *adt.Comprehension:
-		for _, c := range x.Clauses {
-			w.node(c)
-		}
-		w.node(adt.ToExpr(x.Value))
-		if x.Fallback != nil {
-			w.node(x.Fallback)
-		}
-
 	case *adt.ForClause:
 		w.feature(x.Key, x)
 		w.feature(x.Value, x)
+		w.node(x.Dst)
 
 	case *adt.IfClause:
 		w.node(x.Condition)
+		w.node(x.Dst)
 
 	case *adt.LetClause:
 		w.feature(x.Label, x)
 		w.node(x.Expr)
-
-	case *adt.TryClause:
-		if x.Expr != nil {
-			// Assignment form
-			w.feature(x.Label, x)
-			w.node(x.Expr)
-		}
-		// Struct form: body is in Comprehension.Value, walked separately
+		w.node(x.Dst)
 
 	case *adt.ValueClause:
+		w.node(x.StructLit)
 
 	default:
 		panic(fmt.Sprintf("unknown field %T", x))

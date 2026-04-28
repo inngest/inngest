@@ -7,109 +7,34 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
 
 var mode = packages.NeedName |
 	packages.NeedFiles |
+	packages.NeedImports |
 	packages.NeedTypes |
 	packages.NeedSyntax |
 	packages.NeedTypesInfo |
-	packages.NeedModule
+	packages.NeedModule |
+	packages.NeedDeps
 
-type (
-	// Packages is a wrapper around x/tools/go/packages that maintains a (hopefully prewarmed) cache
-	// of packages
-	// that can be invalidated as writes are made and packages are known to change.
-	Packages struct {
-		packages              map[string]*packages.Package
-		importToName          map[string]string
-		loadErrors            []error
-		buildFlags            []string
-		packagesToCachePrefix string
+// Packages is a wrapper around x/tools/go/packages that maintains a (hopefully prewarmed) cache of packages
+// that can be invalidated as writes are made and packages are known to change.
+type Packages struct {
+	packages     map[string]*packages.Package
+	importToName map[string]string
+	loadErrors   []error
 
-		numLoadCalls int // stupid test steam. ignore.
-		numNameCalls int // stupid test steam. ignore.
-	}
-	// Option is a function that can be passed to NewPackages to configure the package loader
-	Option func(p *Packages)
-)
-
-// WithBuildTags option for NewPackages adds build tags to the packages.Load call
-func WithBuildTags(tags ...string) func(p *Packages) {
-	return func(p *Packages) {
-		p.buildFlags = append(p.buildFlags, "-tags", strings.Join(tags, ","))
-	}
-}
-
-func WithPreloadNames(importPaths ...string) func(p *Packages) {
-	return func(p *Packages) {
-		p.LoadAllNames(importPaths...)
-	}
-}
-
-// PackagePrefixToCache option for NewPackages
-// will not reset gqlgen packages in packages.Load call
-func PackagePrefixToCache(prefixPath string) func(p *Packages) {
-	return func(p *Packages) {
-		p.packagesToCachePrefix = prefixPath
-	}
-}
-
-// NewPackages creates a new packages cache
-// It will load all packages in the current module, and any packages that are passed to Load or
-// LoadAll
-func NewPackages(opts ...Option) *Packages {
-	p := &Packages{}
-	for _, opt := range opts {
-		opt(p)
-	}
-	return p
-}
-
-func dedupPackages(packages []string) []string {
-	packageMap := make(map[string]struct{})
-	dedupedPackages := make([]string, 0, len(packageMap))
-	for _, p := range packages {
-		if _, ok := packageMap[p]; ok {
-			continue
-		}
-		packageMap[p] = struct{}{}
-		dedupedPackages = append(dedupedPackages, p)
-	}
-
-	return dedupedPackages
-}
-
-func (p *Packages) CleanupUserPackages() {
-	if p.packagesToCachePrefix == "" {
-		// Cleanup all packages if we don't know which ones to keep
-		p.packages = nil
-	} else {
-		// Don't clean up github.com/99designs/gqlgen prefixed packages,
-		// they haven't changed and do not need to be reloaded
-		// if you are using a fork, then you need to have customized
-		// the prefix using PackagePrefixToCache
-		var toRemove []string
-		for k := range p.packages {
-			if !strings.HasPrefix(k, p.packagesToCachePrefix) {
-				toRemove = append(toRemove, k)
-			}
-		}
-		for _, k := range toRemove {
-			delete(p.packages, k)
-		}
-	}
+	numLoadCalls int // stupid test steam. ignore.
+	numNameCalls int // stupid test steam. ignore.
 }
 
 // ReloadAll will call LoadAll after clearing the package cache, so we can reload
 // packages in the case that the packages have changed
 func (p *Packages) ReloadAll(importPaths ...string) []*packages.Package {
-	if p.packages != nil {
-		p.CleanupUserPackages()
-	}
+	p.packages = nil
 	return p.LoadAll(importPaths...)
 }
 
@@ -122,17 +47,15 @@ func (p *Packages) LoadAll(importPaths ...string) []*packages.Package {
 
 	missing := make([]string, 0, len(importPaths))
 	for _, path := range importPaths {
-		if _, ok := p.packages[path]; !ok {
-			missing = append(missing, path)
+		if _, ok := p.packages[path]; ok {
+			continue
 		}
+		missing = append(missing, path)
 	}
 
 	if len(missing) > 0 {
 		p.numLoadCalls++
-		pkgs, err := packages.Load(&packages.Config{
-			Mode:       mode,
-			BuildFlags: p.buildFlags,
-		}, missing...)
+		pkgs, err := packages.Load(&packages.Config{Mode: mode}, missing...)
 		if err != nil {
 			p.loadErrors = append(p.loadErrors, err)
 		}
@@ -144,10 +67,7 @@ func (p *Packages) LoadAll(importPaths ...string) []*packages.Package {
 
 	res := make([]*packages.Package, 0, len(importPaths))
 	for _, path := range importPaths {
-		pkg, ok := p.loadFromCache(path)
-		if ok {
-			res = append(res, pkg)
-		}
+		res = append(res, p.packages[NormalizeVendor(path)])
 	}
 	return res
 }
@@ -155,42 +75,22 @@ func (p *Packages) LoadAll(importPaths ...string) []*packages.Package {
 func (p *Packages) addToCache(pkg *packages.Package) {
 	imp := NormalizeVendor(pkg.PkgPath)
 	p.packages[imp] = pkg
-	p.packages[pkg.Dir] = pkg // also cache by dir for relative path bindings
-}
-
-func (p *Packages) loadFromCache(importPath string) (*packages.Package, bool) {
-	pkg, ok := p.packages[importPath]
-	if ok {
-		return pkg, true
-	}
-
-	pkg, ok = p.packages[NormalizeVendor(importPath)]
-	if ok {
-		return pkg, true
-	}
-
-	// Special case relative paths. For example "./mypkg" or "../otherpkg"
-	if strings.HasPrefix(importPath, "./") || strings.HasPrefix(importPath, "../") {
-		wd, err := os.Getwd()
-		if err != nil {
-			p.loadErrors = append(p.loadErrors,
-				fmt.Errorf("unable to get working directory: %w", err))
-			return nil, false
-		}
-		if pkg, ok := p.packages[filepath.Clean(filepath.Join(wd, importPath))]; ok {
-			return pkg, true
+	for _, imp := range pkg.Imports {
+		if _, found := p.packages[NormalizeVendor(imp.PkgPath)]; !found {
+			p.addToCache(imp)
 		}
 	}
-
-	return nil, false
 }
 
 // Load works the same as LoadAll, except a single package at a time.
 func (p *Packages) Load(importPath string) *packages.Package {
-	pkg, ok := p.loadFromCache(importPath)
-	if ok {
-		return pkg
+	// Quick cache check first to avoid expensive allocations of LoadAll()
+	if p.packages != nil {
+		if pkg, ok := p.packages[importPath]; ok {
+			return pkg
+		}
 	}
+
 	pkgs := p.LoadAll(importPath)
 	if len(pkgs) == 0 {
 		return nil
@@ -198,17 +98,13 @@ func (p *Packages) Load(importPath string) *packages.Package {
 	return pkgs[0]
 }
 
-// LoadWithTypes tries a standard load, which may not have enough type info (TypesInfo== nil)
-// available if the imported package is a second order dependency. Fortunately this doesnt happen
-// very often, so we can just issue a load when we detect it.
+// LoadWithTypes tries a standard load, which may not have enough type info (TypesInfo== nil) available if the imported package is a
+// second order dependency. Fortunately this doesnt happen very often, so we can just issue a load when we detect it.
 func (p *Packages) LoadWithTypes(importPath string) *packages.Package {
 	pkg := p.Load(importPath)
 	if pkg == nil || pkg.TypesInfo == nil {
 		p.numLoadCalls++
-		pkgs, err := packages.Load(&packages.Config{
-			Mode:       mode,
-			BuildFlags: p.buildFlags,
-		}, importPath)
+		pkgs, err := packages.Load(&packages.Config{Mode: mode}, importPath)
 		if err != nil {
 			p.loadErrors = append(p.loadErrors, err)
 			return nil
@@ -219,79 +115,57 @@ func (p *Packages) LoadWithTypes(importPath string) *packages.Package {
 	return pkg
 }
 
-// LoadAllNames will call packages.Load with the NeedName mode only and will store the package name
-// in a cache. it does not return any package data, but after calling this you can call
-// NameForPackage to get the package name without loading the full package data.
-func (p *Packages) LoadAllNames(importPaths ...string) {
-	importPaths = dedupPackages(importPaths)
-	missing := make([]string, 0, len(importPaths))
-	for _, importPath := range importPaths {
-		if importPath == "" {
-			panic(errors.New("import path can not be empty"))
-		}
-
-		if p.importToName == nil {
-			p.importToName = map[string]string{}
-		}
-
-		importPath = NormalizeVendor(importPath)
-
-		// if it's in the name cache use it
-		if name := p.importToName[importPath]; name != "" {
-			continue
-		}
-
-		// otherwise we might have already loaded the full package data for it cached
-		pkg := p.packages[importPath]
-		if pkg != nil {
-			if _, ok := p.importToName[importPath]; !ok {
-				p.importToName[importPath] = pkg.Name
-			}
-
-			continue
-		}
-
-		missing = append(missing, importPath)
-	}
-
-	if len(missing) > 0 {
-		pkgs, err := packages.Load(&packages.Config{
-			Mode:       packages.NeedName,
-			BuildFlags: p.buildFlags,
-		}, missing...)
-		if err != nil {
-			p.loadErrors = append(p.loadErrors, err)
-		}
-
-		for _, pkg := range pkgs {
-			if pkg.Name == "" {
-				pkg.Name = SanitizePackageName(filepath.Base(pkg.PkgPath))
-			}
-
-			p.importToName[pkg.PkgPath] = pkg.Name
-		}
-	}
-}
-
-// NameForPackage looks up the package name from the package stanza in the go files at the given
-// import path.
+// NameForPackage looks up the package name from the package stanza in the go files at the given import path.
 func (p *Packages) NameForPackage(importPath string) string {
-	p.numNameCalls++
-	p.LoadAllNames(importPath)
+	if importPath == "" {
+		panic(errors.New("import path can not be empty"))
+	}
+	if p.importToName == nil {
+		p.importToName = map[string]string{}
+	}
 
 	importPath = NormalizeVendor(importPath)
-	return p.importToName[importPath]
+
+	// if its in the name cache use it
+	if name := p.importToName[importPath]; name != "" {
+		return name
+	}
+
+	// otherwise we might have already loaded the full package data for it cached
+	pkg := p.packages[importPath]
+
+	if pkg == nil {
+		// otherwise do a name only lookup for it but don't put it in the package cache.
+		p.numNameCalls++
+		pkgs, err := packages.Load(&packages.Config{Mode: packages.NeedName}, importPath)
+		if err != nil {
+			p.loadErrors = append(p.loadErrors, err)
+		} else {
+			pkg = pkgs[0]
+		}
+	}
+
+	if pkg == nil || pkg.Name == "" {
+		return SanitizePackageName(filepath.Base(importPath))
+	}
+
+	p.importToName[importPath] = pkg.Name
+
+	return pkg.Name
 }
 
-// Evict removes a given package import path from the cache. Further calls to Load will fetch it
-// from disk.
+// Evict removes a given package import path from the cache, along with any packages that depend on it. Further calls
+// to Load will fetch it from disk.
 func (p *Packages) Evict(importPath string) {
-	pkg, ok := p.packages[importPath]
-	if !ok {
-		return
-	}
 	delete(p.packages, importPath)
-	delete(p.packages, pkg.Dir)
+
+	for _, pkg := range p.packages {
+		for _, imported := range pkg.Imports {
+			if imported.PkgPath == importPath {
+				p.Evict(pkg.PkgPath)
+			}
+		}
+	}
 }
 
 func (p *Packages) ModTidy() error {
@@ -305,36 +179,10 @@ func (p *Packages) ModTidy() error {
 	return nil
 }
 
-// disableOptimizationsFlag is passed to go build to skip compiler optimizations.
-// This makes cold cache builds ~2x faster since we only need error checking.
-const disableOptimizationsFlag = "-gcflags=-N -l"
-
-// ValidateWithBuild validates packages by running `go build` instead of loading
-// with NeedTypes. This is more efficient because:
-// 1. It reuses the existing build cache
-// 2. The user will likely run `go build` anyway after generation
-// 3. It avoids double-loading type information
-//
-// If fastValidation is true, disables compiler optimizations for faster builds.
-func ValidateWithBuild(fastValidation bool, importPaths ...string) error {
-	args := []string{"build"}
-	if fastValidation {
-		args = append(args, disableOptimizationsFlag)
-	}
-	args = append(args, importPaths...)
-
-	cmd := exec.Command("go", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("validation failed: %w\n%s", err, string(output))
-	}
-	return nil
-}
-
-// Errors returns any errors that were returned by Load, either from the call itself or any of the
-// loaded packages.
+// Errors returns any errors that were returned by Load, either from the call itself or any of the loaded packages.
 func (p *Packages) Errors() PkgErrors {
-	res := append([]error{}, p.loadErrors...)
+	var res []error //nolint:prealloc
+	res = append(res, p.loadErrors...)
 	for _, pkg := range p.packages {
 		for _, err := range pkg.Errors {
 			res = append(res, err)

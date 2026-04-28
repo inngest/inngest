@@ -15,9 +15,10 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/containerd/errdefs"
-	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/network"
-	"github.com/moby/moby/client"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/go-connections/nat"
 
 	"github.com/testcontainers/testcontainers-go/internal/config"
 	"github.com/testcontainers/testcontainers-go/internal/core"
@@ -40,7 +41,7 @@ var (
 
 	// defaultReaperPort is the default port that the reaper listens on if not
 	// overridden by the RYUK_PORT environment variable.
-	defaultReaperPort = network.MustParsePort("8080/tcp")
+	defaultReaperPort = nat.Port("8080/tcp")
 
 	// errReaperNotFound is returned when no reaper container is found.
 	errReaperNotFound = errors.New("reaper not found")
@@ -63,10 +64,9 @@ type ReaperProvider interface {
 	Config() TestcontainersConfig
 }
 
+// NewReaper creates a Reaper with a sessionID to identify containers and a provider to use
 // Deprecated: it's not possible to create a reaper any more. Compose module uses this method
 // to create a reaper for the compose stack.
-//
-// # NewReaper creates a Reaper with a sessionID to identify containers and a provider to use
 //
 // The caller must call Connect at least once on the returned Reaper and use the returned
 // result otherwise the reaper will be kept open until the process exits.
@@ -94,9 +94,9 @@ type reaperSpawner struct {
 }
 
 // port returns the port that a new reaper should listen on.
-func (r *reaperSpawner) port() network.Port {
+func (r *reaperSpawner) port() nat.Port {
 	if port := os.Getenv("RYUK_PORT"); port != "" {
-		natPort, err := network.ParsePort(port + "/tcp")
+		natPort, err := nat.NewPort("tcp", port)
 		if err != nil {
 			panic(fmt.Sprintf("invalid RYUK_PORT value %q: %s", port, err))
 		}
@@ -169,13 +169,14 @@ func (r *reaperSpawner) lookupContainer(ctx context.Context, sessionID string) (
 
 	provider.SetClient(dockerClient)
 
-	opts := client.ContainerListOptions{
+	opts := container.ListOptions{
 		All: true,
-		Filters: make(client.Filters).
-			Add("label", fmt.Sprintf("%s=%s", core.LabelSessionID, sessionID)).
-			Add("label", fmt.Sprintf("%s=%t", core.LabelReaper, true)).
-			Add("label", fmt.Sprintf("%s=%t", core.LabelRyuk, true)).
-			Add("name", reaperContainerNameFromSessionID(sessionID)),
+		Filters: filters.NewArgs(
+			filters.Arg("label", fmt.Sprintf("%s=%s", core.LabelSessionID, sessionID)),
+			filters.Arg("label", fmt.Sprintf("%s=%t", core.LabelReaper, true)),
+			filters.Arg("label", fmt.Sprintf("%s=%t", core.LabelRyuk, true)),
+			filters.Arg("name", reaperContainerNameFromSessionID(sessionID)),
+		),
 	}
 
 	return backoff.RetryWithData(
@@ -185,26 +186,29 @@ func (r *reaperSpawner) lookupContainer(ctx context.Context, sessionID string) (
 				return nil, fmt.Errorf("container list: %w", err)
 			}
 
-			if len(resp.Items) == 0 {
+			if len(resp) == 0 {
 				// No reaper container not found.
 				return nil, backoff.Permanent(errReaperNotFound)
 			}
 
-			if len(resp.Items) > 1 {
-				return nil, fmt.Errorf("found %d reaper containers for session ID %q", len(resp.Items), sessionID)
+			if len(resp) > 1 {
+				return nil, fmt.Errorf("found %d reaper containers for session ID %q", len(resp), sessionID)
 			}
 
-			r, err := provider.ContainerFromType(ctx, resp.Items[0])
+			r, err := provider.ContainerFromType(ctx, resp[0])
 			if err != nil {
 				return nil, fmt.Errorf("from docker: %w", err)
 			}
 
-			switch r.healthStatus {
-			case "", container.Healthy, container.NoHealthcheck:
+			switch {
+			case r.healthStatus == types.Healthy,
+				r.healthStatus == types.NoHealthcheck:
 				return r, nil
-			default:
+			case r.healthStatus != "":
 				return nil, fmt.Errorf("container not healthy: %s", r.healthStatus)
 			}
+
+			return r, nil
 		},
 		backoff.WithContext(r.backoff(), ctx),
 	)
@@ -220,7 +224,7 @@ func (r *reaperSpawner) isRunning(ctx context.Context, ctr Container) error {
 	if !state.Running {
 		// Use NotFound error to indicate the container is not running
 		// and should be recreated.
-		return errdefs.ErrNotFound.WithMessage("container state: " + string(state.Status))
+		return errdefs.ErrNotFound.WithMessage("container state: " + state.Status)
 	}
 
 	return nil
@@ -376,9 +380,9 @@ func (r *reaperSpawner) newReaper(ctx context.Context, sessionID string, provide
 	tcConfig := provider.Config().Config
 	req := ContainerRequest{
 		Image:        config.ReaperDefaultImage,
-		ExposedPorts: []string{port.String()},
+		ExposedPorts: []string{string(port)},
 		Labels:       core.DefaultLabels(sessionID),
-		WaitingFor:   wait.ForListeningPort(port.String()),
+		WaitingFor:   wait.ForListeningPort(port),
 		Name:         reaperContainerNameFromSessionID(sessionID),
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true
@@ -423,7 +427,7 @@ func (r *reaperSpawner) newReaper(ctx context.Context, sessionID string, provide
 		return nil, fmt.Errorf("run container: %w", err)
 	}
 
-	endpoint, err := c.PortEndpoint(ctx, port.String(), "")
+	endpoint, err := c.PortEndpoint(ctx, port, "")
 	if err != nil {
 		return nil, fmt.Errorf("port endpoint: %w", err)
 	}
@@ -564,9 +568,8 @@ func (r *Reaper) handshake(conn net.Conn) error {
 	return nil
 }
 
-// Deprecated: internally replaced by core.DefaultLabels(sessionID)
-//
 // Labels returns the container labels to use so that this Reaper cleans them up
+// Deprecated: internally replaced by core.DefaultLabels(sessionID)
 func (r *Reaper) Labels() map[string]string {
 	return GenericLabels()
 }

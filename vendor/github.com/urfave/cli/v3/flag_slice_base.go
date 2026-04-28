@@ -9,11 +9,9 @@ import (
 
 // SliceBase wraps []T to satisfy flag.Value
 type SliceBase[T any, C any, VC ValueCreator[T, C]] struct {
-	slice                 *[]T
-	hasBeenSet            bool
-	value                 Value
-	sliceSeparator        string
-	disableSliceSeparator bool
+	slice      *[]T
+	hasBeenSet bool
+	value      Value
 }
 
 func (i SliceBase[T, C, VC]) Create(val []T, p *[]T, c C) Value {
@@ -35,13 +33,6 @@ func NewSliceBase[T any, C any, VC ValueCreator[T, C]](defaults ...T) *SliceBase
 	}
 }
 
-// configuration of slicing
-func (i *SliceBase[T, C, VC]) setMultiValueParsingConfig(c multiValueParsingConfig) {
-	i.disableSliceSeparator = c.DisableSliceFlagSeparator
-	i.sliceSeparator = c.SliceFlagSeparator
-	tracef("set slice parsing config - slice separator '%s', disable separator:%v", i.sliceSeparator, i.disableSliceSeparator)
-}
-
 // Set parses the value and appends it to the list of values
 func (i *SliceBase[T, C, VC]) Set(value string) error {
 	if !i.hasBeenSet {
@@ -56,22 +47,8 @@ func (i *SliceBase[T, C, VC]) Set(value string) error {
 		return nil
 	}
 
-	trimSpace := true
-	// hack. How do we know if we should trim spaces?
-	// it makes sense only for string slice flags which have
-	// an option to not trim spaces. So by default we trim spaces
-	// otherwise we let the underlying value type handle it.
-	var t T
-	if reflect.TypeOf(t).Kind() == reflect.String {
-		trimSpace = false
-	}
-
-	tracef("splitting slice value '%s', separator '%s', disable separator:%v", value, i.sliceSeparator, i.disableSliceSeparator)
-	for _, s := range flagSplitMultiValues(value, i.sliceSeparator, i.disableSliceSeparator) {
-		if trimSpace {
-			s = strings.TrimSpace(s)
-		}
-		if err := i.value.Set(s); err != nil {
+	for _, s := range flagSplitMultiValues(value) {
+		if err := i.value.Set(strings.TrimSpace(s)); err != nil {
 			return err
 		}
 		*i.slice = append(*i.slice, i.value.Get().(T))
@@ -82,12 +59,12 @@ func (i *SliceBase[T, C, VC]) Set(value string) error {
 
 // String returns a readable representation of this value (for usage defaults)
 func (i *SliceBase[T, C, VC]) String() string {
-	var defaultVals []string
-	var v VC
-	for _, s := range *i.slice {
-		defaultVals = append(defaultVals, v.ToString(s))
+	v := i.Value()
+	var t T
+	if reflect.TypeOf(t).Kind() == reflect.String {
+		return fmt.Sprintf("%v", v)
 	}
-	return strings.Join(defaultVals, ", ")
+	return fmt.Sprintf("%T{%s}", v, i.ToString(v))
 }
 
 // Serialize allows SliceBase to fulfill Serializer
@@ -105,11 +82,15 @@ func (i *SliceBase[T, C, VC]) Value() []T {
 }
 
 // Get returns the slice of values set by this flag
-func (i *SliceBase[T, C, VC]) Get() any {
+func (i *SliceBase[T, C, VC]) Get() interface{} {
 	return *i.slice
 }
 
 func (i SliceBase[T, C, VC]) ToString(t []T) string {
-	i.slice = &t
-	return i.String()
+	var defaultVals []string
+	var v VC
+	for _, s := range t {
+		defaultVals = append(defaultVals, v.ToString(s))
+	}
+	return strings.Join(defaultVals, ", ")
 }

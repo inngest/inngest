@@ -23,7 +23,8 @@ local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
 local operationIdempotencyTTL = tonumber(ARGV[4])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[5]) == 1
-local enableCacheInvalidation = ARGV[6] == "1"
+local forceReleaseSemaphores = tonumber(ARGV[6]) == 1
+local enableCacheInvalidation = ARGV[7] == "1"
 
 ---@type string[]
 local debugLogs = {}
@@ -35,6 +36,13 @@ local function debug(...)
 	end
 end
 
+--- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
+---@param value number
+---@return integer
+local function toInteger(value)
+	return math.floor(value + 0.5) -- Round to nearest integer
+end
+
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
@@ -44,7 +52,10 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	return opIdempotency
 end
 
--- Check if lease details still exist
+-- Release is idempotent by lease ID. If another caller (e.g. the lease
+-- scavenger or a concurrent ItemLeaseConstraintCheck) already released this
+-- lease, the details will be gone and we return a no-op (status 1). This
+-- means multiple Release calls for the same lease are safe.
 local requestID = call("HGET", keyLeaseDetails, "req")
 if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
@@ -85,6 +96,18 @@ for _, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
+	elseif c.k == 4 then
+		-- semaphore: decrement for auto-release, or when force-released by the scavenger
+		if c.sem.rel == 0 or forceReleaseSemaphores then
+			local weight = c.sem.w
+			if not weight or weight <= 0 then
+				weight = 1
+			end
+			local newVal = call("DECRBY", c.sem.k, toInteger(weight))
+			if tonumber(newVal) < 0 then
+				call("SET", c.sem.k, "0")
+			end
+		end
 	end
 end
 

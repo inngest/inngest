@@ -14,7 +14,7 @@
 
 package path
 
-// OS must be a valid [runtime.GOOS] value or "unix".
+// OS must be a valid runtime.GOOS value or "unix".
 type OS string
 
 const (
@@ -41,6 +41,7 @@ type osInfo interface {
 	splitList(path string) []string
 	volumeNameLen(path string) int
 	IsAbs(path string) (b bool)
+	HasPrefix(p, prefix string) bool
 	join(elem []string) string
 	sameWord(a, b string) bool
 }

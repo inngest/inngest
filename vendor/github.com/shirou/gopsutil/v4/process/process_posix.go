@@ -26,9 +26,7 @@ func getTerminalMap() (map[uint64]string, error) {
 	ret := make(map[uint64]string)
 	var termfiles []string
 
-	devPath := common.HostDev()
-
-	d, err := os.Open(devPath)
+	d, err := os.Open("/dev")
 	if err != nil {
 		return nil, err
 	}
@@ -39,29 +37,32 @@ func getTerminalMap() (map[uint64]string, error) {
 		return nil, err
 	}
 	for _, devname := range devnames {
-		if strings.HasPrefix(devname, "tty") {
-			termfiles = append(termfiles, filepath.Join(devPath, devname))
+		if strings.HasPrefix(devname, "/dev/tty") {
+			termfiles = append(termfiles, "/dev/tty/"+devname)
 		}
 	}
 
 	var ptsnames []string
-	ptsPath := filepath.Join(devPath, "pts")
-	ptsd, err := os.Open(ptsPath)
+	ptsd, err := os.Open("/dev/pts")
 	if err != nil {
-		ptsnames, _ = filepath.Glob(filepath.Join(devPath, "ttyp*"))
+		ptsnames, _ = filepath.Glob("/dev/ttyp*")
 		if ptsnames == nil {
 			return nil, err
 		}
-		termfiles = append(termfiles, ptsnames...)
-	} else {
+	}
+	defer ptsd.Close()
+
+	if ptsnames == nil {
 		defer ptsd.Close()
 		ptsnames, err = ptsd.Readdirnames(-1)
 		if err != nil {
 			return nil, err
 		}
 		for _, ptsname := range ptsnames {
-			termfiles = append(termfiles, filepath.Join(ptsPath, ptsname))
+			termfiles = append(termfiles, "/dev/pts/"+ptsname)
 		}
+	} else {
+		termfiles = ptsnames
 	}
 
 	for _, name := range termfiles {
@@ -71,7 +72,7 @@ func getTerminalMap() (map[uint64]string, error) {
 			return nil, err
 		}
 		rdev := uint64(stat.Rdev)
-		ret[rdev] = strings.TrimPrefix(name, devPath+string(os.PathSeparator))
+		ret[rdev] = strings.ReplaceAll(name, "/dev", "")
 	}
 	return ret, nil
 }

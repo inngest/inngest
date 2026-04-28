@@ -86,16 +86,18 @@ func TestRealtime(t *testing.T) {
 		stream, err := sdkrealtime.SubscribeWithURL(ctx, url, jwt)
 		require.NoError(t, err)
 
-		var mu sync.Mutex
-		messages := []realtime.Message{}
+		var (
+			msgMu    sync.Mutex
+			messages []realtime.Message
+		)
 
 		go func() {
 			for msg := range stream {
 				switch msg.Kind() {
 				case sdkrealtime.StreamMessage:
-					mu.Lock()
+					msgMu.Lock()
 					messages = append(messages, msg.Message())
-					mu.Unlock()
+					msgMu.Unlock()
 				}
 			}
 		}()
@@ -104,16 +106,15 @@ func TestRealtime(t *testing.T) {
 
 		require.Eventually(t, func() bool { return atomic.LoadInt32(&finished) == 1 }, 5*time.Second, 5*time.Millisecond)
 
-		// Wait for the message to be received by the goroutine; the publish
-		// may arrive slightly after the function marks itself finished.
+		// Wait for the stream goroutine to receive the message
 		require.Eventually(t, func() bool {
-			mu.Lock()
-			defer mu.Unlock()
-			return len(messages) >= 1
-		}, 5*time.Second, 50*time.Millisecond)
+			msgMu.Lock()
+			defer msgMu.Unlock()
+			return len(messages) == 1
+		}, 5*time.Second, 10*time.Millisecond)
 
-		mu.Lock()
-		defer mu.Unlock()
+		msgMu.Lock()
+		defer msgMu.Unlock()
 		require.Equal(t, 1, len(messages))
 		require.Equal(t, streamingtypes.MessageKindData, messages[0].Kind)
 		require.Equal(t, json.RawMessage(`"step 1 data"`), messages[0].Data)

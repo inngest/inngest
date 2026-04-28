@@ -16,10 +16,3 @@
 *.out
 gqlgen
 *.exe
-
-node_modules
-
-# generated files
-/api/testdata/default/graph/generated.go
-/api/testdata/federation2/graph/federation.go
-/api/testdata/federation2/graph/generated.go

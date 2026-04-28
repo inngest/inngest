@@ -15,26 +15,44 @@
 package load
 
 import (
-	"cmp"
-	"fmt"
-	"io"
-	"io/fs"
+	"bytes"
 	"os"
-	pathpkg "path"
 	"path/filepath"
-	"slices"
+	"sort"
+	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/filetypes"
-	"cuelang.org/go/mod/module"
+)
+
+// An importMode controls the behavior of the Import method.
+type importMode uint
+
+const (
+	// If findOnly is set, Import stops after locating the directory
+	// that should contain the sources for a package. It does not
+	// read any files in the directory.
+	findOnly importMode = 1 << iota
+
+	// If importComment is set, parse import comments on package statements.
+	// Import returns an error if it finds a comment it cannot understand
+	// or finds conflicting comments in multiple source files.
+	// See golang.org/s/go14customimport for more information.
+	importComment
+
+	allowAnonymous
 )
 
 // importPkg returns details about the CUE package named by the import path,
-// interpreting local import paths relative to l.cfg.Dir.
+// interpreting local import paths relative to the srcDir directory.
 // If the path is a local import path naming a package that can be imported
 // using a standard import path, the returned package will set p.ImportPath
 // to that path.
@@ -42,20 +60,30 @@ import (
 // In the directory and ancestor directories up to including one with a
 // cue.mod file, all .cue files are considered part of the package except for:
 //
-//   - files starting with _ or . (likely editor temporary files)
-//   - files with build constraints not satisfied by the context
+//	- files starting with _ or . (likely editor temporary files)
+//	- files with build constraints not satisfied by the context
 //
 // If an error occurs, importPkg sets the error in the returned instance,
 // which then may contain partial information.
 //
 // pkgName indicates which packages to load. It supports the following
 // values:
+//     ""      the default package for the directory, if only one
+//             is present.
+//     _       anonymous files (which may be marked with _)
+//     *       all packages
 //
-//	""      the default package for the directory, if only one
-//	        is present.
-//	_       anonymous files (which may be marked with _)
-//	*       all packages
 func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
+	l.stk.Push(p.ImportPath)
+	defer l.stk.Pop()
+
+	cfg := l.cfg
+	ctxt := &cfg.fileSystem
+
+	if p.Err != nil {
+		return []*build.Instance{p}
+	}
+
 	retErr := func(errs errors.Error) []*build.Instance {
 		// XXX: move this loop to ReportError
 		for _, err := range errors.Errors(errs) {
@@ -64,23 +92,16 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 		return []*build.Instance{p}
 	}
 
-	if slices.Contains(l.stk, p.ImportPath) {
-		return retErr(&PackageError{Message: errors.NewMessagef("package import cycle not allowed")})
-	}
-	l.stk.Push(p.ImportPath)
-	defer l.stk.Pop()
-
-	cfg := l.cfg
-	ctxt := cfg.fileSystem
-
-	if p.Err != nil {
-		return []*build.Instance{p}
+	if !strings.HasPrefix(p.Dir, cfg.ModuleRoot) {
+		err := errors.Newf(token.NoPos, "module root not defined", p.DisplayPath)
+		return retErr(err)
 	}
 
-	fp := newFileProcessor(cfg, p, l.tagger)
+	fp := newFileProcessor(cfg, p)
 
 	if p.PkgName == "" {
 		if l.cfg.Package == "*" {
+			fp.ignoreOther = true
 			fp.allPackages = true
 			p.PkgName = "_"
 		} else {
@@ -92,20 +113,28 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 		fp.ignoreOther = true
 	}
 
+	if !strings.HasPrefix(p.Dir, cfg.ModuleRoot) {
+		panic("")
+	}
+
 	var dirs [][2]string
 	genDir := GenPath(cfg.ModuleRoot)
 	if strings.HasPrefix(p.Dir, genDir) {
 		dirs = append(dirs, [2]string{genDir, p.Dir})
+		// TODO(legacy): don't support "pkg"
 		// && p.PkgName != "_"
-		for _, sub := range []string{"pkg", "usr"} {
-			rel, err := filepath.Rel(genDir, p.Dir)
-			if err != nil {
-				// should not happen
-				return retErr(errors.Wrapf(err, token.NoPos, "invalid path"))
+		if filepath.Base(genDir) != "pkg" {
+			for _, sub := range []string{"pkg", "usr"} {
+				rel, err := filepath.Rel(genDir, p.Dir)
+				if err != nil {
+					// should not happen
+					return retErr(
+						errors.Wrapf(err, token.NoPos, "invalid path"))
+				}
+				base := filepath.Join(cfg.ModuleRoot, modDir, sub)
+				dir := filepath.Join(base, rel)
+				dirs = append(dirs, [2]string{base, dir})
 			}
-			base := filepath.Join(cfg.ModuleRoot, modDir, sub)
-			dir := filepath.Join(base, rel)
-			dirs = append(dirs, [2]string{base, dir})
 		}
 	} else {
 		dirs = append(dirs, [2]string{cfg.ModuleRoot, p.Dir})
@@ -123,7 +152,8 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 	if !found {
 		return retErr(
 			&PackageError{
-				Message: errors.NewMessagef("cannot find package %q", p.DisplayPath),
+				Message: errors.NewMessage("cannot find package %q",
+					[]interface{}{p.DisplayPath}),
 			})
 	}
 
@@ -131,47 +161,39 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 	// have the same module scope and that there are no invalid modules.
 	inModule := false // if pkg == "_"
 	for _, d := range dirs {
-		if l.cfg.findModRoot(d[1]) != "" {
+		if l.cfg.findRoot(d[1]) != "" {
 			inModule = true
 			break
 		}
 	}
 
-	// Walk the parent directories up to the module root to add their files as well,
-	// since a package foo/bar/baz inherits from parent packages foo/bar and foo.
-	// See https://cuelang.org/docs/concept/modules-packages-instances/#instances.
 	for _, d := range dirs {
-		dir := filepath.Clean(d[1])
-		// firstDir keeps track of whether we're still looking at the initial
-		// directory rather than one of its parents. If there are no CUE files
-		// in the initial directory, we shouldn't walk to its parents because
-		// the initial directory isn't itself a CUE package.
-		firstDir := true
-		for {
-			sd, ok := l.dirCachedBuildFiles[dir]
-			if !ok {
-				sd = l.scanDir(dir)
-				l.dirCachedBuildFiles[dir] = sd
+		for dir := filepath.Clean(d[1]); ctxt.isDir(dir); {
+			files, err := ctxt.readDir(dir)
+			if err != nil && !os.IsNotExist(err) {
+				return retErr(errors.Wrapf(err, pos, "import failed reading dir %v", dirs[0][1]))
 			}
-			if err := sd.err; err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					break
+			for _, f := range files {
+				if f.IsDir() {
+					continue
 				}
-				return retErr(errors.Wrapf(err, token.NoPos, "import failed reading dir %v", dir))
-			}
-			added := false
-			for _, name := range sd.filenames {
-				file, err := filetypes.ParseFileAndType(name, "", filetypes.Input)
+				if f.Name() == "-" {
+					if _, err := cfg.fileSystem.stat("-"); !os.IsNotExist(err) {
+						continue
+					}
+				}
+				file, err := filetypes.ParseFile(f.Name(), filetypes.Input)
 				if err != nil {
 					p.UnknownFiles = append(p.UnknownFiles, &build.File{
-						Filename:      name,
+						Filename:      f.Name(),
 						ExcludeReason: errors.Newf(token.NoPos, "unknown filetype"),
 					})
-				} else if fp.add(dir, file, 0) {
-					added = true
+					continue // skip unrecognized file types
 				}
+				fp.add(pos, dir, file, importComment)
 			}
-			if p.PkgName == "" || !inModule || l.cfg.isModRoot(dir) || dir == d[0] || (firstDir && !added) {
+
+			if p.PkgName == "" || !inModule || l.cfg.isRoot(dir) || dir == d[0] {
 				break
 			}
 
@@ -186,7 +208,6 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 				break
 			}
 			dir = parent
-			firstDir = false
 		}
 	}
 
@@ -196,19 +217,9 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 		impPath, err := addImportQualifier(importPath(p.ImportPath), p.PkgName)
 		p.ImportPath = string(impPath)
 		if err != nil {
-			p.ReportError(errors.Promote(err, ""))
+			p.ReportError(err)
 		}
 
-		if len(p.BuildFiles) == 0 &&
-			len(p.IgnoredFiles) == 0 &&
-			len(p.OrphanedFiles) == 0 &&
-			len(p.InvalidFiles) == 0 &&
-			len(p.UnknownFiles) == 0 {
-			// The package has no files in it. This can happen
-			// when the default package added in newFileProcessor
-			// doesn't have any associated files.
-			continue
-		}
 		all = append(all, p)
 		rewriteFiles(p, cfg.ModuleRoot, false)
 		if errs := fp.finalize(p); errs != nil {
@@ -216,337 +227,391 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 			return all
 		}
 
-		l.addFiles(p)
+		l.addFiles(cfg.ModuleRoot, p)
 		_ = p.Complete()
 	}
-	slices.SortFunc(all, func(a, b *build.Instance) int {
-		// Instances may share the same directory but have different package names.
-		// Sort by directory first, then by package name.
-		if c := cmp.Compare(a.Dir, b.Dir); c != 0 {
-			return c
-		}
-
-		return cmp.Compare(a.PkgName, b.PkgName)
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].Dir < all[j].Dir
 	})
 	return all
 }
 
-func (l *loader) scanDir(dir string) cachedDirFiles {
-	files, err := l.cfg.fileSystem.readDir(dir)
-	if err != nil {
-		return cachedDirFiles{
-			err: err,
+// loadFunc creates a LoadFunc that can be used to create new build.Instances.
+func (l *loader) loadFunc() build.LoadFunc {
+
+	return func(pos token.Pos, path string) *build.Instance {
+		cfg := l.cfg
+
+		impPath := importPath(path)
+		if isLocalImport(path) {
+			return cfg.newErrInstance(pos, impPath,
+				errors.Newf(pos, "relative import paths not allowed (%q)", path))
 		}
-	}
-	filenames := make([]string, 0, len(files))
-	for _, f := range files {
-		if f.IsDir() {
-			continue
+
+		// is it a builtin?
+		if strings.IndexByte(strings.Split(path, "/")[0], '.') == -1 {
+			if l.cfg.StdRoot != "" {
+				p := cfg.newInstance(pos, impPath)
+				_ = l.importPkg(pos, p)
+				return p
+			}
+			return nil
 		}
-		name := f.Name()
-		if name == "-" {
-			// The name "-" has a special significance to the file types
-			// logic, but only when specified directly on the command line.
-			// We don't want an actual file named "-" to have special
-			// significant, so avoid that by making sure we don't see a naked "-"
-			// even when a file named "-" is present in a directory.
-			name = "./-"
-		}
-		filenames = append(filenames, name)
-	}
-	return cachedDirFiles{
-		filenames: filenames,
+
+		p := cfg.newInstance(pos, impPath)
+		_ = l.importPkg(pos, p)
+		return p
 	}
 }
 
-func setFileSource(cfg *Config, f *build.File) error {
-	if f.Source != nil {
-		return nil
-	}
-	fullPath := f.Filename
+func rewriteFiles(p *build.Instance, root string, isLocal bool) {
+	p.Root = root
 
-	// If the input file is stdin or a non-regular file,
-	// such as a named pipe or a device file, we can only read it once.
-	// Given that later on we may consume the source multiple times,
-	// such as first to only parse the imports and later to parse the whole file,
-	// read the whole file here upfront and buffer the bytes.
-	//
-	// TODO(perf): this causes an upfront "stat" syscall for every input file,
-	// which is wasteful given that in the majority of cases we deal with regular files.
-	// Consider doing the buffering the first time we open the file later on.
-	if fullPath == "-" {
-		b, err := io.ReadAll(cfg.stdin())
-		if err != nil {
-			return errors.Newf(token.NoPos, "read stdin: %v", err)
+	normalizeFiles(p.BuildFiles)
+	normalizeFiles(p.IgnoredFiles)
+	normalizeFiles(p.OrphanedFiles)
+	normalizeFiles(p.InvalidFiles)
+	normalizeFiles(p.UnknownFiles)
+}
+
+func normalizeFiles(a []*build.File) {
+	sort.Slice(a, func(i, j int) bool {
+		return len(filepath.Dir(a[i].Filename)) < len(filepath.Dir(a[j].Filename))
+	})
+}
+
+type fileProcessor struct {
+	firstFile        string
+	firstCommentFile string
+	imported         map[string][]token.Pos
+	allTags          map[string]bool
+	allFiles         bool
+	ignoreOther      bool // ignore files from other packages
+	allPackages      bool
+
+	c    *Config
+	pkgs map[string]*build.Instance
+	pkg  *build.Instance
+
+	err errors.Error
+}
+
+func newFileProcessor(c *Config, p *build.Instance) *fileProcessor {
+	return &fileProcessor{
+		imported: make(map[string][]token.Pos),
+		allTags:  make(map[string]bool),
+		c:        c,
+		pkgs:     map[string]*build.Instance{"_": p},
+		pkg:      p,
+	}
+}
+
+func countCUEFiles(c *Config, p *build.Instance) int {
+	count := len(p.BuildFiles)
+	for _, f := range p.IgnoredFiles {
+		if c.Tools && strings.HasSuffix(f.Filename, "_tool.cue") {
+			count++
 		}
-		f.Source = b
-		return nil
+		if c.Tests && strings.HasSuffix(f.Filename, "_test.cue") {
+			count++
+		}
+	}
+	return count
+}
+
+func (fp *fileProcessor) finalize(p *build.Instance) errors.Error {
+	if fp.err != nil {
+		return fp.err
+	}
+	if countCUEFiles(fp.c, p) == 0 &&
+		!fp.c.DataFiles &&
+		(p.PkgName != "_" || !fp.allPackages) {
+		fp.err = errors.Append(fp.err, &NoFilesError{Package: p, ignored: len(p.IgnoredFiles) > 0})
+		return fp.err
 	}
 
-	if !filepath.IsAbs(fullPath) {
-		fullPath = filepath.Join(cfg.Dir, fullPath)
-		// Ensure that encoding.NewDecoder will work correctly.
-		f.Filename = fullPath
+	for tag := range fp.allTags {
+		p.AllTags = append(p.AllTags, tag)
 	}
-	if fi := cfg.fileSystem.getOverlay(fullPath); fi != nil {
-		if fi.file != nil {
-			f.Source = fi.file
-		} else {
-			f.Source = fi.contents
-		}
-		return nil
-	}
+	sort.Strings(p.AllTags)
 
-	// Note that we do this after ensuring fullPath is absolute, and after checking
-	// whether the overlay provides the source.
-	info, err := os.Stat(fullPath)
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() {
-		b, err := os.ReadFile(fullPath)
-		if err != nil {
-			return err
-		}
-		f.Source = b
-		return nil
-	}
+	p.ImportPaths, _ = cleanImports(fp.imported)
 
 	return nil
 }
 
-func (l *loader) loadFunc() build.LoadFunc {
-	if l.cfg.SkipImports {
-		return nil
-	}
-	return l._loadFunc
-}
-
-func (l *loader) _loadFunc(pos token.Pos, path string) *build.Instance {
-	impPath := importPath(path)
-	if isLocalImport(path) {
-		return l.cfg.newErrInstance(errors.Newf(pos, "relative import paths not allowed (%q)", path))
-	}
-
-	if isStdlibPackage(path) {
-		// It looks like a builtin.
-		return nil
-	}
-
-	p := l.newInstance(pos, impPath)
-	_ = l.importPkg(pos, p)
-	return p
-}
-
-// newRelInstance returns a build instance from the given
-// relative import path.
-func (l *loader) newRelInstance(pos token.Pos, path, pkgName string) *build.Instance {
-	if !isLocalImport(path) {
-		panic(fmt.Errorf("non-relative import path %q passed to newRelInstance", path))
-	}
-
-	p := l.cfg.Context.NewInstance(path, nil)
-	p.PkgName = pkgName
-	p.DisplayPath = filepath.ToSlash(path)
-	// p.ImportPath = string(dir) // compute unique ID.
-	p.Root = l.cfg.ModuleRoot
-	p.Module = l.cfg.Module
-	p.ModuleFile = l.cfg.modFile
-
-	var err errors.Error
-	if path != cleanImport(path) {
-		err = errors.Append(err, l.errPkgf(nil,
-			"non-canonical import path: %q should be %q", path, pathpkg.Clean(path)))
-	}
-
-	dir := filepath.Join(l.cfg.Dir, filepath.FromSlash(path))
-	if pkgPath, e := importPathFromAbsDir(l.cfg, dir, path); e != nil {
-		// Detect later to keep error messages consistent.
-	} else {
-		// Add package qualifier if the configuration requires it.
-		name := l.cfg.Package
-		switch name {
-		case "_", "*":
-			name = ""
+func (fp *fileProcessor) add(pos token.Pos, root string, file *build.File, mode importMode) (added bool) {
+	fullPath := file.Filename
+	if fullPath != "-" {
+		if !filepath.IsAbs(fullPath) {
+			fullPath = filepath.Join(root, fullPath)
 		}
-		pkgPath, e := addImportQualifier(pkgPath, name)
-		if e != nil {
-			// Detect later to keep error messages consistent.
+	}
+	file.Filename = fullPath
+
+	base := filepath.Base(fullPath)
+
+	// special * and _
+	p := fp.pkg // default package
+
+	// badFile := func(p *build.Instance, err errors.Error) bool {
+	badFile := func(err errors.Error) bool {
+		fp.err = errors.Append(fp.err, err)
+		file.ExcludeReason = fp.err
+		p.InvalidFiles = append(p.InvalidFiles, file)
+		return true
+	}
+
+	match, data, err := matchFile(fp.c, file, true, fp.allFiles, fp.allTags)
+	switch {
+	case match:
+
+	case err == nil:
+		// Not a CUE file.
+		p.OrphanedFiles = append(p.OrphanedFiles, file)
+		return false
+
+	case !errors.Is(err, errExclude):
+		return badFile(err)
+
+	default:
+		file.ExcludeReason = err
+		if file.Interpretation == "" {
+			p.IgnoredFiles = append(p.IgnoredFiles, file)
 		} else {
-			p.ImportPath = string(pkgPath)
+			p.OrphanedFiles = append(p.OrphanedFiles, file)
+		}
+		return false
+	}
+
+	pf, perr := parser.ParseFile(fullPath, data, parser.ImportsOnly, parser.ParseComments)
+	if perr != nil {
+		badFile(errors.Promote(perr, "add failed"))
+		return true
+	}
+
+	_, pkg, pos := internal.PackageInfo(pf)
+	if pkg == "" {
+		pkg = "_"
+	}
+
+	switch {
+	case pkg == p.PkgName, mode&allowAnonymous != 0:
+	case fp.allPackages && pkg != "_":
+		q := fp.pkgs[pkg]
+		if q == nil {
+			q = &build.Instance{
+				PkgName: pkg,
+
+				Dir:         p.Dir,
+				DisplayPath: p.DisplayPath,
+				ImportPath:  p.ImportPath + ":" + pkg,
+				Root:        p.Root,
+				Module:      p.Module,
+			}
+			fp.pkgs[pkg] = q
+		}
+		p = q
+
+	case pkg != "_":
+
+	default:
+		file.ExcludeReason = excludeError{errors.Newf(pos, "no package name")}
+		p.IgnoredFiles = append(p.IgnoredFiles, file)
+		return false // don't mark as added
+	}
+
+	if !fp.c.AllCUEFiles {
+		if err := shouldBuildFile(pf, fp); err != nil {
+			if !errors.Is(err, errExclude) {
+				fp.err = errors.Append(fp.err, err)
+			}
+			file.ExcludeReason = err
+			p.IgnoredFiles = append(p.IgnoredFiles, file)
+			return false
 		}
 	}
 
-	p.Dir = dir
-
-	if filepath.IsAbs(path) || strings.HasPrefix(path, "/") {
-		err = errors.Append(err, errors.Newf(pos,
-			"absolute import path %q not allowed", path))
-	}
-	if err != nil {
-		p.Err = errors.Append(p.Err, err)
-		p.Incomplete = true
-	}
-	return p
-}
-
-func importPathFromAbsDir(c *Config, absDir string, origPath string) (importPath, error) {
-	if c.ModuleRoot == "" {
-		return "", fmt.Errorf("cannot determine import path for %q (root undefined)", origPath)
-	}
-
-	subdir, ok := strings.CutPrefix(filepath.Clean(absDir), c.ModuleRoot)
-	if !ok {
-		return "", fmt.Errorf("cannot determine import path for %q (dir outside of root)", origPath)
+	if pkg != "" && pkg != "_" {
+		if p.PkgName == "" {
+			p.PkgName = pkg
+			fp.firstFile = base
+		} else if pkg != p.PkgName {
+			if fp.ignoreOther {
+				file.ExcludeReason = excludeError{errors.Newf(pos,
+					"package is %s, want %s", pkg, p.PkgName)}
+				p.IgnoredFiles = append(p.IgnoredFiles, file)
+				return false
+			}
+			return badFile(&MultiplePackageError{
+				Dir:      p.Dir,
+				Packages: []string{p.PkgName, pkg},
+				Files:    []string{fp.firstFile, base},
+			})
+		}
 	}
 
-	pkg := filepath.ToSlash(subdir)
-	if pkg != "" && !strings.HasPrefix(pkg, "/") {
-		// [Config.ModuleRoot] was the root of the filesystem,
-		// and it had a trailing slash which got removed as a prefix; add it back.
-		pkg = "/" + pkg
+	isTest := strings.HasSuffix(base, "_test"+cueSuffix)
+	isTool := strings.HasSuffix(base, "_tool"+cueSuffix)
+
+	if mode&importComment != 0 {
+		qcom, line := findimportComment(data)
+		if line != 0 {
+			com, err := strconv.Unquote(qcom)
+			if err != nil {
+				badFile(errors.Newf(pos, "%s:%d: cannot parse import comment", fullPath, line))
+			} else if p.ImportComment == "" {
+				p.ImportComment = com
+				fp.firstCommentFile = base
+			} else if p.ImportComment != com {
+				badFile(errors.Newf(pos, "found import comments %q (%s) and %q (%s) in %s", p.ImportComment, fp.firstCommentFile, com, base, p.Dir))
+			}
+		}
+	}
+
+	for _, decl := range pf.Decls {
+		d, ok := decl.(*ast.ImportDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range d.Specs {
+			quoted := spec.Path.Value
+			path, err := strconv.Unquote(quoted)
+			if err != nil {
+				badFile(errors.Newf(
+					spec.Path.Pos(),
+					"%s: parser returned invalid quoted string: <%s>", fullPath, quoted,
+				))
+			}
+			if !isTest || fp.c.Tests {
+				fp.imported[path] = append(fp.imported[path], spec.Pos())
+			}
+		}
 	}
 	switch {
-	case strings.HasPrefix(pkg, "/cue.mod/"):
-		pkg = pkg[len("/cue.mod/"):]
-		if pkg == "" {
-			return "", fmt.Errorf("invalid package %q (root of %s)", origPath, modDir)
+	case isTest:
+		if fp.c.loader.cfg.Tests {
+			p.BuildFiles = append(p.BuildFiles, file)
+		} else {
+			file.ExcludeReason = excludeError{errors.Newf(pos,
+				"_test.cue files excluded in non-test mode")}
+			p.IgnoredFiles = append(p.IgnoredFiles, file)
 		}
-
-	case c.Module == "":
-		return "", fmt.Errorf("cannot determine import path for %q (no module)", origPath)
+	case isTool:
+		if fp.c.loader.cfg.Tools {
+			p.BuildFiles = append(p.BuildFiles, file)
+		} else {
+			file.ExcludeReason = excludeError{errors.Newf(pos,
+				"_tool.cue files excluded in non-cmd mode")}
+			p.IgnoredFiles = append(p.IgnoredFiles, file)
+		}
 	default:
-		impPath := ast.ParseImportPath(c.Module)
-		impPath.Path += pkg
-		impPath.Qualifier = ""
-		pkg = impPath.String()
+		p.BuildFiles = append(p.BuildFiles, file)
 	}
-	return importPath(pkg), nil
+	return true
 }
 
-func (l *loader) newInstance(pos token.Pos, p importPath) *build.Instance {
-	dir, mv, modRoot, err := l.absDirFromImportPath(pos, p)
-	i := l.cfg.Context.NewInstance(dir, nil)
-	i.Err = errors.Append(i.Err, err)
-	i.Dir = dir
-	parts := ast.ParseImportPath(string(p))
-	i.PkgName = parts.Qualifier
-	if i.PkgName == "" {
-		i.Err = errors.Append(i.Err, l.errPkgf([]token.Pos{pos}, "cannot determine package name for %q; set it explicitly with ':'", p))
-	} else if i.PkgName == "_" {
-		i.Err = errors.Append(i.Err, l.errPkgf([]token.Pos{pos}, "_ is not a valid import path qualifier in %q", p))
+func findimportComment(data []byte) (s string, line int) {
+	// expect keyword package
+	word, data := parseWord(data)
+	if string(word) != "package" {
+		return "", 0
 	}
-	i.DisplayPath = string(p)
-	i.ImportPath = string(p)
-	if mv.Path() == "" {
-		return i
-	}
-	mf, err1 := l.modFileCache.modFile(mv, modRoot)
-	if err1 != nil {
-		i.Err = errors.Append(i.Err, errors.Promote(err1, ""))
-	}
-	root, err1 := absPathForSourceLoc(modRoot)
-	if err1 != nil {
-		i.Err = errors.Append(i.Err, errors.Promote(err1, ""))
-	} else {
-		i.Root = root
-	}
-	i.Module = mv.Path()
-	i.ModuleFile = mf
 
-	return i
-}
+	// expect package name
+	_, data = parseWord(data)
 
-// absDirFromImportPath converts a giving import path to an absolute directory
-// and a package name. The root directory must be set.
-//
-// The returned directory may not exist.
-func (l *loader) absDirFromImportPath(pos token.Pos, p importPath) (dir string, mv module.Version, modRoot module.SourceLoc, _ errors.Error) {
-	dir, mv, modRoot, err := l.absDirFromImportPath1(pos, p)
-	if err != nil {
-		// Any error trying to determine the package location
-		// is a PackageError.
-		return "", module.Version{}, module.SourceLoc{}, l.errPkgf([]token.Pos{pos}, "%s", err.Error())
+	// now ready for import comment, a // comment
+	// beginning and ending on the current line.
+	for len(data) > 0 && (data[0] == ' ' || data[0] == '\t' || data[0] == '\r') {
+		data = data[1:]
 	}
-	return dir, mv, modRoot, nil
-}
 
-func (l *loader) absDirFromImportPath1(pos token.Pos, p importPath) (absDir string, mv module.Version, modRoot module.SourceLoc, err error) {
-	failf := func(f string, a ...any) (string, module.Version, module.SourceLoc, error) {
-		return "", module.Version{}, module.SourceLoc{}, fmt.Errorf(f, a...)
-	}
-	if p == "" {
-		return failf("empty import path")
-	}
-	if l.cfg.ModuleRoot == "" {
-		return failf("cannot import %q (root undefined)", p)
-	}
-	if isStdlibPackage(string(p)) {
-		return failf("standard library import path %q cannot be imported as a CUE package", p)
-	}
-	if l.pkgs == nil {
-		return failf("imports are unavailable because there is no cue.mod/module.cue file")
-	}
-	// Extract the package name.
-	parts := ast.ParseImportPath(string(p))
-	unqualified := parts.Unqualified().String()
-	// TODO predicate registry-aware lookup on module.cue-declared CUE version?
-
-	// Note: use the canonical form of the import path because
-	// that's the form passed to [modpkgload.LoadPackages]
-	// and hence it's available by that name via Pkg.
-	pkg := l.pkgs.Pkg(parts.Canonical().String())
-	// TODO(mvdan): using "unqualified" for the errors below doesn't seem right,
-	// should we not be using either the original path or the canonical path?
-	// The unqualified import path should only be used for filepath.FromSlash further below.
-	if pkg == nil {
-		return failf("no dependency found for package %q", unqualified)
-	}
-	if err := pkg.Error(); err != nil {
-		return failf("cannot find package %q: %v", unqualified, err)
-	}
-	if mv := pkg.Mod(); mv.IsLocal() {
-		// It's a local package that's present inside one or both of the gen, usr or pkg
-		// directories. Even though modpkgload tells us exactly what those directories
-		// are, the rest of the cue/load logic expects only a single directory for now,
-		// so just use that.
-		absDir = filepath.Join(GenPath(l.cfg.ModuleRoot), parts.Path)
-	} else {
-		locs := pkg.Locations()
-		if len(locs) > 1 {
-			return failf("package %q unexpectedly found in multiple locations", unqualified)
+	var comment []byte
+	switch {
+	case bytes.HasPrefix(data, slashSlash):
+		i := bytes.Index(data, newline)
+		if i < 0 {
+			i = len(data)
 		}
-		if len(locs) == 0 {
-			return failf("no location found for package %q", unqualified)
-		}
-		var err error
-		absDir, err = absPathForSourceLoc(locs[0])
-		if err != nil {
-			return failf("cannot determine source directory for package %q: %v", unqualified, err)
-		}
+		comment = data[2:i]
 	}
-	return absDir, pkg.Mod(), pkg.ModRoot(), nil
+	comment = bytes.TrimSpace(comment)
+
+	// split comment into `import`, `"pkg"`
+	word, arg := parseWord(comment)
+	if string(word) != "import" {
+		return "", 0
+	}
+
+	line = 1 + bytes.Count(data[:cap(data)-cap(arg)], newline)
+	return strings.TrimSpace(string(arg)), line
 }
 
-func absPathForSourceLoc(loc module.SourceLoc) (string, error) {
-	osfs, ok := loc.FS.(module.OSRootFS)
-	if !ok {
-		return "", fmt.Errorf("cannot get absolute path for FS of type %T", loc.FS)
+var (
+	slashSlash = []byte("//")
+	newline    = []byte("\n")
+)
+
+// skipSpaceOrComment returns data with any leading spaces or comments removed.
+func skipSpaceOrComment(data []byte) []byte {
+	for len(data) > 0 {
+		switch data[0] {
+		case ' ', '\t', '\r', '\n':
+			data = data[1:]
+			continue
+		case '/':
+			if bytes.HasPrefix(data, slashSlash) {
+				i := bytes.Index(data, newline)
+				if i < 0 {
+					return nil
+				}
+				data = data[i+1:]
+				continue
+			}
+		}
+		break
 	}
-	osPath := osfs.OSRoot()
-	if osPath == "" {
-		return "", fmt.Errorf("cannot get absolute path for FS of type %T", loc.FS)
-	}
-	return filepath.Join(osPath, loc.Dir), nil
+	return data
 }
 
-// isStdlibPackage reports whether pkgPath looks like
-// an import from the standard library.
-func isStdlibPackage(pkgPath string) bool {
-	firstElem, _, _ := strings.Cut(pkgPath, "/")
-	if firstElem == "" {
-		return false // absolute paths like "/foo/bar"
+// parseWord skips any leading spaces or comments in data
+// and then parses the beginning of data as an identifier or keyword,
+// returning that word and what remains after the word.
+func parseWord(data []byte) (word, rest []byte) {
+	data = skipSpaceOrComment(data)
+
+	// Parse past leading word characters.
+	rest = data
+	for {
+		r, size := utf8.DecodeRune(rest)
+		if unicode.IsLetter(r) || '0' <= r && r <= '9' || r == '_' {
+			rest = rest[size:]
+			continue
+		}
+		break
 	}
-	// Paths like ".foo/bar", "./foo/bar", or "foo.com/bar" are not standard library import paths.
-	return strings.IndexByte(firstElem, '.') == -1
+
+	word = data[:len(data)-len(rest)]
+	if len(word) == 0 {
+		return nil, nil
+	}
+
+	return word, rest
+}
+
+func cleanImports(m map[string][]token.Pos) ([]string, map[string][]token.Pos) {
+	all := make([]string, 0, len(m))
+	for path := range m {
+		all = append(all, path)
+	}
+	sort.Strings(all)
+	return all, m
+}
+
+// isLocalImport reports whether the import path is
+// a local import path, like ".", "..", "./foo", or "../foo".
+func isLocalImport(path string) bool {
+	return path == "." || path == ".." ||
+		strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
 }

@@ -1,15 +1,11 @@
 package ast
 
-func arg2map(
-	defs ArgumentDefinitionList,
-	args ArgumentList,
-	vars map[string]any,
-) map[string]any {
-	result := map[string]any{}
+func arg2map(defs ArgumentDefinitionList, args ArgumentList, vars map[string]interface{}) map[string]interface{} {
+	result := map[string]interface{}{}
 	var err error
 
 	for _, argDef := range defs {
-		var val any
+		var val interface{}
 		var hasValue bool
 
 		if argValue := args.ForName(argDef.Name); argValue != nil {

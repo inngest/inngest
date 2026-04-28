@@ -239,7 +239,7 @@ func readA(i *bufio.Reader, length int64) (*RedisMessage, int64, error) {
 	var err error
 
 	msgs := make([]RedisMessage, length)
-	for n := range length {
+	for n := int64(0); n < length; n++ {
 		if msgs[n], err = readNextMessage(i); err != nil {
 			return nil, 0, err
 		}

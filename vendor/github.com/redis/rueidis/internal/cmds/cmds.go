@@ -3,15 +3,14 @@ package cmds
 import "strings"
 
 const (
-	optInTag     = uint16(1 << 15)
-	blockTag     = uint16(1 << 14)
-	readonly     = uint16(1<<13) | retryableTag
-	noRetTag     = uint16(1<<12) | readonly | pipeTag // make noRetTag can also be retried and auto pipelining
-	mtGetTag     = uint16(1<<11) | readonly           // make mtGetTag can also be retried
-	scrRoTag     = uint16(1<<10) | readonly           // make scrRoTag can also be retried
-	unsubTag     = uint16(1<<9) | noRetTag
-	pipeTag      = uint16(1 << 8) // make blocking mode request can use auto pipelining
-	retryableTag = uint16(1 << 7) // make command retryable
+	optInTag = uint16(1 << 15)
+	blockTag = uint16(1 << 14)
+	readonly = uint16(1 << 13)
+	noRetTag = uint16(1<<12) | readonly | pipeTag // make noRetTag can also be retried and auto pipelining
+	mtGetTag = uint16(1<<11) | readonly           // make mtGetTag can also be retried
+	scrRoTag = uint16(1<<10) | readonly           // make scrRoTag can also be retried
+	unsubTag = uint16(1<<9) | noRetTag
+	pipeTag  = uint16(1 << 8) // make blocking mode request can use auto pipelining
 	// InitSlot indicates that the command be sent to any redis node in cluster
 	InitSlot = uint16(1 << 14)
 	// NoSlot indicates that the command has no key slot specified
@@ -86,10 +85,6 @@ var (
 		cs: newCommandSlice([]string{"UNSUBSCRIBE", "+sentinel", "+slave", "-sdown", "+sdown", "+switch-master", "+reboot"}),
 		cf: unsubTag,
 	}
-	// ClientTrackingOffCmd is predefined CLIENT TRACKING OFF
-	ClientTrackingOffCmd = Completed{
-		cs: newCommandSlice([]string{"CLIENT", "TRACKING", "OFF"}),
-	}
 
 	// DiscardCmd is predefined DISCARD
 	DiscardCmd = Completed{
@@ -125,12 +120,6 @@ func (c Completed) Pin() Completed {
 // ToPipe returns a new command with pipeTag
 func (c Completed) ToPipe() Completed {
 	c.cf |= pipeTag
-	return c
-}
-
-// ToRetryable return a new command with retryableTag
-func (c Completed) ToRetryable() Completed {
-	c.cf |= retryableTag
 	return c
 }
 
@@ -172,11 +161,6 @@ func (c *Completed) IsWrite() bool {
 // IsPipe checks if it is set pipeTag which prefers auto pipelining
 func (c *Completed) IsPipe() bool {
 	return c.cf&pipeTag == pipeTag
-}
-
-// IsRetryable checks if it is set retryableTag
-func (c *Completed) IsRetryable() bool {
-	return c.cf&retryableTag == retryableTag
 }
 
 // Commands returns the commands as []string.
@@ -275,12 +259,6 @@ func CacheKey(c Cacheable) (key, command string) {
 		}
 	}
 	return key, sb.String()
-}
-
-// AppendCompleted appends an arg to a Completed
-func AppendCompleted(c Completed, s string) {
-	c.cs.s = append(c.cs.s, s)
-	c.cs.l += 1
 }
 
 // CompletedCS get the underlying *CommandSlice

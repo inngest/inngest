@@ -1,4 +1,3 @@
-//go:build go1.16
 // +build go1.16
 
 package afero
@@ -8,10 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"sort"
 	"time"
-
-	"github.com/spf13/afero/internal/common"
 )
 
 // IOFS adopts afero.Fs to stdlib io/fs.FS
@@ -70,31 +66,14 @@ func (iofs IOFS) Glob(pattern string) ([]string, error) {
 }
 
 func (iofs IOFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	f, err := iofs.Fs.Open(name)
+	items, err := ReadDir(iofs.Fs, name)
 	if err != nil {
 		return nil, iofs.wrapError("readdir", name, err)
 	}
-
-	defer f.Close()
-
-	if rdf, ok := f.(fs.ReadDirFile); ok {
-		items, err := rdf.ReadDir(-1)
-		if err != nil {
-			return nil, iofs.wrapError("readdir", name, err)
-		}
-		sort.Slice(items, func(i, j int) bool { return items[i].Name() < items[j].Name() })
-		return items, nil
-	}
-
-	items, err := f.Readdir(-1)
-	if err != nil {
-		return nil, iofs.wrapError("readdir", name, err)
-	}
-	sort.Sort(byName(items))
 
 	ret := make([]fs.DirEntry, len(items))
 	for i := range items {
-		ret[i] = common.FileInfoDirEntry{FileInfo: items[i]}
+		ret[i] = dirEntry{items[i]}
 	}
 
 	return ret, nil
@@ -129,6 +108,17 @@ func (IOFS) wrapError(op, path string, err error) error {
 	}
 }
 
+// dirEntry provides adapter from os.FileInfo to fs.DirEntry
+type dirEntry struct {
+	fs.FileInfo
+}
+
+var _ fs.DirEntry = dirEntry{}
+
+func (d dirEntry) Type() fs.FileMode { return d.FileInfo.Mode().Type() }
+
+func (d dirEntry) Info() (fs.FileInfo, error) { return d.FileInfo, nil }
+
 // readDirFile provides adapter from afero.File to fs.ReadDirFile needed for correct Open
 type readDirFile struct {
 	File
@@ -137,14 +127,14 @@ type readDirFile struct {
 var _ fs.ReadDirFile = readDirFile{}
 
 func (r readDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
-	items, err := r.Readdir(n)
+	items, err := r.File.Readdir(n)
 	if err != nil {
 		return nil, err
 	}
 
 	ret := make([]fs.DirEntry, len(items))
 	for i := range items {
-		ret[i] = common.FileInfoDirEntry{FileInfo: items[i]}
+		ret[i] = dirEntry{items[i]}
 	}
 
 	return ret, nil
@@ -161,12 +151,7 @@ var _ Fs = FromIOFS{}
 
 func (f FromIOFS) Create(name string) (File, error) { return nil, notImplemented("create", name) }
 
-func (f FromIOFS) Mkdir(
-	name string,
-	perm os.FileMode,
-) error {
-	return notImplemented("mkdir", name)
-}
+func (f FromIOFS) Mkdir(name string, perm os.FileMode) error { return notImplemented("mkdir", name) }
 
 func (f FromIOFS) MkdirAll(path string, perm os.FileMode) error {
 	return notImplemented("mkdirall", path)
@@ -260,6 +245,7 @@ func (f fromIOFSFile) Readdir(count int) ([]os.FileInfo, error) {
 	ret := make([]os.FileInfo, len(entries))
 	for i := range entries {
 		ret[i], err = entries[i].Info()
+
 		if err != nil {
 			return nil, err
 		}

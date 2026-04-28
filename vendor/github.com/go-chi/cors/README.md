@@ -7,10 +7,6 @@ are required for using the browser native [Fetch API](https://developer.mozilla.
 This middleware is designed to be used as a top-level middleware on the [chi](https://github.com/go-chi/chi) router.
 Applying with within a `r.Group()` or using `With()` will not work without routes matching `OPTIONS` added.
 
-## Install
-
-`go get github.com/go-chi/cors`
-
 ## Usage
 
 ```go
@@ -40,4 +36,4 @@ func main() {
 
 ## Credits
 
-All credit for the original work of this middleware goes out to [github.com/rs](https://github.com/rs).
+All credit for the original work of this middleware goes out to [github.com/rs](github.com/rs).

@@ -63,9 +63,7 @@ func URLFormat(next http.Handler) http.Handler {
 				idx += base
 				format = path[idx+1:]
 
-				if rctx != nil {
-					rctx.RoutePath = path[:idx]
-				}
+				rctx.RoutePath = path[:idx]
 			}
 		}
 

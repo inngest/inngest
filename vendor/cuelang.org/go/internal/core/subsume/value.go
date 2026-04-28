@@ -102,18 +102,11 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		return x == b
 
 	case *adt.BuiltinValidator:
-		state := s.ctx.PushState(s.ctx.Env(0), b.Source())
-		// TODO: is this always correct?
-		cx := adt.MakeRootConjunct(s.ctx.Env(0), x)
-		b1 := s.ctx.Validate(cx, b)
-		if b1 != nil {
-			s.errs = errors.Append(s.errs, b1.Err)
+		if y := s.ctx.Validate(x, b); y != nil {
+			s.errs = errors.Append(s.errs, y.Err)
+			return false
 		}
-		b2 := s.ctx.PopState(state)
-		if b2 != nil {
-			s.errs = errors.Append(s.errs, b2.Err)
-		}
-		return b1 == nil && b2 == nil
+		return true
 
 	case *adt.Null:
 		return b.Kind() == adt.NullKind
@@ -124,7 +117,7 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 
 	case *adt.Num:
 		y, ok := b.(*adt.Num)
-		return ok && x.K&y.K == y.K && adt.BinOpBool(s.ctx, x, adt.EqualOp, x, y)
+		return ok && x.K&y.K == y.K && test(s.ctx, x, adt.EqualOp, x, y)
 
 	case *adt.String:
 		y, ok := b.(*adt.String)
@@ -264,40 +257,40 @@ func (s *subsumer) bound(x *adt.BoundValue, v adt.Value) bool {
 		switch x.Op {
 		case adt.GreaterThanOp:
 			if y.Op == adt.GreaterEqualOp {
-				return adt.BinOpBool(ctx, x, adt.LessThanOp, xv, yv)
+				return test(ctx, x, adt.LessThanOp, xv, yv)
 			}
 			fallthrough
 		case adt.GreaterEqualOp:
 			if y.Op == adt.GreaterThanOp || y.Op == adt.GreaterEqualOp {
-				return adt.BinOpBool(ctx, x, adt.LessEqualOp, xv, yv)
+				return test(ctx, x, adt.LessEqualOp, xv, yv)
 			}
 		case adt.LessThanOp:
 			if y.Op == adt.LessEqualOp {
-				return adt.BinOpBool(ctx, x, adt.GreaterThanOp, xv, yv)
+				return test(ctx, x, adt.GreaterThanOp, xv, yv)
 			}
 			fallthrough
 		case adt.LessEqualOp:
 			if y.Op == adt.LessThanOp || y.Op == adt.LessEqualOp {
-				return adt.BinOpBool(ctx, x, adt.GreaterEqualOp, xv, yv)
+				return test(ctx, x, adt.GreaterEqualOp, xv, yv)
 			}
 		case adt.NotEqualOp:
 			switch y.Op {
 			case adt.NotEqualOp:
-				return adt.BinOpBool(ctx, x, adt.EqualOp, xv, yv)
+				return test(ctx, x, adt.EqualOp, xv, yv)
 			case adt.GreaterEqualOp:
-				return adt.BinOpBool(ctx, x, adt.LessThanOp, xv, yv)
+				return test(ctx, x, adt.LessThanOp, xv, yv)
 			case adt.GreaterThanOp:
-				return adt.BinOpBool(ctx, x, adt.LessEqualOp, xv, yv)
+				return test(ctx, x, adt.LessEqualOp, xv, yv)
 			case adt.LessThanOp:
-				return adt.BinOpBool(ctx, x, adt.GreaterEqualOp, xv, yv)
+				return test(ctx, x, adt.GreaterEqualOp, xv, yv)
 			case adt.LessEqualOp:
-				return adt.BinOpBool(ctx, x, adt.GreaterThanOp, xv, yv)
+				return test(ctx, x, adt.GreaterThanOp, xv, yv)
 			}
 
 		case adt.MatchOp, adt.NotMatchOp:
 			// these are just approximations
 			if y.Op == x.Op {
-				return adt.BinOpBool(ctx, x, adt.EqualOp, xv, yv)
+				return test(ctx, x, adt.EqualOp, xv, yv)
 			}
 
 		default:
@@ -306,7 +299,13 @@ func (s *subsumer) bound(x *adt.BoundValue, v adt.Value) bool {
 		}
 
 	case *adt.Num, *adt.String, *adt.Bool:
-		return adt.BinOpBool(ctx, x, x.Op, y, x.Value)
+		return test(ctx, x, x.Op, y, x.Value)
 	}
 	return false
+}
+
+func test(ctx *adt.OpContext, src adt.Node, op adt.Op, gt, lt adt.Value) bool {
+	x := adt.BinOp(ctx, op, gt, lt)
+	b, ok := x.(*adt.Bool)
+	return ok && b.B
 }

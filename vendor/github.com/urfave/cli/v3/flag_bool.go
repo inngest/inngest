@@ -50,8 +50,7 @@ func (b boolValue) Create(val bool, p *bool, c BoolConfig) Value {
 
 // ToString formats the bool value
 func (b boolValue) ToString(value bool) string {
-	b.destination = &value
-	return b.String()
+	return strconv.FormatBool(value)
 }
 
 // Below functions are to satisfy the flag.Value interface
@@ -69,10 +68,14 @@ func (b *boolValue) Set(s string) error {
 	return err
 }
 
-func (b *boolValue) Get() any { return *b.destination }
+func (b *boolValue) Get() interface{} { return *b.destination }
 
 func (b *boolValue) String() string {
 	return strconv.FormatBool(*b.destination)
 }
 
 func (b *boolValue) IsBoolFlag() bool { return true }
+
+func (b *boolValue) Count() int {
+	return *b.count
+}

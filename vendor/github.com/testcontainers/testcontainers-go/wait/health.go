@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/moby/moby/api/types/container"
+	"github.com/docker/docker/api/types"
 )
 
 // Implement interface
@@ -60,11 +60,6 @@ func (ws *HealthStrategy) Timeout() *time.Duration {
 	return ws.timeout
 }
 
-// String returns a human-readable description of the wait strategy.
-func (ws *HealthStrategy) String() string {
-	return "container to become healthy"
-}
-
 // WaitUntilReady implements Strategy.WaitUntilReady
 func (ws *HealthStrategy) WaitUntilReady(ctx context.Context, target StrategyTarget) error {
 	timeout := defaultStartupTimeout()
@@ -87,7 +82,7 @@ func (ws *HealthStrategy) WaitUntilReady(ctx context.Context, target StrategyTar
 			if err := checkState(state); err != nil {
 				return err
 			}
-			if state.Health == nil || state.Health.Status != container.Healthy {
+			if state.Health == nil || state.Health.Status != types.Healthy {
 				time.Sleep(ws.PollInterval)
 				continue
 			}

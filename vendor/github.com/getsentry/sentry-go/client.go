@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -14,36 +15,24 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go/internal/debug"
-	"github.com/getsentry/sentry-go/internal/debuglog"
-	httpInternal "github.com/getsentry/sentry-go/internal/http"
-	"github.com/getsentry/sentry-go/internal/protocol"
-	"github.com/getsentry/sentry-go/internal/ratelimit"
-	"github.com/getsentry/sentry-go/internal/telemetry"
-	"github.com/getsentry/sentry-go/report"
 )
 
 // The identifier of the SDK.
 const sdkIdentifier = "sentry.go"
 
-const (
-	// maxErrorDepth is the maximum number of errors reported in a chain of errors.
-	// This protects the SDK from an arbitrarily long chain of wrapped errors.
-	//
-	// An additional consideration is that arguably reporting a long chain of errors
-	// is of little use when debugging production errors with Sentry. The Sentry UI
-	// is not optimized for long chains either. The top-level error together with a
-	// stack trace is often the most useful information.
-	maxErrorDepth = 100
+// maxErrorDepth is the maximum number of errors reported in a chain of errors.
+// This protects the SDK from an arbitrarily long chain of wrapped errors.
+//
+// An additional consideration is that arguably reporting a long chain of errors
+// is of little use when debugging production errors with Sentry. The Sentry UI
+// is not optimized for long chains either. The top-level error together with a
+// stack trace is often the most useful information.
+const maxErrorDepth = 10
 
-	// defaultMaxSpans limits the default number of recorded spans per transaction. The limit is
-	// meant to bound memory usage and prevent too large transaction events that
-	// would be rejected by Sentry.
-	defaultMaxSpans = 1000
-
-	// defaultMaxBreadcrumbs is the default maximum number of breadcrumbs added to
-	// an event. Can be overwritten with the MaxBreadcrumbs option.
-	defaultMaxBreadcrumbs = 100
-)
+// defaultMaxSpans limits the default number of recorded spans per transaction. The limit is
+// meant to bound memory usage and prevent too large transaction events that
+// would be rejected by Sentry.
+const defaultMaxSpans = 1000
 
 // hostname is the host name reported by the kernel. It is precomputed once to
 // avoid syscalls when capturing events.
@@ -88,26 +77,20 @@ type usageError struct {
 	error
 }
 
-// DebugLogger is an instance of log.Logger that is used to provide debug information about running Sentry Client
-// can be enabled by either using debuglog.SetOutput directly or with Debug client option.
-var DebugLogger = debuglog.GetLogger()
+// Logger is an instance of log.Logger that is use to provide debug information about running Sentry Client
+// can be enabled by either using Logger.SetOutput directly or with Debug client option.
+var Logger = log.New(io.Discard, "[Sentry] ", log.LstdFlags)
 
 // EventProcessor is a function that processes an event.
 // Event processors are used to change an event before it is sent to Sentry.
 type EventProcessor func(event *Event, hint *EventHint) *Event
-
-// externalContextTraceResolver extracts trace and span IDs from an external context source.
-//
-// This is currently a workaround for extractring trace information from OTel SpanContext without
-// needing the otel dependency on the root package.
-type externalContextTraceResolver func(ctx context.Context) (traceID TraceID, spanID SpanID, ok bool)
 
 // EventModifier is the interface that wraps the ApplyToEvent method.
 //
 // ApplyToEvent changes an event based on external data and/or
 // an event hint.
 type EventModifier interface {
-	ApplyToEvent(event *Event, hint *EventHint, client *Client) *Event
+	ApplyToEvent(event *Event, hint *EventHint) *Event
 }
 
 var globalEventProcessors []EventProcessor
@@ -150,21 +133,9 @@ type ClientOptions struct {
 	TracesSampleRate float64
 	// Used to customize the sampling of traces, overrides TracesSampleRate.
 	TracesSampler TracesSampler
-	// Control with URLs trace propagation should be enabled. Does not support regex patterns.
-	TracePropagationTargets []string
-	// PropagateTraceparent is used to control whether the W3C Trace Context HTTP traceparent header
-	// is propagated on outgoing http requests.
-	PropagateTraceparent bool
-	// StrictTraceContinuation is used to control trace continuation from 3rd party services that happen to be
-	// instrumented by Sentry.
-	//
-	// Enabling the option means that the SDK will require the org ids from baggage to match for continuing the trace.
-	StrictTraceContinuation bool
-	// OrgID configures the orgID used for trace propagation and features like StrictTraceContinuation.
-	//
-	// In most cases the orgID is already parsed from the DSN. This option should be used when non-standard Sentry DSNs
-	// are used, such as self-hosted or when using a local Relay.
-	OrgID uint64
+	// The sample rate for profiling traces in the range [0.0, 1.0].
+	// This is relative to TracesSampleRate - it is a ratio of profiled traces out of all sampled traces.
+	ProfilesSampleRate float64
 	// List of regexp strings that will be used to match against event's message
 	// and if applicable, caught errors type and value.
 	// If the match is found, then a whole event will be dropped.
@@ -176,19 +147,13 @@ type ClientOptions struct {
 	// By default, no such data is sent.
 	SendDefaultPII bool
 	// BeforeSend is called before error events are sent to Sentry.
-	// You can use it to mutate the event or return nil to discard it.
+	// Use it to mutate the event or return nil to discard the event.
 	BeforeSend func(event *Event, hint *EventHint) *Event
-	// BeforeSendLong is called before log events are sent to Sentry.
-	// You can use it to mutate the log event or return nil to discard it.
-	BeforeSendLog func(event *Log) *Log
 	// BeforeSendTransaction is called before transaction events are sent to Sentry.
 	// Use it to mutate the transaction or return nil to discard the transaction.
 	BeforeSendTransaction func(event *Event, hint *EventHint) *Event
 	// Before breadcrumb add callback.
 	BeforeBreadcrumb func(breadcrumb *Breadcrumb, hint *BreadcrumbHint) *Breadcrumb
-	// BeforeSendMetric is called before metric events are sent to Sentry.
-	// You can use it to mutate the metric or return nil to discard it.
-	BeforeSendMetric func(metric *Metric) *Metric
 	// Integrations to be installed on the current Client, receives default
 	// integrations.
 	Integrations func([]Integration) []Integration
@@ -261,53 +226,21 @@ type ClientOptions struct {
 	MaxErrorDepth int
 	// Default event tags. These are overridden by tags set on a scope.
 	Tags map[string]string
-	// EnableLogs controls when logs should be emitted.
-	EnableLogs bool
-	// DisableMetrics controls when metrics should be emitted.
-	DisableMetrics bool
-	// DisableClientReports controls when client reports should be emitted.
-	DisableClientReports bool
-	// TraceIgnoreStatusCodes is a list of HTTP status codes that should not be traced.
-	// Each element can be either:
-	// - A single-element slice [code] for a specific status code
-	// - A two-element slice [min, max] for a range of status codes (inclusive)
-	// When an HTTP request results in a status code that matches any of these codes or ranges,
-	// the transaction will not be sent to Sentry.
-	//
-	// Examples:
-	//   [][]int{{404}}                           // ignore only status code 404
-	//   [][]int{{400, 405}}                     // ignore status codes 400-405
-	//   [][]int{{404}, {500}}                   // ignore status codes 404 and 500
-	//   [][]int{{404}, {400, 405}, {500, 599}}  // ignore 404, range 400-405, and range 500-599
-	//
-	// By default, this ignores 404 status codes.
-	//
-	// IMPORTANT: to not ignore any status codes, the option should be an empty slice and not nil. The nil option is
-	// used for defaulting to 404 ignores.
-	TraceIgnoreStatusCodes [][]int
-	// DisableTelemetryBuffer disables the telemetry buffer layer for prioritizing events and uses the old transport layer.
-	DisableTelemetryBuffer bool
 }
 
 // Client is the underlying processor that is used by the main API and Hub
 // instances. It must be created with NewClient.
 type Client struct {
-	mu                    sync.RWMutex
-	options               ClientOptions
-	dsn                   *Dsn
-	eventProcessors       []EventProcessor
-	integrations          []Integration
-	externalTraceResolver externalContextTraceResolver
-	sdkIdentifier         string
-	sdkVersion            string
+	mu              sync.RWMutex
+	options         ClientOptions
+	dsn             *Dsn
+	eventProcessors []EventProcessor
+	integrations    []Integration
+	sdkIdentifier   string
+	sdkVersion      string
 	// Transport is read-only. Replacing the transport of an existing client is
 	// not supported, create a new client instead.
-	Transport          Transport
-	batchLogger        *logBatchProcessor
-	batchMeter         *metricBatchProcessor
-	telemetryProcessor *telemetry.Processor
-	reportRecorder     report.ClientReportRecorder
-	reportProvider     report.ClientReportProvider
+	Transport Transport
 }
 
 // NewClient creates and returns an instance of Client configured using
@@ -345,7 +278,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 		if debugWriter == nil {
 			debugWriter = os.Stderr
 		}
-		debuglog.SetOutput(debugWriter)
+		Logger.SetOutput(debugWriter)
 	}
 
 	if options.Dsn == "" {
@@ -366,10 +299,6 @@ func NewClient(options ClientOptions) (*Client, error) {
 
 	if options.MaxSpans == 0 {
 		options.MaxSpans = defaultMaxSpans
-	}
-
-	if options.TraceIgnoreStatusCodes == nil {
-		options.TraceIgnoreStatusCodes = [][]int{{404}}
 	}
 
 	// SENTRYGODEBUG is a comma-separated list of key=value pairs (similar
@@ -405,38 +334,13 @@ func NewClient(options ClientOptions) (*Client, error) {
 	}
 
 	client := Client{
-		options:        options,
-		dsn:            dsn,
-		sdkIdentifier:  sdkIdentifier,
-		sdkVersion:     SDKVersion,
-		reportRecorder: report.NoopRecorder(),
-		reportProvider: report.NoopProvider(),
-	}
-
-	if !options.DisableClientReports {
-		a := report.NewAggregator()
-		client.reportRecorder = a
-		client.reportProvider = a
+		options:       options,
+		dsn:           dsn,
+		sdkIdentifier: sdkIdentifier,
+		sdkVersion:    SDKVersion,
 	}
 
 	client.setupTransport()
-
-	// noop Telemetry Buffers and Processor fow now
-	// if !options.DisableTelemetryBuffer {
-	// 	client.setupTelemetryProcessor()
-	// } else
-	if options.EnableLogs {
-		client.batchLogger = newLogBatchProcessor(&client)
-		client.batchLogger.Start()
-	}
-
-	if !options.DisableMetrics {
-		client.batchMeter = newMetricBatchProcessor(&client)
-		client.batchMeter.Start()
-	}
-	if options.OrgID != 0 && client.dsn != nil {
-		client.dsn.SetOrgID(options.OrgID)
-	}
 	client.setupIntegrations()
 
 	return &client, nil
@@ -451,80 +355,19 @@ func (client *Client) setupTransport() {
 			transport = new(noopTransport)
 		} else {
 			httpTransport := NewHTTPTransport()
-			httpTransport.recorder = client.reportRecorder
-			httpTransport.provider = client.reportProvider
+			// When tracing is enabled, use larger buffer to
+			// accommodate more concurrent events.
+			// TODO(tracing): consider using separate buffers per
+			// event type.
+			if opts.EnableTracing {
+				httpTransport.BufferSize = 1000
+			}
 			transport = httpTransport
-		}
-	} else {
-		// For known transport types, inject the client report interfaces.
-		switch tr := transport.(type) {
-		case *HTTPTransport:
-			tr.recorder = client.reportRecorder
-			tr.provider = client.reportProvider
-		case *HTTPSyncTransport:
-			tr.recorder = client.reportRecorder
-			tr.provider = client.reportProvider
-		case *internalAsyncTransportAdapter:
-			tr.recorder = client.reportRecorder
-			tr.provider = client.reportProvider
 		}
 	}
 
 	transport.Configure(opts)
 	client.Transport = transport
-}
-
-func (client *Client) setupTelemetryProcessor() { // nolint: unused
-	if client.options.DisableTelemetryBuffer {
-		return
-	}
-
-	if client.dsn == nil {
-		debuglog.Println("Telemetry buffer disabled: no DSN configured")
-		return
-	}
-
-	// We currently disallow using custom Transport with the new Telemetry Processor, due to the difference in transport signatures.
-	// The option should be enabled when the new Transport interface signature changes.
-	if client.options.Transport != nil {
-		debuglog.Println("Cannot enable Telemetry Processor/Buffers with custom Transport: fallback to old transport")
-		if client.options.EnableLogs {
-			client.batchLogger = newLogBatchProcessor(client)
-			client.batchLogger.Start()
-		}
-		if !client.options.DisableMetrics {
-			client.batchMeter = newMetricBatchProcessor(client)
-			client.batchMeter.Start()
-		}
-		return
-	}
-
-	transport := httpInternal.NewAsyncTransport(httpInternal.TransportOptions{
-		Dsn:           client.options.Dsn,
-		HTTPClient:    client.options.HTTPClient,
-		HTTPTransport: client.options.HTTPTransport,
-		HTTPProxy:     client.options.HTTPProxy,
-		HTTPSProxy:    client.options.HTTPSProxy,
-		CaCerts:       client.options.CaCerts,
-		Recorder:      client.reportRecorder,
-		Provider:      client.reportProvider,
-	})
-	client.Transport = &internalAsyncTransportAdapter{transport: transport}
-
-	buffers := map[ratelimit.Category]telemetry.Buffer[protocol.TelemetryItem]{
-		ratelimit.CategoryError:       telemetry.NewRingBuffer[protocol.TelemetryItem](ratelimit.CategoryError, 100, telemetry.OverflowPolicyDropOldest, 1, 0, client.reportRecorder),
-		ratelimit.CategoryTransaction: telemetry.NewRingBuffer[protocol.TelemetryItem](ratelimit.CategoryTransaction, 1000, telemetry.OverflowPolicyDropOldest, 1, 0, client.reportRecorder),
-		ratelimit.CategoryLog:         telemetry.NewRingBuffer[protocol.TelemetryItem](ratelimit.CategoryLog, 10*100, telemetry.OverflowPolicyDropOldest, 100, 5*time.Second, client.reportRecorder),
-		ratelimit.CategoryMonitor:     telemetry.NewRingBuffer[protocol.TelemetryItem](ratelimit.CategoryMonitor, 100, telemetry.OverflowPolicyDropOldest, 1, 0, client.reportRecorder),
-		ratelimit.CategoryTraceMetric: telemetry.NewRingBuffer[protocol.TelemetryItem](ratelimit.CategoryTraceMetric, 10*100, telemetry.OverflowPolicyDropOldest, 100, 5*time.Second, client.reportRecorder),
-	}
-
-	sdkInfo := &protocol.SdkInfo{
-		Name:    client.sdkIdentifier,
-		Version: client.sdkVersion,
-	}
-
-	client.telemetryProcessor = telemetry.NewProcessor(buffers, transport, &client.dsn.Dsn, sdkInfo, client.reportRecorder)
 }
 
 func (client *Client) setupIntegrations() {
@@ -543,12 +386,12 @@ func (client *Client) setupIntegrations() {
 
 	for _, integration := range integrations {
 		if client.integrationAlreadyInstalled(integration.Name()) {
-			debuglog.Printf("Integration %s is already installed\n", integration.Name())
+			Logger.Printf("Integration %s is already installed\n", integration.Name())
 			continue
 		}
 		client.integrations = append(client.integrations, integration)
 		integration.SetupOnce(client)
-		debuglog.Printf("Integration installed: %s\n", integration.Name())
+		Logger.Printf("Integration installed: %s\n", integration.Name())
 	}
 
 	sort.Slice(client.integrations, func(i, j int) bool {
@@ -565,33 +408,6 @@ func (client *Client) setupIntegrations() {
 // event processor to the client affects all hubs that share the client.
 func (client *Client) AddEventProcessor(processor EventProcessor) {
 	client.eventProcessors = append(client.eventProcessors, processor)
-}
-
-// SetExternalContextTraceResolver installs a resolver used to extract trace/span IDs
-// from external context implementations.
-//
-// This is intended for integrations such as OpenTelemetry.
-func (client *Client) SetExternalContextTraceResolver(resolver func(ctx context.Context) (TraceID, SpanID, bool)) {
-	client.mu.Lock()
-	defer client.mu.Unlock()
-
-	client.externalTraceResolver = resolver
-}
-
-func (client *Client) externalTraceContextFromContext(ctx context.Context) (TraceID, SpanID, bool) {
-	if ctx == nil {
-		return TraceID{}, SpanID{}, false
-	}
-
-	client.mu.RLock()
-	resolver := client.externalTraceResolver
-	client.mu.RUnlock()
-
-	if resolver == nil {
-		return TraceID{}, SpanID{}, false
-	}
-
-	return resolver(ctx)
 }
 
 // Options return ClientOptions for the current Client.
@@ -624,76 +440,11 @@ func (client *Client) CaptureCheckIn(checkIn *CheckIn, monitorConfig *MonitorCon
 
 // CaptureEvent captures an event on the currently active client if any.
 //
-// The event must already be assembled. Typically, code would instead use
+// The event must already be assembled. Typically code would instead use
 // the utility methods like CaptureException. The return value is the
 // event ID. In case Sentry is disabled or event was dropped, the return value will be nil.
 func (client *Client) CaptureEvent(event *Event, hint *EventHint, scope EventModifier) *EventID {
 	return client.processEvent(event, hint, scope)
-}
-
-func (client *Client) captureLog(log *Log, _ *Scope) bool {
-	if log == nil {
-		return false
-	}
-
-	if client.options.BeforeSendLog != nil {
-		approxSize := log.ApproximateSize()
-		log = client.options.BeforeSendLog(log)
-		if log == nil {
-			debuglog.Println("Log dropped due to BeforeSendLog callback.")
-			client.reportRecorder.RecordOne(report.ReasonBeforeSend, ratelimit.CategoryLog)
-			client.reportRecorder.Record(report.ReasonBeforeSend, ratelimit.CategoryLogByte, int64(approxSize))
-			return false
-		}
-	}
-
-	if client.telemetryProcessor != nil {
-		if !client.telemetryProcessor.Add(log) {
-			debuglog.Print("Dropping log: telemetry buffer full or category missing")
-			// Note: processor tracks client report
-			return false
-		}
-	} else if client.batchLogger != nil {
-		if !client.batchLogger.Send(log) {
-			debuglog.Printf("Dropping log [%s]: buffer full", log.Level)
-			client.reportRecorder.RecordOne(report.ReasonBufferOverflow, ratelimit.CategoryLog)
-			client.reportRecorder.Record(report.ReasonBufferOverflow, ratelimit.CategoryLogByte, int64(log.ApproximateSize()))
-			return false
-		}
-	}
-
-	return true
-}
-
-func (client *Client) captureMetric(metric *Metric, _ *Scope) bool {
-	if metric == nil {
-		return false
-	}
-
-	if client.options.BeforeSendMetric != nil {
-		metric = client.options.BeforeSendMetric(metric)
-		if metric == nil {
-			debuglog.Println("Metric dropped due to BeforeSendMetric callback.")
-			client.reportRecorder.RecordOne(report.ReasonBeforeSend, ratelimit.CategoryTraceMetric)
-			return false
-		}
-	}
-
-	if client.telemetryProcessor != nil {
-		if !client.telemetryProcessor.Add(metric) {
-			debuglog.Printf("Dropping metric: telemetry buffer full or category missing")
-			// Note: processor tracks client report
-			return false
-		}
-	} else if client.batchMeter != nil {
-		if !client.batchMeter.Send(metric) {
-			debuglog.Printf("Dropping metric %q: buffer full", metric.Name)
-			client.reportRecorder.RecordOne(report.ReasonBufferOverflow, ratelimit.CategoryTraceMetric)
-			return false
-		}
-	}
-
-	return true
 }
 
 // Recover captures a panic.
@@ -759,54 +510,7 @@ func (client *Client) RecoverWithContext(
 // the network synchronously, configure it to use the HTTPSyncTransport in the
 // call to Init.
 func (client *Client) Flush(timeout time.Duration) bool {
-	if client.batchLogger != nil || client.batchMeter != nil || client.telemetryProcessor != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		return client.FlushWithContext(ctx)
-	}
 	return client.Transport.Flush(timeout)
-}
-
-// FlushWithContext waits until the underlying Transport sends any buffered events
-// to the Sentry server, blocking for at most the duration specified by the context.
-// It returns false if the context is canceled before the events are sent. In such a case,
-// some events may not be delivered.
-//
-// FlushWithContext should be called before terminating the program to ensure no
-// events are unintentionally dropped.
-//
-// Avoid calling FlushWithContext indiscriminately after each call to CaptureEvent,
-// CaptureException, or CaptureMessage. To send events synchronously over the network,
-// configure the SDK to use HTTPSyncTransport during initialization with Init.
-
-func (client *Client) FlushWithContext(ctx context.Context) bool {
-	if client.batchLogger != nil {
-		client.batchLogger.Flush(ctx.Done())
-	}
-	if client.batchMeter != nil {
-		client.batchMeter.Flush(ctx.Done())
-	}
-	if client.telemetryProcessor != nil {
-		return client.telemetryProcessor.FlushWithContext(ctx)
-	}
-	return client.Transport.FlushWithContext(ctx)
-}
-
-// Close clean up underlying Transport resources.
-//
-// Close should be called after Flush and before terminating the program
-// otherwise some events may be lost.
-func (client *Client) Close() {
-	if client.telemetryProcessor != nil {
-		client.telemetryProcessor.Close(5 * time.Second)
-	}
-	if client.batchLogger != nil {
-		client.batchLogger.Shutdown()
-	}
-	if client.batchMeter != nil {
-		client.batchMeter.Shutdown()
-	}
-	client.Transport.Close()
 }
 
 // EventFromMessage creates an event from the given message string.
@@ -886,6 +590,14 @@ func (client *Client) GetSDKIdentifier() string {
 	return client.sdkIdentifier
 }
 
+// reverse reverses the slice a in place.
+func reverse(a []Exception) {
+	for i := len(a)/2 - 1; i >= 0; i-- {
+		opp := len(a) - 1 - i
+		a[i], a[opp] = a[opp], a[i]
+	}
+}
+
 func (client *Client) processEvent(event *Event, hint *EventHint, scope EventModifier) *EventID {
 	if event == nil {
 		err := usageError{fmt.Errorf("%s called with nil event", callerFunctionName())}
@@ -896,8 +608,7 @@ func (client *Client) processEvent(event *Event, hint *EventHint, scope EventMod
 	// options.TracesSampler when they are started. Other events
 	// (errors, messages) are sampled here. Does not apply to check-ins.
 	if event.Type != transactionType && event.Type != checkInType && !sample(client.options.SampleRate) {
-		debuglog.Println("Event dropped due to SampleRate hit.")
-		client.reportRecorder.RecordOne(report.ReasonSampleRate, event.toCategory())
+		Logger.Println("Event dropped due to SampleRate hit.")
 		return nil
 	}
 
@@ -909,40 +620,21 @@ func (client *Client) processEvent(event *Event, hint *EventHint, scope EventMod
 	if hint == nil {
 		hint = &EventHint{}
 	}
-	switch event.Type {
-	case transactionType:
-		if client.options.BeforeSendTransaction != nil {
-			spanCountBefore := event.GetSpanCount()
-			event = client.options.BeforeSendTransaction(event, hint)
-			if event == nil {
-				debuglog.Println("Transaction dropped due to BeforeSendTransaction callback.")
-				client.reportRecorder.RecordOne(report.ReasonBeforeSend, ratelimit.CategoryTransaction)
-				client.reportRecorder.Record(report.ReasonBeforeSend, ratelimit.CategorySpan, int64(spanCountBefore))
-				return nil
-			}
-			// Track spans removed by the callback
-			if droppedSpans := spanCountBefore - event.GetSpanCount(); droppedSpans > 0 {
-				client.reportRecorder.Record(report.ReasonBeforeSend, ratelimit.CategorySpan, int64(droppedSpans))
-			}
+	if event.Type == transactionType && client.options.BeforeSendTransaction != nil {
+		// Transaction events
+		if event = client.options.BeforeSendTransaction(event, hint); event == nil {
+			Logger.Println("Transaction dropped due to BeforeSendTransaction callback.")
+			return nil
 		}
-	case checkInType: // not a default case, since we shouldn't apply BeforeSend on check-in events
-	default:
-		if client.options.BeforeSend != nil {
-			if event = client.options.BeforeSend(event, hint); event == nil {
-				debuglog.Println("Event dropped due to BeforeSend callback.")
-				client.reportRecorder.RecordOne(report.ReasonBeforeSend, ratelimit.CategoryError)
-				return nil
-			}
+	} else if event.Type != transactionType && event.Type != checkInType && client.options.BeforeSend != nil {
+		// All other events
+		if event = client.options.BeforeSend(event, hint); event == nil {
+			Logger.Println("Event dropped due to BeforeSend callback.")
+			return nil
 		}
 	}
 
-	if client.telemetryProcessor != nil {
-		if !client.telemetryProcessor.Add(event) {
-			debuglog.Println("Event dropped: telemetry buffer full or unavailable")
-		}
-	} else {
-		client.Transport.SendEvent(event)
-	}
+	client.Transport.SendEvent(event)
 
 	return &event.EventID
 }
@@ -993,7 +685,7 @@ func (client *Client) prepareEvent(event *Event, hint *EventHint, scope EventMod
 	}
 
 	if scope != nil {
-		event = scope.ApplyToEvent(event, hint, client)
+		event = scope.ApplyToEvent(event, hint)
 		if event == nil {
 			return nil
 		}
@@ -1001,44 +693,24 @@ func (client *Client) prepareEvent(event *Event, hint *EventHint, scope EventMod
 
 	for _, processor := range client.eventProcessors {
 		id := event.EventID
-		category := event.toCategory()
-		spanCountBefore := event.GetSpanCount()
 		event = processor(event, hint)
 		if event == nil {
-			debuglog.Printf("Event dropped by one of the Client EventProcessors: %s\n", id)
-			client.reportRecorder.RecordOne(report.ReasonEventProcessor, category)
-			if category == ratelimit.CategoryTransaction {
-				client.reportRecorder.Record(report.ReasonEventProcessor, ratelimit.CategorySpan, int64(spanCountBefore))
-			}
+			Logger.Printf("Event dropped by one of the Client EventProcessors: %s\n", id)
 			return nil
-		}
-		// Track spans removed by the processor
-		if category == ratelimit.CategoryTransaction {
-			if droppedSpans := spanCountBefore - event.GetSpanCount(); droppedSpans > 0 {
-				client.reportRecorder.Record(report.ReasonEventProcessor, ratelimit.CategorySpan, int64(droppedSpans))
-			}
 		}
 	}
 
 	for _, processor := range globalEventProcessors {
 		id := event.EventID
-		category := event.toCategory()
-		spanCountBefore := event.GetSpanCount()
 		event = processor(event, hint)
 		if event == nil {
-			debuglog.Printf("Event dropped by one of the Global EventProcessors: %s\n", id)
-			client.reportRecorder.RecordOne(report.ReasonEventProcessor, category)
-			if category == ratelimit.CategoryTransaction {
-				client.reportRecorder.Record(report.ReasonEventProcessor, ratelimit.CategorySpan, int64(spanCountBefore))
-			}
+			Logger.Printf("Event dropped by one of the Global EventProcessors: %s\n", id)
 			return nil
 		}
-		// Track spans removed by the processor
-		if category == ratelimit.CategoryTransaction {
-			if droppedSpans := spanCountBefore - event.GetSpanCount(); droppedSpans > 0 {
-				client.reportRecorder.Record(report.ReasonEventProcessor, ratelimit.CategorySpan, int64(droppedSpans))
-			}
-		}
+	}
+
+	if event.sdkMetaData.transactionProfile != nil {
+		event.sdkMetaData.transactionProfile.UpdateFromEvent(event)
 	}
 
 	return event

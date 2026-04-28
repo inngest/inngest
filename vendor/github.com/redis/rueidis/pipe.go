@@ -21,12 +21,9 @@ import (
 )
 
 const LibName = "rueidis"
-const LibVer = "1.0.74"
+const LibVer = "1.0.68"
 
-var (
-	noHello = regexp.MustCompile("unknown command .?(HELLO|hello).?")
-	infoAZ  = regexp.MustCompile(`availability_zone:([^\r\n]+)`)
-)
+var noHello = regexp.MustCompile("unknown command .?(HELLO|hello).?")
 
 // See https://github.com/redis/rueidis/pull/691
 func isUnsubReply(msg *RedisMessage) bool {
@@ -57,7 +54,6 @@ type wire interface {
 
 	CleanSubscriptions()
 	SetPubSubHooks(hooks PubSubHooks) <-chan error
-	GetPubSubHooks() PubSubHooks
 	SetOnCloseHook(fn func(error))
 	StopTimer() bool
 	ResetTimer() bool
@@ -172,22 +168,15 @@ func _newPipe(ctx context.Context, connFn func(context.Context) (net.Conn, error
 		helloCmd = append(helloCmd, "SETNAME", option.ClientName)
 	}
 
-	init := make([][]string, 0, 6)
-
-	init = append(init, helloCmd)
-
-	if option.EnableReplicaAZInfo && option.AZFromInfo {
-		init = append(init, []string{"INFO", "SERVER"})
+	init := make([][]string, 0, 5)
+	if option.ClientTrackingOptions == nil {
+		init = append(init, helloCmd, []string{"CLIENT", "TRACKING", "ON", "OPTIN"})
+	} else {
+		init = append(init, helloCmd, append([]string{"CLIENT", "TRACKING", "ON"}, option.ClientTrackingOptions...))
 	}
-
-	if !option.DisableCache {
-		if option.ClientTrackingOptions == nil {
-			init = append(init, []string{"CLIENT", "TRACKING", "ON", "OPTIN"})
-		} else {
-			init = append(init, append([]string{"CLIENT", "TRACKING", "ON"}, option.ClientTrackingOptions...))
-		}
+	if option.DisableCache {
+		init = init[:1]
 	}
-
 	if option.SelectDB != 0 {
 		init = append(init, []string{"SELECT", strconv.Itoa(option.SelectDB)})
 	}
@@ -235,14 +224,6 @@ func _newPipe(ctx context.Context, connFn func(context.Context) (net.Conn, error
 		for i, r := range resp.s[:count] {
 			if i == 0 {
 				p.info, err = r.AsMap()
-			} else if i == 1 && option.EnableReplicaAZInfo && option.AZFromInfo {
-				var infoStr string
-				infoStr, err = r.ToString()
-				if err == nil {
-					if sm := infoAZ.FindStringSubmatch(infoStr); len(sm) > 1 {
-						p.info["availability_zone"] = strmsg('+', sm[1])
-					}
-				}
 			} else {
 				err = r.Error()
 			}
@@ -290,9 +271,6 @@ func _newPipe(ctx context.Context, connFn func(context.Context) (net.Conn, error
 		}
 		helloIndex := len(init)
 		init = append(init, []string{"HELLO", "2"})
-		if option.EnableReplicaAZInfo && option.AZFromInfo {
-			init = append(init, []string{"INFO", "SERVER"})
-		}
 		if option.ClientName != "" {
 			init = append(init, []string{"CLIENT", "SETNAME", option.ClientName})
 		}
@@ -346,14 +324,6 @@ func _newPipe(ctx context.Context, connFn func(context.Context) (net.Conn, error
 				}
 				if i == helloIndex {
 					p.info, err = r.AsMap()
-				} else if option.EnableReplicaAZInfo && option.AZFromInfo && i == helloIndex+1 {
-					var infoStr string
-					infoStr, err = r.ToString()
-					if err == nil {
-						if sm := infoAZ.FindStringSubmatch(infoStr); len(sm) > 1 {
-							p.info["availability_zone"] = strmsg('+', sm[1])
-						}
-					}
 				}
 			}
 		}
@@ -366,11 +336,11 @@ func _newPipe(ctx context.Context, connFn func(context.Context) (net.Conn, error
 		}
 	}
 	if !nobg {
-		if p.timeout > 0 && p.pinggap > 0 {
-			p.backgroundPing()
-		}
 		if p.onInvalidations != nil || option.AlwaysPipelining {
 			p.background()
+		}
+		if p.timeout > 0 && p.pinggap > 0 {
+			p.backgroundPing()
 		}
 	}
 	if option.ConnLifetime > 0 {
@@ -435,8 +405,7 @@ func (p *pipe) _background() {
 	p.nsubs.Close()
 	p.psubs.Close()
 	p.ssubs.Close()
-	old := p.pshks.Swap(emptypshks)
-	if old.close != nil {
+	if old := p.pshks.Swap(emptypshks); old.close != nil {
 		old.close <- err
 		close(old.close)
 	}
@@ -452,9 +421,6 @@ func (p *pipe) _background() {
 	}
 	if p.onInvalidations != nil {
 		p.onInvalidations(nil)
-	}
-	if old.hooks.onInvalidations != nil {
-		old.hooks.onInvalidations(nil)
 	}
 
 	resp := newErrResult(err)
@@ -686,16 +652,9 @@ func (p *pipe) _backgroundRead() (err error) {
 
 func (p *pipe) backgroundPing() {
 	var prev, recv int32
-	var mu sync.Mutex
-
-	mu.Lock()
-	defer mu.Unlock()
 
 	prev = p.loadRecvs()
 	p.pingTimer = time.AfterFunc(p.pinggap, func() {
-		mu.Lock()
-		defer mu.Unlock()
-
 		var err error
 		recv = p.loadRecvs()
 		defer func() {
@@ -748,89 +707,64 @@ func (p *pipe) handlePush(values []RedisMessage) (reply bool, unsubscribe bool) 
 				p.onInvalidations(values[1].values())
 			}
 		}
-		if fn := p.pshks.Load().hooks.onInvalidations; fn != nil {
-			if values[1].IsNil() {
-				fn(nil)
-			} else {
-				fn(values[1].values())
-			}
-		}
 	case "message":
 		if len(values) >= 3 {
 			m := PubSubMessage{Channel: values[1].string(), Message: values[2].string()}
 			p.nsubs.Publish(values[1].string(), m)
-			if fn := p.pshks.Load().hooks.OnMessage; fn != nil {
-				fn(m)
-			}
+			p.pshks.Load().hooks.OnMessage(m)
 		}
 	case "pmessage":
 		if len(values) >= 4 {
 			m := PubSubMessage{Pattern: values[1].string(), Channel: values[2].string(), Message: values[3].string()}
 			p.psubs.Publish(values[1].string(), m)
-			if fn := p.pshks.Load().hooks.OnMessage; fn != nil {
-				fn(m)
-			}
+			p.pshks.Load().hooks.OnMessage(m)
 		}
 	case "smessage":
 		if len(values) >= 3 {
 			m := PubSubMessage{Channel: values[1].string(), Message: values[2].string()}
 			p.ssubs.Publish(values[1].string(), m)
-			if fn := p.pshks.Load().hooks.OnMessage; fn != nil {
-				fn(m)
-			}
+			p.pshks.Load().hooks.OnMessage(m)
 		}
 	case "unsubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.nsubs.Unsubscribe(s)
-			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
-				fn(s)
-			}
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, true
 	case "punsubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.psubs.Unsubscribe(s)
-			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
-				fn(s)
-			}
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, true
 	case "sunsubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.ssubs.Unsubscribe(s)
-			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
-				fn(s)
-			}
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, true
 	case "subscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.nsubs.Confirm(s)
-			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
-				fn(s)
-			}
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, false
 	case "psubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.psubs.Confirm(s)
-			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
-				fn(s)
-			}
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, false
 	case "ssubscribe":
 		if len(values) >= 3 {
 			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
 			p.ssubs.Confirm(s)
-			if fn := p.pshks.Load().hooks.OnSubscription; fn != nil {
-				fn(s)
-			}
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, false
 	}
@@ -922,16 +856,6 @@ func (p *pipe) CleanSubscriptions() {
 	}
 }
 
-func (p *pipe) GetPubSubHooks() PubSubHooks {
-	if p.r2p != nil {
-		return p.r2p.pipe(context.Background()).GetPubSubHooks()
-	}
-	if pshks := p.pshks.Load(); pshks != emptypshks {
-		return pshks.hooks
-	}
-	return PubSubHooks{}
-}
-
 func (p *pipe) SetPubSubHooks(hooks PubSubHooks) <-chan error {
 	if p.r2p != nil {
 		return p.r2p.pipe(context.Background()).SetPubSubHooks(hooks)
@@ -941,6 +865,12 @@ func (p *pipe) SetPubSubHooks(hooks PubSubHooks) <-chan error {
 			close(old.close)
 		}
 		return nil
+	}
+	if hooks.OnMessage == nil {
+		hooks.OnMessage = func(m PubSubMessage) {}
+	}
+	if hooks.OnSubscription == nil {
+		hooks.OnSubscription = func(s PubSubSubscription) {}
 	}
 	ch := make(chan error, 1)
 	if old := p.pshks.Swap(&pshks{hooks: hooks, close: ch}); old.close != nil {
@@ -1398,7 +1328,7 @@ process:
 	if err = p.w.Flush(); err != nil {
 		goto abort
 	}
-	for i := range resp {
+	for i := 0; i < len(resp); i++ {
 		if msg, err = syncRead(p.r); err != nil {
 			goto abort
 		}
@@ -1412,7 +1342,7 @@ abort:
 	p.error.CompareAndSwap(nil, &errs{error: err})
 	p.conn.Close()
 	p.background() // start the background worker to clean up goroutines
-	for i := range resp {
+	for i := 0; i < len(resp); i++ {
 		resp[i] = newErrResult(err)
 	}
 }
@@ -1818,7 +1748,13 @@ type pshks struct {
 	close chan error
 }
 
-var emptypshks = &pshks{}
+var emptypshks = &pshks{
+	hooks: PubSubHooks{
+		OnMessage:      func(m PubSubMessage) {},
+		OnSubscription: func(s PubSubSubscription) {},
+	},
+	close: nil,
+}
 
 var emptyclhks = func(error) {}
 

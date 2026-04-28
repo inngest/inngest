@@ -1,7 +1,6 @@
 package kgo
 
 import (
-	"context"
 	"net"
 	"time"
 )
@@ -14,7 +13,7 @@ import (
 
 // Hook is a hook to be called when something happens in kgo.
 //
-// The base Hook interface is meaningless, but wherever a hook can occur in kgo,
+// The base Hook interface is useless, but wherever a hook can occur in kgo,
 // the client checks if your hook implements an appropriate interface. If so,
 // your hook is called.
 //
@@ -57,9 +56,8 @@ type HookClientClosed interface {
 // HookBrokerConnect is called after a connection to a broker is opened.
 type HookBrokerConnect interface {
 	// OnBrokerConnect is passed the broker metadata, how long it took to
-	// dial and initialize the connection (issue ApiVersions and run through
-	// any SASL flow), and either the dial's resulting net.Conn or any error.
-	OnBrokerConnect(meta BrokerMetadata, initDur time.Duration, conn net.Conn, err error)
+	// dial, and either the dial's resulting net.Conn or error.
+	OnBrokerConnect(meta BrokerMetadata, dialDur time.Duration, conn net.Conn, err error)
 }
 
 // HookBrokerDisconnect is called when a connection to a broker is closed.
@@ -292,7 +290,7 @@ type FetchBatchMetrics struct {
 	CompressionType uint8
 }
 
-// HookFetchBatchRead is called whenever a batch is read within the client.
+// HookFetchBatchRead is called whenever a batch if read within the client.
 //
 // Note that this hook is called when processing, but a batch may be internally
 // discarded after processing in some uncommon specific circumstances.
@@ -389,24 +387,10 @@ type HookFetchRecordBuffered interface {
 //
 // Note that this hook may slow down high-volume consuming a bit.
 type HookFetchRecordUnbuffered interface {
-	// OnFetchRecordUnbuffered is passed a record that is being
+	// OnFetchRecordUnbuffered is passwed a record that is being
 	// "unbuffered" within the client, and whether the record is being
 	// returned from polling.
 	OnFetchRecordUnbuffered(r *Record, polled bool)
-}
-
-// HookPollStart is called at the beginning of every PollFetches or
-// PollRecords call, before any records are drained from internal buffers and
-// before any HookFetchRecordUnbuffered hooks fire for the same poll.
-//
-// This hook is useful for instrumenting the poll boundary: for example, a
-// tracing integration that opens a span per record via HookFetchRecordUnbuffered
-// can implement this hook to finish the previous poll's spans before new ones
-// are created.
-type HookPollStart interface {
-	// OnPollStart is called at the start of every PollFetches or
-	// PollRecords call with the context passed by the caller.
-	OnPollStart(ctx context.Context)
 }
 
 /////////////
@@ -431,8 +415,7 @@ func implementsAnyHook(h Hook) bool {
 		HookProduceRecordPartitioned,
 		HookProduceRecordUnbuffered,
 		HookFetchRecordBuffered,
-		HookFetchRecordUnbuffered,
-		HookPollStart:
+		HookFetchRecordUnbuffered:
 		return true
 	}
 	return false

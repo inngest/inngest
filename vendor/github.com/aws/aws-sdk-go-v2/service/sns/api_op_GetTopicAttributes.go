@@ -92,12 +92,7 @@ type GetTopicAttributesOutput struct {
 	//
 	// The following attributes apply only to [FIFO topics]:
 	//
-	//   - ArchivePolicy – The policy that sets the retention period for messages
-	//   stored in the message archive of an Amazon SNS FIFO topic.
-	//
-	//   - BeginningArchiveTime – The earliest starting point at which a message in the
-	//   topic’s archive can be replayed from. This point in time is based on the
-	//   configured message retention period set by the topic’s message archiving policy.
+	//   - FifoTopic – When this is set to true , a FIFO topic is created.
 	//
 	//   - ContentBasedDeduplication – Enables content-based deduplication for FIFO
 	//   topics.
@@ -112,8 +107,6 @@ type GetTopicAttributesOutput struct {
 	//
 	// (Optional) To override the generated value, you can specify a value for the
 	//   MessageDeduplicationId parameter for the Publish action.
-	//
-	//   - FifoTopic – When this is set to true , a FIFO topic is created.
 	//
 	// [Key Terms]: https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html#sse-key-terms
 	// [KeyId]: https://docs.aws.amazon.com/kms/latest/APIReference/API_DescribeKey.html#API_DescribeKey_RequestParameters
@@ -171,9 +164,6 @@ func (c *Client) addOperationGetTopicAttributesMiddlewares(stack *middleware.Sta
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -190,9 +180,6 @@ func (c *Client) addOperationGetTopicAttributesMiddlewares(stack *middleware.Sta
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
-		return err
-	}
-	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetTopicAttributesValidationMiddleware(stack); err != nil {
@@ -214,15 +201,6 @@ func (c *Client) addOperationGetTopicAttributesMiddlewares(stack *middleware.Sta
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

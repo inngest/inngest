@@ -1,19 +1,12 @@
-version: v2
+version: v1
 managed:
   enabled: true
-  override:
-    - file_option: go_package_prefix
-      value: connectrpc.com/connect/internal/gen
+  go_package_prefix:
+    default: connectrpc.com/connect/internal/gen
 plugins:
-  - local: protoc-gen-go
+  - name: go
     out: internal/gen
     opt: paths=source_relative
-  - local: protoc-gen-connect-go
-    out: internal/gen/generics
+  - name: connect-go
+    out: internal/gen
     opt: paths=source_relative
-  - local: protoc-gen-connect-go
-    out: internal/gen/simple
-    opt:
-      - paths=source_relative
-      - simple
-clean: true

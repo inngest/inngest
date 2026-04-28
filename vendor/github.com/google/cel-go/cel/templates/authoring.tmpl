@@ -1,29 +1,12 @@
-{{define "fieldPath" }}
-    * path: `{{.Name}}`
-      type: `{{.Type}}`
-      {{- if .Description }}
-      description:
-{{range split .Description }}        {{.}}
+{{define "variable"}}{{.Name}} is a {{.Type}}{{if .Description}}
+
+{{range split .Description}}      {{.}}
 {{end}}
 {{- end -}}
 {{- end -}}
 
-{{define "variable" -}}
-* name: `{{.Name}}`
-  type: `{{.Type}}`
-  {{- if .Description}}
-  description:
-{{range split .Description}}    {{.}}
-{{end -}}
-{{- end -}}
-{{- if .FieldPaths }}
-  attributes:
-{{- range .FieldPaths }}{{ template "fieldPath" . }}{{end}}
-{{- end -}}
-{{- end -}}
-
 {{define "macro" -}}
-{{.Name}} macro{{if .Description}} - {{newlineToSpace .Description}}
+{{.Name}} macro{{if .Description}} - {{range split .Description}}{{.}} {{end}}
 {{end}}
 {{range .Children}}{{range split .Description}}      {{.}}
 {{end}}
@@ -39,7 +22,7 @@
 {{- end -}}
 
 {{define "function" -}}
-{{.Name}}{{if .Description}} - {{newlineToSpace .Description}}
+{{.Name}}{{if .Description}} - {{range split .Description}}{{.}} {{end}}
 {{end}}
 {{range .Children}}{{template "overload" .}}{{end}}
 {{- end -}}
@@ -53,26 +36,25 @@ Only use the following variables, macros, and functions in expressions.
 {{if .Variables}}
 Variables:
 
-{{range .Variables -}}
-{{template "variable" .}}
+{{range .Variables}}* {{template "variable" .}}
 {{end -}}
-{{- end -}}
 
+{{end -}}
 {{if .Macros}}
 Macros:
 
 {{range .Macros}}* {{template "macro" .}}
 {{end -}}
-{{end -}}
 
+{{end -}}
 {{if .Functions}}
 Functions:
 
 {{range .Functions}}* {{template "function" .}}
 {{end -}}
-{{- end -}}
-{{- end -}}
 
+{{end -}}
+{{- end -}}
 {{.GeneralUsage}}
 
 {{.UserPrompt}}

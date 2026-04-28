@@ -1247,9 +1247,7 @@ func TestCompaction(t *testing.T) {
 		duration: 5 * time.Second,
 	}
 
-	// Set compaction limit to 2, so 1 deletion won't trigger compaction.
-	// CompactionSample: -1 disables async compaction from Delete() so the test
-	// controls compaction timing explicitly via compact() calls.
+	// Set compaction limit to 2, so 1 deletion won't trigger compaction
 	store, err := NewBlockstore(BlockstoreOpts{
 		PauseClient:            pauseClient,
 		Bucket:                 bucket,
@@ -1257,7 +1255,7 @@ func TestCompaction(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              5,
 		CompactionGarbageRatio: 0.4,
-		CompactionSample:       -1,
+		CompactionSample:       1.0,
 		CompactionLeaser:       leaser,
 		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
@@ -1304,22 +1302,22 @@ func TestCompaction(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deleteCount)
 
-	// Trigger compaction explicitly (async compaction is disabled via CompactionSample: -1)
-	err = store.(*blockstore).compact(ctx, index)
-	require.NoError(t, err)
+	// Wait for async compaction to complete
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		block, err := store.ReadBlock(ctx, index, blockID)
+		assert.NoError(t, err)
+		assert.Len(t, block.Pauses, 3)
 
-	// Verify compaction removed pause1 and pause5, leaving pause2, pause3, pause4
-	block, err = store.ReadBlock(ctx, index, blockID)
-	require.NoError(t, err)
-	require.Len(t, block.Pauses, 3)
+		deleteKey := blockDeleteKey(index, blockID)
+		exists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
+		assert.NoError(t, err)
+		assert.False(t, exists)
 
-	exists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
-	require.NoError(t, err)
-	require.False(t, exists)
-
-	require.Equal(t, pause2.ID, block.Pauses[0].ID)
-	require.Equal(t, pause3.ID, block.Pauses[1].ID)
-	require.Equal(t, pause4.ID, block.Pauses[2].ID)
+		// Assert that remaining pauses are pause2, pause3, and pause4 (pause1 and pause5 were deleted)
+		assert.Equal(t, pause2.ID, block.Pauses[0].ID)
+		assert.Equal(t, pause3.ID, block.Pauses[1].ID)
+		assert.Equal(t, pause4.ID, block.Pauses[2].ID)
+	}, 5*time.Second, 20*time.Millisecond)
 
 	// Verify that block index score was updated to the new latest timestamp (even though the blockID is stable)
 	indexKey := blockIndexKey(index)
@@ -1329,7 +1327,7 @@ func TestCompaction(t *testing.T) {
 
 	// Verify updated metadata reflects the new block composition with boundaries from pause2 to pause4
 	metadataKey := blockMetadataKey(index)
-	exists, err = rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
+	exists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -1353,31 +1351,29 @@ func TestCompaction(t *testing.T) {
 	err = store.Delete(ctx, index, *pause4)
 	require.NoError(t, err)
 
-	// Trigger compaction explicitly to remove the now-empty block
-	err = store.(*blockstore).compact(ctx, index)
-	require.NoError(t, err)
-
-	// Verify block is completely removed
+	// Wait for async compaction to complete and verify block is completely removed
 	blobKey := store.(*blockstore).BlockKey(index, blockID)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		// Block should be removed from index
+		_, err := rc.Do(ctx, rc.B().Zscore().Key(indexKey).Member(blockID.String()).Build()).AsFloat64()
+		assert.True(t, rueidis.IsRedisNil(err), "expected Redis nil error when block is removed from index")
 
-	// Block should be removed from index
-	_, err = rc.Do(ctx, rc.B().Zscore().Key(indexKey).Member(blockID.String()).Build()).AsFloat64()
-	require.True(t, rueidis.IsRedisNil(err), "expected Redis nil error when block is removed from index")
+		// Block metadata should be removed
+		metadataExists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
+		assert.NoError(t, err)
+		assert.False(t, metadataExists)
 
-	// Block metadata should be removed
-	metadataExists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
-	require.NoError(t, err)
-	require.False(t, metadataExists)
+		// Delete tracking should be cleaned up
+		deleteKey := blockDeleteKey(index, blockID)
+		deleteExists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
+		assert.NoError(t, err)
+		assert.False(t, deleteExists)
 
-	// Delete tracking should be cleaned up
-	deleteExists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
-	require.NoError(t, err)
-	require.False(t, deleteExists)
-
-	// Block should be removed from blob storage
-	blobExists, err := bucket.Exists(ctx, blobKey)
-	require.NoError(t, err)
-	require.False(t, blobExists)
+		// Block should be removed from blob storage
+		blobExists, err := bucket.Exists(ctx, blobKey)
+		assert.NoError(t, err)
+		assert.False(t, blobExists)
+	}, 5*time.Second, 20*time.Millisecond)
 
 	// Verify no blocks exist for this index
 	blocks, err = store.BlocksSince(ctx, index, time.Time{})
@@ -1430,8 +1426,6 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 		duration: 5 * time.Second,
 	}
 
-	// CompactionSample: -1 disables async compaction from Delete() so the test
-	// controls compaction timing explicitly via compact() calls.
 	store, err := NewBlockstore(BlockstoreOpts{
 		PauseClient:            pauseClient,
 		Bucket:                 bucket,
@@ -1439,7 +1433,7 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              4,
 		CompactionGarbageRatio: 0.5,
-		CompactionSample:       -1,
+		CompactionSample:       1.0,
 		CompactionLeaser:       leaser,
 		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
@@ -1945,11 +1939,23 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
-	// Wait for pause deletions after flushing to finish
+	// Wait for pause-block keys to be written after flushing
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		keys, err := rc.Do(ctx, rc.B().Keys().Pattern("*:pause-block:*").Build()).AsStrSlice()
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(keys), "Expected 3 pause-block keys after flush, but found: %v", keys)
+	}, 5*time.Second, 100*time.Millisecond)
+
+	// Wait for the background goroutine in FlushIndexBlock to finish deleting
+	// all pauses from the buffer. Without this, the goroutine may still be
+	// running when DeleteByID is called, and its subsequent buf.Delete() with
+	// WithWriteBlockIndex will re-create pause-block keys that were already
+	// removed by DeleteByID.
+	bufferKey := fmt.Sprintf("{%s}:pause-events:%s:%s", redis_state.StateDefaultKey, workspaceID, eventName)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		bufLen, err := rc.Do(ctx, rc.B().Hlen().Key(bufferKey).Build()).AsInt64()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), bufLen, "Expected buffer to be empty after flush goroutine completes")
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// First, delete from blocks only
@@ -1981,12 +1987,12 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 	}
 
 	// Check that all keys are cleaned up after run deletion.
-	// Background compaction goroutines spawned by DeleteByID may still be
-	// finishing, so we poll instead of asserting immediately.
-	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+	// Use EventuallyWithT because the background compaction goroutine may still
+	// be holding its lease key briefly after pause-block keys are removed.
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		remainingKeys := r.Keys()
-		assert.Equal(ct, 0, len(remainingKeys), "Expected no keys remaining after run deletion, but found: %v", remainingKeys)
-	}, 5*time.Second, 50*time.Millisecond)
+		assert.Equal(t, 0, len(remainingKeys), "Expected no keys remaining after run deletion, but found: %v", remainingKeys)
+	}, 5*time.Second, 100*time.Millisecond)
 }
 
 func TestLoadEvaluablesSinceExpiredPauseCleanup(t *testing.T) {
@@ -2491,14 +2497,10 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              3,
 		CompactionGarbageRatio: 0.5,
-		// Disable automatic compaction triggered by Delete so that only the
-		// explicit compact() calls in this test run compaction.  With a non-zero
-		// sample rate, Delete spawns a background goroutine that races with the
-		// synchronous compact() assertions below.
-		CompactionSample:      -1,
-		CompactionLeaser:      leaser,
-		DeleteAfterFlush:      func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
-		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		CompactionSample:       1.0,
+		CompactionLeaser:       leaser,
+		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 

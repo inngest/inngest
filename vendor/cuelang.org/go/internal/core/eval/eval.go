@@ -15,22 +15,23 @@
 package eval
 
 import (
-	"cuelang.org/go/cue/stats"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/debug"
 )
 
 func Evaluate(r adt.Runtime, v *adt.Vertex) {
+	format := func(n adt.Node) string {
+		return debug.NodeString(r, n, printConfig)
+	}
 	c := adt.New(v, &adt.Config{
 		Runtime: r,
-		Format:  nodeFormat,
+		Format:  format,
 	})
-	v.Finalize(c)
+	c.Unify(v, adt.Finalized)
 }
 
 func New(r adt.Runtime) *Unifier {
-	ctx := NewContext(r, nil)
-	return &Unifier{r: r, e: ctx}
+	return &Unifier{r: r, e: NewContext(r, nil)}
 }
 
 type Unifier struct {
@@ -38,16 +39,23 @@ type Unifier struct {
 	e *adt.OpContext
 }
 
-func (e *Unifier) Stats() *stats.Counts {
+func (e *Unifier) Unify(ctx *adt.OpContext, v *adt.Vertex, state adt.VertexStatus) {
+	e.e.Unify(v, state)
+}
+
+func (e *Unifier) Stats() *adt.Stats {
 	return e.e.Stats()
 }
 
 // TODO: Note: NewContext takes essentially a cue.Value. By making this
 // type more central, we can perhaps avoid context creation.
 func NewContext(r adt.Runtime, v *adt.Vertex) *adt.OpContext {
+	format := func(n adt.Node) string {
+		return debug.NodeString(r, n, printConfig)
+	}
 	return adt.New(v, &adt.Config{
 		Runtime: r,
-		Format:  nodeFormat,
+		Format:  format,
 	})
 }
 
@@ -56,7 +64,3 @@ func (e *Unifier) NewContext(v *adt.Vertex) *adt.OpContext {
 }
 
 var printConfig = &debug.Config{Compact: true}
-
-func nodeFormat(r adt.Runtime, n adt.Node) string {
-	return debug.NodeString(r, n, printConfig)
-}

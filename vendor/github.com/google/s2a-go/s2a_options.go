@@ -19,6 +19,7 @@
 package s2a
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"sync"
@@ -27,7 +28,7 @@ import (
 	"github.com/google/s2a-go/stream"
 	"google.golang.org/grpc/credentials"
 
-	s2av1pb "github.com/google/s2a-go/internal/proto/common_go_proto"
+	s2apbv1 "github.com/google/s2a-go/internal/proto/common_go_proto"
 	s2apb "github.com/google/s2a-go/internal/proto/v2/common_go_proto"
 )
 
@@ -35,17 +36,6 @@ import (
 type Identity interface {
 	// Name returns the name of the identity.
 	Name() string
-	Attributes() map[string]string
-}
-
-type UnspecifiedID struct {
-	Attr map[string]string
-}
-
-func (u *UnspecifiedID) Name() string { return "" }
-
-func (u *UnspecifiedID) Attributes() map[string]string {
-	return u.Attr
 }
 
 type spiffeID struct {
@@ -54,10 +44,10 @@ type spiffeID struct {
 
 func (s *spiffeID) Name() string { return s.spiffeID }
 
-func (spiffeID) Attributes() map[string]string { return nil }
-
 // NewSpiffeID creates a SPIFFE ID from id.
-func NewSpiffeID(id string) Identity { return &spiffeID{spiffeID: id} }
+func NewSpiffeID(id string) Identity {
+	return &spiffeID{spiffeID: id}
+}
 
 type hostname struct {
 	hostname string
@@ -65,10 +55,10 @@ type hostname struct {
 
 func (h *hostname) Name() string { return h.hostname }
 
-func (hostname) Attributes() map[string]string { return nil }
-
 // NewHostname creates a hostname from name.
-func NewHostname(name string) Identity { return &hostname{hostname: name} }
+func NewHostname(name string) Identity {
+	return &hostname{hostname: name}
+}
 
 type uid struct {
 	uid string
@@ -76,10 +66,10 @@ type uid struct {
 
 func (h *uid) Name() string { return h.uid }
 
-func (uid) Attributes() map[string]string { return nil }
-
 // NewUID creates a UID from name.
-func NewUID(name string) Identity { return &uid{uid: name} }
+func NewUID(name string) Identity {
+	return &uid{uid: name}
+}
 
 // VerificationModeType specifies the mode that S2A must use to verify the peer
 // certificate chain.
@@ -93,7 +83,6 @@ const (
 	ReservedCustomVerificationMode3
 	ReservedCustomVerificationMode4
 	ReservedCustomVerificationMode5
-	ReservedCustomVerificationMode6
 )
 
 // ClientOptions contains the client-side options used to establish a secure
@@ -148,7 +137,7 @@ type ClientOptions struct {
 	FallbackOpts *FallbackOptions
 
 	// Generates an S2AStream interface for talking to the S2A server.
-	getS2AStream stream.GetS2AStream
+	getS2AStream func(ctx context.Context, s2av2Address string) (stream.S2AStream, error)
 
 	// Serialized user specified policy for server authorization.
 	serverAuthorizationPolicy []byte
@@ -202,7 +191,7 @@ type ServerOptions struct {
 	VerificationMode VerificationModeType
 
 	// Generates an S2AStream interface for talking to the S2A server.
-	getS2AStream stream.GetS2AStream
+	getS2AStream func(ctx context.Context, s2av2Address string) (stream.S2AStream, error)
 }
 
 // DefaultServerOptions returns the default server options.
@@ -213,30 +202,17 @@ func DefaultServerOptions(s2aAddress string) *ServerOptions {
 	}
 }
 
-func toProtoIdentity(identity Identity) (*s2av1pb.Identity, error) {
+func toProtoIdentity(identity Identity) (*s2apbv1.Identity, error) {
 	if identity == nil {
 		return nil, nil
 	}
 	switch id := identity.(type) {
 	case *spiffeID:
-		return &s2av1pb.Identity{
-			IdentityOneof: &s2av1pb.Identity_SpiffeId{SpiffeId: id.Name()},
-			Attributes:    id.Attributes(),
-		}, nil
+		return &s2apbv1.Identity{IdentityOneof: &s2apbv1.Identity_SpiffeId{SpiffeId: id.Name()}}, nil
 	case *hostname:
-		return &s2av1pb.Identity{
-			IdentityOneof: &s2av1pb.Identity_Hostname{Hostname: id.Name()},
-			Attributes:    id.Attributes(),
-		}, nil
+		return &s2apbv1.Identity{IdentityOneof: &s2apbv1.Identity_Hostname{Hostname: id.Name()}}, nil
 	case *uid:
-		return &s2av1pb.Identity{
-			IdentityOneof: &s2av1pb.Identity_Uid{Uid: id.Name()},
-			Attributes:    id.Attributes(),
-		}, nil
-	case *UnspecifiedID:
-		return &s2av1pb.Identity{
-			Attributes: id.Attributes(),
-		}, nil
+		return &s2apbv1.Identity{IdentityOneof: &s2apbv1.Identity_Uid{Uid: id.Name()}}, nil
 	default:
 		return nil, errors.New("unrecognized identity type")
 	}
@@ -248,24 +224,11 @@ func toV2ProtoIdentity(identity Identity) (*s2apb.Identity, error) {
 	}
 	switch id := identity.(type) {
 	case *spiffeID:
-		return &s2apb.Identity{
-			IdentityOneof: &s2apb.Identity_SpiffeId{SpiffeId: id.Name()},
-			Attributes:    id.Attributes(),
-		}, nil
+		return &s2apb.Identity{IdentityOneof: &s2apb.Identity_SpiffeId{SpiffeId: id.Name()}}, nil
 	case *hostname:
-		return &s2apb.Identity{
-			IdentityOneof: &s2apb.Identity_Hostname{Hostname: id.Name()},
-			Attributes:    id.Attributes(),
-		}, nil
+		return &s2apb.Identity{IdentityOneof: &s2apb.Identity_Hostname{Hostname: id.Name()}}, nil
 	case *uid:
-		return &s2apb.Identity{
-			IdentityOneof: &s2apb.Identity_Uid{Uid: id.Name()},
-			Attributes:    id.Attributes(),
-		}, nil
-	case *UnspecifiedID:
-		return &s2apb.Identity{
-			Attributes: id.Attributes(),
-		}, nil
+		return &s2apb.Identity{IdentityOneof: &s2apb.Identity_Uid{Uid: id.Name()}}, nil
 	default:
 		return nil, errors.New("unrecognized identity type")
 	}

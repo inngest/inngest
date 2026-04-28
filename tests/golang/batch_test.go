@@ -322,7 +322,7 @@ func TestBatchInvoke(t *testing.T) {
 			Name: "test batching",
 			BatchEvents: &inngestgo.ConfigBatchEvents{
 				MaxSize: 3,
-				Timeout: 2 * time.Second,
+				Timeout: 1 * time.Second,
 			},
 		},
 		inngestgo.EventTrigger("batchinvoke/batch", nil),
@@ -376,22 +376,19 @@ func TestBatchInvoke(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// First trigger should be because of batch is full
-		<-time.After(1 * time.Second)
+		// First trigger should be because of batch is full (3 events)
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			assert.EqualValues(t, 1, atomic.LoadInt32(&counter))
 			assert.EqualValues(t, 3, atomic.LoadInt32(&totalEvents))
 			assert.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
-		}, time.Second*3, time.Millisecond)
+		}, time.Second*5, time.Millisecond*50)
 
 		// Second trigger should be because of the batch timeout
-		<-time.After(2 * time.Second)
-
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			assert.EqualValues(t, 2, atomic.LoadInt32(&counter))
 			assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
 			assert.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
-		}, time.Second*15, time.Millisecond)
+		}, time.Second*10, time.Millisecond*50)
 	})
 }
 

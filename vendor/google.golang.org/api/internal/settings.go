@@ -8,7 +8,6 @@ package internal
 import (
 	"crypto/tls"
 	"errors"
-	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -63,8 +62,6 @@ type DialSettings struct {
 	AllowNonDefaultServiceAccount bool
 	DefaultUniverseDomain         string
 	UniverseDomain                string
-	AllowHardBoundTokens          []string
-	Logger                        *slog.Logger
 	// Google API system parameters. For more information please read:
 	// https://cloud.google.com/apis/docs/system-parameters
 	QuotaProject  string
@@ -73,9 +70,6 @@ type DialSettings struct {
 	// New Auth library Options
 	AuthCredentials      *auth.Credentials
 	EnableNewAuthLibrary bool
-
-	// TODO(b/372244283): Remove after b/358175516 has been fixed
-	EnableAsyncRefreshDryRun func()
 }
 
 // GetScopes returns the user-provided scopes, if set, or else falls back to the
@@ -108,9 +102,6 @@ func (ds *DialSettings) IsNewAuthLibraryEnabled() bool {
 		return false
 	}
 	if ds.EnableNewAuthLibrary {
-		return true
-	}
-	if ds.AuthCredentials != nil {
 		return true
 	}
 	if b, err := strconv.ParseBool(os.Getenv(newAuthLibEnvVar)); err == nil {

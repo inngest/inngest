@@ -296,6 +296,15 @@ func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
 	}
 }
 
+// WithSemaphoreManager assigns a semaphore manager to the executor, used to release
+// from semaphores when functions end (for fn concurrency)
+func WithSemaphoreManager(sm constraintapi.SemaphoreManager) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).semaphoreManager = sm
+		return nil
+	}
+}
+
 func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).useConstraintAPI = uca
@@ -473,6 +482,7 @@ type executor struct {
 	singletonMgr singleton.Singleton
 
 	capacityManager               constraintapi.CapacityManager
+	semaphoreManager              constraintapi.SemaphoreManager
 	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
@@ -1127,6 +1137,7 @@ func (e *executor) schedule(
 	// Evaluate concurrency keys to use initially
 	if req.Function.Concurrency != nil {
 		metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID, req.Function.Concurrency.Limits, evtMap)
+		metadata.Config.Semaphores = e.evaluateFnConcurrency(ctx, req.AccountID, req.Function.ID, req.Function.Concurrency.Fn, evtMap)
 	}
 
 	//
@@ -1246,6 +1257,22 @@ func (e *executor) schedule(
 		if metadata.ID.RunID != stv1ID.RunID {
 			id := sv2.IDFromV1(stv1ID)
 			metadata, err = e.smv2.LoadMetadata(ctx, id)
+			// The run was already completed and GC'd, or was deleted.
+			// The idempotency key was used, so skip this run.
+			if err != nil && errors.Is(err, state.ErrRunNotFound) {
+				// Log with delta to help identify short deltas (like 5ms)
+				originalRunCreatedAt := time.UnixMilli(int64(id.RunID.Time()))
+				deltaMs := time.Since(originalRunCreatedAt).Milliseconds()
+				// This sanitization is not needed but CodeQL complains about it
+				sanitizedRunID := util.SanitizeLogField(id.RunID.String())
+				l.Warn("idempotency key exists but run state not found",
+					"original_run_id", sanitizedRunID,
+					"original_run_created_at", originalRunCreatedAt,
+					"delta_ms", deltaMs,
+				)
+				return &stv1ID.RunID, nil, ErrFunctionSkippedIdempotency
+			}
+			// usually other failures (logged by caller)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1364,6 +1391,7 @@ func (e *executor) schedule(
 		Identifier:            stv1ID,
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
+		Semaphores:            metadata.Config.Semaphores,
 		Attempt:               0,
 		MaxAttempts:           &maxAttempts,
 		Payload: queue.PayloadEdge{
@@ -1801,8 +1829,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 						continue
 					}
 
-					// TODO: validate that specific kinds are allowed to be set by the user and check account-level metadata
-					// limits.
+					if err := md.Kind().ValidateAllowed(); err != nil {
+						l.Warn("disallowed metadata kind in driver response", "error", err, "kind", md.Kind())
+						continue
+					}
+
 					_, err := e.createMetadataSpan(
 						ctx,
 						&instance,
@@ -2646,8 +2677,7 @@ func (e *executor) handlePause(
 			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
 			// NOTE: cleanup closure is ignored here since there's already another one that will be called
 			_, _, err = e.pm.ConsumePause(context.Background(), e.smv2, *pause, state.ConsumePauseOpts{
-				IdempotencyKey: evtID.String(),
-				Data:           nil,
+				Data: nil,
 			})
 			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 				atomic.AddInt32(&res[1], 1)
@@ -2866,6 +2896,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			Identifier:            sv2.V1FromMetadata(md),
 			PriorityFactor:        md.Config.PriorityFactor,
 			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			Semaphores:            stepSemaphores(md),
 			MaxAttempts:           pause.MaxAttempts,
 			Payload: queue.PayloadEdge{
 				Edge: inngest.Edge{
@@ -2969,8 +3000,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
 			_, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
-				IdempotencyKey: r.IdempotencyKey,
-				Data:           nil,
+				Data: nil,
 			})
 			switch err {
 			case nil, state.ErrPauseNotFound: // no-op
@@ -2982,8 +3012,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		consumeResult, cleanup, err := e.pm.ConsumePause(ctx, e.smv2, pause, state.ConsumePauseOpts{
-			IdempotencyKey: r.IdempotencyKey,
-			Data:           r.With,
+			Data: r.With,
 		})
 		if err != nil {
 			return fmt.Errorf("error consuming pause via event: %w", err)
@@ -3040,6 +3069,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Identifier:            sv2.V1FromMetadata(md),
 				PriorityFactor:        md.Config.PriorityFactor,
 				CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+				Semaphores:            stepSemaphores(md),
 				MaxAttempts:           pause.MaxAttempts,
 				Payload: queue.PayloadEdge{
 					Edge: pause.Edge(),
@@ -3344,6 +3374,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -3456,6 +3487,18 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 				e.log.Warn("error creating AI output metadata span", "error", err)
 			}
 		}
+
+		// Extract experiment metadata from opcode opts. The SDK spreads
+		// group.experiment() variant context (experimentName, variant,
+		// selectionStrategy) onto variant sub-steps' opts; landing the
+		// same data as a step-scoped metadata span means ClickHouse
+		// can aggregate variant output metrics in a single-row query.
+		//
+		// Performing this emission server-side (rather than via an SDK
+		// addMetadata() call) means clients receive experiment data
+		// without needing to upgrade their SDK, and keeps the metadata
+		// contract consistent across SDK languages.
+		e.emitExperimentMetadataFromOpts(ctx, runCtx, gen.Opts)
 	}
 
 	// Persist the cumulative metadata size delta alongside the step output.
@@ -3655,6 +3698,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -3822,6 +3866,9 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		ParallelMode: gen.ParallelMode(),
 	}
 
+	parent := tracing.RunSpanRefFromMetadata(runCtx.Metadata())
+	attrs := tracing.GeneratorAttrs(&gen)
+
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -3832,8 +3879,8 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStepPlanned"},
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  tracing.GeneratorAttrs(&gen),
+			Parent:      parent,
+			Attributes:  attrs,
 		},
 	)
 	if err != nil {
@@ -3888,6 +3935,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -4095,6 +4143,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -4353,6 +4402,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
@@ -5396,6 +5446,37 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
+}
+
+// emitExperimentMetadataFromOpts extracts experiment context from an opcode's
+// opts (populated by the SDK inside group.experiment() variant callbacks) and,
+// if present, writes a step-scoped inngest.experiment metadata span. This is
+// the executor-owned replacement for the SDK-side addMetadata() call that
+// earlier drafts of inngest-js PR #1458 introduced — performing it here keeps
+// the emission consistent across SDK languages and removes the requirement
+// that end users upgrade their SDK to receive experiment observability.
+//
+// Errors are logged and swallowed: failing to attach experiment metadata must
+// not interrupt step execution.
+func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx execution.RunContext, opts any) {
+	expMd, err := extractors.ExtractExperimentOptsMetadata(opts)
+	if err != nil {
+		e.log.Warn("error extracting experiment opts metadata", "error", err)
+		return
+	}
+	if expMd == nil {
+		return
+	}
+
+	if _, err := e.createMetadataSpan(
+		ctx,
+		runCtx,
+		"executor.handleGeneratorStep.experiment",
+		expMd,
+		enums.MetadataScopeStep,
+	); err != nil {
+		e.log.Warn("error creating experiment metadata span", "error", err)
+	}
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {

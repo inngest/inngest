@@ -49,7 +49,6 @@ type SimpleEmailHeader struct {
 type SimpleEmailCommonHeaders struct {
 	From       []string `json:"from"`
 	To         []string `json:"to"`
-	Cc         []string `json:"cc,omitempty"`
 	ReturnPath string   `json:"returnPath"`
 	MessageID  string   `json:"messageId"`
 	Date       string   `json:"date"`

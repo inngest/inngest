@@ -13,7 +13,7 @@ const (
 	dFastLongLen       = 8                       // Bytes used for table hash
 
 	dLongTableShardCnt  = 1 << (dFastLongTableBits - dictShardBits) // Number of shards in the table
-	dLongTableShardSize = dFastLongTableSize / dLongTableShardCnt   // Size of an individual shard
+	dLongTableShardSize = dFastLongTableSize / tableShardCnt        // Size of an individual shard
 
 	dFastShortTableBits = tableBits                // Bits used in the short match table
 	dFastShortTableSize = 1 << dFastShortTableBits // Size of the table
@@ -149,7 +149,10 @@ encodeLoop:
 					// and have to do special offset treatment.
 					startLimit := nextEmit + 1
 
-					tMin := max(s-e.maxMatchOff, 0)
+					tMin := s - e.maxMatchOff
+					if tMin < 0 {
+						tMin = 0
+					}
 					for repIndex > tMin && start > startLimit && src[repIndex-1] == src[start-1] && seq.matchLen < maxMatchLength-zstdMinMatch-1 {
 						repIndex--
 						start--
@@ -263,7 +266,10 @@ encodeLoop:
 		l := e.matchlen(s+4, t+4, src) + 4
 
 		// Extend backwards
-		tMin := max(s-e.maxMatchOff, 0)
+		tMin := s - e.maxMatchOff
+		if tMin < 0 {
+			tMin = 0
+		}
 		for t > tMin && s > nextEmit && src[t-1] == src[s-1] && l < maxMatchLength {
 			s--
 			t--
@@ -456,7 +462,10 @@ encodeLoop:
 					// and have to do special offset treatment.
 					startLimit := nextEmit + 1
 
-					tMin := max(s-e.maxMatchOff, 0)
+					tMin := s - e.maxMatchOff
+					if tMin < 0 {
+						tMin = 0
+					}
 					for repIndex > tMin && start > startLimit && src[repIndex-1] == src[start-1] {
 						repIndex--
 						start--
@@ -567,7 +576,10 @@ encodeLoop:
 		l := int32(matchLen(src[s+4:], src[t+4:])) + 4
 
 		// Extend backwards
-		tMin := max(s-e.maxMatchOff, 0)
+		tMin := s - e.maxMatchOff
+		if tMin < 0 {
+			tMin = 0
+		}
 		for t > tMin && s > nextEmit && src[t-1] == src[s-1] {
 			s--
 			t--
@@ -797,7 +809,10 @@ encodeLoop:
 					// and have to do special offset treatment.
 					startLimit := nextEmit + 1
 
-					tMin := max(s-e.maxMatchOff, 0)
+					tMin := s - e.maxMatchOff
+					if tMin < 0 {
+						tMin = 0
+					}
 					for repIndex > tMin && start > startLimit && src[repIndex-1] == src[start-1] && seq.matchLen < maxMatchLength-zstdMinMatch-1 {
 						repIndex--
 						start--
@@ -912,7 +927,10 @@ encodeLoop:
 		l := e.matchlen(s+4, t+4, src) + 4
 
 		// Extend backwards
-		tMin := max(s-e.maxMatchOff, 0)
+		tMin := s - e.maxMatchOff
+		if tMin < 0 {
+			tMin = 0
+		}
 		for t > tMin && s > nextEmit && src[t-1] == src[s-1] && l < maxMatchLength {
 			s--
 			t--
@@ -1040,18 +1058,15 @@ func (e *doubleFastEncoder) Reset(d *dict, singleBlock bool) {
 // ResetDict will reset and set a dictionary if not nil
 func (e *doubleFastEncoderDict) Reset(d *dict, singleBlock bool) {
 	allDirty := e.allDirty
-	dictChanged := d != e.lastDict
 	e.fastEncoderDict.Reset(d, singleBlock)
 	if d == nil {
 		return
 	}
 
 	// Init or copy dict table
-	if len(e.dictLongTable) != len(e.longTable) || dictChanged {
+	if len(e.dictLongTable) != len(e.longTable) || d.id != e.lastDictID {
 		if len(e.dictLongTable) != len(e.longTable) {
 			e.dictLongTable = make([]tableEntry, len(e.longTable))
-		} else {
-			clear(e.dictLongTable)
 		}
 		if len(d.content) >= 8 {
 			cv := load6432(d.content, 0)
@@ -1068,6 +1083,7 @@ func (e *doubleFastEncoderDict) Reset(d *dict, singleBlock bool) {
 				}
 			}
 		}
+		e.lastDictID = d.id
 		allDirty = true
 	}
 	// Reset table to initial state

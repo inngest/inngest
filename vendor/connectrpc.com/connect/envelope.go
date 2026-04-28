@@ -1,4 +1,4 @@
-// Copyright 2021-2025 The Connect Authors
+// Copyright 2021-2024 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
-	"math"
 )
 
 // flagEnvelopeCompressed indicates that the data is compressed. It has the
@@ -57,10 +55,7 @@ func (e *envelope) IsSet(flag uint8) bool {
 // Read implements [io.Reader].
 func (e *envelope) Read(data []byte) (readN int, err error) {
 	if e.offset < 5 {
-		prefix, err := makeEnvelopePrefix(e.Flags, e.Data.Len())
-		if err != nil {
-			return 0, err
-		}
+		prefix := makeEnvelopePrefix(e.Flags, e.Data.Len())
 		readN = copy(data, prefix[e.offset:])
 		e.offset += int64(readN)
 		if e.offset < 5 {
@@ -80,10 +75,7 @@ func (e *envelope) Read(data []byte) (readN int, err error) {
 // WriteTo implements [io.WriterTo].
 func (e *envelope) WriteTo(dst io.Writer) (wroteN int64, err error) {
 	if e.offset < 5 {
-		prefix, err := makeEnvelopePrefix(e.Flags, e.Data.Len())
-		if err != nil {
-			return 0, err
-		}
+		prefix := makeEnvelopePrefix(e.Flags, e.Data.Len())
 		prefixN, err := dst.Write(prefix[e.offset:])
 		e.offset += int64(prefixN)
 		wroteN += int64(prefixN)
@@ -374,14 +366,9 @@ func (r *envelopeReader) Read(env *envelope) *Error {
 	return nil
 }
 
-func makeEnvelopePrefix(flags uint8, size int) ([5]byte, error) {
-	// Cast as 64-bit to ensure comparison works on all architectures.
-	size64 := int64(size)
-	if size64 < 0 || size64 > math.MaxUint32 {
-		return [5]byte{}, fmt.Errorf("connect.makeEnvelopePrefix: size %d out of bounds", size)
-	}
+func makeEnvelopePrefix(flags uint8, size int) [5]byte {
 	prefix := [5]byte{}
 	prefix[0] = flags
-	binary.BigEndian.PutUint32(prefix[1:5], uint32(size64))
-	return prefix, nil
+	binary.BigEndian.PutUint32(prefix[1:5], uint32(size))
+	return prefix
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/url"
 )
 
@@ -13,7 +12,7 @@ import (
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#external-documentation-object
 type ExternalDocs struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"-" yaml:"-"`
+	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
 
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	URL         string `json:"url,omitempty" yaml:"url,omitempty"`
@@ -31,7 +30,9 @@ func (e ExternalDocs) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of ExternalDocs.
 func (e ExternalDocs) MarshalYAML() (any, error) {
 	m := make(map[string]any, 2+len(e.Extensions))
-	maps.Copy(m, e.Extensions)
+	for k, v := range e.Extensions {
+		m[k] = v
+	}
 	if x := e.Description; x != "" {
 		m["description"] = x
 	}
@@ -49,6 +50,7 @@ func (e *ExternalDocs) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
+	delete(x.Extensions, originKey)
 	delete(x.Extensions, "description")
 	delete(x.Extensions, "url")
 	if len(x.Extensions) == 0 {

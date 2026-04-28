@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2018 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,7 +16,7 @@ package procfs
 import (
 	"bytes"
 	"math/bits"
-	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -83,19 +83,6 @@ type ProcStatus struct {
 
 	// CpusAllowedList: List of cpu cores processes are allowed to run on.
 	CpusAllowedList []uint64
-
-	// CapInh is the bitmap of inheritable capabilities
-	//
-	// See: https://www.kernel.org/doc/man-pages/online/pages/man7/capabilities.7.html
-	CapInh uint64
-	// CapPrm is the bitmap of permitted capabilities
-	CapPrm uint64
-	// CapEff is the bitmap of effective capabilities
-	CapEff uint64
-	// CapBnd is the bitmap of bounding capabilities
-	CapBnd uint64
-	// CapAmb is the bitmap of ambient capabilities
-	CapAmb uint64
 }
 
 // NewStatus returns the current status information of the process.
@@ -107,7 +94,8 @@ func (p Proc) NewStatus() (ProcStatus, error) {
 
 	s := ProcStatus{PID: p.PID}
 
-	for line := range strings.SplitSeq(string(data), "\n") {
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
 		if !bytes.Contains([]byte(line), []byte(":")) {
 			continue
 		}
@@ -158,11 +146,7 @@ func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintByt
 			}
 		}
 	case "NSpid":
-		nspids, err := calcNSPidsList(vString)
-		if err != nil {
-			return err
-		}
-		s.NSpids = nspids
+		s.NSpids = calcNSPidsList(vString)
 	case "VmPeak":
 		s.VmPeak = vUintBytes
 	case "VmSize":
@@ -203,36 +187,6 @@ func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintByt
 		s.NonVoluntaryCtxtSwitches = vUint
 	case "Cpus_allowed_list":
 		s.CpusAllowedList = calcCpusAllowedList(vString)
-	case "CapInh":
-		var err error
-		s.CapInh, err = strconv.ParseUint(vString, 16, 64)
-		if err != nil {
-			return err
-		}
-	case "CapPrm":
-		var err error
-		s.CapPrm, err = strconv.ParseUint(vString, 16, 64)
-		if err != nil {
-			return err
-		}
-	case "CapEff":
-		var err error
-		s.CapEff, err = strconv.ParseUint(vString, 16, 64)
-		if err != nil {
-			return err
-		}
-	case "CapBnd":
-		var err error
-		s.CapBnd, err = strconv.ParseUint(vString, 16, 64)
-		if err != nil {
-			return err
-		}
-	case "CapAmb":
-		var err error
-		s.CapAmb, err = strconv.ParseUint(vString, 16, 64)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -264,21 +218,21 @@ func calcCpusAllowedList(cpuString string) []uint64 {
 
 	}
 
-	slices.Sort(g)
+	sort.Slice(g, func(i, j int) bool { return g[i] < g[j] })
 	return g
 }
 
-func calcNSPidsList(nspidsString string) ([]uint64, error) {
-	s := strings.Split(nspidsString, "\t")
+func calcNSPidsList(nspidsString string) []uint64 {
+	s := strings.Split(nspidsString, " ")
 	var nspids []uint64
 
 	for _, nspid := range s {
-		nspid, err := strconv.ParseUint(nspid, 10, 64)
-		if err != nil {
-			return nil, err
+		nspid, _ := strconv.ParseUint(nspid, 10, 64)
+		if nspid == 0 {
+			continue
 		}
 		nspids = append(nspids, nspid)
 	}
 
-	return nspids, nil
+	return nspids
 }

@@ -2,12 +2,26 @@ package openapi2
 
 import (
 	"encoding/json"
-	"maps"
+	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
 type Parameters []*Parameter
+
+var _ sort.Interface = Parameters{}
+
+func (ps Parameters) Len() int      { return len(ps) }
+func (ps Parameters) Swap(i, j int) { ps[i], ps[j] = ps[j], ps[i] }
+func (ps Parameters) Less(i, j int) bool {
+	if ps[i].Name != ps[j].Name {
+		return ps[i].Name < ps[j].Name
+	}
+	if ps[i].In != ps[j].In {
+		return ps[i].In < ps[j].In
+	}
+	return ps[i].Ref < ps[j].Ref
+}
 
 type Parameter struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
@@ -46,7 +60,9 @@ func (parameter Parameter) MarshalJSON() ([]byte, error) {
 	}
 
 	m := make(map[string]any, 24+len(parameter.Extensions))
-	maps.Copy(m, parameter.Extensions)
+	for k, v := range parameter.Extensions {
+		m[k] = v
+	}
 
 	if x := parameter.In; x != "" {
 		m["in"] = x

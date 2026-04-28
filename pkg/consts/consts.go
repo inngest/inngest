@@ -147,7 +147,11 @@ const (
 
 	RedisBlockingPoolSize = 10
 
-	ConnectWorkerHeartbeatInterval  = 10 * time.Second
+	// DefaultWorkerConcurrency is the default per-app worker concurrency used when
+	// a connect worker does not specify MaxWorkerConcurrency.
+	DefaultWorkerConcurrency int64 = 1000
+
+	ConnectWorkerHeartbeatInterval = 10 * time.Second
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
 	ConnectGCThreshold              = 5 * time.Minute
 

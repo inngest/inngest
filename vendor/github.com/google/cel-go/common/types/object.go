@@ -187,14 +187,8 @@ func (o *protoObj) format(sb *strings.Builder) {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
-		name := String(field.Name())
-		if field.IsExtension() {
-			name = String(field.FullName())
-			fmt.Fprintf(sb, "`%s`: ", name)
-		} else {
-			fmt.Fprintf(sb, "%s: ", name)
-		}
-		formatTo(sb, o.Get(name))
+		sb.WriteString(fmt.Sprintf("%s: ", field.Name()))
+		formatTo(sb, o.Get(String(field.Name())))
 	}
 	sb.WriteString("}")
 }

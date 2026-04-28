@@ -33,7 +33,7 @@ func New(url string, protocols []string) (c WebSocket, err error) {
 		c = WebSocket{}
 	})
 
-	jsProtocols := make([]any, len(protocols))
+	jsProtocols := make([]interface{}, len(protocols))
 	for i, p := range protocols {
 		jsProtocols[i] = p
 	}
@@ -57,7 +57,7 @@ func (c WebSocket) setBinaryType(typ string) {
 }
 
 func (c WebSocket) addEventListener(eventType string, fn func(e js.Value)) func() {
-	f := js.FuncOf(func(this js.Value, args []js.Value) any {
+	f := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		fn(args[0])
 		return nil
 	})
@@ -97,7 +97,7 @@ func (c WebSocket) OnError(fn func(e js.Value)) (remove func()) {
 // MessageEvent is the type passed to a message handler.
 type MessageEvent struct {
 	// string or []byte.
-	Data any
+	Data interface{}
 
 	// There are more fields to the interface but we don't use them.
 	// See https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
@@ -106,7 +106,7 @@ type MessageEvent struct {
 // OnMessage registers a function to be called when the WebSocket receives a message.
 func (c WebSocket) OnMessage(fn func(m MessageEvent)) (remove func()) {
 	return c.addEventListener("message", func(e js.Value) {
-		var data any
+		var data interface{}
 
 		arrayBuffer := e.Get("data")
 		if arrayBuffer.Type() == js.TypeString {

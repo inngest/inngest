@@ -580,8 +580,7 @@ func checkConsumePause(t *testing.T, m state.Manager, pm state.PauseManager) {
 		<-time.After(time.Millisecond)
 		// Consuming the pause should work.
 		res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           nil,
+			Data: nil,
 		})
 		require.NoError(t, err)
 		require.True(t, res.DidConsume)
@@ -614,8 +613,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager, pm state.PauseMana
 
 	// Consuming the pause should work.
 	_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           pauseData,
+		Data: pauseData,
 	})
 	require.NoError(t, err)
 
@@ -650,8 +648,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager, pm state.Paus
 
 		// Consuming the pause should work.
 		_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           nil,
+			Data: nil,
 		})
 		require.NoError(t, err)
 
@@ -695,8 +692,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager, pm state.Paus
 
 		// Consuming the pause should work.
 		_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           data,
+			Data: data,
 		})
 		require.NoError(t, err)
 
@@ -720,8 +716,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager, pm state.Paus
 	// exist in a different datasotre (block storage), so we assume that the pause
 	// data written is valid.
 	res, err := m.ConsumePause(ctx, state.Pause{ID: uuid.New()}, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.Nil(t, err)
 	require.True(t, res.DidConsume, "got: %#v", res)
@@ -744,8 +739,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager, pm state.Paus
 
 	// Consuming the pause should work.
 	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.NoError(t, err)
 	require.True(t, res.DidConsume)
@@ -781,8 +775,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager, pm state.P
 
 	// Consuming the pause should work.
 	res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           pauseData,
+		Data: pauseData,
 	})
 	require.NoError(t, err)
 	require.True(t, res.DidConsume)
@@ -815,30 +808,26 @@ func checkConsumePauseIdempotency(t *testing.T, m state.Manager, pm state.PauseM
 	_, err := pm.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	key := uuid.NewString()
 	// consuming the pause for the first time
 	res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: key,
-		Data:           pauseData,
+		Data: pauseData,
 	})
 	require.NoError(t, err)
 	require.True(t, res.DidConsume)
 
-	// consuming with another idempotency key will fail
+	// consuming with the same data is an idempotent retry
 	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           pauseData,
+		Data: pauseData,
+	})
+	require.NoError(t, err)
+	require.True(t, res.DidConsume)
+
+	// consuming with different data is rejected
+	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		Data: map[string]any{"different": "data"},
 	})
 	require.NoError(t, err)
 	require.False(t, res.DidConsume)
-
-	// attempt to consume again with the same idempotency key should work
-	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: key,
-		Data:           pauseData,
-	})
-	require.NoError(t, err)
-	require.True(t, res.DidConsume)
 }
 
 func checkPausesByEvent_empty(t *testing.T, m state.Manager, pm state.PauseManager) {
@@ -1174,8 +1163,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager, pm state.PauseMa
 	// Consume the first pause, and assert that it doesn't show up in
 	// an iterator.
 	_, err = m.ConsumePause(ctx, pauses[0], state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.NoError(t, err)
 
@@ -1262,8 +1250,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager, pm state.PauseMa
 		require.Equal(t, 2, n)
 
 		_, err = m.ConsumePause(ctx, p1, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           map[string]any{"ok": true},
+			Data: map[string]any{"ok": true},
 		})
 		require.NoError(t, err)
 
@@ -1321,8 +1308,7 @@ func checkPauseByID(t *testing.T, m state.Manager, pm state.PauseManager) {
 
 	// Consume.
 	_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.Nil(t, err, "Consuming an expired pause should work")
 

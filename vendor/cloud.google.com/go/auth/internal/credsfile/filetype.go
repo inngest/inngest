@@ -127,7 +127,6 @@ type ExecutableConfig struct {
 type CertificateConfig struct {
 	UseDefaultCertificateConfig bool   `json:"use_default_certificate_config"`
 	CertificateConfigLocation   string `json:"certificate_config_location"`
-	TrustChainPath              string `json:"trust_chain_path"`
 }
 
 // ServiceAccountImpersonationInfo has impersonation configuration.

@@ -1,4 +1,4 @@
-// Copyright 2018-2024 The NATS Authors
+// Copyright 2018-2022 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,9 +15,10 @@ package nkeys
 
 import (
 	"bytes"
-	"crypto/ed25519"
 	"crypto/rand"
 	"io"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 // kp is the internal struct for a kepypair using seed.
@@ -30,7 +31,7 @@ const seedLen = 32
 
 // CreatePair will create a KeyPair based on the rand entropy and a type/prefix byte.
 func CreatePair(prefix PrefixByte) (KeyPair, error) {
-	return CreatePairWithRand(prefix, nil)
+	return CreatePairWithRand(prefix, rand.Reader)
 }
 
 // CreatePair will create a KeyPair based on the rand reader and a type/prefix byte. rand can be nil.
@@ -38,12 +39,17 @@ func CreatePairWithRand(prefix PrefixByte, rr io.Reader) (KeyPair, error) {
 	if prefix == PrefixByteCurve {
 		return CreateCurveKeysWithRand(rr)
 	}
-	_, priv, err := ed25519.GenerateKey(rr)
+	if rr == nil {
+		rr = rand.Reader
+	}
+	var rawSeed [seedLen]byte
+
+	_, err := io.ReadFull(rr, rawSeed[:])
 	if err != nil {
 		return nil, err
 	}
 
-	seed, err := EncodeSeed(prefix, priv.Seed())
+	seed, err := EncodeSeed(prefix, rawSeed[:])
 	if err != nil {
 		return nil, err
 	}

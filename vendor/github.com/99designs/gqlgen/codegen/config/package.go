@@ -1,7 +1,7 @@
 package config
 
 import (
-	"errors"
+	"fmt"
 	"go/types"
 	"path/filepath"
 	"strings"
@@ -10,11 +10,9 @@ import (
 )
 
 type PackageConfig struct {
-	Filename      string          `yaml:"filename,omitempty"`
-	Package       string          `yaml:"package,omitempty"`
-	Version       int             `yaml:"version,omitempty"`
-	ModelTemplate string          `yaml:"model_template,omitempty"`
-	Options       map[string]bool `yaml:"options,omitempty"`
+	Filename string `yaml:"filename,omitempty"`
+	Package  string `yaml:"package,omitempty"`
+	Version  int    `yaml:"version,omitempty"`
 }
 
 func (c *PackageConfig) ImportPath() string {
@@ -44,15 +42,13 @@ func (c *PackageConfig) IsDefined() bool {
 
 func (c *PackageConfig) Check() error {
 	if strings.ContainsAny(c.Package, "./\\") {
-		return errors.New(
-			"package should be the output package name only, do not include the output filename",
-		)
+		return fmt.Errorf("package should be the output package name only, do not include the output filename")
 	}
 	if c.Filename == "" {
-		return errors.New("filename must be specified")
+		return fmt.Errorf("filename must be specified")
 	}
 	if !strings.HasSuffix(c.Filename, ".go") {
-		return errors.New("filename should be path to a go source file")
+		return fmt.Errorf("filename should be path to a go source file")
 	}
 
 	c.Filename = abs(c.Filename)

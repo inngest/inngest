@@ -1,4 +1,4 @@
-// Copyright 2021-2025 The Connect Authors
+// Copyright 2021-2024 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,13 +16,6 @@ package connect
 
 import (
 	"context"
-	"errors"
-)
-
-var (
-	// errNewClientContextProhibited signals that a new client context was created
-	// in an interceptor, which is prohibited.
-	errNewClientContextProhibited = errors.New("creating a new context in an interceptor is prohibited")
 )
 
 // UnaryFunc is the generic signature of a unary RPC. Interceptors may wrap
@@ -31,8 +24,6 @@ var (
 // The type of the request and response structs depend on the codec being used.
 // When using Protobuf, request.Any() and response.Any() will always be
 // [proto.Message] implementations.
-//
-// On return, response is non-nil if and only if err is nil.
 type UnaryFunc func(context.Context, AnyRequest) (AnyResponse, error)
 
 // StreamingClientFunc is the generic signature of a streaming RPC from the client's
@@ -45,8 +36,9 @@ type StreamingHandlerFunc func(context.Context, StreamingHandlerConn) error
 
 // An Interceptor adds logic to a generated handler or client, like the
 // decorators or middleware you may have seen in other libraries. Interceptors
-// may mutate requests and responses, handle errors, retry, recover from panics,
-// emit logs and metrics, or do nearly anything else.
+// may replace the context, mutate requests and responses, handle errors,
+// retry, recover from panics, emit logs and metrics, or do nearly anything
+// else.
 //
 // The returned functions must be safe to call concurrently.
 type Interceptor interface {
@@ -93,7 +85,6 @@ func newChain(interceptors []Interceptor) *chain {
 
 func (c *chain) WrapUnary(next UnaryFunc) UnaryFunc {
 	for _, interceptor := range c.interceptors {
-		next = unaryThunk(next)
 		next = interceptor.WrapUnary(next)
 	}
 	return next
@@ -101,7 +92,6 @@ func (c *chain) WrapUnary(next UnaryFunc) UnaryFunc {
 
 func (c *chain) WrapStreamingClient(next StreamingClientFunc) StreamingClientFunc {
 	for _, interceptor := range c.interceptors {
-		next = streamingClientThunk(next)
 		next = interceptor.WrapStreamingClient(next)
 	}
 	return next
@@ -112,29 +102,4 @@ func (c *chain) WrapStreamingHandler(next StreamingHandlerFunc) StreamingHandler
 		next = interceptor.WrapStreamingHandler(next)
 	}
 	return next
-}
-
-func unaryThunk(next UnaryFunc) UnaryFunc {
-	return func(ctx context.Context, req AnyRequest) (AnyResponse, error) {
-		if err := checkSentinel(ctx); err != nil {
-			return nil, err
-		}
-		return next(ctx, req)
-	}
-}
-
-func streamingClientThunk(next StreamingClientFunc) StreamingClientFunc {
-	return func(ctx context.Context, spec Spec) StreamingClientConn {
-		if err := checkSentinel(ctx); err != nil {
-			return &errStreamingClientConn{err: err}
-		}
-		return next(ctx, spec)
-	}
-}
-
-func checkSentinel(ctx context.Context) error {
-	if ctx.Value(clientCallInfoContextKey{}) != ctx.Value(sentinelContextKey{}) {
-		return errNewClientContextProhibited
-	}
-	return nil
 }

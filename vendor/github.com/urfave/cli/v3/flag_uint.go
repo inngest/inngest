@@ -31,8 +31,12 @@ func (i uintValue[T]) Create(val T, p *T, c IntegerConfig) Value {
 }
 
 func (i uintValue[T]) ToString(b T) string {
-	i.val = &b
-	return i.String()
+	base := i.base
+	if base == 0 {
+		base = 10
+	}
+
+	return strconv.FormatUint(uint64(b), base)
 }
 
 // Below functions are to satisfy the flag.Value interface

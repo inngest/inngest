@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/moby/moby/api/types/network"
+	"github.com/docker/go-connections/nat"
 
 	"github.com/testcontainers/testcontainers-go/log"
 )
@@ -32,7 +32,7 @@ var (
 type HostPortStrategy struct {
 	// Port is a string containing port number and protocol in the format "80/tcp"
 	// which
-	Port string
+	Port nat.Port
 	// all WaitStrategies should have a startupTimeout to avoid waiting infinitely
 	timeout      *time.Duration
 	PollInterval time.Duration
@@ -50,7 +50,7 @@ type HostPortStrategy struct {
 
 // NewHostPortStrategy constructs a default host port strategy that waits for the given
 // port to be exposed. The default startup timeout is 60 seconds.
-func NewHostPortStrategy(port string) *HostPortStrategy {
+func NewHostPortStrategy(port nat.Port) *HostPortStrategy {
 	return &HostPortStrategy{
 		Port:         port,
 		PollInterval: defaultPollInterval(),
@@ -64,7 +64,7 @@ func NewHostPortStrategy(port string) *HostPortStrategy {
 // ForListeningPort returns a host port strategy that waits for the given port
 // to be exposed and bound internally the container.
 // Alias for `NewHostPortStrategy(port)`.
-func ForListeningPort(port string) *HostPortStrategy {
+func ForListeningPort(port nat.Port) *HostPortStrategy {
 	return NewHostPortStrategy(port)
 }
 
@@ -76,7 +76,7 @@ func ForExposedPort() *HostPortStrategy {
 
 // ForMappedPort returns a host port strategy that waits for the given port
 // to be mapped without accessing the port itself.
-func ForMappedPort(port string) *HostPortStrategy {
+func ForMappedPort(port nat.Port) *HostPortStrategy {
 	return NewHostPortStrategy(port).SkipInternalCheck().SkipExternalCheck()
 }
 
@@ -114,40 +114,18 @@ func (hp *HostPortStrategy) Timeout() *time.Duration {
 	return hp.timeout
 }
 
-// String returns a human-readable description of the wait strategy.
-func (hp *HostPortStrategy) String() string {
-	port := "first exposed port"
-	if hp.Port != "" {
-		port = "port " + hp.Port
-	}
-
-	var checks string
-	switch {
-	case hp.skipInternalCheck && hp.skipExternalCheck:
-		checks = " to be mapped"
-	case hp.skipInternalCheck:
-		checks = " to be accessible externally"
-	case hp.skipExternalCheck:
-		checks = " to be listening internally"
-	default:
-		checks = " to be listening"
-	}
-
-	return fmt.Sprintf("%s%s", port, checks)
-}
-
 // detectInternalPort returns the lowest internal port that is currently bound.
 // If no internal port is found, it returns the zero nat.Port value which
 // can be checked against an empty string.
-func (hp *HostPortStrategy) detectInternalPort(ctx context.Context, target StrategyTarget) (network.Port, error) {
-	var internalPort network.Port
+func (hp *HostPortStrategy) detectInternalPort(ctx context.Context, target StrategyTarget) (nat.Port, error) {
+	var internalPort nat.Port
 	inspect, err := target.Inspect(ctx)
 	if err != nil {
 		return internalPort, fmt.Errorf("inspect: %w", err)
 	}
 
 	for port := range inspect.NetworkSettings.Ports {
-		if internalPort.IsZero() || port.Num() < internalPort.Num() {
+		if internalPort == "" || port.Int() < internalPort.Int() {
 			internalPort = port
 		}
 	}
@@ -167,17 +145,9 @@ func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyT
 
 	waitInterval := hp.PollInterval
 
-	var internalPort network.Port
-	if hp.Port != "" {
-		p, err := network.ParsePort(hp.Port)
-		if err != nil {
-			return err
-		}
-		internalPort = p
-	}
-
+	internalPort := hp.Port
 	i := 0
-	if internalPort.IsZero() {
+	if internalPort == "" {
 		var err error
 		// Port is not specified, so we need to detect it.
 		internalPort, err = hp.detectInternalPort(ctx, target)
@@ -185,7 +155,7 @@ func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyT
 			return fmt.Errorf("detect internal port: %w", err)
 		}
 
-		for internalPort.IsZero() {
+		for internalPort == "" {
 			select {
 			case <-ctx.Done():
 				return fmt.Errorf("detect internal port: retries: %d, last err: %w, ctx err: %w", i, err, ctx.Err())
@@ -202,10 +172,10 @@ func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyT
 		}
 	}
 
-	port, err := target.MappedPort(ctx, internalPort.String())
+	port, err := target.MappedPort(ctx, internalPort)
 	i = 0
 
-	for port.IsZero() {
+	for port == "" {
 		i++
 
 		select {
@@ -215,7 +185,7 @@ func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyT
 			if err := checkTarget(ctx, target); err != nil {
 				return fmt.Errorf("mapped port: check target: retries: %d, port: %q, last err: %w", i, port, err)
 			}
-			port, err = target.MappedPort(ctx, internalPort.String())
+			port, err = target.MappedPort(ctx, internalPort)
 			if err != nil {
 				log.Printf("mapped port: retries: %d, port: %q, err: %s\n", i, port, err)
 			}
@@ -253,7 +223,7 @@ func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyT
 	return nil
 }
 
-func externalCheck(ctx context.Context, ipAddress string, port network.Port, target StrategyTarget, waitInterval time.Duration) error {
+func externalCheck(ctx context.Context, ipAddress string, port nat.Port, target StrategyTarget, waitInterval time.Duration) error {
 	proto := port.Proto()
 
 	dialer := net.Dialer{}
@@ -262,7 +232,7 @@ func externalCheck(ctx context.Context, ipAddress string, port network.Port, tar
 		if err := checkTarget(ctx, target); err != nil {
 			return fmt.Errorf("check target: retries: %d address: %s: %w", i, address, err)
 		}
-		conn, err := dialer.DialContext(ctx, string(proto), address)
+		conn, err := dialer.DialContext(ctx, proto, address)
 		if err != nil {
 			var v *net.OpError
 			if errors.As(err, &v) {
@@ -277,13 +247,13 @@ func externalCheck(ctx context.Context, ipAddress string, port network.Port, tar
 			return fmt.Errorf("dial: %w", err)
 		}
 
-		_ = conn.Close()
+		conn.Close()
 		return nil
 	}
 }
 
-func internalCheck(ctx context.Context, internalPort network.Port, target StrategyTarget) error {
-	command := buildInternalCheckCommand(internalPort.Num())
+func internalCheck(ctx context.Context, internalPort nat.Port, target StrategyTarget) error {
+	command := buildInternalCheckCommand(internalPort.Int())
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -310,7 +280,7 @@ func internalCheck(ctx context.Context, internalPort network.Port, target Strate
 	}
 }
 
-func buildInternalCheckCommand(internalPort uint16) string {
+func buildInternalCheckCommand(internalPort int) string {
 	command := `(
 					cat /proc/net/tcp* | awk '{print $2}' | grep -i :%04x ||
 					nc -vz -w 1 localhost %d ||

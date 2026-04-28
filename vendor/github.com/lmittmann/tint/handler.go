@@ -105,9 +105,8 @@ import (
 	"unicode/utf8"
 )
 
+// ANSI modes
 const (
-	// ANSI modes
-	ansiEsc          = '\u001b'
 	ansiReset        = "\u001b[0m"
 	ansiFaint        = "\u001b[2m"
 	ansiResetFaint   = "\u001b[22m"
@@ -115,8 +114,12 @@ const (
 	ansiBrightGreen  = "\u001b[92m"
 	ansiBrightYellow = "\u001b[93m"
 
-	errKey = "err"
+	ansiEsc = '\u001b'
+)
 
+const errKey = "err"
+
+const (
 	defaultLevel      = slog.LevelInfo
 	defaultTimeFormat = time.StampMilli
 )
@@ -143,28 +146,28 @@ type Options struct {
 	NoColor bool
 }
 
-func (o *Options) setDefaults() {
-	if o.Level == nil {
-		o.Level = defaultLevel
-	}
-	if o.TimeFormat == "" {
-		o.TimeFormat = defaultTimeFormat
-	}
-}
-
 // NewHandler creates a [slog.Handler] that writes tinted logs to Writer w,
 // using the default options. If opts is nil, the default options are used.
 func NewHandler(w io.Writer, opts *Options) slog.Handler {
+	h := &handler{
+		w:          w,
+		level:      defaultLevel,
+		timeFormat: defaultTimeFormat,
+	}
 	if opts == nil {
-		opts = &Options{}
+		return h
 	}
-	opts.setDefaults()
 
-	return &handler{
-		mu:   &sync.Mutex{},
-		w:    w,
-		opts: *opts,
+	h.addSource = opts.AddSource
+	if opts.Level != nil {
+		h.level = opts.Level
 	}
+	h.replaceAttr = opts.ReplaceAttr
+	if opts.TimeFormat != "" {
+		h.timeFormat = opts.TimeFormat
+	}
+	h.noColor = opts.NoColor
+	return h
 }
 
 // handler implements a [slog.Handler].
@@ -173,10 +176,14 @@ type handler struct {
 	groupPrefix string
 	groups      []string
 
-	mu *sync.Mutex
+	mu sync.Mutex
 	w  io.Writer
 
-	opts Options
+	addSource   bool
+	level       slog.Leveler
+	replaceAttr func([]string, slog.Attr) slog.Attr
+	timeFormat  string
+	noColor     bool
 }
 
 func (h *handler) clone() *handler {
@@ -184,14 +191,17 @@ func (h *handler) clone() *handler {
 		attrsPrefix: h.attrsPrefix,
 		groupPrefix: h.groupPrefix,
 		groups:      h.groups,
-		mu:          h.mu, // mutex shared among all clones of this handler
 		w:           h.w,
-		opts:        h.opts,
+		addSource:   h.addSource,
+		level:       h.level,
+		replaceAttr: h.replaceAttr,
+		timeFormat:  h.timeFormat,
+		noColor:     h.noColor,
 	}
 }
 
 func (h *handler) Enabled(_ context.Context, level slog.Level) bool {
-	return level >= h.opts.Level.Level()
+	return level >= h.level.Level()
 }
 
 func (h *handler) Handle(_ context.Context, r slog.Record) error {
@@ -199,7 +209,7 @@ func (h *handler) Handle(_ context.Context, r slog.Record) error {
 	buf := newBuffer()
 	defer buf.Free()
 
-	rep := h.opts.ReplaceAttr
+	rep := h.replaceAttr
 
 	// write time
 	if !r.Time.IsZero() {
@@ -237,7 +247,7 @@ func (h *handler) Handle(_ context.Context, r slog.Record) error {
 	}
 
 	// write source
-	if h.opts.AddSource {
+	if h.addSource {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		f, _ := fs.Next()
 		if f.File != "" {
@@ -248,7 +258,7 @@ func (h *handler) Handle(_ context.Context, r slog.Record) error {
 			}
 
 			if rep == nil {
-				if h.opts.NoColor {
+				if h.noColor {
 					appendSource(buf, src)
 				} else {
 					buf.WriteString(ansiFaint)
@@ -286,10 +296,9 @@ func (h *handler) Handle(_ context.Context, r slog.Record) error {
 	})
 
 	if len(*buf) == 0 {
-		buf.WriteByte('\n')
-	} else {
-		(*buf)[len(*buf)-1] = '\n' // replace last space with newline
+		return nil
 	}
+	(*buf)[len(*buf)-1] = '\n' // replace last space with newline
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -326,15 +335,15 @@ func (h *handler) WithGroup(name string) slog.Handler {
 }
 
 func (h *handler) appendTintTime(buf *buffer, t time.Time, color int16) {
-	if h.opts.NoColor {
-		*buf = t.AppendFormat(*buf, h.opts.TimeFormat)
+	if h.noColor {
+		*buf = t.AppendFormat(*buf, h.timeFormat)
 	} else {
 		if color >= 0 {
 			appendAnsi(buf, uint8(color), true)
 		} else {
 			buf.WriteString(ansiFaint)
 		}
-		*buf = t.AppendFormat(*buf, h.opts.TimeFormat)
+		*buf = t.AppendFormat(*buf, h.timeFormat)
 		buf.WriteString(ansiReset)
 	}
 }
@@ -349,7 +358,7 @@ func (h *handler) appendTintLevel(buf *buffer, level slog.Level, color int16) {
 		return strconv.AppendInt([]byte(base), int64(val), 10)
 	}
 
-	if !h.opts.NoColor {
+	if !h.noColor {
 		if color >= 0 {
 			appendAnsi(buf, uint8(color), false)
 		} else {
@@ -376,7 +385,7 @@ func (h *handler) appendTintLevel(buf *buffer, level slog.Level, color int16) {
 		buf.Write(str("ERR", level-slog.LevelError))
 	}
 
-	if !h.opts.NoColor && (color >= 0 || level >= slog.LevelInfo) {
+	if !h.noColor && level >= slog.LevelInfo {
 		buf.WriteString(ansiReset)
 	}
 }
@@ -390,7 +399,7 @@ func appendSource(buf *buffer, src *slog.Source) {
 }
 
 func (h *handler) resolve(val slog.Value) (resolvedVal slog.Value, color int16) {
-	if !h.opts.NoColor && val.Kind() == slog.KindLogValuer {
+	if !h.noColor && val.Kind() == slog.KindLogValuer {
 		if tintVal, ok := val.Any().(tintValue); ok {
 			return tintVal.Value.Resolve(), int16(tintVal.Color)
 		}
@@ -401,13 +410,9 @@ func (h *handler) resolve(val slog.Value) (resolvedVal slog.Value, color int16) 
 func (h *handler) appendAttr(buf *buffer, attr slog.Attr, groupsPrefix string, groups []string) {
 	var color int16 // -1 if no color
 	attr.Value, color = h.resolve(attr.Value)
-	if rep := h.opts.ReplaceAttr; rep != nil && attr.Value.Kind() != slog.KindGroup {
+	if rep := h.replaceAttr; rep != nil && attr.Value.Kind() != slog.KindGroup {
 		attr = rep(groups, attr)
-		var colorRep int16
-		attr.Value, colorRep = h.resolve(attr.Value)
-		if colorRep >= 0 {
-			color = colorRep
-		}
+		attr.Value, color = h.resolve(attr.Value)
 	}
 
 	if attr.Equal(slog.Attr{}) {
@@ -425,7 +430,7 @@ func (h *handler) appendAttr(buf *buffer, attr slog.Attr, groupsPrefix string, g
 		return
 	}
 
-	if h.opts.NoColor {
+	if h.noColor {
 		h.appendKey(buf, attr.Key, groupsPrefix)
 		h.appendValue(buf, attr.Value, true)
 	} else {
@@ -446,14 +451,14 @@ func (h *handler) appendAttr(buf *buffer, attr slog.Attr, groupsPrefix string, g
 }
 
 func (h *handler) appendKey(buf *buffer, key, groups string) {
-	appendString(buf, groups+key, true, !h.opts.NoColor)
+	appendString(buf, groups+key, true, !h.noColor)
 	buf.WriteByte('=')
 }
 
 func (h *handler) appendValue(buf *buffer, v slog.Value, quote bool) {
 	switch v.Kind() {
 	case slog.KindString:
-		appendString(buf, v.String(), quote, !h.opts.NoColor)
+		appendString(buf, v.String(), quote, !h.noColor)
 	case slog.KindInt64:
 		*buf = strconv.AppendInt(*buf, v.Int64(), 10)
 	case slog.KindUint64:
@@ -463,9 +468,9 @@ func (h *handler) appendValue(buf *buffer, v slog.Value, quote bool) {
 	case slog.KindBool:
 		*buf = strconv.AppendBool(*buf, v.Bool())
 	case slog.KindDuration:
-		appendString(buf, v.Duration().String(), quote, !h.opts.NoColor)
+		appendString(buf, v.Duration().String(), quote, !h.noColor)
 	case slog.KindTime:
-		*buf = appendRFC3339Millis(*buf, v.Time())
+		appendString(buf, v.Time().String(), quote, !h.noColor)
 	case slog.KindAny:
 		defer func() {
 			// Copied from log/slog/handler.go.
@@ -476,12 +481,12 @@ func (h *handler) appendValue(buf *buffer, v slog.Value, quote bool) {
 				//
 				// Adapted from the code in fmt/print.go.
 				if v := reflect.ValueOf(v.Any()); v.Kind() == reflect.Pointer && v.IsNil() {
-					buf.WriteString("<nil>")
+					appendString(buf, "<nil>", false, false)
 					return
 				}
 
 				// Otherwise just print the original panic message.
-				appendString(buf, fmt.Sprintf("!PANIC: %v", r), true, !h.opts.NoColor)
+				appendString(buf, fmt.Sprintf("!PANIC: %v", r), true, !h.noColor)
 			}
 		}()
 
@@ -491,17 +496,17 @@ func (h *handler) appendValue(buf *buffer, v slog.Value, quote bool) {
 			if err != nil {
 				break
 			}
-			appendString(buf, string(data), quote, !h.opts.NoColor)
+			appendString(buf, string(data), quote, !h.noColor)
 		case *slog.Source:
 			appendSource(buf, cv)
 		default:
-			appendString(buf, fmt.Sprintf("%+v", cv), quote, !h.opts.NoColor)
+			appendString(buf, fmt.Sprintf("%+v", cv), quote, !h.noColor)
 		}
 	}
 }
 
 func (h *handler) appendTintValue(buf *buffer, val slog.Value, quote bool, color int16, faint bool) {
-	if h.opts.NoColor {
+	if h.noColor {
 		h.appendValue(buf, val, quote)
 	} else {
 		if color >= 0 {
@@ -514,20 +519,6 @@ func (h *handler) appendTintValue(buf *buffer, val slog.Value, quote bool, color
 			buf.WriteString(ansiReset)
 		}
 	}
-}
-
-// Copied from log/slog/handler.go.
-func appendRFC3339Millis(b []byte, t time.Time) []byte {
-	// Format according to time.RFC3339Nano since it is highly optimized,
-	// but truncate it to use millisecond resolution.
-	// Unfortunately, that format trims trailing 0s, so add 1/10 millisecond
-	// to guarantee that there are exactly 4 digits after the period.
-	const prefixLen = len("2006-01-02T15:04:05.000")
-	n := len(b)
-	t = t.Truncate(time.Millisecond).Add(time.Millisecond / 10)
-	b = t.AppendFormat(b, time.RFC3339Nano)
-	b = append(b[:n+prefixLen], b[n+prefixLen+1:]...) // drop the 4th digit
-	return b
 }
 
 func appendAnsi(buf *buffer, color uint8, faint bool) {

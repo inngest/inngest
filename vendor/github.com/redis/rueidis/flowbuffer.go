@@ -31,7 +31,7 @@ func newFlowBuffer(factor int) *flowBuffer {
 		r: make(chan queuedCmd, size),
 		w: make(chan queuedCmd, size),
 	}
-	for range size {
+	for i := 0; i < size; i++ {
 		r.f <- queuedCmd{
 			ch: make(chan RedisResult),
 		}

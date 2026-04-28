@@ -15,9 +15,9 @@ import (
 	"strings"
 )
 
-// IncludeOrigin specifies whether to include the origin of the OpenAPI elements.
-// Deprecated: set Loader.IncludeOrigin instead. This global is read by NewLoader
-// for backward compatibility but is not safe for concurrent use.
+// IncludeOrigin specifies whether to include the origin of the OpenAPI elements
+// Set this to true before loading a spec to include the origin of the OpenAPI elements
+// Note it is global and affects all loaders
 var IncludeOrigin = false
 
 func foundUnresolvedRef(ref string) error {
@@ -33,20 +33,8 @@ type Loader struct {
 	// IsExternalRefsAllowed enables visiting other files
 	IsExternalRefsAllowed bool
 
-	// IncludeOrigin enables recording the file/line/column of each OpenAPI element.
-	// Prefer this over the package-level IncludeOrigin global, which is not safe for
-	// concurrent use.
-	IncludeOrigin bool
-
 	// ReadFromURIFunc allows overriding the any file/URL reading func
 	ReadFromURIFunc ReadFromURIFunc
-
-	// JoinFunc allows overriding how relative $ref paths are resolved against
-	// a base path. When set, it is called instead of the default join logic
-	// that uses path.Dir and path.Join. This is useful when loading specs from
-	// non-filesystem sources (e.g. git objects, remote archives) where the base
-	// path follows a different convention than filesystem paths.
-	JoinFunc func(basePath *url.URL, relativePath *url.URL) *url.URL
 
 	Context context.Context
 
@@ -65,8 +53,7 @@ type Loader struct {
 // NewLoader returns an empty Loader
 func NewLoader() *Loader {
 	return &Loader{
-		Context:       context.Background(),
-		IncludeOrigin: IncludeOrigin,
+		Context: context.Background(),
 	}
 }
 
@@ -105,16 +92,11 @@ func (loader *Loader) allowsExternalRefs(ref string) (err error) {
 }
 
 func (loader *Loader) loadSingleElementFromURI(ref string, rootPath *url.URL, element any) (*url.URL, error) {
-	// When a custom ReadFromURIFunc is installed, defer the external-ref decision to it;
-	// the function itself is responsible for enforcing any access policy.
-	// Otherwise enforce IsExternalRefsAllowed here before attempting any I/O.
-	if loader.ReadFromURIFunc == nil {
-		if err := loader.allowsExternalRefs(ref); err != nil {
-			return nil, err
-		}
+	if err := loader.allowsExternalRefs(ref); err != nil {
+		return nil, err
 	}
 
-	resolvedPath, err := loader.resolvePathWithRef(ref, rootPath)
+	resolvedPath, err := resolvePathWithRef(ref, rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +108,7 @@ func (loader *Loader) loadSingleElementFromURI(ref string, rootPath *url.URL, el
 	if err != nil {
 		return nil, err
 	}
-	if err := unmarshal(data, element, loader.IncludeOrigin, resolvedPath); err != nil {
+	if err := unmarshal(data, element, IncludeOrigin); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +144,7 @@ func (loader *Loader) LoadFromIoReader(reader io.Reader) (*T, error) {
 func (loader *Loader) LoadFromData(data []byte) (*T, error) {
 	loader.resetVisitedPathItemRefs()
 	doc := &T{}
-	if err := unmarshal(data, doc, loader.IncludeOrigin, nil); err != nil {
+	if err := unmarshal(data, doc, IncludeOrigin); err != nil {
 		return nil, err
 	}
 	if err := loader.ResolveRefsIn(doc, nil); err != nil {
@@ -191,7 +173,7 @@ func (loader *Loader) loadFromDataWithPathInternal(data []byte, location *url.UR
 	doc := &T{}
 	loader.visitedDocuments[uri] = doc
 
-	if err := unmarshal(data, doc, loader.IncludeOrigin, location); err != nil {
+	if err := unmarshal(data, doc, IncludeOrigin); err != nil {
 		return nil, err
 	}
 
@@ -277,18 +259,10 @@ func (loader *Loader) ResolveRefsIn(doc *T, location *url.URL) (err error) {
 		}
 	}
 
-	for _, name := range componentNames(doc.Webhooks) {
-		if pathItem := doc.Webhooks[name]; pathItem != nil {
-			if err = loader.resolvePathItemRef(doc, pathItem, location); err != nil {
-				return
-			}
-		}
-	}
-
 	return
 }
 
-func defaultJoin(basePath *url.URL, relativePath *url.URL) *url.URL {
+func join(basePath *url.URL, relativePath *url.URL) *url.URL {
 	if basePath == nil {
 		return relativePath
 	}
@@ -297,27 +271,24 @@ func defaultJoin(basePath *url.URL, relativePath *url.URL) *url.URL {
 	return &newPath
 }
 
-func (loader *Loader) resolvePath(basePath *url.URL, componentPath *url.URL) *url.URL {
+func resolvePath(basePath *url.URL, componentPath *url.URL) *url.URL {
 	if is_file(componentPath) {
 		// support absolute paths
 		if filepath.IsAbs(componentPath.Path) {
 			return componentPath
 		}
-		if loader.JoinFunc != nil {
-			return loader.JoinFunc(basePath, componentPath)
-		}
-		return defaultJoin(basePath, componentPath)
+		return join(basePath, componentPath)
 	}
 	return componentPath
 }
 
-func (loader *Loader) resolvePathWithRef(ref string, rootPath *url.URL) (*url.URL, error) {
+func resolvePathWithRef(ref string, rootPath *url.URL) (*url.URL, error) {
 	parsedURL, err := url.Parse(ref)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse reference: %q: %w", ref, err)
 	}
 
-	resolvedPath := loader.resolvePath(rootPath, parsedURL)
+	resolvedPath := resolvePath(rootPath, parsedURL)
 	resolvedPath.Fragment = parsedURL.Fragment
 	return resolvedPath, nil
 }
@@ -335,14 +306,11 @@ func (loader *Loader) resolveRefPath(ref string, path *url.URL) (*url.URL, error
 		return path, nil
 	}
 
-	// When a custom ReadFromURIFunc is installed, defer the external-ref decision to it.
-	if loader.ReadFromURIFunc == nil {
-		if err := loader.allowsExternalRefs(ref); err != nil {
-			return nil, err
-		}
+	if err := loader.allowsExternalRefs(ref); err != nil {
+		return nil, err
 	}
 
-	resolvedPath, err := loader.resolvePathWithRef(ref, path)
+	resolvedPath, err := resolvePathWithRef(ref, path)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +372,7 @@ func (loader *Loader) resolveComponent(doc *T, ref string, path *url.URL, resolv
 	}
 
 	drill := func(cursor any) (any, error) {
-		for pathPart := range strings.SplitSeq(fragment[1:], "/") {
+		for _, pathPart := range strings.Split(fragment[1:], "/") {
 			pathPart = unescapeRefString(pathPart)
 			attempted := false
 
@@ -459,7 +427,7 @@ func (loader *Loader) resolveComponent(doc *T, ref string, path *url.URL, resolv
 		if err2 != nil {
 			return nil, nil, err
 		}
-		if err2 = unmarshal(data, &cursor, loader.IncludeOrigin, path); err2 != nil {
+		if err2 = unmarshal(data, &cursor, IncludeOrigin); err2 != nil {
 			return nil, nil, err
 		}
 		if cursor, err2 = drill(cursor); err2 != nil || cursor == nil {
@@ -566,7 +534,7 @@ func drillIntoField(cursor any, fieldName string) (any, error) {
 
 	case reflect.Struct:
 		hasFields := false
-		for i := range val.NumField() {
+		for i := 0; i < val.NumField(); i++ {
 			hasFields = true
 			if yamlTag := val.Type().Field(i).Tag.Get("yaml"); yamlTag != "-" {
 				if tagName := strings.Split(yamlTag, ",")[0]; tagName != "" {
@@ -689,11 +657,6 @@ func (loader *Loader) resolveHeaderRef(doc *T, component *HeaderRef, documentPat
 			return err
 		}
 	}
-	for _, k := range componentNames(value.Examples) {
-		if err := loader.resolveExampleRef(doc, value.Examples[k], documentPath); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -753,19 +716,9 @@ func (loader *Loader) resolveParameterRef(doc *T, component *ParameterRef, docum
 				return err
 			}
 		}
-		for _, k := range componentNames(contentType.Examples) {
-			if err := loader.resolveExampleRef(doc, contentType.Examples[k], documentPath); err != nil {
-				return err
-			}
-		}
 	}
 	if schema := value.Schema; schema != nil {
 		if err := loader.resolveSchemaRef(doc, schema, documentPath, []string{}); err != nil {
-			return err
-		}
-	}
-	for _, k := range componentNames(value.Examples) {
-		if err := loader.resolveExampleRef(doc, value.Examples[k], documentPath); err != nil {
 			return err
 		}
 	}
@@ -959,18 +912,6 @@ func (loader *Loader) resolveSchemaRef(doc *T, component *SchemaRef, documentPat
 			component.setRefPath(resolved.RefPath())
 		}
 		defer loader.unvisitRef(ref, component.Value)
-
-		// OAS 3.1 / JSON Schema 2020-12: apply sibling keywords from the original schema
-		// object on top of the resolved $ref value. In 3.1, siblings are not ignored —
-		// they augment the referenced schema (e.g. deprecated:true alongside $ref).
-		// Only apply for OAS 3.1+ — in 3.0 $ref replaces its entire object and siblings
-		// are (validly) ignored.
-		if doc.IsOpenAPI31OrLater() && component.sibling != nil && component.Value != nil {
-			// Work on a copy so we don't mutate a schema shared by other references.
-			schemaCopy := *component.Value
-			applySiblingSchemaFields(&schemaCopy, component.sibling, component.extra)
-			component.Value = &schemaCopy
-		}
 	}
 	value := component.Value
 	if value == nil {
@@ -1014,89 +955,6 @@ func (loader *Loader) resolveSchemaRef(doc *T, component *SchemaRef, documentPat
 			return err
 		}
 	}
-	// Discriminator mapping refs are a special case since they are not full
-	// ref objects but are plain strings that reference schema objects.
-	// Only resolve refs that look like external references (contain a path).
-	// Plain schema names like "Dog" or internal refs like "#/components/schemas/Dog"
-	// don't need to be resolved by the loader.
-	if value.Discriminator != nil {
-		for _, k := range componentNames(value.Discriminator.Mapping) {
-			v := value.Discriminator.Mapping[k]
-			// Only resolve if it looks like an external ref (contains path separator)
-			if strings.Contains(v.Ref, "/") && !strings.HasPrefix(v.Ref, "#") {
-				if err := loader.resolveSchemaRef(doc, (*SchemaRef)(&v), documentPath, visited); err != nil {
-					return err
-				}
-				value.Discriminator.Mapping[k] = v
-			}
-		}
-	}
-
-	// OpenAPI 3.1 / JSON Schema 2020-12 fields
-	for _, v := range value.PrefixItems {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.Contains; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	for _, name := range componentNames(value.PatternProperties) {
-		v := value.PatternProperties[name]
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	for _, name := range componentNames(value.DependentSchemas) {
-		v := value.DependentSchemas[name]
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	for _, name := range componentNames(value.Defs) {
-		v := value.Defs[name]
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.PropertyNames; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.UnevaluatedItems.Schema; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.UnevaluatedProperties.Schema; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.If; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.Then; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.Else; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-	if v := value.ContentSchema; v != nil {
-		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -1356,139 +1214,5 @@ func (loader *Loader) resolvePathItemRef(doc *T, pathItem *PathItem, documentPat
 }
 
 func unescapeRefString(ref string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(ref, "~1", "/"), "~0", "~")
-}
-
-// applySiblingSchemaFields overlays the fields listed in presentFields from sibling onto dst.
-// It is used to honour keyword siblings of $ref in OpenAPI 3.1 / JSON Schema 2020-12, where
-// sibling keywords are applied in addition to (not instead of) the referenced schema.
-// Only fields that were explicitly present in the original YAML/JSON are applied; the presentFields
-// slice (derived from SchemaRef.extra) carries this information.
-func applySiblingSchemaFields(dst, sibling *Schema, presentFields []string) {
-	for _, field := range presentFields {
-		switch field {
-		case "oneOf":
-			dst.OneOf = sibling.OneOf
-		case "anyOf":
-			dst.AnyOf = sibling.AnyOf
-		case "allOf":
-			dst.AllOf = sibling.AllOf
-		case "not":
-			dst.Not = sibling.Not
-		case "type":
-			dst.Type = sibling.Type
-		case "title":
-			dst.Title = sibling.Title
-		case "format":
-			dst.Format = sibling.Format
-		case "description":
-			dst.Description = sibling.Description
-		case "enum":
-			dst.Enum = sibling.Enum
-		case "default":
-			dst.Default = sibling.Default
-		case "example":
-			dst.Example = sibling.Example
-		case "externalDocs":
-			dst.ExternalDocs = sibling.ExternalDocs
-		case "uniqueItems":
-			dst.UniqueItems = sibling.UniqueItems
-		case "exclusiveMinimum":
-			dst.ExclusiveMin = sibling.ExclusiveMin
-		case "exclusiveMaximum":
-			dst.ExclusiveMax = sibling.ExclusiveMax
-		case "nullable":
-			dst.Nullable = sibling.Nullable
-		case "readOnly":
-			dst.ReadOnly = sibling.ReadOnly
-		case "writeOnly":
-			dst.WriteOnly = sibling.WriteOnly
-		case "allowEmptyValue":
-			dst.AllowEmptyValue = sibling.AllowEmptyValue
-		case "deprecated":
-			dst.Deprecated = sibling.Deprecated
-		case "xml":
-			dst.XML = sibling.XML
-		case "minimum":
-			dst.Min = sibling.Min
-		case "maximum":
-			dst.Max = sibling.Max
-		case "multipleOf":
-			dst.MultipleOf = sibling.MultipleOf
-		case "minLength":
-			dst.MinLength = sibling.MinLength
-		case "maxLength":
-			dst.MaxLength = sibling.MaxLength
-		case "pattern":
-			dst.Pattern = sibling.Pattern
-		case "minItems":
-			dst.MinItems = sibling.MinItems
-		case "maxItems":
-			dst.MaxItems = sibling.MaxItems
-		case "items":
-			dst.Items = sibling.Items
-		case "required":
-			dst.Required = sibling.Required
-		case "properties":
-			dst.Properties = sibling.Properties
-		case "minProperties":
-			dst.MinProps = sibling.MinProps
-		case "maxProperties":
-			dst.MaxProps = sibling.MaxProps
-		case "additionalProperties":
-			dst.AdditionalProperties = sibling.AdditionalProperties
-		case "discriminator":
-			dst.Discriminator = sibling.Discriminator
-		case "const":
-			dst.Const = sibling.Const
-		case "examples":
-			dst.Examples = sibling.Examples
-		case "prefixItems":
-			dst.PrefixItems = sibling.PrefixItems
-		case "contains":
-			dst.Contains = sibling.Contains
-		case "minContains":
-			dst.MinContains = sibling.MinContains
-		case "maxContains":
-			dst.MaxContains = sibling.MaxContains
-		case "patternProperties":
-			dst.PatternProperties = sibling.PatternProperties
-		case "dependentSchemas":
-			dst.DependentSchemas = sibling.DependentSchemas
-		case "propertyNames":
-			dst.PropertyNames = sibling.PropertyNames
-		case "unevaluatedItems":
-			dst.UnevaluatedItems = sibling.UnevaluatedItems
-		case "unevaluatedProperties":
-			dst.UnevaluatedProperties = sibling.UnevaluatedProperties
-		case "if":
-			dst.If = sibling.If
-		case "then":
-			dst.Then = sibling.Then
-		case "else":
-			dst.Else = sibling.Else
-		case "dependentRequired":
-			dst.DependentRequired = sibling.DependentRequired
-		case "$defs":
-			dst.Defs = sibling.Defs
-		case "$schema":
-			dst.SchemaDialect = sibling.SchemaDialect
-		case "$comment":
-			dst.Comment = sibling.Comment
-		case "$id":
-			dst.SchemaID = sibling.SchemaID
-		case "$anchor":
-			dst.Anchor = sibling.Anchor
-		case "$dynamicRef":
-			dst.DynamicRef = sibling.DynamicRef
-		case "$dynamicAnchor":
-			dst.DynamicAnchor = sibling.DynamicAnchor
-		case "contentMediaType":
-			dst.ContentMediaType = sibling.ContentMediaType
-		case "contentEncoding":
-			dst.ContentEncoding = sibling.ContentEncoding
-		case "contentSchema":
-			dst.ContentSchema = sibling.ContentSchema
-		}
-	}
+	return strings.Replace(strings.Replace(ref, "~1", "/", -1), "~0", "~", -1)
 }

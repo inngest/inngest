@@ -15,7 +15,7 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 		return u
 	}
 
-	parsed = stripDeployID(*parsed)
+	parsed = stripInternalQueryParams(*parsed)
 
 	if forceHTTPS {
 		isWebSocket := strings.HasPrefix(parsed.Scheme, "ws")
@@ -59,9 +59,10 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 	return parsed.String()
 }
 
-func stripDeployID(u url.URL) *url.URL {
+func stripInternalQueryParams(u url.URL) *url.URL {
 	qp := u.Query()
 	qp.Del("deployId")
+	qp.Del("probe")
 	u.RawQuery = qp.Encode()
 	return &u
 }

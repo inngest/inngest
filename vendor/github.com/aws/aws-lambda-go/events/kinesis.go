@@ -20,13 +20,13 @@ type KinesisTimeWindowEventResponse struct {
 }
 
 type KinesisEventRecord struct {
-	AwsRegion         string        `json:"awsRegion"` //nolint: staticcheck
+	AwsRegion         string        `json:"awsRegion"` //nolint: stylecheck
 	EventID           string        `json:"eventID"`
 	EventName         string        `json:"eventName"`
 	EventSource       string        `json:"eventSource"`
-	EventSourceArn    string        `json:"eventSourceARN"` //nolint: staticcheck
+	EventSourceArn    string        `json:"eventSourceARN"` //nolint: stylecheck
 	EventVersion      string        `json:"eventVersion"`
-	InvokeIdentityArn string        `json:"invokeIdentityArn"` //nolint: staticcheck
+	InvokeIdentityArn string        `json:"invokeIdentityArn"` //nolint: stylecheck
 	Kinesis           KinesisRecord `json:"kinesis"`
 }
 

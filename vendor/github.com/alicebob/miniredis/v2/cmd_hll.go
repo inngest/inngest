@@ -5,13 +5,21 @@ import "github.com/alicebob/miniredis/v2/server"
 // commandsHll handles all hll related operations.
 func commandsHll(m *Miniredis) {
 	m.srv.Register("PFADD", m.cmdPfadd)
-	m.srv.Register("PFCOUNT", m.cmdPfcount, server.ReadOnlyOption())
+	m.srv.Register("PFCOUNT", m.cmdPfcount)
 	m.srv.Register("PFMERGE", m.cmdPfmerge)
 }
 
 // PFADD
 func (m *Miniredis) cmdPfadd(c *server.Peer, cmd string, args []string) {
-	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -20,7 +28,7 @@ func (m *Miniredis) cmdPfadd(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if db.exists(key) && db.t(key) != keyTypeHll {
+		if db.exists(key) && db.t(key) != "hll" {
 			c.WriteError(ErrNotValidHllValue.Error())
 			return
 		}
@@ -32,7 +40,15 @@ func (m *Miniredis) cmdPfadd(c *server.Peer, cmd string, args []string) {
 
 // PFCOUNT
 func (m *Miniredis) cmdPfcount(c *server.Peer, cmd string, args []string) {
-	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
+	if len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -53,7 +69,15 @@ func (m *Miniredis) cmdPfcount(c *server.Peer, cmd string, args []string) {
 
 // PFMERGE
 func (m *Miniredis) cmdPfmerge(c *server.Peer, cmd string, args []string) {
-	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
+	if len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 

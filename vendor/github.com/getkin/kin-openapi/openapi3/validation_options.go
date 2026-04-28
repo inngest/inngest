@@ -13,8 +13,6 @@ type ValidationOptions struct {
 	schemaFormatValidationEnabled                    bool
 	schemaPatternValidationDisabled                  bool
 	schemaExtensionsInRefProhibited                  bool
-	jsonSchema2020ValidationEnabled                  bool
-	isOpenAPI31OrLater                               bool
 	regexCompilerFunc                                RegexCompilerFunc
 	extraSiblingFieldsAllowed                        map[string]struct{}
 }
@@ -30,14 +28,6 @@ func AllowExtraSiblingFields(fields ...string) ValidationOption {
 		for _, field := range fields {
 			options.extraSiblingFieldsAllowed[field] = struct{}{}
 		}
-	}
-}
-
-// IsOpenAPI31OrLater enables "JSON Schema Draft 2020-12"-compliant validation (for OpenAPI 3.1 documents).
-func IsOpenAPI31OrLater() ValidationOption {
-	return func(options *ValidationOptions) {
-		options.isOpenAPI31OrLater = true              // To distinguish from v3.0
-		options.jsonSchema2020ValidationEnabled = true // TODO: use even for v3.0
 	}
 }
 

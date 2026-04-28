@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2020 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -12,12 +12,14 @@
 // limitations under the License.
 
 //go:build !windows
+// +build !windows
 
 package procfs
 
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -27,7 +29,7 @@ import (
 )
 
 var (
-	// Match the header line before each mapped zone in `/proc/pid/smaps`.
+	// match the header line before each mapped zone in `/proc/pid/smaps`.
 	procSMapsHeaderLine = regexp.MustCompile(`^[a-f0-9].*$`)
 )
 
@@ -115,6 +117,7 @@ func (p Proc) procSMapsRollupManual() (ProcSMapsRollup, error) {
 func (s *ProcSMapsRollup) parseLine(line string) error {
 	kv := strings.SplitN(line, ":", 2)
 	if len(kv) != 2 {
+		fmt.Println(line)
 		return errors.New("invalid net/dev line, missing colon")
 	}
 

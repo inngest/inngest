@@ -8,119 +8,122 @@ func isScalar(n *Node) bool {
 	return n.Kind == ScalarNode
 }
 
-func isSequence(n *Node) bool {
-	return n.Kind == SequenceNode
-}
+func addOriginInSeq(n *Node) *Node {
 
-func isMapping(n *Node) bool {
-	return n.Kind == MappingNode
-}
-
-func addOriginInSeq(n *Node, file string) *Node {
-	if !isMapping(n) || len(n.Content) == 0 {
+	if n.Kind != MappingNode {
 		return n
 	}
+
 	// in case of a sequence, we use the first element as the key
-	return addOrigin(n.Content[0], n, file)
+	return addOrigin(n.Content[0], n)
 }
 
-func addOriginInMap(key, n *Node, file string) *Node {
-	if !isMapping(n) {
+func addOriginInMap(key, n *Node) *Node {
+
+	if n.Kind != MappingNode {
 		return n
 	}
-	return addOrigin(key, n, file)
+
+	return addOrigin(key, n)
 }
 
-// addOrigin injects a compact __origin__ sequence into the mapping node n.
-//
-// Format: [file, key_name, key_line, key_col, nf, f1_name, f1_delta, f1_col, ..., ns, s1_name, s1_count, s1_l0_delta, s1_c0, ...]
-//
-//   - file: source file path
-//   - key_name:  the YAML key whose value is this mapping
-//   - key_line, key_col: location of that key
-//   - nf: number of scalar+sequence fields recorded
-//   - per field: name (string), line delta from key_line (int), column (int)
-//   - ns: number of sequence fields that have item locations
-//   - per sequence: name (string), item count (int), then count × (line delta, col)
-func addOrigin(key, n *Node, file string) *Node {
+func addOrigin(key, n *Node) *Node {
 	if isOrigin(key) {
 		return n
 	}
 
-	seq := buildOriginSeq(key, n, file)
-	n.Content = append(n.Content,
-		&Node{Kind: ScalarNode, Tag: "!!str", Value: originTag}, // Line==0 → isOrigin
-		&Node{Kind: SequenceNode, Tag: "!!seq", Content: seq},
-	)
+	n.Content = append(n.Content, getNamedMap(originTag, append(getKeyLocation(key), getNamedMap("fields", getFieldLocations(n))...))...)
 	return n
 }
 
-func buildOriginSeq(key, n *Node, file string) []*Node {
-	// Header: file, key_name, key_line, key_col
-	nodes := []*Node{
-		strNode(file),
-		strNode(key.Value),
-		intNode(key.Line),
-		intNode(key.Column),
-	}
-
-	// Collect field and sequence data.
-	var fieldNodes []*Node // nf × (name, delta, col)
-	var seqNodes []*Node   // ns × (name, count, (delta, col)…)
-	nf, ns := 0, 0
+func getFieldLocations(n *Node) []*Node {
 
 	l := len(n.Content)
+	size := 0
 	for i := 0; i < l; i += 2 {
-		k := n.Content[i]
-		v := n.Content[i+1]
-		if isOrigin(k) {
-			continue
-		}
-		// Record the location of this field's key.
-		nf++
-		fieldNodes = append(fieldNodes,
-			strNode(k.Value),
-			intNode(k.Line-key.Line),
-			intNode(k.Column),
-		)
-		if isSequence(v) {
-			// Record locations of scalar items within the sequence.
-			// Format per item: value_str, line_delta, col
-			var itemNodes []*Node
-			for _, item := range v.Content {
-				if item.Kind == ScalarNode {
-					itemNodes = append(itemNodes,
-						strNode(item.Value),
-						intNode(item.Line-key.Line),
-						intNode(item.Column),
-					)
-				}
-			}
-			if len(itemNodes) > 0 {
-				ns++
-				seqNodes = append(seqNodes, strNode(k.Value), intNode(len(itemNodes)/3))
-				seqNodes = append(seqNodes, itemNodes...)
-			}
+		if isScalar(n.Content[i+1]) {
+			size += 2
 		}
 	}
 
-	nodes = append(nodes, intNode(nf))
-	nodes = append(nodes, fieldNodes...)
-	nodes = append(nodes, intNode(ns))
-	nodes = append(nodes, seqNodes...)
+	nodes := make([]*Node, 0, size)
+	for i := 0; i < l; i += 2 {
+		if isScalar(n.Content[i+1]) {
+			nodes = append(nodes, getNodeLocation(n.Content[i])...)
+		}
+	}
 	return nodes
 }
 
-// isOrigin returns true if the key is a synthetic origin node.
-// Synthetic nodes have Line==0 (real YAML lines are 1-based).
+// isOrigin returns true if the key is an "origin" element
+// the current implementation is not optimal, as it relies on the key's line number
+// a better design would be to use a dedicated field in the Node struct
 func isOrigin(key *Node) bool {
 	return key.Line == 0
 }
 
-func strNode(v string) *Node {
-	return &Node{Kind: ScalarNode, Tag: "!!str", Value: v}
+func getNodeLocation(n *Node) []*Node {
+	return getNamedMap(n.Value, getLocationObject(n))
 }
 
-func intNode(v int) *Node {
-	return &Node{Kind: ScalarNode, Tag: "!!int", Value: fmt.Sprintf("%d", v)}
+func getKeyLocation(n *Node) []*Node {
+	return getNamedMap("key", getLocationObject(n))
+}
+
+func getNamedMap(title string, content []*Node) []*Node {
+	if len(content) == 0 {
+		return nil
+	}
+
+	return []*Node{
+		{
+			Kind:  ScalarNode,
+			Tag:   "!!str",
+			Value: title,
+		},
+		getMap(content),
+	}
+}
+
+func getMap(content []*Node) *Node {
+	return &Node{
+		Kind:    MappingNode,
+		Tag:     "!!map",
+		Content: content,
+	}
+}
+
+func getLocationObject(key *Node) []*Node {
+	return []*Node{
+		{
+			Kind:  ScalarNode,
+			Tag:   "!!str",
+			Value: "line",
+		},
+		{
+			Kind:  ScalarNode,
+			Tag:   "!!int",
+			Value: fmt.Sprintf("%d", key.Line),
+		},
+		{
+			Kind:  ScalarNode,
+			Tag:   "!!str",
+			Value: "column",
+		},
+		{
+			Kind:  ScalarNode,
+			Tag:   "!!int",
+			Value: fmt.Sprintf("%d", key.Column),
+		},
+		{
+			Kind:  ScalarNode,
+			Tag:   "!!str",
+			Value: "name",
+		},
+		{
+			Kind:  ScalarNode,
+			Tag:   "!!string",
+			Value: key.Value,
+		},
+	}
 }

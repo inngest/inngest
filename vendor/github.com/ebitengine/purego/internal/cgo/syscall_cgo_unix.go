@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2022 The Ebitengine Authors
 
-//go:build freebsd || (linux && !(386 || amd64 || arm || arm64 || loong64 || ppc64le || riscv64)) || netbsd
+//go:build freebsd || (linux && !(arm64 || amd64))
 
 package cgo
 
@@ -9,7 +9,7 @@ package cgo
 // because Cgo and assembly files can't be in the same package.
 
 /*
-#cgo !netbsd LDFLAGS: -ldl
+ #cgo LDFLAGS: -ldl
 
 #include <stdint.h>
 #include <dlfcn.h>

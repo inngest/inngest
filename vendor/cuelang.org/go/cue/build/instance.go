@@ -18,8 +18,6 @@ import (
 	"fmt"
 	pathpkg "path"
 	"path/filepath"
-	"slices"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -28,7 +26,7 @@ import (
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal/mod/modfiledata"
+	"cuelang.org/go/internal"
 )
 
 // An Instance describes the collection of files, and its imports, necessary
@@ -38,7 +36,7 @@ import (
 type Instance struct {
 	ctxt *Context
 
-	BuildFiles    []*File // files to be included in the build
+	BuildFiles    []*File // files to be inclduded in the build
 	IgnoredFiles  []*File // files excluded for this build
 	OrphanedFiles []*File // recognized file formats not part of any build
 	InvalidFiles  []*File // could not parse these files
@@ -59,7 +57,7 @@ type Instance struct {
 
 	// ImportPath returns the unique path to identify an imported instance.
 	//
-	// Instances created with [Context.NewInstance] do not have an import path.
+	// Instances created with NewInstance do not have an import path.
 	ImportPath string
 
 	// Imports lists the instances of all direct imports of this instance.
@@ -69,11 +67,6 @@ type Instance struct {
 	// include any errors of dependencies. Incomplete will be set if there
 	// were any errors in dependencies.
 	Err errors.Error
-
-	// ResolutionErr contains errors from identifier resolution, such as
-	// "imported and not used". These are stored separately from Err to
-	// avoid failing import loading for dependencies.
-	ResolutionErr errors.Error
 
 	parent *Instance // TODO: for cycle detection
 
@@ -88,36 +81,36 @@ type Instance struct {
 	// imported by other packages, including those within the module.
 	Module string
 
-	// ModuleFile holds the actual module file data, if available.
-	ModuleFile *modfiledata.File
-
 	// Root is the root of the directory hierarchy, it may be "" if this an
 	// instance has no imports.
 	// If Module != "", this corresponds to the module root.
 	// Root/pkg is the directory that holds third-party packages.
-	Root string
+	Root string // root directory of hierarchy ("" if unknown)
 
 	// Dir is the package directory. A package may also include files from
 	// ancestor directories, up to the module file.
 	Dir string
 
-	// NOTICE: the below struct field tags may change in the future.
+	// NOTICE: the below tags may change in the future.
+
+	// ImportComment is the path in the import comment on the package statement.
+	ImportComment string `api:"alpha"`
+
+	// AllTags are the build tags that can influence file selection in this
+	// directory.
+	AllTags []string `api:"alpha"`
 
 	// Incomplete reports whether any dependencies had an error.
 	Incomplete bool `api:"alpha"`
 
 	// Dependencies
-
 	// ImportPaths gives the transitive dependencies of all imports.
 	ImportPaths []string               `api:"alpha"`
 	ImportPos   map[string][]token.Pos `api:"alpha"` // line information for Imports
 
 	Deps       []string `api:"alpha"`
 	DepsErrors []error  `api:"alpha"`
-	// TODO: Match was declared for years but never set by any of the cue/build logic.
-	// If any user was trying to use it, we should implement it,
-	// but that seems unlikely given that it was always empty.
-	// Match []string `api:"alpha"`
+	Match      []string `api:"alpha"`
 }
 
 // RelPath reports the path of f relative to the root of the instance's module
@@ -192,14 +185,10 @@ func (inst *Instance) Context() *Context {
 }
 
 func (inst *Instance) parse(name string, src interface{}) (*ast.File, error) {
-	cfg := parser.NewConfig(parser.ParseComments)
-	if inst.ModuleFile != nil && inst.ModuleFile.Language != nil {
-		cfg = cfg.Apply(parser.Version(inst.ModuleFile.Language.Version))
-	}
 	if inst.ctxt != nil && inst.ctxt.parseFunc != nil {
-		return inst.ctxt.parseFunc(name, src, cfg)
+		return inst.ctxt.parseFunc(name, src)
 	}
-	return parser.ParseFile(name, src, cfg)
+	return parser.ParseFile(name, src, parser.ParseComments)
 }
 
 // LookupImport defines a mapping from an ImportSpec's ImportPath to Instance.
@@ -230,7 +219,7 @@ func (inst *Instance) addImport(imp *Instance) {
 // It does not process the file's imports. The package name of the file must
 // match the package name of the instance.
 //
-// Deprecated: use [Instance.AddSyntax] or wait for this to be renamed using a new
+// Deprecated: use AddSyntax or wait for this to be renamed using a new
 // signature.
 func (inst *Instance) AddFile(filename string, src interface{}) error {
 	file, err := inst.parse(filename, src)
@@ -250,9 +239,9 @@ func (inst *Instance) AddSyntax(file *ast.File) errors.Error {
 	astutil.Resolve(file, func(pos token.Pos, msg string, args ...interface{}) {
 		inst.Err = errors.Append(inst.Err, errors.Newf(pos, msg, args...))
 	})
-	pkg := file.PackageName()
-	if pkg != "" && pkg != "_" && !inst.User && !inst.setPkg(pkg) && pkg != inst.PkgName {
-		err := errors.Newf(file.Pos(),
+	_, pkg, pos := internal.PackageInfo(file)
+	if pkg != "" && pkg != "_" && !inst.setPkg(pkg) && pkg != inst.PkgName {
+		err := errors.Newf(pos,
 			"package name %q conflicts with previous package name %q",
 			pkg, inst.PkgName)
 		inst.ReportError(err)
@@ -295,130 +284,4 @@ func makeImportValid(r rune) rune {
 func IsLocalImport(path string) bool {
 	return path == "." || path == ".." ||
 		strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
-}
-
-func (inst *Instance) resolveIdentifiers() errors.Error {
-	// Link top-level declarations. As top-level entries get unified, an entry
-	// may be linked to any top-level entry of any of the files.
-	allFields := map[string]ast.Node{}
-	for _, f := range inst.Files {
-		if f.PackageName() == "" {
-			continue
-		}
-		for _, d := range f.Decls {
-			if f, ok := d.(*ast.Field); ok && f.Value != nil {
-				if ident, ok := f.Label.(*ast.Ident); ok {
-					allFields[ident.Name] = f.Value
-				}
-			}
-		}
-	}
-
-	var errs errors.Error
-	for _, f := range inst.Files {
-		err := inst.resolveFile(f, allFields)
-		errs = errors.Append(errs, err)
-	}
-	return errs
-}
-
-func (inst *Instance) resolveFile(f *ast.File, allFields map[string]ast.Node) errors.Error {
-	unresolved := map[string][]*ast.Ident{}
-	for _, u := range f.Unresolved {
-		unresolved[u.Name] = append(unresolved[u.Name], u)
-	}
-	fields := map[string]ast.Node{}
-	for _, d := range f.Decls {
-		if f, ok := d.(*ast.Field); ok && f.Value != nil {
-			if ident, ok := f.Label.(*ast.Ident); ok {
-				fields[ident.Name] = d
-			}
-		}
-	}
-	var errs errors.Error
-
-	specs := []*ast.ImportSpec{}
-
-	for spec := range f.ImportSpecs() {
-		id, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
-			continue // quietly ignore the error
-		}
-		name := pathpkg.Base(id)
-		if imp := inst.LookupImport(id); imp != nil {
-			name = imp.PkgName
-		}
-		if spec.Name != nil {
-			name = spec.Name.Name
-		}
-		if n, ok := fields[name]; ok {
-			errs = errors.Append(errs, errors.Newf(spec.Pos(),
-				"%s redeclared as imported package name\n"+
-					"\tprevious declaration at %s", name, n.Pos()))
-			continue
-		}
-		fields[name] = spec
-		used := false
-		for _, u := range unresolved[name] {
-			used = true
-			u.Node = spec
-		}
-		if !used {
-			specs = append(specs, spec)
-		}
-	}
-
-	// Verify each import is used.
-	if len(specs) > 0 {
-		// Find references to imports. This assumes that identifiers in labels
-		// are not resolved or that such errors are caught elsewhere.
-		ast.Walk(f, nil, func(n ast.Node) {
-			if x, ok := n.(*ast.Ident); ok {
-				// As we also visit labels, most nodes will be nil.
-				if x.Node == nil {
-					return
-				}
-				for i, s := range specs {
-					if s == x.Node {
-						specs[i] = nil
-						return
-					}
-				}
-			}
-		})
-
-		// Add errors for unused imports.
-		for _, spec := range specs {
-			if spec == nil {
-				continue
-			}
-			if spec.Name == nil {
-				errs = errors.Append(errs, errors.Newf(spec.Pos(),
-					"imported and not used: %s", spec.Path.Value))
-			} else {
-				errs = errors.Append(errs, errors.Newf(spec.Pos(),
-					"imported and not used: %s as %s", spec.Path.Value, spec.Name))
-			}
-		}
-	}
-
-	f.Unresolved = slices.DeleteFunc(f.Unresolved, func(u *ast.Ident) bool {
-		if n, ok := allFields[u.Name]; ok {
-			u.Node = n
-			u.Scope = f
-			return true
-		}
-		if u.Node != nil {
-			// Keep valid import resolutions; clear any stale
-			// field references from a previous instance context.
-			if _, ok := u.Node.(*ast.ImportSpec); ok {
-				return true
-			}
-			u.Node = nil
-			u.Scope = nil
-		}
-		return false
-	})
-
-	return errs
 }

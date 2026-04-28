@@ -1,4 +1,4 @@
-// Copyright 2021-2025 The Connect Authors
+// Copyright 2021-2024 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package connect
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 )
 
@@ -52,11 +53,7 @@ func NewUnaryHandler[Req, Res any](
 		if res == nil && err == nil {
 			// This is going to panic during serialization. Debugging is much easier
 			// if we panic here instead, so we can include the procedure name.
-			panic(procedure + " returned nil *connect.Response and nil error") //nolint: forbidigo
-		}
-		if res == nil {
-			// Avoid returning a typed nil (*Response[Res]) as an AnyResponse interface value.
-			return nil, err
+			panic(fmt.Sprintf("%s returned nil *connect.Response and nil error", procedure)) //nolint: forbidigo
 		}
 		return res, err
 	})
@@ -70,34 +67,12 @@ func NewUnaryHandler[Req, Res any](
 		if err != nil {
 			return err
 		}
-		// Add the request header to the context, and store the response header
-		// and trailer to propagate back to the caller.
-		info := &handlerCallInfo{
-			peer:          request.Peer(),
-			spec:          request.Spec(),
-			method:        request.HTTPMethod(),
-			requestHeader: request.Header(),
-		}
-		ctx = newHandlerContext(ctx, info)
 		response, err := untyped(ctx, request)
-		// Add response headers/trailers from the context callinfo into the conn if they exist
-		if info.responseHeader != nil {
-			mergeNonProtocolHeaders(conn.ResponseHeader(), info.responseHeader)
-		}
-		if info.responseTrailer != nil {
-			mergeNonProtocolHeaders(conn.ResponseTrailer(), info.responseTrailer)
-		}
 		if err != nil {
 			return err
 		}
-
-		// Add response headers/trailers from the response into the conn if they exist
-		if len(response.Header()) != 0 {
-			mergeNonProtocolHeaders(conn.ResponseHeader(), response.Header())
-		}
-		if len(response.Trailer()) != 0 {
-			mergeNonProtocolHeaders(conn.ResponseTrailer(), response.Trailer())
-		}
+		mergeHeaders(conn.ResponseHeader(), response.Header())
+		mergeHeaders(conn.ResponseTrailer(), response.Trailer())
 		return conn.Send(response.Any())
 	}
 
@@ -109,29 +84,6 @@ func NewUnaryHandler[Req, Res any](
 		allowMethod:      sortedAllowMethodValue(protocolHandlers),
 		acceptPost:       sortedAcceptPostValue(protocolHandlers),
 	}
-}
-
-// NewUnaryHandlerSimple constructs a [Handler] for a request-response procedure using the
-// function signature associated with the "simple" generation option.
-//
-// This option eliminates the [Request] and [Response] wrappers, and instead uses the
-// context.Context to propagate information such as headers.
-func NewUnaryHandlerSimple[Req, Res any](
-	procedure string,
-	unary func(context.Context, *Req) (*Res, error),
-	options ...HandlerOption,
-) *Handler {
-	return NewUnaryHandler(
-		procedure,
-		func(ctx context.Context, request *Request[Req]) (*Response[Res], error) {
-			responseMsg, err := unary(ctx, request.Msg)
-			if err != nil {
-				return nil, err
-			}
-			return NewResponse(responseMsg), nil
-		},
-		options...,
-	)
 }
 
 // NewClientStreamHandler constructs a [Handler] for a client streaming procedure.
@@ -148,9 +100,6 @@ func NewClientStreamHandler[Req, Res any](
 				conn:        conn,
 				initializer: config.Initializer,
 			}
-			ctx = newHandlerContext(ctx, &streamingHandlerCallInfo{
-				conn: conn,
-			})
 			res, err := implementation(ctx, stream)
 			if err != nil {
 				return err
@@ -158,35 +107,12 @@ func NewClientStreamHandler[Req, Res any](
 			if res == nil {
 				// This is going to panic during serialization. Debugging is much easier
 				// if we panic here instead, so we can include the procedure name.
-				panic(procedure + " returned nil *connect.Response and nil error") //nolint: forbidigo
+				panic(fmt.Sprintf("%s returned nil *connect.Response and nil error", procedure)) //nolint: forbidigo
 			}
 			mergeHeaders(conn.ResponseHeader(), res.header)
 			mergeHeaders(conn.ResponseTrailer(), res.trailer)
 			return conn.Send(res.Msg)
 		},
-	)
-}
-
-// NewClientStreamHandlerSimple constructs a [Handler] for a request-streaming procedure
-// using the function signature associated with the "simple" generation option.
-//
-// This option eliminates the [Response] wrapper, and instead uses the context.Context
-// to propagate information such as headers.
-func NewClientStreamHandlerSimple[Req, Res any](
-	procedure string,
-	implementation func(context.Context, *ClientStream[Req]) (*Res, error),
-	options ...HandlerOption,
-) *Handler {
-	return NewClientStreamHandler(
-		procedure,
-		func(ctx context.Context, stream *ClientStream[Req]) (*Response[Res], error) {
-			responseMsg, err := implementation(ctx, stream)
-			if err != nil {
-				return nil, err
-			}
-			return NewResponse(responseMsg), nil
-		},
-		options...,
 	)
 }
 
@@ -204,30 +130,8 @@ func NewServerStreamHandler[Req, Res any](
 			if err != nil {
 				return err
 			}
-			ctx = newHandlerContext(ctx, &streamingHandlerCallInfo{
-				conn: conn,
-			})
 			return implementation(ctx, req, &ServerStream[Res]{conn: conn})
 		},
-	)
-}
-
-// NewServerStreamHandlerSimple constructs a [Handler] a server streaming procedure using the function
-// signature associated with the "simple" generation option.
-//
-// This option eliminates the [Request] wrapper, and instead uses the context.Context to
-// propagate information such as headers.
-func NewServerStreamHandlerSimple[Req, Res any](
-	procedure string,
-	implementation func(context.Context, *Req, *ServerStream[Res]) error,
-	options ...HandlerOption,
-) *Handler {
-	return NewServerStreamHandler(
-		procedure,
-		func(ctx context.Context, request *Request[Req], serverStream *ServerStream[Res]) error {
-			return implementation(ctx, request.Msg, serverStream)
-		},
-		options...,
 	)
 }
 
@@ -241,9 +145,6 @@ func NewBidiStreamHandler[Req, Res any](
 	return newStreamHandler(
 		config,
 		func(ctx context.Context, conn StreamingHandlerConn) error {
-			ctx = newHandlerContext(ctx, &streamingHandlerCallInfo{
-				conn: conn,
-			})
 			return implementation(
 				ctx,
 				&BidiStream[Req, Res]{

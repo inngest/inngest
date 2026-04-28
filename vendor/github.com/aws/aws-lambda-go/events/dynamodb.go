@@ -56,7 +56,7 @@ type DynamoDBEventRecord struct {
 	EventVersion string `json:"eventVersion"`
 
 	// The event source ARN of DynamoDB
-	EventSourceArn string `json:"eventSourceARN"` //nolint: staticcheck
+	EventSourceArn string `json:"eventSourceARN"` //nolint: stylecheck
 
 	// Items that are deleted by the Time to Live process after expiration have
 	// the following fields:

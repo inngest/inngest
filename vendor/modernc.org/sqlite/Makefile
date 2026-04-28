@@ -61,13 +61,13 @@ edit:
 editor:
 	go test -c -o /dev/null
 	go build -v  -o /dev/null ./...
-	cd vendor_libs && go build -o /dev/null main.go
+	cd vendor_libsqlite3 && go build -o /dev/null main.go
 
 test:
 	go test -v -timeout 24h
 	
 vendor:
-	cd vendor_libs && go build -o ../vendor main.go
+	cd vendor_libsqlite3 && go build -o ../vendor main.go
 	./vendor
 	rm -f vendor
 	make build_all_targets

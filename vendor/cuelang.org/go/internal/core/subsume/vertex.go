@@ -16,30 +16,27 @@ package subsume
 
 import (
 	"fmt"
-	"slices"
 
 	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/core/export"
 )
 
 // Notes:
-//   - Can optional fields of y can always be ignored here? Maybe not in the
-//     schema case.
-//   - Definitions of y can be ignored in data mode.
+// - Can optional fields of y can always be ignored here? Maybe not in the
+//   schema case.
+// - Definitions of y can be ignored in data mode.
 //
 // TODO(perf): use merge sort where possible.
 func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 	if x == y {
 		return true
 	}
-	if a, b := x.ArcType, y.ArcType; a < b {
-		return false
-	}
 
 	if s.Defaults {
 		y = y.Default()
 	}
 
-	if b := y.Bottom(); b != nil {
+	if b, _ := y.BaseValue.(*adt.Bottom); b != nil {
 		// If the value is incomplete, the error is not final. So either check
 		// structural equivalence or return an error.
 		return !b.IsIncomplete()
@@ -55,7 +52,7 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 
 	case *adt.ListMarker:
 		if !y.IsList() {
-			s.errf("list does not subsume %v (type %s)", y, y.Kind())
+			s.errf("list does not subsume %s (type %s)", y, y.Kind())
 			return false
 		}
 		if !s.listVertices(x, y) {
@@ -80,9 +77,6 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 			return true
 		}
 
-	case nil:
-		return false
-
 	default:
 		panic(fmt.Sprintf("unexpected type %T", v))
 	}
@@ -97,35 +91,32 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		return false
 	}
 
-	// From here, verticesDev differs significantly from vertices.
+	types := x.OptionalTypes()
+	if !final && !s.IgnoreOptional && types&(adt.HasPattern|adt.HasAdditional) != 0 {
+		// TODO: there are many cases where pattern constraints can be checked.
+		s.inexact = true
+		return false
+	}
 
-	for _, a := range x.Arcs {
-		f := a.Label
+	// All arcs in x must exist in y and its values must subsume.
+	xFeatures := export.VertexFeatures(x)
+	for _, f := range xFeatures {
 		if s.Final && !f.IsRegular() {
 			continue
 		}
 
-		isConstraint := false
-		switch a.ArcType {
-		case adt.ArcOptional:
+		a := x.Lookup(f)
+		aOpt := false
+		if a == nil {
+			// x.f is optional
 			if s.IgnoreOptional {
 				continue
 			}
 
-			if a.Kind() == adt.TopKind {
-				continue
-			}
+			a = &adt.Vertex{Label: f}
+			x.MatchAndInsert(ctx, a)
+			a.Finalize(ctx)
 
-			isConstraint = true
-
-		case adt.ArcRequired:
-			// TODO: what to do with required fields. Logically they should be
-			// ignored if subsuming at the value level. OTOH, they represent an
-			// (incomplete) error at the value level.
-			// Mimic the old evaluator for now.
-			if s.IgnoreOptional {
-				continue
-			}
 			// If field a is optional and has value top, neither the
 			// omission of the field nor the field defined with any value
 			// may cause unification to fail.
@@ -133,13 +124,14 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 				continue
 			}
 
-			isConstraint = true
+			aOpt = true
 		}
 
 		b := y.Lookup(f)
 		if b == nil {
-			if !isConstraint {
-				s.errf("regular field is constraint in subsumed value: %v", f)
+			// y.f is optional
+			if !aOpt {
+				s.errf("required field is optional in subsumed value: %s", f)
 				return false
 			}
 
@@ -151,8 +143,6 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 				continue
 			}
 
-			// There is no explicit field, but the values of pattern constraints
-			// may still be relevant.
 			b = &adt.Vertex{Label: f}
 			y.MatchAndInsert(ctx, b)
 			b.Finalize(ctx)
@@ -166,7 +156,7 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		s.gt = a
 		s.lt = y
 
-		s.errf("field %v not present in %v", f, y)
+		s.errf("field %s not present in %s", f, y)
 		return false
 	}
 
@@ -175,91 +165,51 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		return false
 	}
 
+	yFeatures := export.VertexFeatures(y)
 outer:
-	for _, b := range y.Arcs {
-		f := b.Label
-
+	for _, f := range yFeatures {
 		if s.Final && !f.IsRegular() {
 			continue
 		}
 
-		if b.IsConstraint() && (s.IgnoreOptional || s.Final) {
-			continue
-		}
-
-		for _, a := range x.Arcs {
-			g := a.Label
+		for _, g := range xFeatures {
 			if g == f {
 				// already validated
 				continue outer
 			}
 		}
 
+		b := y.Lookup(f)
+		if b == nil {
+			if s.IgnoreOptional || s.Final {
+				continue
+			}
+
+			b = &adt.Vertex{Label: f}
+			y.MatchAndInsert(ctx, b)
+		}
+
 		if !x.Accept(ctx, f) {
 			if s.Profile.IgnoreClosedness {
 				continue
 			}
-			s.errf("field not allowed in closed struct: %v", f)
+			s.errf("field not allowed in closed struct: %s", f)
 			return false
 		}
 
 		a := &adt.Vertex{Label: f}
 		x.MatchAndInsert(ctx, a)
-		if !a.HasConjuncts() {
+		if len(a.Conjuncts) == 0 {
 			// It is accepted and has no further constraints, so all good.
 			continue
 		}
 
 		a.Finalize(ctx)
+		b.Finalize(ctx)
 
 		if !s.vertices(a, b) {
 			return false
 		}
-	}
-
-	// Now compare pattern constraints.
-	apc := x.PatternConstraints
-	bpc := y.PatternConstraints
-	if bpc == nil {
-		if apc == nil {
-			return true
-		}
-		if y.IsClosedStruct() || y.IsClosedList() || final {
-			// This is a special case where know that any allowed optional field
-			// in a must be bottom in y, which is strictly more specific.
-			return true
-		}
-		return false
-	}
-	if apc == nil {
-		return true
-	}
-	if len(apc.Pairs) > len(bpc.Pairs) {
-		// Theoretically it is still possible for a to subsume b, but it will
-		// somewhat tricky and expensive to compute and it is probably not worth
-		// it.
-		s.inexact = true
-		return false
-	}
-
-outerConstraint:
-	for _, p := range apc.Pairs {
-		for _, q := range bpc.Pairs {
-			if adt.Equal(s.ctx, p.Pattern, q.Pattern, 0) {
-				p.Constraint.Finalize(s.ctx)
-				q.Constraint.Finalize(s.ctx)
-				if !s.values(p.Constraint, q.Constraint) {
-					return false
-				}
-				continue outerConstraint
-			}
-		}
-		// We have a pattern in a that does not exist in b. Theoretically a
-		// could still subsume b if the values of the patterns in b combined
-		// subsume this value.
-		// TODO: consider whether it is worth computing this.
-		s.inexact = true
-		return false
 	}
 
 	return true
@@ -272,8 +222,8 @@ func (s *subsumer) listVertices(x, y *adt.Vertex) bool {
 		return false
 	}
 
-	xElems := slices.Collect(x.Elems())
-	yElems := slices.Collect(y.Elems())
+	xElems := x.Elems()
+	yElems := y.Elems()
 
 	switch {
 	case len(xElems) == len(yElems):

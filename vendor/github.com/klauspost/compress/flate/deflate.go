@@ -6,12 +6,11 @@
 package flate
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-
-	"github.com/klauspost/compress/internal/le"
 )
 
 const (
@@ -235,9 +234,12 @@ func (d *compressor) fillWindow(b []byte) {
 
 	// Calculate 256 hashes at the time (more L1 cache hits)
 	loops := (n + 256 - minMatchLength) / 256
-	for j := range loops {
+	for j := 0; j < loops; j++ {
 		startindex := j * 256
-		end := min(startindex+256+minMatchLength-1, n)
+		end := startindex + 256 + minMatchLength - 1
+		if end > n {
+			end = n
+		}
 		tocheck := d.window[startindex:end]
 		dstSize := len(tocheck) - minMatchLength + 1
 
@@ -267,12 +269,18 @@ func (d *compressor) fillWindow(b []byte) {
 // We only look at chainCount possibilities before giving up.
 // pos = s.index, prevHead = s.chainHead-s.hashOffset, prevLength=minMatchLength-1, lookahead
 func (d *compressor) findMatch(pos int, prevHead int, lookahead int) (length, offset int, ok bool) {
-	minMatchLook := min(lookahead, maxMatchLength)
+	minMatchLook := maxMatchLength
+	if lookahead < minMatchLook {
+		minMatchLook = lookahead
+	}
 
 	win := d.window[0 : pos+minMatchLook]
 
 	// We quit when we get a match that's at least nice long
-	nice := min(d.nice, len(win)-pos)
+	nice := len(win) - pos
+	if d.nice < nice {
+		nice = d.nice
+	}
 
 	// If we've got a match that's good enough, only look in 1/4 the chain.
 	tries := d.chain
@@ -280,7 +288,10 @@ func (d *compressor) findMatch(pos int, prevHead int, lookahead int) (length, of
 
 	wEnd := win[pos+length]
 	wPos := win[pos:]
-	minIndex := max(pos-windowSize, 0)
+	minIndex := pos - windowSize
+	if minIndex < 0 {
+		minIndex = 0
+	}
 	offset = 0
 
 	if d.chain < 100 {
@@ -363,7 +374,7 @@ func (d *compressor) writeStoredBlock(buf []byte) error {
 // of the supplied slice.
 // The caller must ensure that len(b) >= 4.
 func hash4(b []byte) uint32 {
-	return hash4u(le.Load32(b, 0), hashBits)
+	return hash4u(binary.LittleEndian.Uint32(b), hashBits)
 }
 
 // hash4 returns the hash of u to fit in a hash table with h bits.
@@ -378,7 +389,7 @@ func bulkHash4(b []byte, dst []uint32) {
 	if len(b) < 4 {
 		return
 	}
-	hb := le.Load32(b, 0)
+	hb := binary.LittleEndian.Uint32(b)
 
 	dst[0] = hash4u(hb, hashBits)
 	end := len(b) - 4 + 1
@@ -421,9 +432,7 @@ func (d *compressor) deflateLazy() {
 			d.h = newHuffmanEncoder(maxFlateBlockTokens)
 		}
 		var tmp [256]uint16
-		toIndex := d.window[s.index:d.windowEnd]
-		toIndex = toIndex[:min(len(toIndex), maxFlateBlockTokens)]
-		for _, v := range toIndex {
+		for _, v := range d.window[s.index:d.windowEnd] {
 			tmp[v]++
 		}
 		d.h.generate(tmp[:], 15)
@@ -471,7 +480,10 @@ func (d *compressor) deflateLazy() {
 		prevOffset := s.offset
 		s.length = minMatchLength - 1
 		s.offset = 0
-		minIndex := max(s.index-windowSize, 0)
+		minIndex := s.index - windowSize
+		if minIndex < 0 {
+			minIndex = 0
+		}
 
 		if s.chainHead-s.hashOffset >= minIndex && lookahead > prevLength && prevLength < d.lazy {
 			if newLength, newOffset, ok := d.findMatch(s.index, s.chainHead-s.hashOffset, lookahead); ok {
@@ -491,7 +503,10 @@ func (d *compressor) deflateLazy() {
 			if prevLength < maxMatchLength-checkOff {
 				prevIndex := s.index - 1
 				if prevIndex+prevLength < s.maxInsertIndex {
-					end := min(lookahead, maxMatchLength+checkOff)
+					end := lookahead
+					if lookahead > maxMatchLength+checkOff {
+						end = maxMatchLength + checkOff
+					}
 					end += prevIndex
 
 					// Hash at match end.
@@ -588,9 +603,15 @@ func (d *compressor) deflateLazy() {
 			// table.
 			newIndex := s.index + prevLength - 1
 			// Calculate missing hashes
-			end := min(newIndex, s.maxInsertIndex)
+			end := newIndex
+			if end > s.maxInsertIndex {
+				end = s.maxInsertIndex
+			}
 			end += minMatchLength - 1
-			startindex := min(s.index+1, s.maxInsertIndex)
+			startindex := s.index + 1
+			if startindex > s.maxInsertIndex {
+				startindex = s.maxInsertIndex
+			}
 			tocheck := d.window[startindex:end]
 			dstSize := len(tocheck) - minMatchLength + 1
 			if dstSize > 0 {

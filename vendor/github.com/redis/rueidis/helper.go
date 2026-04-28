@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"iter"
-	"sync/atomic"
 	"time"
 
 	intl "github.com/redis/rueidis/internal/cmds"
@@ -51,7 +50,12 @@ func MGet(client Client, ctx context.Context, keys []string) (ret map[string]Red
 		return clientMGet(client, ctx, client.B().Mget().Key(keys...).Build(), keys)
 	}
 
-	return clusterMGet(client, ctx, keys)
+	cmds := mgetcmdsp.Get(len(keys), len(keys))
+	defer mgetcmdsp.Put(cmds)
+	for i := range cmds.s {
+		cmds.s[i] = client.B().Get().Key(keys[i]).Build()
+	}
+	return doMultiGet(client, ctx, cmds.s, keys)
 }
 
 // MSet is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into MSETs or multiple SETs
@@ -66,10 +70,11 @@ func MSet(client Client, ctx context.Context, kvs map[string]string) map[string]
 	}
 
 	cmds := mgetcmdsp.Get(0, len(kvs))
+	defer mgetcmdsp.Put(cmds)
 	for k, v := range kvs {
 		cmds.s = append(cmds.s, client.B().Set().Key(k).Value(v).Build().Pin())
 	}
-	return doMultiSet(client, ctx, cmds)
+	return doMultiSet(client, ctx, cmds.s)
 }
 
 // MDel is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into DELs
@@ -84,10 +89,11 @@ func MDel(client Client, ctx context.Context, keys []string) map[string]error {
 	}
 
 	cmds := mgetcmdsp.Get(len(keys), len(keys))
+	defer mgetcmdsp.Put(cmds)
 	for i, k := range keys {
 		cmds.s[i] = client.B().Del().Key(k).Build().Pin()
 	}
-	return doMultiSet(client, ctx, cmds)
+	return doMultiSet(client, ctx, cmds.s)
 }
 
 // MSetNX is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into MSETNXs or multiple SETNXs
@@ -102,10 +108,11 @@ func MSetNX(client Client, ctx context.Context, kvs map[string]string) map[strin
 	}
 
 	cmds := mgetcmdsp.Get(0, len(kvs))
+	defer mgetcmdsp.Put(cmds)
 	for k, v := range kvs {
 		cmds.s = append(cmds.s, client.B().Set().Key(k).Value(v).Nx().Build().Pin())
 	}
-	return doMultiSet(client, ctx, cmds)
+	return doMultiSet(client, ctx, cmds.s)
 }
 
 // JsonMGetCache is a helper that consults the client-side caches with multiple keys by grouping keys within the same slot into multiple JSON.GETs
@@ -132,7 +139,12 @@ func JsonMGet(client Client, ctx context.Context, keys []string, path string) (r
 		return clientMGet(client, ctx, client.B().JsonMget().Key(keys...).Path(path).Build(), keys)
 	}
 
-	return clusterJsonMGet(client, ctx, keys, path)
+	cmds := mgetcmdsp.Get(len(keys), len(keys))
+	defer mgetcmdsp.Put(cmds)
+	for i := range cmds.s {
+		cmds.s[i] = client.B().JsonGet().Key(keys[i]).Path(path).Build()
+	}
+	return doMultiGet(client, ctx, cmds.s, keys)
 }
 
 // JsonMSet is a helper that consults redis directly with multiple keys by grouping keys within the same slot into JSON.MSETs or multiple JSON.SETs
@@ -147,10 +159,11 @@ func JsonMSet(client Client, ctx context.Context, kvs map[string]string, path st
 	}
 
 	cmds := mgetcmdsp.Get(0, len(kvs))
+	defer mgetcmdsp.Put(cmds)
 	for k, v := range kvs {
 		cmds.s = append(cmds.s, client.B().JsonSet().Key(k).Path(path).Value(v).Build().Pin())
 	}
-	return doMultiSet(client, ctx, cmds)
+	return doMultiSet(client, ctx, cmds.s)
 }
 
 // DecodeSliceOfJSON is a helper that struct-scans each RedisMessage into dest, which must be a slice of the pointer.
@@ -232,27 +245,28 @@ func doMultiCache(cc Client, ctx context.Context, cmds []CacheableTTL, keys []st
 	return ret, nil
 }
 
-// doMultiSet runs DoMulti, recycles each Completed on success, and returns buf to
-// mgetcmdsp when every result has no non-Redis error. If any non-Redis error
-// occurs (e.g. context deadline), the auto-pipelining writer may still be
-// reading buf.s, so buf is not Put back.
-func doMultiSet(cc Client, ctx context.Context, buf *mgetcmds) (ret map[string]error) {
-	cmds := buf.s
+func doMultiGet(cc Client, ctx context.Context, cmds []Completed, keys []string) (ret map[string]RedisMessage, err error) {
+	ret = make(map[string]RedisMessage, len(keys))
+	resps := cc.DoMulti(ctx, cmds...)
+	defer resultsp.Put(&redisresults{s: resps})
+	for i, resp := range resps {
+		if err := resp.NonRedisError(); err != nil {
+			return nil, err
+		}
+		ret[keys[i]] = resp.val
+	}
+	return ret, nil
+}
+
+func doMultiSet(cc Client, ctx context.Context, cmds []Completed) (ret map[string]error) {
 	ret = make(map[string]error, len(cmds))
 	resps := cc.DoMulti(ctx, cmds...)
-	recycle := true
 	for i, resp := range resps {
-		ret[cmds[i].Commands()[1]] = resp.Error()
-		if resp.NonRedisError() != nil {
-			recycle = false
-		} else {
+		if ret[cmds[i].Commands()[1]] = resp.Error(); resp.NonRedisError() == nil {
 			intl.PutCompletedForce(cmds[i])
 		}
 	}
 	resultsp.Put(&redisresults{s: resps})
-	if recycle {
-		mgetcmdsp.Put(buf)
-	}
 	return ret
 }
 
@@ -261,88 +275,6 @@ func arrayToKV(m map[string]RedisMessage, arr []RedisMessage, keys []string) map
 		m[keys[i]] = resp
 	}
 	return m
-}
-
-func clusterMGet(client Client, ctx context.Context, keys []string) (ret map[string]RedisMessage, err error) {
-	ret = make(map[string]RedisMessage, len(keys))
-	if len(keys) == 0 {
-		return ret, nil
-	}
-
-	// Map slot -> index in cmds.s
-	hint := len(keys) / 2
-	slotIdx := make(map[uint16]int, hint)
-	cmds := mgetcmdsp.Get(0, hint)
-
-	for _, key := range keys {
-		slot := intl.Slot(key)
-		idx, ok := slotIdx[slot]
-		if !ok {
-			slotIdx[slot] = len(cmds.s)
-			cmds.s = append(cmds.s, client.B().Mget().Key(key).Build().Pin())
-			continue
-		}
-		intl.AppendCompleted(cmds.s[idx], key)
-	}
-
-	resps := client.DoMulti(ctx, cmds.s...)
-	defer resultsp.Put(&redisresults{s: resps})
-
-	for i, resp := range resps {
-		arr, err := resp.ToArray()
-		if err != nil {
-			return nil, err
-		}
-		for j, val := range arr {
-			ret[cmds.s[i].Commands()[j+1]] = val
-		}
-		intl.PutCompletedForce(cmds.s[i])
-	}
-	mgetcmdsp.Put(cmds)
-	return ret, nil
-}
-
-func clusterJsonMGet(client Client, ctx context.Context, keys []string, path string) (ret map[string]RedisMessage, err error) {
-	ret = make(map[string]RedisMessage, len(keys))
-	if len(keys) == 0 {
-		return ret, nil
-	}
-
-	// Map slot -> index in cmds.s
-	hint := len(keys) / 2
-	slotIdx := make(map[uint16]int, hint)
-	cmds := mgetcmdsp.Get(0, hint)
-
-	for _, key := range keys {
-		slot := intl.Slot(key)
-		idx, ok := slotIdx[slot]
-		if !ok {
-			slotIdx[slot] = len(cmds.s)
-			cmds.s = append(cmds.s, client.B().Arbitrary("JSON.MGET").Keys(key).MultiGet().Pin())
-			continue
-		}
-		intl.AppendCompleted(cmds.s[idx], key)
-	}
-
-	for _, c := range cmds.s {
-		intl.AppendCompleted(c, path)
-	}
-
-	resps := client.DoMulti(ctx, cmds.s...)
-	defer resultsp.Put(&redisresults{s: resps})
-
-	for i, resp := range resps {
-		arr, err := resp.ToArray()
-		if err != nil {
-			return nil, err
-		}
-		for j, val := range arr {
-			ret[cmds.s[i].Commands()[j+1]] = val
-		}
-		intl.PutCompletedForce(cmds.s[i])
-	}
-	mgetcmdsp.Put(cmds)
-	return ret, nil
 }
 
 // ErrMSetNXNotSet is used in the MSetNX helper when the underlying MSETNX response is 0.
@@ -393,104 +325,4 @@ func (s *Scanner) Iter2() iter.Seq2[string, string] {
 
 func (s *Scanner) Err() error {
 	return s.err
-}
-
-// PreferReplicaNodeSelector prioritizes reading from any replica using Round-Robin.
-// If no replicas are available, it falls back to the primary.
-func PreferReplicaNodeSelector() ReadNodeSelectorFunc {
-	var counter atomic.Uint32
-	return func(_ uint16, nodes []NodeInfo) int {
-		length := uint32(len(nodes))
-		if length > 1 {
-			c := counter.Add(1)
-			return int(c%(length-1)) + 1
-		}
-		return -1
-	}
-}
-
-// AZAffinityNodeSelector prioritizes replicas in the same AZ using Round-Robin.
-func AZAffinityNodeSelector(clientAZ string) ReadNodeSelectorFunc {
-	return newAZSelector(clientAZ, 1)
-}
-
-// AZAffinityReplicasAndPrimaryNodeSelector prioritizes:
-// 1. Same-AZ Replicas
-// 2. Same-AZ Primary
-// 3. Any Replica
-// 4. Primary
-func AZAffinityReplicasAndPrimaryNodeSelector(clientAZ string) ReadNodeSelectorFunc {
-	var counter atomic.Uint32
-	return func(_ uint16, nodes []NodeInfo) int {
-		// Same-AZ Replicas
-		if idx := pickAZ(nodes, clientAZ, 1, &counter); idx != -1 {
-			return idx
-		}
-
-		length := uint32(len(nodes))
-
-		// Same-AZ Primary
-		if length > 0 && nodes[0].AZ == clientAZ {
-			return 0
-		}
-
-		// Any Replica
-		if length > 1 {
-			c := counter.Add(1)
-			return int(c%(length-1)) + 1
-		}
-		return -1
-	}
-}
-
-// newAZSelector creates the internal selector closure with a specific start index.
-func newAZSelector(clientAZ string, startIdx int) func(uint16, []NodeInfo) int {
-	var counter atomic.Uint32
-	return func(_ uint16, nodes []NodeInfo) int {
-		// Round-Robin on Same-AZ Replicas
-		if idx := pickAZ(nodes, clientAZ, startIdx, &counter); idx != -1 {
-			return idx
-		}
-
-		// Round-Robin on ALL available nodes
-		if count := uint32(len(nodes) - startIdx); count > 0 {
-			c := counter.Add(1)
-			return int(c%count) + startIdx
-		}
-
-		return -1
-	}
-}
-
-// pickAZ selects a node index from nodes[startIdx:] that matches the clientAZ.
-func pickAZ(nodes []NodeInfo, clientAZ string, startIdx int, counter *atomic.Uint32) int {
-	n := len(nodes)
-	if n <= startIdx {
-		return -1
-	}
-
-	// We cap the search at 255 nodes
-	limit := min(n, 255)
-	var matches [8]uint8
-	var count uint32 = 0
-
-	for i := startIdx; i < limit; i++ {
-		if nodes[i].AZ == clientAZ {
-			matches[count] = uint8(i)
-			count++
-			if count == 8 {
-				break
-			}
-		}
-	}
-
-	if count == 0 {
-		return -1
-	}
-
-	// Round-Robin Selection
-	c := counter.Add(1)
-	k := c % count
-
-	return int(matches[k])
 }

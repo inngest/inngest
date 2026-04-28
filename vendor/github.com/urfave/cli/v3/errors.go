@@ -92,7 +92,8 @@ type ErrorFormatter interface {
 	Format(s fmt.State, verb rune)
 }
 
-// ExitCoder is the interface checked by `Command` for a custom exit code.
+// ExitCoder is the interface checked by `App` and `Command` for a custom exit
+// code
 type ExitCoder interface {
 	error
 	ExitCode() int
@@ -106,11 +107,11 @@ type exitError struct {
 // Exit wraps a message and exit code into an error, which by default is
 // handled with a call to os.Exit during default error handling.
 //
-// This is the simplest way to trigger a non-zero exit code for a Command without
+// This is the simplest way to trigger a non-zero exit code for an App without
 // having to call os.Exit manually. During testing, this behavior can be avoided
-// by overriding the ExitErrHandler function on a Command or the package-global
+// by overriding the ExitErrHandler function on an App or the package-global
 // OsExiter function.
-func Exit(message any, exitCode int) ExitCoder {
+func Exit(message interface{}, exitCode int) ExitCoder {
 	var err error
 
 	switch e := message.(type) {
@@ -143,17 +144,19 @@ func (ee *exitError) ExitCode() int {
 // for the ExitCoder interface, and OsExiter will be called with the last exit
 // code found, or exit code 1 if no ExitCoder is found.
 //
-// This function is the default error-handling behavior for a Command.
+// This function is the default error-handling behavior for an App.
 func HandleExitCoder(err error) {
 	if err == nil {
 		return
 	}
 
 	if exitErr, ok := err.(ExitCoder); ok {
-		if _, ok := exitErr.(ErrorFormatter); ok {
-			_, _ = fmt.Fprintf(ErrWriter, "%+v\n", err)
-		} else {
-			_, _ = fmt.Fprintln(ErrWriter, err)
+		if err.Error() != "" {
+			if _, ok := exitErr.(ErrorFormatter); ok {
+				_, _ = fmt.Fprintf(ErrWriter, "%+v\n", err)
+			} else {
+				_, _ = fmt.Fprintln(ErrWriter, err)
+			}
 		}
 		OsExiter(exitErr.ExitCode())
 		return

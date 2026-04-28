@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/moby/moby/client"
+	"github.com/docker/docker/client"
 )
 
 // DockerSocketSchema is the unix schema.

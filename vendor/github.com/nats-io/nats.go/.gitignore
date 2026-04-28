@@ -21,9 +21,6 @@ _testmain.go
 
 *.exe
 
-# Git backup files
-*.orig
-
 # Emacs
 *~
 \#*\#
@@ -45,4 +42,4 @@ _testmain.go
 .idea
 
 # VS Code
-.vscode
+.vscode 

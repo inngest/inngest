@@ -31,8 +31,7 @@ var (
 			return fmt.Sprintf(string(b), appName), err
 		},
 		"fish": func(c *Command, appName string) (string, error) {
-			b, err := autoCompleteFS.ReadFile("autocomplete/fish_autocomplete")
-			return fmt.Sprintf(string(b), appName), err
+			return c.Root().ToFishCompletion()
 		},
 		"pwsh": func(c *Command, appName string) (string, error) {
 			b, err := autoCompleteFS.ReadFile("autocomplete/powershell_autocomplete.ps1")
@@ -66,7 +65,6 @@ func buildCompletionCommand(appName string) *Command {
 		Action: func(ctx context.Context, cmd *Command) error {
 			return printShellCompletion(ctx, cmd, appName)
 		},
-		isCompletionCommand: true,
 	}
 }
 

@@ -2,7 +2,6 @@ package openapi2
 
 import (
 	"encoding/json"
-	"maps"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -27,7 +26,9 @@ type Operation struct {
 // MarshalJSON returns the JSON encoding of Operation.
 func (operation Operation) MarshalJSON() ([]byte, error) {
 	m := make(map[string]any, 12+len(operation.Extensions))
-	maps.Copy(m, operation.Extensions)
+	for k, v := range operation.Extensions {
+		m[k] = v
+	}
 	if x := operation.Summary; x != "" {
 		m["summary"] = x
 	}

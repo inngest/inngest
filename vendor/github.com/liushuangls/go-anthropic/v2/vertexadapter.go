@@ -13,8 +13,7 @@ type VertexAdapter struct {
 
 func (v *VertexAdapter) TranslateError(resp *http.Response, body []byte) (error, bool) {
 	switch resp.StatusCode {
-	case http.StatusBadRequest,
-		http.StatusUnauthorized,
+	case http.StatusUnauthorized,
 		http.StatusForbidden,
 		http.StatusNotFound,
 		http.StatusTooManyRequests:

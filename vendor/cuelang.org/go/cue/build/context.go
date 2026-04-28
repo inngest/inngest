@@ -26,22 +26,24 @@
 package build
 
 import (
+	"context"
+
 	"cuelang.org/go/cue/ast"
-	"cuelang.org/go/cue/parser"
 )
 
 // A Context keeps track of state of building instances and caches work.
 type Context struct {
+	ctxt context.Context
+
 	loader    LoadFunc
-	parseFunc func(str string, src interface{}, cfg parser.Config) (*ast.File, error)
+	parseFunc func(str string, src interface{}) (*ast.File, error)
 
 	initialized bool
 
 	imports map[string]*Instance
 }
 
-// NewInstance creates an instance for this Context. If the [LoadFunc]
-// is nil, then the LoadFunc in the [Context] is used.
+// NewInstance creates an instance for this Context.
 func (c *Context) NewInstance(dir string, f LoadFunc) *Instance {
 	if c == nil {
 		c = &Context{}
@@ -68,12 +70,6 @@ func (inst *Instance) Complete() error {
 	if err != nil {
 		inst.ReportError(err)
 	}
-
-	// Resolve identifiers after imports are loaded. Store errors separately
-	// to avoid "imported and not used" errors in dependencies being reported
-	// as "import failed".
-	inst.ResolutionErr = inst.resolveIdentifiers()
-
 	if inst.Err != nil {
 		inst.Incomplete = true
 		return inst.Err
@@ -84,13 +80,14 @@ func (inst *Instance) Complete() error {
 func (c *Context) init() {
 	if !c.initialized {
 		c.initialized = true
+		c.ctxt = context.Background()
 		c.imports = map[string]*Instance{}
 	}
 }
 
 // Options:
 // - certain parse modes
-// - parallelism
+// - parallellism
 // - error handler (allows cancelling the context)
 // - file set.
 
@@ -117,7 +114,7 @@ func Loader(f LoadFunc) Option {
 // ParseFile is called to read and parse each file
 // when building syntax tree.
 // It must be safe to call ParseFile simultaneously from multiple goroutines.
-// If f is nil, the loader will use [cuelang.org/go/cue/parser.ParseFile].
+// If ParseFile is nil, the loader will uses parser.ParseFile.
 //
 // ParseFile should parse the source from src and use filename only for
 // recording position information.
@@ -126,9 +123,6 @@ func Loader(f LoadFunc) Option {
 // to change the effective file contents or the behavior of the parser,
 // or to modify the syntax tree. For example, changing the backwards
 // compatibility.
-//
-// In general, the function should respect the parser configuration passed
-// in, and modify it incrementally rather than overwriting it entirely.
-func ParseFile(f func(filename string, src interface{}, cfg parser.Config) (*ast.File, error)) Option {
+func ParseFile(f func(filename string, src interface{}) (*ast.File, error)) Option {
 	return func(c *Context) { c.parseFunc = f }
 }

@@ -14,16 +14,11 @@
 
 package exec
 
-// Run executes a program with the given arguments.
+// Run executes the given shell command.
 Run: {
-	$id: _id
-	_id: *"tool/exec.Run" | "exec" // exec for backwards compatibility
+	$id: *"tool/exec.Run" | "exec" // exec for backwards compatibility
 
-	// cmd is a non-empty list holding the program name to run
-	// and the arguments to be passed to it.
-	//
-	// Simple commands can use a string, which is split by white space characters.
-	// If any arguments include white space, or for clarity, use the list form.
+	// cmd is the command to run.
 	cmd: string | [string, ...string]
 
 	// dir specifies the working directory of the command.
@@ -34,7 +29,7 @@ Run: {
 	// If the value is a list, the entries mus be of the form key=value,
 	// where the last value takes precendence in the case of multiple
 	// occurrances of the same key.
-	env: {[string]: string} | [...=~"="]
+	env: [string]: string | [...=~"="]
 
 	// stdout captures the output from stdout if it is of type bytes or string.
 	// The default value of null indicates it is redirected to the stdout of the
@@ -49,12 +44,8 @@ Run: {
 	// If it is of typ bytes or string, that input will be used instead.
 	stdin: *null | string | bytes
 
-	// success is set to true when the process terminates with a zero exit
+	// success is set to true when the process terminates with with a zero exit
 	// code or false otherwise. The user can explicitly specify the value
 	// force a fatal error if the desired success code is not reached.
 	success: bool
-
-	// mustSucceed indicates whether a command must succeed, in which case success==false results in a fatal error.
-	// This option is enabled by default, but may be disabled to control what is done when a command execution fails.
-	mustSucceed: bool | *true
 }

@@ -14,7 +14,6 @@ type AccessDeniedException struct {
 	ErrorCodeOverride *string
 
 	Error_            *string
-	Reason            AccessDeniedExceptionReason
 	Error_description *string
 
 	noSmithyDocumentSerde
@@ -256,7 +255,6 @@ type InvalidRequestException struct {
 	ErrorCodeOverride *string
 
 	Error_            *string
-	Reason            InvalidRequestExceptionReason
 	Error_description *string
 
 	noSmithyDocumentSerde

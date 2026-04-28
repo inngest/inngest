@@ -1127,10 +1127,6 @@ func (obs *obs) Watch(opts ...WatchOpt) (ObjectWatcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Set us up to close when the waitForMessages func returns.
-	sub.pDone = func(_ string) {
-		close(w.updates)
-	}
 	w.sub = sub
 	return w, nil
 }

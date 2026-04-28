@@ -3,7 +3,7 @@ package ast
 type QueryDocument struct {
 	Operations OperationList
 	Fragments  FragmentDefinitionList
-	Position   *Position `dump:"-" json:"-"`
+	Position   *Position `dump:"-"`
 	Comment    *CommentGroup
 }
 
@@ -13,7 +13,7 @@ type SchemaDocument struct {
 	Directives      DirectiveDefinitionList
 	Definitions     DefinitionList
 	Extensions      DefinitionList
-	Position        *Position `dump:"-" json:"-"`
+	Position        *Position `dump:"-"`
 	Comment         *CommentGroup
 }
 
@@ -26,10 +26,9 @@ func (d *SchemaDocument) Merge(other *SchemaDocument) {
 }
 
 type Schema struct {
-	Query            *Definition
-	Mutation         *Definition
-	Subscription     *Definition
-	SchemaDirectives DirectiveList
+	Query        *Definition
+	Mutation     *Definition
+	Subscription *Definition
 
 	Types      map[string]*Definition
 	Directives map[string]*DirectiveDefinition
@@ -42,7 +41,7 @@ type Schema struct {
 	Comment *CommentGroup
 }
 
-// AddTypes is the helper to add types definition to the schema.
+// AddTypes is the helper to add types definition to the schema
 func (s *Schema) AddTypes(defs ...*Definition) {
 	if s.Types == nil {
 		s.Types = make(map[string]*Definition)
@@ -56,7 +55,7 @@ func (s *Schema) AddPossibleType(name string, def *Definition) {
 	s.PossibleTypes[name] = append(s.PossibleTypes[name], def)
 }
 
-// GetPossibleTypes will enumerate all the definitions for a given interface or union.
+// GetPossibleTypes will enumerate all the definitions for a given interface or union
 func (s *Schema) GetPossibleTypes(def *Definition) []*Definition {
 	return s.PossibleTypes[def.Name]
 }
@@ -65,8 +64,7 @@ func (s *Schema) AddImplements(name string, iface *Definition) {
 	s.Implements[name] = append(s.Implements[name], iface)
 }
 
-// GetImplements returns all the interface and union definitions that the given definition
-// satisfies.
+// GetImplements returns all the interface and union definitions that the given definition satisfies
 func (s *Schema) GetImplements(def *Definition) []*Definition {
 	return s.Implements[def.Name]
 }
@@ -75,7 +73,7 @@ type SchemaDefinition struct {
 	Description    string
 	Directives     DirectiveList
 	OperationTypes OperationTypeDefinitionList
-	Position       *Position `dump:"-" json:"-"`
+	Position       *Position `dump:"-"`
 
 	BeforeDescriptionComment *CommentGroup
 	AfterDescriptionComment  *CommentGroup
@@ -85,6 +83,6 @@ type SchemaDefinition struct {
 type OperationTypeDefinition struct {
 	Operation Operation
 	Type      string
-	Position  *Position `dump:"-" json:"-"`
+	Position  *Position `dump:"-"`
 	Comment   *CommentGroup
 }

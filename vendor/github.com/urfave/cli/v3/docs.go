@@ -14,7 +14,7 @@ func prefixFor(name string) (prefix string) {
 		prefix = "--"
 	}
 
-	return prefix
+	return
 }
 
 // Returns the placeholder, if any, and the unquoted usage string.
@@ -35,21 +35,21 @@ func unquoteUsage(usage string) (string, string) {
 }
 
 func prefixedNames(names []string, placeholder string) string {
-	var prefixed strings.Builder
+	var prefixed string
 	for i, name := range names {
 		if name == "" {
 			continue
 		}
 
-		prefixed.WriteString(prefixFor(name) + name)
+		prefixed += prefixFor(name) + name
 		if placeholder != "" {
-			prefixed.WriteString(" " + placeholder)
+			prefixed += " " + placeholder
 		}
 		if i < len(names)-1 {
-			prefixed.WriteString(", ")
+			prefixed += ", "
 		}
 	}
-	return prefixed.String()
+	return prefixed
 }
 
 func envFormat(envVars []string, prefix, sep, suffix string) string {
@@ -107,12 +107,9 @@ func stringifyFlag(f Flag) string {
 
 	// don't print default text for required flags
 	if rf, ok := f.(RequiredFlag); !ok || !rf.IsRequired() {
-		if df.IsDefaultVisible() {
-			if s := df.GetDefaultText(); s != "" {
-				defaultValueString = fmt.Sprintf(formatDefault("%s"), s)
-			} else if df.TakesValue() && df.GetValue() != "" {
-				defaultValueString = fmt.Sprintf(formatDefault("%s"), df.GetValue())
-			}
+		isVisible := df.IsDefaultVisible()
+		if s := df.GetDefaultText(); isVisible && s != "" {
+			defaultValueString = fmt.Sprintf(formatDefault("%s"), s)
 		}
 	}
 

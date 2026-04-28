@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/gosimple/slug"
 	"github.com/inngest/inngestgo/internal/event"
@@ -108,6 +109,19 @@ func CronTrigger(cron string) fn.Trigger {
 	return fn.Trigger{
 		CronTrigger: &fn.CronTrigger{
 			Cron: cron,
+		},
+	}
+}
+
+// CronTriggerWithJitter returns a cron trigger with an optional jitter duration.
+// Jitter delays the function execution by a random amount up to the specified duration.
+// The duration is serialized as a string (e.g. "30s") for the server.
+func CronTriggerWithJitter(cron string, jitter time.Duration) fn.Trigger {
+	s := jitter.String()
+	return fn.Trigger{
+		CronTrigger: &fn.CronTrigger{
+			Cron:   cron,
+			Jitter: &s,
 		},
 	}
 }

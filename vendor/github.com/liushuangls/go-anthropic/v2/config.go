@@ -20,17 +20,12 @@ const (
 type BetaVersion string
 
 const (
-	BetaTools20240404               BetaVersion = "tools-2024-04-04"
-	BetaTools20240516               BetaVersion = "tools-2024-05-16"
-	BetaPromptCaching20240731       BetaVersion = "prompt-caching-2024-07-31"
-	BetaMessageBatches20240924      BetaVersion = "message-batches-2024-09-24"
-	BetaTokenCounting20241101       BetaVersion = "token-counting-2024-11-01"
-	BetaMaxTokens35Sonnet20240715   BetaVersion = "max-tokens-3-5-sonnet-2024-07-15"
-	BetaComputerUse20241022         BetaVersion = "computer-use-2024-10-22"
-	BetaOutput128k20250219          BetaVersion = "output-128k-2025-02-19"
-	BetaInterleavedThinking20250514 BetaVersion = "interleaved-thinking-2025-05-14"
-	BetaComputerUse20250124         BetaVersion = "computer-use-2025-01-24"
-	BetaStructuredOutputs20251113   BetaVersion = "structured-outputs-2025-11-13"
+	BetaTools20240404             BetaVersion = "tools-2024-04-04"
+	BetaTools20240516             BetaVersion = "tools-2024-05-16"
+	BetaPromptCaching20240731     BetaVersion = "prompt-caching-2024-07-31"
+	BetaMessageBatches20240924    BetaVersion = "message-batches-2024-09-24"
+	BetaTokenCounting20241101     BetaVersion = "token-counting-2024-11-01"
+	BetaMaxTokens35Sonnet20240715 BetaVersion = "max-tokens-3-5-sonnet-2024-07-15"
 )
 
 type ApiKeyFunc func() string

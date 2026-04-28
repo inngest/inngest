@@ -4,19 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
-	"github.com/twmb/franz-go/pkg/kgo/internal/xsync"
 )
 
 type metawait struct {
-	mu         xsync.Mutex
+	mu         sync.Mutex
 	c          *sync.Cond
 	lastUpdate time.Time
 }
@@ -78,37 +75,17 @@ func (cl *Client) PartitionLeader(topic string, partition int32) (leader, leader
 	return p.leader, p.leaderEpoch, p.loadErr
 }
 
-var noid2t = make(map[[16]byte]string)
-
-func (cl *Client) id2tMap() map[[16]byte]string {
-	v := cl.id2t.Load()
-	if v == nil {
-		return noid2t
-	}
-	m := v.(map[[16]byte]string)
-	if m == nil {
-		return noid2t
-	}
-	return m
-}
-
 // waitmeta returns immediately if metadata was updated within the last second,
 // otherwise this waits for up to wait for a metadata update to complete.
 func (cl *Client) waitmeta(ctx context.Context, wait time.Duration, why string) {
-	cl.dowaitmeta(ctx, wait, false, why)
-}
-
-func (cl *Client) dowaitmeta(ctx context.Context, wait time.Duration, force bool, why string) {
 	now := time.Now()
 
-	if !force {
-		cl.metawait.mu.Lock()
-		if now.Sub(cl.metawait.lastUpdate) < cl.cfg.metadataMinAge {
-			cl.metawait.mu.Unlock()
-			return
-		}
+	cl.metawait.mu.Lock()
+	if now.Sub(cl.metawait.lastUpdate) < cl.cfg.metadataMinAge {
 		cl.metawait.mu.Unlock()
+		return
 	}
+	cl.metawait.mu.Unlock()
 
 	cl.triggerUpdateMetadataNow(why)
 
@@ -248,7 +225,6 @@ loop:
 		}
 
 		retryWhy, err := cl.updateMetadata()
-		lastAt = time.Now()
 		if retryWhy != nil || err != nil {
 			// If err is non-nil, the metadata request failed
 			// itself and already retried 3x; we do not loop more.
@@ -261,7 +237,10 @@ loop:
 			// still fail we will fall into the slower update below
 			// which waits (default) 5s between tries.
 			if now && err == nil && nowTries < 8 {
-				wait := min(cl.cfg.metadataMinAge, 250*time.Millisecond)
+				wait := 250 * time.Millisecond
+				if cl.cfg.metadataMinAge < wait {
+					wait = cl.cfg.metadataMinAge
+				}
 				cl.cfg.logger.Log(LogLevelDebug, "immediate metadata update had inner errors, re-updating",
 					"errors", retryWhy.reason(""),
 					"update_after", wait,
@@ -288,13 +267,12 @@ loop:
 		if err == nil {
 			cl.metawait.signal()
 			cl.consumer.doOnMetadataUpdate()
+			lastAt = time.Now()
 			consecutiveErrors = 0
 			continue
 		}
 
 		consecutiveErrors++
-		// We sleep a bit in case the max metadata age is very small;
-		// typically this sleep is inconsequential.
 		after := time.NewTimer(cl.cfg.retryBackoff(consecutiveErrors))
 	backoff:
 		select {
@@ -330,8 +308,6 @@ func (cl *Client) updateMetadata() (retryWhy multiUpdateWhy, err error) {
 	case c.g != nil:
 		tpsConsumer = c.g.tps
 		groupExternal = c.g.loadExternal()
-	case c.s != nil:
-		tpsConsumer = c.s.tps
 	case c.d != nil:
 		tpsConsumer = c.d.tps
 	}
@@ -355,35 +331,6 @@ func (cl *Client) updateMetadata() (retryWhy multiUpdateWhy, err error) {
 		}
 	}
 
-	// If the user has auto topic creation while producing AND is consuming
-	// via regex, we need to send a separate metadata request with unknown
-	// produce topics before our standard metadata request. The standard
-	// metadata request is send with a nil Topics field (requesting all),
-	// which prevents us from ever creating the topics.
-	var unknownCreateResp map[string]*metadataTopic
-	if all && cl.cfg.allowAutoTopicCreation {
-		cl.producer.unknownTopicsMu.Lock()
-		if len(cl.producer.unknownTopics) > 0 {
-			unknownTopics := make([]string, 0, len(cl.producer.unknownTopics))
-			for unknown := range cl.producer.unknownTopics {
-				unknownTopics = append(unknownTopics, unknown)
-			}
-			var err error
-			unknownCreateResp, err = cl.fetchTopicMetadata(false, unknownTopics)
-			if err != nil {
-				// We bump all produce topics even though we
-				// only explicitly requested unknown ones; this
-				// is a general request failure and we want to
-				// note it (also this is simpler...).
-				cl.bumpMetadataFailForTopics(
-					tpsProducerLoad,
-					err,
-				)
-			}
-		}
-		cl.producer.unknownTopicsMu.Unlock()
-	}
-
 	latest, err := cl.fetchTopicMetadata(all, reqTopics)
 	if err != nil {
 		cl.bumpMetadataFailForTopics( // bump load failures for all topics
@@ -394,72 +341,14 @@ func (cl *Client) updateMetadata() (retryWhy multiUpdateWhy, err error) {
 	}
 	groupExternal.updateLatest(latest)
 
-	// If regex consuming AND we issued a metadata request to forcefully
-	// create topics, we merge any topics missing into the all-request from
-	// the create-request. It is possible we want to keep failed creation
-	// errors.
-	for t, mt := range unknownCreateResp {
-		if _, ok := latest[t]; !ok {
-			latest[t] = mt
-		}
-	}
-
-	// Merge topic ID mappings into the existing id2t map. We clone
-	// rather than rebuild so that topics missing from this particular
-	// metadata response (transient broker omission, non-all request)
-	// retain their ID mapping from prior responses.
-	//
-	// If a topic was deleted and recreated, the broker returns a new
-	// ID for the same name. We do NOT add the new ID if the old ID
-	// is still present - the old mapping is preserved until the user
-	// explicitly purges via PurgeTopicsFromClient. This avoids having
-	// two IDs for the same topic name.
-	{
-		old := cl.id2tMap()
-		merged := make(map[[16]byte]string, len(old)+len(latest))
-		maps.Copy(merged, old)
-
-		// Build the set of topic names that already have an ID.
-		knownNames := make(map[string]struct{}, len(merged))
-		for _, name := range merged {
-			knownNames[name] = struct{}{}
-		}
-
-		for _, mt := range latest {
-			if mt.id == ([16]byte{}) {
-				continue
-			}
-			if _, exists := knownNames[mt.topic]; exists {
-				// This name already has an ID in the map.
-				// Only update if it's the same ID (normal
-				// case), skip if it's a different ID
-				// (recreated topic).
-				if _, sameID := merged[mt.id]; sameID {
-					merged[mt.id] = mt.topic
-				}
-				continue
-			}
-			merged[mt.id] = mt.topic
-			knownNames[mt.topic] = struct{}{}
-		}
-		cl.id2t.Store(merged)
-	}
-
 	// If we are consuming with regex and fetched all topics, the metadata
 	// may have returned topics the consumer is not yet tracking. We ensure
 	// that we will store the topics at the end of our metadata update.
 	tpsConsumerLoad := tpsConsumer.load()
 	if all {
 		allTopics := make([]string, 0, len(latest))
-		for topic, mt := range latest {
-			// loadErr should only be non-nil when requesting all
-			// topics if this is with auto-topic-creation && the
-			// creation failed. That is, we should not consume the
-			// topic since we just tried creating it and creating
-			// it failed.
-			if mt.loadErr == nil {
-				allTopics = append(allTopics, topic)
-			}
+		for topic := range latest {
+			allTopics = append(allTopics, topic)
 		}
 
 		// We filter out topics will not match any of our regex's.
@@ -501,22 +390,18 @@ func (cl *Client) updateMetadata() (retryWhy multiUpdateWhy, err error) {
 	css := &consumerSessionStopper{cl: cl}
 	defer css.maybeRestart()
 
-	consumerKind := partitionKindConsume
-	if cl.consumer.s != nil {
-		consumerKind = partitionKindShare
-	}
 	var missingProduceTopics []*topicPartitions
 	for _, m := range []struct {
-		priors map[string]*topicPartitions
-		kind   partitionKind
+		priors    map[string]*topicPartitions
+		isProduce bool
 	}{
-		{tpsProducerLoad, partitionKindProduce},
-		{tpsConsumerLoad, consumerKind},
+		{tpsProducerLoad, true},
+		{tpsConsumerLoad, false},
 	} {
 		for topic, priorParts := range m.priors {
 			newParts, exists := latest[topic]
 			if !exists {
-				if m.kind == partitionKindProduce {
+				if m.isProduce {
 					missingProduceTopics = append(missingProduceTopics, priorParts)
 				}
 				continue
@@ -525,7 +410,7 @@ func (cl *Client) updateMetadata() (retryWhy multiUpdateWhy, err error) {
 				topic,
 				priorParts,
 				newParts,
-				m.kind,
+				m.isProduce,
 				css,
 				&retryWhy,
 			)
@@ -563,7 +448,7 @@ func (cl *Client) updateMetadata() (retryWhy multiUpdateWhy, err error) {
 	return retryWhy, nil
 }
 
-// We use a special structure to represent metadata before we *actually* convert
+// We use a special structure to repesent metadata before we *actually* convert
 // it to topicPartitionsData. This helps avoid any pointer reuse problems
 // because we want to keep the client's producer and consumer maps completely
 // independent.  If we just returned map[string]*topicPartitionsData, we could
@@ -575,11 +460,10 @@ type metadataTopic struct {
 	loadErr    error
 	isInternal bool
 	topic      string
-	id         [16]byte
 	partitions []metadataPartition
 }
 
-func (mt *metadataTopic) newPartitions(cl *Client, kind partitionKind) *topicPartitionsData {
+func (mt *metadataTopic) newPartitions(cl *Client, isProduce bool) *topicPartitionsData {
 	n := len(mt.partitions)
 	ps := &topicPartitionsData{
 		loadErr:            mt.loadErr,
@@ -587,11 +471,10 @@ func (mt *metadataTopic) newPartitions(cl *Client, kind partitionKind) *topicPar
 		partitions:         make([]*topicPartition, 0, n),
 		writablePartitions: make([]*topicPartition, 0, n),
 		topic:              mt.topic,
-		id:                 mt.id,
 		when:               time.Now().Unix(),
 	}
 	for i := range mt.partitions {
-		p := mt.partitions[i].newPartition(cl, kind)
+		p := mt.partitions[i].newPartition(cl, isProduce)
 		ps.partitions = append(ps.partitions, p)
 		if p.loadErr == nil {
 			ps.writablePartitions = append(ps.writablePartitions, p)
@@ -610,7 +493,7 @@ type metadataPartition struct {
 	sns         sinkAndSource
 }
 
-func (mp metadataPartition) newPartition(cl *Client, kind partitionKind) *topicPartition {
+func (mp metadataPartition) newPartition(cl *Client, isProduce bool) *topicPartition {
 	td := topicPartitionData{
 		leader:      mp.leader,
 		leaderEpoch: mp.leaderEpoch,
@@ -619,12 +502,10 @@ func (mp metadataPartition) newPartition(cl *Client, kind partitionKind) *topicP
 		loadErr:            kerr.ErrorForCode(mp.loadErr),
 		topicPartitionData: td,
 	}
-	switch kind {
-	case partitionKindProduce:
-		r := &recBuf{
+	if isProduce {
+		p.records = &recBuf{
 			cl:                  cl,
 			topic:               mp.topic,
-			topicID:             mp.topicID,
 			partition:           mp.partition,
 			maxRecordBatchBytes: cl.maxRecordBatchBytesForTopic(mp.topic),
 			recBufsIdx:          -1,
@@ -633,17 +514,7 @@ func (mp metadataPartition) newPartition(cl *Client, kind partitionKind) *topicP
 			topicPartitionData:  td,
 			lastAckedOffset:     -1,
 		}
-		r.lingerFn = r.unlingerAndManuallyDrain
-		p.records = r
-	case partitionKindShare:
-		p.shareCursor = &shareCursor{
-			topic:      mp.topic,
-			topicID:    mp.topicID,
-			partition:  mp.partition,
-			cursorsIdx: -1, // sentinel: not yet added to a source
-		}
-		p.shareCursor.source.Store(mp.sns.source)
-	default:
+	} else {
 		p.cursor = &cursor{
 			topic:              mp.topic,
 			topicID:            mp.topicID,
@@ -664,10 +535,15 @@ func (mp metadataPartition) newPartition(cl *Client, kind partitionKind) *topicP
 // fetchTopicMetadata fetches metadata for all reqTopics and returns new
 // topicPartitionsData for each topic.
 func (cl *Client) fetchTopicMetadata(all bool, reqTopics []string) (map[string]*metadataTopic, error) {
-	_, meta, err := cl.fetchMetadataByName(cl.ctx, all, reqTopics, nil)
+	_, meta, err := cl.fetchMetadataForTopics(cl.ctx, all, reqTopics)
 	if err != nil {
 		return nil, err
 	}
+
+	// Since we've fetched the metadata for some topics we can optimistically cache it
+	// for mapped metadata too. This may reduce the number of Metadata requests issued
+	// by the client.
+	cl.storeCachedMappedMetadata(meta, nil)
 
 	topics := make(map[string]*metadataTopic, len(meta.Topics))
 
@@ -688,7 +564,6 @@ func (cl *Client) fetchTopicMetadata(all bool, reqTopics []string) (map[string]*
 			loadErr:    kerr.ErrorForCode(topicMeta.ErrorCode),
 			isInternal: topicMeta.IsInternal,
 			topic:      topic,
-			id:         topicMeta.TopicID,
 			partitions: make([]metadataPartition, 0, len(topicMeta.Partitions)),
 		}
 
@@ -712,7 +587,7 @@ func (cl *Client) fetchTopicMetadata(all bool, reqTopics []string) (map[string]*
 		})
 		for i := range topicMeta.Partitions {
 			if got := topicMeta.Partitions[i].Partition; got != int32(i) {
-				mt.loadErr = fmt.Errorf("kafka did not reply with a comprehensive set of partitions for a topic; we expected partition %d but saw %d", i, got)
+				mt.loadErr = fmt.Errorf("kafka did not reply with a comprensive set of partitions for a topic; we expected partition %d but saw %d", i, got)
 				break
 			}
 		}
@@ -775,15 +650,13 @@ func (cl *Client) mergeTopicPartitions(
 	topic string,
 	l *topicPartitions,
 	mt *metadataTopic,
-	kind partitionKind,
+	isProduce bool,
 	css *consumerSessionStopper,
 	retryWhy *multiUpdateWhy,
 ) {
-	isProduce := kind == partitionKindProduce
-	isShare := kind == partitionKindShare
 	lv := *l.load() // copy so our field writes do not collide with reads
 
-	r := mt.newPartitions(cl, kind)
+	r := mt.newPartitions(cl, isProduce)
 
 	// Producers must store the update through a special function that
 	// manages unknown topic waiting, whereas consumers can just simply
@@ -798,7 +671,6 @@ func (cl *Client) mergeTopicPartitions(
 	lv.loadErr = r.loadErr
 	lv.isInternal = r.isInternal
 	lv.topic = r.topic
-	lv.id = r.id
 	if lv.when == 0 {
 		lv.when = r.when
 	}
@@ -930,20 +802,11 @@ func (cl *Client) mergeTopicPartitions(
 
 		if !isProduce {
 			var noID [16]byte
-			var newID, oldID [16]byte
-			if isShare {
-				newID = newTP.shareCursor.topicID
-				oldID = oldTP.shareCursor.topicID
-			} else {
-				newID = newTP.cursor.topicID
-				oldID = oldTP.cursor.topicID
-			}
-			if newID == noID && oldID != noID {
+			if newTP.cursor.topicID == noID && oldTP.cursor.topicID != noID {
 				cl.cfg.logger.Log(LogLevelWarn, "metadata update is missing the topic ID when we previously had one, ignoring update",
 					"topic", topic,
 					"partition", part,
 				)
-				*newTP = *oldTP
 				retryWhy.add(topic, int32(part), errMissingTopicID)
 				continue
 			}
@@ -961,13 +824,10 @@ func (cl *Client) mergeTopicPartitions(
 				"leader", newTP.leader,
 				"leader_epoch", newTP.leaderEpoch,
 			)
-			switch kind {
-			case partitionKindProduce:
+			if isProduce {
 				newTP.records = oldTP.records
 				newTP.records.clearFailing() // always clear failing state for producing after meta update
-			case partitionKindShare:
-				newTP.shareCursor = oldTP.shareCursor
-			default:
+			} else {
 				newTP.cursor = oldTP.cursor // unlike records, there is no failing state for a cursor
 			}
 		} else {
@@ -979,12 +839,9 @@ func (cl *Client) mergeTopicPartitions(
 				"old_leader", oldTP.leader,
 				"old_leader_epoch", oldTP.leaderEpoch,
 			)
-			switch kind {
-			case partitionKindProduce:
+			if isProduce {
 				oldTP.migrateProductionTo(newTP) // migration clears failing state
-			case partitionKindShare:
-				oldTP.migrateShareCursorTo(cl, newTP)
-			default:
+			} else {
 				oldTP.migrateCursorTo(newTP, css)
 			}
 		}
@@ -1002,45 +859,10 @@ func (cl *Client) mergeTopicPartitions(
 	// Anything left with a negative recBufsIdx / cursorsIdx is a new topic
 	// partition and must be added to the sink / source.
 	for _, newTP := range newPartitions {
-		if newTP.loadErr != nil {
-			if isProduce {
-				newTP.records.bumpRepeatedLoadErr(newTP.loadErr)
-			} else if !kerr.IsRetriable(newTP.loadErr) || cl.cfg.keepRetryableFetchErrors {
-				cl.consumer.addFakeReadyForDraining(topic, newTP.partition(), newTP.loadErr, "metadata refresh has a load error on a new partition")
-			}
-			retryWhy.add(topic, newTP.partition(), newTP.loadErr)
-		}
-		switch kind {
-		case partitionKindProduce:
-			if newTP.records.recBufsIdx == -1 {
-				newTP.records.sink.addRecBuf(newTP.records)
-				cl.cfg.logger.Log(LogLevelDebug, "metadata refresh new produce partition",
-					"topic", topic,
-					"partition", newTP.partition(),
-					"leader", newTP.leader,
-					"leader_epoch", newTP.leaderEpoch,
-				)
-			}
-		case partitionKindShare:
-			if newTP.shareCursor.cursorsIdx == -1 {
-				newTP.shareCursor.source.Load().addShareCursor(newTP.shareCursor)
-				cl.cfg.logger.Log(LogLevelDebug, "metadata refresh new share consume partition",
-					"topic", topic,
-					"partition", newTP.partition(),
-					"leader", newTP.leader,
-					"leader_epoch", newTP.leaderEpoch,
-				)
-			}
-		default:
-			if newTP.cursor.cursorsIdx == -1 {
-				newTP.cursor.source.addCursor(newTP.cursor)
-				cl.cfg.logger.Log(LogLevelDebug, "metadata refresh new consume partition",
-					"topic", topic,
-					"partition", newTP.partition(),
-					"leader", newTP.leader,
-					"leader_epoch", newTP.leaderEpoch,
-				)
-			}
+		if isProduce && newTP.records.recBufsIdx == -1 {
+			newTP.records.sink.addRecBuf(newTP.records)
+		} else if !isProduce && newTP.cursor.cursorsIdx == -1 {
+			newTP.cursor.source.addCursor(newTP.cursor)
 		}
 	}
 }
@@ -1135,7 +957,7 @@ func (m multiUpdateWhy) reason(reason string) string {
 				for p := range ps {
 					psSorted = append(psSorted, p)
 				}
-				slices.Sort(psSorted)
+				sort.Slice(psSorted, func(i, j int) bool { return psSorted[i] < psSorted[j] })
 				topicStrings = append(topicStrings, fmt.Sprintf("%s%v", t, psSorted))
 			}
 		}

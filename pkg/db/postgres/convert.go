@@ -38,8 +38,8 @@ func eventFromPG(s *sqlc.Event) *db.Event {
 
 func eventBatchFromPG(s *sqlc.EventBatch) *db.EventBatch {
 	return &db.EventBatch{
-		ID: s.ID, AccountID: s.AccountID, WorkspaceID: s.WorkspaceID,
-		AppID: s.AppID, WorkflowID: s.WorkflowID, RunID: s.RunID,
+		ID: s.ID.ULID(), AccountID: s.AccountID, WorkspaceID: s.WorkspaceID,
+		AppID: s.AppID, WorkflowID: s.WorkflowID, RunID: s.RunID.ULID(),
 		StartedAt: s.StartedAt, ExecutedAt: s.ExecutedAt, EventIds: s.EventIds,
 	}
 }
@@ -110,7 +110,7 @@ func workerConnectionFromPG(s *sqlc.WorkerConnection) *db.WorkerConnection {
 		AppID: s.AppID, ID: s.ID, GatewayID: s.GatewayID, InstanceID: s.InstanceID,
 		Status: int64(s.Status), WorkerIp: s.WorkerIp,
 		MaxWorkerConcurrency: s.MaxWorkerConcurrency,
-		ConnectedAt: s.ConnectedAt, LastHeartbeatAt: s.LastHeartbeatAt,
+		ConnectedAt:          s.ConnectedAt, LastHeartbeatAt: s.LastHeartbeatAt,
 		DisconnectedAt: s.DisconnectedAt, RecordedAt: s.RecordedAt,
 		InsertedAt: s.InsertedAt, DisconnectReason: s.DisconnectReason,
 		GroupHash: s.GroupHash, SdkLang: s.SdkLang, SdkVersion: s.SdkVersion,

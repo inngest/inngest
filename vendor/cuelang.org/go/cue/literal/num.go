@@ -17,15 +17,14 @@ package literal
 import (
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
-	"github.com/cockroachdb/apd/v3"
+	"github.com/cockroachdb/apd/v2"
 )
 
-// We avoid cuelang.org/go/internal.Context as that would be an import cycle.
 var baseContext apd.Context
 
 func init() {
 	baseContext = apd.BaseContext
-	baseContext.Precision = 34
+	baseContext.Precision = 24
 }
 
 // NumInfo contains information about a parsed numbers.
@@ -102,12 +101,9 @@ func ParseNum(s string, n *NumInfo) error {
 	if !n.next() {
 		return n.errorf("invalid number %q", s)
 	}
-	switch n.ch {
-	case '-':
+	if n.ch == '-' {
 		n.neg = true
 		n.buf = append(n.buf, '-')
-		n.next()
-	case '+':
 		n.next()
 	}
 	seenDecimalPoint := false

@@ -1,4 +1,4 @@
-// Copyright 2022-2025 The NATS Authors
+// Copyright 2022-2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -35,8 +35,6 @@ type (
 		aecb MsgErrHandler
 		// Max async pub ack in flight
 		maxpa int
-		// ackTimeout is the max time to wait for an ack.
-		ackTimeout time.Duration
 	}
 
 	// PublishOpt are the options that can be passed to Publish methods.
@@ -44,12 +42,10 @@ type (
 
 	pubOpts struct {
 		id             string
-		lastMsgID      string        // Expected last msgId
-		stream         string        // Expected stream name
-		lastSeq        *uint64       // Expected last sequence
-		lastSubjectSeq *uint64       // Expected last sequence for subject
-		lastSubject    string        // Expected subject for last sequence
-		ttl            time.Duration // Message TTL
+		lastMsgID      string  // Expected last msgId
+		stream         string  // Expected stream name
+		lastSeq        *uint64 // Expected last sequence
+		lastSubjectSeq *uint64 // Expected last sequence per subject
 
 		// Publish retries for NoResponders err.
 		retryWait     time.Duration // Retry wait between attempts
@@ -85,8 +81,6 @@ type (
 		err        error
 		errCh      chan error
 		doneCh     chan *PubAck
-		reply      string
-		timeout    *time.Timer
 	}
 
 	jetStreamClient struct {
@@ -130,8 +124,6 @@ type (
 
 		// Domain is the domain the message was published to.
 		Domain string `json:"domain,omitempty"`
-
-		Value string `json:"val,omitempty"`
 	}
 )
 
@@ -161,7 +153,7 @@ func (js *jetStream) Publish(ctx context.Context, subj string, data []byte, opts
 // ack from server. It accepts subject name (which must be bound to a
 // stream) and nats.Message.
 func (js *jetStream) PublishMsg(ctx context.Context, m *nats.Msg, opts ...PublishOpt) (*PubAck, error) {
-	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
+	ctx, cancel := wrapContextWithoutDeadline(ctx)
 	if cancel != nil {
 		defer cancel()
 	}
@@ -197,13 +189,6 @@ func (js *jetStream) PublishMsg(ctx context.Context, m *nats.Msg, opts ...Publis
 	}
 	if o.lastSubjectSeq != nil {
 		m.Header.Set(ExpectedLastSubjSeqHeader, strconv.FormatUint(*o.lastSubjectSeq, 10))
-	}
-	if o.lastSubject != "" {
-		m.Header.Set(ExpectedLastSubjSeqSubjHeader, o.lastSubject)
-		m.Header.Set(ExpectedLastSubjSeqHeader, strconv.FormatUint(*o.lastSubjectSeq, 10))
-	}
-	if o.ttl > 0 {
-		m.Header.Set(MsgTTLHeader, o.ttl.String())
 	}
 
 	var resp *nats.Msg
@@ -288,13 +273,6 @@ func (js *jetStream) PublishMsgAsync(m *nats.Msg, opts ...PublishOpt) (PubAckFut
 	if o.lastSubjectSeq != nil {
 		m.Header.Set(ExpectedLastSubjSeqHeader, strconv.FormatUint(*o.lastSubjectSeq, 10))
 	}
-	if o.lastSubject != "" {
-		m.Header.Set(ExpectedLastSubjSeqSubjHeader, o.lastSubject)
-		m.Header.Set(ExpectedLastSubjSeqHeader, strconv.FormatUint(*o.lastSubjectSeq, 10))
-	}
-	if o.ttl > 0 {
-		m.Header.Set(MsgTTLHeader, o.ttl.String())
-	}
 
 	paf := o.pafRetry
 	if paf == nil && m.Reply != "" {
@@ -302,17 +280,17 @@ func (js *jetStream) PublishMsgAsync(m *nats.Msg, opts ...PublishOpt) (PubAckFut
 	}
 
 	var id string
-	var reply string
 
 	// register new paf if not retrying
 	if paf == nil {
 		var err error
-		reply, err = js.newAsyncReply()
+		m.Reply, err = js.newAsyncReply()
+		defer func() { m.Reply = "" }()
 		if err != nil {
 			return nil, fmt.Errorf("nats: error creating async reply handler: %s", err)
 		}
-		id = reply[js.opts.replyPrefixLen:]
-		paf = &pubAckFuture{msg: m, jsClient: js.publisher, maxRetries: o.retryAttempts, retryWait: o.retryWait, reply: reply}
+		id = m.Reply[js.replyPrefixLen:]
+		paf = &pubAckFuture{msg: m, jsClient: js.publisher, maxRetries: o.retryAttempts, retryWait: o.retryWait}
 		numPending, maxPending := js.registerPAF(id, paf)
 
 		if maxPending > 0 && numPending > maxPending {
@@ -323,60 +301,12 @@ func (js *jetStream) PublishMsgAsync(m *nats.Msg, opts ...PublishOpt) (PubAckFut
 				return nil, ErrTooManyStalledMsgs
 			}
 		}
-		if js.publisher.ackTimeout > 0 {
-			paf.timeout = time.AfterFunc(js.publisher.ackTimeout, func() {
-				js.publisher.Lock()
-				defer js.publisher.Unlock()
-
-				if _, ok := js.publisher.acks[id]; !ok {
-					// paf has already been resolved
-					// while waiting for the lock
-					return
-				}
-
-				// ack timed out, remove from pending acks
-				delete(js.publisher.acks, id)
-
-				// check on anyone stalled and waiting.
-				if js.publisher.stallCh != nil && len(js.publisher.acks) < js.publisher.maxpa {
-					close(js.publisher.stallCh)
-					js.publisher.stallCh = nil
-				}
-
-				// send error to user
-				paf.err = ErrAsyncPublishTimeout
-				if paf.errCh != nil {
-					paf.errCh <- paf.err
-				}
-
-				// call error callback if set
-				if js.publisher.asyncPublisherOpts.aecb != nil {
-					js.publisher.asyncPublisherOpts.aecb(js, paf.msg, ErrAsyncPublishTimeout)
-				}
-
-				// check on anyone one waiting on done status.
-				if js.publisher.doneCh != nil && len(js.publisher.acks) == 0 {
-					close(js.publisher.doneCh)
-					js.publisher.doneCh = nil
-				}
-			})
-		}
 	} else {
 		// when retrying, get the ID from existing reply subject
-		reply = paf.reply
-		if paf.timeout != nil {
-			paf.timeout.Reset(js.publisher.ackTimeout)
-		}
-		id = reply[js.opts.replyPrefixLen:]
+		id = m.Reply[js.replyPrefixLen:]
 	}
 
-	pubMsg := &nats.Msg{
-		Subject: m.Subject,
-		Reply:   reply,
-		Data:    m.Data,
-		Header:  m.Header,
-	}
-	if err := js.conn.PublishMsg(pubMsg); err != nil {
+	if err := js.conn.PublishMsg(m); err != nil {
 		js.clearPAF(id)
 		return nil, err
 	}
@@ -399,7 +329,7 @@ func (js *jetStream) newAsyncReply() (string, error) {
 		for i := 0; i < aReplyTokensize; i++ {
 			b[i] = rdigits[int(b[i]%base)]
 		}
-		js.publisher.replyPrefix = fmt.Sprintf("%s%s.", js.opts.replyPrefix, b[:aReplyTokensize])
+		js.publisher.replyPrefix = fmt.Sprintf("%s%s.", js.replyPrefix, b[:aReplyTokensize])
 		sub, err := js.conn.Subscribe(fmt.Sprintf("%s*", js.publisher.replyPrefix), js.handleAsyncReply)
 		if err != nil {
 			js.publisher.Unlock()
@@ -414,30 +344,23 @@ func (js *jetStream) newAsyncReply() (string, error) {
 	}
 	var sb strings.Builder
 	sb.WriteString(js.publisher.replyPrefix)
-	for {
-		rn := js.publisher.rr.Int63()
-		var b [aReplyTokensize]byte
-		for i, l := 0, rn; i < len(b); i++ {
-			b[i] = rdigits[l%base]
-			l /= base
-		}
-		if _, ok := js.publisher.acks[string(b[:])]; ok {
-			continue
-		}
-		sb.Write(b[:])
-		break
+	rn := js.publisher.rr.Int63()
+	var b [aReplyTokensize]byte
+	for i, l := 0, rn; i < len(b); i++ {
+		b[i] = rdigits[l%base]
+		l /= base
 	}
-
+	sb.Write(b[:])
 	js.publisher.Unlock()
 	return sb.String(), nil
 }
 
 // Handle an async reply from PublishAsync.
 func (js *jetStream) handleAsyncReply(m *nats.Msg) {
-	if len(m.Subject) <= js.opts.replyPrefixLen {
+	if len(m.Subject) <= js.replyPrefixLen {
 		return
 	}
-	id := m.Subject[js.opts.replyPrefixLen:]
+	id := m.Subject[js.replyPrefixLen:]
 
 	js.publisher.Lock()
 
@@ -445,31 +368,6 @@ func (js *jetStream) handleAsyncReply(m *nats.Msg) {
 	if paf == nil {
 		js.publisher.Unlock()
 		return
-	}
-
-	closeStc := func() {
-		// Check on anyone stalled and waiting.
-		if js.publisher.stallCh != nil && len(js.publisher.acks) < js.publisher.maxpa {
-			close(js.publisher.stallCh)
-			js.publisher.stallCh = nil
-		}
-	}
-
-	closeDchFn := func() func() {
-		var dch chan struct{}
-		// Check on anyone one waiting on done status.
-		if js.publisher.doneCh != nil && len(js.publisher.acks) == 0 {
-			dch = js.publisher.doneCh
-			js.publisher.doneCh = nil
-		}
-		// Return function to close done channel which
-		// should be deferred so that error is processed and
-		// can be checked.
-		return func() {
-			if dch != nil {
-				close(dch)
-			}
-		}
 	}
 
 	doErr := func(err error) {
@@ -480,18 +378,16 @@ func (js *jetStream) handleAsyncReply(m *nats.Msg) {
 		cb := js.publisher.asyncPublisherOpts.aecb
 		js.publisher.Unlock()
 		if cb != nil {
+			paf.msg.Reply = ""
 			cb(js, paf.msg, err)
 		}
 	}
 
-	if paf.timeout != nil {
-		paf.timeout.Stop()
-	}
-
 	// Process no responders etc.
-	if len(m.Data) == 0 && m.Header.Get(statusHdr) == statusNoResponders {
+	if len(m.Data) == 0 && m.Header.Get(statusHdr) == noResponders {
 		if paf.retries < paf.maxRetries {
 			paf.retries++
+			paf.msg.Reply = m.Subject
 			time.AfterFunc(paf.retryWait, func() {
 				js.publisher.Lock()
 				paf := js.getPAF(id)
@@ -512,16 +408,25 @@ func (js *jetStream) handleAsyncReply(m *nats.Msg) {
 			return
 		}
 		delete(js.publisher.acks, id)
-		closeStc()
-		defer closeDchFn()()
 		doErr(ErrNoStreamResponse)
 		return
 	}
 
 	// Remove
 	delete(js.publisher.acks, id)
-	closeStc()
-	defer closeDchFn()()
+
+	// Check on anyone stalled and waiting.
+	if js.publisher.stallCh != nil && len(js.publisher.acks) < js.publisher.asyncPublisherOpts.maxpa {
+		close(js.publisher.stallCh)
+		js.publisher.stallCh = nil
+	}
+	// Check on anyone waiting on done status.
+	if js.publisher.doneCh != nil && len(js.publisher.acks) == 0 {
+		dch := js.publisher.doneCh
+		js.publisher.doneCh = nil
+		// Defer here so error is processed and can be checked.
+		defer close(dch)
+	}
 
 	var pa pubAckResponse
 	if err := json.Unmarshal(m.Data, &pa); err != nil {

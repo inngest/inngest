@@ -3,15 +3,15 @@
 //
 // You can configure it by passing an option struct to cors.New:
 //
-//	c := cors.New(cors.Options{
-//	    AllowedOrigins: []string{"foo.com"},
-//	    AllowedMethods: []string{"GET", "POST", "DELETE"},
-//	    AllowCredentials: true,
-//	})
+//     c := cors.New(cors.Options{
+//         AllowedOrigins: []string{"foo.com"},
+//         AllowedMethods: []string{"GET", "POST", "DELETE"},
+//         AllowCredentials: true,
+//     })
 //
 // Then insert the handler in the chain:
 //
-//	handler = c.Handler(handler)
+//     handler = c.Handler(handler)
 //
 // See Options documentation for more options.
 //
@@ -210,10 +210,7 @@ func AllowAll() *Cors {
 // as necessary.
 func (c *Cors) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// null or empty Origin header value is acceptable and it is considered having that header
-		_, hasOriginHeader := r.Header["Origin"]
-
-		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" && hasOriginHeader {
+		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 			c.logf("Handler: Preflight request")
 			c.handlePreflight(w, r)
 			// Preflight requests are standalone and should stop the chain as some other
@@ -249,6 +246,10 @@ func (c *Cors) handlePreflight(w http.ResponseWriter, r *http.Request) {
 	headers.Add("Vary", "Access-Control-Request-Method")
 	headers.Add("Vary", "Access-Control-Request-Headers")
 
+	if origin == "" {
+		c.logf("Preflight aborted: empty origin")
+		return
+	}
 	if !c.isOriginAllowed(r, origin) {
 		c.logf("Preflight aborted: origin '%s' not allowed", origin)
 		return
@@ -290,17 +291,14 @@ func (c *Cors) handlePreflight(w http.ResponseWriter, r *http.Request) {
 // handleActualRequest handles simple cross-origin requests, actual request or redirects
 func (c *Cors) handleActualRequest(w http.ResponseWriter, r *http.Request) {
 	headers := w.Header()
-	// null Origin header value is acceptable and it is considered having that header
-	_, hasOriginHeader := r.Header["Origin"]
+	origin := r.Header.Get("Origin")
 
 	// Always set Vary, see https://github.com/rs/cors/issues/10
 	headers.Add("Vary", "Origin")
-
-	if !hasOriginHeader {
+	if origin == "" {
 		c.logf("Actual request no headers added: missing origin")
 		return
 	}
-	origin := r.Header.Get("Origin")
 	if !c.isOriginAllowed(r, origin) {
 		c.logf("Actual request no headers added: origin '%s' not allowed", origin)
 		return

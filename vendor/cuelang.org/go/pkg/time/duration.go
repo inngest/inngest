@@ -22,14 +22,13 @@ import (
 // to avoid confusion across daylight savings time zone transitions.
 //
 // To count the number of units in a Duration, divide:
-//
 //	second := time.Second
 //	fmt.Print(int64(second/time.Millisecond)) // prints 1000
 //
 // To convert an integer number of units to a Duration, multiply:
-//
 //	seconds := 10
 //	fmt.Print(time.Duration(seconds)*time.Second) // prints 10s
+//
 const (
 	Nanosecond  = 1
 	Microsecond = 1000
@@ -49,16 +48,6 @@ func Duration(s string) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-// FormatDuration converts nanoseconds to a string representing the duration in
-// the form "72h3m0.5s".
-//
-// Leading zero units are omitted. As a special case, durations less than
-// one second use a smaller unit (milli-, micro-, or nanoseconds) to ensure
-// that the leading digit is non-zero. The zero duration formats as 0s.
-func FormatDuration(d int64) string {
-	return time.Duration(d).String()
 }
 
 // ParseDuration reports the nanoseconds represented by a duration string.

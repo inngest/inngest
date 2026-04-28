@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"slices"
 	"strings"
 )
 
@@ -30,7 +29,13 @@ func contentEncoding(ce string, charsets ...string) bool {
 	_, ce = split(strings.ToLower(ce), ";")
 	_, ce = split(ce, "charset=")
 	ce, _ = split(ce, ";")
-	return slices.Contains(charsets, ce)
+	for _, c := range charsets {
+		if ce == c {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Split a string in two parts, cleaning any whitespace.

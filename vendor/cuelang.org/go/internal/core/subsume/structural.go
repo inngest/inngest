@@ -54,10 +54,13 @@ func (s *subsumer) node(env *adt.Environment, up int32) *adt.Vertex {
 	for ; up != 0; up-- {
 		env = env.Up
 	}
-	return env.DerefVertex(s.ctx)
+	return env.Vertex
 }
 
 func (s *subsumer) structural(a, b adt.Conjunct) bool {
+	if y, ok := b.Expr().(*adt.LetReference); ok {
+		return s.conjunct(a, s.c(b.Env, y.X))
+	}
 	if isBottomConjunct(b) {
 		return true
 	}
@@ -69,55 +72,51 @@ func (s *subsumer) structural(a, b adt.Conjunct) bool {
 	case *adt.ListLit:
 
 	case *adt.FieldReference:
-		if y, ok := b.Elem().(*adt.FieldReference); ok && x.Label == y.Label {
+		if y, ok := b.Expr().(*adt.FieldReference); ok && x.Label == y.Label {
 			if s.node(a.Env, x.UpCount) == s.node(b.Env, y.UpCount) {
 				return true
 			}
 		}
 
 	case *adt.LabelReference:
-		if y, ok := b.Elem().(*adt.LabelReference); ok {
+		if y, ok := b.Expr().(*adt.LabelReference); ok {
 			if s.node(a.Env, x.UpCount) == s.node(b.Env, y.UpCount) {
 				return true
 			}
 		}
 
 	case *adt.DynamicReference:
-		if y, ok := b.Elem().(*adt.FieldReference); ok {
+		if y, ok := b.Expr().(*adt.FieldReference); ok {
 			if s.node(a.Env, x.UpCount) == s.node(b.Env, y.UpCount) {
 				return true
 			}
 		}
 
 	case *adt.ImportReference:
-		if y, ok := b.Elem().(*adt.ImportReference); ok &&
+		if y, ok := b.Expr().(*adt.ImportReference); ok &&
 			x.ImportPath == y.ImportPath {
 			return true
 		}
 
 	case *adt.LetReference:
-		if y, ok := b.Elem().(*adt.LetReference); ok && x.Label == y.Label {
-			if s.node(a.Env, x.UpCount) == s.node(b.Env, y.UpCount) {
-				return true
-			}
-		}
+		return s.conjunct(s.c(a.Env, x.X), b)
 
 	case *adt.SelectorExpr:
-		if y, ok := a.Elem().(*adt.SelectorExpr); ok &&
+		if y, ok := a.Expr().(*adt.SelectorExpr); ok &&
 			x.Sel == y.Sel &&
 			s.conjunct(s.c(a.Env, x.X), s.c(b.Env, y.X)) {
 			return true
 		}
 
 	case *adt.IndexExpr:
-		if y, ok := b.Elem().(*adt.IndexExpr); ok &&
+		if y, ok := b.Expr().(*adt.IndexExpr); ok &&
 			s.conjunct(s.c(a.Env, x.X), s.c(b.Env, y.X)) &&
 			s.conjunct(s.c(a.Env, x.Index), s.c(b.Env, y.Index)) {
 			return true
 		}
 
 	case *adt.SliceExpr:
-		if r, ok := b.Elem().(*adt.SliceExpr); ok &&
+		if r, ok := b.Expr().(*adt.SliceExpr); ok &&
 			s.conjunct(s.c(a.Env, x.X), s.c(b.Env, r.X)) &&
 			s.conjunct(s.c(a.Env, x.Lo), s.c(b.Env, r.Lo)) &&
 			s.conjunct(s.c(a.Env, x.Hi), s.c(b.Env, r.Hi)) {
@@ -125,7 +124,7 @@ func (s *subsumer) structural(a, b adt.Conjunct) bool {
 		}
 
 	case *adt.Interpolation:
-		switch y := b.Elem().(type) {
+		switch y := b.Expr().(type) {
 		case *adt.String:
 			// Be conservative if not ground.
 			s.inexact = true
@@ -144,23 +143,23 @@ func (s *subsumer) structural(a, b adt.Conjunct) bool {
 		}
 
 	case *adt.BoundExpr:
-		if y, ok := b.Elem().(*adt.BoundExpr); ok && x.Op == y.Op {
+		if y, ok := b.Expr().(*adt.BoundExpr); ok && x.Op == y.Op {
 			return s.conjunct(s.c(a.Env, x.Expr), s.c(b.Env, y.Expr))
 		}
 
 	case *adt.UnaryExpr:
-		if y, ok := b.Elem().(*adt.UnaryExpr); ok && x.Op == y.Op {
+		if y, ok := b.Expr().(*adt.UnaryExpr); ok && x.Op == y.Op {
 			return s.conjunct(s.c(a.Env, x.X), s.c(b.Env, y.X))
 		}
 
 	case *adt.BinaryExpr:
-		if y, ok := b.Elem().(*adt.BinaryExpr); ok && x.Op == y.Op {
+		if y, ok := b.Expr().(*adt.BinaryExpr); ok && x.Op == y.Op {
 			return s.conjunct(s.c(a.Env, x.X), s.c(b.Env, y.X)) &&
 				s.conjunct(s.c(a.Env, x.Y), s.c(b.Env, y.Y))
 		}
 
 	case *adt.CallExpr:
-		if y, ok := b.Elem().(*adt.CallExpr); ok {
+		if y, ok := b.Expr().(*adt.CallExpr); ok {
 			if len(x.Args) != len(y.Args) {
 				return false
 			}
@@ -250,9 +249,12 @@ func (c *collatedDecls) collate(env *adt.Environment, s *adt.StructLit) {
 			e.required = true
 			e.conjuncts = append(e.conjuncts, adt.MakeRootConjunct(env, x))
 			c.fields[x.Label] = e
-			if x.ArcType != adt.ArcMember {
-				c.hasOptional = true
-			}
+
+		case *adt.OptionalField:
+			e := c.fields[x.Label]
+			e.conjuncts = append(e.conjuncts, adt.MakeRootConjunct(env, x))
+			c.fields[x.Label] = e
+			c.hasOptional = true
 
 		case *adt.BulkOptionalField:
 			c.pattern = append(c.pattern, x)
@@ -266,11 +268,16 @@ func (c *collatedDecls) collate(env *adt.Environment, s *adt.StructLit) {
 			c.isOpen = true
 			c.additional = append(c.additional, x)
 
-		case *adt.Comprehension:
-			c.yielders = append(c.yielders, x.Clauses...)
+		case *adt.ForClause:
+			c.yielders = append(c.yielders, x)
+
+		case *adt.IfClause:
+			c.yielders = append(c.yielders, x)
 
 		case *adt.LetClause:
 			c.yielders = append(c.yielders, x)
+
+		case *adt.ValueClause:
 		}
 	}
 }

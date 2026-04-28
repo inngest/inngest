@@ -17,16 +17,9 @@ package list
 
 import (
 	"fmt"
-	"slices"
+	"sort"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal/core/adt"
-	"cuelang.org/go/internal/core/eval"
-	"cuelang.org/go/internal/iterutil"
-	"cuelang.org/go/internal/pkg"
-	"cuelang.org/go/internal/value"
 )
 
 // Drop reports the suffix of list x after the first n elements,
@@ -34,11 +27,12 @@ import (
 //
 // For instance:
 //
-//	Drop([1, 2, 3, 4], 2)
+//    Drop([1, 2, 3, 4], 2)
 //
 // results in
 //
-//	[3, 4]
+//    [3, 4]
+//
 func Drop(x []cue.Value, n int) ([]cue.Value, error) {
 	if n < 0 {
 		return nil, fmt.Errorf("negative index")
@@ -56,7 +50,7 @@ func Drop(x []cue.Value, n int) ([]cue.Value, error) {
 //       extensions are introduced, which may provide flatten functionality
 //       natively.
 //
-// // Flatten reports a flattened sequence of the list xs by expanding any elements
+// // Flatten reports a flattend sequence of the list xs by expanding any elements
 // // that are lists.
 // //
 // // For instance:
@@ -92,16 +86,17 @@ func Drop(x []cue.Value, n int) ([]cue.Value, error) {
 // 	return flatten(xs)
 // }
 
-// FlattenN reports a flattened sequence of the list xs by expanding any elements
+// FlattenN reports a flattend sequence of the list xs by expanding any elements
 // depth levels deep. If depth is negative all elements are expanded.
 //
 // For instance:
 //
-//	FlattenN([1, [[2, 3], []], [4]], 1)
+//    FlattenN([1, [[2, 3], []], [4]], 1)
 //
 // results in
 //
-//	[1, [2, 3], [], 4]
+//    [1, [2, 3], [], 4]
+//
 func FlattenN(xs cue.Value, depth int) ([]cue.Value, error) {
 	var flattenN func(cue.Value, int) ([]cue.Value, error)
 	flattenN = func(xs cue.Value, depth int) ([]cue.Value, error) {
@@ -132,23 +127,29 @@ func FlattenN(xs cue.Value, depth int) ([]cue.Value, error) {
 //
 // For instance:
 //
-//	Repeat([1, 2], 2)
+//    Repeat([1, 2], 2)
 //
 // results in
 //
-//	[1, 2, 1, 2]
+//    [1, 2, 1, 2]
+//
 func Repeat(x []cue.Value, count int) ([]cue.Value, error) {
 	if count < 0 {
 		return nil, fmt.Errorf("negative count")
 	}
-	return slices.Repeat(x, count), nil
+	var a []cue.Value
+	for i := 0; i < count; i++ {
+		a = append(a, x...)
+	}
+	return a, nil
 }
 
 // Concat takes a list of lists and concatenates them.
 //
 // Concat([a, b, c]) is equivalent to
 //
-//	[for x in a {x}, for x in b {x}, for x in c {x}]
+//     [ for x in a {x}, for x in b {x}, for x in c {x} ]
+//
 func Concat(a []cue.Value) ([]cue.Value, error) {
 	var res []cue.Value
 	for _, e := range a {
@@ -167,11 +168,12 @@ func Concat(a []cue.Value) ([]cue.Value, error) {
 //
 // For instance:
 //
-//	Take([1, 2, 3, 4], 2)
+//    Take([1, 2, 3, 4], 2)
 //
 // results in
 //
-//	[1, 2]
+//    [1, 2]
+//
 func Take(x []cue.Value, n int) ([]cue.Value, error) {
 	if n < 0 {
 		return nil, fmt.Errorf("negative index")
@@ -189,11 +191,12 @@ func Take(x []cue.Value, n int) ([]cue.Value, error) {
 //
 // For instance:
 //
-//	Slice([1, 2, 3, 4], 1, 3)
+//    Slice([1, 2, 3, 4], 1, 3)
 //
 // results in
 //
-//	[2, 3]
+//    [2, 3]
+//
 func Slice(x []cue.Value, i, j int) ([]cue.Value, error) {
 	if i < 0 {
 		return nil, fmt.Errorf("negative index")
@@ -214,142 +217,38 @@ func Slice(x []cue.Value, i, j int) ([]cue.Value, error) {
 	return x[i:j], nil
 }
 
-// Reverse reverses a list.
-//
-// For instance:
-//
-//	Reverse([1, 2, 3, 4])
-//
-// results in
-//
-//	[4, 3, 2, 1]
-func Reverse(x []cue.Value) []cue.Value {
-	slices.Reverse(x)
-	return x
-}
-
 // MinItems reports whether a has at least n items.
-func MinItems(list pkg.List, n int) (bool, error) {
-	count := iterutil.Count(list.Elems())
-	if count >= n {
-		return true, nil
-	}
-	code := adt.EvalError
-	if list.IsOpen() {
-		code = adt.IncompleteError
-	}
-	return false, pkg.ValidationError{B: &adt.Bottom{
-		Code: code,
-		Err:  errors.Newf(token.NoPos, "len(list) < MinItems(%[2]d) (%[1]d < %[2]d)", count, n),
-	}}
+func MinItems(a []cue.Value, n int) bool {
+	return len(a) >= n
 }
 
 // MaxItems reports whether a has at most n items.
-func MaxItems(list pkg.List, n int) (bool, error) {
-	count := iterutil.Count(list.Elems())
-	if count > n {
-		return false, pkg.ValidationError{B: &adt.Bottom{
-			Code: adt.EvalError,
-			Err:  errors.Newf(token.NoPos, "len(list) > MaxItems(%[2]d) (%[1]d > %[2]d)", count, n),
-		}}
-	}
-
-	return true, nil
+func MaxItems(a []cue.Value, n int) bool {
+	return len(a) <= n
 }
 
 // UniqueItems reports whether all elements in the list are unique.
-func UniqueItems(a []cue.Value) (bool, error) {
-	if len(a) <= 1 {
-		return true, nil
+func UniqueItems(a []cue.Value) bool {
+	b := []string{}
+	for _, v := range a {
+		b = append(b, fmt.Sprintf("%+v", v))
 	}
-
-	// TODO(perf): this is an O(n^2) algorithm. We should make it O(n log n).
-	// This could be done as follows:
-	// - Create a list with some hash value for each element x in a as well
-	//   alongside the value of x itself.
-	// - Sort the elements based on the hash value.
-	// - Compare subsequent elements to see if they are equal.
-
-	tv := a[0].Core()
-	ctx := eval.NewContext(tv.R, tv.V)
-
-	posX, posY := 0, 0
-	code := adt.IncompleteError
-
-outer:
-	for i, x := range a {
-		_, vx := value.ToInternal(x)
-
-		for j := i + 1; j < len(a); j++ {
-			_, vy := value.ToInternal(a[j])
-
-			if adt.Equal(ctx, vx, vy, adt.RegularOnly) {
-				posX, posY = i, j
-				if adt.IsFinal(vy) {
-					code = adt.EvalError
-					break outer
-				}
-			}
+	sort.Strings(b)
+	for i := 1; i < len(b); i++ {
+		if b[i-1] == b[i] {
+			return false
 		}
 	}
-
-	if posX == posY {
-		return true, nil
-	}
-
-	var err errors.Error
-	switch x := a[posX].Value(); x.Kind() {
-	case cue.BoolKind, cue.NullKind, cue.IntKind, cue.FloatKind, cue.StringKind, cue.BytesKind:
-		err = errors.Newf(token.NoPos, "equal value (%v) at position %d and %d", x, posX, posY)
-	default:
-		err = errors.Newf(token.NoPos, "equal values at position %d and %d", posX, posY)
-	}
-
-	return false, pkg.ValidationError{B: &adt.Bottom{
-		Code: code,
-		Err:  err,
-	}}
+	return true
 }
 
 // Contains reports whether v is contained in a. The value must be a
 // comparable value.
 func Contains(a []cue.Value, v cue.Value) bool {
-	return slices.ContainsFunc(a, v.Equals)
-}
-
-// MatchN is a validator that checks that the number of elements in the given
-// list that unifies with the schema "matchValue" matches "n".
-// "n" may be a number constraint and does not have to be a concrete number.
-// Likewise, "matchValue" will usually be a non-concrete value.
-func MatchN(list []cue.Value, n pkg.Schema, matchValue pkg.Schema) (bool, error) {
-	c := value.OpContext(n)
-	return matchN(c, list, n, matchValue)
-}
-
-// matchN is the actual implementation of MatchN.
-func matchN(c *adt.OpContext, list []cue.Value, n pkg.Schema, matchValue pkg.Schema) (bool, error) {
-	var nmatch int64
-	for _, w := range list {
-		vx := adt.Unify(c, value.Vertex(matchValue), value.Vertex(w))
-		x := value.Make(c, vx)
-		if x.Validate(cue.Final()) == nil {
-			nmatch++
+	for _, w := range a {
+		if v.Equals(w) {
+			return true
 		}
 	}
-
-	ctx := value.Context(c)
-
-	if err := n.Unify(ctx.Encode(nmatch)).Err(); err != nil {
-		return false, pkg.ValidationError{B: &adt.Bottom{
-			Code: adt.EvalError,
-			Err: errors.Newf(
-				token.NoPos,
-				"number of matched elements is %d: does not satisfy %v",
-				nmatch,
-				n,
-			),
-		}}
-	}
-
-	return true, nil
+	return false
 }

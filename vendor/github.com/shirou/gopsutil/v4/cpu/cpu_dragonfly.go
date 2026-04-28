@@ -128,11 +128,7 @@ func InfoWithContext(_ context.Context) ([]InfoStat, error) {
 
 func parseDmesgBoot(fileName string) (InfoStat, error) {
 	c := InfoStat{}
-	lines, err := common.ReadLines(fileName)
-	if err != nil {
-		return c, fmt.Errorf("could not read %s: %w", fileName, err)
-	}
-
+	lines, _ := common.ReadLines(fileName)
 	for _, line := range lines {
 		if matches := cpuEnd.FindStringSubmatch(line); matches != nil {
 			break

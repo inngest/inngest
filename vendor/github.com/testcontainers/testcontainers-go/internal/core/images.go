@@ -39,6 +39,7 @@ func ExtractImagesFromDockerfile(dockerfile string, buildArgs map[string]*string
 
 // ExtractImagesFromReader extracts images from the Dockerfile sourced from r.
 func ExtractImagesFromReader(r io.Reader, buildArgs map[string]*string) ([]string, error) {
+	var images []string
 	var lines []string
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -47,8 +48,6 @@ func ExtractImagesFromReader(r io.Reader, buildArgs map[string]*string) ([]strin
 	if scanner.Err() != nil {
 		return nil, scanner.Err()
 	}
-
-	images := make([]string, 0, len(lines))
 
 	// extract images from dockerfile
 	for _, line := range lines {
@@ -99,16 +98,6 @@ func ExtractRegistry(image string, fallback string) string {
 	}
 
 	registry := exp[1]
-
-	// docker.io is an implicit reference, return fallback for normalization
-	if strings.EqualFold(registry, "docker.io") {
-		return fallback
-	}
-
-	// registry.hub.docker.com is an explicit registry reference, preserve it
-	if strings.EqualFold(registry, "registry.hub.docker.com") {
-		return "registry.hub.docker.com"
-	}
 
 	if IsURL(registry) {
 		return registry

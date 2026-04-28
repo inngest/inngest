@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"strconv"
 
 	"github.com/go-openapi/jsonpointer"
@@ -15,7 +14,7 @@ import (
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#operation-object
 type Operation struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"-" yaml:"-"`
+	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
 
 	// Optional tags for documentation.
 	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty"`
@@ -70,7 +69,9 @@ func (operation Operation) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Operation.
 func (operation Operation) MarshalYAML() (any, error) {
 	m := make(map[string]any, 12+len(operation.Extensions))
-	maps.Copy(m, operation.Extensions)
+	for k, v := range operation.Extensions {
+		m[k] = v
+	}
 	if x := operation.Tags; len(x) != 0 {
 		m["tags"] = x
 	}
@@ -116,6 +117,7 @@ func (operation *Operation) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
+	delete(x.Extensions, originKey)
 	delete(x.Extensions, "tags")
 	delete(x.Extensions, "summary")
 	delete(x.Extensions, "description")

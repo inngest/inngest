@@ -10,8 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric/internal/counter"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric/internal/observ"
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -27,8 +25,6 @@ type exporter struct {
 	aggregationSelector metric.AggregationSelector
 
 	redactTimestamps bool
-
-	inst *observ.Instrumentation
 }
 
 // New returns a configured metric exporter.
@@ -43,9 +39,7 @@ func New(options ...Option) (metric.Exporter, error) {
 		redactTimestamps:    cfg.redactTimestamps,
 	}
 	exp.encVal.Store(*cfg.encoder)
-	var err error
-	exp.inst, err = observ.NewInstrumentation(counter.NextExporterID())
-	return exp, err
+	return exp, nil
 }
 
 func (e *exporter) Temporality(k metric.InstrumentKind) metricdata.Temporality {
@@ -56,13 +50,8 @@ func (e *exporter) Aggregation(k metric.InstrumentKind) metric.Aggregation {
 	return e.aggregationSelector(k)
 }
 
-func (e *exporter) Export(ctx context.Context, data *metricdata.ResourceMetrics) (err error) {
-	if e.inst != nil {
-		op := e.inst.ExportMetrics(ctx, countDataPoints(data))
-		defer func() { op.End(err) }()
-	}
-	err = ctx.Err()
-	if err != nil {
+func (e *exporter) Export(ctx context.Context, data *metricdata.ResourceMetrics) error {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if e.redactTimestamps {
@@ -74,7 +63,7 @@ func (e *exporter) Export(ctx context.Context, data *metricdata.ResourceMetrics)
 	return e.encVal.Load().(encoderHolder).Encode(data)
 }
 
-func (*exporter) ForceFlush(context.Context) error {
+func (e *exporter) ForceFlush(context.Context) error {
 	// exporter holds no state, nothing to flush.
 	return nil
 }
@@ -88,7 +77,7 @@ func (e *exporter) Shutdown(context.Context) error {
 	return nil
 }
 
-func (*exporter) MarshalLog() any {
+func (e *exporter) MarshalLog() interface{} {
 	return struct{ Type string }{Type: "STDOUT"}
 }
 
@@ -142,9 +131,7 @@ func redactAggregationTimestamps(orig metricdata.Aggregation) metricdata.Aggrega
 	}
 }
 
-func redactHistogramTimestamps[T int64 | float64](
-	hdp []metricdata.HistogramDataPoint[T],
-) []metricdata.HistogramDataPoint[T] {
+func redactHistogramTimestamps[T int64 | float64](hdp []metricdata.HistogramDataPoint[T]) []metricdata.HistogramDataPoint[T] {
 	out := make([]metricdata.HistogramDataPoint[T], len(hdp))
 	for i, dp := range hdp {
 		out[i] = metricdata.HistogramDataPoint[T]{
@@ -169,38 +156,4 @@ func redactDataPointTimestamps[T int64 | float64](sdp []metricdata.DataPoint[T])
 		}
 	}
 	return out
-}
-
-// countDataPoints counts the total number of data points in a ResourceMetrics.
-func countDataPoints(rm *metricdata.ResourceMetrics) int64 {
-	if rm == nil {
-		return 0
-	}
-
-	var total int64
-	for _, sm := range rm.ScopeMetrics {
-		for _, m := range sm.Metrics {
-			switch data := m.Data.(type) {
-			case metricdata.Gauge[int64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.Gauge[float64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.Sum[int64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.Sum[float64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.Histogram[int64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.Histogram[float64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.ExponentialHistogram[int64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.ExponentialHistogram[float64]:
-				total += int64(len(data.DataPoints))
-			case metricdata.Summary:
-				total += int64(len(data.DataPoints))
-			}
-		}
-	}
-	return total
 }

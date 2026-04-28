@@ -3,7 +3,7 @@ package testcontainers
 import (
 	"context"
 
-	"github.com/moby/moby/client"
+	"github.com/docker/docker/client"
 )
 
 // ImageInfo represents summary information of an image

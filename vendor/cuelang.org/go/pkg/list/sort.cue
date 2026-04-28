@@ -28,10 +28,11 @@ Comparer: {
 //     list.Sort(a, list.Ascending)
 Ascending: {
 	Comparer
-	T:    number | string
-	x:    T
-	y:    T
-	less: x < y
+	T: number | string
+	x: T
+	y: T
+	// TODO: the following will be fixed when removing old-school templating.
+	less: true && (x < y)
 }
 
 // Descending defines a Comparer to sort comparable values in decreasing order.
@@ -43,5 +44,5 @@ Descending: {
 	T:    number | string
 	x:    T
 	y:    T
-	less: x > y
+	less: (x > y)
 }

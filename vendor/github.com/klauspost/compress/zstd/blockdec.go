@@ -54,11 +54,11 @@ const (
 )
 
 var (
-	huffDecoderPool = sync.Pool{New: func() any {
+	huffDecoderPool = sync.Pool{New: func() interface{} {
 		return &huff0.Scratch{}
 	}}
 
-	fseDecoderPool = sync.Pool{New: func() any {
+	fseDecoderPool = sync.Pool{New: func() interface{} {
 		return &fseDecoder{}
 	}}
 )
@@ -553,7 +553,7 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 		if compMode&3 != 0 {
 			return errors.New("corrupt block: reserved bits not zero")
 		}
-		for i := range uint(3) {
+		for i := uint(0); i < 3; i++ {
 			mode := seqCompMode((compMode >> (6 - i*2)) & 3)
 			if debugDecoder {
 				println("Table", tableIndex(i), "is", mode)

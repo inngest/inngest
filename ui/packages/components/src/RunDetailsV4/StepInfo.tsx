@@ -15,7 +15,6 @@ import {
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -30,6 +29,7 @@ import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
 import {
+  isExperimentMetadata,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
@@ -188,8 +188,7 @@ export const StepInfo = ({
     preview: tracesPreviewEnabled,
   });
 
-  const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const metadataIsEnabled = true;
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -245,8 +244,16 @@ export const StepInfo = ({
     : [];
 
   const nonHeaderMetadata = metadataIsEnabled
-    ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
+    ? trace.metadata?.filter(
+        (md) => md.kind !== 'inngest.response_headers' && !isExperimentMetadata(md)
+      )
     : undefined;
+
+  const experimentMetadataList = metadataIsEnabled
+    ? trace.metadata?.filter(isExperimentMetadata)
+    : undefined;
+
+  const experimentMetadata = experimentMetadataList?.[0];
 
   const hasNoData = !prettyInput && !prettyOutput && !result?.error;
 
@@ -259,7 +266,7 @@ export const StepInfo = ({
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
-      <div className="min-h-11 flex w-full flex-row items-center justify-between border-none px-4">
+      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
@@ -345,6 +352,17 @@ export const StepInfo = ({
 
           {stepKindInfo}
 
+          {experimentMetadata && (
+            <>
+              <ElementWrapper label="Experiment name">
+                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+              </ElementWrapper>
+              <ElementWrapper label="Variant">
+                <TextElement>{experimentMetadata.values.variant_selected}</TextElement>
+              </ElementWrapper>
+            </>
+          )}
+
           {debug && trace.debugRunID && (
             <ElementWrapper label="Debug Run ID">
               <IDElement>{trace.debugRunID}</IDElement>
@@ -371,6 +389,15 @@ export const StepInfo = ({
                       label: 'Headers',
                       id: 'headers',
                       node: <MetadataAttrs metadata={responseHeaderData} />,
+                    },
+                  ]
+                : []),
+              ...(experimentMetadataList?.length
+                ? [
+                    {
+                      label: 'Experiment',
+                      id: 'experiment',
+                      node: <MetadataAttrs metadata={experimentMetadataList} />,
                     },
                   ]
                 : []),
@@ -438,6 +465,15 @@ export const StepInfo = ({
                           label: 'Headers',
                           id: 'headers',
                           node: <MetadataAttrs metadata={responseHeaderData} />,
+                        },
+                      ]
+                    : []),
+                  ...(experimentMetadataList?.length
+                    ? [
+                        {
+                          label: 'Experiment',
+                          id: 'experiment',
+                          node: <MetadataAttrs metadata={experimentMetadataList} />,
                         },
                       ]
                     : []),

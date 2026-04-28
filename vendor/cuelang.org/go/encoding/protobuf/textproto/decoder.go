@@ -39,14 +39,14 @@ type Option func(*options)
 type options struct {
 }
 
-// NewDecoder returns a new [Decoder].
+// NewDecoder returns a new Decoder
 func NewDecoder(option ...Option) *Decoder {
 	d := &Decoder{}
 	_ = d.m // work around linter bug.
 	return d
 }
 
-// A Decoder caches conversions of [cue.Value] between calls to its methods.
+// A Decoder caches conversions of cue.Value between calls to its methods.
 type Decoder struct {
 	m map[*adt.Vertex]*mapping
 }
@@ -62,11 +62,11 @@ type decoder struct {
 // Parse parses the given textproto bytes and converts them to a CUE expression,
 // using schema as the guideline for conversion using the following rules:
 //
-//   - the @protobuf attribute is optional, but is necessary for:
-//   - interpreting protobuf maps
-//   - using a name different from the CUE name
-//   - fields in the textproto that have no corresponding field in
-//     schema are ignored
+//    - the @protobuf attribute is optional, but is necessary for:
+//        - interpreting protobuf maps
+//        - using a name different from the CUE name
+//    - fields in the textproto that have no corresponding field in
+//      schema are ignored
 //
 // NOTE: the filename is used for associating position information. However,
 // currently no position information is associated with the text proto because
@@ -77,7 +77,7 @@ func (d *Decoder) Parse(schema cue.Value, filename string, b []byte) (ast.Expr, 
 
 	// dec.errs = nil
 
-	f := token.NewFile(filename, -1, len(b))
+	f := token.NewFile(filename, 0, len(b))
 	f.SetLinesForContent(b)
 	dec.file = f
 
@@ -129,6 +129,7 @@ func (d *decoder) protoPos(p pbast.Position) token.Pos {
 
 // parseSchema walks over a CUE "type", converts it to an internal data
 // structure that is used for parsing text proto, and writes it to
+//
 func (d *decoder) parseSchema(schema cue.Value) *mapping {
 	_, v := value.ToInternal(schema)
 	if v == nil {
@@ -143,7 +144,7 @@ func (d *decoder) parseSchema(schema cue.Value) *mapping {
 
 	m := &mapping{children: map[string]*fieldInfo{}}
 
-	i, err := schema.Fields(cue.Optional(true))
+	i, err := schema.Fields()
 	if err != nil {
 		d.addErr(err)
 		return nil
@@ -165,13 +166,8 @@ func (d *decoder) parseSchema(schema cue.Value) *mapping {
 				msg = d.parseSchema(i.Value())
 			}
 
-		case pbinternal.List:
-			e := i.Value().LookupPath(cue.MakePath(cue.AnyIndex))
-			if e.IncompleteKind() == cue.StructKind {
-				msg = d.parseSchema(e)
-			}
-		case pbinternal.Map:
-			e := i.Value().LookupPath(cue.MakePath(cue.AnyString))
+		case pbinternal.List, pbinternal.Map:
+			e, _ := i.Value().Elem()
 			if e.IncompleteKind() == cue.StructKind {
 				msg = d.parseSchema(e)
 			}
@@ -325,10 +321,17 @@ func (d *decoder) decodeMsg(m *mapping, n []*pbast.Node) ast.Expr {
 		}
 
 		if value != nil {
+			var label ast.Label
+			if s := f.CUEName; ast.IsValidIdent(s) {
+				label = ast.NewIdent(s)
+			} else {
+				label = ast.NewString(s)
+
+			}
 			// TODO: convert line number information. However, position
 			// information in textpbfmt packages is too wonky to be useful
 			f := &ast.Field{
-				Label: ast.NewStringLabel(f.CUEName),
+				Label: label,
 				Value: value,
 				// Attrs: []*ast.Attribute{{Text: f.attr.}},
 			}
@@ -391,7 +394,7 @@ func (d *decoder) decodeValue(f *fieldInfo, n *pbast.Node) (x ast.Expr) {
 
 	switch f.ValueType {
 	case pbinternal.String, pbinternal.Bytes:
-		s, _, err := unquote.Unquote(n)
+		s, err := unquote.Unquote(n)
 		if err != nil {
 			d.addErrf(n.Start, "invalid string or bytes: %v", err)
 		}

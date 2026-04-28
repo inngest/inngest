@@ -15,7 +15,6 @@
 package openapi
 
 import (
-	"fmt"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -30,9 +29,7 @@ import (
 //
 // It currently only converts entries in #/components/schema and extracts some
 // meta data.
-//
-// The result can be converted to a [cue.Value] via [cue.Context.BuildFile].
-func Extract(data cue.InstanceOrValue, c *Config) (*ast.File, error) {
+func Extract(data *cue.Instance, c *Config) (*ast.File, error) {
 	// TODO: find a good OpenAPI validator. Both go-openapi and kin-openapi
 	// seem outdated. The k8s one might be good, but avoid pulling in massive
 	// amounts of dependencies.
@@ -44,54 +41,30 @@ func Extract(data cue.InstanceOrValue, c *Config) (*ast.File, error) {
 		}
 	}
 
-	v := data.Value()
-	versionValue := v.LookupPath(cue.MakePath(cue.Str("openapi")))
-	if versionValue.Err() != nil {
-		return nil, fmt.Errorf("openapi field is required but not found")
-	}
-	version, err := versionValue.String()
+	js, err := jsonschema.Extract(data, &jsonschema.Config{
+		Root: oapiSchemas,
+		Map:  openAPIMapping,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("invalid openapi field (must be string): %v", err)
-	}
-	// A simple prefix match is probably OK for now, following
-	// the same logic used by internal/encoding.isOpenAPI.
-	// The specification says that the patch version should be disregarded:
-	// https://swagger.io/specification/v3/
-	var schemaVersion jsonschema.Version
-	switch {
-	case strings.HasPrefix(version, "3.0."):
-		schemaVersion = jsonschema.VersionOpenAPI
-	case strings.HasPrefix(version, "3.1."):
-		schemaVersion = jsonschema.VersionDraft2020_12
-	default:
-		return nil, fmt.Errorf("unknown OpenAPI version %q", version)
+		return nil, err
 	}
 
-	doc, _ := v.LookupPath(cue.MakePath(cue.Str("info"), cue.Str("title"))).String() // Required
-	if s, _ := v.LookupPath(cue.MakePath(cue.Str("info"), cue.Str("description"))).String(); s != "" {
+	v := data.Value()
+
+	doc, _ := v.Lookup("info", "title").String() // Required
+	if s, _ := v.Lookup("info", "description").String(); s != "" {
 		doc += "\n\n" + s
 	}
 	cg := internal.NewComment(true, doc)
 
 	if c.PkgName != "" {
 		p := &ast.Package{Name: ast.NewIdent(c.PkgName)}
-		ast.AddComment(p, cg)
+		p.AddComment(cg)
 		add(p)
-	} else if cg != nil {
+	} else {
 		add(cg)
 	}
 
-	js, err := jsonschema.Extract(data, &jsonschema.Config{
-		Root:           oapiSchemas,
-		Map:            openAPIMapping,
-		DefaultVersion: schemaVersion,
-		StrictFeatures: c.StrictFeatures,
-		// OpenAPI 3.0 is stricter than JSON Schema about allowed keywords.
-		StrictKeywords: schemaVersion == jsonschema.VersionOpenAPI || c.StrictKeywords,
-	})
-	if err != nil {
-		return nil, err
-	}
 	preamble := js.Preamble()
 	body := js.Decls[len(preamble):]
 	for _, d := range preamble {
@@ -108,10 +81,10 @@ func Extract(data cue.InstanceOrValue, c *Config) (*ast.File, error) {
 
 	// TODO: do we want to store the OpenAPI version?
 	// if version, _ := v.Lookup("openapi").String(); version != "" {
-	//  add(&ast.Attribute{Text: fmt.Sprintf("@openapi(version=%s)", version)})
+	// 	add(internal.NewAttr("openapi", "version="+ version))
 	// }
 
-	if info := v.LookupPath(cue.MakePath(cue.Str("info"))); info.Exists() {
+	if info := v.Lookup("info"); info.Exists() {
 		decls := []interface{}{}
 		if st, ok := info.Syntax().(*ast.StructLit); ok {
 			// Remove title.
@@ -159,7 +132,9 @@ func openAPIMapping(pos token.Pos, a []string) ([]ast.Label, error) {
 			oapiSchemas, strings.Join(a, "/"))
 	}
 	name := a[2]
-	if name != rootDefs[1:] && !ast.StringLabelNeedsQuoting(name) {
+	if ast.IsValidIdent(name) &&
+		name != rootDefs[1:] &&
+		!internal.IsDefOrHidden(name) {
 		return []ast.Label{ast.NewIdent("#" + name)}, nil
 	}
 	return []ast.Label{ast.NewIdent(rootDefs), ast.NewString(name)}, nil

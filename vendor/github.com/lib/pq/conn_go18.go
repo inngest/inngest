@@ -6,17 +6,22 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"time"
-
-	"github.com/lib/pq/internal/proto"
 )
 
-const watchCancelDialContextTimeout = 10 * time.Second
+const (
+	watchCancelDialContextTimeout = time.Second * 10
+)
 
 // Implement the "QueryerContext" interface
 func (cn *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	list := make([]driver.Value, len(args))
+	for i, nv := range args {
+		list[i] = nv.Value
+	}
 	finish := cn.watchCancel(ctx)
-	r, err := cn.query(query, args)
+	r, err := cn.query(query, list)
 	if err != nil {
 		if finish != nil {
 			finish()
@@ -52,6 +57,7 @@ func (cn *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, 
 // Implement the "ConnBeginTx" interface
 func (cn *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	var mode string
+
 	switch sql.IsolationLevel(opts.Isolation) {
 	case sql.LevelDefault:
 		// Don't touch mode: use the server's default
@@ -66,6 +72,7 @@ func (cn *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, 
 	default:
 		return nil, fmt.Errorf("pq: isolation level not supported: %d", opts.Isolation)
 	}
+
 	if opts.ReadOnly {
 		mode += " READ ONLY"
 	} else {
@@ -86,9 +93,9 @@ func (cn *conn) Ping(ctx context.Context) error {
 	}
 	rows, err := cn.simpleQuery(";")
 	if err != nil {
-		return driver.ErrBadConn
+		return driver.ErrBadConn // https://golang.org/pkg/database/sql/driver/#Pinger
 	}
-	_ = rows.Close()
+	rows.Close()
 	return nil
 }
 
@@ -124,7 +131,7 @@ func (cn *conn) watchCancel(ctx context.Context) func() {
 			select {
 			case <-finished:
 				cn.err.set(ctx.Err())
-				_ = cn.Close()
+				cn.Close()
 			case finished <- struct{}{}:
 			}
 		}
@@ -133,39 +140,55 @@ func (cn *conn) watchCancel(ctx context.Context) func() {
 }
 
 func (cn *conn) cancel(ctx context.Context) error {
-	// Use a copy since a new connection is created here. This is necessary
-	// because cancel is called from a goroutine in watchCancel.
-	cfg := cn.cfg.Clone()
+	// Create a new values map (copy). This makes sure the connection created
+	// in this method cannot write to the same underlying data, which could
+	// cause a concurrent map write panic. This is necessary because cancel
+	// is called from a goroutine in watchCancel.
+	o := make(values)
+	for k, v := range cn.opts {
+		o[k] = v
+	}
 
-	c, err := dial(ctx, cn.dialer, cfg)
+	c, err := dial(ctx, cn.dialer, o)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = c.Close() }()
+	defer c.Close()
 
-	cn2 := conn{c: c}
-	err = cn2.ssl(cfg, cfg.SSLMode)
-	if err != nil {
-		return err
-	}
+	{
+		can := conn{
+			c: c,
+		}
+		err = can.ssl(o)
+		if err != nil {
+			return err
+		}
 
-	w := cn2.writeBuf(0)
-	w.int32(proto.CancelRequestCode)
-	w.int32(cn.pid)
-	w.bytes(cn.secretKey)
-	if err := cn2.sendStartupPacket(w); err != nil {
-		return err
+		w := can.writeBuf(0)
+		w.int32(80877102) // cancel request code
+		w.int32(cn.processID)
+		w.int32(cn.secretKey)
+
+		if err := can.sendStartupPacket(w); err != nil {
+			return err
+		}
 	}
 
 	// Read until EOF to ensure that the server received the cancel.
-	_, err = io.Copy(io.Discard, c)
-	return err
+	{
+		_, err := io.Copy(ioutil.Discard, c)
+		return err
+	}
 }
 
 // Implement the "StmtQueryContext" interface
 func (st *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	list := make([]driver.Value, len(args))
+	for i, nv := range args {
+		list[i] = nv.Value
+	}
 	finish := st.watchCancel(ctx)
-	r, err := st.query(args)
+	r, err := st.query(list)
 	if err != nil {
 		if finish != nil {
 			finish()
@@ -178,19 +201,16 @@ func (st *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (dri
 
 // Implement the "StmtExecContext" interface
 func (st *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	list := make([]driver.Value, len(args))
+	for i, nv := range args {
+		list[i] = nv.Value
+	}
+
 	if finish := st.watchCancel(ctx); finish != nil {
 		defer finish()
 	}
-	if err := st.cn.err.get(); err != nil {
-		return nil, err
-	}
 
-	err := st.exec(args)
-	if err != nil {
-		return nil, st.cn.handleError(err)
-	}
-	res, _, err := st.cn.readExecuteResponse("simple query")
-	return res, st.cn.handleError(err)
+	return st.Exec(list)
 }
 
 // watchCancel is implemented on stmt in order to not mark the parent conn as bad
@@ -200,9 +220,10 @@ func (st *stmt) watchCancel(ctx context.Context) func() {
 		go func() {
 			select {
 			case <-done:
-				// At this point the function level context is canceled, so it
-				// must not be used for the additional network request to cancel
-				// the query. Create a new context to pass into the dial.
+				// At this point the function level context is canceled,
+				// so it must not be used for the additional network
+				// request to cancel the query.
+				// Create a new context to pass into the dial.
 				ctxCancel, cancel := context.WithTimeout(context.Background(), watchCancelDialContextTimeout)
 				defer cancel()
 

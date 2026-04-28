@@ -2,7 +2,6 @@ package pool
 
 import (
 	"context"
-	"sort"
 	"sync"
 )
 
@@ -20,8 +19,9 @@ func NewWithResults[T any]() *ResultPool[T] {
 // Tasks are executed in the pool with Go(), then the results of the tasks are
 // returned by Wait().
 //
-// The order of the results is guaranteed to be the same as the order the
-// tasks were submitted.
+// The order of the results is not guaranteed to be the same as the order the
+// tasks were submitted. If your use case requires consistent ordering,
+// consider using the `stream` package or `Map` from the `iter` package.
 type ResultPool[T any] struct {
 	pool Pool
 	agg  resultAggregator[T]
@@ -30,9 +30,8 @@ type ResultPool[T any] struct {
 // Go submits a task to the pool. If all goroutines in the pool
 // are busy, a call to Go() will block until the task can be started.
 func (p *ResultPool[T]) Go(f func() T) {
-	idx := p.agg.nextIndex()
 	p.pool.Go(func() {
-		p.agg.save(idx, f(), false)
+		p.agg.add(f())
 	})
 }
 
@@ -40,9 +39,7 @@ func (p *ResultPool[T]) Go(f func() T) {
 // a slice of results from tasks that did not panic.
 func (p *ResultPool[T]) Wait() []T {
 	p.pool.Wait()
-	results := p.agg.collect(true)
-	p.agg = resultAggregator[T]{} // reset for reuse
-	return results
+	return p.agg.results
 }
 
 // MaxGoroutines returns the maximum size of the pool.
@@ -86,57 +83,11 @@ func (p *ResultPool[T]) panicIfInitialized() {
 // goroutines. The zero value is valid and ready to use.
 type resultAggregator[T any] struct {
 	mu      sync.Mutex
-	len     int
 	results []T
-	errored []int
 }
 
-// nextIndex reserves a slot for a result. The returned value should be passed
-// to save() when adding a result to the aggregator.
-func (r *resultAggregator[T]) nextIndex() int {
+func (r *resultAggregator[T]) add(res T) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	nextIdx := r.len
-	r.len += 1
-	return nextIdx
-}
-
-func (r *resultAggregator[T]) save(i int, res T, errored bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if i >= len(r.results) {
-		old := r.results
-		r.results = make([]T, r.len)
-		copy(r.results, old)
-	}
-
-	r.results[i] = res
-
-	if errored {
-		r.errored = append(r.errored, i)
-	}
-}
-
-// collect returns the set of aggregated results.
-func (r *resultAggregator[T]) collect(collectErrored bool) []T {
-	if !r.mu.TryLock() {
-		panic("collect should not be called until all goroutines have exited")
-	}
-
-	if collectErrored || len(r.errored) == 0 {
-		return r.results
-	}
-
-	filtered := r.results[:0]
-	sort.Ints(r.errored)
-	for i, e := range r.errored {
-		if i == 0 {
-			filtered = append(filtered, r.results[:e]...)
-		} else {
-			filtered = append(filtered, r.results[r.errored[i-1]+1:e]...)
-		}
-	}
-	return filtered
+	r.results = append(r.results, res)
+	r.mu.Unlock()
 }

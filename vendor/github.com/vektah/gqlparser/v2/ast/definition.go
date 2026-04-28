@@ -1,7 +1,5 @@
 package ast
 
-import "slices"
-
 type DefinitionKind string
 
 const (
@@ -31,7 +29,7 @@ type Definition struct {
 	Types       []string      // union
 	EnumValues  EnumValueList // enum
 
-	Position *Position `dump:"-" json:"-"`
+	Position *Position `dump:"-"`
 	BuiltIn  bool      `dump:"-"`
 
 	BeforeDescriptionComment *CommentGroup
@@ -56,7 +54,12 @@ func (d *Definition) IsInputType() bool {
 }
 
 func (d *Definition) OneOf(types ...string) bool {
-	return slices.Contains(types, d.Name)
+	for _, t := range types {
+		if d.Name == t {
+			return true
+		}
+	}
+	return false
 }
 
 type FieldDefinition struct {
@@ -66,7 +69,7 @@ type FieldDefinition struct {
 	DefaultValue *Value                 // only for input objects
 	Type         *Type
 	Directives   DirectiveList
-	Position     *Position `dump:"-" json:"-"`
+	Position     *Position `dump:"-"`
 
 	BeforeDescriptionComment *CommentGroup
 	AfterDescriptionComment  *CommentGroup
@@ -78,7 +81,7 @@ type ArgumentDefinition struct {
 	DefaultValue *Value
 	Type         *Type
 	Directives   DirectiveList
-	Position     *Position `dump:"-" json:"-"`
+	Position     *Position `dump:"-"`
 
 	BeforeDescriptionComment *CommentGroup
 	AfterDescriptionComment  *CommentGroup
@@ -88,7 +91,7 @@ type EnumValueDefinition struct {
 	Description string
 	Name        string
 	Directives  DirectiveList
-	Position    *Position `dump:"-" json:"-"`
+	Position    *Position `dump:"-"`
 
 	BeforeDescriptionComment *CommentGroup
 	AfterDescriptionComment  *CommentGroup
@@ -100,7 +103,7 @@ type DirectiveDefinition struct {
 	Arguments    ArgumentDefinitionList
 	Locations    []DirectiveLocation
 	IsRepeatable bool
-	Position     *Position `dump:"-" json:"-"`
+	Position     *Position `dump:"-"`
 
 	BeforeDescriptionComment *CommentGroup
 	AfterDescriptionComment  *CommentGroup

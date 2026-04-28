@@ -17,25 +17,15 @@ package adt
 import (
 	"bytes"
 	"fmt"
-	"math/big"
+	"io"
+	"regexp"
 
-	"github.com/cockroachdb/apd/v3"
+	"github.com/cockroachdb/apd/v2"
 
 	"cuelang.org/go/cue/ast"
-	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 )
-
-var _ Elem = &ConjunctGroup{}
-
-// A ConjunctGroup is an Elem that is used for internal grouping of Conjuncts
-// only.
-type ConjunctGroup []Conjunct
-
-func (g *ConjunctGroup) Source() ast.Node {
-	return nil
-}
 
 // A StructLit represents an unevaluated struct literal or file body.
 type StructLit struct {
@@ -44,14 +34,26 @@ type StructLit struct {
 
 	// TODO: record the merge order somewhere.
 
-	// IsOpen is kept as it's used by ListMarker and some validations
-	IsOpen bool // has a ...
+	// The below fields are redundant to Decls and are computed with Init.
 
-	// initialized is kept as it's used in the Init method and unify.go
+	// field marks the optional conjuncts of all explicit Fields.
+	// Required Fields are marked as empty
+	Fields []FieldInfo
+
+	Dynamic []*DynamicField
+
+	// excluded are all literal fields that already exist.
+	Bulk []*BulkOptionalField
+
+	Additional  []Expr
+	HasEmbed    bool
+	IsOpen      bool // has a ...
 	initialized bool
 
-	// isComprehension is kept as it's used in comprehension.go and conjunct.go
-	isComprehension bool
+	types OptionalType
+
+	// administrative fields like hasreferences.
+	// hasReferences bool
 }
 
 func (o *StructLit) IsFile() bool {
@@ -59,46 +61,111 @@ func (o *StructLit) IsFile() bool {
 	return ok
 }
 
+type FieldInfo struct {
+	Label    Feature
+	Optional []Node
+}
+
+func (x *StructLit) HasOptional() bool {
+	return x.types&(HasField|HasPattern|HasAdditional) != 0
+}
+
 func (x *StructLit) Source() ast.Node { return x.Src }
 
-func (x *StructLit) evaluate(c *OpContext, state Flags) Value {
+func (x *StructLit) evaluate(c *OpContext) Value {
 	e := c.Env(0)
-	v := c.newInlineVertex(e.DerefVertex(c), nil, Conjunct{e, x, c.ci})
+	v := &Vertex{Conjuncts: []Conjunct{{e, x, CloseInfo{}}}}
 	// evaluate may not finalize a field, as the resulting value may be
 	// used in a context where more conjuncts are added. It may also lead
 	// to disjuncts being in a partially expanded state, leading to
 	// misaligned nodeContexts.
-
-	// TODO(evalv3): to be fully compatible correct, we should not always
-	// finalize the arcs here. This is a temporary fix. For now, we have to do
-	// this as we need a mechanism to set the arcTypeKnown bit without
-	// finalizing the arcs, as they may depend on the completion of sub fields.
-	// See, for instance:
-	//
-	// 		chainSuccess: a: {
-	// 			raises?: {}
-	// 			if raises == _|_ {
-	// 				ret: a: 1
-	// 			}
-	// 			ret?: {}
-	// 			if ret != _|_ {
-	// 				foo: a: 1
-	// 			}
-	// 		}
-	//
-	// This would also require changing the arcType process in ForClause.yield.
-	//
-	// v.completeArcs(c, state)
-
-	v.CompleteArcsOnly(c)
+	c.Unify(v, AllArcs)
 	return v
 }
 
-func (o *StructLit) Init(ctx *OpContext) {
+// TODO: remove this method
+func (o *StructLit) MarkField(f Feature) {
+	o.Fields = append(o.Fields, FieldInfo{Label: f})
+}
+
+func (o *StructLit) Init() {
 	if o.initialized {
 		return
 	}
 	o.initialized = true
+	for _, d := range o.Decls {
+		switch x := d.(type) {
+		case *Field:
+			if o.fieldIndex(x.Label) < 0 {
+				o.Fields = append(o.Fields, FieldInfo{Label: x.Label})
+			}
+
+		case *OptionalField:
+			p := o.fieldIndex(x.Label)
+			if p < 0 {
+				p = len(o.Fields)
+				o.Fields = append(o.Fields, FieldInfo{Label: x.Label})
+			}
+			o.Fields[p].Optional = append(o.Fields[p].Optional, x)
+			o.types |= HasField
+
+		case *DynamicField:
+			o.Dynamic = append(o.Dynamic, x)
+			o.types |= HasDynamic
+
+		case Expr:
+			o.HasEmbed = true
+
+		case *ForClause, Yielder:
+			o.HasEmbed = true
+
+		case *BulkOptionalField:
+			o.Bulk = append(o.Bulk, x)
+			o.types |= HasPattern
+			switch x.Filter.(type) {
+			case *BasicType, *Top:
+			default:
+				o.types |= HasComplexPattern
+			}
+
+		case *Ellipsis:
+			expr := x.Value
+			if x.Value == nil {
+				o.IsOpen = true
+				o.types |= IsOpen
+				// TODO(perf): encode more efficiently.
+				expr = &Top{}
+			} else {
+				o.types |= HasAdditional
+			}
+			o.Additional = append(o.Additional, expr)
+
+		default:
+			panic("unreachable")
+		}
+	}
+}
+
+func (o *StructLit) fieldIndex(f Feature) int {
+	for i := range o.Fields {
+		if o.Fields[i].Label == f {
+			return i
+		}
+	}
+	return -1
+}
+
+func (o *StructLit) OptionalTypes() OptionalType {
+	return o.types
+}
+
+func (o *StructLit) IsOptional(label Feature) bool {
+	for _, f := range o.Fields {
+		if f.Label == label && len(f.Optional) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // FIELDS
@@ -106,18 +173,22 @@ func (o *StructLit) Init(ctx *OpContext) {
 // Fields can also be used as expressions whereby the value field is the
 // expression this allows retaining more context.
 
-// Field represents a regular field or field constraint with a fixed label.
-// The label can be a regular field, definition or hidden field.
+// Field represents a field with a fixed label. It can be a regular field,
+// definition or hidden field.
 //
-//	foo: bar
-//	#foo: bar
-//	_foo: bar
+//   foo: bar
+//   #foo: bar
+//   _foo: bar
+//
+// Legacy:
+//
+//   Foo :: bar
+//
 type Field struct {
 	Src *ast.Field
 
-	ArcType ArcType
-	Label   Feature
-	Value   Expr
+	Label Feature
+	Value Expr
 }
 
 func (x *Field) Source() ast.Node {
@@ -127,20 +198,17 @@ func (x *Field) Source() ast.Node {
 	return x.Src
 }
 
-// A LetField represents a field that is only visible in the local scope.
+// An OptionalField represents an optional regular field.
 //
-//	let X = expr
-type LetField struct {
-	Src   *ast.LetClause
+//   foo?: expr
+//
+type OptionalField struct {
+	Src   *ast.Field
 	Label Feature
-	// IsMulti is true when this let field should be replicated for each
-	// incarnation. This is the case when its expression refers to the
-	// variables of a for comprehension embedded within a struct.
-	IsMulti bool
-	Value   Expr
+	Value Expr
 }
 
-func (x *LetField) Source() ast.Node {
+func (x *OptionalField) Source() ast.Node {
 	if x.Src == nil {
 		return nil
 	}
@@ -149,9 +217,10 @@ func (x *LetField) Source() ast.Node {
 
 // A BulkOptionalField represents a set of optional field.
 //
-//	[expr]: expr
+//   [expr]: expr
+//
 type BulkOptionalField struct {
-	Src    *ast.Field // Ellipsis or Field
+	Src    *ast.Field // Elipsis or Field
 	Filter Expr
 	Value  Expr
 	Label  Feature // for reference and formatting
@@ -166,7 +235,8 @@ func (x *BulkOptionalField) Source() ast.Node {
 
 // A Ellipsis represents a set of optional fields of a given type.
 //
-//	...T
+//   ...T
+//
 type Ellipsis struct {
 	Src   *ast.Ellipsis
 	Value Expr
@@ -181,14 +251,17 @@ func (x *Ellipsis) Source() ast.Node {
 
 // A DynamicField represents a regular field for which the key is computed.
 //
-//	"\(expr)": expr
-//	(expr): expr
+//    "\(expr)": expr
+//    (expr): expr
+//
 type DynamicField struct {
-	Src *ast.Field
+	Src   *ast.Field
+	Key   Expr
+	Value Expr
+}
 
-	ArcType ArcType
-	Key     Expr
-	Value   Expr
+func (x *DynamicField) IsOptional() bool {
+	return x.Src.Optional != token.NoPos
 }
 
 func (x *DynamicField) Source() ast.Node {
@@ -200,7 +273,8 @@ func (x *DynamicField) Source() ast.Node {
 
 // A ListLit represents an unevaluated list literal.
 //
-//	[a, for x in src { ... }, b, ...T]
+//    [a, for x in src { ... }, b, ...T]
+//
 type ListLit struct {
 	Src *ast.ListLit
 
@@ -215,20 +289,11 @@ func (x *ListLit) Source() ast.Node {
 	return x.Src
 }
 
-func (x *ListLit) evaluate(c *OpContext, state Flags) Value {
+func (x *ListLit) evaluate(c *OpContext) Value {
 	e := c.Env(0)
-	// Pass conditions but at least set fieldSetKnown.
-	v := c.newInlineVertex(e.DerefVertex(c), nil, Conjunct{e, x, c.ci})
-	v.CompleteArcsOnly(c)
-
-	// TODO(evalv3): evaluating more aggressively yields some improvements, but
-	// breaks other tests. Consider using this approach, though.
-	// mode := state.runMode()
-	// if mode == finalize {
-	// 	v.completeArcs(c, allKnown)
-	// } else {
-	// 	v.completeArcs(c, fieldSetKnown)
-	// }
+	v := &Vertex{Conjuncts: []Conjunct{{e, x, CloseInfo{}}}}
+	// TODO: should be AllArcs and then use Finalize for builtins?
+	c.Unify(v, Finalized) // TODO: also partial okay?
 	return v
 }
 
@@ -276,24 +341,22 @@ type Num struct {
 func (x *Num) Source() ast.Node { return x.Src }
 func (x *Num) Kind() Kind       { return x.K }
 
-func (x *Num) BigInt(z *big.Int) *big.Int {
-	if x.X.Exponent != 0 {
-		panic("cue: exponent should always be nil for integer types")
-	}
-	if z == nil {
-		z = &big.Int{}
-	}
-	z.Set(x.X.Coeff.MathBigInt())
-	if x.X.Negative {
-		z.Neg(z)
-	}
-	return z
-}
+// TODO: do we still need this?
+// func (x *Num) Specialize(k Kind) Value {
+// 	k = k & x.K
+// 	if k == x.K {
+// 		return x
+// 	}
+// 	y := *x
+// 	y.K = k
+// 	return &y
+// }
 
 // String is a string value. It can be used as a Value and Expr.
 type String struct {
 	Src ast.Node
 	Str string
+	RE  *regexp.Regexp // only set if needed
 }
 
 func (x *String) Source() ast.Node { return x.Src }
@@ -303,6 +366,7 @@ func (x *String) Kind() Kind       { return StringKind }
 type Bytes struct {
 	Src ast.Node
 	B   []byte
+	RE  *regexp.Regexp // only set if needed
 }
 
 func (x *Bytes) Source() ast.Node { return x.Src }
@@ -312,7 +376,7 @@ func (x *Bytes) Kind() Kind       { return BytesKind }
 // vertices.
 
 type ListMarker struct {
-	Src    ast.Expr
+	Src    ast.Node
 	IsOpen bool
 }
 
@@ -321,9 +385,9 @@ func (x *ListMarker) Kind() Kind       { return ListKind }
 func (x *ListMarker) node()            {}
 
 type StructMarker struct {
-	// TODO: once we introduce open by default lists,
-	// we can get rid of StructMarker and ListMarker
-	// in its entirety in favor of using type bit masks.
+	// NeedClose is used to signal that the evaluator should close this struct.
+	// It is only set by the close builtin.
+	NeedClose bool
 }
 
 func (x *StructMarker) Source() ast.Node { return nil }
@@ -344,12 +408,13 @@ func (x *Top) Kind() Kind { return TopKind }
 // BasicType represents all values of a certain Kind. It can be used as a Value
 // and Expr.
 //
-//	string
-//	int
-//	num
-//	bool
+//   string
+//   int
+//   num
+//   bool
+//
 type BasicType struct {
-	Src ast.Node
+	Src *ast.Ident
 	K   Kind
 }
 
@@ -361,12 +426,24 @@ func (x *BasicType) Source() ast.Node {
 }
 func (x *BasicType) Kind() Kind { return x.K }
 
+// TODO: do we still need this?
+// func (x *BasicType) Specialize(k Kind) Value {
+// 	k = x.K & k
+// 	if k == x.K {
+// 		return x
+// 	}
+// 	y := *x
+// 	y.K = k
+// 	return &y
+// }
+
 // TODO: should we use UnaryExpr for Bound now we have BoundValue?
 
 // BoundExpr represents an unresolved unary comparator.
 //
-//	<a
-//	=~MyPattern
+//    <a
+//    =~MyPattern
+//
 type BoundExpr struct {
 	Src  *ast.UnaryExpr
 	Op   Op
@@ -380,45 +457,33 @@ func (x *BoundExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *BoundExpr) evaluate(ctx *OpContext, state Flags) Value {
-	// scalarKnown is used here to ensure we know the value. The result does
-	// not have to be concrete, though.
-	v := ctx.value(x.Expr, Flags{
-		status:    partial,
-		condition: scalarKnown,
-		mode:      yield,
-	})
+func (x *BoundExpr) evaluate(ctx *OpContext) Value {
+	v := ctx.value(x.Expr)
 	if isError(v) {
 		return v
 	}
 
 	switch k := v.Kind(); k {
-	case IntKind, FloatKind, NumberKind, StringKind, BytesKind:
-	case NullKind, StructKind, ListKind:
-		if x.Op != NotEqualOp && x.Op != EqualOp {
-			err := ctx.NewPosf(Pos(x.Expr),
-				"cannot use %s for bound %s", k, x.Op)
-			return &Bottom{
-				Err:  err,
-				Node: ctx.vertex,
-			}
+	case IntKind, FloatKind, NumKind, StringKind, BytesKind:
+	case NullKind:
+		if x.Op != NotEqualOp {
+			err := ctx.NewPosf(pos(x.Expr),
+				"cannot use null for bound %s", x.Op)
+			return &Bottom{Err: err}
 		}
 	default:
-		mask := IntKind | FloatKind | NumberKind | StringKind | BytesKind
-		if x.Op == NotEqualOp || x.Op == EqualOp {
-			mask |= NullKind | StructKind | ListKind
+		mask := IntKind | FloatKind | NumKind | StringKind | BytesKind
+		if x.Op == NotEqualOp {
+			mask |= NullKind
 		}
 		if k&mask != 0 {
 			ctx.addErrf(IncompleteError, token.NoPos, // TODO(errors): use ctx.pos()?
 				"non-concrete value %s for bound %s", x.Expr, x.Op)
 			return nil
 		}
-		err := ctx.NewPosf(Pos(x.Expr),
+		err := ctx.NewPosf(pos(x.Expr),
 			"invalid value %s (type %s) for bound %s", v, k, x.Op)
-		return &Bottom{
-			Err:  err,
-			Node: ctx.vertex,
-		}
+		return &Bottom{Err: err}
 	}
 
 	if v, ok := x.Expr.(Value); ok {
@@ -428,6 +493,75 @@ func (x *BoundExpr) evaluate(ctx *OpContext, state Flags) Value {
 		return &BoundValue{x.Src, x.Op, v}
 	}
 
+	// This simplifies boundary expressions. It is an alternative to an
+	// evaluation strategy that makes nodes increasingly more specific.
+	//
+	// For instance, a completely different implementation would be to allow
+	// the precense of a concrete value to ignore incomplete errors.
+	//
+	// TODO: consider an alternative approach.
+	switch y := v.(type) {
+	case *BoundValue:
+		switch {
+		case y.Op == NotEqualOp:
+			switch x.Op {
+			case LessEqualOp, LessThanOp, GreaterEqualOp, GreaterThanOp:
+				// <(!=3)  =>  number
+				// Smaller than an arbitrarily large number is any number.
+				return &BasicType{K: y.Kind()}
+			case NotEqualOp:
+				// !=(!=3) ==> 3
+				// Not a value that is anything but a given value is that
+				// given value.
+				return y.Value
+			}
+
+		case x.Op == NotEqualOp:
+			// Invert if applicable.
+			switch y.Op {
+			case LessEqualOp:
+				return &BoundValue{x.Src, GreaterThanOp, y.Value}
+			case LessThanOp:
+				return &BoundValue{x.Src, GreaterEqualOp, y.Value}
+			case GreaterEqualOp:
+				return &BoundValue{x.Src, LessThanOp, y.Value}
+			case GreaterThanOp:
+				return &BoundValue{x.Src, LessEqualOp, y.Value}
+			}
+
+		case (x.Op == LessThanOp || x.Op == LessEqualOp) &&
+			(y.Op == GreaterThanOp || y.Op == GreaterEqualOp),
+			(x.Op == GreaterThanOp || x.Op == GreaterEqualOp) &&
+				(y.Op == LessThanOp || y.Op == LessEqualOp):
+			// <(>=3)
+			// Something smaller than an arbitrarily large number is any number.
+			return &BasicType{K: y.Kind()}
+
+		case x.Op == LessThanOp &&
+			(y.Op == LessEqualOp || y.Op == LessThanOp),
+			x.Op == GreaterThanOp &&
+				(y.Op == GreaterEqualOp || y.Op == GreaterThanOp):
+			// <(<=x)  => <x
+			// <(<x)   => <x
+			// Less than something that is less or equal to x is less than x.
+			return &BoundValue{x.Src, x.Op, y.Value}
+
+		case x.Op == LessEqualOp &&
+			(y.Op == LessEqualOp || y.Op == LessThanOp),
+			x.Op == GreaterEqualOp &&
+				(y.Op == GreaterEqualOp || y.Op == GreaterThanOp):
+			// <=(<x)   => <x
+			// <=(<=x)  => <=x
+			// Less or equal than something that is less than x is less than x.
+			return y
+		}
+
+	case *BasicType:
+		switch x.Op {
+		case LessEqualOp, LessThanOp, GreaterEqualOp, GreaterThanOp:
+			return y
+		}
+	}
 	if v.Concreteness() > Concrete {
 		// TODO(errors): analyze dependencies of x.Expr to get positions.
 		ctx.addErrf(IncompleteError, token.NoPos, // TODO(errors): use ctx.pos()?
@@ -440,8 +574,9 @@ func (x *BoundExpr) evaluate(ctx *OpContext, state Flags) Value {
 // A BoundValue is a fully evaluated unary comparator that can be used to
 // validate other values.
 //
-//	<5
-//	=~"Name$"
+//    <5
+//    =~"Name$"
+//
 type BoundValue struct {
 	Src   ast.Expr
 	Op    Op
@@ -452,8 +587,8 @@ func (x *BoundValue) Source() ast.Node { return x.Src }
 func (x *BoundValue) Kind() Kind {
 	k := x.Value.Kind()
 	switch k {
-	case IntKind, FloatKind, NumberKind:
-		return NumberKind
+	case IntKind, FloatKind, NumKind:
+		return NumKind
 
 	case NullKind:
 		if x.Op == NotEqualOp {
@@ -465,12 +600,12 @@ func (x *BoundValue) Kind() Kind {
 
 func (x *BoundValue) validate(c *OpContext, y Value) *Bottom {
 	a := y // Can be list or struct.
-	b := x.Value
+	b := c.scalar(x.Value)
 	if c.HasErr() {
 		return c.Err()
 	}
 
-	switch v := BinOp(c, x, x.Op, a, b).(type) {
+	switch v := BinOp(c, x.Op, a, b).(type) {
 	case *Bottom:
 		return v
 
@@ -482,12 +617,7 @@ func (x *BoundValue) validate(c *OpContext, y Value) *Bottom {
 		// predeclared identifier such as `int`.
 		err := c.Newf("invalid value %v (out of bound %s)", y, x)
 		err.AddPosition(y)
-		return &Bottom{
-			Src:  c.src,
-			Err:  err,
-			Code: EvalError,
-			Node: c.vertex,
-		}
+		return &Bottom{Src: c.src, Err: err, Code: EvalError}
 
 	default:
 		panic(fmt.Sprintf("unsupported type %T", v))
@@ -557,18 +687,18 @@ func (x *NodeLink) Kind() Kind {
 }
 func (x *NodeLink) Source() ast.Node { return x.Node.Source() }
 
-func (x *NodeLink) resolve(c *OpContext, state Flags) *Vertex {
+func (x *NodeLink) resolve(c *OpContext, state VertexStatus) *Vertex {
 	return x.Node
 }
 
 // A FieldReference represents a lexical reference to a field.
 //
-//	a
+//    a
+//
 type FieldReference struct {
-	Src      *ast.Ident
-	UpCount  int32
-	Label    Feature
-	Optional bool // true if this is a ?-marked reference (e.g., a?)
+	Src     *ast.Ident
+	UpCount int32
+	Label   Feature
 }
 
 func (x *FieldReference) Source() ast.Node {
@@ -578,42 +708,20 @@ func (x *FieldReference) Source() ast.Node {
 	return x.Src
 }
 
-func (x *FieldReference) resolve(c *OpContext, state Flags) *Vertex {
+func (x *FieldReference) resolve(c *OpContext, state VertexStatus) *Vertex {
 	n := c.relNode(x.UpCount)
-	pos := Pos(x)
-
-	savedErrs := c.errs
-	c.errs = nil
-	defer func() {
-		c.errs = CombineErrors(c.src, c.errs, savedErrs)
-	}()
-
-	v := c.lookup(n, pos, x.Label, state)
-
-	return c.checkSkipTry(x.Optional, v)
-}
-
-func (c *OpContext) checkSkipTry(optional bool, arc *Vertex) *Vertex {
-	if arc != nil {
-		return arc
-	}
-
-	if optional && c.errs != nil && c.errs.IsIncomplete() {
-		c.skipTry = true
-	}
-
-	return nil
+	pos := pos(x)
+	return c.lookup(n, pos, x.Label, state)
 }
 
 // A ValueReference represents a lexical reference to a value.
 //
-// Example: an X referring to
+//    a: X=b
 //
-//	a: X=b
 type ValueReference struct {
 	Src     *ast.Ident
 	UpCount int32
-	Label   Feature // for informative purposes.
+	Label   Feature // for informative purposes
 }
 
 func (x *ValueReference) Source() ast.Node {
@@ -623,7 +731,7 @@ func (x *ValueReference) Source() ast.Node {
 	return x.Src
 }
 
-func (x *ValueReference) resolve(c *OpContext, state Flags) *Vertex {
+func (x *ValueReference) resolve(c *OpContext, state VertexStatus) *Vertex {
 	if x.UpCount == 0 {
 		return c.vertex
 	}
@@ -633,9 +741,8 @@ func (x *ValueReference) resolve(c *OpContext, state Flags) *Vertex {
 
 // A LabelReference refers to the string or integer value of a label.
 //
-// Example: an X referring to
+//    [X=Pattern]: b: X
 //
-//	[X=Pattern]: b: a
 type LabelReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -650,7 +757,7 @@ func (x *LabelReference) Source() ast.Node {
 	return x.Src
 }
 
-func (x *LabelReference) evaluate(ctx *OpContext, state Flags) Value {
+func (x *LabelReference) evaluate(ctx *OpContext) Value {
 	label := ctx.relLabel(x.UpCount)
 	if label == 0 {
 		// There is no label. This may happen if a LabelReference is evaluated
@@ -663,13 +770,11 @@ func (x *LabelReference) evaluate(ctx *OpContext, state Flags) Value {
 	return label.ToValue(ctx)
 }
 
-// A DynamicReference is like a FieldReference, but with a computed label.
+// A DynamicReference is like a LabelReference, but with a computed label.
 //
-// Example: an X referring to
+//    X=(x): X
+//    X="\(x)": X
 //
-//	X=(x): v
-//	X="\(x)": v
-//	X=[string]: v
 type DynamicReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -691,45 +796,25 @@ func (x *DynamicReference) Source() ast.Node {
 	return x.Src
 }
 
-func (x *DynamicReference) EvaluateLabel(ctx *OpContext, env *Environment) Feature {
-	env = env.up(ctx, x.UpCount)
-	frame := ctx.PushState(env, x.Src)
-	v := ctx.value(x.Label, Flags{
-		status:    partial,
-		condition: scalarKnown,
-		mode:      yield,
-	})
-	ctx.PopState(frame)
-	return ctx.Label(x, v)
-}
-
-func (x *DynamicReference) resolve(ctx *OpContext, state Flags) *Vertex {
+func (x *DynamicReference) resolve(ctx *OpContext, state VertexStatus) *Vertex {
 	e := ctx.Env(x.UpCount)
 	frame := ctx.PushState(e, x.Src)
-	v := ctx.value(x.Label, Flags{
-		status:    partial,
-		condition: scalarKnown,
-		mode:      yield,
-	})
+	v := ctx.value(x.Label)
 	ctx.PopState(frame)
 	f := ctx.Label(x.Label, v)
-	return ctx.lookup(e.DerefVertex(ctx), Pos(x), f, state)
+	return ctx.lookup(e.Vertex, pos(x), f, state)
 }
 
 // An ImportReference refers to an imported package.
 //
-// Example: strings in
+//    import "strings"
 //
-//	import "strings"
+//    strings.ToLower("Upper")
 //
-//	strings.ToLower("Upper")
 type ImportReference struct {
 	Src        *ast.Ident
 	ImportPath Feature
-	// Instance holds the build instance that the import
-	// resolves to. This is nil for standard library imports.
-	Instance *build.Instance
-	Label    Feature // for informative purposes
+	Label      Feature // for informative purposes
 }
 
 func (x *ImportReference) Source() ast.Node {
@@ -739,25 +824,19 @@ func (x *ImportReference) Source() ast.Node {
 	return x.Src
 }
 
-func (x *ImportReference) resolve(ctx *OpContext, state Flags) *Vertex {
-	var v *Vertex
-	if x.Instance != nil {
-		v = ctx.Runtime.LoadInstance(x.Instance)
-	} else {
-		v = ctx.Runtime.LoadBuiltin(x.ImportPath.StringValue(ctx))
-	}
+func (x *ImportReference) resolve(ctx *OpContext, state VertexStatus) *Vertex {
+	path := x.ImportPath.StringValue(ctx)
+	v := ctx.Runtime.LoadImport(path)
 	if v == nil {
-		ctx.addErrf(EvalError, x.Src.Pos(), "cannot find package %q",
-			x.ImportPath.StringValue(ctx))
+		ctx.addErrf(EvalError, x.Src.Pos(), "cannot find package %q", path)
 	}
 	return v
 }
 
 // A LetReference evaluates a let expression in its original environment.
 //
-// Example: an X referring to
+//   let X = x
 //
-//	let X = x
 type LetReference struct {
 	Src     *ast.Ident
 	UpCount int32
@@ -772,116 +851,31 @@ func (x *LetReference) Source() ast.Node {
 	return x.Src
 }
 
-func (x *LetReference) resolve(ctx *OpContext, state Flags) *Vertex {
-	e := ctx.Env(x.UpCount)
-
-	// No need to Unify n, as Let references can only result from evaluating
-	// an expression within n, in which case evaluation must already have
-	// started.
-
-	arc := ctx.lookup(e.DerefVertex(ctx), Pos(x), x.Label, state)
-	if arc == nil {
-		return nil
+func (x *LetReference) resolve(c *OpContext, state VertexStatus) *Vertex {
+	e := c.Env(x.UpCount)
+	label := e.Vertex.Label
+	if x.X == nil {
+		panic("nil expression")
 	}
+	// Anonymous arc.
+	return &Vertex{Parent: nil, Label: label, Conjuncts: []Conjunct{{e, x.X, CloseInfo{}}}}
+}
 
-	// Using a let arc directly saves an allocation, but should not be done
-	// in the following circumstances:
-	// 1) multiple Environments to be resolved for a single let
-	// 2) in case of error: some errors, like structural cycles, may only
-	//    occur when an arc is resolved directly, but not when used in an
-	//    expression. Consider, for instance:
-	//
-	//        a: {
-	//            b: 1
-	//            let X = a  // structural cycle
-	//            c: X.b     // not a structural cycle
-	//        }
-	//
-	//     In other words, a Vertex is not necessarily erroneous when a let
-	//     field contained in that Vertex is erroneous.
-
-	// NOTE: eval v2 used to finalize here.
-	// We should only partly finalize the result here as it is not safe to
-	// finalize any references made by the let.
-
-	b := arc.Bottom()
-	// Check if the arc is currently being evaluated to prevent infinite
-	// recursion when a let references itself through a field selector.
-	// If the arc has a running state, we must use the cache mechanism
-	// to properly detect and handle cycles.
-	arcState := arc.getState(ctx)
-	if !arc.MultiLet && ((b == nil && arcState == nil) || isCyclePlaceholder(b)) {
-		return arc
-	}
+func (x *LetReference) evaluate(c *OpContext) Value {
+	e := c.Env(x.UpCount)
 
 	// Not caching let expressions may lead to exponential behavior.
-	// The expr uses the expression of a Let field, which can never be used in
-	// any other context.
-	c := arc.ConjunctAt(0)
-	expr := c.Expr()
-
-	// A let field always has a single expression and thus ConjunctGroups
-	// should always have been eliminated. This is critical, as we must
-	// ensure that Comprehensions, which may be wrapped in ConjunctGroups,
-	// are eliminated.
-	_, isGroup := expr.(*ConjunctGroup)
-	ctx.Assertf(Pos(expr), !isGroup, "unexpected number of expressions")
-
-	// TODO(mem): add counter for let cache usage.
-	key := cacheKey{expr, arc}
-	v, ok := e.cache[key]
-	if !ok {
-		// Link in the right environment to ensure comprehension context is not
-		// lost. Use a Vertex to piggyback on cycle processing.
-		c.Env = e
-		c.x = expr
-
-		if e.cache == nil {
-			e.cache = map[cacheKey]Value{}
-		}
-		n := &Vertex{
-			Parent:    arc.Parent,
-			Label:     x.Label,
-			IsDynamic: b != nil && b.Code == StructuralCycleError,
-			Conjuncts: []Conjunct{c},
-		}
-		v = n
-		e.cache[key] = n
-		// TODO(mem): enable again once we implement memory management.
-		// nc := n.getState(ctx)
-		// TODO: unlike with the old evaluator, we do not allow the first
-		// cycle to be skipped. Doing so can lead to hanging evaluation.
-		// As the cycle detection works slightly differently in the new
-		// evaluator (and is not entirely completed), this can happen. We
-		// should revisit this once we have completed the structural cycle
-		// detection.
-		// nc.hasNonCycle = true
-		// Allow a first cycle to be skipped.
-		// nc.free()
-
-		// Parents cannot add more conjuncts to a let expression, so set of
-		// conjuncts is always complete.
-		//
-		// NOTE(let finalization): as this let expression is not recorded as
-		// a subfield within its parent arc, setParentDone will not be called
-		// as part of normal processing. The same is true for finalization.
-		// The use of setParentDone has the additional effect that the arc
-		// will be finalized where it is needed. See the namesake NOTE for the
-		// location where this is triggered.
-		n.setParentDone()
-	}
-	return v.(*Vertex)
+	return e.evalCached(c, x.X)
 }
 
 // A SelectorExpr looks up a fixed field in an expression.
 //
-//	a.sel
-//	a.sel? (optional - returns OptionalUndefined if field doesn't exist)
+//     X.Sel
+//
 type SelectorExpr struct {
-	Src      *ast.SelectorExpr
-	X        Expr
-	Sel      Feature
-	Optional bool // true if selector has ? suffix (e.g., foo.bar?)
+	Src *ast.SelectorExpr
+	X   Expr
+	Sel Feature
 }
 
 func (x *SelectorExpr) Source() ast.Node {
@@ -891,40 +885,28 @@ func (x *SelectorExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *SelectorExpr) resolve(c *OpContext, state Flags) *Vertex {
-	n := c.node(x, x.X, x.Sel.IsRegular(), Flags{
-		status:    partial,
-		condition: needFieldSetKnown,
-		mode:      yield,
-	})
+func (x *SelectorExpr) resolve(c *OpContext, state VertexStatus) *Vertex {
+	n := c.node(x, x.X, x.Sel.IsRegular(), state)
 	if n == emptyNode {
 		return n
 	}
-	// TODO(eval): dynamic nodes should be fully evaluated here as the result
-	// will otherwise be discarded and there will be no other chance to check
-	// the struct is valid.
-
-	savedErrs := c.errs
-	c.errs = nil
-	defer func() {
-		c.errs = CombineErrors(c.src, c.errs, savedErrs)
-	}()
-
-	pos := x.Src.Sel.Pos()
-	result := c.lookup(n, pos, x.Sel, state)
-
-	return c.checkSkipTry(x.Optional, result)
+	if n.status == Partial {
+		if b := n.state.incompleteErrors(); b != nil && b.Code < CycleError {
+			n.BaseValue = b
+			return n
+		}
+	}
+	return c.lookup(n, x.Src.Sel.Pos(), x.Sel, state)
 }
 
 // IndexExpr is like a selector, but selects an index.
 //
-//	a[index]
-//	a[index]? (optional - returns OptionalUndefined if index doesn't exist)
+//    X[Index]
+//
 type IndexExpr struct {
-	Src      *ast.IndexExpr
-	X        Expr
-	Index    Expr
-	Optional bool // true if index has ? suffix (e.g., foo[0]?)
+	Src   *ast.IndexExpr
+	X     Expr
+	Index Expr
 }
 
 func (x *IndexExpr) Source() ast.Node {
@@ -934,52 +916,27 @@ func (x *IndexExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *IndexExpr) resolve(ctx *OpContext, state Flags) *Vertex {
+func (x *IndexExpr) resolve(ctx *OpContext, state VertexStatus) *Vertex {
 	// TODO: support byte index.
-	n := ctx.node(x, x.X, true, Flags{
-		status:    partial,
-		condition: needFieldSetKnown,
-		mode:      yield,
-	})
-	i := ctx.value(x.Index, Flags{
-		status:    partial,
-		condition: scalarKnown,
-		mode:      yield,
-	})
+	n := ctx.node(x, x.X, true, state)
+	i := ctx.value(x.Index)
 	if n == emptyNode {
 		return n
 	}
-	// TODO(eval): dynamic nodes should be fully evaluated here as the result
-	// will otherwise be discarded and there will be no other chance to check
-	// the struct is valid.
-
-	f := ctx.Label(x.Index, i)
-
-	// Within lookup, errors collected in ctx may be associated with n. This is
-	// correct if the error is generated within lookup, but not if it has
-	// already been generated at this point. We therefore bail out early here if
-	// we already have an error.
-	// TODO: this code can probably go once we have cleaned up error generation.
-	if ctx.errs != nil {
-		return nil
+	if n.status == Partial {
+		if b := n.state.incompleteErrors(); b != nil && b.Code < CycleError {
+			n.BaseValue = b
+			return n
+		}
 	}
-
-	// TODO: uncomment once above code can be removed.
-	// savedErrs := ctx.errs
-	// ctx.errs = nil
-	// defer func() {
-	// 	ctx.errs = CombineErrors(ctx.src, ctx.errs, savedErrs)
-	// }()
-
-	pos := x.Src.Index.Pos()
-	result := ctx.lookup(n, pos, f, state)
-
-	return ctx.checkSkipTry(x.Optional, result)
+	f := ctx.Label(x.Index, i)
+	return ctx.lookup(n, x.Src.Index.Pos(), f, state)
 }
 
 // A SliceExpr represents a slice operation. (Not currently in spec.)
 //
-//	X[Lo:Hi:Stride]
+//    X[Lo:Hi:Stride]
+//
 type SliceExpr struct {
 	Src    *ast.SliceExpr
 	X      Expr
@@ -995,14 +952,10 @@ func (x *SliceExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *SliceExpr) evaluate(c *OpContext, state Flags) Value {
+func (x *SliceExpr) evaluate(c *OpContext) Value {
 	// TODO: strides
 
-	v := c.value(x.X, Flags{
-		status:    partial,
-		condition: fieldSetKnown,
-		mode:      yield,
-	})
+	v := c.value(x.X)
 	const as = "slice index"
 
 	switch v := v.(type) {
@@ -1019,18 +972,10 @@ func (x *SliceExpr) evaluate(c *OpContext, state Flags) Value {
 			hi = uint64(len(v.Arcs))
 		)
 		if x.Lo != nil {
-			lo = c.uint64(c.value(x.Lo, Flags{
-				status:    partial,
-				condition: scalarKnown,
-				mode:      yield,
-			}), as)
+			lo = c.uint64(c.value(x.Lo), as)
 		}
 		if x.Hi != nil {
-			hi = c.uint64(c.value(x.Hi, Flags{
-				status:    partial,
-				condition: scalarKnown,
-				mode:      yield,
-			}), as)
+			hi = c.uint64(c.value(x.Hi), as)
 			if hi > uint64(len(v.Arcs)) {
 				return c.NewErrf("index %d out of range", hi)
 			}
@@ -1043,26 +988,15 @@ func (x *SliceExpr) evaluate(c *OpContext, state Flags) Value {
 		for i, a := range v.Arcs[lo:hi] {
 			label, err := MakeLabel(a.Source(), int64(i), IntLabel)
 			if err != nil {
-				c.AddBottom(&Bottom{
-					Src:  a.Source(),
-					Err:  err,
-					Node: v,
-				})
+				c.AddBottom(&Bottom{Src: a.Source(), Err: err})
 				return nil
-			}
-			if v.IsDynamic {
-				// If the list is dynamic, there is no need to recompute the
-				// arcs.
-				a.Label = label
-				n.Arcs = append(n.Arcs, a)
-				continue
 			}
 			arc := *a
 			arc.Parent = n
 			arc.Label = label
 			n.Arcs = append(n.Arcs, &arc)
 		}
-		n.status = finalized
+		n.status = Finalized
 		return n
 
 	case *Bytes:
@@ -1071,18 +1005,10 @@ func (x *SliceExpr) evaluate(c *OpContext, state Flags) Value {
 			hi = uint64(len(v.B))
 		)
 		if x.Lo != nil {
-			lo = c.uint64(c.value(x.Lo, Flags{
-				status:    partial,
-				condition: scalarKnown,
-				mode:      yield,
-			}), as)
+			lo = c.uint64(c.value(x.Lo), as)
 		}
 		if x.Hi != nil {
-			hi = c.uint64(c.value(x.Hi, Flags{
-				status:    partial,
-				condition: scalarKnown,
-				mode:      yield,
-			}), as)
+			hi = c.uint64(c.value(x.Hi), as)
 			if hi > uint64(len(v.B)) {
 				return c.NewErrf("index %d out of range", hi)
 			}
@@ -1101,7 +1027,8 @@ func (x *SliceExpr) evaluate(c *OpContext, state Flags) Value {
 
 // An Interpolation is a string interpolation.
 //
-//	"a \(b) c"
+//    "a \(b) c"
+//
 type Interpolation struct {
 	Src   *ast.Interpolation
 	K     Kind   // string or bytes
@@ -1115,14 +1042,10 @@ func (x *Interpolation) Source() ast.Node {
 	return x.Src
 }
 
-func (x *Interpolation) evaluate(c *OpContext, state Flags) Value {
+func (x *Interpolation) evaluate(c *OpContext) Value {
 	buf := bytes.Buffer{}
 	for _, e := range x.Parts {
-		v := c.value(e, Flags{
-			status:    partial,
-			condition: scalarKnown,
-			mode:      yield,
-		})
+		v := c.value(e)
 		if x.K == BytesKind {
 			buf.Write(c.ToBytes(v))
 		} else {
@@ -1132,23 +1055,23 @@ func (x *Interpolation) evaluate(c *OpContext, state Flags) Value {
 	if err := c.Err(); err != nil {
 		err = &Bottom{
 			Code: err.Code,
-			Node: c.vertex,
-			Err:  errors.Wrapf(err.Err, Pos(x), "invalid interpolation"),
+			Err:  errors.Wrapf(err.Err, pos(x), "invalid interpolation"),
 		}
 		// c.AddBottom(err)
 		// return nil
 		return err
 	}
 	if x.K == BytesKind {
-		return &Bytes{x.Src, buf.Bytes()}
+		return &Bytes{x.Src, buf.Bytes(), nil}
 	}
-	return &String{x.Src, buf.String()}
+	return &String{x.Src, buf.String(), nil}
 }
 
 // UnaryExpr is a unary expression.
 //
-//	Op X
-//	-X !X +X
+//    Op X
+//    -X !X +X
+//
 type UnaryExpr struct {
 	Src *ast.UnaryExpr
 	Op  Op
@@ -1162,15 +1085,11 @@ func (x *UnaryExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *UnaryExpr) evaluate(c *OpContext, state Flags) Value {
+func (x *UnaryExpr) evaluate(c *OpContext) Value {
 	if !c.concreteIsPossible(x.Op, x.X) {
 		return nil
 	}
-	v := c.value(x.X, Flags{
-		status:    partial,
-		condition: scalarKnown,
-		mode:      yield,
-	})
+	v := c.value(x.X)
 	if isError(v) {
 		return v
 	}
@@ -1186,33 +1105,34 @@ func (x *UnaryExpr) evaluate(c *OpContext, state Flags) Value {
 			f.Src = x.Src
 			return &f
 		}
-		expectedKind = NumberKind
+		expectedKind = NumKind
 
 	case AddOp:
 		if v, ok := v.(*Num); ok {
 			// TODO: wrap in thunk to save position of '+'?
 			return v
 		}
-		expectedKind = NumberKind
+		expectedKind = NumKind
 
 	case NotOp:
 		if v, ok := v.(*Bool); ok {
-			return c.NewBool(!v.B)
+			return &Bool{x.Src, !v.B}
 		}
 		expectedKind = BoolKind
 	}
 	if k&expectedKind != BottomKind {
-		c.addErrf(IncompleteError, Pos(x.X),
+		c.addErrf(IncompleteError, pos(x.X),
 			"operand %s of '%s' not concrete (was %s)", x.X, op, k)
 		return nil
 	}
-	return c.NewErrf("invalid operation %v (%s %s)", x, op, k)
+	return c.NewErrf("invalid operation %s (%s %s)", x, op, k)
 }
 
 // BinaryExpr is a binary expression.
 //
-//	X + Y
-//	X & Y
+//    X + Y
+//    X & Y
+//
 type BinaryExpr struct {
 	Src *ast.BinaryExpr
 	Op  Op
@@ -1227,25 +1147,12 @@ func (x *BinaryExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *BinaryExpr) evaluate(c *OpContext, state Flags) Value {
+func (x *BinaryExpr) evaluate(c *OpContext) Value {
 	env := c.Env(0)
 	if x.Op == AndOp {
-		v := c.newInlineVertex(nil, nil, makeAnonymousConjunct(env, x, c.ci.Refs))
-
-		// Do not fully evaluate the Vertex: if it is embedded within a
-		// struct with arcs that are referenced from within this expression,
-		// it will end up adding "locked" fields, resulting in an error.
-		// It will be the responsibility of the "caller" to get the result
-		// to the required state. If the struct is already dynamic, we will
-		// evaluate the struct regardless to ensure that cycle reporting
-		// keeps working.
-		envVertex := env.DerefVertex(c)
-		if (c.inDetached == 0 && envVertex != nil && envVertex.IsDynamic) || c.inValidator > 0 {
-			v.Finalize(c)
-		} else {
-			v.CompleteArcsOnly(c)
-		}
-
+		// Anonymous Arc
+		v := &Vertex{Conjuncts: []Conjunct{{env, x, CloseInfo{}}}}
+		c.Unify(v, Finalized)
 		return v
 	}
 
@@ -1259,15 +1166,15 @@ func (x *BinaryExpr) evaluate(c *OpContext, state Flags) Value {
 	// Bottom here and require that one of the values be a Bottom literal.
 	if x.Op == EqualOp || x.Op == NotEqualOp {
 		if isLiteralBottom(x.X) {
-			return c.validate(env, x.Src, x.Y, x.Op, state)
+			return c.validate(env, x.Src, x.Y, x.Op)
 		}
 		if isLiteralBottom(x.Y) {
-			return c.validate(env, x.Src, x.X, x.Op, state)
+			return c.validate(env, x.Src, x.X, x.Op)
 		}
 	}
 
-	left, _ := c.concrete(env, x.X, x.Op)
-	right, _ := c.concrete(env, x.Y, x.Op)
+	left, _ := c.Concrete(env, x.X, x.Op)
+	right, _ := c.Concrete(env, x.Y, x.Op)
 
 	if err := CombineErrors(x.Src, left, right); err != nil {
 		return err
@@ -1277,83 +1184,35 @@ func (x *BinaryExpr) evaluate(c *OpContext, state Flags) Value {
 		return err
 	}
 
-	return BinOp(c, x, x.Op, left, right)
+	return BinOp(c, x.Op, left, right)
 }
 
-// OpenExpr represents the ... operator to disable typo checking.
-//
-// #A...
-type OpenExpr struct {
-	Src *ast.PostfixExpr
-	X   Expr
-}
-
-func (x *OpenExpr) Source() ast.Node {
-	if x.Src == nil {
-		return nil
-	}
-	return x.Src
-}
-
-func (x *OpenExpr) evaluate(c *OpContext, state Flags) Value {
-	c.ci.Opened = true
-	return c.evalState(x.X, state)
-}
-
-func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op, flags Flags) (r Value) {
-	state := flags.status
-
+func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op) (r Value) {
 	s := c.PushState(env, src)
-
-	match := op != EqualOp // non-error case
-
-	c.inValidator++
-	// Note that evalState may call yield, so we need to balance the counter
-	// with a defer.
-	defer func() { c.inValidator-- }()
-	req := Flags{
-		status:    state,
-		condition: needTasksDone,
-		mode:      finalize,
-	}
-	v := c.evalState(x, req)
-	u, _ := c.getDefault(v)
-	u = Unwrap(u)
-
-	// If our final (unwrapped) value is potentially a recursive structure, we
-	// still need to recursively check for errors. We do so by treating it
-	// as the original value, which if it is a Vertex will be evaluated
-	// recursively below.
-	if u != nil && u.Kind().IsAnyOf(StructKind|ListKind) {
-		u = v
+	if c.nonMonotonicLookupNest == 0 {
+		c.nonMonotonicGeneration++
 	}
 
-	switch v := u.(type) {
+	var match bool
+	// NOTE: using Unwrap is maybe note entirely accurate, as it may discard
+	// a future error. However, if it does so, the error will at least be
+	// reported elsewhere.
+	switch b := c.value(x).(type) {
 	case nil:
 	case *Bottom:
-		switch v.Code {
-		case CycleError:
+		if b.Code == CycleError {
 			c.PopState(s)
-			c.AddBottom(v)
-			// TODO: add this. This erases some
-			// c.verifyNonMonotonicResult(env, x, true)
+			c.AddBottom(b)
 			return nil
-
-		case IncompleteError:
-			c.evalState(x, Flags{
-				status:    finalized,
-				condition: allKnown,
-				mode:      ignore,
-			})
-
-			// We have a nonmonotonic use of a failure. Referenced fields should
-			// not be added anymore.
-			c.verifyNonMonotonicResult(env, x, true)
 		}
-
 		match = op == EqualOp
+		// We have a nonmonotonic use of a failure. Referenced fields should
+		// not be added anymore.
+		c.nonMonotonicRejectNest++
+		c.evalState(x, Partial)
+		c.nonMonotonicRejectNest--
 
-	case *Vertex:
+	default:
 		// TODO(cycle): if EqualOp:
 		// - ensure to pass special status to if clause or keep a track of "hot"
 		//   paths.
@@ -1361,77 +1220,30 @@ func (c *OpContext) validate(env *Environment, src ast.Node, x Expr, op Op, flag
 		// - walk over all fields and verify that fields are not contradicting
 		//   previously marked fields.
 		//
-
-		if c.hasDepthCycle(v) {
-			c.verifyNonMonotonicResult(env, x, true)
-			match = op == EqualOp
-			break
-		}
-
-		v.Finalize(c)
-
 		switch {
-		case isFinalError(v):
-			// Need to recursively check for errors, so we need to evaluate the
-			// Vertex in case it hadn't been evaluated yet.
-			match = op == EqualOp
-		}
-
-	default:
-		if v.Kind().IsAnyOf(CompositeKind) && v.Concreteness() > Concrete && state < conjuncts {
-			c.PopState(s)
-			c.AddBottom(cycle)
-			return nil
-		}
-
-		c.verifyNonMonotonicResult(env, x, false)
-
-		if v.Concreteness() > Concrete {
+		case b.Concreteness() > Concrete:
 			// TODO: mimic comparison to bottom semantics. If it is a valid
 			// value, check for concreteness that this level only. This
 			// should ultimately be replaced with an exists and valid
 			// builtin.
 			match = op == EqualOp
+		default:
+			match = op != EqualOp
 		}
-
-		c.evalState(x, Flags{
-			status:    state,
-			condition: needTasksDone,
-			mode:      yield,
-		})
+		c.nonMonotonicLookupNest++
+		c.evalState(x, Partial)
+		c.nonMonotonicLookupNest--
 	}
 
 	c.PopState(s)
-	return c.NewBool(match)
-}
-
-func isFinalError(n *Vertex) bool {
-	n = n.DerefValue()
-	if b, ok := Unwrap(n).(*Bottom); ok && b.Code < IncompleteError {
-		return true
-	}
-	return false
-}
-
-// verifyNonMonotonicResult re-evaluates the given expression at a later point
-// to ensure that the result has not changed. This is relevant when a function
-// uses reflection, as in `if a != _|_`, where the result of an evaluation may
-// change after the fact.
-// expectError indicates whether the value should evaluate to an error or not.
-func (c *OpContext) verifyNonMonotonicResult(env *Environment, x Expr, expectError bool) {
-	if n := env.DerefVertex(c).state; n != nil {
-		n.postChecks = append(n.postChecks, envCheck{
-			env:         env,
-			expr:        x,
-			expectError: expectError,
-		})
-	}
+	return &Bool{src, match}
 }
 
 // A CallExpr represents a call to a builtin.
 //
-//	len(x)
-//	strings.ToLower(x)
+//    len(x)
+//    strings.ToLower(x)
+//
 type CallExpr struct {
 	Src  *ast.CallExpr
 	Fun  Expr
@@ -1445,29 +1257,15 @@ func (x *CallExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
-	call := CallContext{
-		ctx:  c,
-		call: x,
-	}
-
-	fun := c.value(x.Fun, Flags{
-		status:    partial,
-		condition: concreteKnown,
-		mode:      yield,
-	})
+func (x *CallExpr) evaluate(c *OpContext) Value {
+	fun := c.value(x.Fun)
+	var b *Builtin
 	switch f := fun.(type) {
 	case *Builtin:
-		call.builtin = f
-		if f.RawFunc != nil {
-			if !call.builtin.checkArgs(c, Pos(x), len(x.Args)) {
-				return nil
-			}
-			return f.RawFunc(call)
-		}
+		b = f
 
 	case *BuiltinValidator:
-		// We allow a validator that takes no arguments except the validated
+		// We allow a validator that takes no arguments accept the validated
 		// value to be called with zero arguments.
 		switch {
 		case f.Src != nil:
@@ -1479,94 +1277,44 @@ func (x *CallExpr) evaluate(c *OpContext, state Flags) Value {
 			return &v
 
 		default:
-			call.builtin = f.Builtin
+			b = f.Builtin
 		}
 
 	default:
-		if !IsConcrete(fun) && fun.Kind()&FuncKind != 0 {
-			c.addErrf(IncompleteError, Pos(x.Fun), "cannot call non-concrete value %s (type %s)", x.Fun, kind(fun))
-		} else {
-			c.AddErrf("cannot call non-function %s (type %s)", x.Fun, kind(fun))
-		}
+		c.AddErrf("cannot call non-function %s (type %s)", x.Fun, kind(fun))
 		return nil
 	}
-
-	// Arguments to functions are open. This mostly matters for NonConcrete
-	// builtins.
-	saved := c.ci
-	c.ci.FromDef = false
-	c.ci.FromEmbed = false
-	defer func() {
-		c.ci.FromDef = saved.FromDef
-		c.ci.FromEmbed = saved.FromEmbed
-	}()
-
-	args := make([]Value, 0, len(x.Args))
+	args := []Value{}
 	for i, a := range x.Args {
-		saved := c.errs
-		c.errs = nil
-		// XXX: XXX: clear id.closeContext per argument and remove from runTask?
-
-		runMode := state.mode
-		cond := state.condition
-		var expr Value
-		if call.builtin.NonConcrete {
-			state = Flags{
-				status:    state.status,
-				condition: cond,
-				mode:      runMode,
-			}
-			expr = c.evalState(a, state)
-		} else {
-			cond |= fieldSetKnown | concreteKnown
-			// Be sure to process disjunctions at the very least when
-			// finalizing. Requiring disjunctions earlier may lead to too eager
-			// evaluation.
-			//
-			// TODO: Ideally we would always add this flag regardless of mode.
-			if runMode == finalize {
-				cond |= disjunctionTask
-			}
-			state = Flags{
-				status:    state.status,
-				condition: cond,
-				mode:      runMode,
-			}
-			expr = c.value(a, state)
-		}
-
+		expr := c.value(a)
 		switch v := expr.(type) {
 		case nil:
-			if c.errs == nil {
-				// There SHOULD be an error in the context. If not, we generate
-				// one.
-				c.Assertf(Pos(x.Fun), c.HasErr(),
-					"argument %d to function %s is incomplete", i, x.Fun)
-			}
+			// There SHOULD be an error in the context. If not, we generate
+			// one.
+			c.Assertf(pos(x.Fun), c.HasErr(),
+				"argument %d to function %s is incomplete", i, x.Fun)
 
 		case *Bottom:
 			// TODO(errors): consider adding an argument index for this errors.
-			c.errs = CombineErrors(a.Source(), c.errs, v)
+			// On the other hand, this error is really not related to the
+			// argument itself, so maybe it is good as it is.
+			c.AddBottom(v)
 
 		default:
 			args = append(args, expr)
 		}
-		c.errs = CombineErrors(a.Source(), saved, c.errs)
 	}
 	if c.HasErr() {
 		return nil
 	}
-	if call.builtin.IsValidator(len(args)) {
-		return &BuiltinValidator{x, call.builtin, args}
+	if b.IsValidator(len(args)) {
+		return &BuiltinValidator{x, b, args}
 	}
-	call.args = args
-	result := call.builtin.call(call)
+	result := b.call(c, pos(x), args)
 	if result == nil {
 		return nil
 	}
-	v, ci := c.evalStateCI(result, Flags{status: partial, condition: state.condition, mode: state.mode})
-	c.ci = ci
-	return v
+	return c.evalState(result, Partial)
 }
 
 // A Builtin is a value representing a native function call.
@@ -1574,25 +1322,7 @@ type Builtin struct {
 	// TODO:  make these values for better type checking.
 	Params []Param
 	Result Kind
-
-	// NonConcrete should be set to true if a builtin supports non-concrete
-	// arguments. By default, all arguments are checked to be concrete.
-	NonConcrete bool
-
-	Func func(call CallContext) Expr
-
-	// RawFunc gives low-level control to CUE's internals for builtins.
-	// It should be used when fine control over the evaluation process is
-	// needed. Note that RawFuncs are responsible for returning a Value. This
-	// gives them fine control over how exactly such value gets evaluated.
-	// A RawFunc may pass CycleInfo, errors and other information through
-	// the Context.
-	//
-	// TODO: consider merging Func and RawFunc into a single field again.
-	RawFunc func(call CallContext) Value
-
-	// Added indicates as of which language version this builtin can be used.
-	Added string
+	Func   func(c *OpContext, args []Value) Expr
 
 	Package Feature
 	Name    string
@@ -1617,11 +1347,8 @@ func (p Param) Default() Value {
 	return d.Values[0]
 }
 
-func (x *Builtin) qualifiedName(c *OpContext) string {
-	if x.Package != InvalidLabel {
-		return x.Package.StringValue(c) + "." + x.Name
-	}
-	return x.Name
+func (x *Builtin) WriteName(w io.Writer, c *OpContext) {
+	_, _ = fmt.Fprintf(w, "%s.%s", x.Package.StringValue(c), x.Name)
 }
 
 // Kind here represents the case where Builtin is used as a Validator.
@@ -1653,38 +1380,25 @@ func bottom(v Value) *Bottom {
 	return b
 }
 
-func (x *Builtin) checkArgs(c *OpContext, p token.Pos, numArgs int) bool {
-	if numArgs > len(x.Params) {
-		c.addErrf(0, p,
-			"too many arguments in call to %v (have %d, want %d)",
-			x, numArgs, len(x.Params))
-		return false
-	}
-	if numArgs < len(x.Params) {
-		// Assume that all subsequent params have a default as well.
-		v := x.Params[numArgs].Default()
-		if v == nil {
-			c.addErrf(0, p,
-				"not enough arguments in call to %v (have %d, want %d)",
-				x, numArgs, len(x.Params))
-			return false
-		}
-	}
-	return true
-}
-
-func (x *Builtin) call(call CallContext) Expr {
-	c := call.ctx
-	p := call.Pos()
-
+func (x *Builtin) call(c *OpContext, p token.Pos, args []Value) Expr {
 	fun := x // right now always x.
-	if !x.checkArgs(c, p, len(call.args)) {
+	if len(args) > len(x.Params) {
+		c.addErrf(0, p,
+			"too many arguments in call to %s (have %d, want %d)",
+			fun, len(args), len(x.Params))
 		return nil
 	}
-	for i := len(call.args); i < len(x.Params); i++ {
-		call.args = append(call.args, x.Params[i].Default())
+	for i := len(args); i < len(x.Params); i++ {
+		v := x.Params[i].Default()
+		if v == nil {
+			c.addErrf(0, p,
+				"not enough arguments in call to %s (have %d, want %d)",
+				fun, len(args), len(x.Params))
+			return nil
+		}
+		args = append(args, v)
 	}
-	for i, a := range call.args {
+	for i, a := range args {
 		if x.Params[i].Kind() == BottomKind {
 			continue
 		}
@@ -1693,12 +1407,12 @@ func (x *Builtin) call(call CallContext) Expr {
 		}
 		if k := kind(a); x.Params[i].Kind()&k == BottomKind {
 			code := EvalError
-			b, _ := call.args[i].(*Bottom)
+			b, _ := args[i].(*Bottom)
 			if b != nil {
 				code = b.Code
 			}
-			c.addErrf(code, Pos(a),
-				"cannot use %s (type %s) as %s in argument %d to %v",
+			c.addErrf(code, pos(a),
+				"cannot use %s (type %s) as %s in argument %d to %s",
 				a, k, x.Params[i].Kind(), i+1, fun)
 			return nil
 		}
@@ -1706,35 +1420,18 @@ func (x *Builtin) call(call CallContext) Expr {
 		if _, ok := v.(*BasicType); !ok {
 			env := c.Env(0)
 			x := &BinaryExpr{Op: AndOp, X: v, Y: a}
-			n := c.newInlineVertex(nil, nil, Conjunct{env, x, c.ci})
-			n.Finalize(c)
-			if n.IsErr() {
-				c.addErrf(0, Pos(a),
-					"cannot use %s as %s in argument %d to %v",
+			n := &Vertex{Conjuncts: []Conjunct{{env, x, CloseInfo{}}}}
+			c.Unify(n, Finalized)
+			if _, ok := n.BaseValue.(*Bottom); ok {
+				c.addErrf(0, pos(a),
+					"cannot use %s as %s in argument %d to %s",
 					a, v, i+1, fun)
 				return nil
 			}
-			call.args[i] = n
+			args[i] = n
 		}
 	}
-
-	// Arguments to functions are open. This mostly matters for NonConcrete
-	// builtins.
-	saved := c.IsValidator
-	c.IsValidator = call.isValidator
-	ci := c.ci
-	c.ci.FromEmbed = false
-	c.ci.FromDef = false
-	defer func() {
-		c.ci.FromDef = ci.FromDef
-		c.ci.FromEmbed = ci.FromEmbed
-		c.IsValidator = saved
-	}()
-
-	if x.RawFunc != nil {
-		return x.RawFunc(call)
-	}
-	return x.Func(call)
+	return x.Func(c, args)
 }
 
 func (x *Builtin) Source() ast.Node { return nil }
@@ -1742,7 +1439,8 @@ func (x *Builtin) Source() ast.Node { return nil }
 // A BuiltinValidator is a Value that results from evaluation a partial call
 // to a builtin (using CallExpr).
 //
-//	strings.MinRunes(4)
+//    strings.MinRunes(4)
+//
 type BuiltinValidator struct {
 	Src     *CallExpr
 	Builtin *Builtin
@@ -1756,6 +1454,13 @@ func (x *BuiltinValidator) Source() ast.Node {
 	return x.Src.Source()
 }
 
+func (x *BuiltinValidator) Pos() token.Pos {
+	if src := x.Source(); src != nil {
+		return src.Pos()
+	}
+	return token.NoPos
+}
+
 func (x *BuiltinValidator) Kind() Kind {
 	return x.Builtin.Params[0].Kind()
 }
@@ -1765,27 +1470,14 @@ func (x *BuiltinValidator) validate(c *OpContext, v Value) *Bottom {
 	args[0] = v
 	copy(args[1:], x.Args)
 
-	call := CallContext{
-		ctx:         c,
-		call:        x.Src,
-		builtin:     x.Builtin,
-		args:        args,
-		isValidator: true,
-	}
-
-	return validateWithBuiltin(call)
+	return validateWithBuiltin(c, x.Pos(), x.Builtin, args)
 }
 
-func validateWithBuiltin(call CallContext) *Bottom {
+func validateWithBuiltin(c *OpContext, src token.Pos, b *Builtin, args []Value) *Bottom {
 	var severeness ErrorCode
 	var err errors.Error
 
-	c := call.ctx
-	b := call.builtin
-	src := call.Pos()
-	arg0 := call.Value(0)
-
-	res := call.builtin.call(call)
+	res := b.call(c, src, args)
 	switch v := res.(type) {
 	case nil:
 		return nil
@@ -1803,46 +1495,33 @@ func validateWithBuiltin(call CallContext) *Bottom {
 		}
 
 	default:
-		return c.NewErrf("invalid validator %s", b.qualifiedName(c))
+		return c.NewErrf("invalid validator %s.%s", b.Package.StringValue(c), b.Name)
 	}
 
-	// If the validator returns an error and we already had an error, just
-	// return the original error.
-	if b, ok := Unwrap(call.Value(0)).(*Bottom); ok {
-		return b
-	}
 	// failed:
-	// TODO(mvdan): building this buffer should be part of the error format and arguments,
-	// e.g. any logic needed here can be wrapped in an [fmt.Stringer].
 	var buf bytes.Buffer
-	buf.WriteString(b.qualifiedName(c))
-
-	// Note: when the builtin accepts non-concrete arguments, omit them because
-	// they can easily be very large.
-	if !b.NonConcrete && call.NumParams() > 1 { // use NumArgs instead
+	b.WriteName(&buf, c)
+	if len(args) > 1 {
 		buf.WriteString("(")
-		// TODO: use accessor instead of call.arg
-		for i, a := range call.args[1:] {
+		for i, a := range args[1:] {
 			if i > 0 {
 				_, _ = buf.WriteString(", ")
 			}
-			buf.WriteString(c.String(a))
+			buf.WriteString(c.Str(a))
 		}
 		buf.WriteString(")")
 	}
 
-	vErr := c.NewPosf(src, "invalid value %s (does not satisfy %s)", arg0, buf.String())
+	vErr := c.NewPosf(src, "invalid value %s (does not satisfy %s)", args[0], buf.String())
 
-	call.AddPositions(vErr)
-
-	return &Bottom{
-		Code: severeness,
-		Err:  errors.Wrap(vErr, err),
-		Node: c.vertex,
+	for _, v := range args {
+		vErr.AddPosition(v)
 	}
+
+	return &Bottom{Code: severeness, Err: errors.Wrap(vErr, err)}
 }
 
-// A DisjunctionExpr represents a disjunction, where each disjunct may or may not
+// A Disjunction represents a disjunction, where each disjunct may or may not
 // be marked as a default.
 type DisjunctionExpr struct {
 	Src    *ast.BinaryExpr
@@ -1864,10 +1543,10 @@ func (x *DisjunctionExpr) Source() ast.Node {
 	return x.Src
 }
 
-func (x *DisjunctionExpr) evaluate(c *OpContext, state Flags) Value {
+func (x *DisjunctionExpr) evaluate(c *OpContext) Value {
 	e := c.Env(0)
-	v := c.newInlineVertex(nil, nil, Conjunct{e, x, c.ci})
-	v.Finalize(c) // TODO: also partial okay?
+	v := &Vertex{Conjuncts: []Conjunct{{e, x, CloseInfo{}}}}
+	c.Unify(v, Finalized) // TODO: also partial okay?
 	// TODO: if the disjunction result originated from a literal value, we may
 	// consider the result closed to create more permanent errors.
 	return v
@@ -1889,14 +1568,14 @@ func (x *Conjunction) Kind() Kind {
 	return k
 }
 
-// A Disjunction is a disjunction of values. It is the result of expanding
-// a [DisjunctionExpr] if the expression cannot be represented as a single value.
+// A disjunction is a disjunction of values. It is the result of expanding
+// a DisjunctionExpr if the expression cannot be represented as a single value.
 type Disjunction struct {
 	Src ast.Expr
 
 	// Values are the non-error disjuncts of this expression. The first
-	// NumDefaults values are default values.
-	Values []Value
+	// NumDefault values are default values.
+	Values []*Vertex
 
 	Errors *Bottom // []bottom
 
@@ -1914,76 +1593,17 @@ func (x *Disjunction) Kind() Kind {
 	return k
 }
 
-type Comprehension struct {
-	Syntax ast.Node
-
-	// Clauses is the list of for, if, and other clauses of a comprehension,
-	// not including the yielded value (in curly braces).
-	Clauses []Yielder
-
-	// Value can be either a StructLit if this is a compiled expression or
-	// a Field if this is a computed Comprehension. Value holds a Field,
-	// rather than an Expr, in the latter case to preserve as much position
-	// information as possible.
-	Value Node
-
-	// Fallback is the optional else clause that is yielded when the comprehension
-	// produces zero values.
-	Fallback *StructLit
-
-	// The type of field as which the comprehension is added.
-	arcType ArcType
-
-	// Kind indicates the possible kind of Value.
-	kind Kind
-
-	// Only used for partial comprehensions.
-	comp   *envComprehension
-	parent *Comprehension // comprehension from which this one was derived, if any
-	arc    *Vertex        // arc to which this comprehension was added.
-}
-
-// Nest returns the nesting level of void arcs of this comprehension.
-func (c *Comprehension) Nest() int {
-	count := 0
-	for ; c.parent != nil; c = c.parent {
-		count++
-	}
-	return count
-}
-
-// Envs returns all Environments yielded from an evaluated comprehension.
-// Together with the Comprehension value, each Environment represents a
-// result value of the comprehension.
-func (c *Comprehension) Envs() []*Environment {
-	if c.comp == nil {
-		return nil
-	}
-	return c.comp.envs
-}
-
-// DidResolve reports whether a comprehension was processed and resulted in at
-// least one yielded value.
-func (x *Comprehension) DidResolve() bool {
-	return x.comp.done && len(x.comp.envs) > 0
-}
-
-func (x *Comprehension) Source() ast.Node {
-	if x.Syntax == nil {
-		return nil
-	}
-	return x.Syntax
-}
-
 // A ForClause represents a for clause of a comprehension. It can be used
 // as a struct or list element.
 //
-//	for k, v in src {}
+//    for k, v in src {}
+//
 type ForClause struct {
 	Syntax *ast.ForClause
 	Key    Feature
 	Value  Feature
 	Src    Expr
+	Dst    Yielder
 }
 
 func (x *ForClause) Source() ast.Node {
@@ -1993,180 +1613,41 @@ func (x *ForClause) Source() ast.Node {
 	return x.Syntax
 }
 
-func (c *OpContext) forSource(x Expr) *Vertex {
-	state := Flags{
-		status:    conjuncts,
-		condition: needFieldSetKnown,
-		mode:      attemptOnly,
-	}
-
-	// TODO: always get the vertex. This allows a whole bunch of trickery
-	// down the line.
-	c.inDetached++
-	v := c.unifyNode(x, state)
-	c.inDetached--
-
-	node, ok := v.(*Vertex)
-	if ok {
-		// We do not request to "yield" here, but rather rely on the
-		// call-by-need behavior in combination with the freezing mechanism.
-		// TODO: this seems a bit fragile. At some point we need to make this
-		// more robust by moving to a pure call-by-need mechanism, for instance.
-		// TODO: using attemptOnly here will remove the cyclic reference error
-		// of comprehension.t1.ok (which also errors in V2),
-		node.unify(c, Flags{condition: state.condition, mode: finalize, checkTypos: true})
-	}
-
-	v, ok = c.getDefault(v)
-
-	if !ok {
-		// Error already generated by getDefault.
-		return emptyNode
-	}
-
-	// TODO: skip in new evaluator? Check once we introduce disjunctions.
-	if w := Unwrap(v); !isCyclePlaceholder(w) {
-		v = w
-	}
-	node, ok = v.(*Vertex)
-	if ok && !isCyclePlaceholder(node.BaseValue) {
-		v = node.Value()
-	}
-
-	switch nv := v.(type) {
-	case nil:
-		c.addErrf(IncompleteError, Pos(x),
-			"cannot range over %s (incomplete)", x)
-		return emptyNode
-
-	case *Bottom:
-		// TODO: this is a bit messy. In some cases errors are already added
-		// and in some cases not. Not a huge deal, as errors will be uniqued
-		// down the line, but could be better.
-		c.AddBottom(nv)
-		return emptyNode
-
-	case *Vertex:
-		if node == nil {
-			panic("unexpected markers with nil node")
-		}
-
-	default:
-		if kind := v.Kind(); kind&(StructKind|ListKind) != 0 {
-			c.addErrf(IncompleteError, Pos(x),
-				"cannot range over %s (incomplete type %s)", x, kind)
-			return emptyNode
-
-		} else if !ok {
-			c.addErrf(0, Pos(x), // TODO(error): better message.
-				"cannot range over %s (found %s, want list or struct)",
-				x.Source(), v.Kind())
-			return emptyNode
-		}
-	}
-	kind := v.Kind()
-	// At this point it is possible that the Vertex represents an incomplete
-	// struct or list, which is the case if it may be struct or list, but
-	// is also at least some other type, such as is the case with top.
-	if kind&(StructKind|ListKind) != 0 && kind != StructKind && kind != ListKind {
-		c.addErrf(IncompleteError, Pos(x),
-			"cannot range over %s (incomplete type %s)", x, kind)
-		return emptyNode
-	}
-
-	return node
-}
-
-func (x *ForClause) yield(s *compState) {
-	c := s.ctx
-	env := c.Env(0)
-	n := c.forSource(x.Src)
-
-	if s := n.getState(c); s != nil {
-		s.freeze(fieldSetKnown)
-	}
-
+func (x *ForClause) yield(c *OpContext, f YieldFunc) {
+	n := c.node(x, x.Src, true, AllArcs)
 	for _, a := range n.Arcs {
 		if !a.Label.IsRegular() {
 			continue
 		}
 
-		// See comment in StructLit.evaluate.
-		if state := a.getState(c); state != nil {
-			state.process(arcTypeKnown, attemptOnly)
-		}
+		c.Unify(a, Partial)
 
-		switch a.ArcType {
-		case ArcMember:
-		case ArcRequired:
-			c.AddBottom(newRequiredFieldInComprehensionError(c, x, a))
-			continue
-		default:
-			continue
-		}
-
-		// "for" clauses tend to yield many values;
-		// group allocations with the same lifetime here
-		// for the sake of reducing the runtime overhead.
-		alloc := struct {
-			v0, v1, v2 Vertex
-			arcs       [2]*Vertex
-			env        Environment
-		}{}
-
-		n := &alloc.v0
-		*n = Vertex{
-			Parent: env.DerefVertex(c),
-
-			// Using Finalized here ensures that no nodeContext is allocated,
-			// preventing a leak, as this "helper" struct bypasses normal
-			// processing, eluding the deallocation step.
-			status:    finalized,
-			IsDynamic: true,
-			anonymous: true,
-			ArcType:   ArcMember,
-
-			Arcs: alloc.arcs[:0],
-		}
+		n := &Vertex{status: Finalized}
 
 		if x.Value != InvalidLabel {
-			b := &alloc.v1
-			*b = Vertex{
+			b := &Vertex{
 				Label:     x.Value,
 				BaseValue: a,
-				IsDynamic: true,
-				anonymous: true,
-				ArcType:   ArcPending,
 			}
 			n.Arcs = append(n.Arcs, b)
 		}
 
 		if x.Key != InvalidLabel {
-			v := &alloc.v2
-			*v = Vertex{
-				Label:     x.Key,
-				IsDynamic: true,
-				anonymous: true,
-			}
-			var key Value
-			if a.Label.IsString() {
-				key = &String{Src: c.src, Str: c.IndexToString(a.Label.safeIndex())}
-			} else {
-				num := &Num{Src: c.src, K: IntKind}
-				num.X.SetInt64(int64(a.Label.Index()))
-				key = num
-			}
-			v.AddConjunct(MakeRootConjunct(env, key))
-			v.SetValue(c, key)
+			v := &Vertex{Label: x.Key}
+			key := a.Label.ToValue(c)
+			v.AddConjunct(MakeRootConjunct(c.Env(0), key))
+			v.SetValue(c, Finalized, key)
 			n.Arcs = append(n.Arcs, v)
 		}
 
-		sub := &alloc.env
-		*sub = Environment{
-			Up:     env,
-			Vertex: n,
+		sub := c.spawn(n)
+		saved := c.PushState(sub, x.Dst.Source())
+		x.Dst.yield(c, f)
+		if b := c.PopState(saved); b != nil {
+			c.AddBottom(b)
+			break
 		}
-		if !s.yield(sub) {
+		if c.HasErr() {
 			break
 		}
 	}
@@ -2175,10 +1656,12 @@ func (x *ForClause) yield(s *compState) {
 // An IfClause represents an if clause of a comprehension. It can be used
 // as a struct or list element.
 //
-//	if cond {}
+//    if cond {}
+//
 type IfClause struct {
 	Src       *ast.IfClause
 	Condition Expr
+	Dst       Yielder
 }
 
 func (x *IfClause) Source() ast.Node {
@@ -2188,24 +1671,21 @@ func (x *IfClause) Source() ast.Node {
 	return x.Src
 }
 
-func (x *IfClause) yield(s *compState) {
-	ctx := s.ctx
-	if ctx.BoolValue(ctx.value(x.Condition, Flags{
-		status:    s.state,
-		condition: scalarKnown,
-		mode:      yield,
-	})) {
-		s.yield(ctx.e)
+func (x *IfClause) yield(ctx *OpContext, f YieldFunc) {
+	if ctx.BoolValue(ctx.value(x.Condition)) {
+		x.Dst.yield(ctx, f)
 	}
 }
 
-// A LetClause represents a let clause in a comprehension.
+// An LetClause represents a let clause in a comprehension.
 //
-//	let x = y
+//    for k, v in src {}
+//
 type LetClause struct {
 	Src   *ast.LetClause
 	Label Feature
 	Expr  Expr
+	Dst   Yielder
 }
 
 func (x *LetClause) Source() ast.Node {
@@ -2215,91 +1695,34 @@ func (x *LetClause) Source() ast.Node {
 	return x.Src
 }
 
-func (x *LetClause) yield(s *compState) {
-	c := s.ctx
+func (x *LetClause) yield(c *OpContext, f YieldFunc) {
 	n := &Vertex{Arcs: []*Vertex{
-		{
-			Label:     x.Label,
-			IsDynamic: true,
-			anonymous: true,
-			Conjuncts: []Conjunct{{c.Env(0), x.Expr, c.ci}},
-		},
+		{Label: x.Label, Conjuncts: []Conjunct{{c.Env(0), x.Expr, CloseInfo{}}}},
 	}}
 
-	s.yield(c.spawn(n))
+	sub := c.spawn(n)
+	saved := c.PushState(sub, x.Dst.Source())
+	x.Dst.yield(c, f)
+	if b := c.PopState(saved); b != nil {
+		c.AddBottom(b)
+	}
 }
 
-// A TryClause represents a try clause in a comprehension.
-// It evaluates its body and yields if successful. If a ?-marked reference
-// fails due to an undefined optional field, the try clause discards silently.
-// Other errors propagate normally.
-//
-//	try { ... }
-//
-// TryClause represents a try clause in a comprehension.
-// It can have two forms:
-//   - try { struct } - Value is set, Label/Expr are zero/nil
-//   - try x = expr   - Label/Expr are set, Value is nil
-type TryClause struct {
-	Src   *ast.TryClause
-	Label Feature // identifier for assignment form (InvalidLabel for struct form)
-	Expr  Expr    // expression for assignment form (nil for struct form)
-	// Struct form: body is in Comprehension.Value
+// A ValueClause represents the value part of a comprehension.
+type ValueClause struct {
+	*StructLit
 }
 
-func (x *TryClause) Source() ast.Node {
+func (x *ValueClause) Source() ast.Node {
+	if x.StructLit == nil {
+		return nil
+	}
 	if x.Src == nil {
 		return nil
 	}
 	return x.Src
 }
 
-func (x *TryClause) yield(s *compState) {
-	c := s.ctx
-	env := c.e
-
-	// Pre-evaluate the try body to detect OptionalUndefined errors from
-	// ?-marked references. If any ?-marked reference fails, the try block
-	// is discarded and the else clause (if present) runs.
-	//
-	// Final (non-incomplete) errors are reported immediately as an optimization,
-	// since they would be encountered during re-evaluation anyway.
-
-	// Save state
-	savedSkipTry := c.skipTry
-	c.skipTry = false
-	defer func() { c.skipTry = savedSkipTry }()
-
-	// TODO(perf): we could capture "final" errors and bail out processing of
-	// the try expression early.
-
-	var expr Expr
-	if x.Expr != nil {
-		expr = x.Expr
-	} else {
-		// Struct form: body is in Comprehension.Value
-		expr = s.comp.Value.(Expr)
-	}
-
-	v := c.newInlineVertex(env.DerefVertex(c), nil, Conjunct{env, expr, c.ci})
-	v.Finalize(c)
-
-	// If any ?-marked reference failed, don't yield - else clause runs.
-	// Check for OptionalUndefined - set by ?-marked references that fail.
-	if c.skipTry {
-		return
-	}
-
-	// Success - yield with fresh conjuncts (will be re-evaluated).
-	if x.Expr != nil {
-		n := &Vertex{Arcs: []*Vertex{{
-			Label:     x.Label,
-			IsDynamic: true,
-			anonymous: true,
-			Conjuncts: []Conjunct{{c.Env(0), x.Expr, c.ci}},
-		}}}
-		s.yield(c.spawn(n))
-	} else {
-		s.yield(env)
-	}
+func (x *ValueClause) yield(op *OpContext, f YieldFunc) {
+	f(op.Env(0), x.StructLit)
 }

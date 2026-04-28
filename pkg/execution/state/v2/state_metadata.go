@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
@@ -62,6 +63,7 @@ func V1FromMetadata(md Metadata) statev1.Identifier {
 		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
 		PriorityFactor:        md.Config.PriorityFactor,
 		OriginalRunID:         md.Config.OriginalRunID,
+		Semaphores:            md.Config.Semaphores,
 	}
 }
 
@@ -182,6 +184,10 @@ type Config struct {
 	ForceStepPlan bool
 	// Context allows storing arbitrary context for a run.
 	Context map[string]any
+
+	// Semaphores stores the semaphore constraints acquired by the start job.
+	// This is the source of truth for Finalize() to release manual-release semaphores.
+	Semaphores []constraintapi.Semaphore
 
 	mu *sync.RWMutex
 }

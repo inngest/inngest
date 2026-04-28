@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 )
 
 // Tags is specified by OpenAPI/Swagger 3.0 standard.
@@ -35,7 +34,7 @@ func (tags Tags) Validate(ctx context.Context, opts ...ValidationOption) error {
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#tag-object
 type Tag struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"-" yaml:"-"`
+	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
 
 	Name         string        `json:"name,omitempty" yaml:"name,omitempty"`
 	Description  string        `json:"description,omitempty" yaml:"description,omitempty"`
@@ -54,7 +53,9 @@ func (t Tag) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Tag.
 func (t Tag) MarshalYAML() (any, error) {
 	m := make(map[string]any, 3+len(t.Extensions))
-	maps.Copy(m, t.Extensions)
+	for k, v := range t.Extensions {
+		m[k] = v
+	}
 	if x := t.Name; x != "" {
 		m["name"] = x
 	}
@@ -75,6 +76,7 @@ func (t *Tag) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
+	delete(x.Extensions, originKey)
 	delete(x.Extensions, "name")
 	delete(x.Extensions, "description")
 	delete(x.Extensions, "externalDocs")

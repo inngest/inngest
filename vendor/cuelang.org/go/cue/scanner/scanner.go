@@ -15,11 +15,14 @@
 // Package scanner implements a scanner for CUE source text. It takes a []byte
 // as source which can then be tokenized through repeated calls to the Scan
 // method.
-package scanner
+package scanner // import "cuelang.org/go/cue/scanner"
 
 import (
+	"bytes"
 	"fmt"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -46,6 +49,7 @@ type Scanner struct {
 	ch              rune // current character
 	offset          int  // character offset
 	rdOffset        int  // reading offset (position after current character)
+	lineOffset      int  // current line offset
 	linesSinceLast  int
 	spacesSinceLast int
 	insertEOL       bool // insert a comma before next newline
@@ -70,6 +74,7 @@ func (s *Scanner) next() {
 	if s.rdOffset < len(s.src) {
 		s.offset = s.rdOffset
 		if s.ch == '\n' {
+			s.lineOffset = s.offset
 			s.file.AddLine(s.offset)
 		}
 		r, w := rune(s.src[s.rdOffset]), 1
@@ -90,6 +95,7 @@ func (s *Scanner) next() {
 	} else {
 		s.offset = len(s.src)
 		if s.ch == '\n' {
+			s.lineOffset = s.offset
 			s.file.AddLine(s.offset)
 		}
 		s.ch = -1 // eof
@@ -103,7 +109,7 @@ type Mode uint
 // These constants are options to the Init function.
 const (
 	ScanComments     Mode = 1 << iota // return comments as COMMENT tokens
-	DontInsertCommas                  // do not automatically insert commas
+	dontInsertCommas                  // do not automatically insert commas - for testing only
 )
 
 // Init prepares the scanner s to tokenize the text src by setting the
@@ -134,6 +140,7 @@ func (s *Scanner) Init(file *token.File, src []byte, eh ErrorHandler, mode Mode)
 	s.ch = ' '
 	s.offset = 0
 	s.rdOffset = 0
+	s.lineOffset = 0
 	s.insertEOL = false
 	s.ErrorCount = 0
 
@@ -150,8 +157,31 @@ func (s *Scanner) errf(offs int, msg string, args ...interface{}) {
 	s.ErrorCount++
 }
 
+var prefix = []byte("//line ")
+
+func (s *Scanner) interpretLineComment(text []byte) {
+	if bytes.HasPrefix(text, prefix) {
+		// get filename and line number, if any
+		if i := bytes.LastIndex(text, []byte{':'}); i > 0 {
+			if line, err := strconv.Atoi(string(text[i+1:])); err == nil && line > 0 {
+				// valid //line filename:line comment
+				filename := string(bytes.TrimSpace(text[len(prefix):i]))
+				if filename != "" {
+					filename = filepath.Clean(filename)
+					if !filepath.IsAbs(filename) {
+						// make filename relative to current directory
+						filename = filepath.Join(s.dir, filename)
+					}
+				}
+				// update scanner position
+				s.file.AddLineInfo(s.lineOffset+len(text)+1, filename, line) // +len(text)+1 since comment applies to next line
+			}
+		}
+	}
+}
+
 func (s *Scanner) scanComment() string {
-	// initial '/' already consumed; s.ch == '/'
+	// initial '/' already consumed; s.ch == '/' || s.ch == '*'
 	offs := s.offset - 1 // position of initial '/'
 	hasCR := false
 
@@ -163,6 +193,10 @@ func (s *Scanner) scanComment() string {
 				hasCR = true
 			}
 			s.next()
+		}
+		if offs == s.lineOffset {
+			// comment starts at the beginning of the current line
+			s.interpretLineComment(s.src[offs:s.offset])
 		}
 		goto exit
 	}
@@ -177,6 +211,50 @@ exit:
 	}
 
 	return string(lit)
+}
+
+func (s *Scanner) findLineEnd() bool {
+	// initial '/' already consumed
+
+	defer func(offs int) {
+		// reset scanner state to where it was upon calling findLineEnd
+		s.ch = '/'
+		s.offset = offs
+		s.rdOffset = offs + 1
+		s.next() // consume initial '/' again
+	}(s.offset - 1)
+
+	// read ahead until a newline, EOF, or non-comment token is found
+	for s.ch == '/' || s.ch == '*' {
+		if s.ch == '/' {
+			//-style comment always contains a newline
+			return true
+		}
+		/*-style comment: look for newline */
+		s.next()
+		for s.ch >= 0 {
+			ch := s.ch
+			if ch == '\n' {
+				return true
+			}
+			s.next()
+			if ch == '*' && s.ch == '/' {
+				s.next()
+				break
+			}
+		}
+		s.skipWhitespace(0) // s.insertSemi is set
+		if s.ch < 0 || s.ch == '\n' {
+			return true
+		}
+		if s.ch != '/' {
+			// non-comment token
+			return false
+		}
+		s.next() // consume '/'
+	}
+
+	return false
 }
 
 func isLetter(ch rune) bool {
@@ -212,6 +290,36 @@ func (s *Scanner) scanIdentifier() string {
 		s.next()
 	}
 	return string(s.src[offs:s.offset])
+}
+
+func isExtendedIdent(r rune) bool {
+	return strings.IndexRune("-_#$%. ", r) >= 0
+}
+
+func (s *Scanner) scanQuotedIdentifier() string {
+	offs := s.offset - 1 // quote already consumed
+	hasInvalid := false
+	for ; ; s.next() {
+		switch {
+		default:
+			if !hasInvalid {
+				s.errf(s.offset, "invalid character '%s' in identifier", string(s.ch))
+				hasInvalid = true
+			}
+			continue
+
+		case isLetter(s.ch) || isDigit(s.ch) || isExtendedIdent(s.ch):
+			continue
+
+		case s.ch == '`':
+			s.next()
+			return string(s.src[offs:s.offset])
+
+		case s.ch == '\n':
+			s.errf(s.offset, "quoted identifier not terminated")
+			return string(s.src[offs:s.offset])
+		}
+	}
 }
 
 func digitVal(ch rune) int {
@@ -350,7 +458,7 @@ exit:
 //
 // Must be compliant with https://tools.ietf.org/html/rfc4627.
 func (s *Scanner) scanEscape(quote quoteInfo) (ok, interpolation bool) {
-	for range quote.numHash {
+	for i := 0; i < quote.numHash; i++ {
 		if s.ch != '#' {
 			return true, false
 		}
@@ -485,14 +593,14 @@ func (s *Scanner) consumeStringClose(ch rune, quote quoteInfo) (next rune, atEnd
 	return s.ch, true
 }
 
-func (s *Scanner) scanHashes(maxHash int) int {
-	for i := range maxHash {
+func (s *Scanner) checkHashCount(offs int, quote quoteInfo) {
+	for i := 0; i < quote.numHash; i++ {
 		if s.ch != '#' {
-			return i
+			s.errf(offs, "string literal not terminated")
+			return
 		}
 		s.next()
 	}
-	return maxHash
 }
 
 func stripCR(b []byte) []byte {
@@ -605,30 +713,19 @@ func (s *Scanner) popInterpolation() quoteInfo {
 }
 
 // ResumeInterpolation resumes scanning of a string interpolation.
-// It should be called when the final parenthesis (RPAREN) of an expression
-// inside a string interpolation has been consumed, and returns
-// the next literal segment of the interpolation string, including
-// the closing parenthesis, and possible the opening parenthesis
-// of the next interpolation expression if there is one.
 func (s *Scanner) ResumeInterpolation() string {
 	quote := s.popInterpolation()
 	_, str := s.scanString(s.offset-1, quote)
 	return str
 }
 
-// Offset returns the current position offset.
-func (s *Scanner) Offset() int {
-	return s.offset
-}
-
 // Scan scans the next token and returns the token position, the token,
 // and its literal string if applicable. The source end is indicated by
 // EOF.
 //
-// If the returned token is a literal (IDENT, INT, FLOAT, IMAG, CHAR,
-// STRING, INTERPOLATION) or COMMENT or ATTRIBUTE, the literal
-// string has the corresponding value, but see below for more
-// information on INTERPOLATION.
+// If the returned token is a literal (IDENT, INT, FLOAT,
+// IMAG, CHAR, STRING) or COMMENT, the literal string
+// has the corresponding value.
 //
 // If the returned token is a keyword, the literal string is the keyword.
 //
@@ -652,44 +749,6 @@ func (s *Scanner) Offset() int {
 // Scan adds line information to the file added to the file
 // set with Init. Token positions are relative to that file
 // and thus relative to the file set.
-//
-// # String Interpolations
-//
-// The INTERPOLATION token is treated somewhat specially, as the scanner
-// does not itself determine the extent of the interpolation
-// expressions.
-//
-// The scanner relies on the caller to read tokens after the literal
-// string segments of the interpolation; when the caller has scanned the
-// final parenthesis, it must call [Scanner.ResumeInterpolation], which
-// returns the next segment of the interpolation, which may or may not
-// itself be an interpolation (it's an interpolation iff the final
-// character is an open-parenthesis).
-//
-// Note that the string literal associated with the INTERPOLATION token
-// and the string returned by ResumeInterpolation contain the bounding
-// parenthesis characters, even though they are also returned from the
-// scanner as separate tokens.
-//
-// For example, scanning the following CUE
-//
-//	#"a\#(foo("c \(d)"))"#
-//
-// would produce the following tokens and literal values:
-//
-//	INTERPOLATION `#"a\#(`
-//	LPAREN
-//	IDENT `b`
-//	LPAREN
-//	IDENT `foo`
-//	LPAREN
-//	INTERPOLATION `"c \(`
-//	IDENT `d`
-//	RPAREN
-//	ResumeInterpolation -> `)"`
-//	RPAREN
-//	RPAREN
-//	ResumeInterpolation -> `)"#`
 func (s *Scanner) Scan() (pos token.Pos, tok token.Token, lit string) {
 scanAgain:
 	s.skipWhitespace(1)
@@ -762,6 +821,10 @@ scanAgain:
 				lit = "_" + s.scanFieldIdentifier()
 			}
 			insertEOL = true
+		case '`':
+			tok = token.IDENT
+			lit = s.scanQuotedIdentifier()
+			insertEOL = true
 
 		case '\n':
 			// we only reach here if s.insertComma was
@@ -797,18 +860,8 @@ scanAgain:
 				quote.numChar = 1
 				tok, lit = s.scanString(offs, quote)
 			case 1:
-				// When the string is surrounded by hashes,
-				// a single leading quote is OK (and part of the string)
-				// e.g. #""hello""#
-				// unless it's succeeded by the correct number of terminating
-				// hash characters
-				// e.g. ##""##
-				if n := s.scanHashes(quote.numHash); n == quote.numHash {
-					// It's the empty string.
-					tok, lit = token.STRING, string(s.src[offs:s.offset])
-				} else {
-					tok, lit = s.scanString(offs, quote)
-				}
+				s.checkHashCount(offs, quote)
+				tok, lit = token.STRING, string(s.src[offs:s.offset])
 			case 2:
 				quote.numChar = 3
 				switch s.ch {
@@ -833,15 +886,18 @@ scanAgain:
 			insertEOL = true
 			tok, lit = s.scanAttribute()
 		case ':':
-			tok = token.COLON
+			if s.ch == ':' {
+				s.next()
+				tok = token.ISA
+			} else {
+				tok = token.COLON
+			}
 		case ';':
 			tok = token.SEMICOLON
 			insertEOL = true
 		case '?':
 			tok = token.OPTION
 			insertEOL = true
-		case '~':
-			tok = token.TILDE
 		case '.':
 			if '0' <= s.ch && s.ch <= '9' {
 				insertEOL = true
@@ -885,7 +941,7 @@ scanAgain:
 		case '/':
 			if s.ch == '/' {
 				// comment
-				if s.insertEOL {
+				if s.insertEOL && s.findLineEnd() {
 					// reset position to the beginning of the comment
 					s.ch = '/'
 					s.offset = s.file.Offset(pos)
@@ -955,7 +1011,7 @@ scanAgain:
 			lit = string(ch)
 		}
 	}
-	if s.mode&DontInsertCommas == 0 {
+	if s.mode&dontInsertCommas == 0 {
 		s.insertEOL = insertEOL
 	}
 

@@ -48,20 +48,17 @@ func (r Range) SourceRepresentation() string {
 // parseRanges is used to parse ranges for extensions and reserved
 func parseRanges(p *Parser, n Visitee) (list []Range, err error) {
 	seenTo := false
-	negate := false // for numbers
 	for {
 		pos, tok, lit := p.next()
 		if isString(lit) {
 			return list, p.unexpected(lit, "integer, <to> <max>", n)
 		}
 		switch lit {
-		case "-":
-			negate = true
 		case ",":
 		case "to":
 			seenTo = true
-		case ";", "[":
-			p.nextPut(pos, tok, lit) // allow for inline comment parsing or options
+		case ";":
+			p.nextPut(pos, tok, lit) // allow for inline comment parsing
 			goto done
 		case "max":
 			if !seenTo {
@@ -74,10 +71,6 @@ func parseRanges(p *Parser, n Visitee) (list []Range, err error) {
 			i, err := strconv.Atoi(lit)
 			if err != nil {
 				return list, p.unexpected(lit, "range integer", n)
-			}
-			if negate {
-				i = -i
-				negate = false
 			}
 			if seenTo {
 				// replace last two ranges with one

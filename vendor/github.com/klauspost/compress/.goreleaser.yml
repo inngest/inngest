@@ -31,9 +31,6 @@ builds:
       - mips64le
     goarm:
       - 7
-    ignore:
-      - goos: windows
-        goarch: arm
   -
     id: "s2d"
     binary: s2d
@@ -60,9 +57,6 @@ builds:
       - mips64le
     goarm:
       - 7
-    ignore:
-      - goos: windows
-        goarch: arm
   -
     id: "s2sx"
     binary: s2sx
@@ -90,9 +84,6 @@ builds:
       - mips64le
     goarm:
       - 7
-    ignore:
-      - goos: windows
-        goarch: arm
 
 archives:
   -
@@ -100,7 +91,7 @@ archives:
     name_template: "s2-{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     format_overrides:
       - goos: windows
-        formats: ['zip']
+        format: zip
     files:
       - unpack/*
       - s2/LICENSE

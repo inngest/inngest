@@ -11,7 +11,6 @@ import (
 	"github.com/aws/smithy-go/encoding/httpbinding"
 	smithyjson "github.com/aws/smithy-go/encoding/json"
 	"github.com/aws/smithy-go/middleware"
-	"github.com/aws/smithy-go/tracing"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"path"
 )
@@ -26,10 +25,6 @@ func (*awsAwsjson10_serializeOpAddPermission) ID() string {
 func (m *awsAwsjson10_serializeOpAddPermission) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -57,7 +52,6 @@ func (m *awsAwsjson10_serializeOpAddPermission) HandleSerialize(ctx context.Cont
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.AddPermission")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentAddPermissionInput(input, jsonEncoder.Value); err != nil {
@@ -73,8 +67,6 @@ func (m *awsAwsjson10_serializeOpAddPermission) HandleSerialize(ctx context.Cont
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -88,10 +80,6 @@ func (*awsAwsjson10_serializeOpCancelMessageMoveTask) ID() string {
 func (m *awsAwsjson10_serializeOpCancelMessageMoveTask) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -119,7 +107,6 @@ func (m *awsAwsjson10_serializeOpCancelMessageMoveTask) HandleSerialize(ctx cont
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.CancelMessageMoveTask")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentCancelMessageMoveTaskInput(input, jsonEncoder.Value); err != nil {
@@ -135,8 +122,6 @@ func (m *awsAwsjson10_serializeOpCancelMessageMoveTask) HandleSerialize(ctx cont
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -150,10 +135,6 @@ func (*awsAwsjson10_serializeOpChangeMessageVisibility) ID() string {
 func (m *awsAwsjson10_serializeOpChangeMessageVisibility) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -181,7 +162,6 @@ func (m *awsAwsjson10_serializeOpChangeMessageVisibility) HandleSerialize(ctx co
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.ChangeMessageVisibility")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentChangeMessageVisibilityInput(input, jsonEncoder.Value); err != nil {
@@ -197,8 +177,6 @@ func (m *awsAwsjson10_serializeOpChangeMessageVisibility) HandleSerialize(ctx co
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -212,10 +190,6 @@ func (*awsAwsjson10_serializeOpChangeMessageVisibilityBatch) ID() string {
 func (m *awsAwsjson10_serializeOpChangeMessageVisibilityBatch) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -243,7 +217,6 @@ func (m *awsAwsjson10_serializeOpChangeMessageVisibilityBatch) HandleSerialize(c
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.ChangeMessageVisibilityBatch")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentChangeMessageVisibilityBatchInput(input, jsonEncoder.Value); err != nil {
@@ -259,8 +232,6 @@ func (m *awsAwsjson10_serializeOpChangeMessageVisibilityBatch) HandleSerialize(c
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -274,10 +245,6 @@ func (*awsAwsjson10_serializeOpCreateQueue) ID() string {
 func (m *awsAwsjson10_serializeOpCreateQueue) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -305,7 +272,6 @@ func (m *awsAwsjson10_serializeOpCreateQueue) HandleSerialize(ctx context.Contex
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.CreateQueue")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentCreateQueueInput(input, jsonEncoder.Value); err != nil {
@@ -321,8 +287,6 @@ func (m *awsAwsjson10_serializeOpCreateQueue) HandleSerialize(ctx context.Contex
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -336,10 +300,6 @@ func (*awsAwsjson10_serializeOpDeleteMessage) ID() string {
 func (m *awsAwsjson10_serializeOpDeleteMessage) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -367,7 +327,6 @@ func (m *awsAwsjson10_serializeOpDeleteMessage) HandleSerialize(ctx context.Cont
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.DeleteMessage")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentDeleteMessageInput(input, jsonEncoder.Value); err != nil {
@@ -383,8 +342,6 @@ func (m *awsAwsjson10_serializeOpDeleteMessage) HandleSerialize(ctx context.Cont
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -398,10 +355,6 @@ func (*awsAwsjson10_serializeOpDeleteMessageBatch) ID() string {
 func (m *awsAwsjson10_serializeOpDeleteMessageBatch) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -429,7 +382,6 @@ func (m *awsAwsjson10_serializeOpDeleteMessageBatch) HandleSerialize(ctx context
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.DeleteMessageBatch")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentDeleteMessageBatchInput(input, jsonEncoder.Value); err != nil {
@@ -445,8 +397,6 @@ func (m *awsAwsjson10_serializeOpDeleteMessageBatch) HandleSerialize(ctx context
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -460,10 +410,6 @@ func (*awsAwsjson10_serializeOpDeleteQueue) ID() string {
 func (m *awsAwsjson10_serializeOpDeleteQueue) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -491,7 +437,6 @@ func (m *awsAwsjson10_serializeOpDeleteQueue) HandleSerialize(ctx context.Contex
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.DeleteQueue")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentDeleteQueueInput(input, jsonEncoder.Value); err != nil {
@@ -507,8 +452,6 @@ func (m *awsAwsjson10_serializeOpDeleteQueue) HandleSerialize(ctx context.Contex
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -522,10 +465,6 @@ func (*awsAwsjson10_serializeOpGetQueueAttributes) ID() string {
 func (m *awsAwsjson10_serializeOpGetQueueAttributes) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -553,7 +492,6 @@ func (m *awsAwsjson10_serializeOpGetQueueAttributes) HandleSerialize(ctx context
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.GetQueueAttributes")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentGetQueueAttributesInput(input, jsonEncoder.Value); err != nil {
@@ -569,8 +507,6 @@ func (m *awsAwsjson10_serializeOpGetQueueAttributes) HandleSerialize(ctx context
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -584,10 +520,6 @@ func (*awsAwsjson10_serializeOpGetQueueUrl) ID() string {
 func (m *awsAwsjson10_serializeOpGetQueueUrl) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -615,7 +547,6 @@ func (m *awsAwsjson10_serializeOpGetQueueUrl) HandleSerialize(ctx context.Contex
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.GetQueueUrl")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentGetQueueUrlInput(input, jsonEncoder.Value); err != nil {
@@ -631,8 +562,6 @@ func (m *awsAwsjson10_serializeOpGetQueueUrl) HandleSerialize(ctx context.Contex
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -646,10 +575,6 @@ func (*awsAwsjson10_serializeOpListDeadLetterSourceQueues) ID() string {
 func (m *awsAwsjson10_serializeOpListDeadLetterSourceQueues) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -677,7 +602,6 @@ func (m *awsAwsjson10_serializeOpListDeadLetterSourceQueues) HandleSerialize(ctx
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.ListDeadLetterSourceQueues")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentListDeadLetterSourceQueuesInput(input, jsonEncoder.Value); err != nil {
@@ -693,8 +617,6 @@ func (m *awsAwsjson10_serializeOpListDeadLetterSourceQueues) HandleSerialize(ctx
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -708,10 +630,6 @@ func (*awsAwsjson10_serializeOpListMessageMoveTasks) ID() string {
 func (m *awsAwsjson10_serializeOpListMessageMoveTasks) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -739,7 +657,6 @@ func (m *awsAwsjson10_serializeOpListMessageMoveTasks) HandleSerialize(ctx conte
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.ListMessageMoveTasks")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentListMessageMoveTasksInput(input, jsonEncoder.Value); err != nil {
@@ -755,8 +672,6 @@ func (m *awsAwsjson10_serializeOpListMessageMoveTasks) HandleSerialize(ctx conte
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -770,10 +685,6 @@ func (*awsAwsjson10_serializeOpListQueues) ID() string {
 func (m *awsAwsjson10_serializeOpListQueues) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -801,7 +712,6 @@ func (m *awsAwsjson10_serializeOpListQueues) HandleSerialize(ctx context.Context
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.ListQueues")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentListQueuesInput(input, jsonEncoder.Value); err != nil {
@@ -817,8 +727,6 @@ func (m *awsAwsjson10_serializeOpListQueues) HandleSerialize(ctx context.Context
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -832,10 +740,6 @@ func (*awsAwsjson10_serializeOpListQueueTags) ID() string {
 func (m *awsAwsjson10_serializeOpListQueueTags) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -863,7 +767,6 @@ func (m *awsAwsjson10_serializeOpListQueueTags) HandleSerialize(ctx context.Cont
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.ListQueueTags")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentListQueueTagsInput(input, jsonEncoder.Value); err != nil {
@@ -879,8 +782,6 @@ func (m *awsAwsjson10_serializeOpListQueueTags) HandleSerialize(ctx context.Cont
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -894,10 +795,6 @@ func (*awsAwsjson10_serializeOpPurgeQueue) ID() string {
 func (m *awsAwsjson10_serializeOpPurgeQueue) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -925,7 +822,6 @@ func (m *awsAwsjson10_serializeOpPurgeQueue) HandleSerialize(ctx context.Context
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.PurgeQueue")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentPurgeQueueInput(input, jsonEncoder.Value); err != nil {
@@ -941,8 +837,6 @@ func (m *awsAwsjson10_serializeOpPurgeQueue) HandleSerialize(ctx context.Context
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -956,10 +850,6 @@ func (*awsAwsjson10_serializeOpReceiveMessage) ID() string {
 func (m *awsAwsjson10_serializeOpReceiveMessage) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -987,7 +877,6 @@ func (m *awsAwsjson10_serializeOpReceiveMessage) HandleSerialize(ctx context.Con
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.ReceiveMessage")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentReceiveMessageInput(input, jsonEncoder.Value); err != nil {
@@ -1003,8 +892,6 @@ func (m *awsAwsjson10_serializeOpReceiveMessage) HandleSerialize(ctx context.Con
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -1018,10 +905,6 @@ func (*awsAwsjson10_serializeOpRemovePermission) ID() string {
 func (m *awsAwsjson10_serializeOpRemovePermission) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -1049,7 +932,6 @@ func (m *awsAwsjson10_serializeOpRemovePermission) HandleSerialize(ctx context.C
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.RemovePermission")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentRemovePermissionInput(input, jsonEncoder.Value); err != nil {
@@ -1065,8 +947,6 @@ func (m *awsAwsjson10_serializeOpRemovePermission) HandleSerialize(ctx context.C
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -1080,10 +960,6 @@ func (*awsAwsjson10_serializeOpSendMessage) ID() string {
 func (m *awsAwsjson10_serializeOpSendMessage) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -1111,7 +987,6 @@ func (m *awsAwsjson10_serializeOpSendMessage) HandleSerialize(ctx context.Contex
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.SendMessage")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentSendMessageInput(input, jsonEncoder.Value); err != nil {
@@ -1127,8 +1002,6 @@ func (m *awsAwsjson10_serializeOpSendMessage) HandleSerialize(ctx context.Contex
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -1142,10 +1015,6 @@ func (*awsAwsjson10_serializeOpSendMessageBatch) ID() string {
 func (m *awsAwsjson10_serializeOpSendMessageBatch) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -1173,7 +1042,6 @@ func (m *awsAwsjson10_serializeOpSendMessageBatch) HandleSerialize(ctx context.C
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.SendMessageBatch")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentSendMessageBatchInput(input, jsonEncoder.Value); err != nil {
@@ -1189,8 +1057,6 @@ func (m *awsAwsjson10_serializeOpSendMessageBatch) HandleSerialize(ctx context.C
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -1204,10 +1070,6 @@ func (*awsAwsjson10_serializeOpSetQueueAttributes) ID() string {
 func (m *awsAwsjson10_serializeOpSetQueueAttributes) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -1235,7 +1097,6 @@ func (m *awsAwsjson10_serializeOpSetQueueAttributes) HandleSerialize(ctx context
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.SetQueueAttributes")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentSetQueueAttributesInput(input, jsonEncoder.Value); err != nil {
@@ -1251,8 +1112,6 @@ func (m *awsAwsjson10_serializeOpSetQueueAttributes) HandleSerialize(ctx context
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -1266,10 +1125,6 @@ func (*awsAwsjson10_serializeOpStartMessageMoveTask) ID() string {
 func (m *awsAwsjson10_serializeOpStartMessageMoveTask) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -1297,7 +1152,6 @@ func (m *awsAwsjson10_serializeOpStartMessageMoveTask) HandleSerialize(ctx conte
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.StartMessageMoveTask")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentStartMessageMoveTaskInput(input, jsonEncoder.Value); err != nil {
@@ -1313,8 +1167,6 @@ func (m *awsAwsjson10_serializeOpStartMessageMoveTask) HandleSerialize(ctx conte
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -1328,10 +1180,6 @@ func (*awsAwsjson10_serializeOpTagQueue) ID() string {
 func (m *awsAwsjson10_serializeOpTagQueue) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -1359,7 +1207,6 @@ func (m *awsAwsjson10_serializeOpTagQueue) HandleSerialize(ctx context.Context, 
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.TagQueue")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentTagQueueInput(input, jsonEncoder.Value); err != nil {
@@ -1375,8 +1222,6 @@ func (m *awsAwsjson10_serializeOpTagQueue) HandleSerialize(ctx context.Context, 
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 
@@ -1390,10 +1235,6 @@ func (*awsAwsjson10_serializeOpUntagQueue) ID() string {
 func (m *awsAwsjson10_serializeOpUntagQueue) HandleSerialize(ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler) (
 	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
 ) {
-	_, span := tracing.StartSpan(ctx, "OperationSerializer")
-	endTimer := startMetricTimer(ctx, "client.call.serialization_duration")
-	defer endTimer()
-	defer span.End()
 	request, ok := in.Request.(*smithyhttp.Request)
 	if !ok {
 		return out, metadata, &smithy.SerializationError{Err: fmt.Errorf("unknown transport type %T", in.Request)}
@@ -1421,7 +1262,6 @@ func (m *awsAwsjson10_serializeOpUntagQueue) HandleSerialize(ctx context.Context
 	}
 	httpBindingEncoder.SetHeader("Content-Type").String("application/x-amz-json-1.0")
 	httpBindingEncoder.SetHeader("X-Amz-Target").String("AmazonSQS.UntagQueue")
-	httpBindingEncoder.SetHeader("X-Amzn-Query-Mode").Boolean(true)
 
 	jsonEncoder := smithyjson.NewEncoder()
 	if err := awsAwsjson10_serializeOpDocumentUntagQueueInput(input, jsonEncoder.Value); err != nil {
@@ -1437,8 +1277,6 @@ func (m *awsAwsjson10_serializeOpUntagQueue) HandleSerialize(ctx context.Context
 	}
 	in.Request = request
 
-	endTimer()
-	span.End()
 	return next.HandleSerialize(ctx, in)
 }
 func awsAwsjson10_serializeDocumentActionNameList(v []string, value smithyjson.Value) error {
@@ -1502,7 +1340,7 @@ func awsAwsjson10_serializeDocumentChangeMessageVisibilityBatchRequestEntry(v *t
 		ok.String(*v.ReceiptHandle)
 	}
 
-	{
+	if v.VisibilityTimeout != 0 {
 		ok := object.Key("VisibilityTimeout")
 		ok.Integer(v.VisibilityTimeout)
 	}

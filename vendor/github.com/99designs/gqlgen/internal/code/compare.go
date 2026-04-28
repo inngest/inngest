@@ -1,15 +1,12 @@
 package code
 
 import (
-	"errors"
 	"fmt"
 	"go/types"
 )
 
 // CompatibleTypes isnt a strict comparison, it allows for pointer differences
-func CompatibleTypes(expected, actual types.Type) error {
-	// Unwrap any aliases
-	expected, actual = Unalias(expected), Unalias(actual)
+func CompatibleTypes(expected types.Type, actual types.Type) error {
 	// Special case to deal with pointer mismatches
 	{
 		expectedPtr, expectedIsPtr := expected.(*types.Pointer)
@@ -35,7 +32,7 @@ func CompatibleTypes(expected, actual types.Type) error {
 	case *types.Array:
 		if actual, ok := actual.(*types.Array); ok {
 			if expected.Len() != actual.Len() {
-				return errors.New("array length differs")
+				return fmt.Errorf("array length differs")
 			}
 
 			return CompatibleTypes(expected.Elem(), actual.Elem())
@@ -53,22 +50,14 @@ func CompatibleTypes(expected, actual types.Type) error {
 	case *types.Struct:
 		if actual, ok := actual.(*types.Struct); ok {
 			if expected.NumFields() != actual.NumFields() {
-				return errors.New("number of struct fields differ")
+				return fmt.Errorf("number of struct fields differ")
 			}
 
-			for i := range expected.NumFields() {
+			for i := 0; i < expected.NumFields(); i++ {
 				if expected.Field(i).Name() != actual.Field(i).Name() {
-					return fmt.Errorf(
-						"struct field %d name differs, %s != %s",
-						i,
-						expected.Field(i).Name(),
-						actual.Field(i).Name(),
-					)
+					return fmt.Errorf("struct field %d name differs, %s != %s", i, expected.Field(i).Name(), actual.Field(i).Name())
 				}
-				if err := CompatibleTypes(
-					expected.Field(i).Type(),
-					actual.Field(i).Type(),
-				); err != nil {
+				if err := CompatibleTypes(expected.Field(i).Type(), actual.Field(i).Type()); err != nil {
 					return err
 				}
 			}
@@ -81,7 +70,7 @@ func CompatibleTypes(expected, actual types.Type) error {
 				return fmt.Errorf("tuple length differs, %d != %d", expected.Len(), actual.Len())
 			}
 
-			for i := range expected.Len() {
+			for i := 0; i < expected.Len(); i++ {
 				if err := CompatibleTypes(expected.At(i).Type(), actual.At(i).Type()); err != nil {
 					return err
 				}
@@ -95,32 +84,23 @@ func CompatibleTypes(expected, actual types.Type) error {
 			if err := CompatibleTypes(expected.Params(), actual.Params()); err != nil {
 				return err
 			}
-			err := CompatibleTypes(expected.Results(), actual.Results())
-			return err
+			if err := CompatibleTypes(expected.Results(), actual.Results()); err != nil {
+				return err
+			}
+
+			return nil
 		}
 	case *types.Interface:
 		if actual, ok := actual.(*types.Interface); ok {
 			if expected.NumMethods() != actual.NumMethods() {
-				return fmt.Errorf(
-					"interface method count differs, %d != %d",
-					expected.NumMethods(),
-					actual.NumMethods(),
-				)
+				return fmt.Errorf("interface method count differs, %d != %d", expected.NumMethods(), actual.NumMethods())
 			}
 
-			for i := range expected.NumMethods() {
+			for i := 0; i < expected.NumMethods(); i++ {
 				if expected.Method(i).Name() != actual.Method(i).Name() {
-					return fmt.Errorf(
-						"interface method %d name differs, %s != %s",
-						i,
-						expected.Method(i).Name(),
-						actual.Method(i).Name(),
-					)
+					return fmt.Errorf("interface method %d name differs, %s != %s", i, expected.Method(i).Name(), actual.Method(i).Name())
 				}
-				if err := CompatibleTypes(
-					expected.Method(i).Type(),
-					actual.Method(i).Type(),
-				); err != nil {
+				if err := CompatibleTypes(expected.Method(i).Type(), actual.Method(i).Type()); err != nil {
 					return err
 				}
 			}
@@ -134,8 +114,11 @@ func CompatibleTypes(expected, actual types.Type) error {
 				return err
 			}
 
-			err := CompatibleTypes(expected.Elem(), actual.Elem())
-			return err
+			if err := CompatibleTypes(expected.Elem(), actual.Elem()); err != nil {
+				return err
+			}
+
+			return nil
 		}
 
 	case *types.Chan:
@@ -145,11 +128,7 @@ func CompatibleTypes(expected, actual types.Type) error {
 
 	case *types.Named:
 		if actual, ok := actual.(*types.Named); ok {
-			if NormalizeVendor(
-				expected.Obj().Pkg().Path(),
-			) != NormalizeVendor(
-				actual.Obj().Pkg().Path(),
-			) {
+			if NormalizeVendor(expected.Obj().Pkg().Path()) != NormalizeVendor(actual.Obj().Pkg().Path()) {
 				return fmt.Errorf(
 					"package name of named type differs, %s != %s",
 					NormalizeVendor(expected.Obj().Pkg().Path()),

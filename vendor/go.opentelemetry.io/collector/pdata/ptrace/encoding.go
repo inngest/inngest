@@ -9,17 +9,17 @@ type MarshalSizer interface {
 	Sizer
 }
 
-// Marshaler marshals Traces into bytes.
+// Marshaler marshals pdata.Traces into bytes.
 type Marshaler interface {
-	// MarshalTraces the given Traces into bytes.
+	// MarshalTraces the given pdata.Traces into bytes.
 	// If the error is not nil, the returned bytes slice cannot be used.
 	MarshalTraces(td Traces) ([]byte, error)
 }
 
-// Unmarshaler unmarshalls bytes into Traces.
+// Unmarshaler unmarshalls bytes into pdata.Traces.
 type Unmarshaler interface {
-	// UnmarshalTraces the given bytes into Traces.
-	// If the error is not nil, the returned Traces cannot be used.
+	// UnmarshalTraces the given bytes into pdata.Traces.
+	// If the error is not nil, the returned pdata.Traces cannot be used.
 	UnmarshalTraces(buf []byte) (Traces, error)
 }
 

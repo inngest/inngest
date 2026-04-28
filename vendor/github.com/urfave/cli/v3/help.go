@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strings"
 	"text/tabwriter"
 	"text/template"
@@ -17,58 +16,40 @@ const (
 	helpAlias = "h"
 )
 
-// HelpPrinterFunc prints help for the Command.
-type HelpPrinterFunc func(w io.Writer, templ string, data any)
+// Prints help for the App or Command
+type helpPrinter func(w io.Writer, templ string, data interface{})
 
-// Prints help for the Command with custom template function.
-type HelpPrinterCustomFunc func(w io.Writer, templ string, data any, customFunc map[string]any)
+// Prints help for the App or Command with custom template function.
+type helpPrinterCustom func(w io.Writer, templ string, data interface{}, customFunc map[string]interface{})
 
 // HelpPrinter is a function that writes the help output. If not set explicitly,
 // this calls HelpPrinterCustom using only the default template functions.
 //
 // If custom logic for printing help is required, this function can be
-// overridden. If the ExtraInfo field is defined on a Command, this function
+// overridden. If the ExtraInfo field is defined on an App, this function
 // should not be modified, as HelpPrinterCustom will be used directly in order
 // to capture the extra information.
-var HelpPrinter HelpPrinterFunc = DefaultPrintHelp
+var HelpPrinter helpPrinter = printHelp
 
 // HelpPrinterCustom is a function that writes the help output. It is used as
 // the default implementation of HelpPrinter, and may be called directly if
-// the ExtraInfo field is set on a Command.
+// the ExtraInfo field is set on an App.
 //
 // In the default implementation, if the customFuncs argument contains a
 // "wrapAt" key, which is a function which takes no arguments and returns
 // an int, this int value will be used to produce a "wrap" function used
 // by the default template to wrap long lines.
-var HelpPrinterCustom HelpPrinterCustomFunc = DefaultPrintHelpCustom
+var HelpPrinterCustom helpPrinterCustom = printHelpCustom
 
-// VersionPrinter prints the version for the root Command.
-var VersionPrinter = DefaultPrintVersion
-
-// ShowRootCommandHelp is an action that displays help for the root command.
-var ShowRootCommandHelp = DefaultShowRootCommandHelp
-
-// ShowAppHelp is a backward-compatible name for ShowRootCommandHelp.
-var ShowAppHelp = ShowRootCommandHelp
-
-// ShowCommandHelp prints help for the given command
-var ShowCommandHelp = DefaultShowCommandHelp
-
-// ShowSubcommandHelp prints help for the given subcommand
-var ShowSubcommandHelp = DefaultShowSubcommandHelp
-
-// UsageCommandHelp is the text to override the USAGE section of the help command
-var UsageCommandHelp = "Shows a list of commands or help for one command"
-
-// ArgsUsageCommandHelp is a short description of the arguments of the help command
-var ArgsUsageCommandHelp = "[command]"
+// VersionPrinter prints the version for the App
+var VersionPrinter = printVersion
 
 func buildHelpCommand(withAction bool) *Command {
 	cmd := &Command{
 		Name:      helpName,
 		Aliases:   []string{helpAlias},
-		Usage:     UsageCommandHelp,
-		ArgsUsage: ArgsUsageCommandHelp,
+		Usage:     "Shows a list of commands or help for one command",
+		ArgsUsage: "[command]",
 		HideHelp:  true,
 	}
 
@@ -119,13 +100,14 @@ func helpCommandAction(ctx context.Context, cmd *Command) error {
 	// Special case when running help on main app itself as opposed to individual
 	// commands/subcommands
 	if cmd.parent == nil {
-		tracef("returning ShowRootCommandHelp")
-		_ = ShowRootCommandHelp(cmd)
+		tracef("returning ShowAppHelp")
+		_ = ShowAppHelp(cmd)
 		return nil
 	}
 
 	// Case 3, 5
-	if len(cmd.VisibleCommands()) == 0 {
+	if (len(cmd.Commands) == 1 && !cmd.HideHelp) ||
+		(len(cmd.Commands) == 0 && cmd.HideHelp) {
 
 		tmpl := cmd.CustomHelpTemplate
 		if tmpl == "" {
@@ -142,17 +124,14 @@ func helpCommandAction(ctx context.Context, cmd *Command) error {
 	return ShowSubcommandHelp(cmd)
 }
 
-// ShowRootCommandHelpAndExit prints the list of subcommands and exits with exit code.
-func ShowRootCommandHelpAndExit(cmd *Command, exitCode int) {
-	_ = ShowRootCommandHelp(cmd)
-	OsExiter(exitCode)
+// ShowAppHelpAndExit - Prints the list of subcommands for the app and exits with exit code.
+func ShowAppHelpAndExit(cmd *Command, exitCode int) {
+	_ = ShowAppHelp(cmd)
+	os.Exit(exitCode)
 }
 
-// ShowAppHelpAndExit is a backward-compatible name for ShowRootCommandHelp.
-var ShowAppHelpAndExit = ShowRootCommandHelpAndExit
-
-// DefaultShowRootCommandHelp is the default implementation of ShowRootCommandHelp.
-func DefaultShowRootCommandHelp(cmd *Command) error {
+// ShowAppHelp is an action that displays the help.
+func ShowAppHelp(cmd *Command) error {
 	tmpl := cmd.CustomRootCommandHelpTemplate
 	if tmpl == "" {
 		tracef("using RootCommandHelpTemplate")
@@ -175,21 +154,17 @@ func DefaultShowRootCommandHelp(cmd *Command) error {
 	return nil
 }
 
-// DefaultRootCommandComplete prints the list of subcommands as the default completion method.
-func DefaultRootCommandComplete(ctx context.Context, cmd *Command) {
+// DefaultAppComplete prints the list of subcommands as the default app completion method
+func DefaultAppComplete(ctx context.Context, cmd *Command) {
 	DefaultCompleteWithFlags(ctx, cmd)
 }
 
-// DefaultAppComplete is a backward-compatible name for DefaultRootCommandComplete.
-var DefaultAppComplete = DefaultRootCommandComplete
-
 func printCommandSuggestions(commands []*Command, writer io.Writer) {
-	shell := os.Getenv("SHELL")
 	for _, command := range commands {
 		if command.Hidden {
 			continue
 		}
-		if (strings.HasSuffix(shell, "zsh") || strings.HasSuffix(shell, "fish")) && len(command.Usage) > 0 {
+		if strings.HasSuffix(os.Getenv("SHELL"), "zsh") {
 			_, _ = fmt.Fprintf(writer, "%s:%s\n", command.Name, command.Usage)
 		} else {
 			_, _ = fmt.Fprintf(writer, "%s\n", command.Name)
@@ -205,8 +180,10 @@ func cliArgContains(flagName string, args []string) bool {
 			count = 2
 		}
 		flag := fmt.Sprintf("%s%s", strings.Repeat("-", count), name)
-		if slices.Contains(args, flag) {
-			return true
+		for _, a := range args {
+			if a == flag {
+				return true
+			}
 		}
 	}
 	return false
@@ -239,8 +216,7 @@ func printFlagSuggestions(lastArg string, flags []Flag, writer io.Writer) {
 		// match if last argument matches this flag and it is not repeated
 		if strings.HasPrefix(name, cur) && cur != name /* && !cliArgContains(name, os.Args)*/ {
 			flagCompletion := fmt.Sprintf("%s%s", strings.Repeat("-", count), name)
-			shell := os.Getenv("SHELL")
-			if usage != "" && (strings.HasSuffix(shell, "zsh") || strings.HasSuffix(shell, "fish")) {
+			if usage != "" && strings.HasSuffix(os.Getenv("SHELL"), "zsh") {
 				flagCompletion = fmt.Sprintf("%s:%s", flagCompletion, usage)
 			}
 			fmt.Fprintln(writer, flagCompletion)
@@ -288,14 +264,14 @@ func DefaultCompleteWithFlags(ctx context.Context, cmd *Command) {
 	}
 }
 
-// ShowCommandHelpAndExit exits with code after showing help via ShowCommandHelp.
+// ShowCommandHelpAndExit - exits with code after showing help
 func ShowCommandHelpAndExit(ctx context.Context, cmd *Command, command string, code int) {
 	_ = ShowCommandHelp(ctx, cmd, command)
-	OsExiter(code)
+	os.Exit(code)
 }
 
-// DefaultShowCommandHelp is the default implementation of ShowCommandHelp.
-func DefaultShowCommandHelp(ctx context.Context, cmd *Command, commandName string) error {
+// ShowCommandHelp prints help for the given command
+func ShowCommandHelp(ctx context.Context, cmd *Command, commandName string) error {
 	for _, subCmd := range cmd.Commands {
 		if !subCmd.HasName(commandName) {
 			continue
@@ -340,26 +316,25 @@ func DefaultShowCommandHelp(ctx context.Context, cmd *Command, commandName strin
 	return nil
 }
 
-// ShowSubcommandHelpAndExit prints help for the given subcommand via ShowSubcommandHelp and exits with exit code.
+// ShowSubcommandHelpAndExit - Prints help for the given subcommand and exits with exit code.
 func ShowSubcommandHelpAndExit(cmd *Command, exitCode int) {
 	_ = ShowSubcommandHelp(cmd)
-	OsExiter(exitCode)
+	os.Exit(exitCode)
 }
 
-// DefaultShowSubcommandHelp is the default implementation of ShowSubcommandHelp.
-func DefaultShowSubcommandHelp(cmd *Command) error {
+// ShowSubcommandHelp prints help for the given subcommand
+func ShowSubcommandHelp(cmd *Command) error {
 	HelpPrinter(cmd.Root().Writer, SubcommandHelpTemplate, cmd)
 	return nil
 }
 
-// ShowVersion prints the version number of the root Command.
+// ShowVersion prints the version number of the App
 func ShowVersion(cmd *Command) {
 	tracef("showing version via VersionPrinter (cmd=%[1]q)", cmd.Name)
 	VersionPrinter(cmd)
 }
 
-// DefaultPrintVersion is the default implementation of VersionPrinter.
-func DefaultPrintVersion(cmd *Command) {
+func printVersion(cmd *Command) {
 	_, _ = fmt.Fprintf(cmd.Root().Writer, "%v version %v\n", cmd.Name, cmd.Version)
 }
 
@@ -375,11 +350,11 @@ func handleTemplateError(err error) {
 	}
 }
 
-// DefaultPrintHelpCustom is the default implementation of HelpPrinterCustom.
+// printHelpCustom is the default implementation of HelpPrinterCustom.
 //
 // The customFuncs map will be combined with a default template.FuncMap to
 // allow using arbitrary functions in template rendering.
-func DefaultPrintHelpCustom(out io.Writer, templ string, data any, customFuncs map[string]any) {
+func printHelpCustom(out io.Writer, templ string, data interface{}, customFuncs map[string]interface{}) {
 	const maxLineLength = 10000
 
 	tracef("building default funcMap")
@@ -468,8 +443,7 @@ func DefaultPrintHelpCustom(out io.Writer, templ string, data any, customFuncs m
 	_ = w.Flush()
 }
 
-// DefaultPrintHelp is the default implementation of HelpPrinter.
-func DefaultPrintHelp(out io.Writer, templ string, data any) {
+func printHelp(out io.Writer, templ string, data interface{}) {
 	HelpPrinterCustom(out, templ, data, nil)
 }
 
@@ -495,11 +469,13 @@ func checkShellCompleteFlag(c *Command, arguments []string) (bool, []string) {
 		return false, arguments
 	}
 
-	// If arguments include "--", shell completion is disabled
-	// because after "--" only positional arguments are accepted.
-	// https://unix.stackexchange.com/a/11382
-	if slices.Contains(arguments, "--") {
-		return false, arguments[:pos]
+	for _, arg := range arguments {
+		// If arguments include "--", shell completion is disabled
+		// because after "--" only positional arguments are accepted.
+		// https://unix.stackexchange.com/a/11382
+		if arg == "--" {
+			return false, arguments[:pos]
+		}
 	}
 
 	return true, arguments[:pos]

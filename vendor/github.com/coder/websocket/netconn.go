@@ -68,7 +68,7 @@ func NetConn(ctx context.Context, c *Conn, msgType MessageType) net.Conn {
 		defer nc.writeMu.unlock()
 
 		// Prevents future writes from writing until the deadline is reset.
-		nc.writeExpired.Store(1)
+		atomic.StoreInt64(&nc.writeExpired, 1)
 	})
 	if !nc.writeTimer.Stop() {
 		<-nc.writeTimer.C
@@ -84,7 +84,7 @@ func NetConn(ctx context.Context, c *Conn, msgType MessageType) net.Conn {
 		defer nc.readMu.unlock()
 
 		// Prevents future reads from reading until the deadline is reset.
-		nc.readExpired.Store(1)
+		atomic.StoreInt64(&nc.readExpired, 1)
 	})
 	if !nc.readTimer.Stop() {
 		<-nc.readTimer.C
@@ -94,22 +94,25 @@ func NetConn(ctx context.Context, c *Conn, msgType MessageType) net.Conn {
 }
 
 type netConn struct {
+	// These must be first to be aligned on 32 bit platforms.
+	// https://github.com/nhooyr/websocket/pull/438
+	readExpired  int64
+	writeExpired int64
+
 	c       *Conn
 	msgType MessageType
 
-	writeTimer   *time.Timer
-	writeMu      *mu
-	writeExpired atomic.Int64
-	writeCtx     context.Context
-	writeCancel  context.CancelFunc
+	writeTimer  *time.Timer
+	writeMu     *mu
+	writeCtx    context.Context
+	writeCancel context.CancelFunc
 
-	readTimer   *time.Timer
-	readMu      *mu
-	readExpired atomic.Int64
-	readCtx     context.Context
-	readCancel  context.CancelFunc
-	readEOFed   bool
-	reader      io.Reader
+	readTimer  *time.Timer
+	readMu     *mu
+	readCtx    context.Context
+	readCancel context.CancelFunc
+	readEOFed  bool
+	reader     io.Reader
 }
 
 var _ net.Conn = &netConn{}
@@ -126,7 +129,7 @@ func (nc *netConn) Write(p []byte) (int, error) {
 	nc.writeMu.forceLock()
 	defer nc.writeMu.unlock()
 
-	if nc.writeExpired.Load() == 1 {
+	if atomic.LoadInt64(&nc.writeExpired) == 1 {
 		return 0, fmt.Errorf("failed to write: %w", context.DeadlineExceeded)
 	}
 
@@ -154,7 +157,7 @@ func (nc *netConn) Read(p []byte) (int, error) {
 }
 
 func (nc *netConn) read(p []byte) (int, error) {
-	if nc.readExpired.Load() == 1 {
+	if atomic.LoadInt64(&nc.readExpired) == 1 {
 		return 0, fmt.Errorf("failed to read: %w", context.DeadlineExceeded)
 	}
 
@@ -188,7 +191,8 @@ func (nc *netConn) read(p []byte) (int, error) {
 	return n, err
 }
 
-type websocketAddr struct{}
+type websocketAddr struct {
+}
 
 func (a websocketAddr) Network() string {
 	return "websocket"
@@ -205,7 +209,7 @@ func (nc *netConn) SetDeadline(t time.Time) error {
 }
 
 func (nc *netConn) SetWriteDeadline(t time.Time) error {
-	nc.writeExpired.Store(0)
+	atomic.StoreInt64(&nc.writeExpired, 0)
 	if t.IsZero() {
 		nc.writeTimer.Stop()
 	} else {
@@ -219,7 +223,7 @@ func (nc *netConn) SetWriteDeadline(t time.Time) error {
 }
 
 func (nc *netConn) SetReadDeadline(t time.Time) error {
-	nc.readExpired.Store(0)
+	atomic.StoreInt64(&nc.readExpired, 0)
 	if t.IsZero() {
 		nc.readTimer.Stop()
 	} else {

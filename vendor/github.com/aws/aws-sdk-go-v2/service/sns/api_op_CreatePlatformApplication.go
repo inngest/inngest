@@ -35,10 +35,10 @@ import (
 //
 //   - For GCM (Firebase Cloud Messaging) using token credentials, there is no
 //     PlatformPrincipal . The PlatformCredential is a JSON formatted private key
-//     file. When using the Amazon Web Services CLI or Amazon Web Services SDKs, the
-//     file must be in string format and special characters must be ignored. To format
-//     the file correctly, Amazon SNS recommends using the following command:
-//     SERVICE_JSON=$(jq @json < service.json) .
+//     file. When using the Amazon Web Services CLI, the file must be in string format
+//     and special characters must be ignored. To format the file correctly, Amazon SNS
+//     recommends using the following command: SERVICE_JSON=`jq @json <<< cat
+//     service.json` .
 //
 //   - For MPNS, PlatformPrincipal is TLS certificate and PlatformCredential is
 //     private key .
@@ -145,9 +145,6 @@ func (c *Client) addOperationCreatePlatformApplicationMiddlewares(stack *middlew
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -164,9 +161,6 @@ func (c *Client) addOperationCreatePlatformApplicationMiddlewares(stack *middlew
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
-		return err
-	}
-	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreatePlatformApplicationValidationMiddleware(stack); err != nil {
@@ -188,15 +182,6 @@ func (c *Client) addOperationCreatePlatformApplicationMiddlewares(stack *middlew
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

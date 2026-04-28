@@ -5,7 +5,7 @@ package pcommon // import "go.opentelemetry.io/collector/pdata/pcommon"
 import (
 	"encoding/hex"
 
-	"go.opentelemetry.io/collector/pdata/internal"
+	"go.opentelemetry.io/collector/pdata/internal/data"
 )
 
 var emptySpanID = SpanID([8]byte{})
@@ -32,5 +32,5 @@ func (ms SpanID) String() string {
 
 // IsEmpty returns true if id doesn't contain at least one non-zero byte.
 func (ms SpanID) IsEmpty() bool {
-	return internal.SpanID(ms).IsEmpty()
+	return data.SpanID(ms).IsEmpty()
 }

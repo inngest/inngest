@@ -55,23 +55,15 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 
 	r := func() {
 		t.Helper()
-
-		var (
-			resp *http.Response
-			err  error
-		)
-
-		// Retry to handle transient connection errors (e.g. EOF from stale
-		// keep-alive connections that the server closed while idle).
-		for attempt := 0; attempt < 3; attempt++ {
-			req, reqErr := http.NewRequest(http.MethodPut, server.LocalURL(), nil)
-			require.NoError(t, reqErr)
-			resp, err = http.DefaultClient.Do(req)
-			if err == nil {
-				break
-			}
-			time.Sleep(250 * time.Millisecond)
-		}
+		req, err := http.NewRequest(http.MethodPut, server.LocalURL(), nil)
+		require.NoError(t, err)
+		req.Close = true
+		// Registration updates are infrequent and CI occasionally reuses a stale
+		// idle connection here. Use a one-off transport to avoid surfacing that
+		// socket reuse as a flaky test failure.
+		resp, err := (&http.Client{
+			Transport: &http.Transport{DisableKeepAlives: true},
+		}).Do(req)
 		require.NoError(t, err)
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -147,7 +139,6 @@ func NewHTTPServer(f http.Handler) *HTTPServer {
 		Handler:        f,
 		ReadTimeout:    60 * time.Second,
 		WriteTimeout:   60 * time.Second,
-		IdleTimeout:    10 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {
@@ -175,7 +166,6 @@ func NewHTTPSServer(f http.Handler) *HTTPServer {
 		Handler:        f,
 		ReadTimeout:    60 * time.Second,
 		WriteTimeout:   60 * time.Second,
-		IdleTimeout:    10 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {

@@ -60,7 +60,7 @@ type Info struct {
 }
 
 func FromIter(i *cue.Iterator) (info Info, err error) {
-	return FromValue(i.Selector().Unquoted(), i.Value())
+	return FromValue(i.Label(), i.Value())
 }
 
 func FromValue(name string, v cue.Value) (info Info, err error) {
@@ -89,7 +89,8 @@ func FromValue(name string, v cue.Value) (info Info, err error) {
 	switch v.IncompleteKind() {
 	case cue.ListKind:
 		info.CompositeType = List
-		if e := v.LookupPath(cue.MakePath(cue.AnyIndex)); e.Exists() {
+		e, _ := v.Elem()
+		if e.Exists() {
 			v = e
 		} else {
 			for i, _ := v.List(); i.Next(); {
@@ -115,7 +116,7 @@ func FromValue(name string, v cue.Value) (info Info, err error) {
 				info.KeyType = Int // Assuming
 			}
 			info.CompositeType = Map
-			v = v.LookupPath(cue.MakePath(cue.AnyString))
+			v, _ = v.Elem()
 		}
 	}
 

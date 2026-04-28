@@ -129,14 +129,7 @@ func (p *Parser) next() (pos scanner.Position, tok token, lit string) {
 
 // pre: first single quote has been read
 func (p *Parser) nextSingleQuotedString() (pos scanner.Position, tok token, lit string) {
-	// Save current scanner mode and temporarily disable comment scanning
-	// to prevent // inside single quotes from being treated as comments
-	savedMode := p.scanner.Mode
-	p.scanner.Mode = scanner.ScanIdents | scanner.ScanFloats | scanner.ScanStrings | scanner.ScanRawStrings
-	defer func() { p.scanner.Mode = savedMode }()
-
-	var ch rune
-	p.ignoreErrorsWhile(func() { ch = p.scanner.Scan() })
+	ch := p.scanner.Scan()
 	if ch == scanner.EOF {
 		return p.scanner.Position, tEOF, ""
 	}
@@ -149,7 +142,7 @@ func (p *Parser) nextSingleQuotedString() (pos scanner.Position, tok token, lit 
 
 	// scan for partial tokens until actual closing single-quote(') token
 	for {
-		p.ignoreErrorsWhile(func() { ch = p.scanner.Scan() })
+		ch = p.scanner.Scan()
 
 		if ch == scanner.EOF {
 			return p.scanner.Position, tEOF, ""
@@ -166,14 +159,6 @@ func (p *Parser) nextSingleQuotedString() (pos scanner.Position, tok token, lit 
 		p.unexpected(lit, "'", p)
 	}
 	return p.scanner.Position, tIDENT, fmt.Sprintf("'%s'", lit)
-}
-
-func (p *Parser) ignoreErrorsWhile(block func()) {
-	// during block call change error handler which ignores it all
-	p.scanner.Error = func(s *scanner.Scanner, msg string) { return }
-	block()
-	// restore
-	p.scanner.Error = p.handleScanError
 }
 
 // nextPut sets the buffer
@@ -196,10 +181,10 @@ func (p *Parser) nextInteger() (i int, err error) {
 		i, err = p.nextInteger()
 		return i * -1, err
 	}
-	if tok != tNUMBER {
+	if tok != tIDENT {
 		return 0, errors.New("non integer")
 	}
-	if strings.HasPrefix(lit, "0x") || strings.HasPrefix(lit, "0X") {
+	if strings.HasPrefix(lit, "0x") {
 		// hex decode
 		i64, err := strconv.ParseInt(lit, 0, 64)
 		return int(i64), err
@@ -219,42 +204,9 @@ func (p *Parser) nextIdentifier() (pos scanner.Position, tok token, lit string) 
 	return
 }
 
-func (p *Parser) nextMessageLiteralFieldName() (pos scanner.Position, tok token, lit string) {
-	pos, tok, lit = p.nextIdent(true)
-	if tok == tLEFTSQUARE {
-		pos, tok, lit = p.nextIdent(true)
-		_, _, _ = p.next() // consume right square
-	}
-	return
-}
-
 // nextTypeName implements the Packages and Name Resolution for finding the name of the type.
-// Valid examples:
-// .google.protobuf.Empty
-// stream T must return tSTREAM
-// optional int32 must return tOPTIONAL
-// Bogus must return Bogus
 func (p *Parser) nextTypeName() (pos scanner.Position, tok token, lit string) {
-	pos, tok, lit = p.next()
-	startPos := pos
-	fullLit := lit
-	// leading dot allowed
-	if tDOT == tok {
-		pos, tok, lit = p.next()
-		fullLit = fmt.Sprintf(".%s", lit)
-	}
-	// type can be namespaced more
-	for {
-		r := p.peekNonWhitespace()
-		if '.' != r {
-			break
-		}
-		p.next() // consume dot
-		pos, tok, lit = p.next()
-		fullLit = fmt.Sprintf("%s.%s", fullLit, lit)
-		tok = tIDENT
-	}
-	return startPos, tok, fullLit
+	return p.nextIdentifier()
 }
 
 func (p *Parser) nextIdent(keywordStartAllowed bool) (pos scanner.Position, tok token, lit string) {
@@ -271,17 +223,16 @@ func (p *Parser) nextIdent(keywordStartAllowed bool) (pos scanner.Position, tok 
 	// see if identifier is namespaced
 	for {
 		r := p.peekNonWhitespace()
-		if r != '.' {
+		if '.' != r {
 			break
 		}
 		p.next() // consume dot
-		fullLit += "."
 		pos, tok, lit := p.next()
 		if tIDENT != tok && !isKeyword(tok) {
 			p.nextPut(pos, tok, lit)
 			break
 		}
-		fullLit += lit
+		fullLit = fmt.Sprintf("%s.%s", fullLit, lit)
 	}
 	return startPos, tIDENT, fullLit
 }
@@ -297,31 +248,4 @@ func (p *Parser) peekNonWhitespace() rune {
 		return p.peekNonWhitespace()
 	}
 	return r
-}
-
-// https://protobuf.dev/reference/protobuf/proto3-spec/
-func (p *Parser) nextFullIdent(keywordStartAllowed bool) (pos scanner.Position, tok token, lit string) {
-	pos, tok, lit = p.next()
-	if tIDENT != tok {
-		// can be keyword
-		if !(isKeyword(tok) && keywordStartAllowed) {
-			return
-		}
-		// proceed with keyword as first literal
-	}
-	fullIdent := lit
-	for {
-		r := p.peekNonWhitespace()
-		if r != '.' {
-			break
-		}
-		p.next() // consume dot
-		pos, tok, lit = p.nextFullIdent(true)
-		if tok != tIDENT {
-			p.nextPut(pos, tok, lit)
-			break
-		}
-		fullIdent = fmt.Sprintf("%s.%s", fullIdent, lit)
-	}
-	return pos, tIDENT, fullIdent
 }

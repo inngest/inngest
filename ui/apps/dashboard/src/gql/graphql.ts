@@ -1090,6 +1090,7 @@ export type InsightsColumn = {
 
 export enum InsightsColumnType {
   Date = 'DATE',
+  Dynamic = 'DYNAMIC',
   Number = 'NUMBER',
   String = 'STRING',
   Unknown = 'UNKNOWN'

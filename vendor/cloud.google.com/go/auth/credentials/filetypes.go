@@ -25,7 +25,6 @@ import (
 	"cloud.google.com/go/auth/credentials/internal/impersonate"
 	internalauth "cloud.google.com/go/auth/internal"
 	"cloud.google.com/go/auth/internal/credsfile"
-	"cloud.google.com/go/auth/internal/trustboundary"
 )
 
 func fileCredentials(b []byte, opts *DetectOptions) (*auth.Credentials, error) {
@@ -34,11 +33,9 @@ func fileCredentials(b []byte, opts *DetectOptions) (*auth.Credentials, error) {
 		return nil, err
 	}
 
-	var projectID, universeDomain string
+	var projectID, quotaProjectID, universeDomain string
 	var tp auth.TokenProvider
 	switch fileType {
-	case credsfile.UnknownCredType:
-		return nil, errors.New("credentials: unsupported unidentified file type")
 	case credsfile.ServiceAccountKey:
 		f, err := credsfile.ParseServiceAccount(b)
 		if err != nil {
@@ -59,6 +56,7 @@ func fileCredentials(b []byte, opts *DetectOptions) (*auth.Credentials, error) {
 		if err != nil {
 			return nil, err
 		}
+		quotaProjectID = f.QuotaProjectID
 		universeDomain = f.UniverseDomain
 	case credsfile.ExternalAccountKey:
 		f, err := credsfile.ParseExternalAccount(b)
@@ -69,6 +67,7 @@ func fileCredentials(b []byte, opts *DetectOptions) (*auth.Credentials, error) {
 		if err != nil {
 			return nil, err
 		}
+		quotaProjectID = f.QuotaProjectID
 		universeDomain = resolveUniverseDomain(opts.UniverseDomain, f.UniverseDomain)
 	case credsfile.ExternalAccountAuthorizedUserKey:
 		f, err := credsfile.ParseExternalAccountAuthorizedUser(b)
@@ -79,6 +78,7 @@ func fileCredentials(b []byte, opts *DetectOptions) (*auth.Credentials, error) {
 		if err != nil {
 			return nil, err
 		}
+		quotaProjectID = f.QuotaProjectID
 		universeDomain = f.UniverseDomain
 	case credsfile.ImpersonatedServiceAccountKey:
 		f, err := credsfile.ParseImpersonatedServiceAccount(b)
@@ -108,9 +108,9 @@ func fileCredentials(b []byte, opts *DetectOptions) (*auth.Credentials, error) {
 		TokenProvider: auth.NewCachedTokenProvider(tp, &auth.CachedTokenProviderOptions{
 			ExpireEarly: opts.EarlyTokenRefresh,
 		}),
-		JSON:              b,
-		ProjectIDProvider: internalauth.StaticCredentialsProperty(projectID),
-		// TODO(codyoss): only set quota project here if there was a user override
+		JSON:                   b,
+		ProjectIDProvider:      internalauth.StaticCredentialsProperty(projectID),
+		QuotaProjectIDProvider: internalauth.StaticCredentialsProperty(quotaProjectID),
 		UniverseDomainProvider: internalauth.StaticCredentialsProperty(universeDomain),
 	}), nil
 }
@@ -127,44 +127,22 @@ func resolveUniverseDomain(optsUniverseDomain, fileUniverseDomain string) string
 }
 
 func handleServiceAccount(f *credsfile.ServiceAccountFile, opts *DetectOptions) (auth.TokenProvider, error) {
-	ud := resolveUniverseDomain(opts.UniverseDomain, f.UniverseDomain)
 	if opts.UseSelfSignedJWT {
-		return configureSelfSignedJWT(f, opts)
-	} else if ud != "" && ud != internalauth.DefaultUniverseDomain {
-		// For non-GDU universe domains, token exchange is impossible and services
-		// must support self-signed JWTs.
-		opts.UseSelfSignedJWT = true
 		return configureSelfSignedJWT(f, opts)
 	}
 	opts2LO := &auth.Options2LO{
-		Email:          f.ClientEmail,
-		PrivateKey:     []byte(f.PrivateKey),
-		PrivateKeyID:   f.PrivateKeyID,
-		Scopes:         opts.scopes(),
-		TokenURL:       f.TokenURL,
-		Subject:        opts.Subject,
-		Client:         opts.client(),
-		Logger:         opts.logger(),
-		UniverseDomain: ud,
+		Email:        f.ClientEmail,
+		PrivateKey:   []byte(f.PrivateKey),
+		PrivateKeyID: f.PrivateKeyID,
+		Scopes:       opts.scopes(),
+		TokenURL:     f.TokenURL,
+		Subject:      opts.Subject,
+		Client:       opts.client(),
 	}
 	if opts2LO.TokenURL == "" {
 		opts2LO.TokenURL = jwtTokenURL
 	}
-
-	tp, err := auth.New2LOTokenProvider(opts2LO)
-	if err != nil {
-		return nil, err
-	}
-
-	trustBoundaryEnabled, err := trustboundary.IsEnabled()
-	if err != nil {
-		return nil, err
-	}
-	if !trustBoundaryEnabled {
-		return tp, nil
-	}
-	saConfig := trustboundary.NewServiceAccountConfigProvider(opts2LO.Email, opts2LO.UniverseDomain)
-	return trustboundary.NewProvider(opts.client(), saConfig, opts.logger(), tp)
+	return auth.New2LOTokenProvider(opts2LO)
 }
 
 func handleUserCredential(f *credsfile.UserCredentialsFile, opts *DetectOptions) (auth.TokenProvider, error) {
@@ -178,7 +156,6 @@ func handleUserCredential(f *credsfile.UserCredentialsFile, opts *DetectOptions)
 		EarlyTokenExpiry: opts.EarlyTokenRefresh,
 		RefreshToken:     f.RefreshToken,
 		Client:           opts.client(),
-		Logger:           opts.logger(),
 	}
 	return auth.New3LOTokenProvider(opts3LO)
 }
@@ -197,45 +174,12 @@ func handleExternalAccount(f *credsfile.ExternalAccountFile, opts *DetectOptions
 		Scopes:                         opts.scopes(),
 		WorkforcePoolUserProject:       f.WorkforcePoolUserProject,
 		Client:                         opts.client(),
-		Logger:                         opts.logger(),
 		IsDefaultClient:                opts.Client == nil,
 	}
 	if f.ServiceAccountImpersonation != nil {
 		externalOpts.ServiceAccountImpersonationLifetimeSeconds = f.ServiceAccountImpersonation.TokenLifetimeSeconds
 	}
-	tp, err := externalaccount.NewTokenProvider(externalOpts)
-	if err != nil {
-		return nil, err
-	}
-	trustBoundaryEnabled, err := trustboundary.IsEnabled()
-	if err != nil {
-		return nil, err
-	}
-	if !trustBoundaryEnabled {
-		return tp, nil
-	}
-
-	ud := resolveUniverseDomain(opts.UniverseDomain, f.UniverseDomain)
-	var configProvider trustboundary.ConfigProvider
-
-	if f.ServiceAccountImpersonationURL == "" {
-		// No impersonation, this is a direct external account credential.
-		// The trust boundary is based on the workload/workforce pool.
-		var err error
-		configProvider, err = trustboundary.NewExternalAccountConfigProvider(f.Audience, ud)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Impersonation is used. The trust boundary is based on the target service account.
-		targetSAEmail, err := impersonate.ExtractServiceAccountEmail(f.ServiceAccountImpersonationURL)
-		if err != nil {
-			return nil, fmt.Errorf("credentials: could not extract target service account email for trust boundary: %w", err)
-		}
-		configProvider = trustboundary.NewServiceAccountConfigProvider(targetSAEmail, ud)
-	}
-
-	return trustboundary.NewProvider(opts.client(), configProvider, opts.logger(), tp)
+	return externalaccount.NewTokenProvider(externalOpts)
 }
 
 func handleExternalAccountAuthorizedUser(f *credsfile.ExternalAccountAuthorizedUserFile, opts *DetectOptions) (auth.TokenProvider, error) {
@@ -248,26 +192,8 @@ func handleExternalAccountAuthorizedUser(f *credsfile.ExternalAccountAuthorizedU
 		ClientSecret: f.ClientSecret,
 		Scopes:       opts.scopes(),
 		Client:       opts.client(),
-		Logger:       opts.logger(),
 	}
-	tp, err := externalaccountuser.NewTokenProvider(externalOpts)
-	if err != nil {
-		return nil, err
-	}
-	trustBoundaryEnabled, err := trustboundary.IsEnabled()
-	if err != nil {
-		return nil, err
-	}
-	if !trustBoundaryEnabled {
-		return tp, nil
-	}
-
-	ud := resolveUniverseDomain(opts.UniverseDomain, f.UniverseDomain)
-	configProvider, err := trustboundary.NewExternalAccountConfigProvider(f.Audience, ud)
-	if err != nil {
-		return nil, err
-	}
-	return trustboundary.NewProvider(opts.client(), configProvider, opts.logger(), tp)
+	return externalaccountuser.NewTokenProvider(externalOpts)
 }
 
 func handleImpersonatedServiceAccount(f *credsfile.ImpersonatedServiceAccountFile, opts *DetectOptions) (auth.TokenProvider, error) {
@@ -275,42 +201,22 @@ func handleImpersonatedServiceAccount(f *credsfile.ImpersonatedServiceAccountFil
 		return nil, errors.New("missing 'source_credentials' field or 'service_account_impersonation_url' in credentials")
 	}
 
-	sourceTP, err := fileCredentials(f.CredSource, opts)
+	tp, err := fileCredentials(f.CredSource, opts)
 	if err != nil {
 		return nil, err
 	}
-	ud := resolveUniverseDomain(opts.UniverseDomain, f.UniverseDomain)
-	impOpts := &impersonate.Options{
-		URL:            f.ServiceAccountImpersonationURL,
-		Scopes:         opts.scopes(),
-		Tp:             sourceTP,
-		Delegates:      f.Delegates,
-		Client:         opts.client(),
-		Logger:         opts.logger(),
-		UniverseDomain: ud,
-	}
-	tp, err := impersonate.NewTokenProvider(impOpts)
-	if err != nil {
-		return nil, err
-	}
-	trustBoundaryEnabled, err := trustboundary.IsEnabled()
-	if err != nil {
-		return nil, err
-	}
-	if !trustBoundaryEnabled {
-		return tp, nil
-	}
-	targetSAEmail, err := impersonate.ExtractServiceAccountEmail(f.ServiceAccountImpersonationURL)
-	if err != nil {
-		return nil, fmt.Errorf("credentials: could not extract target service account email for trust boundary: %w", err)
-	}
-	targetSAConfig := trustboundary.NewServiceAccountConfigProvider(targetSAEmail, ud)
-	return trustboundary.NewProvider(opts.client(), targetSAConfig, opts.logger(), tp)
+	return impersonate.NewTokenProvider(&impersonate.Options{
+		URL:       f.ServiceAccountImpersonationURL,
+		Scopes:    opts.scopes(),
+		Tp:        tp,
+		Delegates: f.Delegates,
+		Client:    opts.client(),
+	})
 }
+
 func handleGDCHServiceAccount(f *credsfile.GDCHServiceAccountFile, opts *DetectOptions) (auth.TokenProvider, error) {
 	return gdch.NewTokenProvider(f, &gdch.Options{
 		STSAudience: opts.STSAudience,
 		Client:      opts.client(),
-		Logger:      opts.logger(),
 	})
 }

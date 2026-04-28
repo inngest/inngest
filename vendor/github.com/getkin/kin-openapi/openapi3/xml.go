@@ -3,14 +3,13 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"maps"
 )
 
 // XML is specified by OpenAPI/Swagger standard version 3.
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#xml-object
 type XML struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"-" yaml:"-"`
+	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
 
 	Name      string `json:"name,omitempty" yaml:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
@@ -31,7 +30,9 @@ func (xml XML) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of XML.
 func (xml XML) MarshalYAML() (any, error) {
 	m := make(map[string]any, 5+len(xml.Extensions))
-	maps.Copy(m, xml.Extensions)
+	for k, v := range xml.Extensions {
+		m[k] = v
+	}
 	if x := xml.Name; x != "" {
 		m["name"] = x
 	}
@@ -58,6 +59,7 @@ func (xml *XML) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
+	delete(x.Extensions, originKey)
 	delete(x.Extensions, "name")
 	delete(x.Extensions, "namespace")
 	delete(x.Extensions, "prefix")

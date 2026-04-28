@@ -396,7 +396,7 @@ func (s *Scratch) buildCTable() error {
 			if v > largeLimit {
 				s.zeroBits = true
 			}
-			for range v {
+			for nbOccurrences := int16(0); nbOccurrences < v; nbOccurrences++ {
 				tableSymbol[position] = symbol
 				position = (position + step) & tableMask
 				for position > highThreshold {

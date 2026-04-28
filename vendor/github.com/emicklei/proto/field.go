@@ -68,15 +68,8 @@ func (f *NormalField) Doc() *Comment {
 // [ "repeated" | "optional" ] type fieldName "=" fieldNumber [ "[" fieldOptions "]" ] ";"
 func (f *NormalField) parse(p *Parser) error {
 	for {
-		pos, tok, lit := p.nextTypeName()
+		_, tok, lit := p.nextTypeName()
 		switch tok {
-		case tCOMMENT:
-			c := newComment(pos, lit)
-			if f.InlineComment == nil {
-				f.InlineComment = c
-			} else {
-				f.InlineComment.Merge(c)
-			}
 		case tREPEATED:
 			f.Repeated = true
 			return f.parse(p)
@@ -85,7 +78,7 @@ func (f *NormalField) parse(p *Parser) error {
 			return f.parse(p)
 		case tIDENT:
 			f.Type = lit
-			return parseFieldAfterType(f.Field, p, f)
+			return parseFieldAfterType(f.Field, p)
 		default:
 			goto done
 		}
@@ -96,57 +89,25 @@ done:
 
 // parseFieldAfterType expects:
 // fieldName "=" fieldNumber [ "[" fieldOptions "]" ] ";
-func parseFieldAfterType(f *Field, p *Parser, parent Visitee) error {
-	expectedToken := tIDENT
-	expected := "field identifier"
-
-	for {
-		pos, tok, lit := p.next()
-		if tok == tCOMMENT {
-			c := newComment(pos, lit)
-			if f.InlineComment == nil {
-				f.InlineComment = c
-			} else {
-				f.InlineComment.Merge(c)
-			}
-			continue
-		}
-		if tok != expectedToken {
-			// allow keyword as field name
-			if expectedToken == tIDENT && isKeyword(tok) {
-				// continue as identifier
-				tok = tIDENT
-			} else {
-				return p.unexpected(lit, expected, f)
-			}
-		}
-		// found expected token
-		if tok == tIDENT {
-			f.Name = lit
-			expectedToken = tEQUALS
-			expected = "field ="
-			continue
-		}
-		if tok == tEQUALS {
-			expectedToken = tNUMBER
-			expected = "field sequence number"
-			continue
-		}
-		if tok == tNUMBER {
-			// put it back so we can use the generic nextInteger
-			p.nextPut(pos, tok, lit)
-			i, err := p.nextInteger()
-			if err != nil {
-				return p.unexpected(lit, expected, f)
-			}
-			f.Sequence = i
-			break
+func parseFieldAfterType(f *Field, p *Parser) error {
+	pos, tok, lit := p.next()
+	if tok != tIDENT {
+		if !isKeyword(tok) {
+			return p.unexpected(lit, "field identifier", f)
 		}
 	}
-	consumeFieldComments(f, p)
-
+	f.Name = lit
+	pos, tok, lit = p.next()
+	if tok != tEQUALS {
+		return p.unexpected(lit, "field =", f)
+	}
+	i, err := p.nextInteger()
+	if err != nil {
+		return p.unexpected(lit, "field sequence number", f)
+	}
+	f.Sequence = i
 	// see if there are options
-	pos, tok, lit := p.next()
+	pos, tok, _ = p.next()
 	if tLEFTSQUARE != tok {
 		p.nextPut(pos, tok, lit)
 		return nil
@@ -156,7 +117,6 @@ func parseFieldAfterType(f *Field, p *Parser, parent Visitee) error {
 		o := new(Option)
 		o.Position = pos
 		o.IsEmbedded = true
-		o.parent(parent)
 		err := o.parse(p)
 		if err != nil {
 			return err
@@ -174,37 +134,6 @@ func parseFieldAfterType(f *Field, p *Parser, parent Visitee) error {
 	return nil
 }
 
-func consumeFieldComments(f *Field, p *Parser) {
-	pos, tok, lit := p.next()
-	for tok == tCOMMENT {
-		c := newComment(pos, lit)
-		if f.InlineComment == nil {
-			f.InlineComment = c
-		} else {
-			f.InlineComment.Merge(c)
-		}
-		pos, tok, lit = p.next()
-	}
-	// no longer a comment, put it back
-	p.nextPut(pos, tok, lit)
-}
-
-// TODO copy paste
-func consumeOptionComments(o *Option, p *Parser) {
-	pos, tok, lit := p.next()
-	for tok == tCOMMENT {
-		c := newComment(pos, lit)
-		if o.Comment == nil {
-			o.Comment = c
-		} else {
-			o.Comment.Merge(c)
-		}
-		pos, tok, lit = p.next()
-	}
-	// no longer a comment, put it back
-	p.nextPut(pos, tok, lit)
-}
-
 // MapField represents a map entry in a message.
 type MapField struct {
 	*Field
@@ -218,16 +147,10 @@ func (f *MapField) Accept(v Visitor) {
 	v.VisitMapField(f)
 }
 
-// Doc is part of Documented
-func (f *MapField) Doc() *Comment {
-	return f.Comment
-}
-
 // parse expects:
 // mapField = "map" "<" keyType "," type ">" mapName "=" fieldNumber [ "[" fieldOptions "]" ] ";"
 // keyType = "int32" | "int64" | "uint32" | "uint64" | "sint32" | "sint64" |
-//
-//	"fixed32" | "fixed64" | "sfixed32" | "sfixed64" | "bool" | "string"
+//           "fixed32" | "fixed64" | "sfixed32" | "sfixed64" | "bool" | "string"
 func (f *MapField) parse(p *Parser) error {
 	_, tok, lit := p.next()
 	if tLESS != tok {
@@ -251,19 +174,7 @@ func (f *MapField) parse(p *Parser) error {
 	if tGREATER != tok {
 		return p.unexpected(lit, "map valueType >", f)
 	}
-	return parseFieldAfterType(f.Field, p, f)
+	return parseFieldAfterType(f.Field, p)
 }
 
 func (f *Field) parent(v Visitee) { f.Parent = v }
-
-const optionNameDeprecated = "deprecated"
-
-// IsDeprecated returns true if the option "deprecated" is set with value "true".
-func (f *Field) IsDeprecated() bool {
-	for _, each := range f.Options {
-		if each.Name == optionNameDeprecated {
-			return each.Constant.Source == "true"
-		}
-	}
-	return false
-}

@@ -2,170 +2,171 @@ package pq
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/lib/pq/internal/pqtime"
 	"github.com/lib/pq/oid"
 )
 
-func binaryEncode(x any) ([]byte, error) {
+var time2400Regex = regexp.MustCompile(`^(24:00(?::00(?:\.0+)?)?)(?:[Z+-].*)?$`)
+
+func binaryEncode(parameterStatus *parameterStatus, x interface{}) []byte {
 	switch v := x.(type) {
 	case []byte:
-		return v, nil
+		return v
 	default:
-		return encode(x, oid.T_unknown)
+		return encode(parameterStatus, x, oid.T_unknown)
 	}
 }
 
-func encode(x any, pgtypOid oid.Oid) ([]byte, error) {
+func encode(parameterStatus *parameterStatus, x interface{}, pgtypOid oid.Oid) []byte {
 	switch v := x.(type) {
 	case int64:
-		return strconv.AppendInt(nil, v, 10), nil
+		return strconv.AppendInt(nil, v, 10)
 	case float64:
-		return strconv.AppendFloat(nil, v, 'f', -1, 64), nil
+		return strconv.AppendFloat(nil, v, 'f', -1, 64)
 	case []byte:
-		if v == nil {
-			return nil, nil
-		}
 		if pgtypOid == oid.T_bytea {
-			return encodeBytea(v), nil
+			return encodeBytea(parameterStatus.serverVersion, v)
 		}
-		return v, nil
+
+		return v
 	case string:
 		if pgtypOid == oid.T_bytea {
-			return encodeBytea([]byte(v)), nil
+			return encodeBytea(parameterStatus.serverVersion, []byte(v))
 		}
-		return []byte(v), nil
+
+		return []byte(v)
 	case bool:
-		return strconv.AppendBool(nil, v), nil
+		return strconv.AppendBool(nil, v)
 	case time.Time:
-		return formatTS(v), nil
+		return formatTs(v)
+
 	default:
-		return nil, fmt.Errorf("pq: encode: unknown type for %T", v)
+		errorf("encode: unknown type for %T", v)
 	}
+
+	panic("not reached")
 }
 
-func decode(ps *parameterStatus, s []byte, typ oid.Oid, f format) (any, error) {
+func decode(parameterStatus *parameterStatus, s []byte, typ oid.Oid, f format) interface{} {
 	switch f {
 	case formatBinary:
-		return binaryDecode(s, typ)
+		return binaryDecode(parameterStatus, s, typ)
 	case formatText:
-		return textDecode(ps, s, typ)
+		return textDecode(parameterStatus, s, typ)
 	default:
-		panic("unreachable")
+		panic("not reached")
 	}
 }
 
-func binaryDecode(s []byte, typ oid.Oid) (any, error) {
+func binaryDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interface{} {
 	switch typ {
 	case oid.T_bytea:
-		return s, nil
+		return s
 	case oid.T_int8:
-		return int64(binary.BigEndian.Uint64(s)), nil
+		return int64(binary.BigEndian.Uint64(s))
 	case oid.T_int4:
-		return int64(int32(binary.BigEndian.Uint32(s))), nil
+		return int64(int32(binary.BigEndian.Uint32(s)))
 	case oid.T_int2:
-		return int64(int16(binary.BigEndian.Uint16(s))), nil
+		return int64(int16(binary.BigEndian.Uint16(s)))
 	case oid.T_uuid:
-		return decodeUUIDBinary(s)
+		b, err := decodeUUIDBinary(s)
+		if err != nil {
+			panic(err)
+		}
+		return b
+
 	default:
-		return nil, fmt.Errorf("pq: don't know how to decode binary parameter of type %d", uint32(typ))
+		errorf("don't know how to decode binary parameter of type %d", uint32(typ))
 	}
 
+	panic("not reached")
 }
 
-// decodeUUIDBinary interprets the binary format of a uuid, returning it in text format.
-func decodeUUIDBinary(src []byte) ([]byte, error) {
-	if len(src) != 16 {
-		return nil, fmt.Errorf("pq: unable to decode uuid; bad length: %d", len(src))
-	}
-
-	dst := make([]byte, 36)
-	dst[8], dst[13], dst[18], dst[23] = '-', '-', '-', '-'
-	hex.Encode(dst[0:], src[0:4])
-	hex.Encode(dst[9:], src[4:6])
-	hex.Encode(dst[14:], src[6:8])
-	hex.Encode(dst[19:], src[8:10])
-	hex.Encode(dst[24:], src[10:16])
-	return dst, nil
-}
-
-func textDecode(ps *parameterStatus, s []byte, typ oid.Oid) (any, error) {
+func textDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interface{} {
 	switch typ {
-	case oid.T_char, oid.T_bpchar, oid.T_varchar, oid.T_text:
-		return string(s), nil
+	case oid.T_char, oid.T_varchar, oid.T_text:
+		return string(s)
 	case oid.T_bytea:
 		b, err := parseBytea(s)
 		if err != nil {
-			err = errors.New("pq: " + err.Error())
+			errorf("%s", err)
 		}
-		return b, err
+		return b
 	case oid.T_timestamptz:
-		return parseTS(ps.currentLocation, string(s))
+		return parseTs(parameterStatus.currentLocation, string(s))
 	case oid.T_timestamp, oid.T_date:
-		return parseTS(nil, string(s))
+		return parseTs(nil, string(s))
 	case oid.T_time:
-		return parseTime(typ, s)
+		return mustParse("15:04:05", typ, s)
 	case oid.T_timetz:
-		return parseTime(typ, s)
+		return mustParse("15:04:05-07", typ, s)
 	case oid.T_bool:
-		return s[0] == 't', nil
+		return s[0] == 't'
 	case oid.T_int8, oid.T_int4, oid.T_int2:
 		i, err := strconv.ParseInt(string(s), 10, 64)
 		if err != nil {
-			err = errors.New("pq: " + err.Error())
+			errorf("%s", err)
 		}
-		return i, err
+		return i
 	case oid.T_float4, oid.T_float8:
 		// We always use 64 bit parsing, regardless of whether the input text is for
 		// a float4 or float8, because clients expect float64s for all float datatypes
 		// and returning a 32-bit parsed float64 produces lossy results.
 		f, err := strconv.ParseFloat(string(s), 64)
 		if err != nil {
-			err = errors.New("pq: " + err.Error())
+			errorf("%s", err)
 		}
-		return f, err
+		return f
 	}
-	return s, nil
+
+	return s
 }
 
 // appendEncodedText encodes item in text format as required by COPY
 // and appends to buf
-func appendEncodedText(buf []byte, x any) ([]byte, error) {
+func appendEncodedText(parameterStatus *parameterStatus, buf []byte, x interface{}) []byte {
 	switch v := x.(type) {
 	case int64:
-		return strconv.AppendInt(buf, v, 10), nil
+		return strconv.AppendInt(buf, v, 10)
 	case float64:
-		return strconv.AppendFloat(buf, v, 'f', -1, 64), nil
+		return strconv.AppendFloat(buf, v, 'f', -1, 64)
 	case []byte:
-		encodedBytea := encodeBytea(v)
-		return appendEscapedText(buf, string(encodedBytea)), nil
+		encodedBytea := encodeBytea(parameterStatus.serverVersion, v)
+		return appendEscapedText(buf, string(encodedBytea))
 	case string:
-		return appendEscapedText(buf, v), nil
+		return appendEscapedText(buf, v)
 	case bool:
-		return strconv.AppendBool(buf, v), nil
+		return strconv.AppendBool(buf, v)
 	case time.Time:
-		return append(buf, formatTS(v)...), nil
+		return append(buf, formatTs(v)...)
 	case nil:
-		return append(buf, `\N`...), nil
+		return append(buf, "\\N"...)
 	default:
-		return nil, fmt.Errorf("pq: encode: unknown type for %T", v)
+		errorf("encode: unknown type for %T", v)
 	}
+
+	panic("not reached")
 }
 
 func appendEscapedText(buf []byte, text string) []byte {
 	escapeNeeded := false
 	startPos := 0
+	var c byte
 
 	// check if we need to escape
 	for i := 0; i < len(text); i++ {
-		c := text[i]
+		c = text[i]
 		if c == '\\' || c == '\n' || c == '\r' || c == '\t' {
 			escapeNeeded = true
 			startPos = i
@@ -179,7 +180,8 @@ func appendEscapedText(buf []byte, text string) []byte {
 	// copy till first char to escape, iterate the rest
 	result := append(buf, text[:startPos]...)
 	for i := startPos; i < len(text); i++ {
-		switch c := text[i]; c {
+		c = text[i]
+		switch c {
 		case '\\':
 			result = append(result, '\\', '\\')
 		case '\n':
@@ -195,62 +197,119 @@ func appendEscapedText(buf []byte, text string) []byte {
 	return result
 }
 
-func parseTime(typ oid.Oid, s []byte) (time.Time, error) {
+func mustParse(f string, typ oid.Oid, s []byte) time.Time {
 	str := string(s)
 
-	f := "15:04:05"
-	if typ == oid.T_timetz {
-		f = "15:04:05-07"
-		// PostgreSQL just sends the hour if the minute and second is 0:
-		//   22:04:59+00
-		//   22:04:59+08
-		//   22:04:59+08:30
-		//   22:04:59+08:30:40
-		//   23:00:00.112321+02:12:13
-		// So add those to the format string.
-		c := strings.Count(str, ":")
-		if c > 3 {
-			f = "15:04:05-07:00:00"
-		} else if c > 2 {
-			f = "15:04:05-07:00"
+	// Check for a minute and second offset in the timezone.
+	if typ == oid.T_timestamptz || typ == oid.T_timetz {
+		for i := 3; i <= 6; i += 3 {
+			if str[len(str)-i] == ':' {
+				f += ":00"
+				continue
+			}
+			break
 		}
 	}
 
-	// Go doesn't parse 24:00, so manually set that to midnight on Jan 2. 24:00
-	// is never with subseconds but may have a timezone:
-	//   24:00:00
-	//   24:00:00+08
-	//   24:00:00-08:01:01
+	// Special case for 24:00 time.
+	// Unfortunately, golang does not parse 24:00 as a proper time.
+	// In this case, we want to try "round to the next day", to differentiate.
+	// As such, we find if the 24:00 time matches at the beginning; if so,
+	// we default it back to 00:00 but add a day later.
 	var is2400Time bool
-	if strings.HasPrefix(str, "24:00:00") {
-		is2400Time = true
-		if len(str) > 8 {
-			str = "00:00:00" + str[8:]
-		} else {
-			str = "00:00:00"
+	switch typ {
+	case oid.T_timetz, oid.T_time:
+		if matches := time2400Regex.FindStringSubmatch(str); matches != nil {
+			// Concatenate timezone information at the back.
+			str = "00:00:00" + str[len(matches[1]):]
+			is2400Time = true
 		}
 	}
-
 	t, err := time.Parse(f, str)
 	if err != nil {
-		return time.Time{}, errors.New("pq: " + err.Error())
+		errorf("decode: %s", err)
 	}
 	if is2400Time {
 		t = t.Add(24 * time.Hour)
 	}
-	// TODO(v2): it uses UTC, which it shouldn't. But I'm afraid changing it now
-	// will break people's code.
-	//if typ == oid.T_time {
-	//	// Don't use UTC but time.FixedZone("", 0)
-	//	t = t.In(globalLocationCache.getLocation(0))
-	//}
-	return t, nil
+	return t
 }
 
-var (
-	infinityTSEnabled  = false
-	infinityTSNegative time.Time
-	infinityTSPositive time.Time
+var errInvalidTimestamp = errors.New("invalid timestamp")
+
+type timestampParser struct {
+	err error
+}
+
+func (p *timestampParser) expect(str string, char byte, pos int) {
+	if p.err != nil {
+		return
+	}
+	if pos+1 > len(str) {
+		p.err = errInvalidTimestamp
+		return
+	}
+	if c := str[pos]; c != char && p.err == nil {
+		p.err = fmt.Errorf("expected '%v' at position %v; got '%v'", char, pos, c)
+	}
+}
+
+func (p *timestampParser) mustAtoi(str string, begin int, end int) int {
+	if p.err != nil {
+		return 0
+	}
+	if begin < 0 || end < 0 || begin > end || end > len(str) {
+		p.err = errInvalidTimestamp
+		return 0
+	}
+	result, err := strconv.Atoi(str[begin:end])
+	if err != nil {
+		if p.err == nil {
+			p.err = fmt.Errorf("expected number; got '%v'", str)
+		}
+		return 0
+	}
+	return result
+}
+
+// The location cache caches the time zones typically used by the client.
+type locationCache struct {
+	cache map[int]*time.Location
+	lock  sync.Mutex
+}
+
+// All connections share the same list of timezones. Benchmarking shows that
+// about 5% speed could be gained by putting the cache in the connection and
+// losing the mutex, at the cost of a small amount of memory and a somewhat
+// significant increase in code complexity.
+var globalLocationCache = newLocationCache()
+
+func newLocationCache() *locationCache {
+	return &locationCache{cache: make(map[int]*time.Location)}
+}
+
+// Returns the cached timezone for the specified offset, creating and caching
+// it if necessary.
+func (c *locationCache) getLocation(offset int) *time.Location {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	location, ok := c.cache[offset]
+	if !ok {
+		location = time.FixedZone("", offset)
+		c.cache[offset] = location
+	}
+
+	return location
+}
+
+var infinityTsEnabled = false
+var infinityTsNegative time.Time
+var infinityTsPositive time.Time
+
+const (
+	infinityTsEnabledAlready        = "pq: infinity timestamp enabled already"
+	infinityTsNegativeMustBeSmaller = "pq: infinity timestamp: negative value must be smaller (before) than positive"
 )
 
 // EnableInfinityTs controls the handling of Postgres' "-infinity" and
@@ -274,63 +333,170 @@ var (
 // undefined behavior.  If EnableInfinityTs is called more than once, it will
 // panic.
 func EnableInfinityTs(negative time.Time, positive time.Time) {
-	if infinityTSEnabled {
-		panic("pq: infinity timestamp already enabled")
+	if infinityTsEnabled {
+		panic(infinityTsEnabledAlready)
 	}
 	if !negative.Before(positive) {
-		panic("pq: infinity timestamp: negative value must be smaller (before) than positive")
+		panic(infinityTsNegativeMustBeSmaller)
 	}
-	infinityTSEnabled = true
-	infinityTSNegative = negative
-	infinityTSPositive = positive
+	infinityTsEnabled = true
+	infinityTsNegative = negative
+	infinityTsPositive = positive
 }
 
-// Testing might want to toggle infinityTSEnabled
-func disableInfinityTS() {
-	infinityTSEnabled = false
+/*
+ * Testing might want to toggle infinityTsEnabled
+ */
+func disableInfinityTs() {
+	infinityTsEnabled = false
 }
 
-// This is a time function specific to the Postgres default DateStyle setting
-// ("ISO, MDY"), the only one we currently support. This accounts for the
-// discrepancies between the parsing available with time.Parse and the Postgres
-// date formatting quirks.
-func parseTS(currentLocation *time.Location, str string) (any, error) {
+// This is a time function specific to the Postgres default DateStyle
+// setting ("ISO, MDY"), the only one we currently support. This
+// accounts for the discrepancies between the parsing available with
+// time.Parse and the Postgres date formatting quirks.
+func parseTs(currentLocation *time.Location, str string) interface{} {
 	switch str {
 	case "-infinity":
-		if infinityTSEnabled {
-			return infinityTSNegative, nil
+		if infinityTsEnabled {
+			return infinityTsNegative
 		}
-		return []byte(str), nil
+		return []byte(str)
 	case "infinity":
-		if infinityTSEnabled {
-			return infinityTSPositive, nil
+		if infinityTsEnabled {
+			return infinityTsPositive
 		}
-		return []byte(str), nil
+		return []byte(str)
 	}
 	t, err := ParseTimestamp(currentLocation, str)
 	if err != nil {
-		err = errors.New("pq: " + err.Error())
+		panic(err)
 	}
-	return t, err
+	return t
 }
 
 // ParseTimestamp parses Postgres' text format. It returns a time.Time in
 // currentLocation iff that time's offset agrees with the offset sent from the
-// Postgres server. Otherwise, ParseTimestamp returns a time.Time with the fixed
-// offset offset provided by the Postgres server.
+// Postgres server. Otherwise, ParseTimestamp returns a time.Time with the
+// fixed offset offset provided by the Postgres server.
 func ParseTimestamp(currentLocation *time.Location, str string) (time.Time, error) {
-	return pqtime.Parse(currentLocation, str)
+	p := timestampParser{}
+
+	monSep := strings.IndexRune(str, '-')
+	// this is Gregorian year, not ISO Year
+	// In Gregorian system, the year 1 BC is followed by AD 1
+	year := p.mustAtoi(str, 0, monSep)
+	daySep := monSep + 3
+	month := p.mustAtoi(str, monSep+1, daySep)
+	p.expect(str, '-', daySep)
+	timeSep := daySep + 3
+	day := p.mustAtoi(str, daySep+1, timeSep)
+
+	minLen := monSep + len("01-01") + 1
+
+	isBC := strings.HasSuffix(str, " BC")
+	if isBC {
+		minLen += 3
+	}
+
+	var hour, minute, second int
+	if len(str) > minLen {
+		p.expect(str, ' ', timeSep)
+		minSep := timeSep + 3
+		p.expect(str, ':', minSep)
+		hour = p.mustAtoi(str, timeSep+1, minSep)
+		secSep := minSep + 3
+		p.expect(str, ':', secSep)
+		minute = p.mustAtoi(str, minSep+1, secSep)
+		secEnd := secSep + 3
+		second = p.mustAtoi(str, secSep+1, secEnd)
+	}
+	remainderIdx := monSep + len("01-01 00:00:00") + 1
+	// Three optional (but ordered) sections follow: the
+	// fractional seconds, the time zone offset, and the BC
+	// designation. We set them up here and adjust the other
+	// offsets if the preceding sections exist.
+
+	nanoSec := 0
+	tzOff := 0
+
+	if remainderIdx < len(str) && str[remainderIdx] == '.' {
+		fracStart := remainderIdx + 1
+		fracOff := strings.IndexAny(str[fracStart:], "-+Z ")
+		if fracOff < 0 {
+			fracOff = len(str) - fracStart
+		}
+		fracSec := p.mustAtoi(str, fracStart, fracStart+fracOff)
+		nanoSec = fracSec * (1000000000 / int(math.Pow(10, float64(fracOff))))
+
+		remainderIdx += fracOff + 1
+	}
+	if tzStart := remainderIdx; tzStart < len(str) && (str[tzStart] == '-' || str[tzStart] == '+') {
+		// time zone separator is always '-' or '+' or 'Z' (UTC is +00)
+		var tzSign int
+		switch c := str[tzStart]; c {
+		case '-':
+			tzSign = -1
+		case '+':
+			tzSign = +1
+		default:
+			return time.Time{}, fmt.Errorf("expected '-' or '+' at position %v; got %v", tzStart, c)
+		}
+		tzHours := p.mustAtoi(str, tzStart+1, tzStart+3)
+		remainderIdx += 3
+		var tzMin, tzSec int
+		if remainderIdx < len(str) && str[remainderIdx] == ':' {
+			tzMin = p.mustAtoi(str, remainderIdx+1, remainderIdx+3)
+			remainderIdx += 3
+		}
+		if remainderIdx < len(str) && str[remainderIdx] == ':' {
+			tzSec = p.mustAtoi(str, remainderIdx+1, remainderIdx+3)
+			remainderIdx += 3
+		}
+		tzOff = tzSign * ((tzHours * 60 * 60) + (tzMin * 60) + tzSec)
+	} else if tzStart < len(str) && str[tzStart] == 'Z' {
+		// time zone Z separator indicates UTC is +00
+		remainderIdx += 1
+	}
+
+	var isoYear int
+
+	if isBC {
+		isoYear = 1 - year
+		remainderIdx += 3
+	} else {
+		isoYear = year
+	}
+	if remainderIdx < len(str) {
+		return time.Time{}, fmt.Errorf("expected end of input, got %v", str[remainderIdx:])
+	}
+	t := time.Date(isoYear, time.Month(month), day,
+		hour, minute, second, nanoSec,
+		globalLocationCache.getLocation(tzOff))
+
+	if currentLocation != nil {
+		// Set the location of the returned Time based on the session's
+		// TimeZone value, but only if the local time zone database agrees with
+		// the remote database on the offset.
+		lt := t.In(currentLocation)
+		_, newOff := lt.Zone()
+		if newOff == tzOff {
+			t = lt
+		}
+	}
+
+	return t, p.err
 }
 
-// formatTS formats t into a format postgres understands.
-func formatTS(t time.Time) []byte {
-	if infinityTSEnabled {
+// formatTs formats t into a format postgres understands.
+func formatTs(t time.Time) []byte {
+	if infinityTsEnabled {
 		// t <= -infinity : ! (t > -infinity)
-		if !t.After(infinityTSNegative) {
+		if !t.After(infinityTsNegative) {
 			return []byte("-infinity")
 		}
 		// t >= infinity : ! (!t < infinity)
-		if !t.Before(infinityTSPositive) {
+		if !t.Before(infinityTsPositive) {
 			return []byte("infinity")
 		}
 	}
@@ -339,62 +505,128 @@ func formatTS(t time.Time) []byte {
 
 // FormatTimestamp formats t into Postgres' text format for timestamps.
 func FormatTimestamp(t time.Time) []byte {
-	return pqtime.Format(t)
+	// Need to send dates before 0001 A.D. with " BC" suffix, instead of the
+	// minus sign preferred by Go.
+	// Beware, "0000" in ISO is "1 BC", "-0001" is "2 BC" and so on
+	bc := false
+	if t.Year() <= 0 {
+		// flip year sign, and add 1, e.g: "0" will be "1", and "-10" will be "11"
+		t = t.AddDate((-t.Year())*2+1, 0, 0)
+		bc = true
+	}
+	b := []byte(t.Format("2006-01-02 15:04:05.999999999Z07:00"))
+
+	_, offset := t.Zone()
+	offset %= 60
+	if offset != 0 {
+		// RFC3339Nano already printed the minus sign
+		if offset < 0 {
+			offset = -offset
+		}
+
+		b = append(b, ':')
+		if offset < 10 {
+			b = append(b, '0')
+		}
+		b = strconv.AppendInt(b, int64(offset), 10)
+	}
+
+	if bc {
+		b = append(b, " BC"...)
+	}
+	return b
 }
 
 // Parse a bytea value received from the server.  Both "hex" and the legacy
 // "escape" format are supported.
 func parseBytea(s []byte) (result []byte, err error) {
-	// Hex format.
 	if len(s) >= 2 && bytes.Equal(s[:2], []byte("\\x")) {
+		// bytea_output = hex
 		s = s[2:] // trim off leading "\\x"
 		result = make([]byte, hex.DecodedLen(len(s)))
 		_, err := hex.Decode(result, s)
 		if err != nil {
 			return nil, err
 		}
-		return result, nil
-	}
+	} else {
+		// bytea_output = escape
+		for len(s) > 0 {
+			if s[0] == '\\' {
+				// escaped '\\'
+				if len(s) >= 2 && s[1] == '\\' {
+					result = append(result, '\\')
+					s = s[2:]
+					continue
+				}
 
-	// Escape format.
-	for len(s) > 0 {
-		if s[0] == '\\' {
-			// escaped '\\'
-			if len(s) >= 2 && s[1] == '\\' {
-				result = append(result, '\\')
-				s = s[2:]
-				continue
+				// '\\' followed by an octal number
+				if len(s) < 4 {
+					return nil, fmt.Errorf("invalid bytea sequence %v", s)
+				}
+				r, err := strconv.ParseUint(string(s[1:4]), 8, 8)
+				if err != nil {
+					return nil, fmt.Errorf("could not parse bytea value: %s", err.Error())
+				}
+				result = append(result, byte(r))
+				s = s[4:]
+			} else {
+				// We hit an unescaped, raw byte.  Try to read in as many as
+				// possible in one go.
+				i := bytes.IndexByte(s, '\\')
+				if i == -1 {
+					result = append(result, s...)
+					break
+				}
+				result = append(result, s[:i]...)
+				s = s[i:]
 			}
-
-			// '\\' followed by an octal number
-			if len(s) < 4 {
-				return nil, fmt.Errorf("invalid bytea sequence %v", s)
-			}
-			r, err := strconv.ParseUint(string(s[1:4]), 8, 8)
-			if err != nil {
-				return nil, fmt.Errorf("could not parse bytea value: %w", err)
-			}
-			result = append(result, byte(r))
-			s = s[4:]
-		} else {
-			// We hit an unescaped, raw byte.  Try to read in as many as
-			// possible in one go.
-			i := bytes.IndexByte(s, '\\')
-			if i == -1 {
-				result = append(result, s...)
-				break
-			}
-			result = append(result, s[:i]...)
-			s = s[i:]
 		}
 	}
+
 	return result, nil
 }
 
-func encodeBytea(v []byte) (result []byte) {
-	result = make([]byte, 2+hex.EncodedLen(len(v)))
-	result[0] = '\\'
-	result[1] = 'x'
-	hex.Encode(result[2:], v)
+func encodeBytea(serverVersion int, v []byte) (result []byte) {
+	if serverVersion >= 90000 {
+		// Use the hex format if we know that the server supports it
+		result = make([]byte, 2+hex.EncodedLen(len(v)))
+		result[0] = '\\'
+		result[1] = 'x'
+		hex.Encode(result[2:], v)
+	} else {
+		// .. or resort to "escape"
+		for _, b := range v {
+			if b == '\\' {
+				result = append(result, '\\', '\\')
+			} else if b < 0x20 || b > 0x7e {
+				result = append(result, []byte(fmt.Sprintf("\\%03o", b))...)
+			} else {
+				result = append(result, b)
+			}
+		}
+	}
+
 	return result
+}
+
+// NullTime represents a time.Time that may be null. NullTime implements the
+// sql.Scanner interface so it can be used as a scan destination, similar to
+// sql.NullString.
+type NullTime struct {
+	Time  time.Time
+	Valid bool // Valid is true if Time is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (nt *NullTime) Scan(value interface{}) error {
+	nt.Time, nt.Valid = value.(time.Time)
+	return nil
+}
+
+// Value implements the driver Valuer interface.
+func (nt NullTime) Value() (driver.Value, error) {
+	if !nt.Valid {
+		return nil, nil
+	}
+	return nt.Time, nil
 }

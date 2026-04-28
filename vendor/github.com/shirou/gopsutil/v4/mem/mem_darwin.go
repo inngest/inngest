@@ -85,23 +85,26 @@ func VirtualMemory() (*VirtualMemoryStat, error) {
 }
 
 func VirtualMemoryWithContext(_ context.Context) (*VirtualMemoryStat, error) {
-	sys, err := common.NewSystemLib()
+	machLib, err := common.NewLibrary(common.System)
 	if err != nil {
 		return nil, err
 	}
-	defer sys.Close()
+	defer machLib.Close()
+
+	hostStatistics := common.GetFunc[common.HostStatisticsFunc](machLib, common.HostStatisticsSym)
+	machHostSelf := common.GetFunc[common.MachHostSelfFunc](machLib, common.MachHostSelfSym)
 
 	count := uint32(common.HOST_VM_INFO_COUNT)
 	var vmstat vmStatisticsData
 
-	status := sys.HostStatistics(sys.MachHostSelf(), common.HOST_VM_INFO,
+	status := hostStatistics(machHostSelf(), common.HOST_VM_INFO,
 		uintptr(unsafe.Pointer(&vmstat)), &count)
 
 	if status != common.KERN_SUCCESS {
 		return nil, fmt.Errorf("host_statistics error=%d", status)
 	}
 
-	pageSizeAddr, _ := sys.Dlsym("vm_kernel_page_size")
+	pageSizeAddr, _ := machLib.Dlsym("vm_kernel_page_size")
 	pageSize := **(**uint64)(unsafe.Pointer(&pageSizeAddr))
 	total, err := getHwMemsize()
 	if err != nil {

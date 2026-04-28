@@ -3,8 +3,8 @@
 Long lived objects in memory introduce expensive GC overhead, With FreeCache, you can cache unlimited number of objects in memory 
 without increased latency and degraded throughput. 
 
-[![Build Status](https://github.com/coocood/freecache/workflows/Test/badge.svg)](https://github.com/coocood/freecache/actions/workflows/test.yml)
-[![GoCover](http://github.com/coocood/freecache/wiki/coverage.svg)](https://raw.githack.com/wiki/coocood/freecache/coverage.html)
+[![Build Status](https://travis-ci.org/coocood/freecache.png?branch=master)](https://travis-ci.org/coocood/freecache)
+[![GoCover](http://gocover.io/_badge/github.com/coocood/freecache)](http://gocover.io/github.com/coocood/freecache)
 [![GoDoc](https://godoc.org/github.com/coocood/freecache?status.svg)](https://godoc.org/github.com/coocood/freecache)
 
 ## Features
@@ -56,11 +56,6 @@ fmt.Println("entry count ", cache.EntryCount())
 * Memory is preallocated.
 * If you allocate large amount of memory, you may need to set `debug.SetGCPercent()`
 to a much lower percentage to get a normal GC frequency.
-* If you set a key to be expired in X seconds, e.g. using `cache.Set(key, val, X)`, 
-the effective cache duration will be within this range: `(X-1, X] seconds`.
-This is because that sub-second time at the moment will be ignored when calculating the
-the expiration: for example, if the current time is 8:15::01.800 (800 milliseconds passed
-since 8:15::01), the actual duration will be `X-800ms`.
 
 ## How it is done
 

@@ -43,47 +43,24 @@ func (af *arrayFlags) Set(value string) error {
 	return nil
 }
 
-type generateOptions struct {
-	includeJSON         bool
-	includeYAML         bool
-	includeSQL          bool
-	includeText         bool
-	includeGQLGen       bool
-	transformMethod     string
-	trimPrefix          string
-	addPrefix           string
-	lineComment         bool
-	includeValuesMethod bool
-	includeFlagMethods  bool
-	includePflagMethods bool
-	useTypedErrors      bool
-}
-
 var (
-	typeNames string
-	opts      generateOptions
-	output    string
-	comments  arrayFlags
+	typeNames       = flag.String("type", "", "comma-separated list of type names; must be set")
+	sql             = flag.Bool("sql", false, "if true, the Scanner and Valuer interface will be implemented.")
+	json            = flag.Bool("json", false, "if true, json marshaling methods will be generated. Default: false")
+	yaml            = flag.Bool("yaml", false, "if true, yaml marshaling methods will be generated. Default: false")
+	text            = flag.Bool("text", false, "if true, text marshaling methods will be generated. Default: false")
+	gqlgen          = flag.Bool("gqlgen", false, "if true, GraphQL marshaling methods for gqlgen will be generated. Default: false")
+	altValuesFunc   = flag.Bool("values", false, "if true, alternative string values method will be generated. Default: false")
+	output          = flag.String("output", "", "output file name; default srcdir/<type>_string.go")
+	transformMethod = flag.String("transform", "noop", "enum item name transformation method. Default: noop")
+	trimPrefix      = flag.String("trimprefix", "", "transform each item name by removing a prefix. Default: \"\"")
+	addPrefix       = flag.String("addprefix", "", "transform each item name by adding a prefix. Default: \"\"")
+	linecomment     = flag.Bool("linecomment", false, "use line comment text as printed text when present")
 )
 
+var comments arrayFlags
+
 func init() {
-	flag.StringVar(&typeNames, "type", "", "comma-separated list of type names; must be set")
-
-	flag.BoolVar(&opts.includeSQL, "sql", false, "if true, the Scanner and Valuer interface will be implemented.")
-	flag.BoolVar(&opts.includeJSON, "json", false, "if true, json marshaling methods will be generated. Default: false")
-	flag.BoolVar(&opts.includeYAML, "yaml", false, "if true, yaml marshaling methods will be generated. Default: false")
-	flag.BoolVar(&opts.includeText, "text", false, "if true, text marshaling methods will be generated. Default: false")
-	flag.BoolVar(&opts.includeGQLGen, "gqlgen", false, "if true, GraphQL marshaling methods for gqlgen will be generated. Default: false")
-	flag.BoolVar(&opts.includeValuesMethod, "values", false, "if true, alternative string values method will be generated. Default: false")
-	flag.BoolVar(&opts.includeFlagMethods, "flag.value", false, "if true, ensure that the enumeration type implements stdlib flag.Value interface. Default: false")
-	flag.BoolVar(&opts.includePflagMethods, "pflag.value", false, "if true, ensure that the enumeration type implements pflag.Value interface, see: https://pkg.go.dev/github.com/spf13/pflag#Value  Default: false")
-	flag.StringVar(&output, "output", "", "output file name; default srcdir/<type>_string.go")
-	flag.StringVar(&opts.transformMethod, "transform", "noop", "enum item name transformation method. Default: noop")
-	flag.StringVar(&opts.trimPrefix, "trimprefix", "", "transform each item name by removing a prefix or comma separated list of prefixes. Default: \"\"")
-	flag.StringVar(&opts.addPrefix, "addprefix", "", "transform each item name by adding a prefix. Default: \"\"")
-	flag.BoolVar(&opts.lineComment, "linecomment", false, "use line comment text as printed text when present")
-	flag.BoolVar(&opts.useTypedErrors, "typederrors", false, "if true, use typed errors for enum string conversion methods. Default: false")
-
 	flag.Var(&comments, "comment", "comments to include in generated code, can repeat. Default: \"\"")
 }
 
@@ -104,11 +81,11 @@ func main() {
 	log.SetPrefix("enumer: ")
 	flag.Usage = Usage
 	flag.Parse()
-	if len(typeNames) == 0 {
+	if len(*typeNames) == 0 {
 		flag.Usage()
 		os.Exit(2)
 	}
-	typs := strings.Split(typeNames, ",")
+	typs := strings.Split(*typeNames, ",")
 
 	// We accept either one directory or a list of files. Which do we have?
 	args := flag.Args()
@@ -142,19 +119,15 @@ func main() {
 	g.Printf("package %s", g.pkg.name)
 	g.Printf("\n")
 	g.Printf("import (\n")
-	if opts.useTypedErrors {
-		g.Printf("\t\"errors\"\n")
-		g.Printf("\t\"github.com/dmarkham/enumer/enumerrs\"\n")
-	}
 	g.Printf("\t\"fmt\"\n")
 	g.Printf("\t\"strings\"\n")
-	if opts.includeSQL {
+	if *sql {
 		g.Printf("\t\"database/sql/driver\"\n")
 	}
-	if opts.includeJSON {
+	if *json {
 		g.Printf("\t\"encoding/json\"\n")
 	}
-	if opts.includeGQLGen {
+	if *gqlgen {
 		g.Printf("\t\"io\"\n")
 		g.Printf("\t\"strconv\"\n")
 	}
@@ -162,14 +135,14 @@ func main() {
 
 	// Run generate for each type.
 	for _, typeName := range typs {
-		g.generate(typeName, opts)
+		g.generate(typeName, *json, *yaml, *sql, *text, *gqlgen, *transformMethod, *trimPrefix, *addPrefix, *linecomment, *altValuesFunc)
 	}
 
 	// Format the output.
 	src := g.format()
 
 	// Figure out filename to write to
-	outputName := output
+	outputName := *output
 	if outputName == "" {
 		baseName := fmt.Sprintf("%s_enumer.go", typs[0])
 		outputName = filepath.Join(dir, strings.ToLower(baseName))
@@ -440,10 +413,12 @@ func (g *Generator) prefixValueNames(values []Value, prefix string) {
 }
 
 // generate produces the String method for the named type.
-func (g *Generator) generate(typeName string, opts generateOptions) {
+func (g *Generator) generate(typeName string,
+	includeJSON, includeYAML, includeSQL, includeText, includeGQLGen bool,
+	transformMethod string, trimPrefix string, addPrefix string, lineComment bool, includeValuesMethod bool) {
 	values := make([]Value, 0, 100)
 	for _, file := range g.pkg.files {
-		file.lineComment = opts.lineComment
+		file.lineComment = lineComment
 		// Set the state for this run of the walker.
 		file.typeName = typeName
 		file.values = nil
@@ -457,13 +432,13 @@ func (g *Generator) generate(typeName string, opts generateOptions) {
 		log.Fatalf("no values defined for type %s", typeName)
 	}
 
-	for _, prefix := range strings.Split(opts.trimPrefix, ",") {
+	for _, prefix := range strings.Split(trimPrefix, ",") {
 		g.trimValueNames(values, prefix)
 	}
 
-	g.transformValueNames(values, opts.transformMethod)
+	g.transformValueNames(values, transformMethod)
 
-	g.prefixValueNames(values, opts.addPrefix)
+	g.prefixValueNames(values, addPrefix)
 
 	runs := splitIntoRuns(values)
 	// The decision of which pattern to use depends on the number of
@@ -487,32 +462,27 @@ func (g *Generator) generate(typeName string, opts generateOptions) {
 	default:
 		g.buildMap(runs, typeName)
 	}
-	if opts.includeValuesMethod {
+	if includeValuesMethod {
 		g.buildAltStringValuesMethod(typeName)
 	}
 
 	g.buildNoOpOrderChangeDetect(runs, typeName)
 
-	g.buildBasicExtras(runs, typeName, runsThreshold, opts.useTypedErrors)
-	if opts.includeJSON {
-		g.buildJSONMethods(runs, typeName, runsThreshold, opts.useTypedErrors)
+	g.buildBasicExtras(runs, typeName, runsThreshold)
+	if includeJSON {
+		g.buildJSONMethods(runs, typeName, runsThreshold)
 	}
-	if opts.includeText {
-		g.buildTextMethods(runs, typeName, runsThreshold, opts.useTypedErrors)
+	if includeText {
+		g.buildTextMethods(runs, typeName, runsThreshold)
 	}
-	if opts.includeYAML {
-		g.buildYAMLMethods(runs, typeName, runsThreshold, opts.useTypedErrors)
+	if includeYAML {
+		g.buildYAMLMethods(runs, typeName, runsThreshold)
 	}
-	if opts.includeSQL {
+	if includeSQL {
 		g.addValueAndScanMethod(typeName)
 	}
-	if opts.includeGQLGen {
+	if includeGQLGen {
 		g.buildGQLGenMethods(runs, typeName)
-	}
-	if opts.includePflagMethods {
-		g.buildPflagMethods(runs, typeName, runsThreshold)
-	} else if opts.includeFlagMethods {
-		g.buildFlagMethods(runs, typeName, runsThreshold)
 	}
 }
 
@@ -804,9 +774,9 @@ func (g *Generator) buildOneRun(runs [][]Value, typeName string) {
 }
 
 // Arguments to format are:
-// [1]: type name
-// [2]: size of index element (8 for uint8 etc.)
-// [3]: less than zero check (for signed types)
+// 	[1]: type name
+// 	[2]: size of index element (8 for uint8 etc.)
+// 	[3]: less than zero check (for signed types)
 const stringOneRun = `func (i %[1]s) String() string {
 	if %[3]si >= %[1]s(len(_%[1]sIndex)-1) {
 		return fmt.Sprintf("%[1]s(%%d)", i)
@@ -816,10 +786,10 @@ const stringOneRun = `func (i %[1]s) String() string {
 `
 
 // Arguments to format are:
-// [1]: type name
-// [2]: lowest defined value for type, as a string
-// [3]: size of index element (8 for uint8 etc.)
-// [4]: less than zero check (for signed types)
+// 	[1]: type name
+// 	[2]: lowest defined value for type, as a string
+// 	[3]: size of index element (8 for uint8 etc.)
+// 	[4]: less than zero check (for signed types)
 const stringOneRunWithOffset = `func (i %[1]s) String() string {
 	i -= %[2]s
 	if %[4]si >= %[1]s(len(_%[1]sIndex)-1) {

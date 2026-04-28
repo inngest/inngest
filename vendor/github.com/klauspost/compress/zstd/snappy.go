@@ -257,7 +257,7 @@ func (r *SnappyConverter) Convert(in io.Reader, w io.Writer) (int64, error) {
 			if !r.readFull(r.buf[:len(snappyMagicBody)], false) {
 				return written, r.err
 			}
-			for i := range len(snappyMagicBody) {
+			for i := 0; i < len(snappyMagicBody); i++ {
 				if r.buf[i] != snappyMagicBody[i] {
 					println("r.buf[i] != snappyMagicBody[i]", r.buf[i], snappyMagicBody[i], i)
 					r.err = ErrSnappyCorrupt

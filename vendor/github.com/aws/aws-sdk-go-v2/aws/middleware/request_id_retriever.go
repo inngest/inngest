@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/aws/smithy-go/middleware"
-	"github.com/aws/smithy-go/tracing"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
@@ -46,9 +45,6 @@ func (m *RequestIDRetriever) HandleDeserialize(ctx context.Context, in middlewar
 		if v := resp.Header.Get(h); len(v) != 0 {
 			// set reqID on metadata for successful responses.
 			SetRequestIDMetadata(&metadata, v)
-
-			span, _ := tracing.GetSpan(ctx)
-			span.SetProperty("aws.request_id", v)
 			break
 		}
 	}

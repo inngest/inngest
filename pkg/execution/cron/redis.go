@@ -273,6 +273,7 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 
 // ScheduleNext schedules the next "cron" job w.r.t the CronItem provided.
 // While CronItem.ID and CronItem.JobID encode the _actual_ timestamp of the next schedule, the CronItem is scheduled for a few milliseconds (jitterOpts) before the schedule to allow for some processing time to create the function run.
+// User-visible jitter is not applied here — it is computed in handleCron() from the live function config.
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
 	kind := queue.KindCron
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op)
