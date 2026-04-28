@@ -42,19 +42,6 @@ export function TableRow({ node }: TableRowProps): React.ReactElement {
         <span className={'text-subtle overflow-hidden text-ellipsis whitespace-nowrap text-sm'}>
           {node.name}
         </span>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger>
-              <RiInformationLine
-                className={
-                  'hover:bg-canvasBase min-w-sm rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100'
-                }
-                size={16}
-              />
-            </TooltipTrigger>
-            <TooltipContent>Query {node.name} table</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
         <div className="ml-auto flex items-baseline gap-1.5">
           <span className="text-muted min-w-0 whitespace-nowrap font-mono text-xs capitalize">
             {typeText}
