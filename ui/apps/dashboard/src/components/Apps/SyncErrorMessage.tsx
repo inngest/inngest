@@ -1,5 +1,7 @@
 import type { MouseEventHandler } from 'react';
 
+import { isSafeCTAURL } from '@/components/ActiveBanners/safeUrl';
+
 const advisoryMarker = 'See more information:';
 
 export function parseSyncErrorMessage(error: string) {
@@ -11,7 +13,7 @@ export function parseSyncErrorMessage(error: string) {
   const advisoryURL = error.slice(markerIndex + advisoryMarker.length).trim();
   return {
     message: error.slice(0, markerIndex).trim(),
-    advisoryURL: advisoryURL || null,
+    advisoryURL: advisoryURL && isSafeCTAURL(advisoryURL) ? advisoryURL : null,
   };
 }
 
