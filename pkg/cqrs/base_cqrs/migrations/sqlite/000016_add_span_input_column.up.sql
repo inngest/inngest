@@ -1,1 +1,0 @@
-ALTER TABLE spans ADD COLUMN input JSON;

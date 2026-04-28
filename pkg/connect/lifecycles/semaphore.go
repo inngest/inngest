@@ -3,21 +3,39 @@ package lifecycles
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 )
 
 type semaphoreLifecycles struct {
 	sm constraintapi.SemaphoreManager
+
+	// rolloutDate allows us to only adjust semaphore capacity after a specific time.
+	rolloutDate time.Time
 }
 
-func NewSemaphoreLifecycleListener(sm constraintapi.SemaphoreManager) connect.ConnectGatewayLifecycleListener {
-	return &semaphoreLifecycles{sm: sm}
+func NewSemaphoreLifecycleListener(sm constraintapi.SemaphoreManager, rolloutDate time.Time) connect.ConnectGatewayLifecycleListener {
+	return &semaphoreLifecycles{sm: sm, rolloutDate: rolloutDate}
+}
+
+func (s *semaphoreLifecycles) enabled(ctx context.Context, conn *state.Connection) bool {
+	if conn.Data == nil {
+		return false
+	}
+
+	ct := ulid.Time(conn.ConnectionId.Time())
+	if !s.rolloutDate.IsZero() && ct.Before(s.rolloutDate) {
+		return false
+	}
+
+	return true
 }
 
 func (s *semaphoreLifecycles) OnConnected(ctx context.Context, conn *state.Connection)          {}
@@ -29,7 +47,7 @@ func (s *semaphoreLifecycles) OnStartDisconnecting(ctx context.Context, conn *st
 // OnSynced is called after a worker group has been synced. At this point, AppID is available.
 // We adjust the app semaphore capacity by the worker's max concurrency.
 func (s *semaphoreLifecycles) OnSynced(ctx context.Context, conn *state.Connection) {
-	if conn.Data == nil {
+	if !s.enabled(ctx, conn) {
 		return
 	}
 
@@ -65,7 +83,7 @@ func (s *semaphoreLifecycles) OnSynced(ctx context.Context, conn *state.Connecti
 
 // OnDisconnected is called when a connection is lost. Decrement the app semaphore capacity.
 func (s *semaphoreLifecycles) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
-	if conn.Data == nil {
+	if !s.enabled(ctx, conn) {
 		return
 	}
 

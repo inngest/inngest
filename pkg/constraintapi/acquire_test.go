@@ -80,6 +80,53 @@ func makeAcquireRequest(accountID, envID, fnID uuid.UUID, clock clockwork.Clock,
 	}
 }
 
+func TestBuildConstraintUsage(t *testing.T) {
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeAccount,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeFn,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+	}
+
+	t.Run("maps usage entries when lengths match", func(t *testing.T) {
+		parsedUsage := []constraintUsageResponse{
+			{Limit: 10, Usage: 4},
+			{Limit: 5, Usage: 1},
+		}
+
+		got, err := buildConstraintUsage(parsedUsage, constraints)
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		require.Equal(t, constraints[0], got[0].Constraint)
+		require.Equal(t, 10, got[0].Limit)
+		require.Equal(t, 4, got[0].Used)
+		require.Equal(t, constraints[1], got[1].Constraint)
+		require.Equal(t, 5, got[1].Limit)
+		require.Equal(t, 1, got[1].Used)
+	})
+
+	t.Run("returns error on length mismatch", func(t *testing.T) {
+		parsedUsage := []constraintUsageResponse{
+			{Limit: 10, Usage: 4},
+			{Limit: 5, Usage: 1},
+			{Limit: 2, Usage: 2},
+		}
+
+		_, err := buildConstraintUsage(parsedUsage, constraints)
+		require.ErrorContains(t, err, "expected 2 constraint usage entries, got 3")
+	})
+}
+
 func TestAcquireCachePreExistingKey(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 	cm, r, clock, ctx := newTestSetup(t, enableAllCache())

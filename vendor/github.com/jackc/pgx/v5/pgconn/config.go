@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"net"
 	"net/url"
@@ -23,9 +24,11 @@ import (
 	"github.com/jackc/pgx/v5/pgproto3"
 )
 
-type AfterConnectFunc func(ctx context.Context, pgconn *PgConn) error
-type ValidateConnectFunc func(ctx context.Context, pgconn *PgConn) error
-type GetSSLPasswordFunc func(ctx context.Context) string
+type (
+	AfterConnectFunc    func(ctx context.Context, pgconn *PgConn) error
+	ValidateConnectFunc func(ctx context.Context, pgconn *PgConn) error
+	GetSSLPasswordFunc  func(ctx context.Context) string
+)
 
 // Config is the settings used to establish a connection to a PostgreSQL server. It must be created by [ParseConfig]. A
 // manually initialized Config will cause ConnectConfig to panic.
@@ -53,6 +56,13 @@ type Config struct {
 
 	SSLNegotiation string // sslnegotiation=postgres or sslnegotiation=direct
 
+	// AfterNetConnect is called after the network connection, including TLS if applicable, is established but before any
+	// PostgreSQL protocol communication. It takes the established net.Conn and returns a net.Conn that will be used in
+	// its place. It can be used to wrap the net.Conn (e.g. for logging, diagnostics, or testing). Its functionality has
+	// some overlap with DialFunc. However, DialFunc takes place before TLS is established and cannot be used to control
+	// the final net.Conn used for PostgreSQL protocol communication while AfterNetConnect can.
+	AfterNetConnect func(ctx context.Context, config *Config, conn net.Conn) (net.Conn, error)
+
 	// ValidateConnect is called during a connection attempt after a successful authentication with the PostgreSQL server.
 	// It can be used to validate that the server is acceptable. If this returns an error the connection is closed and the next
 	// fallback config is tried. This allows implementing high availability behavior such as libpq does with target_session_attrs.
@@ -72,6 +82,23 @@ type Config struct {
 	// the connection on any FATAL errors. If you override this handler you should call the previously set handler or ensure
 	// that you close on FATAL errors by returning false.
 	OnPgError PgErrorHandler
+
+	// OAuthTokenProvider is a function that returns an OAuth token for authentication. If set, it will be used for
+	// OAUTHBEARER SASL authentication when the server requests it.
+	OAuthTokenProvider func(context.Context) (string, error)
+
+	// MinProtocolVersion is the minimum acceptable PostgreSQL protocol version.
+	// If the server does not support at least this version, the connection will fail.
+	// Valid values: "3.0", "3.2", "latest". Defaults to "3.0".
+	MinProtocolVersion string
+
+	// MaxProtocolVersion is the maximum PostgreSQL protocol version to request from the server.
+	// Valid values: "3.0", "3.2", "latest". Defaults to "3.0" for compatibility.
+	MaxProtocolVersion string
+
+	// ChannelBinding is the channel_binding parameter for SCRAM-SHA-256-PLUS authentication.
+	// Valid values: "disable", "prefer", "require". Defaults to "prefer".
+	ChannelBinding string
 
 	createdByParseConfig bool // Used to enforce created by ParseConfig rule.
 }
@@ -94,9 +121,7 @@ func (c *Config) Copy() *Config {
 	}
 	if newConf.RuntimeParams != nil {
 		newConf.RuntimeParams = make(map[string]string, len(c.RuntimeParams))
-		for k, v := range c.RuntimeParams {
-			newConf.RuntimeParams[k] = v
-		}
+		maps.Copy(newConf.RuntimeParams, c.RuntimeParams)
 	}
 	if newConf.Fallbacks != nil {
 		newConf.Fallbacks = make([]*FallbackConfig, len(c.Fallbacks))
@@ -179,7 +204,7 @@ func NetworkAddress(host string, port uint16) (network, address string) {
 //
 // ParseConfig supports specifying multiple hosts in similar manner to libpq. Host and port may include comma separated
 // values that will be tried in order. This can be used as part of a high availability system. See
-// https://www.postgresql.org/docs/11/libpq-connect.html#LIBPQ-MULTIPLE-HOSTS for more information.
+// https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-MULTIPLE-HOSTS for more information.
 //
 //	# Example URL
 //	postgres://jack:secret@foo.example.com:5432,bar.example.com:5432/mydb
@@ -205,10 +230,12 @@ func NetworkAddress(host string, port uint16) (network, address string) {
 //	PGCONNECT_TIMEOUT
 //	PGTARGETSESSIONATTRS
 //	PGTZ
+//	PGMINPROTOCOLVERSION
+//	PGMAXPROTOCOLVERSION
 //
-// See http://www.postgresql.org/docs/11/static/libpq-envars.html for details on the meaning of environment variables.
+// See http://www.postgresql.org/docs/current/static/libpq-envars.html for details on the meaning of environment variables.
 //
-// See https://www.postgresql.org/docs/11/libpq-connect.html#LIBPQ-PARAMKEYWORDS for parameter key word names. They are
+// See https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS for parameter key word names. They are
 // usually but not always the environment variable name downcased and without the "PG" prefix.
 //
 // Important Security Notes:
@@ -216,7 +243,7 @@ func NetworkAddress(host string, port uint16) (network, address string) {
 // ParseConfig tries to match libpq behavior with regard to PGSSLMODE. This includes defaulting to "prefer" behavior if
 // not set.
 //
-// See http://www.postgresql.org/docs/11/static/libpq-ssl.html#LIBPQ-SSL-PROTECTION for details on what level of
+// See http://www.postgresql.org/docs/current/static/libpq-ssl.html#LIBPQ-SSL-PROTECTION for details on what level of
 // security each sslmode provides.
 //
 // The sslmode "prefer" (the default), sslmode "allow", and multiple hosts are implemented via the Fallbacks field of
@@ -330,6 +357,9 @@ func ParseConfigWithOptions(connString string, options ParseConfigOptions) (*Con
 		"target_session_attrs": {},
 		"service":              {},
 		"servicefile":          {},
+		"min_protocol_version": {},
+		"max_protocol_version": {},
+		"channel_binding":      {},
 	}
 
 	// Adding kerberos configuration
@@ -422,6 +452,38 @@ func ParseConfigWithOptions(connString string, options ParseConfigOptions) (*Con
 		return nil, &ParseConfigError{ConnString: connString, msg: fmt.Sprintf("unknown target_session_attrs value: %v", tsa)}
 	}
 
+	minProto, err := parseProtocolVersion(settings["min_protocol_version"])
+	if err != nil {
+		return nil, &ParseConfigError{ConnString: connString, msg: "invalid min_protocol_version", err: err}
+	}
+	maxProto, err := parseProtocolVersion(settings["max_protocol_version"])
+	if err != nil {
+		return nil, &ParseConfigError{ConnString: connString, msg: "invalid max_protocol_version", err: err}
+	}
+	if minProto > maxProto {
+		return nil, &ParseConfigError{ConnString: connString, msg: "min_protocol_version cannot be greater than max_protocol_version"}
+	}
+
+	config.MinProtocolVersion = settings["min_protocol_version"]
+	config.MaxProtocolVersion = settings["max_protocol_version"]
+	if config.MinProtocolVersion == "" {
+		config.MinProtocolVersion = "3.0"
+	}
+	if config.MaxProtocolVersion == "" {
+		config.MaxProtocolVersion = "3.0"
+	}
+
+	switch channelBinding := settings["channel_binding"]; channelBinding {
+	case "", "prefer":
+		config.ChannelBinding = "prefer"
+	case "disable":
+		config.ChannelBinding = "disable"
+	case "require":
+		config.ChannelBinding = "require"
+	default:
+		return nil, &ParseConfigError{ConnString: connString, msg: fmt.Sprintf("unknown channel_binding value: %v", channelBinding)}
+	}
+
 	return config, nil
 }
 
@@ -429,9 +491,7 @@ func mergeSettings(settingSets ...map[string]string) map[string]string {
 	settings := make(map[string]string)
 
 	for _, s2 := range settingSets {
-		for k, v := range s2 {
-			settings[k] = v
-		}
+		maps.Copy(settings, s2)
 	}
 
 	return settings
@@ -461,6 +521,8 @@ func parseEnvSettings() map[string]string {
 		"PGSERVICEFILE":        "servicefile",
 		"PGTZ":                 "timezone",
 		"PGOPTIONS":            "options",
+		"PGMINPROTOCOLVERSION": "min_protocol_version",
+		"PGMAXPROTOCOLVERSION": "max_protocol_version",
 	}
 
 	for envname, realname := range nameMap {
@@ -485,7 +547,9 @@ func parseURLSettings(connString string) (map[string]string, error) {
 	}
 
 	if parsedURL.User != nil {
-		settings["user"] = parsedURL.User.Username()
+		if u := parsedURL.User.Username(); u != "" {
+			settings["user"] = u
+		}
 		if password, present := parsedURL.User.Password(); present {
 			settings["password"] = password
 		}
@@ -494,7 +558,7 @@ func parseURLSettings(connString string) (map[string]string, error) {
 	// Handle multiple host:port's in url.Host by splitting them into host,host,host and port,port,port.
 	var hosts []string
 	var ports []string
-	for _, host := range strings.Split(parsedURL.Host, ",") {
+	for host := range strings.SplitSeq(parsedURL.Host, ",") {
 		if host == "" {
 			continue
 		}
@@ -612,6 +676,9 @@ func parseKeywordValueSettings(s string) (map[string]string, error) {
 			return nil, errors.New("invalid keyword/value")
 		}
 
+		if key == "user" && val == "" {
+			continue
+		}
 		settings[key] = val
 	}
 
@@ -713,7 +780,7 @@ func configTLS(settings map[string]string, thisHost string, parseConfigOptions P
 		// According to PostgreSQL documentation, if a root CA file exists,
 		// the behavior of sslmode=require should be the same as that of verify-ca
 		//
-		// See https://www.postgresql.org/docs/12/libpq-ssl.html
+		// See https://www.postgresql.org/docs/current/libpq-ssl.html
 		if sslrootcert != "" {
 			goto nextCase
 		}
@@ -782,10 +849,10 @@ func configTLS(settings map[string]string, thisHost string, parseConfigOptions P
 			// Attempt decryption with pass phrase
 			// NOTE: only supports RSA (PKCS#1)
 			if sslpassword != "" {
-				decryptedKey, decryptedError = x509.DecryptPEMBlock(block, []byte(sslpassword))
+				decryptedKey, decryptedError = x509.DecryptPEMBlock(block, []byte(sslpassword)) //nolint:ineffassign
 			}
-			//if sslpassword not provided or has decryption error when use it
-			//try to find sslpassword with callback function
+			// if sslpassword not provided or has decryption error when use it
+			// try to find sslpassword with callback function
 			if sslpassword == "" || decryptedError != nil {
 				if parseConfigOptions.GetSSLPassword != nil {
 					sslpassword = parseConfigOptions.GetSSLPassword(context.Background())
@@ -797,7 +864,7 @@ func configTLS(settings map[string]string, thisHost string, parseConfigOptions P
 			decryptedKey, decryptedError = x509.DecryptPEMBlock(block, []byte(sslpassword))
 			// Should we also provide warning for PKCS#1 needed?
 			if decryptedError != nil {
-				return nil, fmt.Errorf("unable to decrypt key: %w", err)
+				return nil, fmt.Errorf("unable to decrypt key: %w", decryptedError)
 			}
 
 			pemBytes := pem.Block{
@@ -948,4 +1015,15 @@ func ValidateConnectTargetSessionAttrsPreferStandby(ctx context.Context, pgConn 
 	}
 
 	return nil
+}
+
+func parseProtocolVersion(s string) (uint32, error) {
+	switch s {
+	case "", "3.0":
+		return pgproto3.ProtocolVersion30, nil
+	case "3.2", "latest":
+		return pgproto3.ProtocolVersion32, nil
+	default:
+		return 0, fmt.Errorf("invalid protocol version: %q", s)
+	}
 }

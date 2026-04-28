@@ -567,6 +567,7 @@ function InsightsTabManagerInternal({
     if (isInsightsAgentEnabled) {
       items.push({
         title: INSIGHTS_AI,
+        label: 'INSIGHTS AI',
         icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} />,
         action: () => handleSelectHelper(INSIGHTS_AI),
       });
@@ -583,6 +584,7 @@ function InsightsTabManagerInternal({
     if (isSchemaWidgetEnabled) {
       items.push({
         title: SCHEMA_EXPLORER,
+        label: 'SCHEMA EXPLORER',
         icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
         action: () => handleSelectHelper(SCHEMA_EXPLORER),
       });

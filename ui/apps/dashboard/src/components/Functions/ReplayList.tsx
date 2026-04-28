@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import {
   NumberCell,
@@ -10,11 +11,12 @@ import {
 import { IconReplay } from '@inngest/components/icons/Replay';
 import { ReplayStatus, type Replay } from '@inngest/components/types/replay';
 import { formatMilliseconds } from '@inngest/components/utils/date';
-import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { RiExternalLinkLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetReplays } from '@/components/Replay/useGetReplay';
+import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { pathCreator } from '@/utils/urls';
 import { useNavigate } from '@tanstack/react-router';
 
@@ -95,11 +97,13 @@ const columns = [
 
 type Props = {
   functionSlug: string;
+  disableNewReplay?: boolean;
 };
 
-export function ReplayList({ functionSlug }: Props) {
+export function ReplayList({ functionSlug, disableNewReplay = false }: Props) {
   const environment = useEnvironment();
   const navigate = useNavigate();
+  const [replayOpen, setReplayOpen] = useState(false);
 
   const { isLoading, error, data: replays } = useGetReplays(functionSlug);
 
@@ -108,50 +112,53 @@ export function ReplayList({ functionSlug }: Props) {
   }
 
   return (
-    <Table
-      data={replays}
-      columns={columns}
-      isLoading={isLoading}
-      onRowClick={(row) =>
-        navigate({
-          to: pathCreator.functionReplay({
-            envSlug: environment.slug,
-            functionSlug,
-            replayID: row.original.id,
-          }),
-        })
-      }
-      blankState={
-        <TableBlankState
-          title="No replays found"
-          icon={<IconReplay />}
-          actions={
-            <>
-              <Button
-                appearance="outlined"
-                label="Refresh"
-                onClick={() =>
-                  navigate({
-                    to: pathCreator.functionReplays({
-                      envSlug: environment.slug,
-                      functionSlug,
-                    }),
-                  })
-                }
-                icon={<RiRefreshLine />}
-                iconSide="left"
-              />
-              <Button
-                label="Go to docs"
-                href="https://inngest.com/docs/platform/replay"
-                target="_blank"
-                icon={<RiExternalLinkLine />}
-                iconSide="left"
-              />
-            </>
-          }
+    <>
+      <Table
+        data={replays}
+        columns={columns}
+        isLoading={isLoading}
+        onRowClick={(row) =>
+          navigate({
+            to: pathCreator.functionReplay({
+              envSlug: environment.slug,
+              functionSlug,
+              replayID: row.original.id,
+            }),
+          })
+        }
+        blankState={
+          <TableBlankState
+            title="No replays found"
+            icon={<IconReplay />}
+            actions={
+              <>
+                <Button
+                  label="New replay"
+                  onClick={() => setReplayOpen(true)}
+                  disabled={disableNewReplay}
+                  icon={<IconReplay />}
+                  iconSide="left"
+                />
+                <Button
+                  appearance="outlined"
+                  label="Go to docs"
+                  href="https://inngest.com/docs/platform/replay"
+                  target="_blank"
+                  icon={<RiExternalLinkLine />}
+                  iconSide="left"
+                />
+              </>
+            }
+          />
+        }
+      />
+      {replayOpen && (
+        <NewReplayModal
+          isOpen={replayOpen}
+          functionSlug={functionSlug}
+          onClose={() => setReplayOpen(false)}
         />
-      }
-    />
+      )}
+    </>
   );
 }

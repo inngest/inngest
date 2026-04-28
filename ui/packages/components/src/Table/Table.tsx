@@ -33,6 +33,7 @@ type BaseTableProps<T> = {
   blankState?: React.ReactNode;
   cellClassName?: string;
   enableColumnSizing?: boolean;
+  enableColumnDynamicSizing?: boolean;
   selectedCell?: { rowIndex: number; columnId: string } | null;
   noHeader?: boolean;
 };
@@ -57,6 +58,7 @@ export function Table<T>({
   cellClassName,
   selectedCell,
   enableColumnSizing = false,
+  enableColumnDynamicSizing = false,
   noHeader = false,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
@@ -135,6 +137,14 @@ export function Table<T>({
                               width: header.getSize(),
                               minWidth: header.getSize(),
                               maxWidth: header.getSize(),
+                            }
+                          : enableColumnDynamicSizing
+                          ? {
+                              minWidth: header.column.columnDef.minSize,
+                              maxWidth:
+                                table.getTotalSize() -
+                                header.column.getStart() -
+                                header.column.getAfter(),
                             }
                           : undefined
                       }
@@ -236,6 +246,14 @@ export function Table<T>({
                                 width: cell.column.getSize(),
                                 minWidth: cell.column.getSize(),
                                 maxWidth: cell.column.getSize(),
+                              }
+                            : enableColumnDynamicSizing
+                            ? {
+                                minWidth: cell.column.columnDef.minSize,
+                                maxWidth:
+                                  table.getTotalSize() -
+                                  cell.column.getStart() -
+                                  cell.column.getAfter(),
                               }
                             : undefined
                         }

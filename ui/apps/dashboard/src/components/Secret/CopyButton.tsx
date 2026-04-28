@@ -25,7 +25,7 @@ export function CopyButton({ value }: Props) {
       <TooltipTrigger asChild>
         <button
           aria-label={label}
-          className="bg-canvasBase flex items-center justify-center px-2"
+          className="flex items-center justify-center px-2"
           onClick={() => handleCopyClick(value)}
         >
           <Icon className="h-6" />

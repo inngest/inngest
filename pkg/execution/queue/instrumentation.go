@@ -60,7 +60,9 @@ func (q *queueProcessor) runInstrumentation(ctx context.Context) {
 			leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "instrument", ConfigLeaseMax, q.instrumentationLease())
 
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("error claiming instrumentation lease", "error", err)
+				if err != ErrConfigAlreadyLeased {
+					logger.StdlibLogger(ctx).Error("error claiming instrumentation lease", "error", err)
+				}
 				setLease(nil)
 				continue
 			}
