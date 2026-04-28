@@ -13,6 +13,7 @@ import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from './types';
 import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
 import { getNextStepName } from './utils';
 
 const tabs = [
@@ -42,6 +43,8 @@ export default function CreateApp() {
     tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const navigate = useNavigate();
   const { isRunning: devServerIsRunning } = useDevServer(2500);
+  const tracking = useOnboardingTracking();
+
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
@@ -105,6 +108,11 @@ export default function CreateApp() {
               href="http://localhost:8288"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                tracking?.trackOnboardingAction(currentStepName, {
+                  metadata: { type: 'btn-click', label: 'open-dev-server' },
+                })
+              }
             />
           ) : (
             <div className="text-link flex items-center gap-1.5 text-sm">
@@ -119,7 +127,14 @@ export default function CreateApp() {
           label="Next"
           disabled={!devServerIsRunning}
           onClick={() => {
-            updateCompletedSteps(currentStepName);
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'next' },
+            });
             navigate({
               to: pathCreator.onboardingSteps({ step: nextStepName }),
             });
@@ -129,7 +144,14 @@ export default function CreateApp() {
           appearance="outlined"
           label="I already have an Inngest app"
           onClick={() => {
-            updateCompletedSteps(currentStepName);
+            updateCompletedSteps(currentStepName, {
+              metadata: {
+                completionSource: 'manual',
+              },
+            });
+            tracking?.trackOnboardingAction(currentStepName, {
+              metadata: { type: 'btn-click', label: 'skip' },
+            });
             navigate({
               to: pathCreator.onboardingSteps({ step: nextStepName }),
             });

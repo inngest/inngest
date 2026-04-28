@@ -23,6 +23,14 @@ import { TooltipProvider } from '@inngest/components/Tooltip';
 import { QueryClient } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 
+//
+// don't load locally, causes issues with adblockers
+const PageViewTracker = React.lazy(() =>
+  import.meta.env.PROD
+    ? import('@/components/Analytics/PageViewTracker')
+    : Promise.resolve({ default: () => null }),
+);
+
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
 }>()({
@@ -92,6 +100,9 @@ function RootComponent() {
               <Toaster />
               <SegmentAnalytics />
               <CustomerIOAnalytics />
+              <React.Suspense>
+                <PageViewTracker />
+              </React.Suspense>
             </ClientFeatureFlagProvider>
           </URQLProviderWrapper>
         </InngestClerkProvider>

@@ -16,6 +16,7 @@ import { pathCreator } from '@/utils/urls';
 import { onboardingWidgetContent } from '../Onboarding/content';
 import { OnboardingSteps, steps } from '../Onboarding/types';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
 import { Link, useNavigate, type FileRouteTypes } from '@tanstack/react-router';
 
 export default function OnboardingWidget({
@@ -28,6 +29,8 @@ export default function OnboardingWidget({
   const navigate = useNavigate();
   const { lastCompletedStep, nextStep, totalStepsCompleted } =
     useOnboardingStep();
+  const tracking = useOnboardingTracking();
+
   const stepContent = lastCompletedStep?.isFinalStep
     ? onboardingWidgetContent.step.success
     : onboardingWidgetContent.step[nextStep?.name || OnboardingSteps.CreateApp];
@@ -80,6 +83,13 @@ export default function OnboardingWidget({
                       className="hover:bg-canvasBase"
                       onClick={(e) => {
                         e.preventDefault();
+                        tracking?.trackOnboardingAction(undefined, {
+                          metadata: {
+                            type: 'btn-click',
+                            label: 'close-widget',
+                            totalStepsCompleted: totalStepsCompleted,
+                          },
+                        });
                         closeWidget();
                       }}
                     />

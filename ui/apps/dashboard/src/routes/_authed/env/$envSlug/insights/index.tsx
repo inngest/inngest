@@ -2,7 +2,7 @@ import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { useQuery } from 'urql';
 
 import { createFileRoute } from '@tanstack/react-router';
-import { useRef, useState, type JSX } from 'react';
+import { useRef, useState } from 'react';
 import {
   useInsightsTabManager,
   type TabManagerActions,
