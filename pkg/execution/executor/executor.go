@@ -3193,7 +3193,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 				StartedAt:      i.md.Config.StartedAt,
 			}
 		}
-		if len(resp.Generator) > 1 {
+		if nonLazyOpCount(resp.Generator) > 1 {
 			if !i.md.Config.ForceStepPlan {
 				// With parallelism, we currently instruct the SDK to disable immediate execution,
 				// enforcing that every step becomes pre-planned.
@@ -3252,7 +3252,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// When this happens, we ALWAYS need to create a trace for each step.
 	//
 	// We pass this down in context, unfortunately.
-	if len(resp.Generator) > 1 {
+	if nonLazyOpCount(resp.Generator) > 1 {
 		for _, op := range resp.Generator {
 			if op.Op == enums.OpcodeStepRun {
 				ctx = setEmitCheckpointTraces(ctx)

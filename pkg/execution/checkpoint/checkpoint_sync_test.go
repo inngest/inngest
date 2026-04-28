@@ -682,16 +682,21 @@ func TestCheckpointSyncSteps_DeferAdd(t *testing.T) {
 // TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep asserts that when
 // the same batch also contains a RunComplete, SaveStep is elided (we're about
 // to delete state via Finalize anyway). SaveDefer still runs so Finalize's
-// LoadDefers can read the record before deletion.
+// LoadDefers can read the record before deletion. ForceStepPlan must NOT
+// trigger because [DeferAdd, RunComplete] has only one non-lazy op — DeferAdd
+// is a lazy op piggybacked onto RunComplete.
 func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
 	ops := []state.GeneratorOpcode{
 		{
-			ID:   "step-defer",
-			Op:   enums.OpcodeDeferAdd,
-			Opts: map[string]any{"fn_slug": "onDefer-score"},
+			ID: "step-defer",
+			Op: enums.OpcodeDeferAdd,
+			Opts: map[string]any{
+				"fn_slug": "onDefer-score",
+				"input":   map[string]any{},
+			},
 		},
 		{
 			ID:   "run-complete",
@@ -701,11 +706,6 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 	}
 
 	mocks, testData := setupSyncCheckpointTest(t, ops...)
-
-	// >1 op in sync batch triggers ForceStepPlan.
-	mocks.state.On("UpdateMetadata", ctx, testData.metadata.ID, mock.MatchedBy(func(config state.MutableConfig) bool {
-		return config.ForceStepPlan == true
-	})).Return(nil)
 
 	// No SaveStep for the defer (runComplete=true optimization).
 	// SaveDefer still runs so Finalize can read it.
@@ -722,6 +722,7 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 	require.NoError(err)
 
 	mocks.state.AssertNotCalled(t, "SaveStep", ctx, testData.metadata.ID, "step-defer", mock.Anything)
+	mocks.state.AssertNotCalled(t, "UpdateMetadata", mock.Anything, mock.Anything, mock.Anything)
 	mocks.state.AssertExpectations(t)
 	mocks.executor.AssertExpectations(t)
 }

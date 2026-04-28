@@ -129,10 +129,14 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		return s.Op == enums.OpcodeRunComplete
 	})
 
-	// When we have >1 steps (parallel mode), we need to set ForceStepPlan to disable
-	// immediate execution in the SDK. This ensures that parallel steps are properly
-	// planned rather than executed immediately.
-	if len(input.Steps) > 1 && !input.Metadata.Config.ForceStepPlan {
+	// >1 non-lazy steps means parallel mode — see enums.OpcodeIsLazy.
+	nonLazyCount := 0
+	for _, s := range input.Steps {
+		if !enums.OpcodeIsLazy(s.Op) {
+			nonLazyCount++
+		}
+	}
+	if nonLazyCount > 1 && !input.Metadata.Config.ForceStepPlan {
 		if err := c.State.UpdateMetadata(ctx, input.Metadata.ID, state.MutableConfig{
 			ForceStepPlan:  true,
 			RequestVersion: input.Metadata.Config.RequestVersion,
