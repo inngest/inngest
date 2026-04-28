@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -893,4 +894,87 @@ func TestDeferInputEmptyObjectSurvivesStatusUpdate(t *testing.T) {
 		require.JSONEq(t, `null`, string(d.Input),
 			"empty-object Input should normalize to null, got %s", string(d.Input))
 	}
+}
+
+// enqueueCountingQueue wraps a queue.Queue and counts Enqueue calls. Reads
+// happen post-Execute (after eg.Wait), so the field can be read without
+// locking; the mutex protects the increment side from concurrent op handlers.
+type enqueueCountingQueue struct {
+	queue.Queue
+	mu       sync.Mutex
+	enqueues int
+}
+
+func (q *enqueueCountingQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {
+	q.mu.Lock()
+	q.enqueues++
+	q.mu.Unlock()
+	return q.Queue.Enqueue(ctx, item, at, opts)
+}
+
+// TestDeferAdd_WithRunCompleteSkipsDiscovery asserts that when DeferAdd is
+// piggybacked onto RunComplete, DeferAdd does NOT enqueue a discovery step.
+// Without this gating, the discovery would be orphaned because RunComplete
+// finalizes (deletes state) immediately after.
+func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
+	infra := newDeferTestInfra(t)
+
+	countingQ := &enqueueCountingQueue{Queue: infra.rq}
+
+	stepID := "step-defer"
+	driver := &mockDriverV1{
+		t: t,
+		response: &state.DriverResponse{
+			StatusCode: 206,
+			Generator: []*state.GeneratorOpcode{
+				{
+					Op: enums.OpcodeDeferAdd,
+					ID: stepID,
+					Opts: map[string]any{
+						"fn_slug": "onDefer-score",
+						"input":   map[string]any{},
+					},
+				},
+				{
+					Op:   enums.OpcodeRunComplete,
+					ID:   "run-complete",
+					Data: json.RawMessage(`{"data": {"status_code": 200}}`),
+				},
+			},
+		},
+	}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return infra.queueShard, nil
+	}
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(infra.smv2),
+		executor.WithPauseManager(infra.pauseMgr),
+		executor.WithQueue(countingQ),
+		executor.WithLogger(logger.StdlibLogger(infra.ctx)),
+		executor.WithFunctionLoader(infra.loader),
+		executor.WithAssignedQueueShard(infra.queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithDriverV1(driver),
+	)
+	require.NoError(t, err)
+
+	run := infra.scheduleRun(t, exec)
+	countBeforeExecute := countingQ.enqueues
+
+	_, err = exec.Execute(infra.ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID,
+	}, queue.Item{
+		WorkspaceID: infra.wsID,
+		Kind:        queue.KindStart,
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: stepID}},
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: stepID})
+	require.NoError(t, err)
+
+	enqueuesDuringExecute := countingQ.enqueues - countBeforeExecute
+	require.Equal(t, 0, enqueuesDuringExecute,
+		"DeferAdd should not enqueue discovery when piggybacked onto RunComplete; got %d enqueues", enqueuesDuringExecute)
 }
