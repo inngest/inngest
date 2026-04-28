@@ -1280,6 +1280,10 @@ func (e *executor) schedule(
 	}
 
 	runTimestamp := runID.Timestamp()
+	var scheduleTypePtr *string
+	if req.ScheduleType != "" {
+		scheduleTypePtr = &req.ScheduleType
+	}
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1289,6 +1293,8 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
+			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
+			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
