@@ -35,34 +35,34 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
+          cache-dependency-path: docs/api-docs/pnpm-lock.yaml
 
       - name: Generate OpenAPI docs
         run: make docs
 
       - name: Install dependencies
-        working-directory: ui
+        working-directory: docs/api-docs
         run: pnpm install
 
       - name: Install Vercel CLI
         run: npm install -g vercel
 
       - name: Build
-        working-directory: ui/apps/api-docs
+        working-directory: docs/api-docs
         run: vercel build
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to preview
         if: inputs.environment == 'preview'
-        working-directory: ui/apps/api-docs
+        working-directory: docs/api-docs
         run: vercel deploy --prebuilt
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to production
         if: inputs.environment == 'production'
-        working-directory: ui/apps/api-docs
+        working-directory: docs/api-docs
         run: vercel deploy --prebuilt --prod
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

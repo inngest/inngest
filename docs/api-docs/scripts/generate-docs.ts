@@ -5,7 +5,7 @@ import { createOpenAPI } from 'fumadocs-openapi/server';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 const appRoot = resolve(import.meta.dirname, '..');
-const repoRoot = resolve(appRoot, '../../..');
+const repoRoot = resolve(appRoot, '../..');
 
 type Operation = {
   requestBody?: { content?: Record<string, unknown> };
