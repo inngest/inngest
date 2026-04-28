@@ -194,6 +194,7 @@ message CapacityAcquireRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string env_id = 3;
+  string app_id = 16;
   string function_id = 4;
   ConstraintConfig configuration = 5;
   repeated ConstraintItem constraints = 6;

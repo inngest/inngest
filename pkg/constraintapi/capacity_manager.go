@@ -84,6 +84,9 @@ type CapacityAcquireRequest struct {
 	// FunctionID is used for identifying the function.
 	FunctionID uuid.UUID
 
+	// AppID is included for lifecycle reporting.
+	AppID uuid.UUID
+
 	// Configuration represents the latest known constraint configuration (a subset of the function config).
 	//
 	// The server _may_ reject calls if it has recently seen a newer configuration. This is expected for a short

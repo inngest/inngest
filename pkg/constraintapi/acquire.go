@@ -160,12 +160,12 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints  flexibleIntArray    `json:"lc"`
-	ExhaustedConstraints flexibleIntArray    `json:"ec"`
-	FairnessReduction    int                 `json:"fr"`
-	RetryAt              int                 `json:"ra"`
-	Debug                flexibleStringArray `json:"d"`
-	CacheHit             int                 `json:"ch"`
+	LimitingConstraints  flexibleIntArray          `json:"lc"`
+	ExhaustedConstraints flexibleIntArray          `json:"ec"`
+	FairnessReduction    int                       `json:"fr"`
+	RetryAt              int                       `json:"ra"`
+	Debug                flexibleStringArray       `json:"d"`
+	CacheHit             int                       `json:"ch"`
 	ConstraintUsage      []constraintUsageResponse `json:"cu"`
 }
 
@@ -451,6 +451,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
 				AccountID:            req.AccountID,
 				EnvID:                req.EnvID,
+				AppID:                req.AppID,
 				FunctionID:           req.FunctionID,
 				Configuration:        req.Configuration,
 				Constraints:          req.Constraints,
