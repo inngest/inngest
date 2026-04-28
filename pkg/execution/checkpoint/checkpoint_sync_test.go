@@ -524,6 +524,124 @@ func TestSyncStepInvalidMetadataSkipped(t *testing.T) {
 	require.Equal(meta.SpanNameStep, mocks.tracer.createdSpans[0].name)
 }
 
+// TestSyncStepWithExperimentOptsEmitsMetadata asserts that when a step
+// opcode's opts carry the experiment context the SDK spreads in
+// group.experiment() variant callbacks, the checkpoint path emits an
+// inngest.experiment metadata span even though the opcode has no
+// explicit Metadata entries.
+func TestSyncStepWithExperimentOptsEmitsMetadata(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	now := time.Now()
+	ops := []state.GeneratorOpcode{
+		{
+			ID:     "variant-step-1",
+			Op:     enums.OpcodeStepRun,
+			Data:   json.RawMessage(`{"result": "variant output"}`),
+			Name:   "Variant Step",
+			Timing: interval.New(now, now.Add(100*time.Millisecond)),
+			// No explicit Metadata entries — the executor must emit the
+			// experiment metadata from opts alone.
+			Opts: map[string]any{
+				"experimentName":    "checkout-flow",
+				"variant":           "express",
+				"selectionStrategy": "weighted",
+			},
+		},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+	testData.checkpointer = New(Opts{
+		State:           mocks.state,
+		TracerProvider:  mocks.tracer,
+		Queue:           mocks.queue,
+		MetricsProvider: mocks.metrics,
+		Executor:        mocks.executor,
+		FnReader:        mocks.fnReader,
+		AllowStepMetadata: executor.AllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+	})
+
+	expectedData := map[string]any{"data": json.RawMessage(`{"result": "variant output"}`)}
+	expectedOutputBytes, _ := json.Marshal(expectedData)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "variant-step-1", expectedOutputBytes).Return(false, nil)
+
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+
+	mocks.metrics.On("OnStepFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.StepStatusCompleted)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	// 1 step span + 1 experiment metadata span.
+	require.Len(mocks.tracer.createdSpans, 2, "expected step + experiment metadata span")
+	var metaSpans int
+	for _, s := range mocks.tracer.createdSpans {
+		if s.name == meta.SpanNameMetadata {
+			metaSpans++
+		}
+	}
+	require.Equal(1, metaSpans, "expected exactly one metadata span for experiment opts")
+}
+
+// TestSyncStepNonVariantOptsEmitsNoExperimentMetadata asserts that regular
+// (non-variant) step opts do not trigger a spurious experiment metadata span.
+func TestSyncStepNonVariantOptsEmitsNoExperimentMetadata(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	now := time.Now()
+	ops := []state.GeneratorOpcode{
+		{
+			ID:     "regular-step",
+			Op:     enums.OpcodeStepRun,
+			Data:   json.RawMessage(`{"result": "ok"}`),
+			Name:   "Regular Step",
+			Timing: interval.New(now, now.Add(100*time.Millisecond)),
+			Opts: map[string]any{
+				"type":  "step",
+				"input": []any{},
+			},
+		},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+	testData.checkpointer = New(Opts{
+		State:           mocks.state,
+		TracerProvider:  mocks.tracer,
+		Queue:           mocks.queue,
+		MetricsProvider: mocks.metrics,
+		Executor:        mocks.executor,
+		FnReader:        mocks.fnReader,
+		AllowStepMetadata: executor.AllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+	})
+
+	expectedData := map[string]any{"data": json.RawMessage(`{"result": "ok"}`)}
+	expectedOutputBytes, _ := json.Marshal(expectedData)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "regular-step", expectedOutputBytes).Return(false, nil)
+
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+
+	mocks.metrics.On("OnStepFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.StepStatusCompleted)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	// Only the step span — no metadata span.
+	require.Len(mocks.tracer.createdSpans, 1, "expected only the step span")
+	require.Equal(meta.SpanNameStep, mocks.tracer.createdSpans[0].name)
+}
+
 //
 //
 // Testing utils.

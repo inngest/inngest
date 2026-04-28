@@ -360,6 +360,16 @@ func (q *queue) RemoveQueueItem(ctx context.Context, partitionID string, itemID 
 		q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, partitionID, ""),
 		q.RedisClient.kg.QueueItem(),
 	}
+
+	// If partitionID is a valid function UUID, append status index keys so the
+	// Lua script can clean up orphaned entries from all status sorted sets.
+	if fnID, err := uuid.Parse(partitionID); err == nil {
+		keys = append(keys,
+			q.RedisClient.kg.Status("start", fnID),
+			q.RedisClient.kg.Status("in-progress", fnID),
+			q.RedisClient.kg.Status("sleep", fnID),
+		)
+	}
 	args := []string{itemID}
 
 	code, err := scripts["queue/removeItem"].Exec(

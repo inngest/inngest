@@ -44,7 +44,10 @@ function RouteComponent() {
         </div>
       )}
       <div className="h-full overflow-y-auto">
-        <ReplayList functionSlug={functionSlug} />
+        <ReplayList
+          functionSlug={functionSlug}
+          disableNewReplay={env.isArchived || functionIsPaused}
+        />
       </div>
     </>
   );

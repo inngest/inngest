@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/consts"
@@ -16,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/deploy"
+	cronpkg "github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -23,6 +25,19 @@ import (
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
+
+type capturingCronSyncer struct {
+	items []cronpkg.CronItem
+}
+
+func (c *capturingCronSyncer) Sync(_ context.Context, ci cronpkg.CronItem) error {
+	c.items = append(c.items, ci)
+	return nil
+}
+
+func (c *capturingCronSyncer) Items() []cronpkg.CronItem {
+	return c.items
+}
 
 func TestRegister_FunctionVersionIncrement(t *testing.T) {
 	ctx := context.Background()
@@ -255,6 +270,79 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.Contains(t, fnVersions, sdkFunction2.Name)
 		require.Equal(t, fnVersions[sdkFunction2.Name], 2)
 	})
+}
+
+func TestRegister_CronJitterPropagation(t *testing.T) {
+	ctx := context.Background()
+
+	jitter := "5m"
+	sdkFunction := sdk.SDKFunction{
+		Name: "Cron Function",
+		Slug: "cron-function",
+		Triggers: []inngest.Trigger{
+			{
+				CronTrigger: &inngest.CronTrigger{
+					Cron:   "0 * * * *",
+					Jitter: &jitter,
+				},
+			},
+		},
+		Steps: map[string]sdk.SDKStep{
+			"step-1": {
+				ID:   "step-1",
+				Name: "test step",
+				Runtime: map[string]any{
+					"url": "http://localhost:3000/api/inngest",
+				},
+			},
+		},
+	}
+
+	req := sdk.RegisterRequest{
+		URL:       "http://localhost:3000/api/inngest",
+		AppName:   "cron-app",
+		V:         "1",
+		Functions: []sdk.SDKFunction{sdkFunction},
+	}
+
+	// Create a test devserver with in-memory data store
+	// and a capturing cron syncer
+	ds := newTestDevServer(t)
+	syncer := &capturingCronSyncer{}
+	ds.CronSyncer = syncer
+	api := &devapi{devserver: ds}
+
+	// register the app with a cron function that has jitter configured
+	_, err := api.register(ctx, req)
+	require.NoError(t, err)
+
+	// Verify the cron item was synced
+	items := syncer.Items()
+	require.Len(t, items, 1)
+	require.Equal(t, "0 * * * *", items[0].Expression)
+
+	// Verify jitter is persisted in the function config and retrievable.
+	fns, err := ds.Data.Functions(ctx)
+	require.NoError(t, err)
+	require.Len(t, fns, 1)
+	require.Equal(t, 5*time.Minute, fns[0].CronJitter("0 * * * *"))
+
+	updatedJitter := "1m"
+	sdkFunction.Triggers[0].CronTrigger.Jitter = &updatedJitter
+	req.Functions[0] = sdkFunction
+
+	_, err = api.register(ctx, req)
+	require.NoError(t, err)
+
+	// Verify the cron item was synced a second time again with the updated jitter
+	items = syncer.Items()
+	require.Len(t, items, 2)
+
+	// Verify updated jitter is in the function config.
+	fns, err = ds.Data.Functions(ctx)
+	require.NoError(t, err)
+	require.Len(t, fns, 1)
+	require.Equal(t, 1*time.Minute, fns[0].CronJitter("0 * * * *"))
 }
 
 // newTestDevServer creates a test devserver with in-memory data store

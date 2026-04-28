@@ -25,6 +25,8 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 )
 
 type Checkpointer interface {
@@ -526,7 +528,41 @@ func (c checkpointer) processMetadata(
 	if !c.AllowStepMetadata.Enabled(ctx, accountID) {
 		return
 	}
-	for _, spanMd := range op.Metadata {
+
+	// Extract experiment metadata from opts and merge into the list of
+	// metadata entries to process. The SDK spreads group.experiment()
+	// variant context onto a sub-step's opts; emitting the metadata span
+	// here (rather than requiring the SDK to call addMetadata()) means
+	// end users get experiment observability without an SDK upgrade and
+	// keeps the emission consistent across SDK languages.
+	metadataEntries := op.Metadata
+	if expMd, err := extractors.ExtractExperimentOptsMetadata(op.Opts); err != nil {
+		l.Warn("error extracting experiment opts metadata",
+			"error", err,
+			"run_id", md.ID.RunID,
+		)
+	} else if expMd != nil {
+		values, serializeErr := expMd.Serialize()
+		if serializeErr != nil {
+			l.Warn("error serializing experiment metadata",
+				"error", serializeErr,
+				"run_id", md.ID.RunID,
+			)
+		} else {
+			metadataEntries = append(metadataEntries, metadata.ScopedUpdate{
+				Scope: enums.MetadataScopeStep,
+				Update: metadata.Update{
+					RawUpdate: metadata.RawUpdate{
+						Kind:   expMd.Kind(),
+						Op:     expMd.Op(),
+						Values: values,
+					},
+				},
+			})
+		}
+	}
+
+	for _, spanMd := range metadataEntries {
 		if err := spanMd.Validate(); err != nil {
 			l.Warn("invalid metadata in checkpoint step",
 				"error", err,

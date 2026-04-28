@@ -20,6 +20,7 @@ import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
 import { getNextStepName } from './utils';
 import { useVercelIntegration } from '@/queries/useVercelIntegration';
+import { Card } from '@inngest/components/Card';
 
 export default function DeployApp() {
   const currentStepName = OnboardingSteps.DeployApp;
@@ -362,6 +363,25 @@ export default function DeployApp() {
           />
         </TabCards.Content>
       </TabCards>
+      <Card className="mt-6">
+        <Card.Content className="text-sm">
+          <p className="font-semibold">
+            Before you go live, review security best practices.
+          </p>
+          <p>
+            Covers signing keys, end-to-end encryption, IP allowlisting, and
+            SAML for enterprise accounts.
+          </p>
+          <Link
+            size="small"
+            href="https://www.inngest.com/docs/learn/security?ref=app-onboarding"
+            className="block"
+            target="_blank"
+          >
+            Read security docs
+          </Link>
+        </Card.Content>
+      </Card>
     </div>
   );
 }

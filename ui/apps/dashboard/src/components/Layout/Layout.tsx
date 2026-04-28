@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from 'react';
 import { type ProfileDisplayType } from '@/queries/server/profile';
 import type { Environment } from '@/utils/environments';
 import SideBar from './SideBar';
+import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
 import IncidentBanner from '../Incident/IncidentBanner';
 
 type LayoutProps = {
@@ -27,6 +28,8 @@ export default function Layout({
 
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
         <IncidentBanner />
+
+        <ActiveBanners />
 
         {/* disabled by Dan 11/22/2025 for performance reasons */}
         <Suspense>{/* <BillingBanner /> */}</Suspense>

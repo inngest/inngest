@@ -110,6 +110,11 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		require.Nil(t, resp.LimitingConstraints)
 		require.Empty(t, resp.ExhaustedConstraints)
 
+		// Usage should reflect post-acquire state
+		require.NotEmpty(t, resp.Usage, "Acquire response should include per-constraint usage")
+		require.Equal(t, 120, resp.Usage[0].Limit, "Rate limit constraint limit should be 120")
+		require.Equal(t, 1, resp.Usage[0].Used, "Rate limit usage should be 1 after acquiring 1 lease")
+
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)
 

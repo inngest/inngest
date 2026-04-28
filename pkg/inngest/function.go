@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/strduration"
@@ -50,6 +51,11 @@ type DeployedFunction struct {
 	PausedAt time.Time
 	// DrainedAt, if non-zero, indicates that the function is draining as of the given time.
 	DrainedAt time.Time
+}
+
+type ScheduledCronTrigger struct {
+	Expression string
+	Jitter     time.Duration
 }
 
 // Function represents a step function which is triggered whenever an event
@@ -355,13 +361,47 @@ func (f Function) IsScheduled() bool {
 
 // ScheduleExpression returns all the cron expression strings for the function
 func (f Function) ScheduleExpressions() []string {
+	cronTriggers := f.ScheduleTriggers()
+
 	var cronExpressions []string
-	for _, t := range f.Triggers {
-		if t.CronTrigger != nil {
-			cronExpressions = append(cronExpressions, t.CronTrigger.Cron)
-		}
+	for _, t := range cronTriggers {
+		cronExpressions = append(cronExpressions, t.Expression)
 	}
 	return cronExpressions
+}
+
+// ScheduleTriggers returns all cron trigger expressions together with their parsed jitter.
+// Jitter validation is expected to have already occurred at the registration boundary
+// via CronTrigger.Validate(). If parsing fails here, jitter defaults to zero.
+func (f Function) ScheduleTriggers() []ScheduledCronTrigger {
+	var cronTriggers []ScheduledCronTrigger
+	for _, t := range f.Triggers {
+		if t.CronTrigger == nil {
+			continue
+		}
+
+		jitter, err := t.CronTrigger.JitterDuration()
+		if err != nil {
+			logger.StdlibLogger(context.Background()).Warn("unparseable cron jitter, defaulting to zero")
+		}
+
+		cronTriggers = append(cronTriggers, ScheduledCronTrigger{
+			Expression: t.CronTrigger.Cron,
+			Jitter:     jitter,
+		})
+	}
+	return cronTriggers
+}
+
+// CronJitter returns the parsed jitter duration for the given cron expression,
+// or zero if the expression is not found or jitter is not configured.
+func (f Function) CronJitter(expr string) time.Duration {
+	for _, t := range f.ScheduleTriggers() {
+		if t.Expression == expr {
+			return t.Jitter
+		}
+	}
+	return 0
 }
 
 func (f Function) IsBatchEnabled() bool {

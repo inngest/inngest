@@ -19,6 +19,7 @@ import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
+import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
@@ -122,6 +123,11 @@ export const TopInfo = ({
       return undefined;
     }
   }, [trigger?.payloads]);
+
+  const cronMetadata = useMemo(
+    () => getCronTriggerMetadata(trigger?.payloads),
+    [trigger?.payloads]
+  );
 
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
@@ -234,6 +240,20 @@ export const TopInfo = ({
                   <TimeElement date={new Date(trigger.timestamp)} />
                 )}
               </ElementWrapper>
+              {cronMetadata.scheduledAt && (
+                <ElementWrapper label="Scheduled for">
+                  {isPending ? (
+                    <SkeletonElement />
+                  ) : (
+                    <TimeElement date={cronMetadata.scheduledAt} />
+                  )}
+                </ElementWrapper>
+              )}
+              {cronMetadata.fireAt && (
+                <ElementWrapper label="Fired at">
+                  {isPending ? <SkeletonElement /> : <TimeElement date={cronMetadata.fireAt} />}
+                </ElementWrapper>
+              )}
             </>
           )}
           {type === 'BATCH' && (
