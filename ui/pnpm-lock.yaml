@@ -67,7 +67,7 @@ overrides:
   srvx@<=0.11.13: 0.11.15
   protobufjs@<=8.0.1: 8.0.1
   uuid@<14.0.0: 14.0.0
-  '@clerk/shared@<3.47.4': 3.47.4
+  '@clerk/shared@<3.47.4': 4.8.5
 
 importers:
 
@@ -11269,7 +11269,7 @@ packages:
   vite-tsconfig-paths@6.1.1:
     resolution: {integrity: sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg==}
     peerDependencies:
-      vite: '>=6.2.7'
+      vite: '>=4.5.11'
 
   vite@8.0.10:
     resolution: {integrity: sha512-rZuUu9j6J5uotLDs+cAA4O5H4K1SfPliUlQwqa6YEwSrWDZzP4rhm00oJR5snMewjxF5V/K3D4kctsUTsIU9Mw==}
