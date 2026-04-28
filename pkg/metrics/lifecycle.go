@@ -107,9 +107,9 @@ func (l *PrometheusLifecycleListener) OnFunctionFinished(
 	_ []json.RawMessage,
 	resp statev1.DriverResponse,
 ) {
-	status := "Completed"
+	status := "completed"
 	if resp.Err != nil {
-		status = "Failed"
+		status = "failed"
 	}
 	functionRunEnded.WithLabelValues(fnLabel(md), status).Inc()
 }
@@ -120,7 +120,7 @@ func (l *PrometheusLifecycleListener) OnFunctionCancelled(
 	_ execution.CancelRequest,
 	_ []json.RawMessage,
 ) {
-	functionRunEnded.WithLabelValues(fnLabel(md), "Cancelled").Inc()
+	functionRunEnded.WithLabelValues(fnLabel(md), "cancelled").Inc()
 }
 
 func (l *PrometheusLifecycleListener) OnStepScheduled(
