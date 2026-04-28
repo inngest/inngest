@@ -1256,12 +1256,12 @@ func (schema *Schema) WithMaxProperties(i int64) *Schema {
 }
 
 func (schema *Schema) WithAnyAdditionalProperties() *Schema {
-	schema.AdditionalProperties = AdditionalProperties{Has: new(true)}
+	schema.AdditionalProperties = AdditionalProperties{Has: Ptr(true)}
 	return schema
 }
 
 func (schema *Schema) WithoutAdditionalProperties() *Schema {
-	schema.AdditionalProperties = AdditionalProperties{Has: new(false)}
+	schema.AdditionalProperties = AdditionalProperties{Has: Ptr(false)}
 	return schema
 }
 

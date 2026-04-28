@@ -152,8 +152,12 @@ func (v *jsonSchemaValidator) validate(value any) error {
 
 // convertJSONSchemaError converts a jsonschema validation error to OpenAPI SchemaError format
 func convertJSONSchemaError(err error) error {
-	if err, ok := errors.AsType[*jsonschema.ValidationError](err); ok {
-		return formatValidationError(err, "")
+	// TODO: Go 1.26
+	// if err, ok := errors.AsType[*jsonschema.ValidationError](err); ok {
+	// 	return formatValidationError(err, "")
+	var validationErr *jsonschema.ValidationError
+	if errors.As(err, &validationErr) {
+		return formatValidationError(validationErr, "")
 	}
 	return err
 }
