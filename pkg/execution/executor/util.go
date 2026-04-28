@@ -38,9 +38,24 @@ type OpcodeGroups struct {
 	OtherGroup OpcodeGroup
 }
 
+// nonLazyOpCount returns the count used to gate parallel-step behavior — see
+// enums.OpcodeIsLazy. Nil entries are skipped to mirror handleGeneratorGroup.
+func nonLazyOpCount(opcodes []*state.GeneratorOpcode) int {
+	n := 0
+	for _, op := range opcodes {
+		if op == nil {
+			continue
+		}
+		if !enums.OpcodeIsLazy(op.Op) {
+			n++
+		}
+	}
+	return n
+}
+
 // opGroups groups opcodes by their type.
 func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
-	shouldStartHistoryGroup := len(opcodes) > 1
+	shouldStartHistoryGroup := nonLazyOpCount(opcodes) > 1
 
 	groups := OpcodeGroups{
 		PriorityGroup: OpcodeGroup{

@@ -53,3 +53,15 @@ func OpcodeIsSync(o Opcode) bool {
 func OpcodeIsAsync(o Opcode) bool {
 	return !OpcodeIsSync(o)
 }
+
+// OpcodeIsLazy reports whether the opcode is a lazy op piggybacked onto a host
+// op rather than a standalone step. Lazy ops travel alongside another opcode
+// (e.g. [StepRun, DeferAdd]) and shouldn't trigger parallel-step gating like
+// ForceStepPlan or per-step history grouping.
+func OpcodeIsLazy(o Opcode) bool {
+	switch o {
+	case OpcodeDeferAdd, OpcodeDeferCancel:
+		return true
+	}
+	return false
+}
