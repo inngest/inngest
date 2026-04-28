@@ -5,9 +5,10 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/vektah/gqlparser/v2/ast"
+
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
-	"github.com/vektah/gqlparser/v2/ast"
 )
 
 type ArgSet struct {
@@ -17,19 +18,21 @@ type ArgSet struct {
 
 type FieldArgument struct {
 	*ast.ArgumentDefinition
-	TypeReference *config.TypeReference
-	VarName       string      // The name of the var in go
-	Object        *Object     // A link back to the parent object
-	Default       interface{} // The default value
-	Directives    []*Directive
-	Value         interface{} // value set in Data
+	TypeReference                  *config.TypeReference
+	VarName                        string  // The name of the var in go
+	Object                         *Object // A link back to the parent object
+	Default                        any     // The default value
+	Directives                     []*Directive
+	Value                          any // value set in Data
+	CallArgumentDirectivesWithNull bool
 }
 
-// ImplDirectives get not Builtin and location ARGUMENT_DEFINITION directive
+// ImplDirectives get not SkipRuntime and location ARGUMENT_DEFINITION directive
 func (f *FieldArgument) ImplDirectives() []*Directive {
 	d := make([]*Directive, 0)
 	for i := range f.Directives {
-		if !f.Directives[i].Builtin && f.Directives[i].IsLocation(ast.LocationArgumentDefinition) {
+		if !f.Directives[i].SkipRuntime &&
+			f.Directives[i].IsLocation(ast.LocationArgumentDefinition) {
 			d = append(d, f.Directives[i])
 		}
 	}
@@ -39,6 +42,12 @@ func (f *FieldArgument) ImplDirectives() []*Directive {
 
 func (f *FieldArgument) DirectiveObjName() string {
 	return "rawArgs"
+}
+
+// ZeroVal returns the Go declaration for the typed zero value of this argument's
+// type, suitable for use as an error-path return value inside a directive closure.
+func (f *FieldArgument) ZeroVal() string {
+	return fmt.Sprintf("var zeroVal %s", templates.CurrentImports.LookupType(f.TypeReference.GO))
 }
 
 func (f *FieldArgument) Stream() bool {
@@ -56,11 +65,12 @@ func (b *builder) buildArg(obj *Object, arg *ast.ArgumentDefinition) (*FieldArgu
 		return nil, err
 	}
 	newArg := FieldArgument{
-		ArgumentDefinition: arg,
-		TypeReference:      tr,
-		Object:             obj,
-		VarName:            templates.ToGoPrivate(arg.Name),
-		Directives:         argDirs,
+		ArgumentDefinition:             arg,
+		TypeReference:                  tr,
+		Object:                         obj,
+		VarName:                        templates.ToGoPrivate(arg.Name),
+		Directives:                     argDirs,
+		CallArgumentDirectivesWithNull: b.Config.CallArgumentDirectivesWithNull,
 	}
 
 	if arg.DefaultValue != nil {
@@ -73,7 +83,11 @@ func (b *builder) buildArg(obj *Object, arg *ast.ArgumentDefinition) (*FieldArgu
 	return &newArg, nil
 }
 
-func (b *builder) bindArgs(field *Field, sig *types.Signature, params *types.Tuple) ([]*FieldArgument, error) {
+func (b *builder) bindArgs(
+	field *Field,
+	sig *types.Signature,
+	params *types.Tuple,
+) ([]*FieldArgument, error) {
 	n := params.Len()
 	newArgs := make([]*FieldArgument, 0, len(field.Args))
 	// Accept variadic methods (i.e. have optional parameters).
@@ -103,9 +117,9 @@ nextArg:
 	return newArgs, nil
 }
 
-func (a *Data) Args() map[string][]*FieldArgument {
+func (d *Data) Args() map[string][]*FieldArgument {
 	ret := map[string][]*FieldArgument{}
-	for _, o := range a.Objects {
+	for _, o := range d.Objects {
 		for _, f := range o.Fields {
 			if len(f.Args) > 0 {
 				ret[f.ArgsFunc()] = f.Args
@@ -113,9 +127,9 @@ func (a *Data) Args() map[string][]*FieldArgument {
 		}
 	}
 
-	for _, d := range a.Directives() {
-		if len(d.Args) > 0 {
-			ret[d.ArgsFunc()] = d.Args
+	for _, directive := range d.Directives() {
+		if len(directive.Args) > 0 {
+			ret[directive.ArgsFunc()] = directive.Args
 		}
 	}
 	return ret

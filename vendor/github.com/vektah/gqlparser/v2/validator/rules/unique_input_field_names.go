@@ -1,14 +1,14 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("UniqueInputFieldNames", func(observers *Events, addError AddErrFunc) {
+var UniqueInputFieldNamesRule = Rule{
+	Name: "UniqueInputFieldNames",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		observers.OnValue(func(walker *Walker, value *ast.Value) {
 			if value.Kind != ast.ObjectValue {
 				return
@@ -25,5 +25,5 @@ func init() {
 				seen[field.Name] = true
 			}
 		})
-	})
+	},
 }

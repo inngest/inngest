@@ -1,13 +1,17 @@
 {{- range $input := .Inputs }}
 	{{- if not .HasUnmarshal }}
 	{{- $it := "it" }}
-	{{- if .PointersInUmarshalInput }}
+	{{- if .PointersInUnmarshalInput }}
 	  {{- $it = "&it" }}
 	{{- end }}
-	func (ec *executionContext) unmarshalInput{{ .Name }}(ctx context.Context, obj interface{}) ({{ if .PointersInUmarshalInput }}*{{ end }}{{.Type | ref}}, error) {
+	func {{$.FuncReceiver}}unmarshalInput{{ .Name }}(ctx context.Context, {{$.ECFuncParam}}obj any) ({{ if .PointersInUnmarshalInput }}*{{ end }}{{.Type | ref}}, error) {
 		var it {{.Type | ref}}
-		asMap := map[string]interface{}{}
-		for k, v := range obj.(map[string]interface{}) {
+		if obj == nil {
+			return it, nil
+		}
+
+		asMap := map[string]any{}
+		for k, v := range obj.(map[string]any) {
 			asMap[k] = v
 		}
 		{{ range $field := .Fields}}
@@ -19,6 +23,9 @@
 		{{- end }}
 
 		fieldsInOrder := [...]string{ {{ range .Fields }}{{ quote .Name }},{{ end }} }
+		{{- if $input.IsMap }}
+			it = make(map[string]any, len(asMap))
+		{{- end }}
 		for _, k := range fieldsInOrder {
 			v, ok := asMap[k]
 			if !ok {
@@ -27,28 +34,38 @@
 			switch k {
 			{{- range $field := .Fields }}
 			case {{$field.Name|quote}}:
-				var err error
-
+				{{- $lhs := (printf "it.%s" $field.GoFieldName) }}
+				{{- if $input.IsMap }}
+					{{- $lhs = (printf "it[%q]" $field.Name) }}
+				{{- end }}
 				ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField({{$field.Name|quote}}))
 				{{- if $field.ImplDirectives }}
-					directive0 := func(ctx context.Context) (interface{}, error) { return ec.{{ $field.TypeReference.UnmarshalFunc }}(ctx, v) }
-					{{ template "implDirectives" $field }}
+					directive0 := func(ctx context.Context) (any, error) { return {{$.ECDot}}{{ $field.TypeReference.UnmarshalFunc }}(ctx, {{$.ECArg}}v) }
+					{{ template "implDirectives" ($.ImplDirectivesCtx $field) }}
 					tmp, err := directive{{$field.ImplDirectives|len}}(ctx)
 					if err != nil {
 						return {{$it}}, graphql.ErrorOnPath(ctx, err)
 					}
 					if data, ok := tmp.({{ $field.TypeReference.GO | ref }}) ; ok {
 						{{- if $field.IsResolver }}
-							if err = ec.resolvers.{{ $field.ShortInvocation }}; err != nil {
+							if err = ec.Resolvers.{{ $field.ShortInvocation }}; err != nil {
 								return {{$it}}, err
 							}
 						{{- else }}
-							it.{{$field.GoFieldName}} = data
+							{{- if $field.TypeReference.IsOmittable }}
+								{{ $lhs }} = graphql.OmittableOf(data)
+							{{- else }}
+								{{ $lhs }} = data
+							{{- end }}
 						{{- end }}
 					{{- if $field.TypeReference.IsNilable }}
 						{{- if not $field.IsResolver }}
 						} else if tmp == nil {
-							it.{{$field.GoFieldName}} = nil
+							{{- if $field.TypeReference.IsOmittable }}
+								{{ $lhs }} = graphql.OmittableOf[{{ $field.TypeReference.GO | ref }}](nil)
+							{{- else }}
+								{{ $lhs }} = nil
+							{{- end }}
 						{{- end }}
 					{{- end }}
 					} else {
@@ -57,25 +74,46 @@
 					}
 				{{- else }}
 					{{- if $field.IsResolver }}
-						data, err := ec.{{ $field.TypeReference.UnmarshalFunc }}(ctx, v)
+						data, err := {{$.ECDot}}{{ $field.TypeReference.UnmarshalFunc }}(ctx, {{$.ECArg}}v)
 						if err != nil {
 							return {{$it}}, err
 						}
-						if err = ec.resolvers.{{ $field.ShortInvocation }}; err != nil {
+						if err = ec.Resolvers.{{ $field.ShortInvocation }}; err != nil {
 							return {{$it}}, err
 						}
 					{{- else }}
-						it.{{$field.GoFieldName}}, err = ec.{{ $field.TypeReference.UnmarshalFunc }}(ctx, v)
+						data, err := {{$.ECDot}}{{ $field.TypeReference.UnmarshalFunc }}(ctx, {{$.ECArg}}v)
 						if err != nil {
 							return {{$it}}, err
 						}
+						{{- if $field.TypeReference.IsOmittable }}
+							{{ $lhs }} = graphql.OmittableOf(data)
+						{{- else }}
+							{{ $lhs }} = data
+						{{- end }}
 					{{- end }}
 				{{- end }}
 			{{- end }}
 			}
 		}
 
+		{{- if $input.InputObjectDirectives }}
+		// Execute INPUT_OBJECT level directives (e.g., @oneOf, @directive3)
+		// These run after all fields have been unmarshaled
+		directive0 := func(ctx context.Context) (any, error) { return {{$it}}, nil }
+		{{ template "implDirectives" ($.InputObjectImplDirectivesCtx $input $it) }}
+		tmp, err := directive{{$input.InputObjectDirectives|len}}(ctx)
+		if err != nil {
+			return {{$it}}, graphql.ErrorOnPath(ctx, err)
+		}
+		if data, ok := tmp.({{ if $input.PointersInUnmarshalInput }}*{{ end }}{{$input.Type | ref}}) ; ok {
+			return data, nil
+		}
+		return {{$it}}, graphql.ErrorOnPath(ctx, fmt.Errorf(`unexpected type %T from INPUT_OBJECT directive, should be {{ if $input.PointersInUnmarshalInput }}*{{ end }}{{$input.Type | ref}}`, tmp))
+		{{- else }}
 		return {{$it}}, nil
+		{{- end }}
 	}
 	{{- end }}
 {{ end }}
+

@@ -1,6 +1,6 @@
 {{- range $interface := .Interfaces }}
 
-func (ec *executionContext) _{{$interface.Name}}(ctx context.Context, sel ast.SelectionSet, obj {{$interface.Type | ref}}) graphql.Marshaler {
+func {{$.FuncReceiver}}_{{$interface.Name}}(ctx context.Context, {{$.ECFuncParam}}sel ast.SelectionSet, obj {{$interface.Type | ref}}) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
@@ -11,10 +11,14 @@ func (ec *executionContext) _{{$interface.Name}}(ctx context.Context, sel ast.Se
 					return graphql.Null
 				}
 			{{- end }}
-			return ec._{{$implementor.Name}}(ctx, sel, {{ if $implementor.TakeRef }}&{{ end }}obj)
+			return {{$.ECDot}}_{{$implementor.Name}}(ctx, {{$.ECArg}}sel, {{ if $implementor.TakeRef }}&{{ end }}obj)
 	{{- end }}
 	default:
-		panic(fmt.Errorf("unexpected type %T", obj))
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of {{$interface.Name}} must implement graphql.Marshaler", obj))
+		}
 	}
 }
 

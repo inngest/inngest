@@ -1,14 +1,14 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("LoneAnonymousOperation", func(observers *Events, addError AddErrFunc) {
+var LoneAnonymousOperationRule = Rule{
+	Name: "LoneAnonymousOperation",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		observers.OnOperation(func(walker *Walker, operation *ast.OperationDefinition) {
 			if operation.Name == "" && len(walker.Document.Operations) > 1 {
 				addError(
@@ -17,5 +17,5 @@ func init() {
 				)
 			}
 		})
-	})
+	},
 }

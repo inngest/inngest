@@ -1,0 +1,23 @@
+package graphql
+
+import (
+	"context"
+)
+
+// ProcessArgField Parses argument value without Execution Context
+// This function is called from generated code
+func ProcessArgField[T any](
+	ctx context.Context,
+	rawArgs map[string]any,
+	fieldName string,
+	valueMapperFn func(ctx context.Context, value any) (T, error),
+) (T, error) {
+	value, exists := rawArgs[fieldName]
+	if !exists {
+		var zeroVal T
+		return zeroVal, nil
+	}
+
+	ctx = WithPathContext(ctx, NewPathWithField(fieldName))
+	return valueMapperFn(ctx, value)
+}

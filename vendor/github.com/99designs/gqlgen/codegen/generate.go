@@ -4,14 +4,13 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/vektah/gqlparser/v2/ast"
 
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
-	"github.com/vektah/gqlparser/v2/ast"
 )
 
 //go:embed *.gotpl
@@ -19,7 +18,7 @@ var codegenTemplates embed.FS
 
 func GenerateCode(data *Data) error {
 	if !data.Config.Exec.IsDefined() {
-		return fmt.Errorf("missing exec config")
+		return errors.New("missing exec config")
 	}
 
 	switch data.Config.Exec.Layout {
@@ -41,6 +40,7 @@ func generateSingleFile(data *Data) error {
 		GeneratedHeader: true,
 		Packages:        data.Config.Packages,
 		TemplateFS:      codegenTemplates,
+		PruneOptions:    data.Config.GetPruneOptions(),
 	})
 }
 
@@ -72,6 +72,11 @@ func generatePerSchema(data *Data) error {
 		return err
 	}
 
+	err = addDirectives(data, &builds)
+	if err != nil {
+		return err
+	}
+
 	for filename, build := range builds {
 		if filename == "" {
 			continue
@@ -88,6 +93,7 @@ func generatePerSchema(data *Data) error {
 			GeneratedHeader: true,
 			Packages:        data.Config.Packages,
 			TemplateFS:      codegenTemplates,
+			PruneOptions:    data.Config.GetPruneOptions(),
 		})
 		if err != nil {
 			return err
@@ -128,30 +134,25 @@ func addBuild(filename string, p *ast.Position, data *Data, builds *map[string]*
 	}
 }
 
+//go:embed root_.gotpl
+var rootTemplate string
+
 // Root file contains top-level definitions that should not be duplicated across the generated
 // files for each schema file.
 func generateRootFile(data *Data) error {
 	dir := data.Config.Exec.DirName
 	path := filepath.Join(dir, "root_.generated.go")
 
-	_, thisFile, _, _ := runtime.Caller(0)
-	rootDir := filepath.Dir(thisFile)
-	templatePath := filepath.Join(rootDir, "root_.gotpl")
-	templateBytes, err := os.ReadFile(templatePath)
-	if err != nil {
-		return err
-	}
-	template := string(templateBytes)
-
 	return templates.Render(templates.Options{
 		PackageName:     data.Config.Exec.Package,
-		Template:        template,
+		Template:        rootTemplate,
 		Filename:        path,
 		Data:            data,
 		RegionTags:      false,
 		GeneratedHeader: true,
 		Packages:        data.Config.Packages,
 		TemplateFS:      codegenTemplates,
+		PruneOptions:    data.Config.GetPruneOptions(),
 	})
 }
 
@@ -195,6 +196,27 @@ func addInterfaces(data *Data, builds *map[string]*Data) error {
 		}
 
 		build.Interfaces[k] = inf
+	}
+	return nil
+}
+
+// addDirectives ensures a per-schema build exists for every source file that
+// declares directives with arguments. Without this, a .graphql file containing
+// only directive declarations (no type definitions) would produce no generated
+// file, leaving the dir_*_args argument-parsing functions undefined.
+//
+// No directive data is added to the build struct: Data.Args() calls
+// Directives(), which is scoped to the build's Config.Sources, so it
+// automatically picks up the right directive args for each per-schema file.
+func addDirectives(data *Data, builds *map[string]*Data) error {
+	for _, directive := range data.Directives() {
+		if len(directive.Args) == 0 {
+			continue
+		}
+		fname := filename(directive.Position, data.Config)
+		if (*builds)[fname] == nil {
+			addBuild(fname, directive.Position, data, builds)
+		}
 	}
 	return nil
 }

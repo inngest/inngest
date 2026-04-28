@@ -1,16 +1,16 @@
-package validator
+package rules
 
 import (
 	"fmt"
 
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("KnownRootType", func(observers *Events, addError AddErrFunc) {
+var KnownRootTypeRule = Rule{
+	Name: "KnownRootType",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		// A query's root must be a valid type.  Surprisingly, this isn't
 		// checked anywhere else!
 		observers.OnOperation(func(walker *Walker, operation *ast.OperationDefinition) {
@@ -33,5 +33,5 @@ func init() {
 					At(operation.Position))
 			}
 		})
-	})
+	},
 }

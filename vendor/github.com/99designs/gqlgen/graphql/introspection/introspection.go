@@ -1,7 +1,10 @@
-// introspection implements the spec defined in https://github.com/facebook/graphql/blob/master/spec/Section%204%20--%20Introspection.md#schema-introspection
+// introspection implements the spec defined in
+// https://github.com/facebook/graphql/blob/master/spec/Section%204%20--%20Introspection.md#schema-introspection
 package introspection
 
-import "github.com/vektah/gqlparser/v2/ast"
+import (
+	"github.com/vektah/gqlparser/v2/ast"
+)
 
 type (
 	Directive struct {
@@ -31,6 +34,7 @@ type (
 		description  string
 		DefaultValue *string
 		Type         *Type
+		deprecation  *ast.Directive
 	}
 )
 
@@ -74,6 +78,25 @@ func (f *Field) IsDeprecated() bool {
 }
 
 func (f *Field) DeprecationReason() *string {
+	if f.deprecation == nil || !f.IsDeprecated() {
+		return nil
+	}
+
+	reason := f.deprecation.Arguments.ForName("reason")
+
+	if reason == nil {
+		defaultReason := "No longer supported"
+		return &defaultReason
+	}
+
+	return &reason.Value.Raw
+}
+
+func (f *InputValue) IsDeprecated() bool {
+	return f.deprecation != nil
+}
+
+func (f *InputValue) DeprecationReason() *string {
 	if f.deprecation == nil {
 		return nil
 	}

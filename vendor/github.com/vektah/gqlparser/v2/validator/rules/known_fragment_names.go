@@ -1,14 +1,14 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("KnownFragmentNames", func(observers *Events, addError AddErrFunc) {
+var KnownFragmentNamesRule = Rule{
+	Name: "KnownFragmentNames",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		observers.OnFragmentSpread(func(walker *Walker, fragmentSpread *ast.FragmentSpread) {
 			if fragmentSpread.Definition == nil {
 				addError(
@@ -17,5 +17,5 @@ func init() {
 				)
 			}
 		})
-	})
+	},
 }

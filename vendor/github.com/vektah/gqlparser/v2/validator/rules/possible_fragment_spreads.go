@@ -1,14 +1,14 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
-
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
-func init() {
-	AddRule("PossibleFragmentSpreads", func(observers *Events, addError AddErrFunc) {
+var PossibleFragmentSpreadsRule = Rule{
+	Name: "PossibleFragmentSpreads",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		validate := func(walker *Walker, parentDef *ast.Definition, fragmentName string, emitError func()) {
 			if parentDef == nil {
 				return
@@ -48,7 +48,11 @@ func init() {
 		observers.OnInlineFragment(func(walker *Walker, inlineFragment *ast.InlineFragment) {
 			validate(walker, inlineFragment.ObjectDefinition, inlineFragment.TypeCondition, func() {
 				addError(
-					Message(`Fragment cannot be spread here as objects of type "%s" can never be of type "%s".`, inlineFragment.ObjectDefinition.Name, inlineFragment.TypeCondition),
+					Message(
+						`Fragment cannot be spread here as objects of type "%s" can never be of type "%s".`,
+						inlineFragment.ObjectDefinition.Name,
+						inlineFragment.TypeCondition,
+					),
 					At(inlineFragment.Position),
 				)
 			})
@@ -58,12 +62,22 @@ func init() {
 			if fragmentSpread.Definition == nil {
 				return
 			}
-			validate(walker, fragmentSpread.ObjectDefinition, fragmentSpread.Definition.TypeCondition, func() {
-				addError(
-					Message(`Fragment "%s" cannot be spread here as objects of type "%s" can never be of type "%s".`, fragmentSpread.Name, fragmentSpread.ObjectDefinition.Name, fragmentSpread.Definition.TypeCondition),
-					At(fragmentSpread.Position),
-				)
-			})
+			validate(
+				walker,
+				fragmentSpread.ObjectDefinition,
+				fragmentSpread.Definition.TypeCondition,
+				func() {
+					addError(
+						Message(
+							`Fragment "%s" cannot be spread here as objects of type "%s" can never be of type "%s".`,
+							fragmentSpread.Name,
+							fragmentSpread.ObjectDefinition.Name,
+							fragmentSpread.Definition.TypeCondition,
+						),
+						At(fragmentSpread.Position),
+					)
+				},
+			)
 		})
-	})
+	},
 }
