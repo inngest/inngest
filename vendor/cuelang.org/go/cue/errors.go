@@ -18,7 +18,6 @@ import (
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
-	"cuelang.org/go/internal/core/runtime"
 )
 
 func (v Value) toErr(b *adt.Bottom) (err errors.Error) {
@@ -59,11 +58,7 @@ func (e *valueError) Position() token.Pos {
 	if e.err.Err != nil {
 		return e.err.Err.Position()
 	}
-	src := e.err.Source()
-	if src == nil {
-		return token.NoPos
-	}
-	return src.Pos()
+	return adt.Pos(e.err)
 }
 
 func (e *valueError) InputPositions() []token.Pos {
@@ -91,11 +86,41 @@ func (e *valueError) Path() (a []string) {
 }
 
 var errNotExists = &adt.Bottom{
-	Code: adt.NotExistError,
-	Err:  errors.Newf(token.NoPos, "undefined value"),
+	Code:      adt.IncompleteError,
+	NotExists: true,
+	Err:       errors.Newf(token.NoPos, "undefined value"),
 }
 
-func mkErr(idx *runtime.Runtime, src adt.Node, args ...interface{}) *adt.Bottom {
+// IsIncomplete reports whether err is an incomplete error.
+// Incomplete errors occur when a value cannot be fully evaluated
+// due to missing information, such as unresolved references or
+// incomplete disjunctions. These errors may be acceptable in
+// non-concrete contexts.
+//
+// If the error returned by [Value.Err] is incomplete but the value
+// still exists (i.e., [Value.Exists] returns true), it typically means
+// the value is valid CUE but not fully resolved. In such cases,
+// [Value.Validate] with default options will return nil.
+func IsIncomplete(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Fast path:
+	if ve, ok := err.(*valueError); ok {
+		return ve.err.IsIncomplete()
+	}
+	// Handle combined errors
+	for _, e := range errors.Errors(err) {
+		if ve, ok := e.(*valueError); ok {
+			if ve.err.IsIncomplete() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func mkErr(src adt.Node, args ...interface{}) *adt.Bottom {
 	var e *adt.Bottom
 	var code adt.ErrorCode = -1
 outer:
@@ -115,7 +140,7 @@ outer:
 		case string:
 			args := args[i+1:]
 			// Do not expand message so that errors can be localized.
-			pos := pos(src)
+			pos := adt.Pos(src)
 			if code < 0 {
 				code = 0
 			}

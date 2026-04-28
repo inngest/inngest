@@ -1179,7 +1179,7 @@ func (m *RedisMessage) AsZScores() ([]ZScore, error) {
 		return scores, nil
 	}
 	scores := make([]ZScore, len(arr)/2)
-	for i := 0; i < len(scores); i++ {
+	for i := range scores {
 		j := i * 2
 		if scores[i], err = toZScore(arr[j : j+2]); err != nil {
 			return nil, err
@@ -1337,7 +1337,6 @@ func (m *RedisMessage) AsFtSearch() (total int64, docs []FtSearchDoc, err error)
 				}
 			case "error":
 				for _, e := range m.values()[i+1].values() {
-					e := e
 					return 0, nil, (*RedisError)(&e)
 				}
 			}
@@ -1405,7 +1404,6 @@ func (m *RedisMessage) AsFtAggregate() (total int64, docs []map[string]string, e
 				}
 			case "error":
 				for _, e := range m.values()[i+1].values() {
-					e := e
 					return 0, nil, (*RedisError)(&e)
 				}
 			}

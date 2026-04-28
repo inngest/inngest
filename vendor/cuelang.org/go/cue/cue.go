@@ -14,30 +14,21 @@
 
 // Package cue is the main API for CUE evaluation.
 //
-// Value is the main type that represents CUE evaluations. Values are created
-// with a cue.Context. Only values created from the same Context can be
-// involved in the same operation.
+// [Value] is the main type that represents CUE evaluations.
+// Values are created with a [cuelang.org/go/cue/cuecontext.Context].
+// Only values created from the same Context can be involved in the same operation.
+// Values created from the same Context are not safe for concurrent use,
+// which we intend to change in the future.
 //
-// A Context defines the set of active packages, the translations of field
-// names to unique codes, as well as the set of builtins. Use
+// [Context] defines the set of active packages, the translations of field
+// names to unique codes, as well as the set of builtins.
+// Use [cuelang.org/go/cue/cuecontext.New] to create a new context.
 //
-//     import "cuelang.org/go/cue/cuecontext"
+// While a context can be used to build values, note that loading a module and its
+// dependencies should be done with the [cuelang.org/go/cue/load] package.
+// To print a value into its string syntax form, use [cuelang.org/go/cue/format].
 //
-//     ctx := cuecontext.New()
-//
-// to obtain a context.
-//
-//
-// Note that the following types are DEPRECATED and their usage should be
-// avoided if possible:
-//
-//    FieldInfo
-//    Instance
-//    Runtime
-//    Struct
-//
-// Many types also have deprecated methods. Code that already uses deprecated
-// methods can keep using them for at least some time. We aim to provide a
+// Note that some types and funcs are deprecated. Code that already uses deprecated
+// funcs can keep using them for at least some time. We aim to provide a
 // go or cue fix solution to automatically rewrite code using the new API.
-//
 package cue

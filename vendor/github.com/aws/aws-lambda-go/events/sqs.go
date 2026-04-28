@@ -7,7 +7,7 @@ type SQSEvent struct {
 }
 
 type SQSMessage struct {
-	MessageId              string                         `json:"messageId"` //nolint: stylecheck
+	MessageId              string                         `json:"messageId"` //nolint: staticcheck
 	ReceiptHandle          string                         `json:"receiptHandle"`
 	Body                   string                         `json:"body"`
 	Md5OfBody              string                         `json:"md5OfBody"`

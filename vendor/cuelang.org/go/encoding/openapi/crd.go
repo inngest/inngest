@@ -55,7 +55,7 @@ func newCoreBuilder(c *buildContext) *builder {
 	return b
 }
 
-func (b *builder) coreSchemaWithName(name string) *ast.StructLit {
+func (b *builder) coreSchemaWithName(name cue.Selector) *ast.StructLit {
 	oldPath := b.ctx.path
 	b.ctx.path = append(b.ctx.path, name)
 	s := b.coreSchema()
@@ -69,15 +69,15 @@ func (b *builder) coreSchema() *ast.StructLit {
 	case cue.ListKind:
 		if b.items != nil {
 			b.setType("array", "")
-			schema := b.items.coreSchemaWithName("*")
+			schema := b.items.coreSchemaWithName(cue.AnyString)
 			b.setSingle("items", schema, false)
 		}
 
 	case cue.StructKind:
-		p := &OrderedMap{}
+		p := &orderedMap{}
 		for _, k := range b.keys {
 			sub := b.properties[k]
-			p.Set(k, sub.coreSchemaWithName(k))
+			p.setExpr(k, sub.coreSchemaWithName(cue.Str(k)))
 		}
 		if p.len() > 0 || b.items != nil {
 			b.setType("object", "")
@@ -87,7 +87,7 @@ func (b *builder) coreSchema() *ast.StructLit {
 		}
 		// TODO: in Structural schema only one of these is allowed.
 		if b.items != nil {
-			schema := b.items.coreSchemaWithName("*")
+			schema := b.items.coreSchemaWithName(cue.AnyString)
 			b.setSingle("additionalProperties", schema, false)
 		}
 	}
@@ -113,8 +113,8 @@ func (b *builder) buildCore(v cue.Value) {
 	defer b.popNode()
 
 	if !b.ctx.expandRefs {
-		_, r := v.Reference()
-		if len(r) > 0 {
+		_, r := v.ReferencePath()
+		if len(r.Selectors()) > 0 {
 			return
 		}
 	}
@@ -128,7 +128,7 @@ func (b *builder) buildCore(v cue.Value) {
 
 		switch b.kind {
 		case cue.StructKind:
-			if typ, ok := v.Elem(); ok {
+			if typ := v.LookupPath(cue.MakePath(cue.AnyString)); typ.Exists() {
 				if !b.checkCycle(typ) {
 					return
 				}
@@ -140,7 +140,7 @@ func (b *builder) buildCore(v cue.Value) {
 			b.buildCoreStruct(v)
 
 		case cue.ListKind:
-			if typ, ok := v.Elem(); ok {
+			if typ := v.LookupPath(cue.MakePath(cue.AnyIndex)); typ.Exists() {
 				if !b.checkCycle(typ) {
 					return
 				}
@@ -169,7 +169,7 @@ func (b *builder) buildCoreStruct(v cue.Value) {
 		}
 	}
 	for i, _ := v.Fields(cue.Optional(true), cue.Hidden(false)); i.Next(); {
-		label := i.Label()
+		label := i.Selector().Unquoted()
 		sub, ok := b.properties[label]
 		if !ok {
 			sub = newCoreBuilder(b.ctx)

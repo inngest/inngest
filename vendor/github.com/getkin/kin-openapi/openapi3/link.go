@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 )
 
 // Link is specified by OpenAPI/Swagger standard version 3.
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#link-object
 type Link struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
+	Origin     *Origin        `json:"-" yaml:"-"`
 
 	OperationRef string         `json:"operationRef,omitempty" yaml:"operationRef,omitempty"`
 	OperationID  string         `json:"operationId,omitempty" yaml:"operationId,omitempty"`
@@ -33,9 +34,7 @@ func (link Link) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Link.
 func (link Link) MarshalYAML() (any, error) {
 	m := make(map[string]any, 6+len(link.Extensions))
-	for k, v := range link.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, link.Extensions)
 
 	if x := link.OperationRef; x != "" {
 		m["operationRef"] = x
@@ -68,7 +67,6 @@ func (link *Link) UnmarshalJSON(data []byte) error {
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
 
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "operationRef")
 	delete(x.Extensions, "operationId")
 	delete(x.Extensions, "description")
@@ -98,6 +96,6 @@ func (link *Link) Validate(ctx context.Context, opts ...ValidationOption) error 
 
 // UnmarshalJSON sets Links to a copy of data.
 func (links *Links) UnmarshalJSON(data []byte) (err error) {
-	*links, _, err = unmarshalStringMapP[LinkRef](data)
+	*links, err = unmarshalStringMapP[LinkRef](data)
 	return
 }

@@ -1,4 +1,4 @@
-// Copyright 2021-2024 The Connect Authors
+// Copyright 2021-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -79,6 +79,11 @@ func NewClient[Req, Res any](httpClient HTTPClient, url string, options ...Clien
 		conn := client.protocolClient.NewConn(ctx, unarySpec, request.Header())
 		conn.onRequestSend(func(r *http.Request) {
 			request.setRequestMethod(r.Method)
+			callInfo, ok := clientCallInfoForContext(ctx)
+			if ok {
+				callInfo.method = r.Method
+				callInfo.responseSource = conn
+			}
 		})
 		// Send always returns an io.EOF unless the error is from the client-side.
 		// We want the user to continue to call Receive in those cases to get the
@@ -100,6 +105,7 @@ func NewClient[Req, Res any](httpClient HTTPClient, url string, options ...Clien
 		return response, conn.CloseResponse()
 	})
 	if interceptor := config.Interceptor; interceptor != nil {
+		// interceptor is the full chain of all interceptors provided
 		unaryFunc = interceptor.WrapUnary(unaryFunc)
 	}
 	client.callUnary = func(ctx context.Context, request *Request[Req]) (*Response[Res], error) {
@@ -109,6 +115,23 @@ func NewClient[Req, Res any](httpClient HTTPClient, url string, options ...Clien
 		request.spec = unarySpec
 		request.peer = client.protocolClient.Peer()
 		protocolClient.WriteRequestHeader(StreamTypeUnary, request.Header())
+
+		// Also set them in the context if there's a call info present
+		callInfo, callInfoOk := clientCallInfoForContext(ctx)
+		if callInfoOk {
+			callInfo.peer = request.Peer()
+			callInfo.spec = request.Spec()
+			// A client could have set request headers in the call info OR the request wrapper
+			// So if a callInfo exists in context, merge any headers from there into the request wrapper
+			// so that all headers are sent in the request
+			mergeHeaders(request.Header(), callInfo.requestHeader)
+
+			// Copy the call info into a sentinel value. This is so we can compare
+			// the sentinel value against the call info in context. If they're different,
+			// we can stop the request. This protects against changing the context in interceptors.
+			ctx = context.WithValue(ctx, sentinelContextKey{}, callInfo)
+		}
+
 		response, err := unaryFunc(ctx, request)
 		if err != nil {
 			return nil, err
@@ -131,6 +154,10 @@ func (c *Client[Req, Res]) CallUnary(ctx context.Context, request *Request[Req])
 }
 
 // CallClientStream calls a client streaming procedure.
+//
+// Request headers can be sent via the [ClientStreamForClient.RequestHeader] method on the stream. Note that the
+// request headers are not sent automatically when this method is invoked and instead require an explicit call to
+// [ClientStreamForClient.Send].
 func (c *Client[Req, Res]) CallClientStream(ctx context.Context) *ClientStreamForClient[Req, Res] {
 	if c.err != nil {
 		return &ClientStreamForClient[Req, Res]{err: c.err}
@@ -141,6 +168,33 @@ func (c *Client[Req, Res]) CallClientStream(ctx context.Context) *ClientStreamFo
 	}
 }
 
+// CallClientStreamSimple calls a client streaming procedure.
+//
+// Request headers should be set in a [CallInfo] object inside the context using [NewClientContext]. These headers are
+// transmitted when this method is called and do not require an explicit call to [ClientStreamForClientSimple.Send].
+//
+// In addition, when calling [ClientStreamForClientSimple.CloseAndReceive] on the returned stream, the returned response
+// is the response type defined for the stream and _not_ a Connect [Response] wrapper type. As a result, any response
+// headers and trailers should be read from the [CallInfo] object in context.
+func (c *Client[Req, Res]) CallClientStreamSimple(ctx context.Context) (*ClientStreamForClientSimple[Req, Res], error) {
+	if c.err != nil {
+		return &ClientStreamForClientSimple[Req, Res]{
+			stream: &ClientStreamForClient[Req, Res]{err: c.err},
+		}, c.err
+	}
+
+	stream := &ClientStreamForClientSimple[Req, Res]{
+		stream: &ClientStreamForClient[Req, Res]{
+			conn:        c.newConn(ctx, StreamTypeClient, nil),
+			initializer: c.config.Initializer,
+		},
+	}
+	if err := stream.Send(nil); err != nil {
+		return nil, err
+	}
+	return stream, nil
+}
+
 // CallServerStream calls a server streaming procedure.
 func (c *Client[Req, Res]) CallServerStream(ctx context.Context, request *Request[Req]) (*ServerStreamForClient[Res], error) {
 	if c.err != nil {
@@ -149,9 +203,11 @@ func (c *Client[Req, Res]) CallServerStream(ctx context.Context, request *Reques
 	conn := c.newConn(ctx, StreamTypeServer, func(r *http.Request) {
 		request.method = r.Method
 	})
-	request.spec = conn.Spec()
 	request.peer = conn.Peer()
+	request.spec = conn.Spec()
+
 	mergeHeaders(conn.RequestHeader(), request.header)
+
 	// Send always returns an io.EOF unless the error is from the client-side.
 	// We want the user to continue to call Receive in those cases to get the
 	// full error from the server-side.
@@ -170,6 +226,10 @@ func (c *Client[Req, Res]) CallServerStream(ctx context.Context, request *Reques
 }
 
 // CallBidiStream calls a bidirectional streaming procedure.
+//
+// Request headers can be sent via the [BidiStreamForClient.RequestHeader] method. Note that the
+// request headers are not sent automatically when this method is invoked and instead require an explicit call to
+// [BidiStreamForClient.Send].
 func (c *Client[Req, Res]) CallBidiStream(ctx context.Context) *BidiStreamForClient[Req, Res] {
 	if c.err != nil {
 		return &BidiStreamForClient[Req, Res]{err: c.err}
@@ -180,7 +240,41 @@ func (c *Client[Req, Res]) CallBidiStream(ctx context.Context) *BidiStreamForCli
 	}
 }
 
+// CallBidiStreamSimple calls a bidirectional streaming procedure.
+//
+// Request headers should be set in a [CallInfo] object inside the context using [NewClientContext]. These headers
+// are transmitted when this method is called and do not require an explicit call to [BidiStreamForClient.Send].
+//
+// Likewise, response headers and trailers should be read from the [CallInfo] object in context.
+func (c *Client[Req, Res]) CallBidiStreamSimple(ctx context.Context) (*BidiStreamForClientSimple[Req, Res], error) {
+	if c.err != nil {
+		return &BidiStreamForClientSimple[Req, Res]{
+			stream: &BidiStreamForClient[Req, Res]{err: c.err},
+		}, c.err
+	}
+
+	stream := &BidiStreamForClientSimple[Req, Res]{
+		stream: &BidiStreamForClient[Req, Res]{
+			conn:        c.newConn(ctx, StreamTypeBidi, nil),
+			initializer: c.config.Initializer,
+		},
+	}
+
+	if err := stream.Send(nil); err != nil {
+		return nil, err
+	}
+	return stream, nil
+}
+
 func (c *Client[Req, Res]) newConn(ctx context.Context, streamType StreamType, onRequestSend func(r *http.Request)) StreamingClientConn {
+	callInfo, callInfoOk := clientCallInfoForContext(ctx)
+	// Set values in the context if there's a call info present
+	if callInfoOk {
+		// Copy the call info into a sentinel value. This is so we can compare
+		// the sentinel value against the call info in context. If they're different,
+		// we can stop the request. This protects against changing the context in interceptors.
+		ctx = context.WithValue(ctx, sentinelContextKey{}, callInfo)
+	}
 	newConn := func(ctx context.Context, spec Spec) StreamingClientConn {
 		header := make(http.Header, 8) // arbitrary power of two, prevent immediate resizing
 		c.protocolClient.WriteRequestHeader(streamType, header)
@@ -191,7 +285,20 @@ func (c *Client[Req, Res]) newConn(ctx context.Context, streamType StreamType, o
 	if interceptor := c.config.Interceptor; interceptor != nil {
 		newConn = interceptor.WrapStreamingClient(newConn)
 	}
-	return newConn(ctx, c.config.newSpec(streamType))
+	conn := newConn(ctx, c.config.newSpec(streamType))
+
+	// Set values in the context if there's a call info present
+	if callInfoOk {
+		callInfo.peer = conn.Peer()
+		callInfo.spec = conn.Spec()
+		callInfo.responseSource = conn
+
+		// Merge any callInfo request headers first, then do the request,
+		// so that context headers show first in the list of headers.
+		mergeHeaders(conn.RequestHeader(), callInfo.RequestHeader())
+	}
+
+	return conn
 }
 
 type clientConfig struct {

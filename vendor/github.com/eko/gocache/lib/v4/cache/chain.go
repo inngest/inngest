@@ -15,10 +15,10 @@ const (
 )
 
 type chainKeyValue[T any] struct {
-	key       any
-	value     T
-	ttl       time.Duration
-	storeType *string
+	key          any
+	value        T
+	ttl          time.Duration
+	cacheAddress *string
 }
 
 // ChainCache represents the configuration needed by a cache aggregator
@@ -43,7 +43,9 @@ func NewChain[T any](caches ...SetterCacheInterface[T]) *ChainCache[T] {
 func (c *ChainCache[T]) setter() {
 	for item := range c.setChannel {
 		for _, cache := range c.caches {
-			if item.storeType != nil && *item.storeType == cache.GetCodec().GetStore().GetType() {
+			cacheAddress := fmt.Sprintf("%p", cache)
+
+			if item.cacheAddress != nil && *item.cacheAddress == cacheAddress {
 				break
 			}
 
@@ -59,11 +61,12 @@ func (c *ChainCache[T]) Get(ctx context.Context, key any) (T, error) {
 	var ttl time.Duration
 
 	for _, cache := range c.caches {
-		storeType := cache.GetCodec().GetStore().GetType()
+		cacheAddress := fmt.Sprintf("%p", cache)
+
 		object, ttl, err = cache.GetWithTTL(ctx, key)
 		if err == nil {
 			// Set the value back until this cache layer
-			c.setChannel <- &chainKeyValue[T]{key, object, ttl, &storeType}
+			c.setChannel <- &chainKeyValue[T]{key, object, ttl, &cacheAddress}
 			return object, nil
 		}
 	}
@@ -78,18 +81,10 @@ func (c *ChainCache[T]) Set(ctx context.Context, key any, object T, options ...s
 		err := cache.Set(ctx, key, object, options...)
 		if err != nil {
 			storeType := cache.GetCodec().GetStore().GetType()
-			errs = append(errs, fmt.Errorf("Unable to set item into cache with store '%s': %v", storeType, err))
+			errs = append(errs, fmt.Errorf("unable to set item into cache with store '%s': %w", storeType, err))
 		}
 	}
-	if len(errs) > 0 {
-		errStr := ""
-		for k, v := range errs {
-			errStr += fmt.Sprintf("error %d of %d: %v", k+1, len(errs), v.Error())
-		}
-		return errors.New(errStr)
-	}
-
-	return nil
+	return errors.Join(errs...)
 }
 
 // Delete removes a value from all available caches

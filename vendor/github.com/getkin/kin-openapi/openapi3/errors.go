@@ -57,3 +57,13 @@ func (meo multiErrorForOneOf) Error() string {
 func (meo multiErrorForOneOf) Unwrap() error {
 	return MultiError(meo)
 }
+
+type multiErrorForAllOf MultiError
+
+func (mea multiErrorForAllOf) Error() string {
+	return spliceErr(" And ", mea)
+}
+
+func (mea multiErrorForAllOf) Unwrap() error {
+	return MultiError(mea)
+}

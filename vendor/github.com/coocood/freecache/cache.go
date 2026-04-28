@@ -86,6 +86,47 @@ func (cache *Cache) Get(key []byte) (value []byte, err error) {
 	return
 }
 
+// MultiGet returns values and errors for the given keys. The returned slices
+// have the same length as keys; values[i] and errs[i] correspond to keys[i].
+// A miss is represented by values[i] == nil and errs[i] == ErrNotFound.
+// MultiGet reduces lock contention by grouping keys by segment and acquiring
+// each segment lock at most once.
+// Note that MultiGet holds each segment lock longer than a single Get (for
+// the duration of all keys in that segment), which can increase Get tail
+// latency when MultiGet and Get run concurrently.
+func (cache *Cache) MultiGet(keys [][]byte) (values [][]byte, errs []error) {
+	n := len(keys)
+	if n == 0 {
+		return nil, nil
+	}
+	values = make([][]byte, n)
+	errs = make([]error, n)
+	type keyLoc struct {
+		idx     int
+		hashVal uint64
+	}
+	var groups [segmentCount][]keyLoc
+	for i, key := range keys {
+		hashVal := hashFunc(key)
+		segID := hashVal & segmentAndOpVal
+		groups[segID] = append(groups[segID], keyLoc{idx: i, hashVal: hashVal})
+	}
+	for segID := 0; segID < segmentCount; segID++ {
+		batch := groups[segID]
+		if len(batch) == 0 {
+			continue
+		}
+		cache.locks[segID].Lock()
+		for _, loc := range batch {
+			value, _, err := cache.segments[segID].get(keys[loc.idx], nil, loc.hashVal, false)
+			values[loc.idx] = value
+			errs[loc.idx] = err
+		}
+		cache.locks[segID].Unlock()
+	}
+	return values, errs
+}
+
 // GetFn is equivalent to Get or GetWithBuf, but it attempts to be zero-copy,
 // calling the provided function with slice view over the current underlying
 // value of the key in memory. The slice is constrained in length and capacity.
@@ -165,6 +206,8 @@ func (cache *Cache) Update(key []byte, updater Updater) (found bool, replaced bo
 }
 
 // Peek returns the value or not found error, without updating access time or counters.
+// Warning: No expiry check is performed so if an expired value is found, it will be
+// returned without error
 func (cache *Cache) Peek(key []byte) (value []byte, err error) {
 	hashVal := hashFunc(key)
 	segID := hashVal & segmentAndOpVal
@@ -174,15 +217,29 @@ func (cache *Cache) Peek(key []byte) (value []byte, err error) {
 	return
 }
 
+// PeekWithExpiration returns the value and expiration time, without updating access time or counters.
+// Warning: No expiry check is performed so if an expired value is found, it will be
+// returned without error
+func (cache *Cache) PeekWithExpiration(key []byte) (value []byte, expireAt uint32, err error) {
+	hashVal := hashFunc(key)
+	segID := hashVal & segmentAndOpVal
+	cache.locks[segID].Lock()
+	value, expireAt, err = cache.segments[segID].get(key, nil, hashVal, true)
+	cache.locks[segID].Unlock()
+	return
+}
+
 // PeekFn is equivalent to Peek, but it attempts to be zero-copy, calling the
 // provided function with slice view over the current underlying value of the
 // key in memory. The slice is constrained in length and capacity.
 //
-// In moth cases, this method will not alloc a byte buffer. The only exception
+// In most cases, this method will not alloc a byte buffer. The only exception
 // is when the value wraps around the underlying segment ring buffer.
 //
 // The method will return ErrNotFound is there's a miss, and the function will
 // not be called. Errors returned by the function will be propagated.
+// Warning: No expiry check is performed so if an expired value is found, it will be
+// returned without error
 func (cache *Cache) PeekFn(key []byte, fn func([]byte) error) (err error) {
 	hashVal := hashFunc(key)
 	segID := hashVal & segmentAndOpVal
@@ -209,6 +266,17 @@ func (cache *Cache) GetWithExpiration(key []byte) (value []byte, expireAt uint32
 	segID := hashVal & segmentAndOpVal
 	cache.locks[segID].Lock()
 	value, expireAt, err = cache.segments[segID].get(key, nil, hashVal, false)
+	cache.locks[segID].Unlock()
+	return
+}
+
+// GetWithExpirationAndBuf copies the value to the buf and gets with expiration or returns a not found error.
+// This method doesn't allocate memory when the capacity of buf is greater or equal to value.
+func (cache *Cache) GetWithExpirationAndBuf(key []byte, buf []byte) (value []byte, expireAt uint32, err error) {
+	hashVal := hashFunc(key)
+	segID := hashVal & segmentAndOpVal
+	cache.locks[segID].Lock()
+	value, expireAt, err = cache.segments[segID].get(key, buf, hashVal, false)
 	cache.locks[segID].Unlock()
 	return
 }
@@ -333,7 +401,7 @@ func (cache *Cache) HitRate() float64 {
 	}
 }
 
-// OverwriteCount indicates the number of times entries have been overriden.
+// OverwriteCount indicates the number of times entries have been overridden.
 func (cache *Cache) OverwriteCount() (overwriteCount int64) {
 	for i := range cache.segments {
 		overwriteCount += atomic.LoadInt64(&cache.segments[i].overwrites)

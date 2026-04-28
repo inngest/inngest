@@ -81,6 +81,14 @@ func (proto *Proto) parse(p *Parser) error {
 				return err
 			}
 			proto.addElement(s)
+		case tEDITION == tok:
+			s := new(Edition)
+			s.Position = pos
+			s.Comment, proto.Elements = takeLastCommentIfEndsOnLine(proto.Elements, pos.Line-1)
+			if err := s.parse(p); err != nil {
+				return err
+			}
+			proto.addElement(s)
 		case tIMPORT == tok:
 			im := new(Import)
 			im.Position = pos

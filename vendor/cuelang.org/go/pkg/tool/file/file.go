@@ -14,38 +14,45 @@
 
 package file
 
-//go:generate go run gen.go
-//go:generate gofmt -s -w .
-
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/internal/task"
+	pkgpath "cuelang.org/go/pkg/path"
 )
 
 func init() {
 	task.Register("tool/file.Read", newReadCmd)
 	task.Register("tool/file.Append", newAppendCmd)
 	task.Register("tool/file.Create", newCreateCmd)
+	task.Register("tool/file.Symlink", newSymlinkCmd)
 	task.Register("tool/file.Glob", newGlobCmd)
 	task.Register("tool/file.Mkdir", newMkdirCmd)
+	task.Register("tool/file.MkdirTemp", newMkdirTempCmd)
+	task.Register("tool/file.RemoveAll", newRemoveAllCmd)
 }
 
-func newReadCmd(v cue.Value) (task.Runner, error)   { return &cmdRead{}, nil }
-func newAppendCmd(v cue.Value) (task.Runner, error) { return &cmdAppend{}, nil }
-func newCreateCmd(v cue.Value) (task.Runner, error) { return &cmdCreate{}, nil }
-func newGlobCmd(v cue.Value) (task.Runner, error)   { return &cmdGlob{}, nil }
-func newMkdirCmd(v cue.Value) (task.Runner, error)  { return &cmdMkdir{}, nil }
+func newReadCmd(v cue.Value) (task.Runner, error)      { return &cmdRead{}, nil }
+func newAppendCmd(v cue.Value) (task.Runner, error)    { return &cmdAppend{}, nil }
+func newCreateCmd(v cue.Value) (task.Runner, error)    { return &cmdCreate{}, nil }
+func newSymlinkCmd(v cue.Value) (task.Runner, error)   { return &cmdSymlink{}, nil }
+func newGlobCmd(v cue.Value) (task.Runner, error)      { return &cmdGlob{}, nil }
+func newMkdirCmd(v cue.Value) (task.Runner, error)     { return &cmdMkdir{}, nil }
+func newMkdirTempCmd(v cue.Value) (task.Runner, error) { return &cmdMkdirTemp{}, nil }
+func newRemoveAllCmd(v cue.Value) (task.Runner, error) { return &cmdRemoveAll{}, nil }
 
 type cmdRead struct{}
 type cmdAppend struct{}
 type cmdCreate struct{}
+type cmdSymlink struct{}
 type cmdGlob struct{}
 type cmdMkdir struct{}
+type cmdMkdirTemp struct{}
+type cmdRemoveAll struct{}
 
 func (c *cmdRead) Run(ctx *task.Context) (res interface{}, err error) {
 	filename := ctx.String("filename")
@@ -53,7 +60,7 @@ func (c *cmdRead) Run(ctx *task.Context) (res interface{}, err error) {
 		return nil, ctx.Err
 	}
 
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -100,13 +107,35 @@ func (c *cmdCreate) Run(ctx *task.Context) (res interface{}, err error) {
 		return nil, ctx.Err
 	}
 
-	return nil, ioutil.WriteFile(filename, b, os.FileMode(mode))
+	return nil, os.WriteFile(filename, b, os.FileMode(mode))
+}
+
+func (c *cmdSymlink) Run(ctx *task.Context) (res interface{}, err error) {
+	var (
+		filename = filepath.FromSlash(ctx.String("filename"))
+		target   = filepath.FromSlash(ctx.String("target"))
+	)
+	if ctx.Err != nil {
+		return nil, ctx.Err
+	}
+
+	return nil, os.Symlink(target, filename)
 }
 
 func (c *cmdGlob) Run(ctx *task.Context) (res interface{}, err error) {
 	glob := ctx.String("glob")
 	if ctx.Err != nil {
 		return nil, ctx.Err
+	}
+	// Validate that the glob pattern is valid per [pkgpath.Match].
+	// Note that we use the current OS to match the semantics of [filepath.Glob],
+	// and since the APIs in this package are meant to support native paths.
+	os := pkgpath.Unix
+	if runtime.GOOS == "windows" {
+		os = pkgpath.Windows
+	}
+	if _, err := pkgpath.Match(glob, "", os); err != nil {
+		return nil, err
 	}
 	m, err := filepath.Glob(glob)
 	for i, s := range m {
@@ -140,4 +169,38 @@ func (c *cmdMkdir) Run(ctx *task.Context) (res interface{}, err error) {
 	}
 
 	return nil, nil
+}
+
+func (c *cmdMkdirTemp) Run(ctx *task.Context) (res interface{}, err error) {
+	dir := ctx.String("dir")
+	pattern := ctx.String("pattern")
+
+	if ctx.Err != nil {
+		return nil, ctx.Err
+	}
+
+	path, err := os.MkdirTemp(dir, pattern)
+	if err != nil {
+		return nil, errors.Wrapf(err, ctx.Obj.Pos(), "failed to create temporary directory")
+	}
+
+	return map[string]interface{}{"path": path}, nil
+}
+
+func (c *cmdRemoveAll) Run(ctx *task.Context) (res interface{}, err error) {
+	path := ctx.String("path")
+
+	if ctx.Err != nil {
+		return nil, ctx.Err
+	}
+
+	if _, err := os.Stat(path); err != nil {
+		return map[string]interface{}{"success": false}, nil
+	}
+
+	if err := os.RemoveAll(path); err != nil {
+		return nil, errors.Wrapf(err, ctx.Obj.Pos(), "failed to remove path")
+	}
+
+	return map[string]interface{}{"success": true}, nil
 }

@@ -19,16 +19,24 @@
 package list
 
 import (
+	"slices"
 	"sort"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/core/eval"
 )
 
 // valueSorter defines a sort.Interface; implemented in cue/builtinutil.go.
 type valueSorter struct {
+	ctx *adt.OpContext
 	a   []cue.Value
-	cmp cue.Value
 	err error
+
+	cmp  *adt.Vertex
+	less *adt.Vertex
+	x    *adt.Vertex
+	y    *adt.Vertex
 }
 
 func (s *valueSorter) ret() ([]cue.Value, error) {
@@ -42,14 +50,89 @@ func (s *valueSorter) ret() ([]cue.Value, error) {
 func (s *valueSorter) Len() int      { return len(s.a) }
 func (s *valueSorter) Swap(i, j int) { s.a[i], s.a[j] = s.a[j], s.a[i] }
 func (s *valueSorter) Less(i, j int) bool {
-	v := s.cmp.Fill(s.a[i], "x")
-	v = v.Fill(s.a[j], "y")
-	isLess, err := v.Lookup("less").Bool()
-	if err != nil && s.err == nil {
-		s.err = err
+	if s.err != nil {
+		return false
+	}
+
+	return s.lessNew(i, j)
+}
+
+func (s *valueSorter) lessNew(i, j int) bool {
+	ctx := s.ctx
+
+	n := &adt.Vertex{
+		Label:     s.cmp.Label,
+		Parent:    s.cmp.Parent,
+		Conjuncts: s.cmp.Conjuncts,
+	}
+
+	n.Init(ctx)
+
+	less := getArc(ctx, n, "less")
+	xa := getArc(ctx, n, "x")
+	ya := getArc(ctx, n, "y")
+
+	x := s.a[i].Core()
+	y := s.a[j].Core()
+
+	xa.InsertConjunctsFrom(x.V)
+	ya.InsertConjunctsFrom(y.V)
+
+	// TODO(perf): if we can determine that the comparator values for
+	// x and y are idempotent (no arcs and a basevalue being top or
+	// a struct or list marker), then we do not need to reevaluate the input.
+	// In that case, we can use the below code instead of the above two loops
+	// setting the conjuncts. This may improve performance significantly.
+	//
+	// s.x.BaseValue = x.V.BaseValue
+	// s.x.Arcs = x.V.Arcs
+	// s.y.BaseValue = y.V.BaseValue
+	// s.y.Arcs = y.V.Arcs
+
+	less.Finalize(s.ctx)
+
+	isLess := s.ctx.BoolValue(less)
+	if b := less.Err(s.ctx); b != nil && s.err == nil {
+		s.err = b.Err
 		return true
 	}
+
 	return isLess
+}
+
+var less = cue.ParsePath("less")
+
+func makeValueSorter(list []cue.Value, cmp cue.Value) (s valueSorter) {
+	if v := cmp.LookupPath(less); !v.Exists() {
+		return valueSorter{err: v.Err()}
+	}
+
+	v := cmp.Core()
+	ctx := eval.NewContext(v.R, v.V)
+
+	n := &adt.Vertex{
+		Label:     v.V.Label,
+		Parent:    v.V.Parent,
+		Conjuncts: v.V.Conjuncts,
+	}
+	n.CompleteArcs(ctx)
+
+	s = valueSorter{
+		a:    list,
+		ctx:  ctx,
+		cmp:  n,
+		less: getArc(ctx, n, "less"),
+		x:    getArc(ctx, n, "x"),
+		y:    getArc(ctx, n, "y"),
+	}
+
+	// TODO(perf): see comment in the Less method. If we can determine
+	// the conjuncts for x and y are idempotent, we can pre finalize here and
+	// ignore the values in the Less method.
+	// s.x.UpdateStatus(adt.Finalized)
+	// s.y.UpdateStatus(adt.Finalized)
+
+	return s
 }
 
 // Sort sorts data while keeping the original order of equal elements.
@@ -60,27 +143,33 @@ func (s *valueSorter) Less(i, j int) bool {
 //
 // Example:
 //
-//    Sort([2, 3, 1], list.Ascending)
+//	Sort([2, 3, 1], list.Ascending)
 //
-//    Sort{{a: 2}, {a: 3}, {a: 1}, {x: {}, y: {}, less: x.a < y.a}}
-//
+//	Sort([{a: 2}, {a: 3}, {a: 1}], {x: {}, y: {}, less: x.a < y.a})
 func Sort(list []cue.Value, cmp cue.Value) (sorted []cue.Value, err error) {
-	s := valueSorter{list, cmp, nil}
+	s := makeValueSorter(list, cmp)
+
 	// The input slice is already a copy and that we can modify it safely.
 	sort.Stable(&s)
 	return s.ret()
 }
 
-// Deprecated: use Sort, which is always stable
+func getArc(ctx *adt.OpContext, v *adt.Vertex, s string) *adt.Vertex {
+	f := ctx.StringLabel(s)
+	arc, _ := v.GetArc(ctx, f, 0)
+	return arc
+}
+
+// Deprecated: use [Sort], which is always stable
 func SortStable(list []cue.Value, cmp cue.Value) (sorted []cue.Value, err error) {
-	s := valueSorter{list, cmp, nil}
+	s := makeValueSorter(list, cmp)
 	sort.Stable(&s)
 	return s.ret()
 }
 
-// Strings sorts a list of strings in increasing order.
+// SortStrings sorts a list of strings in increasing order.
 func SortStrings(a []string) []string {
-	sort.Strings(a)
+	slices.Sort(a)
 	return a
 }
 
@@ -88,11 +177,11 @@ func SortStrings(a []string) []string {
 //
 // See Sort for an example comparator.
 func IsSorted(list []cue.Value, cmp cue.Value) bool {
-	s := valueSorter{list, cmp, nil}
+	s := makeValueSorter(list, cmp)
 	return sort.IsSorted(&s)
 }
 
-// IsSortedStrings tests whether a list is a sorted lists of strings.
+// IsSortedStrings tests whether a list is a sorted list of strings.
 func IsSortedStrings(a []string) bool {
-	return sort.StringsAreSorted(a)
+	return slices.IsSorted(a)
 }

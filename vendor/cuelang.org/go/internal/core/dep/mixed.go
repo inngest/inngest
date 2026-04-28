@@ -27,10 +27,12 @@ import (
 // evaluated Vertex. A more correct and more performant algorithm would be to
 // descend into the conjuncts and evaluate the necessary values, like fields
 // and comprehension sources.
-func dynamic(c *adt.OpContext, n *adt.Vertex, f VisitFunc, m marked, top bool) {
+func (v *visitor) dynamic(n *adt.Vertex, top bool) {
 	found := false
-	for _, c := range n.Conjuncts {
-		if m[c.Expr()] {
+	// TODO: Consider if we should only visit the conjuncts of the disjunction
+	// for dynamic mode.
+	for c := range n.LeafConjuncts() {
+		if v.marked[c.Expr()] {
 			found = true
 			break
 		}
@@ -40,12 +42,16 @@ func dynamic(c *adt.OpContext, n *adt.Vertex, f VisitFunc, m marked, top bool) {
 		return
 	}
 
-	if visit(c, n, f, false, top) != nil {
+	if v.visit(n, top) != nil {
 		return
 	}
 
+	n = n.DerefValue()
 	for _, a := range n.Arcs {
-		dynamic(c, a, f, m, false)
+		if !a.IsDefined(v.ctxt) || a.Label.IsLet() {
+			continue
+		}
+		v.dynamic(a, false)
 	}
 }
 
@@ -63,7 +69,7 @@ func (m marked) markExpr(x adt.Expr) {
 
 	case nil:
 	case *adt.Vertex:
-		for _, c := range x.Conjuncts {
+		for c := range x.LeafConjuncts() {
 			m.markExpr(c.Expr())
 		}
 
@@ -79,10 +85,10 @@ func (m marked) markExpr(x adt.Expr) {
 			case *adt.Field:
 				m.markExpr(x.Value)
 
-			case *adt.OptionalField:
+			case *adt.BulkOptionalField:
 				m.markExpr(x.Value)
 
-			case *adt.BulkOptionalField:
+			case *adt.LetField:
 				m.markExpr(x.Value)
 
 			case *adt.DynamicField:
@@ -94,8 +100,8 @@ func (m marked) markExpr(x adt.Expr) {
 			case adt.Expr:
 				m.markExpr(x)
 
-			case adt.Yielder:
-				m.markYielder(x)
+			case *adt.Comprehension:
+				m.markComprehension(x)
 
 			default:
 				panic(fmt.Sprintf("unreachable %T", x))
@@ -108,8 +114,8 @@ func (m marked) markExpr(x adt.Expr) {
 			case adt.Expr:
 				m.markExpr(x)
 
-			case adt.Yielder:
-				m.markYielder(x)
+			case *adt.Comprehension:
+				m.markComprehension(x)
 
 			case *adt.Ellipsis:
 				m.markExpr(x.Value)
@@ -123,24 +129,12 @@ func (m marked) markExpr(x adt.Expr) {
 		for _, d := range x.Values {
 			m.markExpr(d.Val)
 		}
-
-	case adt.Yielder:
-		m.markYielder(x)
 	}
 }
 
-func (m marked) markYielder(y adt.Yielder) {
-	switch x := y.(type) {
-	case *adt.ForClause:
-		m.markYielder(x.Dst)
-
-	case *adt.IfClause:
-		m.markYielder(x.Dst)
-
-	case *adt.LetClause:
-		m.markYielder(x.Dst)
-
-	case *adt.ValueClause:
-		m.markExpr(x.StructLit)
+func (m marked) markComprehension(y *adt.Comprehension) {
+	m.markExpr(adt.ToExpr(y.Value))
+	if y.Fallback != nil {
+		m.markExpr(y.Fallback)
 	}
 }

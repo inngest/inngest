@@ -2,7 +2,6 @@
 package {{ .Package }}
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 {{ range $type := .Types }}
 func Test{{ $type.Name }}Ref_Extensions(t *testing.T) {
 	data := []byte(`{"$ref":"#/components/schemas/Pet","something":"integer","x-order":1}`)
+	expectMarshalJson := []byte(`{"$ref":"#/components/schemas/Pet","x-order":1}`)
 
 	ref := {{ $type.Name }}Ref{}
 	err := json.Unmarshal(data, &ref)
@@ -25,14 +25,20 @@ func Test{{ $type.Name }}Ref_Extensions(t *testing.T) {
 	assert.Nil(t, ref.Extensions["something"])
 
 	// validation
-	err = ref.Validate(context.Background())
+	err = ref.Validate(t.Context())
 	require.EqualError(t, err, "extra sibling fields: [something]")
 
-	err = ref.Validate(context.Background(), ProhibitExtensionsWithRef())
+	err = ref.Validate(t.Context(), ProhibitExtensionsWithRef())
 	require.EqualError(t, err, "extra sibling fields: [something x-order]")
 
-	err = ref.Validate(context.Background(), AllowExtraSiblingFields("something"))
+	err = ref.Validate(t.Context(), AllowExtraSiblingFields("something"))
 	assert.ErrorContains(t, err, "found unresolved ref") // expected since value not defined
+
+	// Verify round trip JSON
+	// Compare as string to make error message more readable if different
+	outJson, err := ref.MarshalJSON()
+	assert.NoError(t, err)
+	assert.Equal(t, string(outJson), string(expectMarshalJson), "MarshalJSON output is not the same as input data")
 
 	// non-extension not json lookable
 	_, err = ref.JSONLookup("something")

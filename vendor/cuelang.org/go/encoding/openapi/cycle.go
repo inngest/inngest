@@ -15,9 +15,11 @@
 package openapi
 
 import (
+	"slices"
+
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/dep"
 	"cuelang.org/go/internal/core/eval"
 	internalvalue "cuelang.org/go/internal/value"
@@ -39,18 +41,12 @@ func (b *builder) checkCycle(v cue.Value) bool {
 	r, n := internalvalue.ToInternal(v)
 	ctx := eval.NewContext(r, n)
 
-	err := dep.Visit(ctx, n, func(d dep.Dependency) error {
-		for _, m := range b.ctx.cycleNodes {
-			if m == d.Node {
-				var p token.Pos
-				if src := d.Node.Source(); src != nil {
-					p = src.Pos()
-				}
-				err := errors.Newf(p,
-					"cycle in reference at %v: cyclic structures not allowed when reference expansion is requested", v.Path())
-				b.ctx.errs = errors.Append(b.ctx.errs, err)
-				return err
-			}
+	err := dep.Visit(nil, ctx, n, func(d dep.Dependency) error {
+		if slices.Contains(b.ctx.cycleNodes, d.Node) {
+			err := errors.Newf(adt.Pos(d.Node),
+				"cycle in reference at %v: cyclic structures not allowed when reference expansion is requested", v.Path())
+			b.ctx.errs = errors.Append(b.ctx.errs, err)
+			return err
 		}
 		return nil
 	})

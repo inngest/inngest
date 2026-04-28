@@ -13,6 +13,9 @@
 // limitations under the License.
 
 // Package time defines time-related types.
+//
+// In CUE time values are represented as a string of the format
+// time.RFC3339Nano.
 package time
 
 import (
@@ -22,10 +25,14 @@ import (
 
 // These are predefined layouts for use in Time.Format and time.Parse.
 // The reference time used in the layouts is the specific time:
+//
 //	Mon Jan 2 15:04:05 MST 2006
+//
 // which is Unix time 1136239445. Since MST is GMT-0700,
 // the reference time can be thought of as
+//
 //	01/02 03:04:05PM '06 -0700
+//
 // To define your own format, write down what the reference time would look
 // like formatted your way; see the values of constants like ANSIC,
 // StampMicro or Kitchen for examples. The model is to demonstrate what the
@@ -49,12 +56,15 @@ import (
 // series of digits is parsed as a fractional second.
 //
 // Numeric time zone offsets format as follows:
+//
 //	-0700  ±hhmm
 //	-07:00 ±hh:mm
 //	-07    ±hh
+//
 // Replacing the sign in the format with a Z triggers
 // the ISO 8601 behavior of printing Z instead of an
 // offset for the UTC zone. Thus:
+//
 //	Z0700  Z or ±hhmm
 //	Z07:00 Z or ±hh:mm
 //	Z07    Z or ±hh
@@ -130,7 +140,7 @@ func Time(s string) (bool, error) {
 }
 
 func timeFormat(value, layout string) (bool, error) {
-	_, err := time.Parse(layout, value)
+	_, err := time.ParseInLocation(layout, value, time.UTC)
 	if err != nil {
 		// Use our own error, the time package's error as the Go error is too
 		// confusing within this context.
@@ -146,10 +156,23 @@ func Format(value, layout string) (bool, error) {
 	return timeFormat(value, layout)
 }
 
+// FormatString returns a textual representation of the time value.
+// The formatted value is formatted according to the layout defined by the
+// argument. See Parse for more information on the layout string.
+func FormatString(layout, value string) (string, error) {
+	t, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return "", err
+	}
+	return t.Format(layout), nil
+}
+
 // Parse parses a formatted string and returns the time value it represents.
 // The layout defines the format by showing how the reference time,
 // defined to be
+//
 //	Mon Jan 2 15:04:05 -0700 MST 2006
+//
 // would be interpreted if it were the value; it serves as an example of
 // the input format. The same interpretation will then be made to the
 // input string.
@@ -175,17 +198,12 @@ func Format(value, layout string) (bool, error) {
 // location and zone in the returned time. Otherwise it records the time as
 // being in a fabricated location with time fixed at the given zone offset.
 //
-// When parsing a time with a zone abbreviation like MST, if the zone abbreviation
-// has a defined offset in the current location, then that offset is used.
-// The zone abbreviation "UTC" is recognized as UTC regardless of location.
-// If the zone abbreviation is unknown, Parse records the time as being
-// in a fabricated location with the given zone abbreviation and a zero offset.
-// This choice means that such a time can be parsed and reformatted with the
-// same layout losslessly, but the exact instant used in the representation will
-// differ by the actual zone offset. To avoid such problems, prefer time layouts
-// that use a numeric zone offset, or use ParseInLocation.
+// Parse currently does not support zone abbreviations like MST. All are
+// interpreted as UTC.
 func Parse(layout, value string) (string, error) {
-	t, err := time.Parse(layout, value)
+	// TODO: should we support locations? The result will be non-hermetic.
+	// See comments on github.com/cue-lang/cue/issues/1522.
+	t, err := time.ParseInLocation(layout, value, time.UTC)
 	if err != nil {
 		return "", err
 	}
@@ -200,4 +218,36 @@ func Parse(layout, value string) (string, error) {
 func Unix(sec int64, nsec int64) string {
 	t := time.Unix(sec, nsec)
 	return t.UTC().Format(time.RFC3339Nano)
+}
+
+// Parts holds individual parts of a parsed time stamp.
+type Parts struct {
+	Year   int `json:"year"`
+	Month  int `json:"month"`
+	Day    int `json:"day"`
+	Hour   int `json:"hour"`
+	Minute int `json:"minute"`
+
+	// Second is equal to div(Nanosecond, 1_000_000_000)
+	Second     int `json:"second"`
+	Nanosecond int `json:"nanosecond"`
+}
+
+// Split parses a time string into its individual parts.
+func Split(t string) (*Parts, error) {
+	st, err := time.Parse(time.RFC3339Nano, t)
+	if err != nil {
+		return nil, err
+	}
+	year, month, day := st.Date()
+	return &Parts{
+		Year:   year,
+		Month:  int(month),
+		Day:    day,
+		Hour:   st.Hour(),
+		Minute: st.Minute(),
+
+		Second:     st.Second(),
+		Nanosecond: st.Nanosecond(),
+	}, nil
 }

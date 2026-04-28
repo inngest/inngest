@@ -1,4 +1,4 @@
-// Copyright 2022-2024 The NATS Authors
+// Copyright 2022-2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,6 +16,7 @@ package jetstream
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -140,12 +141,21 @@ type (
 )
 
 const (
-	controlMsg       = "100"
-	badRequest       = "400"
-	noMessages       = "404"
-	reqTimeout       = "408"
-	maxBytesExceeded = "409"
-	noResponders     = "503"
+	statusControlMsg    = "100"
+	statusBadRequest    = "400"
+	statusNoMsgs        = "404"
+	statusTimeout       = "408"
+	statusConflict      = "409"
+	statusNoResponders  = "503"
+	statusPinIdMismatch = "423"
+
+	fcRequestDescr     = "flowcontrol request"
+	idleHeartbeatDescr = "idle heartbeat"
+	consumerDeleted    = "consumer deleted"
+	leadershipChange   = "leadership change"
+	maxBytesExceeded   = "message size exceeds maxbytes"
+	batchCompleted     = "batch completed"
+	serverShutdown     = "server shutdown"
 )
 
 // Headers used when publishing messages.
@@ -170,7 +180,7 @@ const (
 	// level. Server will reject the message if it is not the case.
 	//
 	// This can be set when publishing messages using [WithExpectLastSequence]
-	// option. option.
+	// option.
 	ExpectedLastSeqHeader = "Nats-Expected-Last-Sequence"
 
 	// ExpectedLastSubjSeqHeader contains the expected last sequence number on
@@ -181,6 +191,12 @@ const (
 	// [WithExpectLastSequencePerSubject] option.
 	ExpectedLastSubjSeqHeader = "Nats-Expected-Last-Subject-Sequence"
 
+	// ExpectedLastSubjSeqSubjHeader contains the subject for which the
+	// expected last sequence number is set. This is used together with
+	// [ExpectedLastSubjSeqHeader] to apply optimistic concurrency control at
+	// subject level. Server will reject the message if it is not the case.
+	ExpectedLastSubjSeqSubjHeader = "Nats-Expected-Last-Subject-Sequence-Subject"
+
 	// ExpectedLastMsgIDHeader contains the expected last message ID on the
 	// subject and can be used to apply optimistic concurrency control at
 	// stream level. Server will reject the message if it is not the case.
@@ -189,9 +205,16 @@ const (
 	// option.
 	ExpectedLastMsgIDHeader = "Nats-Expected-Last-Msg-Id"
 
+	// MsgTTLHeader is used to specify the TTL for a specific message. This will
+	// override the default TTL for the stream.
+	MsgTTLHeader = "Nats-TTL"
+
 	// MsgRollup is used to apply a purge of all prior messages in the stream
 	// ("all") or at the subject ("sub") before this message.
 	MsgRollup = "Nats-Rollup"
+
+	// MarkerReasonHeader is used to specify a reason for message deletion.
+	MarkerReasonHeader = "Nats-Marker-Reason"
 )
 
 // Headers for republished messages and direct gets. Those headers are set by
@@ -204,7 +227,7 @@ const (
 	// SequenceHeader contains the original sequence number of the message.
 	SequenceHeader = "Nats-Sequence"
 
-	// TimeStampHeader contains the original timestamp of the message.
+	// TimeStampHeaer contains the original timestamp of the message.
 	TimeStampHeaer = "Nats-Time-Stamp"
 
 	// SubjectHeader contains the original subject the message was published to.
@@ -268,7 +291,7 @@ func (m *jetStreamMsg) Headers() nats.Header {
 	return m.msg.Header
 }
 
-// Subject returns a subject on which a message is published.
+// Subject returns a subject on which a message was published/received.
 func (m *jetStreamMsg) Subject() string {
 	return m.msg.Subject
 }
@@ -341,7 +364,7 @@ func (m *jetStreamMsg) ackReply(ctx context.Context, ackType ackType, sync bool,
 
 	if sync {
 		var cancel context.CancelFunc
-		ctx, cancel = wrapContextWithoutDeadline(ctx)
+		ctx, cancel = m.js.wrapContextWithoutDeadline(ctx)
 		if cancel != nil {
 			defer cancel()
 		}
@@ -385,9 +408,9 @@ func (m *jetStreamMsg) checkReply() error {
 	return nil
 }
 
-// Returns if the given message is a user message or not, and if
-// checkSts() is true, returns appropriate error based on the
-// content of the status (404, etc..)
+// checkMsg returns whether the given message is a user message or a control message.
+// If the status header is present, it returns an appropriate error based
+// on the status code (404, etc.)
 func checkMsg(msg *nats.Msg) (bool, error) {
 	// If payload or no header, consider this a user message
 	if len(msg.Data) > 0 || len(msg.Header) == 0 {
@@ -402,26 +425,34 @@ func checkMsg(msg *nats.Msg) (bool, error) {
 	}
 
 	switch val {
-	case badRequest:
+	case statusBadRequest:
 		return false, ErrBadRequest
-	case noResponders:
+	case statusNoResponders:
 		return false, nats.ErrNoResponders
-	case noMessages:
+	case statusNoMsgs:
 		// 404 indicates that there are no messages.
 		return false, ErrNoMessages
-	case reqTimeout:
+	case statusTimeout:
 		return false, nats.ErrTimeout
-	case controlMsg:
+	case statusControlMsg:
 		return false, nil
-	case maxBytesExceeded:
-		if strings.Contains(strings.ToLower(descr), "message size exceeds maxbytes") {
+	case statusPinIdMismatch:
+		return false, ErrPinIDMismatch
+	case statusConflict:
+		if strings.Contains(strings.ToLower(descr), maxBytesExceeded) {
 			return false, ErrMaxBytesExceeded
 		}
-		if strings.Contains(strings.ToLower(descr), "consumer deleted") {
+		if strings.Contains(strings.ToLower(descr), batchCompleted) {
+			return false, ErrBatchCompleted
+		}
+		if strings.Contains(strings.ToLower(descr), consumerDeleted) {
 			return false, ErrConsumerDeleted
 		}
-		if strings.Contains(strings.ToLower(descr), "leadership change") {
+		if strings.Contains(strings.ToLower(descr), leadershipChange) {
 			return false, ErrConsumerLeadershipChanged
+		}
+		if strings.Contains(strings.ToLower(descr), serverShutdown) {
+			return false, ErrServerShutdown
 		}
 	}
 	return false, fmt.Errorf("nats: %s", msg.Header.Get("Description"))
@@ -434,7 +465,7 @@ func parsePending(msg *nats.Msg) (int, int, error) {
 	if msgsLeftStr != "" {
 		msgsLeft, err = strconv.Atoi(msgsLeftStr)
 		if err != nil {
-			return 0, 0, fmt.Errorf("nats: invalid format of Nats-Pending-Messages")
+			return 0, 0, errors.New("nats: invalid format of Nats-Pending-Messages")
 		}
 	}
 	bytesLeftStr := msg.Header.Get("Nats-Pending-Bytes")
@@ -442,7 +473,7 @@ func parsePending(msg *nats.Msg) (int, int, error) {
 	if bytesLeftStr != "" {
 		bytesLeft, err = strconv.Atoi(bytesLeftStr)
 		if err != nil {
-			return 0, 0, fmt.Errorf("nats: invalid format of Nats-Pending-Bytes")
+			return 0, 0, errors.New("nats: invalid format of Nats-Pending-Bytes")
 		}
 	}
 	return msgsLeft, bytesLeft, nil

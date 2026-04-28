@@ -12,7 +12,7 @@ type SNSEvent struct {
 
 type SNSEventRecord struct {
 	EventVersion         string    `json:"EventVersion"`
-	EventSubscriptionArn string    `json:"EventSubscriptionArn"` //nolint: stylecheck
+	EventSubscriptionArn string    `json:"EventSubscriptionArn"` //nolint: staticcheck
 	EventSource          string    `json:"EventSource"`
 	SNS                  SNSEntity `json:"Sns"`
 }
@@ -21,7 +21,7 @@ type SNSEntity struct {
 	Signature         string                 `json:"Signature"`
 	MessageID         string                 `json:"MessageId"`
 	Type              string                 `json:"Type"`
-	TopicArn          string                 `json:"TopicArn"` //nolint: stylecheck
+	TopicArn          string                 `json:"TopicArn"` //nolint: staticcheck
 	MessageAttributes map[string]interface{} `json:"MessageAttributes"`
 	SignatureVersion  string                 `json:"SignatureVersion"`
 	Timestamp         time.Time              `json:"Timestamp"`

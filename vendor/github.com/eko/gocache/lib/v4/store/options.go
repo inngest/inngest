@@ -8,9 +8,11 @@ import (
 type Option func(o *Options)
 
 type Options struct {
+	SynchronousSet            bool
 	Cost                      int64
 	Expiration                time.Duration
 	Tags                      []string
+	TagsTTL                   time.Duration
 	ClientSideCacheExpiration time.Duration
 }
 
@@ -47,6 +49,14 @@ func WithCost(cost int64) Option {
 	}
 }
 
+// WithSynchronousSet allows setting the behavior when setting a value, whether to wait until all buffered writes have been applied or not.
+// Currently to be used by Ristretto library only.
+func WithSynchronousSet() Option {
+	return func(o *Options) {
+		o.SynchronousSet = true
+	}
+}
+
 // WithExpiration allows to specify an expiration time when setting a value.
 func WithExpiration(expiration time.Duration) Option {
 	return func(o *Options) {
@@ -58,6 +68,13 @@ func WithExpiration(expiration time.Duration) Option {
 func WithTags(tags []string) Option {
 	return func(o *Options) {
 		o.Tags = tags
+	}
+}
+
+// WithTagsTTL allows to specify a time-to-live parameter for tags
+func WithTagsTTL(ttl time.Duration) Option {
+	return func(o *Options) {
+		o.TagsTTL = ttl
 	}
 }
 

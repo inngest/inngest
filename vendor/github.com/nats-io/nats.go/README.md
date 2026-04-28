@@ -7,8 +7,8 @@ A [Go](http://golang.org) client for the [NATS messaging system](https://nats.io
 [License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
 [ReportCard-Url]: https://goreportcard.com/report/github.com/nats-io/nats.go
 [ReportCard-Image]: https://goreportcard.com/badge/github.com/nats-io/nats.go
-[Build-Status-Url]: https://travis-ci.com/github/nats-io/nats.go
-[Build-Status-Image]: https://travis-ci.com/nats-io/nats.go.svg?branch=main
+[Build-Status-Url]: https://github.com/nats-io/nats.go/actions
+[Build-Status-Image]: https://github.com/nats-io/nats.go/actions/workflows/ci.yaml/badge.svg?branch=main
 [GoDoc-Url]: https://pkg.go.dev/github.com/nats-io/nats.go
 [GoDoc-Image]: https://img.shields.io/badge/GoDoc-reference-007d9c
 [Coverage-Url]: https://coveralls.io/r/nats-io/nats.go?branch=main
@@ -19,25 +19,14 @@ A [Go](http://golang.org) client for the [NATS messaging system](https://nats.io
 ## Installation
 
 ```bash
-# Go client
-go get github.com/nats-io/nats.go/
+# To get the latest released Go client:
+go get github.com/nats-io/nats.go@latest
 
-# Server
-go get github.com/nats-io/nats-server
-```
+# To get a specific version:
+go get github.com/nats-io/nats.go@v1.51.0
 
-When using or transitioning to Go modules support:
-
-```bash
-# Go client latest or explicit version
-go get github.com/nats-io/nats.go/@latest
-go get github.com/nats-io/nats.go/@v1.37.0
-
-# For latest NATS Server, add /v2 at the end
-go get github.com/nats-io/nats-server/v2
-
-# NATS Server v1 is installed otherwise
-# go get github.com/nats-io/nats-server
+# Note that the latest major version for NATS Server is v2:
+go get github.com/nats-io/nats-server/v2@latest
 ```
 
 ## Basic Usage
@@ -145,7 +134,7 @@ The simplest form is to use the helper method UserCredentials(credsFilepath).
 nc, err := nats.Connect(url, nats.UserCredentials("user.creds"))
 ```
 
-The helper methods creates two callback handlers to present the user JWT and sign the nonce challenge from the server.
+The helper method creates two callback handlers to present the user JWT and sign the nonce challenge from the server.
 The core client library never has direct access to your private key and simply performs the callback for signing the server challenge.
 The helper will load and wipe and erase memory it uses for each connect or reconnect.
 
@@ -188,7 +177,7 @@ nc, err := nats.Connect("tls://nats.demo.io:4443")
 // We provide a helper method to make this case easier.
 nc, err = nats.Connect("tls://localhost:4443", nats.RootCAs("./configs/certs/ca.pem"))
 
-// If the server requires client certificate, there is an helper function for that too:
+// If the server requires client certificate, there is a helper function for that too:
 cert := nats.ClientCert("./configs/certs/client-cert.pem", "./configs/certs/client-key.pem")
 nc, err = nats.Connect("tls://localhost:4443", cert)
 
@@ -221,17 +210,17 @@ if err != nil {
 
 // "*" matches any token, at any level of the subject.
 nc.Subscribe("foo.*.baz", func(m *Msg) {
-    fmt.Printf("Msg received on [%s] : %s\n", m.Subject, string(m.Data));
+    fmt.Printf("Msg received on [%s] : %s\n", m.Subject, string(m.Data))
 })
 
 nc.Subscribe("foo.bar.*", func(m *Msg) {
-    fmt.Printf("Msg received on [%s] : %s\n", m.Subject, string(m.Data));
+    fmt.Printf("Msg received on [%s] : %s\n", m.Subject, string(m.Data))
 })
 
 // ">" matches any length of the tail of a subject, and can only be the last token
 // E.g. 'foo.>' will match 'foo.bar', 'foo.bar.baz', 'foo.foo.bar.bax.22'
 nc.Subscribe("foo.>", func(m *Msg) {
-    fmt.Printf("Msg received on [%s] : %s\n", m.Subject, string(m.Data));
+    fmt.Printf("Msg received on [%s] : %s\n", m.Subject, string(m.Data))
 })
 
 // Matches all of the above
@@ -248,7 +237,7 @@ nc.Publish("foo.bar.baz", []byte("Hello World"))
 // Normal subscribers will continue to work as expected.
 
 nc.QueueSubscribe("foo", "job_workers", func(_ *Msg) {
-  received += 1;
+  received += 1
 })
 ```
 
@@ -278,9 +267,9 @@ fmt.Println("All clear!")
 // FlushTimeout specifies a timeout value as well.
 err := nc.FlushTimeout(1*time.Second)
 if err != nil {
-    fmt.Println("All clear!")
-} else {
     fmt.Println("Flushed timed out!")
+} else {
+    fmt.Println("All clear!")
 }
 
 // Auto-unsubscribe after MAX_WANTED messages received
@@ -296,7 +285,7 @@ nc1.Subscribe("foo", func(m *Msg) {
     fmt.Printf("Received a message: %s\n", string(m.Data))
 })
 
-nc2.Publish("foo", []byte("Hello World!"));
+nc2.Publish("foo", []byte("Hello World!"))
 
 ```
 
@@ -350,7 +339,7 @@ nc, err = nats.Connect("nats://localhost:4222", nats.UserInfo("foo", "bar"))
 // For token based authentication:
 nc, err = nats.Connect("nats://localhost:4222", nats.Token("S3cretT0ken"))
 
-// You can even pass the two at the same time in case one of the server
+// You can even pass the two at the same time in case one of the servers
 // in the mesh requires token instead of user name and password.
 nc, err = nats.Connect("nats://localhost:4222",
     nats.UserInfo("foo", "bar"),
@@ -383,7 +372,7 @@ msg, err := sub.NextMsgWithContext(ctx)
 
 ```
 
-## Backwards compatibility
+## Backward compatibility
 
 In the development of nats.go, we are committed to maintaining backward compatibility and ensuring a stable and reliable  experience for all users. In general, we follow the standard go compatibility guidelines.
 However, it's important to clarify our stance on certain types of changes:

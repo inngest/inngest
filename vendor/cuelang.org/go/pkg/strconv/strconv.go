@@ -16,11 +16,16 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:generate go run cuelang.org/go/internal/cmd/qgo -exclude=Append,Unquote,Itoa,CanBackquote,FormatComplex extract strconv
+// Originally generated with: go run qgo.go -exclude=Append,Unquote,Itoa,CanBackquote,FormatComplex extract strconv
 
 package strconv
 
-import "strconv"
+import (
+	"cuelang.org/go/cue/literal"
+	"cuelang.org/go/internal"
+	"math/big"
+	"strconv"
+)
 
 // ParseBool returns the boolean value represented by the string.
 // It accepts 1, t, T, TRUE, true, True, 0, f, F, FALSE, false, False.
@@ -32,30 +37,6 @@ func ParseBool(str string) (bool, error) {
 // FormatBool returns "true" or "false" according to the value of b.
 func FormatBool(b bool) string {
 	return strconv.FormatBool(b)
-}
-
-// ParseComplex converts the string s to a complex number
-// with the precision specified by bitSize: 64 for complex64, or 128 for complex128.
-// When bitSize=64, the result still has type complex128, but it will be
-// convertible to complex64 without changing its value.
-//
-// The number represented by s must be of the form N, Ni, or N±Ni, where N stands
-// for a floating-point number as recognized by ParseFloat, and i is the imaginary
-// component. If the second N is unsigned, a + sign is required between the two components
-// as indicated by the ±. If the second N is NaN, only a + sign is accepted.
-// The form may be parenthesized and cannot contain any spaces.
-// The resulting complex number consists of the two components converted by ParseFloat.
-//
-// The errors that ParseComplex returns have concrete type *NumError
-// and include err.Num = s.
-//
-// If s is not syntactically well-formed, ParseComplex returns err.Err = ErrSyntax.
-//
-// If s is syntactically well-formed but either component is more than 1/2 ULP
-// away from the largest floating point number of the given component's size,
-// ParseComplex returns err.Err = ErrRange and c = ±Inf for the respective component.
-func ParseComplex(s string, bitSize int) (complex128, error) {
-	return strconv.ParseComplex(s, bitSize)
 }
 
 // ParseFloat converts the string s to a floating-point number
@@ -86,41 +67,154 @@ func ParseFloat(s string, bitSize int) (float64, error) {
 	return strconv.ParseFloat(s, bitSize)
 }
 
+// ParseNumber interprets s using the full CUE number literal syntax and returns
+// the resulting value as an arbitrary-precision decimal. It accepts decimal
+// and non-decimal bases, underscores as separators, fractional syntax, and
+// the decimal or binary multiplier suffixes defined by CUE (for example "1Ki"
+// and "10M").
+//
+// If s is not syntactically well-formed, ParseNumber returns a *strconv.NumError
+// with Err containing detailed syntax information. Semantic errors, such as a
+// multiplier that cannot be represented, are reported in the same way.
+func ParseNumber(s string) (*internal.Decimal, error) {
+	var info literal.NumInfo
+	if err := literal.ParseNum(s, &info); err != nil {
+		return nil, &strconv.NumError{
+			Func: "ParseNumber",
+			Num:  s,
+			Err:  err,
+		}
+	}
+
+	var dec internal.Decimal
+	if err := info.Decimal(&dec); err != nil {
+		return nil, &strconv.NumError{
+			Func: "ParseNumber",
+			Num:  s,
+			Err:  err,
+		}
+	}
+	return &dec, nil
+}
+
 // IntSize is the size in bits of an int or uint value.
 const IntSize = 64
 
-// ParseUint is like ParseInt but for unsigned numbers.
-func ParseUint(s string, base int, bitSize int) (uint64, error) {
-	return strconv.ParseUint(s, base, bitSize)
+// ParseUint is like [ParseInt] but for unsigned numbers.
+func ParseUint(s string, base int, bitSize int) (*big.Int, error) {
+	if bitSize < 0 {
+		return nil, &strconv.NumError{
+			Func: "ParseUint",
+			Num:  s,
+			Err:  strconv.ErrRange,
+		}
+	}
+
+	// Parse the number using big.Int to handle arbitrary precision
+	i := new(big.Int)
+	i, ok := i.SetString(s, base)
+	if !ok {
+		return nil, &strconv.NumError{
+			Func: "ParseUint",
+			Num:  s,
+			Err:  strconv.ErrSyntax,
+		}
+	}
+
+	// Check if the value is negative (not allowed for unsigned)
+	if i.Sign() < 0 {
+		return nil, &strconv.NumError{
+			Func: "ParseUint",
+			Num:  s,
+			Err:  strconv.ErrRange,
+		}
+	}
+
+	// If bitSize is 0, return unlimited precision result
+	if bitSize == 0 {
+		return i, nil
+	}
+
+	// Check if the value fits in the specified bit size
+	// For unsigned integers, the range is [0, 2^bitSize-1]
+	if i.BitLen() <= bitSize {
+		return i, nil
+	}
+
+	return nil, &strconv.NumError{
+		Func: "ParseUint",
+		Num:  s,
+		Err:  strconv.ErrRange,
+	}
 }
 
 // ParseInt interprets a string s in the given base (0, 2 to 36) and
-// bit size (0 to 64) and returns the corresponding value i.
+// bit size and returns the corresponding value i.
 //
 // If the base argument is 0, the true base is implied by the string's
 // prefix: 2 for "0b", 8 for "0" or "0o", 16 for "0x", and 10 otherwise.
 // Also, for argument base 0 only, underscore characters are permitted
 // as defined by the Go syntax for integer literals.
 //
-// The bitSize argument specifies the integer type
-// that the result must fit into. Bit sizes 0, 8, 16, 32, and 64
-// correspond to int, int8, int16, int32, and int64.
-// If bitSize is below 0 or above 64, an error is returned.
-//
-// The errors that ParseInt returns have concrete type *NumError
-// and include err.Num = s. If s is empty or contains invalid
-// digits, err.Err = ErrSyntax and the returned value is 0;
-// if the value corresponding to s cannot be represented by a
-// signed integer of the given size, err.Err = ErrRange and the
-// returned value is the maximum magnitude integer of the
-// appropriate bitSize and sign.
-func ParseInt(s string, base int, bitSize int) (i int64, err error) {
-	return strconv.ParseInt(s, base, bitSize)
+// The bitSize argument specifies the integer type that the result must fit into.
+// If bitSize is 0, the result is unconstrained (unlimited precision).
+// If bitSize is positive, the result must fit in a signed integer of that many bits.
+// If bitSize is negative, an error is returned.
+func ParseInt(s string, base int, bitSize int) (*big.Int, error) {
+	if bitSize < 0 {
+		return nil, &strconv.NumError{
+			Func: "ParseInt",
+			Num:  s,
+			Err:  strconv.ErrRange,
+		}
+	}
+
+	// Parse the number using big.Int to handle arbitrary precision
+	i := new(big.Int)
+	i, ok := i.SetString(s, base)
+	if !ok {
+		return nil, &strconv.NumError{
+			Func: "ParseInt",
+			Num:  s,
+			Err:  strconv.ErrSyntax,
+		}
+	}
+
+	// If bitSize is 0, return unlimited precision result
+	if bitSize == 0 {
+		return i, nil
+	}
+	// Check if the value fits in the specified bit size
+	// For signed integers, the range is [-2^(bitSize-1), 2^(bitSize-1)-1]
+	bitLen := i.BitLen()
+	if bitLen <= bitSize-1 {
+		return i, nil
+	}
+	if i.Sign() < 0 && bitLen == bitSize {
+		// It might be all 1s; add one and see if it fits.
+		x := big.NewInt(1)
+		x.Add(i, x)
+		if x.BitLen() <= bitSize-1 {
+			return i, nil
+		}
+	}
+	return nil, &strconv.NumError{
+		Func: "ParseInt",
+		Num:  s,
+		Err:  strconv.ErrRange,
+	}
 }
 
 // Atoi is equivalent to ParseInt(s, 10, 0), converted to type int.
-func Atoi(s string) (int, error) {
-	return strconv.Atoi(s)
+func Atoi(s string) (*big.Int, error) {
+	n, err := ParseInt(s, 10, 0)
+	if err == nil {
+		return n, nil
+	}
+	if nerr, ok := err.(*strconv.NumError); ok {
+		nerr.Func = "Atoi"
+	}
+	return nil, err
 }
 
 // FormatFloat converts the floating-point number f to a string,
@@ -150,17 +244,19 @@ func FormatFloat(f float64, fmt byte, prec, bitSize int) string {
 }
 
 // FormatUint returns the string representation of i in the given base,
-// for 2 <= base <= 36. The result uses the lower-case letters 'a' to 'z'
-// for digit values >= 10.
-func FormatUint(i uint64, base int) string {
-	return strconv.FormatUint(i, base)
+// for 2 <= base <= 62. The result uses:
+// For 10 <= digit values <= 35, the lower-case letters 'a' to 'z'
+// For 36 <= digit values <= 61, the upper-case letters 'A' to 'Z'
+func FormatUint(i *big.Int, base int) string {
+	return i.Text(base)
 }
 
 // FormatInt returns the string representation of i in the given base,
-// for 2 <= base <= 36. The result uses the lower-case letters 'a' to 'z'
-// for digit values >= 10.
-func FormatInt(i int64, base int) string {
-	return strconv.FormatInt(i, base)
+// for 2 <= base <= 62. The result uses:
+// For 10 <= digit values <= 35, the lower-case letters 'a' to 'z'
+// For 36 <= digit values <= 61, the upper-case letters 'A' to 'Z'
+func FormatInt(i *big.Int, base int) string {
+	return i.Text(base)
 }
 
 // Quote returns a double-quoted Go string literal representing s. The

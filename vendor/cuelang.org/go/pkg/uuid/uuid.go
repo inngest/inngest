@@ -18,22 +18,14 @@
 package uuid
 
 import (
-	"fmt"
 	"math/big"
-	"regexp"
 
 	"github.com/google/uuid"
 )
 
-var valid = regexp.MustCompile(
-	"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-
-// Valid can be used to define a valid Valid.
+// Valid ensures that s is a valid UUID which would be accepted by Parse.
 func Valid(s string) error {
-	if !valid.MatchString(string(s)) {
-		return fmt.Errorf("invalid UUID %q", s)
-	}
-	return nil
+	return uuid.Validate(s)
 }
 
 // Parse decodes s into a UUID or returns an error. Both the standard UUID forms
@@ -43,17 +35,12 @@ func Valid(s string) error {
 // encoding: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.
 func Parse(s string) (string, error) {
 	x, err := uuid.Parse(s)
-	return string(x.String()), err
-}
-
-// String represents a 128-bit UUID value as a string.
-func ToString(x string) string {
-	return string(x)
+	return x.String(), err
 }
 
 // URN reports the canonical URN of a UUID.
 func URN(x string) (string, error) {
-	u, err := uuid.Parse(string(x))
+	u, err := uuid.Parse(x)
 	if err != nil {
 		return "", err
 	}
@@ -62,8 +49,7 @@ func URN(x string) (string, error) {
 
 // FromInt creates a UUID from an integer.
 //
-//    DNS:  uuid.FromInt(0x6ba7b810_9dad_11d1_80b4_00c04fd430c8)
-//
+//	DNS:  uuid.FromInt(0x6ba7b810_9dad_11d1_80b4_00c04fd430c8)
 func FromInt(i *big.Int) (string, error) {
 	// must be uint128
 	var buf [16]byte
@@ -73,7 +59,7 @@ func FromInt(i *big.Int) (string, error) {
 		b = buf[:]
 	}
 	u, err := uuid.FromBytes(b)
-	return string(u.String()), err
+	return u.String(), err
 }
 
 // ToInt represents a UUID string as a 128-bit value.
@@ -85,7 +71,7 @@ func ToInt(x string) *big.Int {
 
 // Variant reports the UUID variant.
 func Variant(x string) (int, error) {
-	u, err := uuid.Parse(string(x))
+	u, err := uuid.Parse(x)
 	if err != nil {
 		return 0, err
 	}
@@ -94,7 +80,7 @@ func Variant(x string) (int, error) {
 
 // Version reports the UUID version.
 func Version(x string) (int, error) {
-	u, err := uuid.Parse(string(x))
+	u, err := uuid.Parse(x)
 	if err != nil {
 		return 0, err
 	}
@@ -103,19 +89,19 @@ func Version(x string) (int, error) {
 
 // SHA1 generates a version 5 UUID based on the supplied name space and data.
 func SHA1(space string, data []byte) (string, error) {
-	u, err := uuid.Parse(string(space))
+	u, err := uuid.Parse(space)
 	if err != nil {
 		return "", err
 	}
-	return string(uuid.NewSHA1(u, data).String()), nil
+	return uuid.NewSHA1(u, data).String(), nil
 }
 
 // MD5 generates a version 3 UUID based on the supplied name space and data.
 // Use SHA1 instead if you can.
 func MD5(space string, data []byte) (string, error) {
-	u, err := uuid.Parse(string(space))
+	u, err := uuid.Parse(space)
 	if err != nil {
 		return "", err
 	}
-	return string(uuid.NewMD5(u, data).String()), nil
+	return uuid.NewMD5(u, data).String(), nil
 }

@@ -2,9 +2,13 @@ package cache
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/eko/gocache/lib/v4/store"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -13,27 +17,31 @@ const (
 )
 
 type loadableKeyValue[T any] struct {
-	key   any
-	value T
+	key     any
+	value   T
+	options []store.Option
 }
 
-type LoadFunction[T any] func(ctx context.Context, key any) (T, error)
+type LoadFunction[T any] func(ctx context.Context, key any) (T, []store.Option, error)
 
 // LoadableCache represents a cache that uses a function to load data
 type LoadableCache[T any] struct {
-	loadFunc   LoadFunction[T]
-	cache      CacheInterface[T]
-	setChannel chan *loadableKeyValue[T]
-	setterWg   *sync.WaitGroup
+	singleFlight singleflight.Group
+	loadFunc     LoadFunction[T]
+	cache        CacheInterface[T]
+	setChannel   chan *loadableKeyValue[T]
+	setCache     sync.Map
+	setterWg     *sync.WaitGroup
 }
 
-// NewLoadable instanciates a new cache that uses a function to load data
+// NewLoadable instantiates a new cache that uses a function to load data
 func NewLoadable[T any](loadFunc LoadFunction[T], cache CacheInterface[T]) *LoadableCache[T] {
 	loadable := &LoadableCache[T]{
-		loadFunc:   loadFunc,
-		cache:      cache,
-		setChannel: make(chan *loadableKeyValue[T], 10000),
-		setterWg:   &sync.WaitGroup{},
+		singleFlight: singleflight.Group{},
+		loadFunc:     loadFunc,
+		cache:        cache,
+		setChannel:   make(chan *loadableKeyValue[T], 10000),
+		setterWg:     &sync.WaitGroup{},
 	}
 
 	loadable.setterWg.Add(1)
@@ -46,29 +54,57 @@ func (c *LoadableCache[T]) setter() {
 	defer c.setterWg.Done()
 
 	for item := range c.setChannel {
-		c.Set(context.Background(), item.key, item.value)
+		c.Set(context.Background(), item.key, item.value, item.options...)
+
+		cacheKey := c.getCacheKey(item.key)
+		c.setCache.Delete(cacheKey)
 	}
 }
 
 // Get returns the object stored in cache if it exists
 func (c *LoadableCache[T]) Get(ctx context.Context, key any) (T, error) {
-	var err error
+	cacheKey := c.getCacheKey(key)
+	if value, err, _ := c.singleFlight.Do(
+		cacheKey,
+		func() (any, error) {
+			// try temporary-while-setter-works cache
+			if v, ok := c.setCache.Load(cacheKey); ok {
+				return v, nil
+			}
+			// try main cache
+			if v, err := c.cache.Get(ctx, key); err == nil {
+				return v, err
+			}
+			// Unable to find in cache, try to load it from load function
+			if value, options, err := c.loadFunc(ctx, key); err == nil {
 
-	object, err := c.cache.Get(ctx, key)
-	if err == nil {
-		return object, err
+				// cache locally until main cache is set
+				c.setCache.Store(cacheKey, value)
+
+				c.setChannel <- &loadableKeyValue[T]{
+					key:     key,
+					value:   value,
+					options: options,
+				}
+				return value, err
+			} else {
+				return *new(T), err
+			}
+		},
+	); err != nil {
+		return *new(T), err
+	} else if value, ok := value.(T); ok {
+		return value, err
+	} else {
+		zero := *new(T)
+		return zero, errors.New(
+			fmt.Sprintf(
+				"type assertion failed: expected %s, got %s",
+				reflect.TypeOf(zero),
+				reflect.TypeOf(value),
+			),
+		)
 	}
-
-	// Unable to find in cache, try to load it from load function
-	object, err = c.loadFunc(ctx, key)
-	if err != nil {
-		return object, err
-	}
-
-	// Then, put it back in cache
-	c.setChannel <- &loadableKeyValue[T]{key, object}
-
-	return object, err
 }
 
 // Set sets a value in available caches
@@ -101,4 +137,18 @@ func (c *LoadableCache[T]) Close() error {
 	c.setterWg.Wait()
 
 	return nil
+}
+
+// getCacheKey returns the cache key for the given key object by returning
+// the key if type is string or by computing a checksum of key structure
+// if its type is other than string
+func (c *LoadableCache[T]) getCacheKey(key any) string {
+	switch v := key.(type) {
+	case string:
+		return v
+	case CacheKeyGenerator:
+		return v.GetCacheKey()
+	default:
+		return checksum(key)
+	}
 }

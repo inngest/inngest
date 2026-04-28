@@ -17,7 +17,7 @@ package export
 import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/internal/core/adt"
-	"github.com/cockroachdb/apd/v2"
+	"github.com/cockroachdb/apd/v3"
 )
 
 // boundSimplifier simplifies bound values into predeclared identifiers, if
@@ -131,10 +131,10 @@ func (s *boundSimplifier) expr(ctx *adt.OpContext) (e ast.Expr) {
 	}
 
 	if s.min != nil {
-		e = wrapBin(e, s.e.expr(s.min), adt.AndOp)
+		e = wrapBin(e, s.e.expr(nil, s.min), adt.AndOp)
 	}
 	if s.max != nil {
-		e = wrapBin(e, s.e.expr(s.max), adt.AndOp)
+		e = wrapBin(e, s.e.expr(nil, s.max), adt.AndOp)
 	}
 	return e
 }

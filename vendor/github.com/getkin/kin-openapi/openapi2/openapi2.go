@@ -2,6 +2,7 @@ package openapi2
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -30,9 +31,7 @@ type T struct {
 // MarshalJSON returns the JSON encoding of T.
 func (doc T) MarshalJSON() ([]byte, error) {
 	m := make(map[string]any, 15+len(doc.Extensions))
-	for k, v := range doc.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, doc.Extensions)
 	m["swagger"] = doc.Swagger
 	m["info"] = doc.Info
 	if x := doc.ExternalDocs; x != nil {

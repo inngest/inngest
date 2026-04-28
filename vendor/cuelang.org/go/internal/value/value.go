@@ -20,53 +20,74 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/convert"
 	"cuelang.org/go/internal/core/eval"
 	"cuelang.org/go/internal/core/runtime"
-	"cuelang.org/go/internal/types"
 )
 
-func ConvertToRuntime(c *cue.Context) *cue.Runtime {
-	return (*cue.Runtime)(c)
+// Context returns the cue.Context of the given argument.
+func Context[Ctx *cue.Runtime | *cue.Context | cue.Value | *adt.OpContext](ctx Ctx) *cue.Context {
+	switch x := any(ctx).(type) {
+	case *cue.Runtime:
+		(*runtime.Runtime)(x).Init()
+		return (*cue.Context)(x)
+	case *cue.Context:
+		return x
+	case cue.Value:
+		r, _ := ToInternal(x)
+		return (*cue.Context)(r)
+	case *adt.OpContext:
+		r := x.Runtime.(*runtime.Runtime)
+		return (*cue.Context)(r)
+	}
+	panic("unreachable")
 }
 
-func ConvertToContext(r *cue.Runtime) *cue.Context {
-	(*runtime.Runtime)(r).Init()
-	return (*cue.Context)(r)
+// OpContext returns an OpContext with proper node formatting initialized.
+func OpContext[Ctx *cue.Runtime | *cue.Context | cue.Value](c Ctx) *adt.OpContext {
+	var r *runtime.Runtime
+	var v *adt.Vertex
+	switch x := any(c).(type) {
+	case *cue.Runtime:
+		r = (*runtime.Runtime)(x)
+		r.Init()
+	case *cue.Context:
+		r = (*runtime.Runtime)(x)
+	case cue.Value:
+		r, v = ToInternal(x)
+	default:
+		panic("unreachable")
+	}
+	return eval.NewContext(r, v)
 }
 
 func ToInternal(v cue.Value) (*runtime.Runtime, *adt.Vertex) {
-	var t types.Value
-	v.Core(&t)
+	t := v.Core()
 	return t.R, t.V
+}
+
+func Vertex(v cue.Value) *adt.Vertex {
+	t := v.Core()
+	return t.V
 }
 
 // Make wraps cue.MakeValue.
 func Make(ctx *adt.OpContext, v adt.Value) cue.Value {
-	return (*cue.Context)(ctx.Impl().(*runtime.Runtime)).Encode(v)
-}
-
-func MakeError(r *runtime.Runtime, err errors.Error) cue.Value {
-	b := &adt.Bottom{Err: err}
-	node := &adt.Vertex{BaseValue: b}
-	node.UpdateStatus(adt.Finalized)
-	node.AddConjunct(adt.MakeRootConjunct(nil, b))
-	return (*cue.Context)(r).Encode(node)
+	return Context(ctx).Encode(v)
 }
 
 // UnifyBuiltin returns the given Value unified with the given builtin template.
 func UnifyBuiltin(v cue.Value, kind string) cue.Value {
-	p := strings.Split(kind, ".")
-	pkg, name := p[0], p[1]
-	s := runtime.SharedRuntime.LoadImport(pkg)
+	pkg, name, _ := strings.Cut(kind, ".")
+	ctx := v.Context()
+	rt := (*runtime.Runtime)(ctx)
+	s := rt.LoadBuiltin(pkg)
 	if s == nil {
 		return v
 	}
 
-	ctx := v.Context()
-	a := s.Lookup((*runtime.Runtime)(ctx).Label(name, false))
+	a := s.Lookup(rt.Label(name, false))
 	if a == nil {
 		return v
 	}
@@ -78,7 +99,7 @@ func FromGoValue(r *cue.Context, x interface{}, nilIsTop bool) cue.Value {
 	rt := (*runtime.Runtime)(r)
 	rt.Init()
 	ctx := eval.NewContext(rt, nil)
-	v := convert.GoValueToValue(ctx, x, nilIsTop)
+	v := convert.FromGoValue(ctx, x, nilIsTop)
 	n := adt.ToVertex(v)
 	return r.Encode(n)
 }
@@ -87,7 +108,7 @@ func FromGoType(r *cue.Context, x interface{}) cue.Value {
 	rt := (*runtime.Runtime)(r)
 	rt.Init()
 	ctx := eval.NewContext(rt, nil)
-	expr, err := convert.GoTypeToExpr(ctx, x)
+	expr, err := convert.FromGoType(ctx, x)
 	if err != nil {
 		expr = &adt.Bottom{Err: err}
 	}

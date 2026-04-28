@@ -16,7 +16,8 @@ package cli
 
 // Print sends text to the stdout of the current process.
 Print: {
-	$id: *"tool/cli.Print" | "print" // for backwards compatibility
+	$id: _id
+	_id: *"tool/cli.Print" | "print" // for backwards compatibility
 
 	// text is the text to be printed.
 	text: string
@@ -27,10 +28,11 @@ Print: {
 // Example:
 //     task: ask: cli.Ask({
 //         prompt:   "Are you okay?"
-//         repsonse: bool
+//         response: bool
 //     })
 Ask: {
-	kind: "tool/cli.Ask"
+	$id: _id
+	_id: "tool/cli.Ask"
 
 	// prompt sends this message to the output.
 	prompt: string

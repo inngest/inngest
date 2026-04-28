@@ -6,16 +6,18 @@ import (
 )
 
 const (
-	defaultNamespace = "cache"
+	defaultNamespace           = "cache"
+	defaultAttributesNamespace = ""
 )
 
 // Prometheus represents the prometheus struct for collecting metrics
 type Prometheus struct {
-	service      string
-	namespace    string
-	collector    *prometheus.GaugeVec
-	registerer   prometheus.Registerer
-	codecChannel chan codec.CodecInterface
+	service             string
+	namespace           string
+	attributesNamespace string
+	collector           *prometheus.GaugeVec
+	registerer          prometheus.Registerer
+	codecChannel        chan codec.CodecInterface
 }
 
 // PrometheusOption is a type for defining Prometheus options
@@ -35,6 +37,13 @@ func WithNamespace(namespace string) PrometheusOption {
 	}
 }
 
+// WithAttributesNamespace sets the prometheus namespace for GaugeVec attributes
+func WithAttributesNamespace(namespace string) PrometheusOption {
+	return func(m *Prometheus) {
+		m.attributesNamespace = namespace
+	}
+}
+
 // WithRegisterer sets the prometheus registerer
 func WithRegisterer(registerer prometheus.Registerer) PrometheusOption {
 	return func(m *Prometheus) {
@@ -45,14 +54,22 @@ func WithRegisterer(registerer prometheus.Registerer) PrometheusOption {
 // NewPrometheus initializes a new prometheus metric instance
 func NewPrometheus(service string, options ...PrometheusOption) *Prometheus {
 	instance := &Prometheus{
-		namespace:    defaultNamespace,
-		registerer:   prometheus.DefaultRegisterer,
-		service:      service,
-		codecChannel: make(chan codec.CodecInterface, 10000),
+		namespace:           defaultNamespace,
+		attributesNamespace: defaultAttributesNamespace,
+		registerer:          prometheus.DefaultRegisterer,
+		service:             service,
+		codecChannel:        make(chan codec.CodecInterface, 10000),
 	}
 
 	for _, option := range options {
 		option(instance)
+	}
+
+	labelNames := []string{"service", "store", "metric"}
+	if instance.attributesNamespace != "" {
+		for i := range labelNames {
+			labelNames[i] = instance.attributesNamespace + "_" + labelNames[i]
+		}
 	}
 
 	instance.collector = prometheus.NewGaugeVec(
@@ -61,7 +78,7 @@ func NewPrometheus(service string, options ...PrometheusOption) *Prometheus {
 			Namespace: instance.namespace,
 			Help:      "This represent the number of items in cache",
 		},
-		[]string{"service", "store", "metric"},
+		labelNames,
 	)
 
 	instance.registerer.MustRegister(instance.collector)

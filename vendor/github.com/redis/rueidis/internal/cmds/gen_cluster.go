@@ -83,6 +83,19 @@ func (c ClusterBumpepoch) Build() Completed {
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
+type ClusterCancelslotmigrations Incomplete
+
+func (b Builder) ClusterCancelslotmigrations() (c ClusterCancelslotmigrations) {
+	c = ClusterCancelslotmigrations{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "CLUSTER", "CANCELSLOTMIGRATIONS")
+	return c
+}
+
+func (c ClusterCancelslotmigrations) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
 type ClusterCountFailureReports Incomplete
 
 func (b Builder) ClusterCountFailureReports() (c ClusterCountFailureReports) {
@@ -273,6 +286,19 @@ func (c ClusterGetkeysinslotSlot) Count(count int64) ClusterGetkeysinslotCount {
 	return (ClusterGetkeysinslotCount)(c)
 }
 
+type ClusterGetslotmigrations Incomplete
+
+func (b Builder) ClusterGetslotmigrations() (c ClusterGetslotmigrations) {
+	c = ClusterGetslotmigrations{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "CLUSTER", "GETSLOTMIGRATIONS")
+	return c
+}
+
+func (c ClusterGetslotmigrations) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
 type ClusterInfo Incomplete
 
 func (b Builder) ClusterInfo() (c ClusterInfo) {
@@ -356,6 +382,43 @@ func (c ClusterMeetPort) ClusterBusPort(clusterBusPort int64) ClusterMeetCluster
 func (c ClusterMeetPort) Build() Completed {
 	c.cs.Build()
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type ClusterMigrateslots Incomplete
+
+func (b Builder) ClusterMigrateslots() (c ClusterMigrateslots) {
+	c = ClusterMigrateslots{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "CLUSTER", "MIGRATESLOTS")
+	return c
+}
+
+func (c ClusterMigrateslots) Slotsrange() ClusterMigrateslotsSlotMigrationSpecSlotsrange {
+	c.cs.s = append(c.cs.s, "SLOTSRANGE")
+	return (ClusterMigrateslotsSlotMigrationSpecSlotsrange)(c)
+}
+
+type ClusterMigrateslotsSlotMigrationSpecNode Incomplete
+
+func (c ClusterMigrateslotsSlotMigrationSpecNode) Slotsrange() ClusterMigrateslotsSlotMigrationSpecSlotsrange {
+	c.cs.s = append(c.cs.s, "SLOTSRANGE")
+	return (ClusterMigrateslotsSlotMigrationSpecSlotsrange)(c)
+}
+
+func (c ClusterMigrateslotsSlotMigrationSpecNode) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type ClusterMigrateslotsSlotMigrationSpecSlotsrange Incomplete
+
+func (c ClusterMigrateslotsSlotMigrationSpecSlotsrange) Slotsrange(startSlot int64, endSlot int64) ClusterMigrateslotsSlotMigrationSpecSlotsrange {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(startSlot, 10), strconv.FormatInt(endSlot, 10))
+	return c
+}
+
+func (c ClusterMigrateslotsSlotMigrationSpecSlotsrange) Node(nodeId string) ClusterMigrateslotsSlotMigrationSpecNode {
+	c.cs.s = append(c.cs.s, "NODE", nodeId)
+	return (ClusterMigrateslotsSlotMigrationSpecNode)(c)
 }
 
 type ClusterMyid Incomplete

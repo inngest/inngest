@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
 
 	"github.com/go-openapi/jsonpointer"
 )
@@ -14,12 +14,12 @@ import (
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#media-type-object
 type MediaType struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
+	Origin     *Origin        `json:"-" yaml:"-"`
 
-	Schema   *SchemaRef           `json:"schema,omitempty" yaml:"schema,omitempty"`
-	Example  any                  `json:"example,omitempty" yaml:"example,omitempty"`
-	Examples Examples             `json:"examples,omitempty" yaml:"examples,omitempty"`
-	Encoding map[string]*Encoding `json:"encoding,omitempty" yaml:"encoding,omitempty"`
+	Schema   *SchemaRef `json:"schema,omitempty" yaml:"schema,omitempty"`
+	Example  any        `json:"example,omitempty" yaml:"example,omitempty"`
+	Examples Examples   `json:"examples,omitempty" yaml:"examples,omitempty"`
+	Encoding Encodings  `json:"encoding,omitempty" yaml:"encoding,omitempty"`
 }
 
 var _ jsonpointer.JSONPointable = (*MediaType)(nil)
@@ -57,7 +57,7 @@ func (mediaType *MediaType) WithExample(name string, value any) *MediaType {
 func (mediaType *MediaType) WithEncoding(name string, enc *Encoding) *MediaType {
 	encoding := mediaType.Encoding
 	if encoding == nil {
-		encoding = make(map[string]*Encoding)
+		encoding = make(Encodings)
 		mediaType.Encoding = encoding
 	}
 	encoding[name] = enc
@@ -76,9 +76,7 @@ func (mediaType MediaType) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of MediaType.
 func (mediaType MediaType) MarshalYAML() (any, error) {
 	m := make(map[string]any, 4+len(mediaType.Extensions))
-	for k, v := range mediaType.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, mediaType.Extensions)
 	if x := mediaType.Schema; x != nil {
 		m["schema"] = x
 	}
@@ -102,7 +100,6 @@ func (mediaType *MediaType) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "schema")
 	delete(x.Extensions, "example")
 	delete(x.Extensions, "examples")
@@ -110,6 +107,7 @@ func (mediaType *MediaType) UnmarshalJSON(data []byte) error {
 	if len(x.Extensions) == 0 {
 		x.Extensions = nil
 	}
+	delete(x.Encoding, originKey)
 	*mediaType = MediaType(x)
 	return nil
 }
@@ -138,12 +136,7 @@ func (mediaType *MediaType) Validate(ctx context.Context, opts ...ValidationOpti
 			}
 
 			if examples := mediaType.Examples; examples != nil {
-				names := make([]string, 0, len(examples))
-				for name := range examples {
-					names = append(names, name)
-				}
-				sort.Strings(names)
-				for _, k := range names {
+				for _, k := range componentNames(examples) {
 					v := examples[k]
 					if err := v.Validate(ctx); err != nil {
 						return fmt.Errorf("example %s: %w", k, err)

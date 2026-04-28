@@ -1,8 +1,6 @@
 package sentry
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,18 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go/internal/debuglog"
+	"github.com/getsentry/sentry-go/internal/protocol"
 	exec "golang.org/x/sys/execabs"
 )
 
 func uuid() string {
-	id := make([]byte, 16)
-	// Prefer rand.Read over rand.Reader, see https://go-review.googlesource.com/c/go/+/272326/.
-	_, _ = rand.Read(id)
-	id[6] &= 0x0F // clear version
-	id[6] |= 0x40 // set version to 4 (random uuid)
-	id[8] &= 0x3F // clear variant
-	id[8] |= 0x80 // set to IETF variant
-	return hex.EncodeToString(id)
+	return protocol.GenerateEventID()
 }
 
 func fileExists(fileName string) bool {
@@ -36,7 +29,7 @@ func monotonicTimeSince(start time.Time) (end time.Time) {
 	return start.Add(time.Since(start))
 }
 
-// nolint: deadcode, unused
+// nolint: unused
 func prettyPrint(data interface{}) {
 	dbg, _ := json.MarshalIndent(data, "", "  ")
 	fmt.Println(string(dbg))
@@ -48,7 +41,8 @@ func defaultRelease() (release string) {
 	// Return first non-empty environment variable known to hold release info, if any.
 	envs := []string{
 		"SENTRY_RELEASE",
-		"HEROKU_SLUG_COMMIT",
+		"HEROKU_BUILD_COMMIT",
+		"HEROKU_SLUG_COMMIT", // Deprecated, kept for backwards compatibility
 		"SOURCE_VERSION",
 		"CODEBUILD_RESOLVED_SOURCE_VERSION",
 		"CIRCLE_SHA1",
@@ -62,7 +56,7 @@ func defaultRelease() (release string) {
 	}
 	for _, e := range envs {
 		if release = os.Getenv(e); release != "" {
-			Logger.Printf("Using release from environment variable %s: %s", e, release)
+			debuglog.Printf("Using release from environment variable %s: %s", e, release)
 			return release
 		}
 	}
@@ -89,26 +83,90 @@ func defaultRelease() (release string) {
 			if err, ok := err.(*exec.ExitError); ok && len(err.Stderr) > 0 {
 				fmt.Fprintf(&s, ": %s", err.Stderr)
 			}
-			Logger.Print(s.String())
+			debuglog.Print(s.String())
 		} else {
 			release = strings.TrimSpace(string(b))
-			Logger.Printf("Using release from Git: %s", release)
+			debuglog.Printf("Using release from Git: %s", release)
 			return release
 		}
 	}
 
-	Logger.Print("Some Sentry features will not be available. See https://docs.sentry.io/product/releases/.")
-	Logger.Print("To stop seeing this message, pass a Release to sentry.Init or set the SENTRY_RELEASE environment variable.")
+	debuglog.Print("Some Sentry features will not be available. See https://docs.sentry.io/product/releases/.")
+	debuglog.Print("To stop seeing this message, pass a Release to sentry.Init or set the SENTRY_RELEASE environment variable.")
 	return ""
 }
 
 func revisionFromBuildInfo(info *debug.BuildInfo) string {
 	for _, setting := range info.Settings {
 		if setting.Key == "vcs.revision" && setting.Value != "" {
-			Logger.Printf("Using release from debug info: %s", setting.Value)
+			debuglog.Printf("Using release from debug info: %s", setting.Value)
 			return setting.Value
 		}
 	}
 
 	return ""
+}
+
+func Pointer[T any](v T) *T {
+	return &v
+}
+
+var sensitiveHeaders = map[string]struct{}{
+	"_csrf":               {},
+	"_csrf_token":         {},
+	"_session":            {},
+	"_xsrf":               {},
+	"api-key":             {},
+	"apikey":              {},
+	"auth":                {},
+	"authorization":       {},
+	"cookie":              {},
+	"credentials":         {},
+	"csrf":                {},
+	"csrf-token":          {},
+	"csrftoken":           {},
+	"ip-address":          {},
+	"passwd":              {},
+	"password":            {},
+	"private-key":         {},
+	"privatekey":          {},
+	"proxy-authorization": {},
+	"remote-addr":         {},
+	"secret":              {},
+	"session":             {},
+	"sessionid":           {},
+	"token":               {},
+	"user-session":        {},
+	"x-api-key":           {},
+	"x-csrftoken":         {},
+	"x-forwarded-for":     {},
+	"x-real-ip":           {},
+	"xsrf-token":          {},
+}
+
+// IsSensitiveHeader reports whether a header or metadata key should be treated as sensitive.
+func IsSensitiveHeader(key string) bool {
+	_, ok := sensitiveHeaders[strings.ToLower(key)]
+	return ok
+}
+
+// eventIdentifier returns a human-readable identifier for the event to be used in log messages.
+// Format: "<description> [<event-id>]".
+func eventIdentifier(event *Event) string {
+	var description string
+	switch event.Type {
+	case errorType:
+		description = "error"
+	case transactionType:
+		description = "transaction"
+	case checkInType:
+		description = "check-in"
+	case logEvent.Type:
+		description = fmt.Sprintf("%d log events", len(event.Logs))
+	case traceMetricEvent.Type:
+		description = fmt.Sprintf("%d metric events", len(event.Metrics))
+	default:
+		description = fmt.Sprintf("%s event", event.Type)
+	}
+	return fmt.Sprintf("%s [%s]", description, event.EventID)
 }

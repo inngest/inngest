@@ -15,11 +15,11 @@
 package protobuf
 
 import (
+	"fmt"
 	"strings"
 	"text/scanner"
 
 	"github.com/emicklei/proto"
-	"golang.org/x/xerrors"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/token"
@@ -28,7 +28,7 @@ import (
 // failf panics with a marked error that can be intercepted upon returning
 // from parsing.
 func failf(pos scanner.Position, format string, args ...interface{}) {
-	panic(protoError{pos, xerrors.Errorf(format, args...)})
+	panic(protoError{pos, fmt.Errorf(format, args...)})
 }
 
 func fail(pos scanner.Position, err error) {
@@ -40,19 +40,15 @@ type protoError struct {
 	error
 }
 
-var (
-	newline    = token.Newline.Pos()
-	newSection = token.NewSection.Pos()
-)
+var newSection = token.NewSection.Pos()
 
-func addComments(f ast.Node, i int, doc, inline *proto.Comment) bool {
+func addComments(f ast.Node, i int, doc, inline *proto.Comment) {
 	cg := comment(doc, true)
 	if cg != nil && len(cg.List) > 0 && i > 0 {
 		cg.List[0].Slash = newSection
 	}
-	f.AddComment(cg)
-	f.AddComment(comment(inline, false))
-	return doc != nil
+	ast.AddComment(f, cg)
+	ast.AddComment(f, comment(inline, false))
 }
 
 func comment(c *proto.Comment, doc bool) *ast.CommentGroup {

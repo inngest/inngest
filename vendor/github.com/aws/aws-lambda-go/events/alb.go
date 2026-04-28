@@ -20,7 +20,7 @@ type ALBTargetGroupRequestContext struct {
 
 // ELBContext contains the information to identify the ARN invoking the lambda
 type ELBContext struct {
-	TargetGroupArn string `json:"targetGroupArn"` //nolint: stylecheck
+	TargetGroupArn string `json:"targetGroupArn"` //nolint: staticcheck
 }
 
 // ALBTargetGroupResponse configures the response to be returned by the ALB Lambda target group for the request

@@ -56,7 +56,7 @@ retry:
 		if err == errConnExpired {
 			goto retry
 		}
-		if c.retry && cmd.IsReadOnly() && c.isRetryable(err, ctx) {
+		if c.retry && cmd.IsRetryable() && c.isRetryable(err, ctx) {
 			if c.retryHandler.WaitOrSkipRetry(ctx, attempts, cmd, err) {
 				attempts++
 				goto retry
@@ -120,7 +120,7 @@ retry:
 			goto recover
 		}
 	}
-	if c.retry && allReadOnly(multi) {
+	if c.retry && allRetryable(multi) {
 		for i, resp := range resps {
 			if c.isRetryable(resp.Error(), ctx) {
 				shouldRetry := c.retryHandler.WaitOrSkipRetry(
@@ -275,7 +275,7 @@ retry:
 		return newErrResult(err)
 	}
 	resp = c.wire.Do(ctx, cmd)
-	if c.retry && cmd.IsReadOnly() && isRetryable(resp.Error(), c.wire, ctx) {
+	if c.retry && cmd.IsRetryable() && isRetryable(resp.Error(), c.wire, ctx) {
 		shouldRetry := c.retryHandler.WaitOrSkipRetry(
 			ctx, attempts, cmd, resp.Error(),
 		)
@@ -297,7 +297,7 @@ func (c *dedicatedSingleClient) DoMulti(ctx context.Context, multi ...Completed)
 	attempts := 1
 	retryable := c.retry
 	if retryable {
-		retryable = allReadOnly(multi)
+		retryable = allRetryable(multi)
 	}
 retry:
 	if err := c.check(); err != nil {
@@ -354,6 +354,17 @@ func (c *dedicatedSingleClient) SetPubSubHooks(hooks PubSubHooks) <-chan error {
 	return c.wire.SetPubSubHooks(hooks)
 }
 
+func (c *dedicatedSingleClient) SetOnInvalidations(fn func([]RedisMessage)) <-chan error {
+	if err := c.check(); err != nil {
+		ch := make(chan error, 1)
+		ch <- err
+		return ch
+	}
+	hooks := c.wire.GetPubSubHooks()
+	hooks.onInvalidations = fn
+	return c.SetPubSubHooks(hooks)
+}
+
 func (c *dedicatedSingleClient) Close() {
 	c.wire.Close()
 	c.release()
@@ -392,9 +403,9 @@ func isRetryable(err error, w wire, ctx context.Context) bool {
 	return true
 }
 
-func allReadOnly(multi []Completed) bool {
+func allRetryable(multi []Completed) bool {
 	for _, cmd := range multi {
-		if cmd.IsWrite() {
+		if !cmd.IsRetryable() {
 			return false
 		}
 	}
@@ -402,7 +413,7 @@ func allReadOnly(multi []Completed) bool {
 }
 
 func chooseSlot(multi []Completed) uint16 {
-	for i := 0; i < len(multi); i++ {
+	for i := range multi {
 		if multi[i].Slot() != cmds.InitSlot {
 			for j := i + 1; j < len(multi); j++ {
 				if multi[j].Slot() != cmds.InitSlot && multi[j].Slot() != multi[i].Slot() {

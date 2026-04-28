@@ -17,47 +17,70 @@
 // Note that the result is not valid CUE, but instead prints the internals
 // of an ADT node in human-readable form. It uses a simple indentation algorithm
 // for improved readability and diffing.
-//
 package debug
 
 import (
 	"fmt"
+	"strconv"
 
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/internal/core/adt"
 )
 
-type compactPrinter struct {
-	printer
-}
-
-func (w *compactPrinter) node(n adt.Node) {
+func (w *printer) compactNode(n adt.Node) {
 	switch x := n.(type) {
 	case *adt.Vertex:
 		if x.BaseValue == nil || (w.cfg.Raw && !x.IsData()) {
-			for i, c := range x.Conjuncts {
+			i := 0
+			for c := range x.LeafConjuncts() {
 				if i > 0 {
 					w.string(" & ")
 				}
-				w.node(c.Expr())
+				i++
+				w.node(c.Elem())
 			}
 			return
 		}
 
 		switch v := x.BaseValue.(type) {
 		case *adt.StructMarker:
+			if !w.pushVertex(x) {
+				return
+			}
+			defer w.popVertex()
+
 			w.string("{")
 			for i, a := range x.Arcs {
 				if i > 0 {
 					w.string(",")
 				}
-				w.label(a.Label)
-				w.string(":")
-				w.node(a)
+				if a.Label.IsLet() {
+					w.string("let ")
+					w.label(a.Label)
+					if a.MultiLet {
+						w.string("m")
+					}
+					w.string("=")
+					if c := a.ConjunctAt(0); a.MultiLet {
+						w.node(c.Expr())
+						continue
+					}
+					w.node(a)
+				} else {
+					w.label(a.Label)
+					w.string(a.ArcType.Suffix())
+					w.string(":")
+					w.node(a)
+				}
 			}
 			w.string("}")
 
 		case *adt.ListMarker:
+			if !w.pushVertex(x) {
+				return
+			}
+			defer w.popVertex()
+
 			w.string("[")
 			for i, a := range x.Arcs {
 				if i > 0 {
@@ -66,6 +89,14 @@ func (w *compactPrinter) node(n adt.Node) {
 				w.node(a)
 			}
 			w.string("]")
+
+		case *adt.Vertex:
+			// Disjunction, structure shared, etc.
+
+			if v, ok := w.printShared(x); !ok {
+				w.node(v)
+				w.popVertex()
+			}
 
 		case adt.Value:
 			w.node(v)
@@ -98,15 +129,18 @@ func (w *compactPrinter) node(n adt.Node) {
 		w.string("]")
 
 	case *adt.Field:
-		s := w.labelString(x.Label)
-		w.string(s)
+		w.label(x.Label)
+		w.string(x.ArcType.Suffix())
 		w.string(":")
 		w.node(x.Value)
 
-	case *adt.OptionalField:
-		s := w.labelString(x.Label)
-		w.string(s)
-		w.string("?:")
+	case *adt.LetField:
+		w.string("let ")
+		w.label(x.Label)
+		if x.IsMulti {
+			w.string("m")
+		}
+		w.string("=")
 		w.node(x.Value)
 
 	case *adt.BulkOptionalField:
@@ -117,9 +151,7 @@ func (w *compactPrinter) node(n adt.Node) {
 
 	case *adt.DynamicField:
 		w.node(x.Key)
-		if x.IsOptional() {
-			w.string("?")
-		}
+		w.string(x.ArcType.Suffix())
 		w.string(":")
 		w.node(x.Value)
 
@@ -133,7 +165,7 @@ func (w *compactPrinter) node(n adt.Node) {
 		w.string(`_|_`)
 		if x.Err != nil {
 			w.string("(")
-			w.string(x.Err.Error())
+			w.shortError(x.Err, false)
 			w.string(")")
 		}
 
@@ -141,29 +173,29 @@ func (w *compactPrinter) node(n adt.Node) {
 		w.string("null")
 
 	case *adt.Bool:
-		fmt.Fprint(w, x.B)
+		w.dst = strconv.AppendBool(w.dst, x.B)
 
 	case *adt.Num:
-		fmt.Fprint(w, &x.X)
+		w.string(x.X.String())
 
 	case *adt.String:
-		w.string(literal.String.Quote(x.Str))
+		w.dst = literal.String.Append(w.dst, x.Str)
 
 	case *adt.Bytes:
-		w.string(literal.Bytes.Quote(string(x.B)))
+		w.dst = literal.Bytes.Append(w.dst, string(x.B))
 
 	case *adt.Top:
 		w.string("_")
 
 	case *adt.BasicType:
-		fmt.Fprint(w, x.K)
+		w.string(x.K.String())
 
 	case *adt.BoundExpr:
-		fmt.Fprint(w, x.Op)
+		w.string(x.Op.String())
 		w.node(x.Expr)
 
 	case *adt.BoundValue:
-		fmt.Fprint(w, x.Op)
+		w.string(x.Op.String())
 		w.node(x.Value)
 
 	case *adt.NodeLink:
@@ -178,6 +210,9 @@ func (w *compactPrinter) node(n adt.Node) {
 
 	case *adt.FieldReference:
 		w.label(x.Label)
+		if x.Optional {
+			w.string("?")
+		}
 
 	case *adt.ValueReference:
 		w.label(x.Label)
@@ -202,12 +237,18 @@ func (w *compactPrinter) node(n adt.Node) {
 		w.node(x.X)
 		w.string(".")
 		w.label(x.Sel)
+		if x.Optional {
+			w.string("?")
+		}
 
 	case *adt.IndexExpr:
 		w.node(x.X)
 		w.string("[")
 		w.node(x.Index)
 		w.string("]")
+		if x.Optional {
+			w.string("?")
+		}
 
 	case *adt.SliceExpr:
 		w.node(x.X)
@@ -229,15 +270,21 @@ func (w *compactPrinter) node(n adt.Node) {
 		w.interpolation(x)
 
 	case *adt.UnaryExpr:
-		fmt.Fprint(w, x.Op)
+		w.string(x.Op.String())
 		w.node(x.X)
 
 	case *adt.BinaryExpr:
 		w.string("(")
 		w.node(x.X)
-		fmt.Fprint(w, " ", x.Op, " ")
+		w.string(" ")
+		w.string(x.Op.String())
+		w.string(" ")
 		w.node(x.Y)
 		w.string(")")
+
+	case *adt.OpenExpr:
+		w.node(x.X)
+		w.string("...")
 
 	case *adt.CallExpr:
 		w.node(x.Fun)
@@ -246,7 +293,7 @@ func (w *compactPrinter) node(n adt.Node) {
 			if i > 0 {
 				w.string(", ")
 			}
-			w.node(a)
+			w.arg(a)
 		}
 		w.string(")")
 
@@ -264,7 +311,7 @@ func (w *compactPrinter) node(n adt.Node) {
 			if i > 0 {
 				w.string(", ")
 			}
-			w.node(a)
+			w.arg(a)
 		}
 		w.string(")")
 
@@ -290,6 +337,14 @@ func (w *compactPrinter) node(n adt.Node) {
 			w.node(c)
 		}
 
+	case *adt.ConjunctGroup:
+		for i, c := range *x {
+			if i > 0 {
+				w.string(" & ")
+			}
+			w.node(c.Expr())
+		}
+
 	case *adt.Disjunction:
 		for i, c := range x.Values {
 			if i > 0 {
@@ -301,6 +356,16 @@ func (w *compactPrinter) node(n adt.Node) {
 			w.node(c)
 		}
 
+	case *adt.Comprehension:
+		for _, c := range x.Clauses {
+			w.node(c)
+		}
+		w.node(adt.ToExpr(x.Value))
+		if x.Fallback != nil {
+			w.string(" else ")
+			w.node(x.Fallback)
+		}
+
 	case *adt.ForClause:
 		w.string("for ")
 		w.ident(x.Key)
@@ -309,13 +374,11 @@ func (w *compactPrinter) node(n adt.Node) {
 		w.string(" in ")
 		w.node(x.Src)
 		w.string(" ")
-		w.node(x.Dst)
 
 	case *adt.IfClause:
 		w.string("if ")
 		w.node(x.Condition)
 		w.string(" ")
-		w.node(x.Dst)
 
 	case *adt.LetClause:
 		w.string("let ")
@@ -323,10 +386,19 @@ func (w *compactPrinter) node(n adt.Node) {
 		w.string(" = ")
 		w.node(x.Expr)
 		w.string(" ")
-		w.node(x.Dst)
+
+	case *adt.TryClause:
+		w.string("try ")
+		if x.Label != adt.InvalidLabel {
+			// Assignment form: try x = expr
+			w.ident(x.Label)
+			w.string(" = ")
+			w.node(x.Expr)
+			w.string(" ")
+		}
+		// Struct form has no Ident/Expr - body is in Comprehension.Value
 
 	case *adt.ValueClause:
-		w.node(x.StructLit)
 
 	default:
 		panic(fmt.Sprintf("unknown type %T", x))

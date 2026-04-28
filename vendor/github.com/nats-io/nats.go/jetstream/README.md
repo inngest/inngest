@@ -3,38 +3,34 @@
 
 This doc covers the basic usage of the `jetstream` package in `nats.go` client.
 
-- [JetStream Simplified Client](#jetstream-simplified-client)
-  - [Overview](#overview)
-  - [Basic usage](#basic-usage)
-  - [Streams](#streams)
-    - [Stream management (CRUD)](#stream-management-crud)
-    - [Listing streams and stream names](#listing-streams-and-stream-names)
-    - [Stream-specific operations](#stream-specific-operations)
-  - [Consumers](#consumers)
-    - [Consumers management](#consumers-management)
-    - [Listing consumers and consumer
-      names](#listing-consumers-and-consumer-names)
-    - [Ordered consumers](#ordered-consumers)
-    - [Receiving messages from the
-      consumer](#receiving-messages-from-the-consumer)
-      - [Single fetch](#single-fetch)
-      - [Continuous polling](#continuous-polling)
-        - [Using `Consume()` receive messages in a
-          callback](#using-consume-receive-messages-in-a-callback)
-        - [Using `Messages()` to iterate over incoming
-          messages](#using-messages-to-iterate-over-incoming-messages)
-  - [Publishing on stream](#publishing-on-stream)
-    - [Synchronous publish](#synchronous-publish)
-    - [Async publish](#async-publish)
-  - [KeyValue Store](#keyvalue-store)
-    - [Basic usage of KV bucket](#basic-usage-of-kv-bucket)
-    - [Watching for changes on a bucket](#watching-for-changes-on-a-bucket)
-    - [Additional operations on a bucket](#additional-operations-on-a-bucket)
-  - [Object Store](#object-store)
-    - [Basic usage of Object Store](#basic-usage-of-object-store)
-    - [Watching for changes on a store](#watching-for-changes-on-a-store)
-    - [Additional operations on a store](#additional-operations-on-a-store)
-  - [Examples](#examples)
+- [Overview](#overview)
+- [Basic usage](#basic-usage)
+- [Streams](#streams)
+  - [Stream management (CRUD)](#stream-management-crud)
+  - [Listing streams and stream names](#listing-streams-and-stream-names)
+  - [Stream-specific operations](#stream-specific-operations)
+- [Consumers](#consumers)
+  - [Consumers management](#consumers-management)
+  - [Listing consumers and consumer names](#listing-consumers-and-consumer-names)
+  - [Ordered consumers](#ordered-consumers)
+  - [Receiving messages from pull consumers](#receiving-messages-from-pull-consumers)
+    - [Single fetch](#single-fetch)
+    - [Continuous polling](#continuous-polling)
+      - [Using `Consume()` receive messages in a callback](#using-consume-receive-messages-in-a-callback)
+      - [Using `Messages()` to iterate over incoming messages](#using-messages-to-iterate-over-incoming-messages)
+    - [Receiving messages from push consumers](#receiving-messages-from-push-consumers)
+- [Publishing on stream](#publishing-on-stream)
+  - [Synchronous publish](#synchronous-publish)
+  - [Async publish](#async-publish)
+- [KeyValue Store](#keyvalue-store)
+  - [Basic usage of KV bucket](#basic-usage-of-kv-bucket)
+  - [Watching for changes on a bucket](#watching-for-changes-on-a-bucket)
+  - [Additional operations on a bucket](#additional-operations-on-a-bucket)
+- [Object Store](#object-store)
+  - [Basic usage of Object Store](#basic-usage-of-object-store)
+  - [Watching for changes on a store](#watching-for-changes-on-a-store)
+  - [Additional operations on a store](#additional-operations-on-a-store)
+- [Examples](#examples)
 
 ## Overview
 
@@ -118,15 +114,15 @@ func main() {
     if err != nil {
         // handle error
     }
-	
+
     for msg := range msgs.Messages() {
         msg.Ack()
         fmt.Printf("Received a JetStream message via fetch: %s\n", string(msg.Data()))
         messageCounter++
     }
-	
-    fmt.Printf("received %d messages\n", messageCounter)
-	
+
+    fmt.Printf("Received %d messages\n", messageCounter)
+
     if msgs.Error() != nil {
         fmt.Println("Error during Fetch(): ", msgs.Error())
     }
@@ -228,7 +224,7 @@ _ = s.Purge(ctx, jetstream.WithPurgeSequence(100))
 _ = s.Purge(ctx, jetstream.WithPurgeKeep(10))
 ```
 
-- Get and messages from stream
+- Get and delete messages from a stream
 
 ```go
 // get message from stream with sequence number == 100
@@ -244,7 +240,7 @@ _ = s.DeleteMsg(ctx, 100)
 - Get information about a stream
 
 ```go
-// Fetches latest stream info from server
+// Fetches the latest stream info from server
 info, _ := s.Info(ctx)
 fmt.Println(info.Config.Name)
 
@@ -255,14 +251,34 @@ fmt.Println(cachedInfo.Config.Name)
 
 ## Consumers
 
-Only pull consumers are supported in `jetstream` package. However, unlike the
-JetStream API in `nats` package, pull consumers allow for continuous message
-retrieval (similarly to how `nats.Subscribe()` works). Because of that, push
-consumers can be easily replaced by pull consumers for most of the use cases.
+Both pull and push consumers are supported in `jetstream` package. For most use
+cases, we recommend using pull consumers as they allow for more fine-grained
+control over the message processing and can often prevent issues such as e.g.
+slow consumers. However, unlike the JetStream API in `nats` package, pull
+consumers allow for continuous message retrieval (similarly to how
+`nats.Subscribe()` works). Because of that, push consumers can be easily
+replaced by pull consumers for most of the use cases. Push consumers are
+supported mainly for the purpose of ease of migration from `nats` package. The
+interfaces for consuming messages via push and pull consumers are similar, with
+the main difference being that push consumers do not support fetching individual
+batches of messages.
 
 ### Consumers management
 
-CRUD operations on consumers can be achieved on 2 levels:
+Both pull and push consumers can be managed using `jetstream` package. The
+following example demonstrates how to create, update, fetch and delete a pull
+consumer. Push consumers can be managed in a similar way, with method names
+containing `Push` (e.g. `CreatePushConsumer`, `UpdatePushConsumer`,
+`DeletePushConsumer`).
+
+> __NOTE__: It is important to use `CreateConsumer` and `CreatePushConsumer`
+methods to create the respective consumer types as they return the correct
+interface (different for push and pull consumers). `DeliverSubject` is mandatory
+when creating a push consumer and cannot be provided when creating a pull
+consumer. Similarly, an attempt to get a push consumer using `Consumer` method
+will result in an error (and vice versa).
+
+CRUD operations on pull consumers can be achieved on 2 levels:
 
 - on `JetStream` interface
 
@@ -294,7 +310,7 @@ cons2 := js.CreateOrUpdateConsumer(ctx, "ORDERS", jetstream.ConsumerConfig{
 // or an illegal property is to be updated (e.g. AckPolicy)
 updated, _ := js.UpdateConsumer(ctx, "ORDERS", jetstream.ConsumerConfig{
     AckPolicy: jetstream.AckExplicitPolicy,
-    Description: "updated consumer"
+    Description: "updated consumer",
 })
 
 // get consumer handle
@@ -320,7 +336,7 @@ cons, _ := stream.CreateConsumer(ctx, jetstream.ConsumerConfig{
 })
 
 // get consumer handle
-cons, _ = stream.Consumer(ctx, "ORDERS", "foo")
+cons, _ = stream.Consumer(ctx, "foo")
 
 // delete a consumer
 stream.DeleteConsumer(ctx, "foo")
@@ -371,26 +387,27 @@ message ordering. It is also resilient to consumer deletion.
 Ordered consumers present the same set of message consumption methods as
 standard pull consumers.
 
+> __NOTE__: Ordered consumers are not supported for push consumers.
+
 ```go
 js, _ := jetstream.New(nc)
 
 // create a consumer (this is an idempotent operation)
 cons, _ := js.OrderedConsumer(ctx, "ORDERS", jetstream.OrderedConsumerConfig{
     // Filter results from "ORDERS" stream by specific subject
-    FilterSubjects: []{"ORDERS.A"},
+    FilterSubjects: []string{"ORDERS.A"},
 })
 ```
 
-### Receiving messages from the consumer
+### Receiving messages from pull consumers
 
-The `Consumer` interface covers allows fetching messages on demand, with
-pre-defined batch size on bytes limit, or continuous push-like receiving of
+The `Consumer` interface allows fetching messages on demand, with a
+pre-defined batch size or byte limit, or continuous push-like receiving of
 messages.
 
 #### __Single fetch__
 
-This pattern pattern allows fetching a defined number of messages in a single
-RPC.
+This pattern allows fetching a defined number of messages in a single RPC.
 
 - Using `Fetch` or `FetchBytes`, consumer will return up to the provided number
 of messages/bytes. By default, `Fetch()` will wait 30 seconds before timing out
@@ -400,7 +417,7 @@ of messages/bytes. By default, `Fetch()` will wait 30 seconds before timing out
 // receive up to 10 messages from the stream
 msgs, err := c.Fetch(10)
 if err != nil {
-	// handle error
+    // handle error
 }
 
 for msg := range msgs.Messages() {
@@ -463,38 +480,52 @@ single messages on demand.
 Subject filtering is achieved by configuring a consumer with a `FilterSubject`
 value.
 
-##### Using `Consume()` receive messages in a callback
+##### Using `Consume()` to receive messages in a callback
 
 ```go
-cons, _ := js.CreateOrUpdateConsumer("ORDERS", jetstream.ConsumerConfig{
+cons, _ := js.CreateOrUpdateConsumer(ctx, "ORDERS", jetstream.ConsumerConfig{
     AckPolicy: jetstream.AckExplicitPolicy,
     // receive messages from ORDERS.A subject only
     FilterSubject: "ORDERS.A"
-}))
+})
 
 consContext, _ := c.Consume(func(msg jetstream.Msg) {
     fmt.Printf("Received a JetStream message: %s\n", string(msg.Data()))
+    // messages are not acknowledged automatically
+    msg.Ack()
 })
 defer consContext.Stop()
 ```
 
-Similarly to `Messages()`, `Consume()` can be supplied with options to modify
+Similar to `Messages()`, `Consume()` can be supplied with options to modify
 the behavior of a single pull request:
 
 - `PullMaxMessages(int)` - up to provided number of messages will be buffered
 - `PullMaxBytes(int)` - up to provided number of bytes will be buffered. This
-setting and `PullMaxMessages` are mutually exclusive
+  setting and `PullMaxMessages` are mutually exclusive.
+  The value should be set to a high enough value to accommodate the largest
+  message expected from the server. Note that it may not be sufficient to set
+  this value to the maximum message size, as this setting controls the client
+  buffer size, not the max bytes requested from the server within a single pull
+  request. If the value is set too low, the consumer will stall and not be able
+  to consume messages.
 - `PullExpiry(time.Duration)` - timeout on a single pull request to the server
-type PullThresholdMessages int
 - `PullThresholdMessages(int)` - amount of messages which triggers refilling the
   buffer
 - `PullThresholdBytes(int)` - amount of bytes which triggers refilling the
   buffer
 - `PullHeartbeat(time.Duration)` - idle heartbeat duration for a single pull
 request. An error will be triggered if at least 2 heartbeats are missed
-- `WithConsumeErrHandler(func (ConsumeContext, error))` - when used, sets a
+- `ConsumeErrHandler(func (ConsumeContext, error))` - when used, sets a
   custom error handler on `Consume()`, allowing e.g. tracking missing
   heartbeats.
+- `PullMaxMessagesWithBytesLimit(int, int)` - up to the provided number of messages
+  will be buffered and a single fetch size will be limited to the provided value.
+  This is an advanced option and should be used with caution. Most of the time,
+  `PullMaxMessages` or `PullMaxBytes` should be used instead. Note that the byte
+  limit should never be set to a value lower than the maximum message size that
+  can be expected from the server. If the byte limit is lower than the maximum
+  message size, the consumer will stall and not be able to consume messages.
 
 > __NOTE__: `Stop()` should always be called on `ConsumeContext` to avoid
 > leaking goroutines.
@@ -527,9 +558,14 @@ iter, _ := cons.Messages(jetstream.PullMaxMessages(10), jetstream.PullMaxBytes(1
 
 - `PullMaxMessages(int)` - up to provided number of messages will be buffered
 - `PullMaxBytes(int)` - up to provided number of bytes will be buffered. This
-setting and `PullMaxMessages` are mutually exclusive
+  setting and `PullMaxMessages` are mutually exclusive.
+  The value should be set to a high enough value to accommodate the largest
+  message expected from the server. Note that it may not be sufficient to set
+  this value to the maximum message size, as this setting controls the client
+  buffer size, not the max bytes requested from the server within a single pull
+  request. If the value is set too low, the consumer will stall and not be able
+  to consume messages.
 - `PullExpiry(time.Duration)` - timeout on a single pull request to the server
-type PullThresholdMessages int
 - `PullThresholdMessages(int)` - amount of messages which triggers refilling the
   buffer
 - `PullThresholdBytes(int)` - amount of bytes which triggers refilling the
@@ -537,6 +573,13 @@ type PullThresholdMessages int
 - `PullHeartbeat(time.Duration)` - idle heartbeat duration for a single pull
 request. An error will be triggered if at least 2 heartbeats are missed (unless
 `WithMessagesErrOnMissingHeartbeat(false)` is used)
+- `PullMaxMessagesWithBytesLimit(int, int)` - up to the provided number of messages
+  will be buffered and a single fetch size will be limited to the provided value.
+  This is an advanced option and should be used with caution. Most of the time,
+  `PullMaxMessages` or `PullMaxBytes` should be used instead. Note that the byte
+  limit should never be set to a value lower than the maximum message size that
+  can be expected from the server. If the byte limit is lower than the maximum
+  message size, the consumer will stall and not be able to consume messages.
 
 ##### Using `Messages()` to fetch single messages one by one
 
@@ -566,6 +609,40 @@ for {
 }
 ```
 
+#### Receiving messages from push consumers
+
+The `PushConsumer` interface currently only allows message processing in a
+callback using `Consume()`.
+
+As heartbeat for push consumers is not managed when using `Consume()`, it is
+important to set `IdleHeartbeat` on the consumer level. Similarly, `FlowControl`
+can be set to prevent the consumer from receiving more messages than it can
+handle.
+
+```go
+cons, _ := js.CreateOrUpdatePushConsumer(ctx, "ORDERS", jetstream.ConsumerConfig{
+    DeliverSubject: nats.NewInbox()
+    AckPolicy: jetstream.AckExplicitPolicy,
+    // receive messages from ORDERS.A subject only
+    FilterSubject: "ORDERS.A",
+    // unlike pull consumers, idle heartbeat is configured on the consumer level
+    IdleHeartbeat: 30 * time.Second
+})
+
+consContext, _ := c.Consume(func(msg jetstream.Msg) {
+    fmt.Printf("Received a JetStream message: %s\n", string(msg.Data()))
+    // messages are not acknowledged automatically
+    msg.Ack()
+})
+defer consContext.Stop()
+```
+
+`Consume()` on `PushConsumer` can be supplied with `ConsumeErrHandler` option
+to set a custom error handler allowing e.g. tracking missing heartbeats.
+
+> __NOTE__: `Stop()` should always be called on `ConsumeContext` to avoid
+> leaking goroutines.
+
 ## Publishing on stream
 
 `JetStream` interface allows publishing messages on stream in 2 ways:
@@ -592,7 +669,7 @@ setting various headers. Additionally, for `PublishMsg()` headers can be set
 directly on `nats.Msg`.
 
 ```go
-// All 3 implementations are work identically 
+// All 3 implementations work identically 
 ack, err := js.PublishMsg(ctx, &nats.Msg{
     Data:    []byte("hello"),
     Subject: "ORDERS.new",
@@ -762,7 +839,7 @@ fmt.Printf("%s @ %d -> %q\n", entry.Key(), entry.Revision(), string(entry.Value(
 In addition to basic CRUD operations and watching for changes, KV buckets
 support several additional operations:
 
-- `ListKeys` will return all keys in a bucket"
+- `ListKeys` will return all keys in a bucket
 
 ```go
 js, _ := jetstream.New(nc)
@@ -893,14 +970,14 @@ js.DeleteObjectStore(ctx, "configs")
 
 Object Stores support Watchers, which can be used to watch for changes on
 objects in a given bucket. Watcher will receive a notification on a channel when
-a change occurs. By default, watcher will return latest information for all
+a change occurs. By default, watcher will return the latest information for all
 objects in a bucket. After sending all initial values, watcher will send nil on
 the channel to signal that all initial values have been sent and it will start
 sending updates when changes occur.
 
 >__NOTE:__ Watchers do not retrieve values for objects, only metadata (containing
 >information such as object name, bucket name, object size etc.). If object data
->is required, `Get` method should be used.
+>is required, the `Get` method should be used.
 
 Watcher supports several configuration options:
 

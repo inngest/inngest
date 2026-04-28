@@ -1,4 +1,4 @@
-// Copyright 2022-2023 The NATS Authors
+// Copyright 2022-2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -50,11 +50,11 @@ const (
 	// apiConsumerCreateT is used to create consumers.
 	apiConsumerCreateT = "CONSUMER.CREATE.%s.%s"
 
-	// apiConsumerCreateT is used to create consumers.
+	// apiConsumerCreateWithFilterSubjectT is used to create consumers with a filter subject.
 	// it accepts stream name, consumer name and filter subject
 	apiConsumerCreateWithFilterSubjectT = "CONSUMER.CREATE.%s.%s.%s"
 
-	// apiConsumerInfoT is used to create consumers.
+	// apiConsumerInfoT is used to retrieve consumer information.
 	apiConsumerInfoT = "CONSUMER.INFO.%s.%s"
 
 	// apiRequestNextT is the prefix for the request next message(s) for a consumer in worker/pull mode.
@@ -62,6 +62,9 @@ const (
 
 	// apiConsumerDeleteT is used to delete consumers.
 	apiConsumerDeleteT = "CONSUMER.DELETE.%s.%s"
+
+	// apiConsumerPauseT is used to pause a consumer.
+	apiConsumerPauseT = "CONSUMER.PAUSE.%s.%s"
 
 	// apiConsumerListT is used to return all detailed consumer information
 	apiConsumerListT = "CONSUMER.LIST.%s"
@@ -93,7 +96,7 @@ const (
 	// apiMsgGetT is the endpoint to get a message.
 	apiMsgGetT = "STREAM.MSG.GET.%s"
 
-	// apiMsgGetT is the endpoint to perform a direct get of a message.
+	// apiDirectMsgGetT is the endpoint to perform a direct get of a message.
 	apiDirectMsgGetT = "DIRECT.GET.%s"
 
 	// apiDirectMsgGetLastBySubjectT is the endpoint to perform a direct get of a message by subject.
@@ -101,6 +104,9 @@ const (
 
 	// apiMsgDeleteT is the endpoint to remove a message.
 	apiMsgDeleteT = "STREAM.MSG.DELETE.%s"
+
+	// apiConsumerUnpinT is the endpoint to unpin a consumer.
+	apiConsumerUnpinT = "CONSUMER.UNPIN.%s.%s"
 )
 
 func (js *jetStream) apiRequestJSON(ctx context.Context, subject string, resp any, data ...[]byte) (*jetStreamMsg, error) {
@@ -116,12 +122,13 @@ func (js *jetStream) apiRequestJSON(ctx context.Context, subject string, resp an
 
 // a RequestWithContext with tracing via TraceCB
 func (js *jetStream) apiRequest(ctx context.Context, subj string, data ...[]byte) (*jetStreamMsg, error) {
+	subj = js.apiSubject(subj)
 	var req []byte
 	if len(data) > 0 {
 		req = data[0]
 	}
-	if js.clientTrace != nil {
-		ctrace := js.clientTrace
+	if js.opts.ClientTrace != nil {
+		ctrace := js.opts.ClientTrace
 		if ctrace.RequestSent != nil {
 			ctrace.RequestSent(subj, req)
 		}
@@ -130,8 +137,8 @@ func (js *jetStream) apiRequest(ctx context.Context, subj string, data ...[]byte
 	if err != nil {
 		return nil, err
 	}
-	if js.clientTrace != nil {
-		ctrace := js.clientTrace
+	if js.opts.ClientTrace != nil {
+		ctrace := js.opts.ClientTrace
 		if ctrace.ResponseReceived != nil {
 			ctrace.ResponseReceived(subj, resp.Data, resp.Header)
 		}
@@ -140,12 +147,12 @@ func (js *jetStream) apiRequest(ctx context.Context, subj string, data ...[]byte
 	return js.toJSMsg(resp), nil
 }
 
-func apiSubj(prefix, subject string) string {
-	if prefix == "" {
-		return subject
+func (js *jetStream) apiSubject(subj string) string {
+	if js.opts.apiPrefix == "" {
+		return subj
 	}
 	var b strings.Builder
-	b.WriteString(prefix)
-	b.WriteString(subject)
+	b.WriteString(js.opts.apiPrefix)
+	b.WriteString(subj)
 	return b.String()
 }

@@ -39,8 +39,6 @@ func DynamicSamplingContextFromHeader(header []byte) (DynamicSamplingContext, er
 }
 
 func DynamicSamplingContextFromTransaction(span *Span) DynamicSamplingContext {
-	entries := map[string]string{}
-
 	hub := hubFromContext(span.Context())
 	scope := hub.Scope()
 	client := hub.Client()
@@ -52,6 +50,8 @@ func DynamicSamplingContextFromTransaction(span *Span) DynamicSamplingContext {
 		}
 	}
 
+	entries := make(map[string]string)
+
 	if traceID := span.TraceID.String(); traceID != "" {
 		entries["trace_id"] = traceID
 	}
@@ -60,8 +60,11 @@ func DynamicSamplingContextFromTransaction(span *Span) DynamicSamplingContext {
 	}
 
 	if dsn := client.dsn; dsn != nil {
-		if publicKey := dsn.publicKey; publicKey != "" {
+		if publicKey := dsn.GetPublicKey(); publicKey != "" {
 			entries["public_key"] = publicKey
+		}
+		if orgID := dsn.GetOrgID(); orgID != 0 {
+			entries["org_id"] = strconv.FormatUint(orgID, 10)
 		}
 	}
 	if release := client.options.Release; release != "" {
@@ -78,20 +81,9 @@ func DynamicSamplingContextFromTransaction(span *Span) DynamicSamplingContext {
 		}
 	}
 
-	if userSegment := scope.user.Segment; userSegment != "" {
-		entries["user_segment"] = userSegment
-	}
+	entries["sampled"] = strconv.FormatBool(span.Sampled.Bool())
 
-	if span.Sampled.Bool() {
-		entries["sampled"] = "true"
-	} else {
-		entries["sampled"] = "false"
-	}
-
-	return DynamicSamplingContext{
-		Entries: entries,
-		Frozen:  true,
-	}
+	return DynamicSamplingContext{Entries: entries, Frozen: true}
 }
 
 func (d DynamicSamplingContext) HasEntries() bool {
@@ -111,13 +103,58 @@ func (d DynamicSamplingContext) String() string {
 		}
 		members = append(members, member)
 	}
-	if len(members) > 0 {
-		baggage, err := baggage.New(members...)
-		if err != nil {
-			return ""
-		}
-		return baggage.String()
+
+	if len(members) == 0 {
+		return ""
 	}
 
-	return ""
+	baggage, err := baggage.New(members...)
+	if err != nil {
+		return ""
+	}
+
+	return baggage.String()
+}
+
+// DynamicSamplingContextFromScope Constructs a new DynamicSamplingContext using a scope and client. Accessing
+// fields on the scope are not thread safe, and this function should only be
+// called within scope methods.
+func DynamicSamplingContextFromScope(scope *Scope, client *Client) DynamicSamplingContext {
+	entries := map[string]string{}
+
+	if client == nil || scope == nil {
+		return DynamicSamplingContext{
+			Entries: entries,
+			Frozen:  false,
+		}
+	}
+
+	propagationContext := scope.propagationContext
+
+	if traceID := propagationContext.TraceID.String(); traceID != "" {
+		entries["trace_id"] = traceID
+	}
+	if sampleRate := client.options.TracesSampleRate; sampleRate != 0 {
+		entries["sample_rate"] = strconv.FormatFloat(sampleRate, 'f', -1, 64)
+	}
+
+	if dsn := client.dsn; dsn != nil {
+		if publicKey := dsn.GetPublicKey(); publicKey != "" {
+			entries["public_key"] = publicKey
+		}
+		if orgID := dsn.GetOrgID(); orgID != 0 {
+			entries["org_id"] = strconv.FormatUint(orgID, 10)
+		}
+	}
+	if release := client.options.Release; release != "" {
+		entries["release"] = release
+	}
+	if environment := client.options.Environment; environment != "" {
+		entries["environment"] = environment
+	}
+
+	return DynamicSamplingContext{
+		Entries: entries,
+		Frozen:  true,
+	}
 }

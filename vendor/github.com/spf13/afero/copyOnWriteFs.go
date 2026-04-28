@@ -34,7 +34,8 @@ func (u *CopyOnWriteFs) isBaseFile(name string) (bool, error) {
 	_, err := u.base.Stat(name)
 	if err != nil {
 		if oerr, ok := err.(*os.PathError); ok {
-			if oerr.Err == os.ErrNotExist || oerr.Err == syscall.ENOENT || oerr.Err == syscall.ENOTDIR {
+			if oerr.Err == os.ErrNotExist || oerr.Err == syscall.ENOENT ||
+				oerr.Err == syscall.ENOTDIR {
 				return false, nil
 			}
 		}
@@ -223,7 +224,7 @@ func (u *CopyOnWriteFs) OpenFile(name string, flag int, perm os.FileMode) (File,
 			return nil, err
 		}
 		if isaDir {
-			if err = u.layer.MkdirAll(dir, 0777); err != nil {
+			if err = u.layer.MkdirAll(dir, 0o777); err != nil {
 				return nil, err
 			}
 			return u.layer.OpenFile(name, flag, perm)
@@ -237,7 +238,11 @@ func (u *CopyOnWriteFs) OpenFile(name string, flag int, perm os.FileMode) (File,
 			return u.layer.OpenFile(name, flag, perm)
 		}
 
-		return nil, &os.PathError{Op: "open", Path: name, Err: syscall.ENOTDIR} // ...or os.ErrNotExist?
+		return nil, &os.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  syscall.ENOTDIR,
+		} // ...or os.ErrNotExist?
 	}
 	if b {
 		return u.base.OpenFile(name, flag, perm)
@@ -247,8 +252,9 @@ func (u *CopyOnWriteFs) OpenFile(name string, flag int, perm os.FileMode) (File,
 
 // This function handles the 9 different possibilities caused
 // by the union which are the intersection of the following...
-//  layer: doesn't exist, exists as a file, and exists as a directory
-//  base:  doesn't exist, exists as a file, and exists as a directory
+//
+//	layer: doesn't exist, exists as a file, and exists as a directory
+//	base:  doesn't exist, exists as a file, and exists as a directory
 func (u *CopyOnWriteFs) Open(name string) (File, error) {
 	// Since the overlay overrides the base we check that first
 	b, err := u.isBaseFile(name)
@@ -322,5 +328,5 @@ func (u *CopyOnWriteFs) MkdirAll(name string, perm os.FileMode) error {
 }
 
 func (u *CopyOnWriteFs) Create(name string) (File, error) {
-	return u.OpenFile(name, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
+	return u.OpenFile(name, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o666)
 }

@@ -6,19 +6,27 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
 // TokenInfo holds information from a bearer token.
 type TokenInfo struct {
 	Scopes     []string
 	Expiration time.Time
-	// TODO: add standard JWT fields
-	Extra map[string]any
+	// UserID is an optional identifier for the authenticated user.
+	// If set by a TokenVerifier, it can be used by transports to prevent
+	// session hijacking by ensuring that all requests for a given session
+	// come from the same user.
+	UserID string
+	Extra  map[string]any
 }
 
 // The error that a TokenVerifier should return if the token cannot be verified.
@@ -66,8 +74,17 @@ func RequireBearerToken(verifier TokenVerifier, opts *RequireBearerTokenOptions)
 			tokenInfo, errmsg, code := verify(r, verifier, opts)
 			if code != 0 {
 				if code == http.StatusUnauthorized || code == http.StatusForbidden {
-					if opts != nil && opts.ResourceMetadataURL != "" {
-						w.Header().Add("WWW-Authenticate", "Bearer resource_metadata="+opts.ResourceMetadataURL)
+					if opts != nil {
+						var params []string
+						if opts.ResourceMetadataURL != "" {
+							params = append(params, fmt.Sprintf("resource_metadata=%q", opts.ResourceMetadataURL))
+						}
+						if len(opts.Scopes) > 0 {
+							params = append(params, fmt.Sprintf("scope=%q", strings.Join(opts.Scopes, " ")))
+						}
+						if len(params) > 0 {
+							w.Header().Add("WWW-Authenticate", "Bearer "+strings.Join(params, ", "))
+						}
 					}
 				}
 				http.Error(w, errmsg, code)
@@ -98,6 +115,9 @@ func verify(req *http.Request, verifier TokenVerifier, opts *RequireBearerTokenO
 		}
 		return nil, err.Error(), http.StatusInternalServerError
 	}
+	if tokenInfo == nil {
+		return nil, "token validation failed", http.StatusInternalServerError
+	}
 
 	// Check scopes. All must be present.
 	if opts != nil {
@@ -117,4 +137,44 @@ func verify(req *http.Request, verifier TokenVerifier, opts *RequireBearerTokenO
 		return nil, "token expired", http.StatusUnauthorized
 	}
 	return tokenInfo, "", 0
+}
+
+// ProtectedResourceMetadataHandler returns an http.Handler that serves OAuth 2.0
+// protected resource metadata (RFC 9728) with CORS support.
+//
+// This handler allows cross-origin requests from any origin (Access-Control-Allow-Origin: *)
+// because OAuth metadata is public information intended for client discovery (RFC 9728 §3.1).
+// The metadata contains only non-sensitive configuration data about authorization servers
+// and supported scopes.
+//
+// No validation of metadata fields is performed; ensure metadata accuracy at configuration time.
+//
+// For more sophisticated CORS policies or to restrict origins, wrap this handler with a
+// CORS middleware like github.com/rs/cors or github.com/jub0bs/cors.
+func ProtectedResourceMetadataHandler(metadata *oauthex.ProtectedResourceMetadata) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers for cross-origin client discovery.
+		// OAuth metadata is public information, so allowing any origin is safe.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		// Handle CORS preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// Only GET allowed for metadata retrieval
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(metadata); err != nil {
+			http.Error(w, "Failed to encode metadata", http.StatusInternalServerError)
+			return
+		}
+	})
 }

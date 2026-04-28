@@ -14,9 +14,6 @@
 
 package exec
 
-//go:generate go run gen.go
-//go:generate gofmt -s -w .
-
 import (
 	"fmt"
 	"os/exec"
@@ -48,13 +45,8 @@ func (c *execCmd) Run(ctx *task.Context) (res interface{}, err error) {
 
 	// TODO: set environment variables, if defined.
 	stream := func(name string) (stream cue.Value, ok bool) {
-		c := ctx.Obj.Lookup(name)
-		// Although the schema defines a default versions, older implementations
-		// may not use it yet.
-		if !c.Exists() {
-			return
-		}
-		if err := c.Null(); ctx.Err != nil || err == nil {
+		c := ctx.Obj.LookupPath(cue.ParsePath(name))
+		if c.Err() != nil || c.IsNull() {
 			return
 		}
 		return c, true
@@ -74,6 +66,12 @@ func (c *execCmd) Run(ctx *task.Context) (res interface{}, err error) {
 		cmd.Stderr = ctx.Stderr
 	}
 
+	v := ctx.Obj.LookupPath(cue.ParsePath("mustSucceed"))
+	mustSucceed, err := v.Bool()
+	if err != nil {
+		return nil, errors.Wrapf(err, v.Pos(), "invalid bool value")
+	}
+
 	update := map[string]interface{}{}
 	if captureOut {
 		var stdout []byte
@@ -83,78 +81,86 @@ func (c *execCmd) Run(ctx *task.Context) (res interface{}, err error) {
 		err = cmd.Run()
 	}
 	update["success"] = err == nil
-	if err != nil {
-		if exit := (*exec.ExitError)(nil); errors.As(err, &exit) && captureErr {
+
+	if err == nil {
+		return update, nil
+	}
+
+	if captureErr {
+		if exit := (*exec.ExitError)(nil); errors.As(err, &exit) {
 			update["stderr"] = string(exit.Stderr)
 		} else {
-			update = nil
+			update["stderr"] = err.Error()
 		}
-		err = fmt.Errorf("command %q failed: %v", doc, err)
 	}
-	return update, err
+
+	if !mustSucceed {
+		return update, nil
+	}
+
+	return nil, fmt.Errorf("command %q failed: %v", doc, err)
 }
 
-func mkCommand(ctx *task.Context) (c *exec.Cmd, doc string, err error) {
-	var bin string
-	var args []string
-
+// mkCommand builds an [exec.Cmd] from a CUE task value,
+// also returning the full list of arguments as a string slice
+// so that it can be used in error messages.
+func mkCommand(ctx *task.Context) (c *exec.Cmd, doc []string, err error) {
 	v := ctx.Lookup("cmd")
 	if ctx.Err != nil {
-		return nil, "", ctx.Err
+		return nil, nil, ctx.Err
 	}
 
+	var bin string
+	var args []string
 	switch v.Kind() {
 	case cue.StringKind:
-		str := ctx.String("cmd")
-		doc = str
+		str, _ := v.String()
 		list := strings.Fields(str)
-		bin = list[0]
-		args = append(args, list[1:]...)
+		bin, args = list[0], list[1:]
 
 	case cue.ListKind:
 		list, _ := v.List()
 		if !list.Next() {
-			return nil, "", errors.New("empty command list")
+			return nil, nil, errors.New("empty command list")
 		}
 		bin, err = list.Value().String()
 		if err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
-		doc += bin
 		for list.Next() {
 			str, err := list.Value().String()
 			if err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
 			args = append(args, str)
-			doc += " " + str
 		}
 	}
 
 	if bin == "" {
-		return nil, "", errors.New("empty command")
+		return nil, nil, errors.New("empty command")
 	}
 
 	cmd := exec.CommandContext(ctx.Context, bin, args...)
 
-	cmd.Dir, _ = ctx.Obj.Lookup("dir").String()
+	cmd.Dir, _ = ctx.Obj.LookupPath(cue.ParsePath("dir")).String()
 
-	env := ctx.Obj.Lookup("env")
+	env := ctx.Obj.LookupPath(cue.ParsePath("env"))
 
 	// List case.
 	for iter, _ := env.List(); iter.Next(); {
-		str, err := iter.Value().String()
+		v, _ := iter.Value().Default()
+		str, err := v.String()
 		if err != nil {
-			return nil, "", errors.Wrapf(err, v.Pos(),
+			return nil, nil, errors.Wrapf(err, v.Pos(),
 				"invalid environment variable value %q", v)
 		}
 		cmd.Env = append(cmd.Env, str)
 	}
 
 	// Struct case.
-	for iter, _ := ctx.Obj.Lookup("env").Fields(); iter.Next(); {
-		label := iter.Label()
-		v := iter.Value()
+	for iter, _ := env.Fields(); iter.Next(); {
+		label := iter.Selector().Unquoted()
+		v, _ := iter.Value().Default()
 		var str string
 		switch v.Kind() {
 		case cue.StringKind:
@@ -162,11 +168,11 @@ func mkCommand(ctx *task.Context) (c *exec.Cmd, doc string, err error) {
 		case cue.IntKind, cue.FloatKind, cue.NumberKind:
 			str = fmt.Sprint(v)
 		default:
-			return nil, "", errors.Newf(v.Pos(),
+			return nil, nil, errors.Newf(v.Pos(),
 				"invalid environment variable value %q", v)
 		}
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", label, str))
 	}
 
-	return cmd, doc, nil
+	return cmd, append([]string{bin}, args...), nil
 }

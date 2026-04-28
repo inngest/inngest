@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package format implements standard formatting of CUE configurations.
-package format // import "cuelang.org/go/cue/format"
+package format
 
 // TODO: this package is in need of a rewrite. When doing so, the API should
 // allow for reformatting an AST, without actually writing bytes.
@@ -25,7 +25,6 @@ package format // import "cuelang.org/go/cue/format"
 import (
 	"bytes"
 	"fmt"
-	"strings"
 	"text/tabwriter"
 
 	"cuelang.org/go/cue/ast"
@@ -80,14 +79,13 @@ func sortImportsOption() Option {
 
 // Node formats node in canonical cue fmt style and writes the result to dst.
 //
-// The node type must be *ast.File, []syntax.Decl, syntax.Expr, syntax.Decl, or
-// syntax.Spec. Node does not modify node. Imports are not sorted for nodes
+// The node type must be [*ast.File], [][ast.Decl], [ast.Expr], [ast.Decl], or
+// [ast.Spec]. Node does not modify node. Imports are not sorted for nodes
 // representing partial source files (for instance, if the node is not an
 // *ast.File).
 //
 // The function may return early (before the entire result is written) and
 // return a formatting error, for instance due to an incorrect AST.
-//
 func Node(node ast.Node, opt ...Option) ([]byte, error) {
 	cfg := newConfig(opt)
 	return cfg.fprint(node)
@@ -105,7 +103,6 @@ func Node(node ast.Node, opt ...Option) ([]byte, error) {
 // Caution: Tools relying on consistent formatting based on the installed
 // version of cue (for instance, such as for presubmit checks) should execute
 // that cue binary instead of calling Source.
-//
 func Source(b []byte, opt ...Option) ([]byte, error) {
 	cfg := newConfig(opt)
 
@@ -178,7 +175,7 @@ func (cfg *config) fprint(node interface{}) (out []byte, err error) {
 	return b, nil
 }
 
-// A formatter walks a syntax.Node, interspersed with comments and spacing
+// A formatter walks an [ast.Node], interspersed with comments and spacing
 // directives, in the order that they would occur in printed form.
 type formatter struct {
 	*printer
@@ -204,7 +201,7 @@ func newFormatter(p *printer) *formatter {
 type whiteSpace int
 
 const (
-	ignore whiteSpace = 0
+	_ whiteSpace = 0
 
 	// write a space, or disallow it
 	blank whiteSpace = 1 << iota
@@ -251,11 +248,10 @@ func (f *formatter) print(a ...interface{}) {
 	for _, x := range a {
 		f.Print(x)
 		switch x.(type) {
-		case string, token.Token: // , *syntax.BasicLit, *syntax.Ident:
+		case string, token.Token: // , *ast.BasicLit, *ast.Ident:
 			f.current.pos++
 		}
 	}
-	f.visitComments(f.current.pos)
 }
 
 func (f *formatter) formfeed() whiteSpace {
@@ -263,13 +259,6 @@ func (f *formatter) formfeed() whiteSpace {
 		return blank
 	}
 	return formfeed
-}
-
-func (f *formatter) wsOverride(def whiteSpace) whiteSpace {
-	if f.current.override == ignore {
-		return def
-	}
-	return f.current.override
 }
 
 func (f *formatter) onOneLine(node ast.Node) bool {
@@ -292,7 +281,7 @@ func (f *formatter) before(node ast.Node) bool {
 		if ok && len(s.Elts) <= 1 && f.current.nodeSep != blank && f.onOneLine(node) {
 			f.current.nodeSep = blank
 		}
-		f.current.cg = node.Comments()
+		f.current.cg = ast.Comments(node)
 		f.visitComments(f.current.pos)
 		return true
 	}
@@ -324,27 +313,20 @@ func (f *formatter) visitComments(until int8) {
 func (f *formatter) printComment(cg *ast.CommentGroup) {
 	f.Print(cg)
 
-	printBlank := false
 	if cg.Doc && len(f.output) > 0 {
 		f.Print(newline)
-		printBlank = true
 	}
 	for _, c := range cg.List {
-		isEnd := strings.HasPrefix(c.Text, "//")
-		if !printBlank {
-			if isEnd {
-				f.Print(vtab)
-			} else {
-				f.Print(blank)
-			}
+		if f.pos.Column > 1 {
+			// Vertically align inline comments.
+			f.Print(vtab)
 		}
 		f.Print(c.Slash)
 		f.Print(c)
-		if isEnd {
-			f.Print(newline)
-			if cg.Doc {
-				f.Print(nooverride)
-			}
+		f.printingComment = true
+		f.Print(newline)
+		if cg.Doc {
+			f.Print(nooverride)
 		}
 	}
 }

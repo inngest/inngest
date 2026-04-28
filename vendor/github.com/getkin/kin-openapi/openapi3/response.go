@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sort"
+	"maps"
 	"strconv"
 )
 
@@ -18,11 +18,8 @@ type Responses struct {
 }
 
 // NewResponses builds a responses object with response objects in insertion order.
-// Given no arguments, NewResponses returns a valid responses object containing a default match-all reponse.
+// Given no arguments, NewResponses returns an empty responses object.
 func NewResponses(opts ...NewResponsesOption) *Responses {
-	if len(opts) == 0 {
-		return NewResponses(WithName("default", NewResponse().WithDescription("")))
-	}
 	responses := NewResponsesWithCapacity(len(opts))
 	for _, opt := range opts {
 		opt(responses)
@@ -84,12 +81,7 @@ func (responses *Responses) Validate(ctx context.Context, opts ...ValidationOpti
 		return errors.New("the responses object MUST contain at least one response code")
 	}
 
-	keys := make([]string, 0, responses.Len())
-	for key := range responses.Map() {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
+	for _, key := range responses.Keys() {
 		v := responses.Value(key)
 		if err := v.Validate(ctx); err != nil {
 			return err
@@ -103,7 +95,7 @@ func (responses *Responses) Validate(ctx context.Context, opts ...ValidationOpti
 // See https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#response-object
 type Response struct {
 	Extensions map[string]any `json:"-" yaml:"-"`
-	Origin     *Origin        `json:"__origin__,omitempty" yaml:"__origin__,omitempty"`
+	Origin     *Origin        `json:"-" yaml:"-"`
 
 	Description *string `json:"description,omitempty" yaml:"description,omitempty"`
 	Headers     Headers `json:"headers,omitempty" yaml:"headers,omitempty"`
@@ -147,9 +139,7 @@ func (response Response) MarshalJSON() ([]byte, error) {
 // MarshalYAML returns the YAML encoding of Response.
 func (response Response) MarshalYAML() (any, error) {
 	m := make(map[string]any, 4+len(response.Extensions))
-	for k, v := range response.Extensions {
-		m[k] = v
-	}
+	maps.Copy(m, response.Extensions)
 	if x := response.Description; x != nil {
 		m["description"] = x
 	}
@@ -173,7 +163,6 @@ func (response *Response) UnmarshalJSON(data []byte) error {
 		return unmarshalError(err)
 	}
 	_ = json.Unmarshal(data, &x.Extensions)
-	delete(x.Extensions, originKey)
 	delete(x.Extensions, "description")
 	delete(x.Extensions, "headers")
 	delete(x.Extensions, "content")
@@ -202,24 +191,14 @@ func (response *Response) Validate(ctx context.Context, opts ...ValidationOption
 		}
 	}
 
-	headers := make([]string, 0, len(response.Headers))
-	for name := range response.Headers {
-		headers = append(headers, name)
-	}
-	sort.Strings(headers)
-	for _, name := range headers {
+	for _, name := range componentNames(response.Headers) {
 		header := response.Headers[name]
 		if err := header.Validate(ctx); err != nil {
 			return err
 		}
 	}
 
-	links := make([]string, 0, len(response.Links))
-	for name := range response.Links {
-		links = append(links, name)
-	}
-	sort.Strings(links)
-	for _, name := range links {
+	for _, name := range componentNames(response.Links) {
 		link := response.Links[name]
 		if err := link.Validate(ctx); err != nil {
 			return err
@@ -231,6 +210,6 @@ func (response *Response) Validate(ctx context.Context, opts ...ValidationOption
 
 // UnmarshalJSON sets ResponseBodies to a copy of data.
 func (responseBodies *ResponseBodies) UnmarshalJSON(data []byte) (err error) {
-	*responseBodies, _, err = unmarshalStringMapP[ResponseRef](data)
+	*responseBodies, err = unmarshalStringMapP[ResponseRef](data)
 	return
 }

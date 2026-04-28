@@ -18,6 +18,8 @@ import (
 	"encoding/base64"
 	"strings"
 
+	"github.com/cockroachdb/apd/v3"
+
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
@@ -25,7 +27,6 @@ import (
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/encoding/protobuf/pbinternal"
-	"github.com/cockroachdb/apd/v2"
 )
 
 // Option is an option.
@@ -40,30 +41,30 @@ type Option func()
 // attributes.
 //
 // Mappings per CUE type:
-//  for any CUE type:
-//             null is omitted if null is not specifically allowed.
-//  bytes:     if the expression is a string, it is reinterpreted using a
-//             base64 encoding. Either standard or URL-safe base64 encoding
-//             with/without paddings are accepted.
-//  int:       string values are interpreted as integers
-//  float:     string values are interpreted as numbers, and the values "NaN",
-//             "Infinity", and "-Infinity" are allowed and converted to
-//             to corresponding error values.
-//  enums:     if a field is of type int and does not have a standard integer
-//             type for its @protobuf attribute, this is assumed to represent
-//             a protobuf enum value. Enum names are converted to integers
-//             by interpreting the definitions of the disjunction constants
-//             as the symbol names.
-//             If CUE uses the string representation for enums, then an
-//             #enumValue integer associated with the string value is used
-//             for the conversion.
-//  {}:        JSON objects representing any values will be left as is.
-//             If the CUE type corresponding to the URL can be determined within
-//             the module context it will be unified.
-//  time.Time / time.Duration:
-//             left as is
-//  _:         left as is.
 //
+//	for any CUE type:
+//	           null is omitted if null is not specifically allowed.
+//	bytes:     if the expression is a string, it is reinterpreted using a
+//	           base64 encoding. Either standard or URL-safe base64 encoding
+//	           with/without paddings are accepted.
+//	int:       string values are interpreted as integers
+//	float:     string values are interpreted as numbers, and the values "NaN",
+//	           "Infinity", and "-Infinity" are allowed and converted
+//	           to corresponding error values.
+//	enums:     if a field is of type int and does not have a standard integer
+//	           type for its @protobuf attribute, this is assumed to represent
+//	           a protobuf enum value. Enum names are converted to integers
+//	           by interpreting the definitions of the disjunction constants
+//	           as the symbol names.
+//	           If CUE uses the string representation for enums, then an
+//	           #enumValue integer associated with the string value is used
+//	           for the conversion.
+//	{}:        JSON objects representing any values will be left as is.
+//	           If the CUE type corresponding to the URL can be determined within
+//	           the module context it will be unified.
+//	time.Time / time.Duration:
+//	           left as is
+//	_:         left as is.
 type Decoder struct {
 	schema cue.Value
 }
@@ -77,7 +78,7 @@ func NewDecoder(schema cue.Value, options ...Option) *Decoder {
 // according to the protocol buffer to JSON mapping defined in the protocol
 // buffer spec.
 //
-// RewriteFile is idempotent, calling it multiples times on an expression gives
+// RewriteFile is idempotent, calling it multiple times on an expression gives
 // the same result.
 func (d *Decoder) RewriteFile(file *ast.File) error {
 	var r rewriter
@@ -171,7 +172,7 @@ func (r *rewriter) rewrite(schema cue.Value, expr ast.Expr) (x ast.Expr) {
 		return x
 
 	case *ast.ListLit:
-		elem, _ := schema.Elem()
+		elem := schema.LookupPath(cue.MakePath(cue.AnyIndex))
 		iter, _ := schema.List()
 		for i, e := range x.Elts {
 			v := elem

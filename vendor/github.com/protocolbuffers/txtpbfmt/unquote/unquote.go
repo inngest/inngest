@@ -11,32 +11,66 @@ import (
 	"github.com/protocolbuffers/txtpbfmt/ast"
 )
 
-// Unquote returns the value of the string node.
+// Unquote returns the value of the string node and the rune used to quote it.
 // Calling Unquote on non-string node doesn't panic, but is otherwise undefined.
-func Unquote(n *ast.Node) (string, error) {
+func Unquote(n *ast.Node) (string, rune, error) {
+	return unquoteValues(n.Values, unquote)
+}
+
+// Raw returns the raw value of the string node and the rune used to quote it, with string escapes
+// left in place.
+// Calling UnquoteRaw on non-string node doesn't panic, but is otherwise undefined.
+func Raw(n *ast.Node) (string, rune, error) {
+	return unquoteValues(n.Values, unquoteRaw)
+}
+
+func unquoteValues(values []*ast.Value, unquoter func(string) (string, rune, error)) (string, rune, error) {
 	var ret strings.Builder
-	for _, v := range n.Values {
-		uq, err := unquote(v.Value)
+	firstQuote := rune(0)
+	for _, v := range values {
+		uq, quote, err := unquoter(v.Value)
+		if firstQuote == rune(0) {
+			firstQuote = quote
+		}
 		if err != nil {
-			return "", err
+			return "", rune(0), err
 		}
 		ret.WriteString(uq)
 	}
-	return ret.String(), nil
+	return ret.String(), firstQuote, nil
 }
 
-func unquote(s string) (string, error) {
+// Returns the quote rune used in the given string (' or "). Returns an error if the string doesn't
+// start and end with a matching pair of valid quotes.
+func quoteRune(s string) (rune, error) {
 	if len(s) < 2 {
-		return "", errors.New("not a quoted string")
+		return 0, errors.New("not a quoted string")
 	}
 	quote := s[0]
 	if quote != '"' && quote != '\'' {
-		return "", errors.New("invalid quote character")
+		return 0, fmt.Errorf("invalid quote character %s", string(quote))
 	}
 	if s[len(s)-1] != quote {
-		return "", errors.New("unmatched quote")
+		return 0, errors.New("unmatched quote")
 	}
-	return unquoteC(s[1:len(s)-1], rune(quote))
+	return rune(quote), nil
+}
+
+func unquote(s string) (string, rune, error) {
+	quote, err := quoteRune(s)
+	if err != nil {
+		return "", rune(0), err
+	}
+	unquoted, err := unquoteC(s[1:len(s)-1], quote)
+	return unquoted, quote, err
+}
+
+func unquoteRaw(s string) (string, rune, error) {
+	quote, err := quoteRune(s) // Trigger validation, which guarantees this is a quote-wrapped string.
+	if err != nil {
+		return "", rune(0), err
+	}
+	return s[1 : len(s)-1], quote, nil
 }
 
 var (
@@ -70,11 +104,7 @@ func unquoteC(s string, quote rune) (string, error) {
 		}
 		s = s[n:]
 		if r != '\\' {
-			if r < utf8.RuneSelf {
-				buf = append(buf, byte(r))
-			} else {
-				buf = append(buf, string(r)...)
-			}
+			buf = appendRune(buf, r)
 			continue
 		}
 
@@ -86,6 +116,13 @@ func unquoteC(s string, quote rune) (string, error) {
 		s = tail
 	}
 	return string(buf), nil
+}
+
+func appendRune(buf []byte, r rune) []byte {
+	if r < utf8.RuneSelf {
+		return append(buf, byte(r))
+	}
+	return append(buf, string(r)...)
 }
 
 func unescape(s string) (ch string, tail string, err error) {
@@ -116,42 +153,45 @@ func unescape(s string) (ch string, tail string, err error) {
 	case '\'', '"', '\\':
 		return string(r), s, nil
 	case '0', '1', '2', '3', '4', '5', '6', '7':
-		if len(s) < 2 {
-			return "", "", fmt.Errorf(`\%c requires 2 following digits`, r)
-		}
-		ss := string(r) + s[:2]
-		s = s[2:]
-		i, err := strconv.ParseUint(ss, 8, 8)
-		if err != nil {
-			return "", "", fmt.Errorf(`\%s contains non-octal digits`, ss)
-		}
-		return string([]byte{byte(i)}), s, nil
-	case 'x', 'X', 'u', 'U':
-		var n int
-		switch r {
-		case 'x', 'X':
-			n = 2
-		case 'u':
-			n = 4
-		case 'U':
-			n = 8
-		}
-		if len(s) < n {
-			return "", "", fmt.Errorf(`\%c requires %d following digits`, r, n)
-		}
-		ss := s[:n]
-		s = s[n:]
-		i, err := strconv.ParseUint(ss, 16, 64)
-		if err != nil {
-			return "", "", fmt.Errorf(`\%c%s contains non-hexadecimal digits`, r, ss)
-		}
-		if r == 'x' || r == 'X' {
-			return string([]byte{byte(i)}), s, nil
-		}
-		if i > utf8.MaxRune {
-			return "", "", fmt.Errorf(`\%c%s is not a valid Unicode code point`, r, ss)
-		}
-		return string(i), s, nil
+		return unescapeOctal(r, s)
+	case 'x', 'X':
+		return unescapeHex(r, s, 2)
+	case 'u':
+		return unescapeHex(r, s, 4)
+	case 'U':
+		return unescapeHex(r, s, 8)
 	}
 	return "", "", fmt.Errorf(`unknown escape \%c`, r)
+}
+
+func unescapeOctal(r rune, s string) (string, string, error) {
+	if len(s) < 2 {
+		return "", "", fmt.Errorf(`\%c requires 2 following digits`, r)
+	}
+	ss := string(r) + s[:2]
+	s = s[2:]
+	i, err := strconv.ParseUint(ss, 8, 8)
+	if err != nil {
+		return "", "", fmt.Errorf(`\%s contains non-octal digits`, ss)
+	}
+	return string([]byte{byte(i)}), s, nil
+}
+
+func unescapeHex(r rune, s string, n int) (string, string, error) {
+	if len(s) < n {
+		return "", "", fmt.Errorf(`\%c requires %d following digits`, r, n)
+	}
+	ss := s[:n]
+	s = s[n:]
+	i, err := strconv.ParseUint(ss, 16, 64)
+	if err != nil {
+		return "", "", fmt.Errorf(`\%c%s contains non-hexadecimal digits`, r, ss)
+	}
+	if r == 'x' || r == 'X' {
+		return string([]byte{byte(i)}), s, nil
+	}
+	if i > utf8.MaxRune {
+		return "", "", fmt.Errorf(`\%c%s is not a valid Unicode code point`, r, ss)
+	}
+	return strconv.FormatUint(i, 10), s, nil
 }

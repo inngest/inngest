@@ -2,10 +2,17 @@ package sentry
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"maps"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/getsentry/sentry-go/attribute"
+	"github.com/getsentry/sentry-go/internal/debuglog"
+	"github.com/getsentry/sentry-go/internal/ratelimit"
+	"github.com/getsentry/sentry-go/report"
 )
 
 // Scope holds contextual data for the current scope.
@@ -24,6 +31,7 @@ import (
 // scope into the event.
 type Scope struct {
 	mu          sync.RWMutex
+	attributes  map[string]attribute.Value
 	breadcrumbs []*Breadcrumb
 	attachments []*Attachment
 	user        User
@@ -43,20 +51,23 @@ type Scope struct {
 		Overflow() bool
 	}
 	eventProcessors []EventProcessor
+
+	propagationContext PropagationContext
+	span               *Span
 }
 
 // NewScope creates a new Scope.
 func NewScope() *Scope {
-	scope := Scope{
-		breadcrumbs: make([]*Breadcrumb, 0),
-		attachments: make([]*Attachment, 0),
-		tags:        make(map[string]string),
-		contexts:    make(map[string]Context),
-		extra:       make(map[string]interface{}),
-		fingerprint: make([]string, 0),
+	return &Scope{
+		attributes:         make(map[string]attribute.Value),
+		breadcrumbs:        make([]*Breadcrumb, 0),
+		attachments:        make([]*Attachment, 0),
+		tags:               make(map[string]string),
+		contexts:           make(map[string]Context),
+		extra:              make(map[string]interface{}),
+		fingerprint:        make([]string, 0),
+		propagationContext: NewPropagationContext(),
 	}
-
-	return &scope
 }
 
 // AddBreadcrumb adds new breadcrumb to the current scope
@@ -198,6 +209,27 @@ type readCloser struct {
 	io.Closer
 }
 
+// SetAttributes adds attributes to the current scope.
+func (scope *Scope) SetAttributes(attrs ...attribute.Builder) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+
+	for _, a := range attrs {
+		if a.Value.Type() == attribute.INVALID {
+			debuglog.Printf("invalid attribute: %v", a)
+			continue
+		}
+		scope.attributes[a.Key] = a.Value
+	}
+}
+
+// RemoveAttribute removes an attribute from the current scope.
+func (scope *Scope) RemoveAttribute(key string) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+	delete(scope.attributes, key)
+}
+
 // SetTag adds a tag to the current scope.
 func (scope *Scope) SetTag(key, value string) {
 	scope.mu.Lock()
@@ -251,6 +283,10 @@ func (scope *Scope) RemoveContext(key string) {
 }
 
 // SetExtra adds an extra to the current scope.
+//
+// Deprecated: Use [Scope.SetAttributes] instead, which attaches typed key-value
+// pairs to logs and metrics. Note that attributes do not attach to error events;
+// if you only capture errors, use [Scope.SetTag] or [Scope.SetContext] to enrich them.
 func (scope *Scope) SetExtra(key string, value interface{}) {
 	scope.mu.Lock()
 	defer scope.mu.Unlock()
@@ -259,6 +295,10 @@ func (scope *Scope) SetExtra(key string, value interface{}) {
 }
 
 // SetExtras assigns multiple extras to the current scope.
+//
+// Deprecated: Use [Scope.SetAttributes] instead, which attaches typed key-value
+// pairs to logs and metrics. Note that attributes do not attach to error events;
+// if you only capture errors, use [Scope.SetTag] or [Scope.SetContext] to enrich them.
 func (scope *Scope) SetExtras(extra map[string]interface{}) {
 	scope.mu.Lock()
 	defer scope.mu.Unlock()
@@ -269,6 +309,10 @@ func (scope *Scope) SetExtras(extra map[string]interface{}) {
 }
 
 // RemoveExtra removes a extra from the current scope.
+//
+// Deprecated: Use [Scope.RemoveAttribute] instead. Note that attributes only
+// attach to logs and metrics, not error events. If you only capture errors,
+// use [Scope.RemoveTag] or [Scope.RemoveContext] instead.
 func (scope *Scope) RemoveExtra(key string) {
 	scope.mu.Lock()
 	defer scope.mu.Unlock()
@@ -292,6 +336,30 @@ func (scope *Scope) SetLevel(level Level) {
 	scope.level = level
 }
 
+// SetPropagationContext sets the propagation context for the current scope.
+func (scope *Scope) SetPropagationContext(propagationContext PropagationContext) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+
+	scope.propagationContext = propagationContext
+}
+
+// GetSpan returns the span from the current scope.
+func (scope *Scope) GetSpan() *Span {
+	scope.mu.RLock()
+	defer scope.mu.RUnlock()
+
+	return scope.span
+}
+
+// SetSpan sets a span for the current scope.
+func (scope *Scope) SetSpan(span *Span) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+
+	scope.span = span
+}
+
 // Clone returns a copy of the current scope with all data copied over.
 func (scope *Scope) Clone() *Scope {
 	scope.mu.RLock()
@@ -303,21 +371,18 @@ func (scope *Scope) Clone() *Scope {
 	copy(clone.breadcrumbs, scope.breadcrumbs)
 	clone.attachments = make([]*Attachment, len(scope.attachments))
 	copy(clone.attachments, scope.attachments)
-	for key, value := range scope.tags {
-		clone.tags[key] = value
-	}
-	for key, value := range scope.contexts {
-		clone.contexts[key] = cloneContext(value)
-	}
-	for key, value := range scope.extra {
-		clone.extra[key] = value
-	}
+	clone.attributes = maps.Clone(scope.attributes)
+	clone.contexts = maps.Clone(scope.contexts)
+	clone.tags = maps.Clone(scope.tags)
+	clone.extra = maps.Clone(scope.extra)
 	clone.fingerprint = make([]string, len(scope.fingerprint))
 	copy(clone.fingerprint, scope.fingerprint)
 	clone.level = scope.level
 	clone.request = scope.request
 	clone.requestBody = scope.requestBody
 	clone.eventProcessors = scope.eventProcessors
+	clone.propagationContext = scope.propagationContext
+	clone.span = scope.span
 	return clone
 }
 
@@ -335,7 +400,7 @@ func (scope *Scope) AddEventProcessor(processor EventProcessor) {
 }
 
 // ApplyToEvent takes the data from the current scope and attaches it to the event.
-func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint) *Event {
+func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint, client *Client) *Event { //nolint:gocyclo
 	scope.mu.RLock()
 	defer scope.mu.RUnlock()
 
@@ -379,6 +444,46 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint) *Event {
 		}
 	}
 
+	if event.Contexts == nil {
+		event.Contexts = make(map[string]Context)
+	}
+
+	if scope.span != nil {
+		if _, ok := event.Contexts["trace"]; !ok {
+			event.Contexts["trace"] = scope.span.traceContext().Map()
+		}
+
+		transaction := scope.span.GetTransaction()
+		if transaction != nil {
+			event.sdkMetaData.dsc = DynamicSamplingContextFromTransaction(transaction)
+		}
+	} else {
+		event.Contexts["trace"] = scope.propagationContext.Map()
+
+		dsc := scope.propagationContext.DynamicSamplingContext
+		if !dsc.HasEntries() && client != nil {
+			dsc = DynamicSamplingContextFromScope(scope, client)
+		}
+		event.sdkMetaData.dsc = dsc
+	}
+
+	// If an external trace resolver is registered (e.g. OTel), override
+	// trace/span IDs from the hint context or the scope's request context.
+	if client != nil {
+		var ctx context.Context
+		if hint != nil {
+			ctx = hint.Context
+		}
+		if ctx == nil && scope.request != nil {
+			ctx = scope.request.Context()
+		}
+		if traceID, spanID, ok := client.externalTraceContextFromContext(ctx); event.Type != transactionType && ok {
+			traceCtx := event.Contexts["trace"]
+			traceCtx["trace_id"] = traceID.String()
+			traceCtx["span_id"] = spanID.String()
+		}
+	}
+
 	if len(scope.extra) > 0 {
 		if event.Extra == nil {
 			event.Extra = make(map[string]interface{}, len(scope.extra))
@@ -419,10 +524,23 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint) *Event {
 
 	for _, processor := range scope.eventProcessors {
 		id := event.EventID
+		category := event.toCategory()
+		spanCountBefore := event.GetSpanCount()
 		event = processor(event, hint)
 		if event == nil {
-			Logger.Printf("Event dropped by one of the Scope EventProcessors: %s\n", id)
+			debuglog.Printf("Event dropped by one of the Scope EventProcessors: %s\n", id)
+			if client != nil {
+				client.reportRecorder.RecordOne(report.ReasonEventProcessor, category)
+				if category == ratelimit.CategoryTransaction {
+					client.reportRecorder.Record(report.ReasonEventProcessor, ratelimit.CategorySpan, int64(spanCountBefore))
+				}
+			}
 			return nil
+		}
+		if droppedSpans := spanCountBefore - event.GetSpanCount(); droppedSpans > 0 {
+			if client != nil {
+				client.reportRecorder.Record(report.ReasonEventProcessor, ratelimit.CategorySpan, int64(droppedSpans))
+			}
 		}
 	}
 
@@ -435,9 +553,95 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint) *Event {
 // a proper deep copy: if some context values are pointer types (e.g. maps),
 // they won't be properly copied.
 func cloneContext(c Context) Context {
-	res := Context{}
+	res := make(Context, len(c))
 	for k, v := range c {
 		res[k] = v
 	}
 	return res
+}
+
+func (scope *Scope) populateAttrs(attrs map[string]attribute.Value) {
+	if scope == nil {
+		return
+	}
+
+	scope.mu.RLock()
+	defer scope.mu.RUnlock()
+
+	// Add user-related attributes
+	if !scope.user.IsEmpty() {
+		if scope.user.ID != "" {
+			attrs["user.id"] = attribute.StringValue(scope.user.ID)
+		}
+		if scope.user.Name != "" {
+			attrs["user.name"] = attribute.StringValue(scope.user.Name)
+		}
+		if scope.user.Email != "" {
+			attrs["user.email"] = attribute.StringValue(scope.user.Email)
+		}
+	}
+
+	for k, v := range scope.attributes {
+		attrs[k] = v
+	}
+}
+
+// hubFromContexts is a helper to return the first hub found in the given contexts.
+func hubFromContexts(ctxs ...context.Context) *Hub {
+	for _, ctx := range ctxs {
+		if ctx == nil {
+			continue
+		}
+		if hub := GetHubFromContext(ctx); hub != nil {
+			return hub
+		}
+	}
+	return nil
+}
+
+// resolveTrace resolves trace ID and span ID from the given scope and contexts.
+//
+// The resolution order follows a most-specific-to-least-specific pattern:
+//  1. If an external trace resolver was registered (eg. OTel), we prioritise trace context
+//     information from that
+//  2. Check for span directly in contexts (SpanFromContext) - this is the most specific
+//     source as it represents a span explicitly attached to the current operation's context
+//  3. Check scope's span - provides access to span set on the hub's scope
+//  4. Fall back to scope's propagation context trace ID
+//
+// This ordering ensures we always use the most contextually relevant tracing information.
+// For example, if a specific span is active for an operation, we use that span's trace/span IDs
+// rather than accidentally using a different span that might be set on the hub's scope.
+func resolveTrace(scope *Scope, client *Client, ctxs ...context.Context) (traceID TraceID, spanID SpanID) {
+	var span *Span
+
+	for _, ctx := range ctxs {
+		if ctx == nil {
+			continue
+		}
+		if client != nil {
+			if traceID, spanID, ok := client.externalTraceContextFromContext(ctx); ok {
+				return traceID, spanID
+			}
+		}
+		if span = SpanFromContext(ctx); span != nil {
+			break
+		}
+	}
+
+	if scope != nil {
+		scope.mu.RLock()
+		if span == nil {
+			span = scope.span
+		}
+		if span != nil {
+			traceID = span.TraceID
+			spanID = span.SpanID
+		} else {
+			traceID = scope.propagationContext.TraceID
+		}
+		scope.mu.RUnlock()
+	}
+
+	return traceID, spanID
 }

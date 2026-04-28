@@ -1,4 +1,4 @@
-// Copyright 2021-2024 The Connect Authors
+// Copyright 2021-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ type ErrorWriter struct {
 
 // NewErrorWriter constructs an ErrorWriter. Handler options may be passed to
 // configure the error writer behaviour to match the handlers.
-// [WithRequiredConnectProtocolHeader] will assert that Connect protocol
+// [WithRequireConnectProtocolHeader] will assert that Connect protocol
 // requests include the version header allowing the error writer to correctly
 // classify the request.
 // Options supplied via [WithConditionalHandlerOptions] are ignored.
@@ -128,7 +128,7 @@ func (w *ErrorWriter) Write(response http.ResponseWriter, request *http.Request,
 
 func (w *ErrorWriter) writeConnectUnary(response http.ResponseWriter, err error) error {
 	if connectErr, ok := asError(err); ok && !connectErr.wireErr {
-		mergeMetadataHeaders(response.Header(), connectErr.meta)
+		mergeNonProtocolHeaders(response.Header(), connectErr.meta)
 	}
 	response.WriteHeader(connectCodeToHTTP(CodeOf(err)))
 	data, marshalErr := json.Marshal(newConnectWireError(err))

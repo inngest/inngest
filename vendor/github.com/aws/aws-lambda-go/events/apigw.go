@@ -2,6 +2,13 @@
 
 package events
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+)
+
 // APIGatewayProxyRequest contains data coming from the API Gateway proxy
 type APIGatewayProxyRequest struct {
 	Resource                        string                        `json:"resource"` // The resource path defined in API Gateway
@@ -25,6 +32,64 @@ type APIGatewayProxyResponse struct {
 	MultiValueHeaders map[string][]string `json:"multiValueHeaders"`
 	Body              string              `json:"body"`
 	IsBase64Encoded   bool                `json:"isBase64Encoded,omitempty"`
+}
+
+// APIGatewayProxyStreamingResponse configures the response to be returned by API Gateway for the request.
+//   - integration type must be AWS_PROXY
+//   - integration uri must be arn:<partition>:apigateway:<region>:lambda:path/2021-11-15/functions/<function-arn>/response-streaming-invocations
+//   - integration response transfer mode must be STREAM
+//
+// If not using the above streaming integration, use APIGatewayProxyResponse instead
+type APIGatewayProxyStreamingResponse struct {
+	prelude *bytes.Buffer
+
+	StatusCode        int
+	Headers           map[string]string
+	MultiValueHeaders map[string][]string
+	Body              io.Reader
+	Cookies           []string
+}
+
+func (r *APIGatewayProxyStreamingResponse) Read(p []byte) (n int, err error) {
+	if r.prelude == nil {
+		b, err := json.Marshal(struct {
+			StatusCode        int                 `json:"statusCode,omitempty"`
+			Headers           map[string]string   `json:"headers,omitempty"`
+			MultiValueHeaders map[string][]string `json:"multiValueHeaders,omitempty"`
+			Cookies           []string            `json:"cookies,omitempty"`
+		}{
+			StatusCode:        r.StatusCode,
+			Headers:           r.Headers,
+			MultiValueHeaders: r.MultiValueHeaders,
+			Cookies:           r.Cookies,
+		})
+		if err != nil {
+			return 0, err
+		}
+		r.prelude = bytes.NewBuffer(append(b, 0, 0, 0, 0, 0, 0, 0, 0))
+	}
+	if r.prelude.Len() > 0 {
+		return r.prelude.Read(p)
+	}
+	if r.Body == nil {
+		return 0, io.EOF
+	}
+	return r.Body.Read(p)
+}
+
+func (r *APIGatewayProxyStreamingResponse) Close() error {
+	if closer, ok := r.Body.(io.ReadCloser); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+func (r *APIGatewayProxyStreamingResponse) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("not json")
+}
+
+func (r *APIGatewayProxyStreamingResponse) ContentType() string {
+	return "application/vnd.awslambda.http-integration-response"
 }
 
 // APIGatewayProxyRequestContext contains the information to identify the AWS account and resources invoking the
@@ -133,63 +198,66 @@ type APIGatewayV2HTTPResponse struct {
 
 // APIGatewayRequestIdentity contains identity information for the request caller.
 type APIGatewayRequestIdentity struct {
-	CognitoIdentityPoolID         string `json:"cognitoIdentityPoolId"`
-	AccountID                     string `json:"accountId"`
-	CognitoIdentityID             string `json:"cognitoIdentityId"`
-	Caller                        string `json:"caller"`
-	APIKey                        string `json:"apiKey"`
-	APIKeyID                      string `json:"apiKeyId"`
-	AccessKey                     string `json:"accessKey"`
-	SourceIP                      string `json:"sourceIp"`
-	CognitoAuthenticationType     string `json:"cognitoAuthenticationType"`
-	CognitoAuthenticationProvider string `json:"cognitoAuthenticationProvider"`
-	UserArn                       string `json:"userArn"` //nolint: stylecheck
-	UserAgent                     string `json:"userAgent"`
-	User                          string `json:"user"`
+	CognitoIdentityPoolID         string                                                          `json:"cognitoIdentityPoolId,omitempty"`
+	AccountID                     string                                                          `json:"accountId,omitempty"`
+	CognitoIdentityID             string                                                          `json:"cognitoIdentityId,omitempty"`
+	Caller                        string                                                          `json:"caller,omitempty"`
+	APIKey                        string                                                          `json:"apiKey,omitempty"`
+	APIKeyID                      string                                                          `json:"apiKeyId,omitempty"`
+	AccessKey                     string                                                          `json:"accessKey,omitempty"`
+	SourceIP                      string                                                          `json:"sourceIp"`
+	CognitoAuthenticationType     string                                                          `json:"cognitoAuthenticationType,omitempty"`
+	CognitoAuthenticationProvider string                                                          `json:"cognitoAuthenticationProvider,omitempty"`
+	UserArn                       string                                                          `json:"userArn,omitempty"` //nolint: staticcheck
+	UserAgent                     string                                                          `json:"userAgent"`
+	User                          string                                                          `json:"user,omitempty"`
+	ClientCert                    *APIGatewayCustomAuthorizerRequestTypeRequestIdentityClientCert `json:"clientCert,omitempty"`
 }
 
 // APIGatewayWebsocketProxyRequest contains data coming from the API Gateway proxy
 type APIGatewayWebsocketProxyRequest struct {
-	Resource                        string                                 `json:"resource"` // The resource path defined in API Gateway
-	Path                            string                                 `json:"path"`     // The url path for the caller
+	Resource                        string                                 `json:"resource,omitempty"` // The resource path defined in API Gateway
+	Path                            string                                 `json:"path,omitempty"`     // The url path for the caller
 	HTTPMethod                      string                                 `json:"httpMethod,omitempty"`
-	Headers                         map[string]string                      `json:"headers"`
-	MultiValueHeaders               map[string][]string                    `json:"multiValueHeaders"`
-	QueryStringParameters           map[string]string                      `json:"queryStringParameters"`
-	MultiValueQueryStringParameters map[string][]string                    `json:"multiValueQueryStringParameters"`
-	PathParameters                  map[string]string                      `json:"pathParameters"`
-	StageVariables                  map[string]string                      `json:"stageVariables"`
+	Headers                         map[string]string                      `json:"headers,omitempty"`
+	MultiValueHeaders               map[string][]string                    `json:"multiValueHeaders,omitempty"`
+	QueryStringParameters           map[string]string                      `json:"queryStringParameters,omitempty"`
+	MultiValueQueryStringParameters map[string][]string                    `json:"multiValueQueryStringParameters,omitempty"`
+	PathParameters                  map[string]string                      `json:"pathParameters,omitempty"`
+	StageVariables                  map[string]string                      `json:"stageVariables,omitempty"`
 	RequestContext                  APIGatewayWebsocketProxyRequestContext `json:"requestContext"`
-	Body                            string                                 `json:"body"`
-	IsBase64Encoded                 bool                                   `json:"isBase64Encoded,omitempty"`
+	Body                            string                                 `json:"body,omitempty"`
+	IsBase64Encoded                 bool                                   `json:"isBase64Encoded"`
 }
 
 // APIGatewayWebsocketProxyRequestContext contains the information to identify
 // the AWS account and resources invoking the Lambda function. It also includes
 // Cognito identity information for the caller.
 type APIGatewayWebsocketProxyRequestContext struct {
-	AccountID          string                    `json:"accountId"`
-	ResourceID         string                    `json:"resourceId"`
-	Stage              string                    `json:"stage"`
-	RequestID          string                    `json:"requestId"`
-	Identity           APIGatewayRequestIdentity `json:"identity"`
-	ResourcePath       string                    `json:"resourcePath"`
-	Authorizer         interface{}               `json:"authorizer"`
-	HTTPMethod         string                    `json:"httpMethod"`
-	APIID              string                    `json:"apiId"` // The API Gateway rest API Id
-	ConnectedAt        int64                     `json:"connectedAt"`
-	ConnectionID       string                    `json:"connectionId"`
-	DomainName         string                    `json:"domainName"`
-	Error              string                    `json:"error"`
-	EventType          string                    `json:"eventType"`
-	ExtendedRequestID  string                    `json:"extendedRequestId"`
-	IntegrationLatency string                    `json:"integrationLatency"`
-	MessageDirection   string                    `json:"messageDirection"`
-	MessageID          interface{}               `json:"messageId"`
-	RequestTime        string                    `json:"requestTime"`
-	RequestTimeEpoch   int64                     `json:"requestTimeEpoch"`
-	RouteKey           string                    `json:"routeKey"`
-	Status             string                    `json:"status"`
+	AccountID            string                    `json:"accountId,omitempty"`
+	ResourceID           string                    `json:"resourceId,omitempty"`
+	Stage                string                    `json:"stage"`
+	RequestID            string                    `json:"requestId"`
+	Identity             APIGatewayRequestIdentity `json:"identity"`
+	ResourcePath         string                    `json:"resourcePath,omitempty"`
+	Authorizer           interface{}               `json:"authorizer,omitempty"`
+	HTTPMethod           string                    `json:"httpMethod,omitempty"`
+	APIID                string                    `json:"apiId"` // The API Gateway rest API Id
+	ConnectedAt          int64                     `json:"connectedAt"`
+	ConnectionID         string                    `json:"connectionId"`
+	DomainName           string                    `json:"domainName"`
+	Error                string                    `json:"error,omitempty"`
+	EventType            string                    `json:"eventType"`
+	ExtendedRequestID    string                    `json:"extendedRequestId"`
+	IntegrationLatency   string                    `json:"integrationLatency,omitempty"`
+	MessageDirection     string                    `json:"messageDirection"`
+	MessageID            interface{}               `json:"messageId,omitempty"`
+	RequestTime          string                    `json:"requestTime"`
+	RequestTimeEpoch     int64                     `json:"requestTimeEpoch"`
+	RouteKey             string                    `json:"routeKey"`
+	Status               string                    `json:"status,omitempty"`
+	DisconnectStatusCode int64                     `json:"disconnectStatusCode,omitempty"`
+	DisconnectReason     *string                   `json:"disconnectReason,omitempty"`
 }
 
 // APIGatewayCustomAuthorizerRequestTypeRequestIdentity contains identity information for the request caller including certificate information if using mTLS.
@@ -249,7 +317,7 @@ type APIGatewayV2CustomAuthorizerV1RequestTypeRequestContext struct {
 type APIGatewayV2CustomAuthorizerV1Request struct {
 	Version               string                                                  `json:"version"`
 	Type                  string                                                  `json:"type"`
-	MethodArn             string                                                  `json:"methodArn"` //nolint: stylecheck
+	MethodArn             string                                                  `json:"methodArn"` //nolint: staticcheck
 	IdentitySource        string                                                  `json:"identitySource"`
 	AuthorizationToken    string                                                  `json:"authorizationToken"`
 	Resource              string                                                  `json:"resource"`
@@ -265,7 +333,7 @@ type APIGatewayV2CustomAuthorizerV1Request struct {
 type APIGatewayV2CustomAuthorizerV2Request struct {
 	Version               string                         `json:"version"`
 	Type                  string                         `json:"type"`
-	RouteArn              string                         `json:"routeArn"` //nolint: stylecheck
+	RouteArn              string                         `json:"routeArn"` //nolint: staticcheck
 	IdentitySource        []string                       `json:"identitySource"`
 	RouteKey              string                         `json:"routeKey"`
 	RawPath               string                         `json:"rawPath"`
@@ -304,13 +372,13 @@ type APIGatewayCustomAuthorizerRequestTypeRequestContext struct {
 type APIGatewayCustomAuthorizerRequest struct {
 	Type               string `json:"type"`
 	AuthorizationToken string `json:"authorizationToken"`
-	MethodArn          string `json:"methodArn"` //nolint: stylecheck
+	MethodArn          string `json:"methodArn"` //nolint: staticcheck
 }
 
 // APIGatewayCustomAuthorizerRequestTypeRequest contains data coming in to a custom API Gateway authorizer function.
 type APIGatewayCustomAuthorizerRequestTypeRequest struct {
 	Type                            string                                              `json:"type"`
-	MethodArn                       string                                              `json:"methodArn"` //nolint: stylecheck
+	MethodArn                       string                                              `json:"methodArn"` //nolint: staticcheck
 	Resource                        string                                              `json:"resource"`
 	Path                            string                                              `json:"path"`
 	HTTPMethod                      string                                              `json:"httpMethod"`

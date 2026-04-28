@@ -16,7 +16,9 @@ package export
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 
 	"cuelang.org/go/cue/ast"
@@ -27,22 +29,23 @@ import (
 )
 
 func (e *exporter) ident(x adt.Feature) *ast.Ident {
-	s := x.IdentString(e.ctx)
+	s := e.identString(x)
 	if !ast.IsValidIdent(s) {
 		panic(s + " is not a valid identifier")
 	}
 	return ast.NewIdent(s)
 }
 
-func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
+func (e *exporter) adt(env *adt.Environment, expr adt.Elem) ast.Expr {
 	switch x := expr.(type) {
 	case adt.Value:
-		return e.expr(x)
+		return e.expr(env, x)
 
 	case *adt.ListLit:
+		env := &adt.Environment{Up: env, Vertex: e.node()}
 		a := []ast.Expr{}
 		for _, x := range x.Elems {
-			a = append(a, e.elem(x))
+			a = append(a, e.elem(env, x))
 		}
 		return ast.NewList(a...)
 
@@ -51,8 +54,11 @@ func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
 		// _, saved := e.pushFrame([]adt.Conjunct{adt.MakeConjunct(nil, x)})
 		// defer e.popFrame(saved)
 		// s := e.frame(0).scope
-
 		s := &ast.StructLit{}
+		// TODO: ensure e.node() is set in more cases. Right now it is not
+		// always set in mergeValues, even in cases where it could be. Better
+		// to be conservative for now, though.
+		env := &adt.Environment{Up: env, Vertex: e.node()}
 
 		for _, d := range x.Decls {
 			var a *ast.Alias
@@ -65,7 +71,19 @@ func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
 					e.valueAlias[alias] = a
 				}
 			}
-			decl := e.decl(d)
+			decl := e.decl(env, d)
+
+			// decl may be nil if it represents a let. Lets are added later, and
+			// only when they are still used.
+			if decl == nil {
+				continue
+			}
+
+			if e.cfg.ShowDocs {
+				ast.SetComments(decl, filterDocs(ast.Comments(d.Source())))
+			}
+			// TODO: use e.copyMeta for positions, but only when the original
+			// source is available.
 
 			if a != nil {
 				if f, ok := decl.(*ast.Field); ok {
@@ -79,46 +97,14 @@ func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
 
 		return s
 
-	case *adt.FieldReference:
-		f := e.frame(x.UpCount)
-		entry := f.fields[x.Label]
-
-		name := x.Label.IdentString(e.ctx)
-		switch {
-		case entry.alias != "":
-			name = entry.alias
-
-		case !ast.IsValidIdent(name):
-			name = "X"
-			if x.Src != nil {
-				name = x.Src.Name
-			}
-			name = e.uniqueAlias(name)
-			entry.alias = name
-		}
-
-		ident := ast.NewIdent(name)
-		entry.references = append(entry.references, ident)
-
-		if f.fields != nil {
-			f.fields[x.Label] = entry
-		}
-
-		return ident
-
-	case *adt.ValueReference:
-		name := x.Label.IdentString(e.ctx)
-		if a, ok := x.Src.Node.(*ast.Alias); ok { // Should always pass
-			if b, ok := e.valueAlias[a]; ok {
-				name = b.Ident.Name
-			}
-		}
-		ident := ast.NewIdent(name)
-		return ident
-
+	// TODO: why does LabelReference not implement resolve?
 	case *adt.LabelReference:
 		// get potential label from Source. Otherwise use X.
+		v, ok := e.ctx.Evaluate(env, x)
 		f := e.frame(x.UpCount)
+		if ok && (adt.IsConcrete(v) || f.field == nil) {
+			return e.value(v)
+		}
 		if f.field == nil {
 			// This can happen when the LabelReference is evaluated outside of
 			// normal evaluation, that is, if a pattern constraint or
@@ -147,65 +133,22 @@ func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
 		ident.Node = f.labelExpr
 		return ident
 
-	case *adt.DynamicReference:
-		// get potential label from Source. Otherwise use X.
-		name := "X"
-		f := e.frame(x.UpCount)
-		if d := f.field; d != nil {
-			if x.Src != nil {
-				name = x.Src.Name
-			}
-			name = e.getFieldAlias(d, name)
-		}
-		ident := ast.NewIdent(name)
-		ident.Scope = f.field
-		ident.Node = f.field
-		return ident
-
-	case *adt.ImportReference:
-		importPath := x.ImportPath.StringValue(e.index)
-		spec := ast.NewImport(nil, importPath)
-
-		info, _ := astutil.ParseImportSpec(spec)
-		name := info.PkgName
-		if x.Label != 0 {
-			name = x.Label.StringValue(e.index)
-			if name != info.PkgName {
-				spec.Name = ast.NewIdent(name)
-			}
-		}
-		ident := ast.NewIdent(name)
-		ident.Node = spec
-		return ident
-
-	case *adt.LetReference:
-		return e.resolveLet(x)
-
-	case *adt.SelectorExpr:
-		return &ast.SelectorExpr{
-			X:   e.expr(x.X),
-			Sel: e.stringLabel(x.Sel),
-		}
-
-	case *adt.IndexExpr:
-		return &ast.IndexExpr{
-			X:     e.expr(x.X),
-			Index: e.expr(x.Index),
-		}
+	case adt.Resolver:
+		return e.resolve(env, x)
 
 	case *adt.SliceExpr:
 		var lo, hi ast.Expr
 		if x.Lo != nil {
-			lo = e.expr(x.Lo)
+			lo = e.innerExpr(env, x.Lo)
 		}
 		if x.Hi != nil {
-			hi = e.expr(x.Hi)
+			hi = e.innerExpr(env, x.Hi)
 		}
 		// TODO: Stride not yet? implemented.
 		// if x.Stride != nil {
-		// 	stride = e.expr(x.Stride)
+		// 	stride = e.innerExpr(env, x.Stride)
 		// }
-		return &ast.SliceExpr{X: e.expr(x.X), Low: lo, High: hi}
+		return &ast.SliceExpr{X: e.innerExpr(env, x.X), Low: lo, High: hi}
 
 	case *adt.Interpolation:
 		var (
@@ -247,7 +190,7 @@ func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
 		suffix := `\(`
 		for i, elem := range x.Parts {
 			if i%2 == 1 {
-				t.Elts = append(t.Elts, e.expr(elem))
+				t.Elts = append(t.Elts, e.innerExpr(env, elem))
 			} else {
 				// b := strings.Builder{}
 				buf := []byte(prefix)
@@ -277,39 +220,48 @@ func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
 	case *adt.BoundExpr:
 		return &ast.UnaryExpr{
 			Op: x.Op.Token(),
-			X:  e.expr(x.Expr),
+			X:  e.innerExpr(env, x.Expr),
 		}
 
 	case *adt.UnaryExpr:
 		return &ast.UnaryExpr{
 			Op: x.Op.Token(),
-			X:  e.expr(x.X),
+			X:  e.innerExpr(env, x.X),
+		}
+
+	case *adt.OpenExpr:
+		return &ast.PostfixExpr{
+			X:  e.innerExpr(env, x.X),
+			Op: token.ELLIPSIS,
 		}
 
 	case *adt.BinaryExpr:
+		if x.Op == adt.AndOp || x.Op == adt.OrOp {
+			return e.sortBinaryTree(env, x)
+		}
 		return &ast.BinaryExpr{
 			Op: x.Op.Token(),
-			X:  e.expr(x.X),
-			Y:  e.expr(x.Y),
+			X:  e.innerExpr(env, x.X),
+			Y:  e.innerExpr(env, x.Y),
 		}
 
 	case *adt.CallExpr:
 		a := []ast.Expr{}
 		for _, arg := range x.Args {
-			v := e.expr(arg)
+			v := e.innerExpr(env, arg)
 			if v == nil {
-				e.expr(arg)
+				e.innerExpr(env, arg)
 				panic("")
 			}
 			a = append(a, v)
 		}
-		fun := e.expr(x.Fun)
+		fun := e.innerExpr(env, x.Fun)
 		return &ast.CallExpr{Fun: fun, Args: a}
 
 	case *adt.DisjunctionExpr:
 		a := []ast.Expr{}
 		for _, d := range x.Values {
-			v := e.expr(d.Val)
+			v := e.expr(env, d.Val)
 			if d.Default {
 				v = &ast.UnaryExpr{Op: token.MUL, X: v}
 			}
@@ -317,61 +269,362 @@ func (e *exporter) adt(expr adt.Expr, conjuncts []adt.Conjunct) ast.Expr {
 		}
 		return ast.NewBinExpr(token.OR, a...)
 
+	case *adt.ConjunctGroup:
+		a := []ast.Expr{}
+		for _, c := range *x {
+			v := e.expr(c.EnvExpr())
+			a = append(a, v)
+		}
+		return ast.NewBinExpr(token.AND, a...)
+
+	case *adt.Comprehension:
+		if !x.DidResolve() {
+			return dummyTop
+		}
+		for _, c := range x.Clauses {
+			switch c := c.(type) {
+			case *adt.ForClause:
+				env = &adt.Environment{Up: env, Vertex: empty}
+			case *adt.IfClause:
+			case *adt.LetClause:
+				env = &adt.Environment{Up: env, Vertex: empty}
+			case *adt.TryClause:
+				if c.Expr != nil {
+					// Assignment form: needs new environment for binding
+					env = &adt.Environment{Up: env, Vertex: empty}
+				}
+				// Struct form: no new environment needed (like IfClause)
+			case *adt.ValueClause:
+				// Can occur in nested comprehenions.
+				env = &adt.Environment{Up: env, Vertex: empty}
+			default:
+				panic("unreachable")
+			}
+		}
+
+		// If this is an "unwrapped" comprehension, we need to also
+		// account for the curly braces of the original comprehension.
+		if x.Nest() > 0 {
+			env = &adt.Environment{Up: env, Vertex: empty}
+		}
+
+		// TODO: consider using adt.EnvExpr.
+		return e.adt(env, adt.ToExpr(x.Value))
+
 	default:
 		panic(fmt.Sprintf("unknown field %T", x))
 	}
 }
 
-func (e *exporter) decl(d adt.Decl) ast.Decl {
+// sortBinaryTree converte x to a binary tree and sorts it's elements
+// using sortLeafAdt.
+func (e *exporter) sortBinaryTree(env *adt.Environment, x *adt.BinaryExpr) (b ast.Expr) {
+	var exprs []adt.Node
+
+	var flatten func(expr adt.Expr)
+	flatten = func(expr adt.Expr) {
+		if y, ok := expr.(*adt.BinaryExpr); ok && x.Op == y.Op {
+			flatten(y.X)
+			flatten(y.Y)
+		} else {
+			exprs = append(exprs, expr)
+		}
+	}
+	flatten(x)
+
+	// Sort the expressions
+	slices.SortStableFunc(exprs, cmpLeafNodes)
+
+	nodes := make([]ast.Expr, 0, len(exprs))
+	for _, x := range exprs {
+		switch y := x.(type) {
+		case *adt.Top:
+		case *adt.BasicType:
+			if y.K != adt.TopKind {
+				nodes = append(nodes, e.expr(env, y))
+			}
+		default:
+			nodes = append(nodes, e.innerExpr(env, y.(adt.Expr)))
+		}
+	}
+
+	if len(nodes) == 0 {
+		return e.adt(env, &adt.Top{})
+	}
+
+	return ast.NewBinExpr(x.Op.Token(), nodes...)
+}
+
+// cmpConjuncts compares two Conjunct based on their element using cmpLeafNodes.
+func cmpConjuncts(a, b adt.Conjunct) int {
+	return cmpLeafNodes(a.Expr(), b.Expr())
+}
+
+// cmpLeafNodes compares two adt.Expr values. The values may not be a binary
+// expressions. It returns true if a is less than b.
+func cmpLeafNodes[T adt.Node](a, b T) int {
+	if c := cmp.Compare(typeOrder(a), typeOrder(b)); c != 0 {
+		return c
+	}
+
+	srcA := a.Source()
+	srcB := b.Source()
+
+	if srcA == nil || srcB == nil {
+		// TODO: some tie breaker
+		return 0
+	}
+
+	return srcA.Pos().Compare(srcB.Pos())
+}
+
+func typeOrder(x adt.Node) int {
+	switch x.(type) {
+	case *adt.Top:
+		return 0
+	case *adt.BasicType:
+		return 1
+	case *adt.FieldReference:
+		return 2 // sometimes basic types are represented as field references.
+	case *adt.Bool, *adt.Null, *adt.Num, *adt.String, *adt.Bytes:
+		return 10
+	case *adt.BoundValue:
+		return 20
+	case *adt.StructLit, *adt.ListLit:
+		return 500
+	case adt.Expr:
+		return 25
+	default:
+		return 100
+	}
+}
+
+var dummyTop = &ast.Ident{Name: "_"}
+
+func wrapIfOptional(expr ast.Expr, isOptional bool) ast.Expr {
+	if isOptional {
+		return &ast.PostfixExpr{X: expr, Op: token.OPTION}
+	}
+	return expr
+}
+
+func (e *exporter) resolve(env *adt.Environment, r adt.Resolver) ast.Expr {
+	if c := e.pivotter; c != nil {
+		if alt := c.refExpr(r); alt != nil {
+			return alt
+		}
+	}
+
+	switch x := r.(type) {
+	case *adt.FieldReference:
+		// Special case when the original CUE already had an alias.
+		if x.Src != nil {
+			if f, ok := x.Src.Node.(*ast.Field); ok {
+				if entry, ok := e.fieldAlias[f]; ok {
+					ident := ast.NewIdent(aliasFromLabel(f))
+					ident.Node = entry.field
+					ident.Scope = entry.scope
+					return wrapIfOptional(ident, x.Optional)
+				}
+			}
+		}
+
+		ident, _ := e.newIdentForField(x.Src, x.Label, x.UpCount)
+
+		// Use low-level lookup to bypass structural cycle detection. This is
+		// fine as we do not recurse on the result and it is necessary to detect
+		// shadowing even when a configuration has a structural cycle.
+		for i := 0; i < int(x.UpCount); i++ {
+			env = env.Up
+		}
+
+		// Exclude comprehensions and other temporary/ inlined Vertices, which
+		// cannot be properly resolved, throwing off the sanitize. Also,
+		// comprehensions originate from a single source and do not need to be
+		// handled.
+		if env != nil { // for generated stuff
+			// TODO: note that env.Vertex should never be nil; investigate and replace the nil check below.
+			if v := env.Vertex; v != nil && !v.IsDynamic {
+				if v = v.Lookup(x.Label); v != nil {
+					e.linkIdentifier(v, ident)
+				}
+			}
+		}
+
+		return wrapIfOptional(ident, x.Optional)
+
+	case *adt.ValueReference:
+		name := x.Label.IdentString(e.ctx)
+		if a, ok := x.Src.Node.(*ast.Alias); ok { // Should always pass
+			if b, ok := e.valueAlias[a]; ok {
+				name = b.Ident.Name
+			}
+		}
+		ident := ast.NewIdent(name)
+		return ident
+
+	case *adt.DynamicReference:
+		// TODO(unshadow): ensure we correctly unshadow newly visible fields.
+		//   before uncommenting this.
+		// if v := x.EvaluateLabel(e.ctx, env); v != 0 {
+		// 	str := v.StringValue(e.ctx)
+		// 	if ast.IsValidIdent(str) {
+		// 		label := e.ctx.StringLabel(str)
+		// 		ident, ok := e.newIdentForField(x.Src, label, x.UpCount)
+		// 		if ok {
+		// 			return ident
+		// 		}
+		// 	}
+		// }
+
+		name := "X"
+		if x.Src != nil {
+			name = x.Src.Name
+		}
+		var f *ast.Field
+		for i := len(e.stack) - 1; i >= 0; i-- {
+			for _, entry := range e.stack[i].dynamicFields {
+				if entry.alias == name {
+					f = entry.field
+				}
+			}
+		}
+
+		if f != nil {
+			name = e.getFieldAlias(f, name)
+		}
+
+		ident := ast.NewIdent(name)
+		ident.Scope = f
+		ident.Node = f
+		return ident
+
+	case *adt.ImportReference:
+		importPath := x.ImportPath.StringValue(e.index)
+		info := ast.ParseImportPath(importPath)
+		spec := ast.NewImport(nil, importPath)
+
+		name := info.Qualifier
+		if x.Label != 0 {
+			name = x.Label.IdentString(e.index)
+			if name != info.Qualifier {
+				spec.Name = ast.NewIdent(name)
+			}
+		}
+		ident := ast.NewIdent(name)
+		ident.Node = spec
+		return ident
+
+	case *adt.LetReference:
+		return e.resolveLet(env, x)
+
+	case *adt.SelectorExpr:
+		sel := &ast.SelectorExpr{
+			X:   e.innerExpr(env, x.X),
+			Sel: e.stringLabel(x.Sel),
+		}
+		return wrapIfOptional(sel, x.Optional)
+
+	case *adt.IndexExpr:
+		idx := &ast.IndexExpr{
+			X:     e.innerExpr(env, x.X),
+			Index: e.innerExpr(env, x.Index),
+		}
+		return wrapIfOptional(idx, x.Optional)
+	}
+	panic("unreachable")
+}
+
+func (e *exporter) newIdentForField(
+	orig *ast.Ident,
+	label adt.Feature,
+	upCount int32) (ident *ast.Ident, ok bool) {
+	f := e.frame(upCount)
+	entry := f.fields[label]
+
+	name := e.identString(label)
+	switch {
+	case entry.alias != "":
+		name = entry.alias
+
+	case !ast.IsValidIdent(name):
+		name = "X"
+		if orig != nil {
+			name = orig.Name
+		}
+		name = e.uniqueAlias(name)
+		entry.alias = name
+	}
+
+	ident = ast.NewIdent(name)
+	entry.references = append(entry.references, ident)
+
+	if f.fields != nil {
+		f.fields[label] = entry
+		ok = true
+	}
+
+	return ident, ok
+}
+
+func (e *exporter) decl(env *adt.Environment, d adt.Decl) ast.Decl {
 	switch x := d.(type) {
 	case adt.Elem:
-		return e.elem(x)
+		return e.elem(env, x)
 
 	case *adt.Field:
 		e.setDocs(x)
-		f := &ast.Field{
-			Label: e.stringLabel(x.Label),
+		f := e.getFixedField(x)
+		f.Constraint = x.ArcType.Token()
+		e.setField(x.Label, f)
+
+		f.Attrs = extractFieldAttrs(nil, x)
+
+		st, ok := x.Value.(*adt.StructLit)
+		if !ok {
+			f.Value = e.expr(env, x.Value)
+			return f
+
 		}
 
-		frame := e.frame(0)
-		entry := frame.fields[x.Label]
-		entry.field = f
-		entry.node = f.Value
-		frame.fields[x.Label] = entry
-
-		f.Value = e.expr(x.Value)
-
-		// extractDocs(nil)
-		return f
-
-	case *adt.OptionalField:
-		e.setDocs(x)
-		f := &ast.Field{
-			Label:    e.stringLabel(x.Label),
-			Optional: token.NoSpace.Pos(),
+		top := e.frame(0)
+		var src *adt.Vertex
+		if top.node != nil {
+			src = top.node.Lookup(x.Label)
 		}
 
-		frame := e.frame(0)
-		entry := frame.fields[x.Label]
-		entry.field = f
-		entry.node = f.Value
-		frame.fields[x.Label] = entry
+		// Instead of calling e.expr directly, we inline the case for
+		// *adt.StructLit, so that we can pass src.
+		c := adt.MakeRootConjunct(env, st)
+		f.Value = e.mergeValues(adt.InvalidLabel, src, []conjunct{{c: c, up: 0}}, c)
 
-		f.Value = e.expr(x.Value)
+		if top.node != nil {
+			if v := top.node.Lookup(x.Label); v != nil {
+				e.linkField(v, f)
+			}
+		}
 
-		// extractDocs(nil)
 		return f
+
+	case *adt.LetField:
+		// Handled elsewhere
+		return nil
 
 	case *adt.BulkOptionalField:
 		e.setDocs(x)
 		// set bulk in frame.
 		frame := e.frame(0)
 
-		expr := e.expr(x.Filter)
+		expr := e.innerExpr(env, x.Filter)
 		frame.labelExpr = expr // see astutil.Resolve.
 
 		if x.Label != 0 {
-			expr = &ast.Alias{Ident: e.ident(x.Label), Expr: expr}
+			// Mark features used in the value expression so that
+			// uniqueAlias can avoid generating a conflicting name
+			// when the alias has the same name as a field in the value.
+			e.markUsedFeatures(x.Value)
+			name := e.uniqueAlias(e.identString(x.Label))
+			expr = &ast.Alias{Ident: ast.NewIdent(name), Expr: expr}
 		}
 		f := &ast.Field{
 			Label: ast.NewList(expr),
@@ -379,26 +632,58 @@ func (e *exporter) decl(d adt.Decl) ast.Decl {
 
 		frame.field = f
 
-		f.Value = e.expr(x.Value)
+		if alias := aliasFromLabel(x.Src); alias != "" {
+			frame.dynamicFields = append(frame.dynamicFields, &entry{
+				alias: alias,
+				field: f,
+			})
+		}
+
+		f.Value = e.expr(env, x.Value)
+		f.Attrs = extractFieldAttrs(nil, x)
 
 		return f
 
 	case *adt.DynamicField:
 		e.setDocs(x)
-		key := e.expr(x.Key)
-		if _, ok := key.(*ast.Interpolation); !ok {
-			key = &ast.ParenExpr{X: key}
+		srcKey := x.Key
+
+		f := &ast.Field{Constraint: x.ArcType.Token()}
+
+		v, _ := e.ctx.Evaluate(env, x.Key)
+
+		switch s, ok := v.(*adt.String); {
+		// TODO(unshadow): allow once unshadowing algorithm is fixed.
+		// case ok && ast.IsValidIdent(s.Str):
+		// 	label := e.ctx.StringLabel(s.Str)
+		// 	f.Label = ast.NewIdent(s.Str)
+		// 	e.setField(label, f)
+
+		case ok:
+			srcKey = s
+
+			fallthrough
+
+		default:
+			key := e.innerExpr(env, srcKey)
+			switch key.(type) {
+			case *ast.Interpolation, *ast.BasicLit:
+			default:
+				key = &ast.ParenExpr{X: key}
+			}
+			f.Label = key.(ast.Label)
 		}
-		f := &ast.Field{
-			Label: key.(ast.Label),
-		}
+
+		alias := aliasFromLabel(x.Src)
 
 		frame := e.frame(0)
-		frame.field = f
-		frame.labelExpr = key
-		// extractDocs(nil)
+		frame.dynamicFields = append(frame.dynamicFields, &entry{
+			alias: alias,
+			field: f,
+		})
 
-		f.Value = e.expr(x.Value)
+		f.Value = e.expr(env, x.Value)
+		f.Attrs = extractFieldAttrs(nil, x)
 
 		return f
 
@@ -407,41 +692,79 @@ func (e *exporter) decl(d adt.Decl) ast.Decl {
 	}
 }
 
-func (e *exporter) elem(d adt.Elem) ast.Expr {
+func (e *exporter) copyMeta(dst, src ast.Node) {
+	if e.cfg.ShowDocs {
+		ast.SetComments(dst, filterDocs(ast.Comments(src)))
+	}
+	astutil.CopyPosition(dst, src)
+}
+
+func filterDocs(a []*ast.CommentGroup) (out []*ast.CommentGroup) {
+	out = append(out, a...)
+	return slices.DeleteFunc(out, func(c *ast.CommentGroup) bool {
+		return !c.Doc
+	})
+}
+
+func (e *exporter) setField(label adt.Feature, f *ast.Field) {
+	frame := e.frame(0)
+	entry := frame.fields[label]
+	entry.field = f
+	entry.node = f.Value
+	// This can happen when evaluation is "pivoted".
+	if frame.fields != nil {
+		frame.fields[label] = entry
+	}
+}
+
+func aliasFromLabel(src *ast.Field) string {
+	if src != nil {
+		if a, ok := src.Label.(*ast.Alias); ok {
+			return a.Ident.Name
+		}
+	}
+	return ""
+}
+
+func (e *exporter) elem(env *adt.Environment, d adt.Elem) ast.Expr {
 
 	switch x := d.(type) {
 	case adt.Expr:
-		return e.expr(x)
+		return e.expr(env, x)
 
 	case *adt.Ellipsis:
 		t := &ast.Ellipsis{}
 		if x.Value != nil {
-			t.Type = e.expr(x.Value)
+			t.Type = e.expr(env, x.Value)
 		}
 		return t
 
-	case adt.Yielder:
-		return e.comprehension(x)
+	case *adt.Comprehension:
+		return e.comprehension(env, x)
 
 	default:
 		panic(fmt.Sprintf("unknown field %T", x))
 	}
 }
 
-func (e *exporter) comprehension(y adt.Yielder) ast.Expr {
+func (e *exporter) comprehension(env *adt.Environment, comp *adt.Comprehension) *ast.Comprehension {
 	c := &ast.Comprehension{}
 
-	for {
+	// Save outer environment for else clause (which doesn't have access to
+	// comprehension-internal bindings).
+	outerEnv := env
+
+	for _, y := range comp.Clauses {
 		switch x := y.(type) {
 		case *adt.ForClause:
+			env = &adt.Environment{Up: env, Vertex: empty}
 			value := e.ident(x.Value)
-			clause := &ast.ForClause{
-				Value:  value,
-				Source: e.expr(x.Src),
-			}
+			src := e.innerExpr(env, x.Src)
+			clause := &ast.ForClause{Value: value, Source: src}
+			e.copyMeta(clause, x.Syntax)
 			c.Clauses = append(c.Clauses, clause)
 
-			_, saved := e.pushFrame(nil)
+			_, saved := e.pushFrame(empty, nil)
 			defer e.popFrame(saved)
 
 			if x.Key != adt.InvalidLabel ||
@@ -452,38 +775,74 @@ func (e *exporter) comprehension(y adt.Yielder) ast.Expr {
 			}
 			e.addField(x.Value, nil, clause)
 
-			y = x.Dst
-
 		case *adt.IfClause:
-			clause := &ast.IfClause{Condition: e.expr(x.Condition)}
+			cond := e.innerExpr(env, x.Condition)
+			clause := &ast.IfClause{Condition: cond}
+			e.copyMeta(clause, x.Src)
 			c.Clauses = append(c.Clauses, clause)
-			y = x.Dst
 
 		case *adt.LetClause:
+			env = &adt.Environment{Up: env, Vertex: empty}
+			expr := e.innerExpr(env, x.Expr)
 			clause := &ast.LetClause{
 				Ident: e.ident(x.Label),
-				Expr:  e.expr(x.Expr),
+				Expr:  expr,
 			}
+			e.copyMeta(clause, x.Src)
 			c.Clauses = append(c.Clauses, clause)
 
-			_, saved := e.pushFrame(nil)
+			_, saved := e.pushFrame(empty, nil)
 			defer e.popFrame(saved)
 
 			e.addField(x.Label, nil, clause)
 
-			y = x.Dst
+		case *adt.TryClause:
+			clause := &ast.TryClause{}
+			if x.Label != adt.InvalidLabel {
+				// Assignment form: try x = expr
+				env = &adt.Environment{Up: env, Vertex: empty}
+				clause.Ident = e.ident(x.Label)
+				clause.Expr = e.innerExpr(env, x.Expr)
+
+				_, saved := e.pushFrame(empty, nil)
+				defer e.popFrame(saved)
+
+				e.addField(x.Label, nil, clause)
+			}
+			// Struct form has no Ident/Expr - body is in Comprehension.Value
+			e.copyMeta(clause, x.Src)
+			c.Clauses = append(c.Clauses, clause)
 
 		case *adt.ValueClause:
-			v := e.expr(x.StructLit)
-			if _, ok := v.(*ast.StructLit); !ok {
-				v = ast.NewStruct(ast.Embed(v))
-			}
-			c.Value = v
-			return c
+			// Can occur in nested comprehenions.
+			env = &adt.Environment{Up: env, Vertex: empty}
 
 		default:
 			panic(fmt.Sprintf("unknown field %T", x))
 		}
 	}
+	e.copyMeta(c, comp.Syntax)
 
+	// If this is an "unwrapped" comprehension, we need to also
+	// account for the curly braces of the original comprehension.
+	if comp.Nest() > 0 {
+		env = &adt.Environment{Up: env, Vertex: empty}
+	}
+
+	// TODO: consider using adt.EnvExpr.
+	v := e.expr(env, adt.ToExpr(comp.Value))
+	if _, ok := v.(*ast.StructLit); !ok {
+		v = ast.NewStruct(ast.Embed(v))
+	}
+	c.Value = v
+
+	// Export fallback clause using outer environment.
+	if comp.Fallback != nil {
+		fallbackBody := e.expr(outerEnv, comp.Fallback)
+		if body, ok := fallbackBody.(*ast.StructLit); ok {
+			c.Fallback = &ast.FallbackClause{Body: body}
+		}
+	}
+
+	return c
 }

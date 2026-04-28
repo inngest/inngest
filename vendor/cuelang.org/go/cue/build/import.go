@@ -15,10 +15,10 @@
 package build
 
 import (
-	"sort"
+	"maps"
+	"slices"
 	"strconv"
 
-	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 )
@@ -54,23 +54,17 @@ func (inst *Instance) complete() errors.Error {
 	)
 
 	for _, f := range inst.Files {
-		for _, decl := range f.Decls {
-			d, ok := decl.(*ast.ImportDecl)
-			if !ok {
-				continue
+		for spec := range f.ImportSpecs() {
+			quoted := spec.Path.Value
+			path, err := strconv.Unquote(quoted)
+			if err != nil {
+				inst.Err = errors.Append(inst.Err,
+					errors.Newf(
+						spec.Path.Pos(),
+						"%s: parser returned invalid quoted string: <%s>",
+						f.Filename, quoted))
 			}
-			for _, spec := range d.Specs {
-				quoted := spec.Path.Value
-				path, err := strconv.Unquote(quoted)
-				if err != nil {
-					inst.Err = errors.Append(inst.Err,
-						errors.Newf(
-							spec.Path.Pos(),
-							"%s: parser returned invalid quoted string: <%s>",
-							f.Filename, quoted))
-				}
-				imported[path] = append(imported[path], spec.Pos())
-			}
+			imported[path] = append(imported[path], spec.Pos())
 		}
 	}
 
@@ -85,14 +79,14 @@ func (inst *Instance) complete() errors.Error {
 		}
 	}
 
-	sort.Strings(paths)
+	slices.Sort(paths)
 
 	if inst.loadFunc != nil {
 		for i, path := range paths {
-			isLocal := IsLocalImport(path)
-			if isLocal {
-				// path = dirToImportPath(filepath.Join(dir, path))
-			}
+			// isLocal := IsLocalImport(path)
+			// if isLocal {
+			// 	path = dirToImportPath(filepath.Join(dir, path))
+			// }
 
 			imp := c.imports[path]
 			if imp == nil {
@@ -150,11 +144,7 @@ func (inst *Instance) complete() errors.Error {
 			deps[path] = p1
 		}
 	}
-	inst.Deps = make([]string, 0, len(deps))
-	for dep := range deps {
-		inst.Deps = append(inst.Deps, dep)
-	}
-	sort.Strings(inst.Deps)
+	inst.Deps = slices.Sorted(maps.Keys(deps))
 
 	for _, dep := range inst.Deps {
 		p1 := deps[dep]

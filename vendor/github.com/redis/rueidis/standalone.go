@@ -2,6 +2,7 @@ package rueidis
 
 import (
 	"context"
+	"maps"
 	"math/rand/v2"
 	"sync/atomic"
 	"time"
@@ -20,6 +21,7 @@ func newStandaloneClient(opt *ClientOption, connFn connFn, retryer retryHandler)
 	}
 	s := &standalone{
 		toReplicas:     opt.SendToReplicas,
+		nodeSelector:   opt.ReadNodeSelector,
 		replicas:       make([]*singleClient, len(opt.Standalone.ReplicaAddress)),
 		enableRedirect: opt.Standalone.EnableRedirect,
 		connFn:         connFn,
@@ -32,12 +34,26 @@ func newStandaloneClient(opt *ClientOption, connFn connFn, retryer retryHandler)
 		replicaConn := connFn(opt.Standalone.ReplicaAddress[i], opt)
 		if err := replicaConn.Dial(); err != nil {
 			s.primary.Load().Close() // close primary if any replica fails
-			for j := 0; j < i; j++ {
+			for j := range i {
 				s.replicas[j].Close()
 			}
 			return nil, err
 		}
 		s.replicas[i] = newSingleClientWithConn(replicaConn, cmds.NewBuilder(cmds.NoSlot), !opt.DisableRetry, opt.DisableCache, retryer, false)
+	}
+	if s.opt.EnableReplicaAZInfo && (s.opt.ReadNodeSelector != nil || len(s.replicas) > 1) {
+		s.nodes = make([]NodeInfo, len(s.replicas)+1)
+		primary := s.primary.Load()
+		s.nodes[0] = NodeInfo{
+			Addr: primary.conn.Addr(),
+			AZ:   primary.conn.AZ(),
+		}
+		for i, replica := range s.replicas {
+			s.nodes[i+1] = NodeInfo{
+				Addr: replica.conn.Addr(),
+				AZ:   replica.conn.AZ(),
+			}
+		}
 	}
 	return s, nil
 }
@@ -45,11 +61,13 @@ func newStandaloneClient(opt *ClientOption, connFn connFn, retryer retryHandler)
 type standalone struct {
 	retryer        retryHandler
 	toReplicas     func(Completed) bool
+	nodeSelector   func(uint16, []NodeInfo) int
 	primary        atomic.Pointer[singleClient]
 	connFn         connFn
 	opt            *ClientOption
 	redirectCall   call
 	replicas       []*singleClient
+	nodes          []NodeInfo
 	enableRedirect bool
 }
 
@@ -57,11 +75,22 @@ func (s *standalone) B() Builder {
 	return s.primary.Load().B()
 }
 
-func (s *standalone) pick() int {
-	if len(s.replicas) == 1 {
-		return 0
+func (s *standalone) pick(slot uint16) *singleClient {
+	if s.nodeSelector != nil {
+		rIndex := s.nodeSelector(slot, s.nodes)
+		if rIndex < 0 || rIndex >= len(s.nodes) {
+			rIndex = 0
+		}
+		if rIndex == 0 {
+			return s.primary.Load()
+		}
+		return s.replicas[rIndex-1]
 	}
-	return rand.IntN(len(s.replicas))
+
+	if len(s.replicas) == 1 {
+		return s.replicas[0]
+	}
+	return s.replicas[rand.IntN(len(s.replicas))]
 }
 
 func (s *standalone) redirectToPrimary(addr string) error {
@@ -106,7 +135,7 @@ func (s *standalone) Do(ctx context.Context, cmd Completed) (resp RedisResult) {
 
 retry:
 	if s.toReplicas != nil && s.toReplicas(cmd) {
-		resp = s.replicas[s.pick()].Do(ctx, cmd)
+		resp = s.pick(cmd.Slot()).Do(ctx, cmd)
 	} else {
 		resp = s.primary.Load().Do(ctx, cmd)
 	}
@@ -136,15 +165,12 @@ func (s *standalone) DoMulti(ctx context.Context, multi ...Completed) (resp []Re
 	}
 
 retry:
-	toReplica := true
-	for _, cmd := range multi {
-		if s.toReplicas == nil || !s.toReplicas(cmd) {
-			toReplica = false
-			break
-		}
+	toReplica := s.toReplicas != nil
+	for i := 0; i < len(multi) && toReplica; i++ {
+		toReplica = s.toReplicas(multi[i])
 	}
-	if toReplica {
-		resp = s.replicas[s.pick()].DoMulti(ctx, multi...)
+	if toReplica && len(multi) > 0 {
+		resp = s.pick(multi[0].Slot()).DoMulti(ctx, multi...)
 	} else {
 		resp = s.primary.Load().DoMulti(ctx, multi...)
 	}
@@ -171,7 +197,7 @@ retry:
 
 func (s *standalone) Receive(ctx context.Context, subscribe Completed, fn func(msg PubSubMessage)) error {
 	if s.toReplicas != nil && s.toReplicas(subscribe) {
-		return s.replicas[s.pick()].Receive(ctx, subscribe, fn)
+		return s.pick(subscribe.Slot()).Receive(ctx, subscribe, fn)
 	}
 	return s.primary.Load().Receive(ctx, subscribe, fn)
 }
@@ -241,7 +267,7 @@ retry:
 func (s *standalone) DoStream(ctx context.Context, cmd Completed) RedisResultStream {
 	var stream RedisResultStream
 	if s.toReplicas != nil && s.toReplicas(cmd) {
-		stream = s.replicas[s.pick()].DoStream(ctx, cmd)
+		stream = s.pick(cmd.Slot()).DoStream(ctx, cmd)
 	} else {
 		stream = s.primary.Load().DoStream(ctx, cmd)
 	}
@@ -250,15 +276,12 @@ func (s *standalone) DoStream(ctx context.Context, cmd Completed) RedisResultStr
 
 func (s *standalone) DoMultiStream(ctx context.Context, multi ...Completed) MultiRedisResultStream {
 	var stream MultiRedisResultStream
-	toReplica := true
-	for _, cmd := range multi {
-		if s.toReplicas == nil || !s.toReplicas(cmd) {
-			toReplica = false
-			break
-		}
+	toReplica := s.toReplicas != nil
+	for i := 0; i < len(multi) && toReplica; i++ {
+		toReplica = s.toReplicas(multi[i])
 	}
-	if toReplica {
-		stream = s.replicas[s.pick()].DoMultiStream(ctx, multi...)
+	if toReplica && len(multi) > 0 {
+		stream = s.pick(multi[0].Slot()).DoMultiStream(ctx, multi...)
 	} else {
 		stream = s.primary.Load().DoMultiStream(ctx, multi...)
 	}
@@ -275,13 +298,9 @@ func (s *standalone) Dedicate() (client DedicatedClient, cancel func()) {
 
 func (s *standalone) Nodes() map[string]Client {
 	nodes := make(map[string]Client, len(s.replicas)+1)
-	for addr, client := range s.primary.Load().Nodes() {
-		nodes[addr] = client
-	}
+	maps.Copy(nodes, s.primary.Load().Nodes())
 	for _, replica := range s.replicas {
-		for addr, client := range replica.Nodes() {
-			nodes[addr] = client
-		}
+		maps.Copy(nodes, replica.Nodes())
 	}
 	return nodes
 }

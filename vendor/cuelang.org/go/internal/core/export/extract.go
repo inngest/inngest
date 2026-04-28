@@ -15,8 +15,9 @@
 package export
 
 import (
+	"slices"
+
 	"cuelang.org/go/cue/ast"
-	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 )
@@ -26,44 +27,38 @@ import (
 // Comments are attached to a field with a field shorthand belong to the
 // child node. So in the following the comment is attached to field bar.
 //
-//     // comment
-//     foo: bar: 2
-//
+//	// comment
+//	foo: bar: 2
 func ExtractDoc(v *adt.Vertex) (docs []*ast.CommentGroup) {
-	return extractDocs(v, v.Conjuncts)
+	return extractDocs(v)
 }
 
-func extractDocs(v *adt.Vertex, a []adt.Conjunct) (docs []*ast.CommentGroup) {
+func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
 	fields := []*ast.Field{}
 
 	// Collect docs directly related to this Vertex.
-	for _, x := range a {
-		if v, ok := x.Expr().(*adt.Vertex); ok {
-			docs = append(docs, extractDocs(v, v.Conjuncts)...)
-			continue
+	for x := range v.LeafConjuncts() {
+		// TODO: Is this still being used?
+		if v, ok := x.Elem().(*adt.Vertex); ok {
+			docs = append(docs, extractDocs(v)...)
 		}
 
-		switch f := x.Source().(type) {
+		switch f := x.Field().Source().(type) {
 		case *ast.Field:
 			if hasShorthandValue(f) {
 				continue
 			}
 			fields = append(fields, f)
-			for _, cg := range f.Comments() {
+			for _, cg := range ast.Comments(f) {
 				if !containsDoc(docs, cg) && cg.Doc {
 					docs = append(docs, cg)
 				}
 			}
 
 		case *ast.File:
-			if c := internal.FileComment(f); c != nil {
-				docs = append(docs, c)
-			}
+			fdocs, _ := internal.FileComments(f)
+			docs = append(docs, fdocs...)
 		}
-	}
-
-	if v == nil {
-		return docs
 	}
 
 	// Collect docs from parent scopes in collapsed fields.
@@ -71,7 +66,7 @@ func extractDocs(v *adt.Vertex, a []adt.Conjunct) (docs []*ast.CommentGroup) {
 
 		newFields := []*ast.Field{}
 
-		for _, x := range p.Conjuncts {
+		for x := range p.LeafConjuncts() {
 			f, ok := x.Source().(*ast.Field)
 			if !ok || !hasShorthandValue(f) {
 				continue
@@ -81,7 +76,7 @@ func extractDocs(v *adt.Vertex, a []adt.Conjunct) (docs []*ast.CommentGroup) {
 			for _, child := range fields {
 				if nested == child {
 					newFields = append(newFields, f)
-					for _, cg := range f.Comments() {
+					for _, cg := range ast.Comments(f) {
 						if !containsDoc(docs, cg) && cg.Doc {
 							docs = append(docs, cg)
 						}
@@ -98,8 +93,7 @@ func extractDocs(v *adt.Vertex, a []adt.Conjunct) (docs []*ast.CommentGroup) {
 // hasShorthandValue reports whether this field has a struct value that will
 // be rendered as a shorthand, for instance:
 //
-//     f: g: 2
-//
+//	f: g: 2
 func hasShorthandValue(f *ast.Field) bool {
 	if f = nestedField(f); f == nil {
 		return false
@@ -117,10 +111,9 @@ func hasShorthandValue(f *ast.Field) bool {
 // nestedField returns the child field of a field shorthand.
 func nestedField(f *ast.Field) *ast.Field {
 	s, _ := f.Value.(*ast.StructLit)
-	if s == nil ||
-		len(s.Elts) != 1 ||
-		s.Lbrace != token.NoPos ||
-		s.Rbrace != token.NoPos {
+	if s == nil || len(s.Elts) != 1 ||
+		s.Lbrace.IsValid() ||
+		s.Rbrace.IsValid() {
 		return nil
 	}
 
@@ -129,10 +122,8 @@ func nestedField(f *ast.Field) *ast.Field {
 }
 
 func containsDoc(a []*ast.CommentGroup, cg *ast.CommentGroup) bool {
-	for _, c := range a {
-		if c == cg {
-			return true
-		}
+	if slices.Contains(a, cg) {
+		return true
 	}
 
 	for _, c := range a {
@@ -145,14 +136,19 @@ func containsDoc(a []*ast.CommentGroup, cg *ast.CommentGroup) bool {
 }
 
 func ExtractFieldAttrs(v *adt.Vertex) (attrs []*ast.Attribute) {
-	for _, x := range v.Conjuncts {
-		attrs = extractFieldAttrs(attrs, x)
+	for x := range v.LeafConjuncts() {
+		attrs = extractFieldAttrs(attrs, x.Field())
 	}
 	return attrs
 }
 
-func extractFieldAttrs(attrs []*ast.Attribute, c adt.Conjunct) []*ast.Attribute {
-	if f, ok := c.Source().(*ast.Field); ok {
+// extractFieldAttrs extracts the fields from n and appends unique entries to
+// attrs.
+//
+// The value of n should be obtained from the Conjunct.Field method if the
+// source for n is a Conjunct so that Comprehensions are properly unwrapped.
+func extractFieldAttrs(attrs []*ast.Attribute, n adt.Node) []*ast.Attribute {
+	if f, ok := n.Source().(*ast.Field); ok {
 		for _, a := range f.Attrs {
 			if !containsAttr(attrs, a) {
 				attrs = append(attrs, a)
@@ -175,8 +171,7 @@ func extractDeclAttrs(attrs []*ast.Attribute, n ast.Node) []*ast.Attribute {
 	switch x := n.(type) {
 	case nil:
 	case *ast.File:
-		info := internal.GetPackageInfo(x)
-		attrs = appendDeclAttrs(attrs, x.Decls[info.Index:])
+		attrs = appendDeclAttrs(attrs, x.Decls[len(x.Preamble()):])
 	case *ast.StructLit:
 		attrs = appendDeclAttrs(attrs, x.Elts)
 	}

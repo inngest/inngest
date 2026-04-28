@@ -15,22 +15,20 @@
 // Package internal exposes some cue internals to other packages.
 //
 // A better name for this package would be technicaldebt.
-package internal // import "cuelang.org/go/internal"
+package internal
 
 // TODO: refactor packages as to make this package unnecessary.
 
 import (
 	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
-	"github.com/cockroachdb/apd/v2"
+	"github.com/cockroachdb/apd/v3"
 
 	"cuelang.org/go/cue/ast"
-	"cuelang.org/go/cue/ast/astutil"
-	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 )
 
@@ -39,90 +37,103 @@ import (
 // Right now Decimal is aliased to apd.Decimal. This may change in the future.
 type Decimal = apd.Decimal
 
-// ErrIncomplete can be used by builtins to signal the evaluation was
-// incomplete.
-var ErrIncomplete = errors.New("incomplete value")
+// Context wraps apd.Context for CUE's custom logic.
+//
+// Note that it avoids pointers to make it easier to make copies.
+type Context struct {
+	apd.Context
+}
 
-// MakeInstance makes a new instance from a value.
-var MakeInstance func(value interface{}) (instance interface{})
+// WithPrecision mirrors upstream, but returning our type without a pointer.
+func (c Context) WithPrecision(p uint32) Context {
+	c.Context = *c.Context.WithPrecision(p)
+	return c
+}
 
-// BaseContext is used as CUEs default context for arbitrary-precision decimals
-var BaseContext = apd.BaseContext.WithPrecision(24)
+// apd/v2 used to call Reduce on the result of Quo and Rem,
+// so that the operations always trimmed all but one trailing zeros.
+// apd/v3 does not do that at all.
+// For now, get the old behavior back by calling Reduce ourselves.
+// Note that v3's Reduce also removes all trailing zeros,
+// whereas v2's Reduce would leave ".0" behind.
+// Get that detail back as well, to consistently show floats with decimal points.
+//
+// TODO: Rather than reducing all trailing zeros,
+// we should keep a number of zeros that makes sense given the operation.
 
-// ListEllipsis reports the list type and remaining elements of a list. If we
-// ever relax the usage of ellipsis, this function will likely change. Using
-// this function will ensure keeping correct behavior or causing a compiler
-// failure.
-func ListEllipsis(n *ast.ListLit) (elts []ast.Expr, e *ast.Ellipsis) {
-	elts = n.Elts
-	if n := len(elts); n > 0 {
-		var ok bool
-		if e, ok = elts[n-1].(*ast.Ellipsis); ok {
-			elts = elts[:n-1]
-		}
+func reduceKeepingFloats(d *apd.Decimal) {
+	oldExponent := d.Exponent
+	d.Reduce(d)
+	// If the decimal had decimal places, like "3.000" and "5.000E+5",
+	// Reduce gives us "3" and "5E+5", but we want "3.0" and "5.0E+5".
+	if oldExponent < 0 && d.Exponent >= 0 {
+		d.Exponent--
+		// TODO: we can likely make the NewBigInt(10) a static global to reduce allocs
+		d.Coeff.Mul(&d.Coeff, apd.NewBigInt(10))
 	}
-	return elts, e
 }
 
-type PkgInfo struct {
-	Package *ast.Package
-	Index   int // position in File.Decls
-	Name    string
+func (c Context) Quo(d, x, y *apd.Decimal) (apd.Condition, error) {
+	res, err := c.Context.Quo(d, x, y)
+	reduceKeepingFloats(d)
+	return res, err
 }
 
-// IsAnonymous reports whether the package is anonymous.
-func (p *PkgInfo) IsAnonymous() bool {
-	return p.Name == "" || p.Name == "_"
+func (c Context) Sqrt(d, x *apd.Decimal) (apd.Condition, error) {
+	res, err := c.Context.Sqrt(d, x)
+	reduceKeepingFloats(d)
+	return res, err
 }
 
-func GetPackageInfo(f *ast.File) PkgInfo {
+// BaseContext is used as CUE's default context for arbitrary-precision decimals.
+var BaseContext = Context{*apd.BaseContext.WithPrecision(34)}
+
+// EvaluatorVersion is declared here so it can be used everywhere without import cycles,
+// but the canonical documentation lives at [cuelang.org/go/cue/cuecontext.EvalVersion].
+//
+// TODO(mvdan): rename to EvalVersion for consistency with cuecontext.
+type EvaluatorVersion int
+
+const (
+	// EvalVersionUnset is the zero value, which signals that no evaluator version is provided.
+	EvalVersionUnset EvaluatorVersion = 0
+
+	// DefaultVersion is a special value as it selects a version depending on the current
+	// value of CUE_EXPERIMENT. It exists separately to [EvalVersionUnset], even though both
+	// implement the same version selection logic, so that we can distinguish between
+	// a user explicitly asking for the default version versus an entirely unset version.
+	DefaultVersion EvaluatorVersion = -1 // TODO(mvdan): rename to EvalDefault for consistency with cuecontext
+
+	// The values below are documented under [cuelang.org/go/cue/cuecontext.EvalVersion].
+	// We should never change or delete the values below, as they describe all known past versions
+	// which is useful for understanding old debug output.
+
+	EvalV2 EvaluatorVersion = 2
+	EvalV3 EvaluatorVersion = 3
+
+	// The current default, stable, and experimental versions.
+
+	StableVersion = EvalV3 // TODO(mvdan): rename to EvalStable for consistency with cuecontext
+	DevVersion    = EvalV3 // TODO(mvdan): rename to EvalExperiment for consistency with cuecontext
+)
+
+// Package finds the package declaration from the preamble of a file,
+// returning it, and its index within the file's Decls.
+func Package(f *ast.File) (*ast.Package, int) {
 	for i, d := range f.Decls {
-		switch x := d.(type) {
+		switch d := d.(type) {
 		case *ast.CommentGroup:
 		case *ast.Attribute:
 		case *ast.Package:
-			if x.Name == nil {
-				break
+			if d.Name == nil { // malformed package declaration
+				return nil, -1
 			}
-			return PkgInfo{x, i, x.Name.Name}
+			return d, i
+		default:
+			return nil, -1
 		}
 	}
-	return PkgInfo{}
-}
-
-// Deprecated: use GetPackageInfo
-func PackageInfo(f *ast.File) (p *ast.Package, name string, tok token.Pos) {
-	x := GetPackageInfo(f)
-	if p := x.Package; p != nil {
-		return p, x.Name, p.Name.Pos()
-	}
-	return nil, "", f.Pos()
-}
-
-func SetPackage(f *ast.File, name string, overwrite bool) {
-	p, str, _ := PackageInfo(f)
-	if p != nil {
-		if !overwrite || str == name {
-			return
-		}
-		ident := ast.NewIdent(name)
-		astutil.CopyMeta(ident, p.Name)
-		return
-	}
-
-	decls := make([]ast.Decl, len(f.Decls)+1)
-	k := 0
-	for _, d := range f.Decls {
-		if _, ok := d.(*ast.CommentGroup); ok {
-			decls[k] = d
-			k++
-			continue
-		}
-		break
-	}
-	decls[k] = &ast.Package{Name: ast.NewIdent(name)}
-	copy(decls[k+1:], f.Decls[k:])
-	f.Decls = decls
+	return nil, -1
 }
 
 // NewComment creates a new CommentGroup from the given text.
@@ -147,7 +158,7 @@ func NewComment(isDoc bool, s string) *ast.CommentGroup {
 		buf.WriteString("//")
 		for scanner.Scan() {
 			s := scanner.Text()
-			n := len([]rune(s)) + 1
+			n := utf8.RuneCountInString(s) + 1
 			if count+n > maxRunesPerLine && count > 3 {
 				cg.List = append(cg.List, &ast.Comment{Text: buf.String()})
 				count = 3
@@ -166,46 +177,28 @@ func NewComment(isDoc bool, s string) *ast.CommentGroup {
 	return cg
 }
 
-func FileComment(f *ast.File) *ast.CommentGroup {
-	pkg, _, _ := PackageInfo(f)
-	var cgs []*ast.CommentGroup
-	if pkg != nil {
-		cgs = pkg.Comments()
-	} else if cgs = f.Comments(); len(cgs) > 0 {
-		// Use file comment.
-	} else {
-		// Use first comment before any declaration.
-		for _, d := range f.Decls {
-			if cg, ok := d.(*ast.CommentGroup); ok {
-				return cg
-			}
-			if cgs = ast.Comments(d); cgs != nil {
-				break
-			}
-			// TODO: what to do here?
-			if _, ok := d.(*ast.Attribute); !ok {
-				break
-			}
+func FileComments(f *ast.File) (docs, rest []*ast.CommentGroup) {
+	hasPkg := false
+	if pkg, _ := Package(f); pkg != nil {
+		hasPkg = true
+		docs = ast.Comments(pkg)
+	}
+
+	for _, c := range ast.Comments(f) {
+		if c.Doc {
+			docs = append(docs, c)
+		} else {
+			rest = append(rest, c)
 		}
 	}
-	var cg *ast.CommentGroup
-	for _, c := range cgs {
-		if c.Position == 0 {
-			cg = c
-		}
+
+	if !hasPkg && len(docs) == 0 && len(rest) > 0 {
+		// use the first file comment group as as doc comment.
+		docs, rest = rest[:1], rest[1:]
+		docs[0].Doc = true
 	}
-	return cg
-}
 
-func NewAttr(name, str string) *ast.Attribute {
-	buf := &strings.Builder{}
-	buf.WriteByte('@')
-	buf.WriteString(name)
-	buf.WriteByte('(')
-	fmt.Fprintf(buf, str)
-	buf.WriteByte(')')
-
-	return &ast.Attribute{Text: buf.String()}
+	return
 }
 
 // ToExpr converts a node to an expression. If it is a file, it will return
@@ -247,47 +240,35 @@ func ToExpr(n ast.Node) ast.Expr {
 // ToFile converts an expression to a file.
 //
 // Adjusts the spacing of x when needed.
-func ToFile(n ast.Node) *ast.File {
-	switch x := n.(type) {
-	case nil:
+//
+// If preserveStructLit is true and n is a [*ast.StructLit], then n
+// will be embedded within the returned [*ast.File] rather than only
+// its elements being included in the returned File. This ensures that
+// position information of the StructLit's braces is not lost.
+func ToFile(n ast.Node, preserveStructLit bool) *ast.File {
+	if n == nil {
 		return nil
+	}
+	switch n := n.(type) {
 	case *ast.StructLit:
-		return &ast.File{Decls: x.Elts}
+		if preserveStructLit {
+			ast.SetRelPos(n, token.NoSpace)
+			return &ast.File{Decls: []ast.Decl{&ast.EmbedDecl{Expr: n}}}
+
+		} else {
+			f := &ast.File{Decls: n.Elts}
+			// Ensure that the comments attached to the struct literal are not lost.
+			ast.SetComments(f, ast.Comments(n))
+			return f
+		}
 	case ast.Expr:
-		ast.SetRelPos(x, token.NoSpace)
-		return &ast.File{Decls: []ast.Decl{&ast.EmbedDecl{Expr: x}}}
+		ast.SetRelPos(n, token.NoSpace)
+		return &ast.File{Decls: []ast.Decl{&ast.EmbedDecl{Expr: n}}}
 	case *ast.File:
-		return x
+		return n
 	default:
-		panic(fmt.Sprintf("Unsupported node type %T", x))
+		panic(fmt.Sprintf("Unsupported node type %T", n))
 	}
-}
-
-// ToStruct gets the non-preamble declarations of a file and puts them in a
-// struct.
-func ToStruct(f *ast.File) *ast.StructLit {
-	start := 0
-	for i, d := range f.Decls {
-		switch d.(type) {
-		case *ast.Package, *ast.ImportDecl:
-			start = i + 1
-		case *ast.Attribute, *ast.CommentGroup:
-		default:
-			break
-		}
-	}
-	s := ast.NewStruct()
-	s.Elts = f.Decls[start:]
-	return s
-}
-
-func IsBulkField(d ast.Decl) bool {
-	if f, ok := d.(*ast.Field); ok {
-		if _, ok := f.Label.(*ast.ListLit); ok {
-			return true
-		}
-	}
-	return false
 }
 
 func IsDef(s string) bool {
@@ -315,9 +296,6 @@ func IsDefinition(label ast.Label) bool {
 }
 
 func IsRegularField(f *ast.Field) bool {
-	if f.Token == token.ISA {
-		return false
-	}
 	var ident *ast.Ident
 	switch x := f.Label.(type) {
 	case *ast.Alias:
@@ -334,89 +312,7 @@ func IsRegularField(f *ast.Field) bool {
 	return true
 }
 
-func EmbedStruct(s *ast.StructLit) *ast.EmbedDecl {
-	e := &ast.EmbedDecl{Expr: s}
-	if len(s.Elts) == 1 {
-		d := s.Elts[0]
-		astutil.CopyPosition(e, d)
-		ast.SetRelPos(d, token.NoSpace)
-		astutil.CopyComments(e, d)
-		ast.SetComments(d, nil)
-		if f, ok := d.(*ast.Field); ok {
-			ast.SetRelPos(f.Label, token.NoSpace)
-		}
-	}
-	s.Lbrace = token.Newline.Pos()
-	s.Rbrace = token.NoSpace.Pos()
-	return e
-}
-
-// IsEllipsis reports whether the declaration can be represented as an ellipsis.
-func IsEllipsis(x ast.Decl) bool {
-	// ...
-	if _, ok := x.(*ast.Ellipsis); ok {
-		return true
-	}
-
-	// [string]: _ or [_]: _
-	f, ok := x.(*ast.Field)
-	if !ok {
-		return false
-	}
-	v, ok := f.Value.(*ast.Ident)
-	if !ok || v.Name != "_" {
-		return false
-	}
-	l, ok := f.Label.(*ast.ListLit)
-	if !ok || len(l.Elts) != 1 {
-		return false
-	}
-	i, ok := l.Elts[0].(*ast.Ident)
-	if !ok {
-		return false
-	}
-	return i.Name == "string" || i.Name == "_"
-}
-
 // GenPath reports the directory in which to store generated files.
 func GenPath(root string) string {
-	info, err := os.Stat(filepath.Join(root, "cue.mod"))
-	if os.IsNotExist(err) || !info.IsDir() {
-		// Try legacy pkgDir mode
-		pkgDir := filepath.Join(root, "pkg")
-		if err == nil && !info.IsDir() {
-			return pkgDir
-		}
-		if info, err := os.Stat(pkgDir); err == nil && info.IsDir() {
-			return pkgDir
-		}
-	}
 	return filepath.Join(root, "cue.mod", "gen")
 }
-
-var ErrInexact = errors.New("inexact subsumption")
-
-func DecorateError(info error, err errors.Error) errors.Error {
-	return &decorated{cueError: err, info: info}
-}
-
-type cueError = errors.Error
-
-type decorated struct {
-	cueError
-
-	info error
-}
-
-func (e *decorated) Is(err error) bool {
-	return errors.Is(e.info, err) || errors.Is(e.cueError, err)
-}
-
-// MaxDepth indicates the maximum evaluation depth. This is there to break
-// cycles in the absence of cycle detection.
-//
-// It is registered in a central place to make it easy to find all spots where
-// cycles are broken in this brute-force manner.
-//
-// TODO(eval): have cycle detection.
-const MaxDepth = 20

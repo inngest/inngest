@@ -51,10 +51,7 @@ func Split(n int, opts *Options) []int {
 	// to [9, 1]; it could be [5, 5].
 	var batches []int
 	for n >= o.MinBatchSize && len(batches) < o.MaxHandlers {
-		b := o.MaxBatchSize
-		if b > n {
-			b = n
-		}
+		b := min(o.MaxBatchSize, n)
 		batches = append(batches, b)
 		n -= b
 	}
@@ -64,7 +61,7 @@ func Split(n int, opts *Options) []int {
 // A Batcher batches items.
 type Batcher struct {
 	opts          Options
-	handler       func(interface{}) error
+	handler       func(any) error
 	itemSliceZero reflect.Value  // nil (zero value) for slice of items
 	wg            sync.WaitGroup // tracks active Add calls
 
@@ -82,7 +79,7 @@ type sizableItem interface {
 }
 
 type waiter struct {
-	item interface{}
+	item any
 	errc chan error
 }
 
@@ -91,6 +88,7 @@ type Options struct {
 	// Maximum number of concurrent handlers. Defaults to 1.
 	MaxHandlers int
 	// Minimum size of a batch. Defaults to 1.
+	// May be ignored during shutdown.
 	MinBatchSize int
 	// Maximum size of a batch. 0 means no limit.
 	MaxBatchSize int
@@ -150,7 +148,7 @@ func (o *Options) NewMergedOptions(opts *Options) *Options {
 //
 // handler is a function that will be called on each bundle. If itemExample is
 // of type T, the argument to handler is of type []T.
-func New(itemType reflect.Type, opts *Options, handler func(interface{}) error) *Batcher {
+func New(itemType reflect.Type, opts *Options, handler func(any) error) *Batcher {
 	return &Batcher{
 		opts:          newOptionsWithDefaults(opts),
 		handler:       handler,
@@ -161,7 +159,7 @@ func New(itemType reflect.Type, opts *Options, handler func(interface{}) error) 
 // Add adds an item to the batcher. It blocks until the handler has
 // processed the item and reports the error that the handler returned.
 // If Shutdown has been called, Add immediately returns an error.
-func (b *Batcher) Add(ctx context.Context, item interface{}) error {
+func (b *Batcher) Add(ctx context.Context, item any) error {
 	c := b.AddNoWait(item)
 	// Wait until either our result is ready or the context is done.
 	select {
@@ -175,7 +173,7 @@ func (b *Batcher) Add(ctx context.Context, item interface{}) error {
 // AddNoWait adds an item to the batcher and returns immediately. When the handler is
 // called on the item, the handler's error return value will be sent to the channel
 // returned from AddNoWait.
-func (b *Batcher) AddNoWait(item interface{}) <-chan error {
+func (b *Batcher) AddNoWait(item any) <-chan error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -199,26 +197,33 @@ func (b *Batcher) AddNoWait(item interface{}) <-chan error {
 	b.pending = append(b.pending, waiter{item, c})
 	if b.nHandlers < b.opts.MaxHandlers {
 		// If we can start a handler, do so with the item just added and any others that are pending.
-		batch := b.nextBatch()
-		if batch != nil {
-			b.wg.Add(1)
-			go func() {
-				b.callHandler(batch)
-				b.wg.Done()
-			}()
-			b.nHandlers++
-		}
+		b.handleBatch(b.nextBatch())
 	}
 	// If we can't start a handler, then one of the currently running handlers will
 	// take our item.
 	return c
 }
 
+// Requires b.mu be held.
+func (b *Batcher) handleBatch(batch []waiter) {
+	if len(batch) == 0 {
+		return
+	}
+	b.wg.Add(1)
+	go func() {
+		b.callHandler(batch)
+		b.wg.Done()
+	}()
+	b.nHandlers++
+}
+
 // nextBatch returns the batch to process, and updates b.pending.
 // It returns nil if there's no batch ready for processing.
 // b.mu must be held.
 func (b *Batcher) nextBatch() []waiter {
-	if len(b.pending) < b.opts.MinBatchSize {
+	// If we're not shutting down, respect minimums.  If we're shutting down
+	// though, we ignore minimums to make sure everything is flushed.
+	if !b.shutdown && len(b.pending) < b.opts.MinBatchSize {
 		return nil
 	}
 
@@ -282,6 +287,12 @@ func (b *Batcher) callHandler(batch []waiter) {
 func (b *Batcher) Shutdown() {
 	b.mu.Lock()
 	b.shutdown = true
+	// If there aren't any handlers running, there might be a partial
+	// batch. Make sure it gets flushed even if it hasn't reached the
+	// minimums.
+	if b.nHandlers == 0 {
+		b.handleBatch(b.nextBatch())
+	}
 	b.mu.Unlock()
 	b.wg.Wait()
 }

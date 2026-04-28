@@ -42,6 +42,15 @@ func walk(container elementContainer, handlers ...Handler) {
 	}
 }
 
+// WithImport returns a Handler that will call the apply function when the Visitee is an Import.
+func WithImport(apply func(*Import)) Handler {
+	return func(v Visitee) {
+		if s, ok := v.(*Import); ok {
+			apply(s)
+		}
+	}
+}
+
 // WithMessage returns a Handler that will call the apply function when the Visitee is a Message.
 func WithMessage(apply func(*Message)) Handler {
 	return func(v Visitee) {
@@ -91,6 +100,24 @@ func WithService(apply func(*Service)) Handler {
 func WithRPC(apply func(*RPC)) Handler {
 	return func(v Visitee) {
 		if s, ok := v.(*RPC); ok {
+			apply(s)
+		}
+	}
+}
+
+// WithPackage returns a Handler that will call the apply function when the Visitee is a Package.
+func WithPackage(apply func(*Package)) Handler {
+	return func(v Visitee) {
+		if s, ok := v.(*Package); ok {
+			apply(s)
+		}
+	}
+}
+
+// WithNormalField returns a Handler that will call the apply function when the Visitee is a NormalField.
+func WithNormalField(apply func(*NormalField)) Handler {
+	return func(v Visitee) {
+		if s, ok := v.(*NormalField); ok {
 			apply(s)
 		}
 	}

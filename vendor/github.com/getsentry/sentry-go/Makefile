@@ -12,10 +12,16 @@ help: ## Show help
 .PHONY: help
 
 build: ## Build everything
+	set -e ; \
 	for dir in $(ALL_GO_MOD_DIRS); do \
-		cd "$${dir}"; \
+		MOD_GO=$$(sed -n 's/^go \([0-9]*\.[0-9]*\).*/\1/p' "$${dir}/go.mod"); \
+		CURRENT=$$($(GO) env GOVERSION | sed 's/^go//' | cut -d. -f1,2); \
+		if [ "$$(printf '%s\n%s' "$${MOD_GO}" "$${CURRENT}" | sort -V | head -n1)" != "$${MOD_GO}" ]; then \
+			echo ">>> Skipping $${dir} (requires Go $${MOD_GO}, have $${CURRENT})"; \
+			continue; \
+		fi; \
 		echo ">>> Running 'go build' for module: $${dir}"; \
-		go build ./...; \
+		(cd "$${dir}" && go build ./...); \
 	done;
 .PHONY: build
 
@@ -28,9 +34,14 @@ $(TEST_TARGETS): test
 test: $(ALL_GO_MOD_DIRS:%=test/%)  ## Run tests
 test/%: DIR=$*
 test/%:
-	@echo ">>> Running tests for module: $(DIR)"
-	@# We use '-count=1' to disable test caching.
-	(cd $(DIR) && $(GO) test -count=1 -timeout $(TIMEOUT)s $(ARGS) ./...)
+	@MOD_GO=$$(sed -n 's/^go \([0-9]*\.[0-9]*\).*/\1/p' "$(DIR)/go.mod"); \
+	CURRENT=$$($(GO) env GOVERSION | sed 's/^go//' | cut -d. -f1,2); \
+	if [ "$$(printf '%s\n%s' "$$MOD_GO" "$$CURRENT" | sort -V | head -n1)" != "$$MOD_GO" ]; then \
+		echo ">>> Skipping tests for $(DIR) (requires Go $$MOD_GO, have $$CURRENT)"; \
+	else \
+		echo ">>> Running tests for module: $(DIR)"; \
+		(cd $(DIR) && $(GO) test -count=1 -timeout $(TIMEOUT)s $(ARGS) ./...); \
+	fi
 .PHONY: $(TEST_TARGETS) test
 
 # Coverage
@@ -45,6 +56,12 @@ clean-report-dir: $(COVERAGE_REPORT_DIR)
 test-coverage: $(COVERAGE_REPORT_DIR) clean-report-dir  ## Test with coverage enabled
 	set -e ; \
 	for dir in $(ALL_GO_MOD_DIRS); do \
+	  MOD_GO=$$(sed -n 's/^go \([0-9]*\.[0-9]*\).*/\1/p' "$${dir}/go.mod"); \
+	  CURRENT=$$($(GO) env GOVERSION | sed 's/^go//' | cut -d. -f1,2); \
+	  if [ "$$(printf '%s\n%s' "$${MOD_GO}" "$${CURRENT}" | sort -V | head -n1)" != "$${MOD_GO}" ]; then \
+	    echo ">>> Skipping $${dir} (requires Go $${MOD_GO}, have $${CURRENT})"; \
+	    continue; \
+	  fi; \
 	  echo ">>> Running tests with coverage for module: $${dir}"; \
 	  DIR_ABS=$$(python -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' $${dir}) ; \
 	  REPORT_NAME=$$(basename $${DIR_ABS}); \
@@ -54,13 +71,30 @@ test-coverage: $(COVERAGE_REPORT_DIR) clean-report-dir  ## Test with coverage en
 	    $(GO) tool cover -html=$(COVERAGE_PROFILE) -o coverage.html); \
 	done;
 .PHONY: test-coverage clean-report-dir
-
+test-race-coverage: $(COVERAGE_REPORT_DIR) clean-report-dir  ## Run tests with race detection and coverage
+	set -e ; \
+	for dir in $(ALL_GO_MOD_DIRS); do \
+	  MOD_GO=$$(sed -n 's/^go \([0-9]*\.[0-9]*\).*/\1/p' "$${dir}/go.mod"); \
+	  CURRENT=$$($(GO) env GOVERSION | sed 's/^go//' | cut -d. -f1,2); \
+	  if [ "$$(printf '%s\n%s' "$${MOD_GO}" "$${CURRENT}" | sort -V | head -n1)" != "$${MOD_GO}" ]; then \
+	    echo ">>> Skipping $${dir} (requires Go $${MOD_GO}, have $${CURRENT})"; \
+	    continue; \
+	  fi; \
+	  echo ">>> Running tests with race detection and coverage for module: $${dir}"; \
+	  DIR_ABS=$$(python -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' $${dir}) ; \
+	  REPORT_NAME=$$(basename $${DIR_ABS}); \
+	  (cd "$${dir}" && \
+	    $(GO) test -count=1 -timeout $(TIMEOUT)s -race -coverpkg=./... -covermode=$(COVERAGE_MODE) -coverprofile="$(COVERAGE_PROFILE)" ./... && \
+		cp $(COVERAGE_PROFILE) "$(COVERAGE_REPORT_DIR_ABS)/$${REPORT_NAME}_$(COVERAGE_PROFILE)" && \
+	    $(GO) tool cover -html=$(COVERAGE_PROFILE) -o coverage.html); \
+	done;
+.PHONY: test-race-coverage
 mod-tidy: ## Check go.mod tidiness
 	set -e ; \
 	for dir in $(ALL_GO_MOD_DIRS); do \
-		cd "$${dir}"; \
-		echo ">>> Running 'go mod tidy' for module: $${dir}"; \
-		go mod tidy -go=1.18 -compat=1.18; \
+		MOD_GO=$$(sed -n 's/^go \([0-9.]*\)/\1/p' "$${dir}/go.mod"); \
+		echo ">>> Running 'go mod tidy' for module: $${dir} (go $${MOD_GO})"; \
+		(cd "$${dir}" && GOTOOLCHAIN=local go mod tidy -go=$${MOD_GO} -compat=$${MOD_GO}); \
 	done; \
 	git diff --exit-code;
 .PHONY: mod-tidy
@@ -68,11 +102,17 @@ mod-tidy: ## Check go.mod tidiness
 vet: ## Run "go vet"
 	set -e ; \
 	for dir in $(ALL_GO_MOD_DIRS); do \
-		cd "$${dir}"; \
+		MOD_GO=$$(sed -n 's/^go \([0-9]*\.[0-9]*\).*/\1/p' "$${dir}/go.mod"); \
+		CURRENT=$$($(GO) env GOVERSION | sed 's/^go//' | cut -d. -f1,2); \
+		if [ "$$(printf '%s\n%s' "$${MOD_GO}" "$${CURRENT}" | sort -V | head -n1)" != "$${MOD_GO}" ]; then \
+			echo ">>> Skipping $${dir} (requires Go $${MOD_GO}, have $${CURRENT})"; \
+			continue; \
+		fi; \
 		echo ">>> Running 'go vet' for module: $${dir}"; \
-		go vet ./...; \
+		(cd "$${dir}" && go vet ./...); \
 	done;
 .PHONY: vet
+
 
 lint: ## Lint (using "golangci-lint")
 	golangci-lint run
