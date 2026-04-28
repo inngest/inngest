@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
@@ -16,13 +17,13 @@ type sqliteQuerier struct {
 	q sqlc.Querier
 }
 
-// bytesToAny converts a byte slice to a string for SQLite JSON columns,
-// returning nil when the slice is empty so that NULL checks work correctly.
-func bytesToAny(b []byte) any {
+// bytesToNullString preserves nil-vs-empty semantics while adapting db-layer
+// []byte JSON payloads to the generated SQLite insert params.
+func bytesToNullString(b []byte) sql.NullString {
 	if len(b) == 0 {
-		return nil
+		return sql.NullString{}
 	}
-	return string(b)
+	return sql.NullString{String: string(b), Valid: true}
 }
 
 // --- Apps ---
@@ -398,20 +399,23 @@ func (sq *sqliteQuerier) GetLatestQueueSnapshotChunks(ctx context.Context) ([]*d
 // --- Spans ---
 
 func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams) error {
+	startTime := arg.StartTime.Round(0).UTC()
+	endTime := arg.EndTime.Round(0).UTC()
+
 	return sq.q.InsertSpan(ctx, sqlc.InsertSpanParams{
 		SpanID: arg.SpanID, TraceID: arg.TraceID, ParentSpanID: arg.ParentSpanID,
-		Name: arg.Name, StartTime: arg.StartTime, EndTime: arg.EndTime,
+		Name: arg.Name, StartTime: startTime, EndTime: endTime,
 		RunID: arg.RunID, AccountID: arg.AccountID, AppID: arg.AppID,
 		FunctionID: arg.FunctionID, EnvID: arg.EnvID,
 		DynamicSpanID:  arg.DynamicSpanID,
-		Attributes:     bytesToAny(arg.Attributes),
-		Links:          bytesToAny(arg.Links),
-		Output:         bytesToAny(arg.Output),
-		Input:          bytesToAny(arg.Input),
+		Attributes:     bytesToNullString(arg.Attributes),
+		Links:          bytesToNullString(arg.Links),
+		Output:         bytesToNullString(arg.Output),
+		Input:          bytesToNullString(arg.Input),
 		DebugRunID:     arg.DebugRunID,
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
-		EventIds:       bytesToAny(arg.EventIds),
+		EventIds:       bytesToNullString(arg.EventIds),
 	})
 }
 
@@ -604,7 +608,7 @@ func (sq *sqliteQuerier) InsertWorkerConnection(ctx context.Context, arg db.Inse
 		GatewayID: arg.GatewayID, InstanceID: arg.InstanceID,
 		Status: arg.Status, WorkerIp: arg.WorkerIp,
 		MaxWorkerConcurrency: arg.MaxWorkerConcurrency,
-		ConnectedAt: arg.ConnectedAt, LastHeartbeatAt: arg.LastHeartbeatAt,
+		ConnectedAt:          arg.ConnectedAt, LastHeartbeatAt: arg.LastHeartbeatAt,
 		DisconnectedAt: arg.DisconnectedAt, RecordedAt: arg.RecordedAt,
 		InsertedAt: arg.InsertedAt, DisconnectReason: arg.DisconnectReason,
 		GroupHash: arg.GroupHash, SdkLang: arg.SdkLang, SdkVersion: arg.SdkVersion,
@@ -641,6 +645,8 @@ func toBytes(v interface{}) []byte {
 	switch b := v.(type) {
 	case []byte:
 		return b
+	case json.RawMessage:
+		return []byte(b)
 	case string:
 		return []byte(b)
 	default:

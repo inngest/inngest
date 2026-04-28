@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -383,12 +384,12 @@ func (q NormalizedQueries) InsertEvent(ctx context.Context, e sqlc_sqlite.Insert
 
 func (q NormalizedQueries) InsertEventBatch(ctx context.Context, eb sqlc_sqlite.InsertEventBatchParams) error {
 	pgParams := InsertEventBatchParams{
-		ID:          eb.ID,
+		ID:          sqltypes.FromULID(eb.ID),
 		AccountID:   eb.AccountID,
 		WorkspaceID: eb.WorkspaceID,
 		AppID:       eb.AppID,
 		WorkflowID:  eb.WorkflowID,
-		RunID:       eb.RunID,
+		RunID:       sqltypes.FromULID(eb.RunID),
 		StartedAt:   eb.StartedAt,
 		ExecutedAt:  eb.ExecutedAt,
 		EventIds:    eb.EventIds,

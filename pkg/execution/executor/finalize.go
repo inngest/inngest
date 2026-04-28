@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
@@ -25,19 +26,31 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+// cancelationGracePeriod is the amount of time we add when marking a cancelled function as finished.  This
+// allows any in-flight steps to complete and report their status, which prevents orphaned steps and ensures
+// that the function's final status is correct.
+const cancelationGracePeriod = 10 * time.Second
+
 // Finalize performs run finalization, which involves sending the function
 // finished/failed event and deleting state.
 func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
 	ctx = context.WithoutCancel(ctx)
 	l := logger.StdlibLogger(ctx)
 
+	var endTimeOffset time.Duration
+	status := opts.Status()
+	if status == enums.StepStatusCancelled {
+		endTimeOffset = cancelationGracePeriod
+	}
+
 	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    e.now(),
-		Debug:      &tracing.SpanDebugData{Location: "executor.finalize"},
-		Metadata:   &opts.Metadata,
-		TargetSpan: tracing.RunSpanRefFromMetadata(&opts.Metadata),
-		Status:     opts.Status(),
-		Attributes: finalizeSpanAttributes(opts),
+		EndTime:       e.now(),
+		EndTimeOffset: endTimeOffset,
+		Debug:         &tracing.SpanDebugData{Location: "executor.finalize"},
+		Metadata:      &opts.Metadata,
+		TargetSpan:    tracing.RunSpanRefFromMetadata(&opts.Metadata),
+		Status:        opts.Status(),
+		Attributes:    finalizeSpanAttributes(opts),
 	})
 	if err != nil {
 		// TODO This should be a warning/error once these spans are critical.

@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	defaultBatchSizeLimit                = 10 * 1024 * 1024 // 10MiB
-	defaultEventIdempotenceCleanupCutOff = 120              // 120 seconds
-	defaultEventIdempotenceSetTTL        = 1800             // 30 minutes
+	defaultBatchSizeLimit         = 10 * 1024 * 1024 // 10MiB
+	defaultEventIdempotenceSetTTL = 1800             // 30 minutes
 )
 
 type RedisBatchManagerOpt func(m *redisBatchManager)
@@ -32,12 +31,6 @@ type RedisBatchManagerOpt func(m *redisBatchManager)
 func WithRedisBatchSizeLimit(l int) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.sizeLimit = l
-	}
-}
-
-func WithRedisBatchIdempotenceSetCleanupCutoff(l int64) RedisBatchManagerOpt {
-	return func(m *redisBatchManager) {
-		m.idempotenceSetCleanupCutoffSeconds = l
 	}
 }
 
@@ -89,11 +82,10 @@ func WithoutBuffer() RedisBatchManagerOpt {
 // or [WithoutBuffer].
 func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := &redisBatchManager{
-		b:                                  b,
-		q:                                  q,
-		sizeLimit:                          defaultBatchSizeLimit,
-		idempotenceSetCleanupCutoffSeconds: defaultEventIdempotenceCleanupCutOff,
-		idempotenceSetTTL:                  defaultEventIdempotenceSetTTL,
+		b:                 b,
+		q:                 q,
+		sizeLimit:         defaultBatchSizeLimit,
+		idempotenceSetTTL: defaultEventIdempotenceSetTTL,
 		log:                                logger.StdlibLogger(context.Background()),
 	}
 
@@ -113,10 +105,7 @@ type redisBatchManager struct {
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
-	// All event IDs appended to a batch are tracked in a set to ensure idempotence to guard against processsing of duplicate eventIDs.
-	// This cutoff denotes the last X seconds of eventsIDs to keep active in the idempotence set.
-	idempotenceSetCleanupCutoffSeconds int64
-	// Every append call sets the TTL to this value to ensure that after this amount of inactivity, this set gets cleared.
+	// idempotenceSetTTL is the TTL in seconds for per-event idempotence keys.
 	idempotenceSetTTL int64
 	log               logger.Logger
 
@@ -347,21 +336,12 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
 	}
-	nowUnixSeconds := time.Now().Unix()
 
-	args, err := redis_state.StrSlice([]any{
-		b.b.KeyGenerator().BatchIdempotenceKey(ctx, functionId),
-		nowUnixSeconds - b.idempotenceSetCleanupCutoffSeconds,
-	})
-	if err != nil {
-		return fmt.Errorf("error constructing batch deletion: %w", err)
-	}
-
-	if _, err = retriableScripts["drop_keys"].Exec(
+	if _, err := retriableScripts["drop_keys"].Exec(
 		ctx,
 		b.b.Client(),
 		keys,
-		args,
+		[]string{},
 	).AsInt64(); err != nil {
 		return fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
 	}

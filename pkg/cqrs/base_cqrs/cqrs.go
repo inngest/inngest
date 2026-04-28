@@ -2941,6 +2941,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		"spans.run_id",
 		"spans.dynamic_span_id",
 		"spans.account_id",
+		"spans.env_id",
 		"spans.app_id",
 		"spans.function_id",
 		"spans.trace_id",
@@ -2958,6 +2959,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		"spans.run_id",
 		"spans.dynamic_span_id",
 		"spans.account_id",
+		"spans.env_id",
 		"spans.app_id",
 		"spans.function_id",
 		"spans.trace_id",
@@ -2995,9 +2997,23 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	allFilters := append(builder.filter, celFilters...)
+	// The inner subquery is bounded by Until (an executor.run always precedes
+	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
+	// also apply the From floor so the inner scan stops growing O(total
+	// executor.run history) as the system ages — at the cost of excluding runs
+	// whose root started before From but had EXTEND activity inside the
+	// window. For end_time-based windows we skip the floor: a run that ended
+	// in-window can legitimately have started arbitrarily earlier.
+	innerPreds := []sq.Expression{
+		sq.C("name").Eq(meta.SpanNameRun),
+		sq.C("start_time").Lt(opt.Filter.Until.UTC()),
+	}
+	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
+		innerPreds = append(innerPreds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
+	}
 	q = q.Select(selectCols...).
 		Where(sq.L("spans.dynamic_span_id").In(
-			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(innerPreds...),
 		)).
 		Where(allFilters...).
 		GroupBy(groupByCols...).
@@ -3038,6 +3054,7 @@ func (w wrapper) convertSpanRunRows(
 		RunID         string
 		DynamicSpanID string
 		AccountID     string
+		EnvID         string
 		AppID         string
 		FunctionID    string
 		TraceID       string
@@ -3056,6 +3073,7 @@ func (w wrapper) convertSpanRunRows(
 			&row.RunID,
 			&row.DynamicSpanID,
 			&row.AccountID,
+			&row.EnvID,
 			&row.AppID,
 			&row.FunctionID,
 			&row.TraceID,
@@ -3085,6 +3103,11 @@ func (w wrapper) convertSpanRunRows(
 		accountUUID, err := uuid.Parse(row.AccountID)
 		if err != nil {
 			l.Debug("invalid account ID", "account_id", row.AccountID, "error", err)
+			continue
+		}
+		workspaceUUID, err := uuid.Parse(row.EnvID)
+		if err != nil {
+			l.Debug("invalid workspace ID", "env_id", row.EnvID, "error", err)
 			continue
 		}
 		appUUID, err := uuid.Parse(row.AppID)
@@ -3139,7 +3162,7 @@ func (w wrapper) convertSpanRunRows(
 
 		traceRun := &cqrs.TraceRun{
 			AccountID:   accountUUID,
-			WorkspaceID: accountUUID,
+			WorkspaceID: workspaceUUID,
 			AppID:       appUUID,
 			FunctionID:  functionUUID,
 			TraceID:     row.TraceID,
@@ -3178,6 +3201,12 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 	//
 	// debug runs are a special kind of run that should not be included in the main runs list
 	filter = append(filter, sq.C("debug_run_id").IsNull())
+	if opt.Filter.AccountID != uuid.Nil {
+		filter = append(filter, sq.C("account_id").Eq(opt.Filter.AccountID))
+	}
+	if opt.Filter.WorkspaceID != uuid.Nil {
+		filter = append(filter, sq.C("env_id").Eq(opt.Filter.WorkspaceID))
+	}
 	if len(opt.Filter.AppID) > 0 {
 		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
 	}

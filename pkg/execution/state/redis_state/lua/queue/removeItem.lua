@@ -13,4 +13,11 @@ local itemID = ARGV[1]
 redis.call("ZREM", queueKey, itemID)
 redis.call("HDEL", queueItemKey, itemID)
 
+-- Clean up any additional index keys (e.g. status indexes) passed by the caller.
+for i = 3, #KEYS do
+    if KEYS[i] ~= "" then
+        redis.call("ZREM", KEYS[i], itemID)
+    end
+end
+
 return 0

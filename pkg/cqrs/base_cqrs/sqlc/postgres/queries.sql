@@ -102,17 +102,31 @@ INSERT INTO function_finishes
     ($1, $2, $3, $4, $5);
 
 -- name: GetFunctionRun :one
-SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes)
+SELECT sqlc.embed(function_runs),
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
   FROM function_runs
   LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
   WHERE function_runs.run_id = $1;
 
 -- name: GetFunctionRuns :many
-SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+SELECT sqlc.embed(function_runs),
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id;
 
 -- name: GetFunctionRunsTimebound :many
-SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+SELECT sqlc.embed(function_runs),
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.run_started_at > $1 AND function_runs.run_started_at <= $2
 ORDER BY function_runs.run_started_at DESC
@@ -157,7 +171,7 @@ SELECT * FROM events WHERE internal_id = ANY($1::BYTEA[]);
 SELECT * FROM event_batches WHERE run_id = CAST($1 AS CHAR(26));
 
 -- name: GetEventBatchesByEventID :many
-SELECT * FROM event_batches WHERE POSITION(CAST($1 AS TEXT) IN CAST(event_ids AS TEXT)) > 0;
+SELECT * FROM event_batches WHERE POSITION(CAST($1 AS TEXT) IN convert_from(event_ids, 'UTF8')) > 0;
 
 -- name: GetEventsIDbound :many
 SELECT DISTINCT e.*
