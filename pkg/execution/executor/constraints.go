@@ -12,8 +12,8 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -413,6 +413,7 @@ func CheckConstraints(
 		// the create state call within schedule().
 		// LeaseRunIDs: []ulid.ULID,
 		EnvID:             req.WorkspaceID,
+		AppID:             req.AppID,
 		FunctionID:        req.Function.ID,
 		Configuration:     configuration,
 		Constraints:       constraints,

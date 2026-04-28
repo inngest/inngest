@@ -1602,6 +1602,7 @@ type CapacityAcquireRequest struct {
 	IdempotencyKey       string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	AccountId            string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	EnvId                string                 `protobuf:"bytes,3,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	AppId                string                 `protobuf:"bytes,16,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
 	FunctionId           string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	Configuration        *ConstraintConfig      `protobuf:"bytes,5,opt,name=configuration,proto3" json:"configuration,omitempty"`
 	Constraints          []*ConstraintItem      `protobuf:"bytes,6,rep,name=constraints,proto3" json:"constraints,omitempty"`
@@ -1665,6 +1666,13 @@ func (x *CapacityAcquireRequest) GetAccountId() string {
 func (x *CapacityAcquireRequest) GetEnvId() string {
 	if x != nil {
 		return x.EnvId
+	}
+	return ""
+}
+
+func (x *CapacityAcquireRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
 	}
 	return ""
 }
@@ -2554,12 +2562,13 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x12fairness_reduction\x18\x04 \x01(\x05R\x11fairnessReduction\x12;\n" +
 	"\vretry_after\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"retryAfter\x12U\n" +
-	"\x15exhausted_constraints\x18\x06 \x03(\v2 .constraintapi.v1.ConstraintItemR\x14exhaustedConstraints\"\xf9\x06\n" +
+	"\x15exhausted_constraints\x18\x06 \x03(\v2 .constraintapi.v1.ConstraintItemR\x14exhaustedConstraints\"\x90\a\n" +
 	"\x16CapacityAcquireRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x15\n" +
-	"\x06env_id\x18\x03 \x01(\tR\x05envId\x12\x1f\n" +
+	"\x06env_id\x18\x03 \x01(\tR\x05envId\x12\x15\n" +
+	"\x06app_id\x18\x10 \x01(\tR\x05appId\x12\x1f\n" +
 	"\vfunction_id\x18\x04 \x01(\tR\n" +
 	"functionId\x12H\n" +
 	"\rconfiguration\x18\x05 \x01(\v2\".constraintapi.v1.ConstraintConfigR\rconfiguration\x12B\n" +
