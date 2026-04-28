@@ -60,6 +60,9 @@ jobs:
         database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
     name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}, db: ${{ matrix.database }}"
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,13 +74,105 @@ jobs:
           go-version-file: ./go.mod
 
       - name: Test
+        id: test
         run: |
-          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1 -coverprofile=coverage.txt
+          set -o pipefail
+          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1 -coverprofile=coverage.txt 2>&1 | tee /tmp/go-test-output.txt
         env:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
           ENABLE_CONSTRAINT_API: "${{ matrix.enableConstraintAPI }}"
           TEST_DATABASE: "${{ matrix.database }}"
+
+      - name: Report failing tests
+        if: failure() && steps.test.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/go-test-output.txt';
+            if (!fs.existsSync(path)) {
+              core.info('No test output file found; skipping comment.');
+              return;
+            }
+
+            const content = fs.readFileSync(path, 'utf8');
+            const lines = content.split('\n');
+
+            // Collect failing test names (including subtests) from `--- FAIL:` lines.
+            const failures = new Set();
+            const failRegex = /^\s*--- FAIL:\s+(\S+)/;
+            for (const line of lines) {
+              const m = line.match(failRegex);
+              if (m) failures.add(m[1]);
+            }
+
+            // Detect build/setup failures that prevent tests from running.
+            const buildFailures = [];
+            const buildFailRegex = /^FAIL\s+(\S+)\s+\[build failed\]/;
+            const setupFailRegex = /^FAIL\s+(\S+)\s+\[setup failed\]/;
+            for (const line of lines) {
+              const bm = line.match(buildFailRegex) || line.match(setupFailRegex);
+              if (bm) buildFailures.push(bm[0].trim());
+            }
+
+            const matrixSlug = [
+              'kq-${{ matrix.experimentalKeyQueues }}',
+              'ca-${{ matrix.enableConstraintAPI }}',
+              'db-${{ matrix.database }}',
+              '${{ matrix.os }}',
+            ].join('-');
+            const matrixLabel =
+              'os: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, ' +
+              'constraint-api: ${{ matrix.enableConstraintAPI }}, db: ${{ matrix.database }}';
+            const marker = `<!-- test-failure-report:test-linux-race:${matrixSlug} -->`;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const sections = [];
+            if (failures.size > 0) {
+              const items = [...failures].sort().map(name => `- \`${name}\``).join('\n');
+              sections.push(`### Failing tests (${failures.size})\n\n${items}`);
+            }
+            if (buildFailures.length > 0) {
+              const items = buildFailures.map(line => `- \`${line}\``).join('\n');
+              sections.push(`### Build/setup failures (${buildFailures.length})\n\n${items}`);
+            }
+            if (sections.length === 0) {
+              sections.push('Tests failed but no specific failing test names were detected. See the workflow logs for details.');
+            }
+
+            const body = [
+              marker,
+              `## :x: Test failures \`(${matrixLabel})\``,
+              '',
+              ...sections,
+              '',
+              `[View full workflow run](${runUrl})`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
