@@ -540,7 +540,7 @@ func createCancellationPauses(ctx context.Context, pm pauses.Manager, l logger.L
 	for _, c := range req.Function.Cancel {
 		expires := now.Add(consts.CancelTimeout)
 		if c.Timeout != nil {
-			parsedExpires, err := strtimeout.ParseTimeout(*c.Timeout, e.now)
+			parsedExpires, err := strtimeout.ParseTimeout(*c.Timeout, func() time.Time { return now })
 			if err != nil {
 				return fmt.Errorf("error parsing cancel timeout: %w", err)
 			}
