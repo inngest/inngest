@@ -167,8 +167,8 @@ func (sq *sqliteQuerier) GetFunctions(ctx context.Context) ([]*db.Function, erro
 	return convertSlice(rows, functionFromSQLite), nil
 }
 
-func (sq *sqliteQuerier) InsertFunction(ctx context.Context, arg db.InsertFunctionParams) (*db.Function, error) {
-	r, err := sq.q.InsertFunction(ctx, sqlc.InsertFunctionParams{
+func (sq *sqliteQuerier) UpsertFunction(ctx context.Context, arg db.UpsertFunctionParams) (*db.Function, error) {
+	r, err := sq.q.UpsertFunction(ctx, sqlc.UpsertFunctionParams{
 		ID: arg.ID, AppID: arg.AppID, Name: arg.Name,
 		Slug: arg.Slug, Config: arg.Config, CreatedAt: arg.CreatedAt,
 	})

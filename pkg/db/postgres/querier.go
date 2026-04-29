@@ -166,8 +166,8 @@ func (pq *pgQuerier) GetFunctions(ctx context.Context) ([]*db.Function, error) {
 	return convertSlice(rows, functionFromPG), nil
 }
 
-func (pq *pgQuerier) InsertFunction(ctx context.Context, arg db.InsertFunctionParams) (*db.Function, error) {
-	r, err := pq.q.InsertFunction(ctx, sqlc.InsertFunctionParams{
+func (pq *pgQuerier) UpsertFunction(ctx context.Context, arg db.UpsertFunctionParams) (*db.Function, error) {
+	r, err := pq.q.UpsertFunction(ctx, sqlc.UpsertFunctionParams{
 		ID: arg.ID, AppID: arg.AppID, Name: arg.Name,
 		Slug: arg.Slug, Config: arg.Config, CreatedAt: arg.CreatedAt,
 	})

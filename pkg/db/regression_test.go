@@ -438,6 +438,166 @@ func TestDeleteFunctionsByIDsHandlesDuplicateRows(t *testing.T) {
 	}
 }
 
+// TestFunctionUniqueActiveAppSlug verifies that an active function (archived_at
+// IS NULL) is unique per (app_id, slug). This guards against the same class of
+// duplicate-row corruption that #3556 surfaced: without the partial unique
+// index, two distinct function rows can claim the same slug within an app, and
+// downstream lookups (GetAppFunctionsBySlug, sync deletes) silently misbehave.
+//
+// Once the row is archived the constraint releases — re-syncing the same slug
+// after a soft-delete must succeed.
+func TestFunctionUniqueActiveAppSlug(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "unique-slug-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-unique-slug",
+		Url:         "https://example.com/inngest",
+	})
+	require.NoError(t, err)
+
+	first := uuid.New()
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        first,
+		AppID:     appID,
+		Name:      "fn-a",
+		Slug:      "fn-shared-slug",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	t.Run("duplicate active slug rejected", func(t *testing.T) {
+		_, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     appID,
+			Name:      "fn-b",
+			Slug:      "fn-shared-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.Error(t, err, "second active function with same (app_id, slug) must fail")
+		assert.Contains(t, strings.ToLower(err.Error()), "unique")
+	})
+
+	t.Run("different slug same app allowed", func(t *testing.T) {
+		_, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     appID,
+			Name:      "fn-c",
+			Slug:      "fn-distinct-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("same slug different app allowed", func(t *testing.T) {
+		otherAppID := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          otherAppID,
+			Name:        "unique-slug-app-2",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "checksum-other-app",
+			Url:         "https://example.com/inngest-2",
+		})
+		require.NoError(t, err)
+
+		_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     otherAppID,
+			Name:      "fn-d",
+			Slug:      "fn-shared-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("archived row releases the slug", func(t *testing.T) {
+		require.NoError(t, q.DeleteFunctionsByIDs(ctx, []uuid.UUID{first}))
+
+		_, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     appID,
+			Name:      "fn-replacement",
+			Slug:      "fn-shared-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err, "after archiving the prior row, slug must be reusable")
+	})
+}
+
+// TestInsertFunctionIdempotentOnSameID covers the resync path: the sync loop
+// uses GetFunctionByInternalUUID to decide between UpsertFunction and
+// UpdateFunctionConfig, but UpsertFunction must still tolerate being called
+// twice with the same id without surfacing a primary-key violation. With
+// PRIMARY KEY (id) now enforced (#3556), the old "INSERT and ignore duplicate"
+// behavior would break resyncs; ON CONFLICT (id) DO UPDATE keeps the row
+// reachable and refreshes its config + clears archived_at.
+func TestInsertFunctionIdempotentOnSameID(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "idempotent-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-idempotent",
+		Url:         "https://example.com/idempotent",
+	})
+	require.NoError(t, err)
+
+	fnID := uuid.New()
+	createdAt := time.Now().UTC()
+
+	first, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        fnID,
+		AppID:     appID,
+		Name:      "fn-original",
+		Slug:      "fn-original-slug",
+		Config:    `{"v":1}`,
+		CreatedAt: createdAt,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "fn-original", first.Name)
+
+	// Soft-delete via the same code path the sync loop uses.
+	require.NoError(t, q.DeleteFunctionsByIDs(ctx, []uuid.UUID{fnID}))
+
+	// Resync: same id, refreshed config. Must not fail on the primary key.
+	second, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        fnID,
+		AppID:     appID,
+		Name:      "fn-refreshed",
+		Slug:      "fn-original-slug",
+		Config:    `{"v":2}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err, "UpsertFunction must be idempotent on id to support resyncs")
+	assert.Equal(t, "fn-refreshed", second.Name)
+	assert.JSONEq(t, `{"v":2}`, second.Config)
+	assert.False(t, second.ArchivedAt.Valid, "resync must clear archived_at")
+}
+
 func TestEventBatchRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()

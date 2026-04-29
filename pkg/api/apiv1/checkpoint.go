@@ -499,7 +499,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		return
 	}
 
-	_, err = a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = a.FunctionCreator.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:        fnID,
 		AccountID: auth.AccountID(),
 		EnvID:     auth.WorkspaceID(),

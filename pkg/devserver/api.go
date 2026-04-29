@@ -425,7 +425,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			continue
 		}
 
-		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = tx.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fn.ID,
 			Name:      fn.Name,
 			Slug:      fn.Slug,

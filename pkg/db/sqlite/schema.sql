@@ -210,3 +210,6 @@ CREATE TABLE IF NOT EXISTS "functions" (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	archived_at TIMESTAMP
 );
+CREATE UNIQUE INDEX functions_app_id_slug_active_key
+    ON functions (app_id, slug)
+    WHERE archived_at IS NULL;

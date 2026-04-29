@@ -66,11 +66,6 @@ type Querier interface {
 	//
 	InsertEvent(ctx context.Context, arg InsertEventParams) error
 	InsertEventBatch(ctx context.Context, arg InsertEventBatchParams) error
-	//
-	// functions
-	//
-	// note - this is very basic right now.
-	InsertFunction(ctx context.Context, arg InsertFunctionParams) (*Function, error)
 	InsertFunctionFinish(ctx context.Context, arg InsertFunctionFinishParams) error
 	//
 	// function runs
@@ -96,6 +91,11 @@ type Querier interface {
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
+	//
+	// functions
+	//
+	// note - this is very basic right now.
+	UpsertFunction(ctx context.Context, arg UpsertFunctionParams) (*Function, error)
 }
 
 var _ Querier = (*Queries)(nil)

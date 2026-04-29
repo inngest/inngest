@@ -323,8 +323,8 @@ func (q NormalizedQueries) GetAppFunctionsBySlug(ctx context.Context, slug strin
 	return sqliteFunctions, nil
 }
 
-func (q NormalizedQueries) InsertFunction(ctx context.Context, params sqlc_sqlite.InsertFunctionParams) (*sqlc_sqlite.Function, error) {
-	pgParams := InsertFunctionParams{
+func (q NormalizedQueries) UpsertFunction(ctx context.Context, params sqlc_sqlite.UpsertFunctionParams) (*sqlc_sqlite.Function, error) {
+	pgParams := UpsertFunctionParams{
 		ID:        params.ID,
 		AppID:     params.AppID,
 		Name:      params.Name,
@@ -333,7 +333,7 @@ func (q NormalizedQueries) InsertFunction(ctx context.Context, params sqlc_sqlit
 		CreatedAt: params.CreatedAt,
 	}
 
-	function, err := q.db.InsertFunction(ctx, pgParams)
+	function, err := q.db.UpsertFunction(ctx, pgParams)
 	if err != nil {
 		return nil, err
 	}

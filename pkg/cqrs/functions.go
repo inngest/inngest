@@ -64,7 +64,7 @@ type DevFunctionManager interface {
 
 // FunctionCreator creates functions in the backing store.
 type FunctionCreator interface {
-	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
+	UpsertFunction(ctx context.Context, params UpsertFunctionParams) (*Function, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 }
 
@@ -82,7 +82,7 @@ type DevFunctionWriter interface {
 	DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error
 }
 
-type InsertFunctionParams struct {
+type UpsertFunctionParams struct {
 	ID        uuid.UUID
 	AccountID uuid.UUID
 	EnvID     uuid.UUID

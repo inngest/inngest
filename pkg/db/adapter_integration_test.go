@@ -179,7 +179,7 @@ func TestInsertFunctionRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	fnID := uuid.New()
-	fn, err := q.InsertFunction(ctx, db.InsertFunctionParams{
+	fn, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
 		ID:        fnID,
 		AppID:     appID,
 		Name:      "my-function",

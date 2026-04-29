@@ -1121,8 +1121,8 @@ func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uu
 	return domainToCQRSList(fns, domainFunction), nil
 }
 
-func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
-	fn, err := w.q.InsertFunction(ctx, dbpkg.InsertFunctionParams{
+func (w wrapper) UpsertFunction(ctx context.Context, params cqrs.UpsertFunctionParams) (*cqrs.Function, error) {
+	fn, err := w.q.UpsertFunction(ctx, dbpkg.UpsertFunctionParams{
 		ID:        params.ID,
 		AppID:     params.AppID,
 		Name:      params.Name,

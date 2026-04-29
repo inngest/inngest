@@ -53,10 +53,17 @@ UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
 
 -- note - this is very basic right now.
--- name: InsertFunction :one
+-- name: UpsertFunction :one
 INSERT INTO functions
 	(id, app_id, name, slug, config, created_at) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING *;
+	(?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET
+	app_id = excluded.app_id,
+	name = excluded.name,
+	slug = excluded.slug,
+	config = excluded.config,
+	archived_at = NULL
+RETURNING *;
 
 -- name: GetFunctions :many
 SELECT functions.*

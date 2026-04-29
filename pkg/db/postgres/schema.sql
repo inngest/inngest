@@ -366,6 +366,12 @@ ALTER TABLE ONLY public.worker_connections
     ADD CONSTRAINT worker_connections_pkey PRIMARY KEY (id, app_name);
 
 --
+-- Name: functions_app_id_slug_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX functions_app_id_slug_active_key ON public.functions USING btree (app_id, slug) WHERE (archived_at IS NULL);
+
+--
 -- Name: idx_events_internal_id; Type: INDEX; Schema: public; Owner: -
 --
 
