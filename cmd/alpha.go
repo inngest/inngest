@@ -7,8 +7,9 @@ import (
 
 func alpha() *cli.Command {
 	return &cli.Command{
-		Name:  "alpha",
-		Usage: "experimental CLI commands",
+		Name:   "alpha",
+		Hidden: true,
+		Usage:  "experimental CLI commands",
 		Commands: []*cli.Command{
 			debug.Command(),
 		},
