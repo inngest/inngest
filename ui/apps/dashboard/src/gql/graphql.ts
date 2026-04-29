@@ -51,7 +51,7 @@ export type Scalars = {
 export type ApiKey = {
   __typename?: 'APIKey';
   createdAt: Scalars['Time']['output'];
-  env?: Maybe<Workspace>;
+  env: Maybe<Workspace>;
   id: Scalars['UUID']['output'];
   maskedKey: Scalars['String']['output'];
   name: Scalars['String']['output'];
@@ -104,6 +104,7 @@ export type Account = {
   plan: Maybe<BillingPlan>;
   quickSearch: QuickSearchResults;
   search: SearchResults;
+  securityEmail: Maybe<Scalars['String']['output']>;
   status: Scalars['String']['output'];
   subscription: Maybe<BillingSubscription>;
   updatedAt: Scalars['Time']['output'];
@@ -2268,6 +2269,7 @@ export type UpdateApiKeyInput = {
 export type UpdateAccount = {
   billingEmail?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
+  securityEmail?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateIngestKey = {
@@ -2688,7 +2690,7 @@ export type CreateApiKeyMutationVariables = Exact<{
 }>;
 
 
-export type CreateApiKeyMutation = { __typename?: 'Mutation', createAPIKey: { __typename?: 'APIKeyCreateResult', plaintextKey: string, apiKey: { __typename?: 'APIKey', id: string, name: string, createdAt: string, maskedKey: string, env?: { __typename?: 'Workspace', id: string, name: string } | null } } };
+export type CreateApiKeyMutation = { __typename?: 'Mutation', createAPIKey: { __typename?: 'APIKeyCreateResult', plaintextKey: string, apiKey: { __typename?: 'APIKey', id: string, name: string, createdAt: string, maskedKey: string, env: { __typename?: 'Workspace', id: string, name: string } | null } } };
 
 export type DeleteApiKeyMutationVariables = Exact<{
   id: Scalars['UUID']['input'];
@@ -2709,7 +2711,7 @@ export type GetApiKeysQueryVariables = Exact<{
 }>;
 
 
-export type GetApiKeysQuery = { __typename?: 'Query', account: { __typename?: 'Account', apiKeys: Array<{ __typename?: 'APIKey', id: string, name: string, createdAt: string, maskedKey: string, env?: { __typename?: 'Workspace', id: string, name: string, slug: string } | null }> } };
+export type GetApiKeysQuery = { __typename?: 'Query', account: { __typename?: 'Account', apiKeys: Array<{ __typename?: 'APIKey', id: string, name: string, createdAt: string, maskedKey: string, env: { __typename?: 'Workspace', id: string, name: string, slug: string } | null }> } };
 
 export type AchiveAppMutationVariables = Exact<{
   appID: Scalars['UUID']['input'];
@@ -3798,6 +3800,18 @@ export type CompleteAwsMarketplaceSetupMutationVariables = Exact<{
 
 export type CompleteAwsMarketplaceSetupMutation = { __typename?: 'Mutation', completeAWSMarketplaceSetup: { __typename?: 'AWSMarketplaceSetupResponse', message: string } | null };
 
+export type SecurityEmailSettingsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SecurityEmailSettingsQuery = { __typename?: 'Query', account: { __typename?: 'Account', securityEmail: string | null } };
+
+export type UpdateSecurityEmailMutationVariables = Exact<{
+  input: UpdateAccount;
+}>;
+
+
+export type UpdateSecurityEmailMutation = { __typename?: 'Mutation', account: { __typename?: 'Account', securityEmail: string | null } };
+
 export type GetAccountSupportInfoQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -3944,4 +3958,6 @@ export const GetFunctionPauseStateDocument = {"kind":"Document","definitions":[{
 export const GetIngestKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetIngestKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ingestKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"presharedKey"}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"filter"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"ips"}},{"kind":"Field","name":{"kind":"Name","value":"events"}}]}},{"kind":"Field","name":{"kind":"Name","value":"metadata"}},{"kind":"Field","name":{"kind":"Name","value":"source"}}]}}]}}]}}]} as unknown as DocumentNode<GetIngestKeyQuery, GetIngestKeyQueryVariables>;
 export const CreateWebhookDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateWebhook"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"NewIngestKey"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"key"},"name":{"kind":"Name","value":"createIngestKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"url"}}]}}]}}]} as unknown as DocumentNode<CreateWebhookMutation, CreateWebhookMutationVariables>;
 export const CompleteAwsMarketplaceSetupDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CompleteAWSMarketplaceSetup"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"AWSMarketplaceSetupInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"completeAWSMarketplaceSetup"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<CompleteAwsMarketplaceSetupMutation, CompleteAwsMarketplaceSetupMutationVariables>;
+export const SecurityEmailSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SecurityEmailSettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"securityEmail"}}]}}]}}]} as unknown as DocumentNode<SecurityEmailSettingsQuery, SecurityEmailSettingsQueryVariables>;
+export const UpdateSecurityEmailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateSecurityEmail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateAccount"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"account"},"name":{"kind":"Name","value":"updateAccount"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"securityEmail"}}]}}]}}]} as unknown as DocumentNode<UpdateSecurityEmailMutation, UpdateSecurityEmailMutationVariables>;
 export const GetAccountSupportInfoDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAccountSupportInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"plan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"features"}}]}}]}}]}}]} as unknown as DocumentNode<GetAccountSupportInfoQuery, GetAccountSupportInfoQueryVariables>;
