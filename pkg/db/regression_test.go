@@ -596,6 +596,72 @@ func TestInsertFunctionIdempotentOnSameID(t *testing.T) {
 	assert.Equal(t, "fn-refreshed", second.Name)
 	assert.JSONEq(t, `{"v":2}`, second.Config)
 	assert.False(t, second.ArchivedAt.Valid, "resync must clear archived_at")
+	assert.WithinDuration(t, createdAt, second.CreatedAt, time.Second,
+		"resync must preserve original created_at — it is not in the DO UPDATE SET clause")
+}
+
+// TestUpsertFunctionRejectsSlugRenameIntoExistingSlug guards the most likely
+// real-world failure mode introduced by the partial unique index: a resync
+// renames an existing function's slug to one already claimed by another
+// active function in the same app. Pre-index this produced silent corruption
+// (two active rows with the same slug). With the index, the ON CONFLICT (id)
+// path fires for the renamed row, attempts to UPDATE its slug, and must hit
+// the partial unique violation instead of silently succeeding.
+func TestUpsertFunctionRejectsSlugRenameIntoExistingSlug(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "rename-conflict-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-rename-conflict",
+		Url:         "https://example.com/rename-conflict",
+	})
+	require.NoError(t, err)
+
+	// Two active functions: A claims "slug-a", B claims "slug-b".
+	idA := uuid.New()
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        idA,
+		AppID:     appID,
+		Name:      "fn-a",
+		Slug:      "slug-a",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	idB := uuid.New()
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        idB,
+		AppID:     appID,
+		Name:      "fn-b",
+		Slug:      "slug-b",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	// Resync B with the slug A already owns. ON CONFLICT (id) fires, the
+	// UPDATE attempts slug = "slug-a", and the partial unique index must
+	// reject it rather than silently producing two active "slug-a" rows.
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        idB,
+		AppID:     appID,
+		Name:      "fn-b-renamed",
+		Slug:      "slug-a",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.Error(t, err, "renaming B's slug into A's must fail the partial unique index")
+	assert.Contains(t, strings.ToLower(err.Error()), "unique")
 }
 
 func TestEventBatchRoundTrip(t *testing.T) {
