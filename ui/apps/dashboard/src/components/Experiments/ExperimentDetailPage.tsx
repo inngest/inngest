@@ -32,13 +32,18 @@ import { pathCreator } from '@/utils/urls';
 
 type Props = {
   experimentName: string;
+  // Disambiguates the experiment when two functions in the same workspace
+  // declare experiment.weighted("X", ...). Required: detail/scoring/insights
+  // queries scope by function ID server-side; passing nothing would silently
+  // merge data across all matching functions.
+  functionID: string;
 };
 
 const INFO_PANEL = 'Info';
 const SCORING_PANEL = 'Scoring formula';
 type PanelKey = typeof INFO_PANEL | typeof SCORING_PANEL;
 
-export function ExperimentDetailPage({ experimentName }: Props) {
+export function ExperimentDetailPage({ experimentName, functionID }: Props) {
   const environment = useEnvironment();
 
   const [preset, setPreset] = useState<TimeRangePreset>('24h');
@@ -46,9 +51,13 @@ export function ExperimentDetailPage({ experimentName }: Props) {
   const [showInactive, setShowInactive] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(INFO_PANEL);
 
-  const detail = useExperimentDetail(experimentName, preset, null);
-  const scoring = useScoringConfig(experimentName);
-  const insightsQuery = useExperimentInsightsQuery(experimentName, preset);
+  const detail = useExperimentDetail(functionID, experimentName, preset, null);
+  const scoring = useScoringConfig(functionID, experimentName);
+  const insightsQuery = useExperimentInsightsQuery(
+    functionID,
+    experimentName,
+    preset,
+  );
 
   const togglePanel = useCallback((key: PanelKey) => {
     setActivePanel((p) => (p === key ? null : key));

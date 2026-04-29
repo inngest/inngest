@@ -5,6 +5,9 @@
 export type ExperimentListItem = {
   experimentName: string;
   functionId: string;
+  // Workspace-unique workflow slug (workflows.slug). Two functions can declare
+  // an experiment with the same name; this is the URL disambiguator.
+  functionSlug: string;
   selectionStrategy: string;
   totalRuns: number;
   variantCount: number;

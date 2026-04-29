@@ -1,24 +1,17 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import NotFound from '@/components/Error/NotFound';
-import { ExperimentDetailPage } from '@/components/Experiments/ExperimentDetailPage';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-
+// Legacy route — experiments now live nested under their function so two
+// functions sharing an experiment name can be disambiguated. The old URL
+// shape (/experiments/$experimentName) doesn't carry the function, so
+// redirect any deep links / bookmarks back to the all-experiments list and
+// let the user re-pick the row they want.
 export const Route = createFileRoute(
   '/_authed/env/$envSlug/experiments/$experimentName/',
 )({
-  component: ExperimentComponent,
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: '/env/$envSlug/experiments',
+      params: { envSlug: params.envSlug },
+    });
+  },
 });
-
-function ExperimentComponent() {
-  const { experimentName } = Route.useParams();
-  const experimentsEnabled = useBooleanFlag('experimentation-steps');
-
-  if (experimentsEnabled.isReady && !experimentsEnabled.value) {
-    return <NotFound />;
-  }
-
-  return (
-    <ExperimentDetailPage experimentName={decodeURIComponent(experimentName)} />
-  );
-}
