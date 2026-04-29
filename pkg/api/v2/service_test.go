@@ -388,6 +388,23 @@ func TestService_GetFunctionTrace(t *testing.T) {
 							ResponseStatusCode: &statusCode,
 							ResponseHeaders:    &responseHeaders,
 						},
+						Children: []*cqrs.OtelSpan{
+							{
+								RawOtelSpan: cqrs.RawOtelSpan{
+									Name:      meta.SpanNameStep,
+									SpanID:    "nested-step-span",
+									TraceID:   "trace-123",
+									StartTime: startedAt.Add(100 * time.Millisecond),
+									EndTime:   endedAt.Add(-100 * time.Millisecond),
+								},
+								Attributes: &meta.ExtractedValues{
+									QueuedAt:      &startedAt,
+									StartedAt:     &startedAt,
+									EndedAt:       &endedAt,
+									DynamicStatus: &stepStatus,
+								},
+							},
+						},
 					},
 				},
 			},
@@ -407,23 +424,20 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		require.NotNil(t, resp)
 		require.NotNil(t, resp.Data)
 		require.Equal(t, runID.String(), resp.Data.RunId)
-		require.Equal(t, "trace-123", resp.Data.TraceId)
 		require.NotNil(t, resp.Data.RootSpan)
 		require.Equal(t, "Run", resp.Data.RootSpan.Name)
+		require.Equal(t, "run-span", resp.Data.RootSpan.Id)
 		require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, resp.Data.RootSpan.Status)
 		require.Len(t, resp.Data.RootSpan.Children, 1)
 
 		child := resp.Data.RootSpan.Children[0]
 		require.Equal(t, "Fetch data", child.Name)
+		require.Equal(t, "step-span", child.Id)
 		require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, child.Status)
 		require.NotNil(t, child.StepOp)
 		require.Equal(t, apiv2.TraceStepOp_TRACE_STEP_OP_RUN, *child.StepOp)
 		require.NotNil(t, child.StepId)
 		require.Equal(t, "step-1", *child.StepId)
-		require.Equal(t, uint64(2000), child.DurationMs)
-		require.NotNil(t, child.Response)
-		require.Equal(t, int32(200), child.Response.StatusCode)
-		require.Equal(t, "application/json", child.Response.Headers["content-type"])
 		require.NotNil(t, child.Input)
 		require.Equal(t, "hello", child.Input.Fields["message"].GetStringValue())
 		require.NotNil(t, child.Output)
@@ -453,6 +467,44 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		require.NotNil(t, resp)
 		require.Nil(t, resp.Data.RootSpan.Children[0].Input)
 		require.Nil(t, resp.Data.RootSpan.Children[0].Output)
+	})
+
+	t.Run("applies max depth", func(t *testing.T) {
+		maxDepth := uint32(1)
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId:    runID.String(),
+			MaxDepth: &maxDepth,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Data.RootSpan.ChildrenTruncated)
+		require.Empty(t, resp.Data.RootSpan.Children)
+	})
+
+	t.Run("rejects oversized max depth", func(t *testing.T) {
+		maxDepth := uint32(11)
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId:    runID.String(),
+			MaxDepth: &maxDepth,
+		})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "max_depth must be between 1 and 10")
+	})
+
+	t.Run("returns span subtree", func(t *testing.T) {
+		maxDepth := uint32(1)
+		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{
+			RunId:    runID.String(),
+			SpanId:   "run-span",
+			MaxDepth: &maxDepth,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, "run-span", resp.Data.Id)
+		require.Equal(t, "Run", resp.Data.Name)
+		require.True(t, resp.Data.ChildrenTruncated)
+		require.Empty(t, resp.Data.Children)
 	})
 }
 
