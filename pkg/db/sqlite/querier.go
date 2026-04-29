@@ -501,8 +501,8 @@ func (sq *sqliteQuerier) GetStepSpanByStepID(ctx context.Context, arg db.GetStep
 	}, nil
 }
 
-func (sq *sqliteQuerier) GetSpanOutput(ctx context.Context, ids []string) ([]*db.SpanOutputRow, error) {
-	rows, err := sq.q.GetSpanOutput(ctx, ids)
+func (sq *sqliteQuerier) GetSpanOutput(ctx context.Context, runID string, ids []string) ([]*db.SpanOutputRow, error) {
+	rows, err := sq.q.GetSpanOutput(ctx, sqlc.GetSpanOutputParams{RunID: runID, Ids: ids})
 	if err != nil {
 		return nil, err
 	}

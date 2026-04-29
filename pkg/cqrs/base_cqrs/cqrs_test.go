@@ -1816,7 +1816,7 @@ func TestSpanOutputReadBack(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{SpanID: spanID})
+	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{RunID: runID, SpanID: spanID})
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted

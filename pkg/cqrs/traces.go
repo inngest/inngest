@@ -516,6 +516,11 @@ type SpanIdentifier struct {
 	TraceID     string    `json:"tid"`
 	SpanID      string    `json:"sid"`
 
+	// RunID scopes preview-path output lookups (GetSpanOutput). Required for
+	// the preview path because span_id can collide across runs when the
+	// checkpoint-deterministic seed produces the same OTEL span ID.
+	RunID string `json:"rid,omitempty,omitzero"`
+
 	// Whether the output should direct to the tracing preview stores
 	Preview *bool `json:"preview,omitempty,omitzero"`
 
