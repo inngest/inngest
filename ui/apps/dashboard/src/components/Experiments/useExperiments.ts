@@ -44,6 +44,7 @@ const experimentsQuery = graphql(`
     experiments(workspaceID: $workspaceID) {
       name
       functionID
+      functionSlug
       selectionStrategy
       totalRuns
       variantCount
@@ -66,6 +67,7 @@ export function useExperimentsList({
     return data.experiments.map((exp) => ({
       experimentName: exp.name,
       functionId: exp.functionID,
+      functionSlug: exp.functionSlug,
       selectionStrategy: exp.selectionStrategy,
       totalRuns: exp.totalRuns,
       variantCount: exp.variantCount,
@@ -86,12 +88,14 @@ export function useExperimentsList({
 const experimentDetailQuery = graphql(`
   query GetExperimentDetail(
     $workspaceID: ID!
+    $functionID: ID!
     $experimentName: String!
     $timeRange: TimeRangeInput
     $variantFilter: String
   ) {
     experimentDetail(
       workspaceID: $workspaceID
+      functionID: $functionID
       experimentName: $experimentName
       timeRange: $timeRange
       variantFilter: $variantFilter
@@ -119,8 +123,16 @@ const experimentDetailQuery = graphql(`
 `);
 
 const experimentScoringConfigQuery = graphql(`
-  query GetExperimentScoringConfig($workspaceID: ID!, $experimentName: String!) {
-    experimentScoringConfig(workspaceID: $workspaceID, experimentName: $experimentName) {
+  query GetExperimentScoringConfig(
+    $workspaceID: ID!
+    $functionID: ID!
+    $experimentName: String!
+  ) {
+    experimentScoringConfig(
+      workspaceID: $workspaceID
+      functionID: $functionID
+      experimentName: $experimentName
+    ) {
       experimentName
       updatedAt
       metrics {
@@ -141,11 +153,13 @@ const experimentScoringConfigQuery = graphql(`
 const experimentInsightsQueryDoc = graphql(`
   query GetExperimentInsightsQuery(
     $workspaceID: ID!
+    $functionID: ID!
     $experimentName: String!
     $timeRange: TimeRangeInput
   ) {
     experimentInsightsQuery(
       workspaceID: $workspaceID
+      functionID: $functionID
       experimentName: $experimentName
       timeRange: $timeRange
     )
@@ -153,6 +167,7 @@ const experimentInsightsQueryDoc = graphql(`
 `);
 
 export function useExperimentInsightsQuery(
+  functionID: string,
   experimentName: string,
   preset: TimeRangePreset,
 ) {
@@ -163,16 +178,18 @@ export function useExperimentInsightsQuery(
     const { from, to } = presetToRange(preset);
     const data = await runQuery(client, experimentInsightsQueryDoc, {
       workspaceID: environment.id,
+      functionID,
       experimentName,
       timeRange: { from: from.toISOString(), to: to.toISOString() },
     });
     return data.experimentInsightsQuery;
-  }, [client, environment.id, experimentName, preset]);
+  }, [client, environment.id, functionID, experimentName, preset]);
 
   return useQuery<string>({
     queryKey: [
       'experiment-insights-query',
       environment.id,
+      functionID,
       experimentName,
       preset,
     ],
@@ -185,11 +202,13 @@ export function useExperimentInsightsQuery(
 const updateExperimentScoringConfigMutation = graphql(`
   mutation UpdateExperimentScoringConfig(
     $workspaceID: ID!
+    $functionID: ID!
     $experimentName: String!
     $metrics: [ExperimentScoringMetricInput!]!
   ) {
     updateExperimentScoringConfig(
       workspaceID: $workspaceID
+      functionID: $functionID
       experimentName: $experimentName
       metrics: $metrics
     ) {
@@ -217,6 +236,7 @@ function presetToRange(preset: TimeRangePreset): { from: Date; to: Date } {
 }
 
 export function useExperimentDetail(
+  functionID: string,
   experimentName: string,
   preset: TimeRangePreset,
   variantFilter: string | null,
@@ -231,6 +251,7 @@ export function useExperimentDetail(
         experimentDetailQuery,
         {
           workspaceID: environment.id,
+          functionID,
           experimentName,
           timeRange: { from: from.toISOString(), to: to.toISOString() },
           variantFilter: variantFilter || null,
@@ -264,12 +285,20 @@ export function useExperimentDetail(
         metrics: v.metrics,
       })),
     };
-  }, [client, environment.id, experimentName, preset, variantFilter]);
+  }, [
+    client,
+    environment.id,
+    functionID,
+    experimentName,
+    preset,
+    variantFilter,
+  ]);
 
   return useQuery<ExperimentDetail | null>({
     queryKey: [
       'experiment-detail',
       environment.id,
+      functionID,
       experimentName,
       preset,
       variantFilter,
@@ -280,13 +309,17 @@ export function useExperimentDetail(
   });
 }
 
-export function useExperimentScoringConfig(experimentName: string) {
+export function useExperimentScoringConfig(
+  functionID: string,
+  experimentName: string,
+) {
   const client = useClient();
   const environment = useEnvironment();
 
   const queryFn = useCallback(async (): Promise<ExperimentScoringConfig> => {
     const data = await runQuery(client, experimentScoringConfigQuery, {
       workspaceID: environment.id,
+      functionID,
       experimentName,
     });
     const c = data.experimentScoringConfig;
@@ -295,30 +328,48 @@ export function useExperimentScoringConfig(experimentName: string) {
       updatedAt: new Date(c.updatedAt),
       metrics: c.metrics,
     };
-  }, [client, environment.id, experimentName]);
+  }, [client, environment.id, functionID, experimentName]);
 
   return useQuery<ExperimentScoringConfig>({
-    queryKey: ['experiment-scoring', environment.id, experimentName],
+    queryKey: [
+      'experiment-scoring',
+      environment.id,
+      functionID,
+      experimentName,
+    ],
     queryFn,
     staleTime: EXPERIMENTS_CACHE_MS,
     gcTime: EXPERIMENTS_CACHE_MS,
   });
 }
 
-export function useUpdateExperimentScoringConfig(experimentName: string) {
+export function useUpdateExperimentScoringConfig(
+  functionID: string,
+  experimentName: string,
+) {
   const client = useClient();
   const environment = useEnvironment();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: ['experiment-scoring-update', environment.id, experimentName],
+    mutationKey: [
+      'experiment-scoring-update',
+      environment.id,
+      functionID,
+      experimentName,
+    ],
     mutationFn: async (
       metrics: ExperimentScoringMetric[],
     ): Promise<ExperimentScoringConfig> => {
       const data = await runMutation(
         client,
         updateExperimentScoringConfigMutation,
-        { workspaceID: environment.id, experimentName, metrics },
+        {
+          workspaceID: environment.id,
+          functionID,
+          experimentName,
+          metrics,
+        },
       );
       const c = data.updateExperimentScoringConfig;
       return {
@@ -329,7 +380,7 @@ export function useUpdateExperimentScoringConfig(experimentName: string) {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(
-        ['experiment-scoring', environment.id, experimentName],
+        ['experiment-scoring', environment.id, functionID, experimentName],
         data,
       );
     },

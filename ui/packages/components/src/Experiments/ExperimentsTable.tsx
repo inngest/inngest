@@ -42,7 +42,10 @@ type ExperimentsTableProps = {
   isPending: boolean;
   error: Error | null;
   refetch: () => void;
-  onRowClick?: (experimentName: string) => void;
+  // Receives the full row so callers can route by (functionSlug, experimentName).
+  // Two functions can declare an experiment with the same name; the slug is the
+  // URL disambiguator.
+  onRowClick?: (row: ExperimentListItem) => void;
   /** Copy shown in the blank state when no experiments exist (unfiltered). */
   emptyDescription: ReactNode;
 };
@@ -214,7 +217,7 @@ export function ExperimentsTable({
           columns={columns}
           data={filteredData}
           isLoading={isPending}
-          onRowClick={onRowClick ? (row) => onRowClick(row.original.experimentName) : undefined}
+          onRowClick={onRowClick ? (row) => onRowClick(row.original) : undefined}
           blankState={
             <ExperimentsBlankState
               title={emptyTitle}

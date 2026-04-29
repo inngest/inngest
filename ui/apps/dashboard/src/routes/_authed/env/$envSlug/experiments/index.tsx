@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { InlineCode } from '@inngest/components/Code';
-import { ExperimentsTable } from '@inngest/components/Experiments';
+import {
+  ExperimentsTable,
+  type ExperimentListItem,
+} from '@inngest/components/Experiments';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
@@ -47,9 +50,13 @@ export default function ExperimentsComponent() {
   });
 
   const handleRowClick = useCallback(
-    (experimentName: string) => {
+    (row: ExperimentListItem) => {
       navigate({
-        to: pathCreator.experiment({ envSlug, experimentName }),
+        to: pathCreator.functionExperiment({
+          envSlug,
+          functionSlug: row.functionSlug,
+          experimentName: row.experimentName,
+        }),
       });
     },
     [navigate, envSlug],

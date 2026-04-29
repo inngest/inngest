@@ -16,9 +16,12 @@ const DEBOUNCE_MS = 600;
  * schedules a save after DEBOUNCE_MS of inactivity. The save is skipped when
  * the local state matches the last-known server state.
  */
-export function useScoringConfig(experimentName: string) {
-  const scoring = useExperimentScoringConfig(experimentName);
-  const updateScoring = useUpdateExperimentScoringConfig(experimentName);
+export function useScoringConfig(functionID: string, experimentName: string) {
+  const scoring = useExperimentScoringConfig(functionID, experimentName);
+  const updateScoring = useUpdateExperimentScoringConfig(
+    functionID,
+    experimentName,
+  );
 
   const [localMetrics, setLocalMetrics] = useState<
     ExperimentScoringMetric[] | null
