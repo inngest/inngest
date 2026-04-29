@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 import { useUser } from '@clerk/tanstack-react-start';
