@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
@@ -91,35 +93,49 @@ type Opts struct {
 	QueueManager   QueueManager
 }
 
+// ExperimentalPromMetricsEnabled reports whether the experimental Prometheus
+// lifecycle metrics are enabled via the INNGEST_EXPERIMENTAL_PROM_METRICS
+// environment variable. The feature is off by default; set to "1", "true",
+// "yes", or any truthy value to enable. "0" always disables.
+func ExperimentalPromMetricsEnabled() bool {
+	v := strings.TrimSpace(os.Getenv("INNGEST_EXPERIMENTAL_PROM_METRICS"))
+	if v == "" || v == "0" || strings.EqualFold(v, "false") || strings.EqualFold(v, "no") {
+		return false
+	}
+	return true
+}
+
+// registry is a package-level private Prometheus registry used for all
+// Inngest metrics. This avoids polluting the default registry (which would
+// leak Go runtime metrics) and prevents MustRegister panics on collision.
+var registry = prometheus.NewRegistry()
+
+var queueDepthGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "inngest_queue_depth",
+	Help: "Total depth of all system queues including backlog and ready state items",
+})
+
+func init() {
+	registry.MustRegister(queueDepthGauge)
+}
+
 // MetricsAPI provides Prometheus-compatible metrics endpoints
 type MetricsAPI struct {
 	opts       Opts
 	Router     chi.Router
 	queueGauge prometheus.Gauge
-	registry   *prometheus.Registry
 }
 
 // NewMetricsAPI creates a new metrics API instance with Prometheus integration
 func NewMetricsAPI(opts Opts) (*MetricsAPI, error) {
-	// Validate required options
 	if opts.QueueManager == nil {
 		return nil, fmt.Errorf("QueueManager is required")
 	}
 
-	registry := prometheus.NewRegistry()
-
-	queueGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "inngest_queue_depth",
-		Help: "Total depth of all system queues including backlog and ready state items",
-	})
-
-	registry.MustRegister(queueGauge)
-
 	api := &MetricsAPI{
 		opts:       opts,
 		Router:     chi.NewRouter(),
-		queueGauge: queueGauge,
-		registry:   registry,
+		queueGauge: queueDepthGauge,
 	}
 
 	api.setupRoutes()
@@ -156,8 +172,7 @@ func (api *MetricsAPI) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	api.queueGauge.Set(float64(sanitizedDepth))
 
-	// Gather metrics from registry
-	metricFamilies, err := api.registry.Gather()
+	metricFamilies, err := registry.Gather()
 	if err != nil {
 		http.Error(w, "Failed to gather metrics", http.StatusInternalServerError)
 		return
