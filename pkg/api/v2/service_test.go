@@ -283,12 +283,13 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, runID.String(), resp.Data.Id)
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data.Status)
-		require.Equal(t, "my-app-test-fn", resp.Data.Function.Slug)
+		require.Equal(t, "my-app-test-fn", resp.Data.Function.Id)
 		require.Equal(t, "Test function", resp.Data.Function.Name)
 		require.Equal(t, appID.String(), resp.Data.App.Id)
 		require.NotNil(t, resp.Data.Output)
 		require.Equal(t, true, resp.Data.Output.Fields["ok"].GetBoolValue())
-		require.Equal(t, uint64(2000), resp.Data.DurationMs)
+		require.NotNil(t, resp.Data.DurationMs)
+		require.Equal(t, uint64(2000), *resp.Data.DurationMs)
 	})
 
 	t.Run("requires run id", func(t *testing.T) {

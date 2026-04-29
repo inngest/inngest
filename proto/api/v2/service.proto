@@ -1040,6 +1040,22 @@ service V2 {
     };
   }
 
+  rpc GetFunctionTraceSpan(GetFunctionTraceSpanRequest) returns (GetFunctionTraceSpanResponse) {
+    option (google.api.http) = {
+      get: "/runs/{run_id}/trace/spans/{span_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get function trace span"
+      description: "Fetches a trace subtree rooted at a single span"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/invoke",
@@ -1178,22 +1194,6 @@ service V2 {
     };
   }
 
-  rpc InvokeFunctionBySlug(InvokeFunctionBySlugRequest) returns (InvokeFunctionResponse) {
-    option (google.api.http) = {
-      post: "/functions/{function_slug}/invoke",
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Invoke function by slug"
-      description: "Invokes a function using its public slug instead of requiring app and function IDs"
-      security: {
-        security_requirement: {
-          key: "BearerAuth"
-          value: {}
-        }
-      }
-    };
-  }
 }
 
 message HealthRequest {
@@ -1252,18 +1252,16 @@ enum TraceStepOp {
   TRACE_STEP_OP_INVOKE = 4;
   TRACE_STEP_OP_SEND_EVENT = 5;
   TRACE_STEP_OP_AI_GATEWAY = 6;
+  TRACE_STEP_OP_WAIT_FOR_SIGNAL = 7;
 }
 
 message FunctionRef {
   string id = 1;
-  string slug = 2;
-  string name = 3;
+  string name = 2;
 }
 
 message AppRef {
   string id = 1;
-  string external_id = 2;
-  string name = 3;
 }
 
 message RunTrigger {
@@ -1271,24 +1269,20 @@ message RunTrigger {
   optional string event_name = 2;
   bool is_batch = 3;
   optional string batch_id = 4;
-  optional google.protobuf.Timestamp batch_created_at = 5;
   optional string cron_schedule = 6;
-  optional string source_id = 7;
 }
 
 message FunctionRun {
   string id = 1;
-  string trace_id = 2;
-  FunctionRef function = 3;
-  AppRef app = 4;
-  FunctionRunStatus status = 5;
-  google.protobuf.Timestamp queued_at = 6;
-  optional google.protobuf.Timestamp started_at = 7;
-  optional google.protobuf.Timestamp ended_at = 8;
-  uint64 duration_ms = 9;
-  RunTrigger trigger = 10;
-  optional google.protobuf.Struct output = 11;
-  bool has_ai = 12;
+  FunctionRef function = 2;
+  AppRef app = 3;
+  FunctionRunStatus status = 4;
+  google.protobuf.Timestamp queued_at = 5;
+  optional google.protobuf.Timestamp started_at = 6;
+  optional google.protobuf.Timestamp ended_at = 7;
+  optional uint64 duration_ms = 8;
+  RunTrigger trigger = 9;
+  optional google.protobuf.Struct output = 10;
 }
 
 message GetFunctionRunRequest {
@@ -1307,37 +1301,47 @@ message TraceResponse {
 }
 
 message TraceSpan {
-  string span_id = 1;
+  string id = 1;
   string name = 2;
   TraceSpanStatus status = 3;
   optional TraceStepOp step_op = 4;
   optional string step_id = 5;
-  uint64 duration_ms = 6;
+  optional uint64 duration_ms = 6;
   google.protobuf.Timestamp queued_at = 7;
   optional google.protobuf.Timestamp started_at = 8;
   optional google.protobuf.Timestamp ended_at = 9;
-  map<string, string> attributes = 10;
-  optional google.protobuf.Struct input = 11;
-  optional google.protobuf.Struct output = 12;
-  optional TraceResponse response = 13;
-  bool is_root = 14;
-  bool is_userland = 15;
-  repeated TraceSpan children = 16;
+  optional google.protobuf.Struct input = 10;
+  optional google.protobuf.Struct output = 11;
+  optional TraceResponse response = 12;
+  repeated TraceSpan children = 13;
+  bool children_truncated = 14;
 }
 
 message FunctionTrace {
   string run_id = 1;
-  string trace_id = 2;
-  TraceSpan root_span = 3;
+  TraceSpan root_span = 2;
 }
 
 message GetFunctionTraceRequest {
   string run_id = 1;
   optional bool include_output = 2;
+  optional uint32 max_depth = 3;
 }
 
 message GetFunctionTraceResponse {
   FunctionTrace data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message GetFunctionTraceSpanRequest {
+  string run_id = 1;
+  string span_id = 2;
+  optional bool include_output = 3;
+  optional uint32 max_depth = 4;
+}
+
+message GetFunctionTraceSpanResponse {
+  TraceSpan data = 1;
   ResponseMetadata metadata = 2;
 }
 
@@ -1625,14 +1629,6 @@ message InvokeFunctionRequest {
     }
   ];
 }
-
-message InvokeFunctionBySlugRequest {
-  string function_slug = 1;
-  google.protobuf.Struct data = 2;
-  optional google.protobuf.Struct user = 3;
-  optional string idempotency_key = 4;
-}
-
 
 message InvokeFunctionResponse {
   InvokeFunctionData data = 1;

@@ -34,8 +34,8 @@ const (
 	V2_GetFunctionRun_FullMethodName          = "/api.v2.V2/GetFunctionRun"
 	V2_SyncApp_FullMethodName                 = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName        = "/api.v2.V2/GetFunctionTrace"
+	V2_GetFunctionTraceSpan_FullMethodName    = "/api.v2.V2/GetFunctionTraceSpan"
 	V2_InvokeFunction_FullMethodName          = "/api.v2.V2/InvokeFunction"
-	V2_InvokeFunctionBySlug_FullMethodName    = "/api.v2.V2/InvokeFunctionBySlug"
 )
 
 // V2Client is the client API for V2 service.
@@ -58,8 +58,8 @@ type V2Client interface {
 	GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
+	GetFunctionTraceSpan(ctx context.Context, in *GetFunctionTraceSpanRequest, opts ...grpc.CallOption) (*GetFunctionTraceSpanResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
-	InvokeFunctionBySlug(ctx context.Context, in *InvokeFunctionBySlugRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
 }
 
 type v2Client struct {
@@ -220,20 +220,20 @@ func (c *v2Client) GetFunctionTrace(ctx context.Context, in *GetFunctionTraceReq
 	return out, nil
 }
 
-func (c *v2Client) InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error) {
+func (c *v2Client) GetFunctionTraceSpan(ctx context.Context, in *GetFunctionTraceSpanRequest, opts ...grpc.CallOption) (*GetFunctionTraceSpanResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(InvokeFunctionResponse)
-	err := c.cc.Invoke(ctx, V2_InvokeFunction_FullMethodName, in, out, cOpts...)
+	out := new(GetFunctionTraceSpanResponse)
+	err := c.cc.Invoke(ctx, V2_GetFunctionTraceSpan_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *v2Client) InvokeFunctionBySlug(ctx context.Context, in *InvokeFunctionBySlugRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error) {
+func (c *v2Client) InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InvokeFunctionResponse)
-	err := c.cc.Invoke(ctx, V2_InvokeFunctionBySlug_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, V2_InvokeFunction_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -260,8 +260,8 @@ type V2Server interface {
 	GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
+	GetFunctionTraceSpan(context.Context, *GetFunctionTraceSpanRequest) (*GetFunctionTraceSpanResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
-	InvokeFunctionBySlug(context.Context, *InvokeFunctionBySlugRequest) (*InvokeFunctionResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -317,11 +317,11 @@ func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncApp
 func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctionTrace not implemented")
 }
+func (UnimplementedV2Server) GetFunctionTraceSpan(context.Context, *GetFunctionTraceSpanRequest) (*GetFunctionTraceSpanResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFunctionTraceSpan not implemented")
+}
 func (UnimplementedV2Server) InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvokeFunction not implemented")
-}
-func (UnimplementedV2Server) InvokeFunctionBySlug(context.Context, *InvokeFunctionBySlugRequest) (*InvokeFunctionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method InvokeFunctionBySlug not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -614,6 +614,24 @@ func _V2_GetFunctionTrace_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_GetFunctionTraceSpan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFunctionTraceSpanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetFunctionTraceSpan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetFunctionTraceSpan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetFunctionTraceSpan(ctx, req.(*GetFunctionTraceSpanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_InvokeFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InvokeFunctionRequest)
 	if err := dec(in); err != nil {
@@ -628,24 +646,6 @@ func _V2_InvokeFunction_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).InvokeFunction(ctx, req.(*InvokeFunctionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _V2_InvokeFunctionBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InvokeFunctionBySlugRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(V2Server).InvokeFunctionBySlug(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: V2_InvokeFunctionBySlug_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(V2Server).InvokeFunctionBySlug(ctx, req.(*InvokeFunctionBySlugRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -718,12 +718,12 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_GetFunctionTrace_Handler,
 		},
 		{
-			MethodName: "InvokeFunction",
-			Handler:    _V2_InvokeFunction_Handler,
+			MethodName: "GetFunctionTraceSpan",
+			Handler:    _V2_GetFunctionTraceSpan_Handler,
 		},
 		{
-			MethodName: "InvokeFunctionBySlug",
-			Handler:    _V2_InvokeFunctionBySlug_Handler,
+			MethodName: "InvokeFunction",
+			Handler:    _V2_InvokeFunction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
