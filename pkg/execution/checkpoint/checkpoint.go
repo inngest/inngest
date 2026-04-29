@@ -559,16 +559,6 @@ func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
 	}
 
-	// op.ID is the cancel step's own hash; target_hashed_id is the target
-	// defer's hash. The SDK always knows the target hash at cancel time
-	// (callers cancel via a handle returned from defer.add), so this field
-	// is required.
-	if opts.TargetHashedID == "" {
-		l.Error("DeferCancel missing target_hashed_id in checkpoint",
-			"cancel_step_id", op.ID)
-		return fmt.Errorf("DeferCancel missing required target_hashed_id")
-	}
-
 	if err := c.State.SetDeferStatus(ctx, id, opts.TargetHashedID, state.ScheduleStatusCancelled); err != nil {
 		l.Error("error cancelling defer in checkpoint", "error", err)
 		return fmt.Errorf("error cancelling defer: %w", err)

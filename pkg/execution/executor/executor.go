@@ -3522,14 +3522,6 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
 	}
 
-	// gen.ID is the cancel step's own hash; target_hashed_id is the target
-	// defer's hash. The SDK always knows the target hash at cancel time
-	// (callers cancel via a handle returned from defer.add), so this field
-	// is required.
-	if opts.TargetHashedID == "" {
-		return fmt.Errorf("DeferCancel missing required target_hashed_id")
-	}
-
 	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, sv2.ScheduleStatusCancelled); err != nil {
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}

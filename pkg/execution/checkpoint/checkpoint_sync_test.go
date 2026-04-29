@@ -775,7 +775,7 @@ func TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID(t *testing.T) {
 
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.Error(err)
-	require.Contains(err.Error(), "target_hashed_id")
+	require.Contains(err.Error(), "TargetHashedID")
 
 	mocks.state.AssertNotCalled(t, "SetDeferStatus", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

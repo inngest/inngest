@@ -427,11 +427,18 @@ func (g GeneratorOpcode) DeferCancelOpts() (*DeferCancelOpts, error) {
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
 		return nil, err
 	}
-	return opts, nil
+	return opts, opts.Validate()
 }
 
 type DeferCancelOpts struct {
 	TargetHashedID string `json:"target_hashed_id"`
+}
+
+func (d *DeferCancelOpts) Validate() error {
+	if d.TargetHashedID == "" {
+		return fmt.Errorf("TargetHashedID is required")
+	}
+	return nil
 }
 
 func (d *DeferCancelOpts) UnmarshalAny(a any) error {
