@@ -610,7 +610,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithExecutionManager(dbcqrs),
 		runner.WithPauseManager(pauseMgr),
 		runner.WithStateManager(sm),
-		runner.WithRunnerQueue(rq),
 		runner.WithBatchManager(batcher),
 		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
@@ -620,7 +619,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// The devserver embeds the event API.
 	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
 	ds.State = sm
-	ds.Queue = rq
 	ds.Executor = exec
 	ds.SemaphoreManager = semaphores
 	ds.CronSyncer = croner
@@ -638,7 +636,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 		Runner:         ds.Runner,
 		State:          ds.State,
-		Queue:          ds.Queue,
+		Queue:          rq,
 		EventHandler:   ds.HandleEvent,
 		Executor:       ds.Executor,
 		HistoryReader:  memory_reader.NewReader(),
@@ -669,7 +667,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
-			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			JobQueueReader:     rq,
 			Executor:           ds.Executor,
 			Queue:              rq,
 			QueueShardSelector: shardSelector,
@@ -759,7 +757,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	if testapi.ShouldEnable() {
 		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
 			QueueShardSelector: shardSelector,
-			Queue:              rq,
 			Executor:           exec,
 			StateManager:       smv2,
 			ResetAll: func() {
