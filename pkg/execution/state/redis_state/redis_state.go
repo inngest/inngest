@@ -796,6 +796,8 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 }
 
 func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, d statev2.Defer) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveDefer"), redis_telemetry.ScopeFnRunState)
+
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
@@ -811,9 +813,21 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 		return err
 	}
 
-	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hset().Key(fnRunState.kg.Defers(ctx, isSharded, fnID, runID)).FieldValue().FieldValue(d.HashedID, string(data)).Build()
-	}).Error()
+	args, err := StrSlice([]any{d.HashedID, string(data), int(statev2.ScheduleStatusCancelled)})
+	if err != nil {
+		return err
+	}
+
+	_, err = retriableScripts["saveDefer"].Exec(
+		redis_telemetry.WithScriptName(ctx, "saveDefer"),
+		r,
+		[]string{fnRunState.kg.Defers(ctx, isSharded, fnID, runID)},
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error saving defer: %w", err)
+	}
+	return nil
 }
 
 func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hashedID string, status statev2.ScheduleStatus) error {
