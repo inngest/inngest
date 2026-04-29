@@ -137,21 +137,30 @@ func TestConstraintEnforcement(t *testing.T) {
 				redis_state.WithPauseDeleter(pauseMgr),
 			)
 			require.NoError(t, err)
-			exec, err := executor.NewExecutor(
-				executor.WithRateLimiter(rl),
-				executor.WithAssignedQueueShard(shard),
-				executor.WithQueue(q),
-				executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
-				executor.WithPauseManager(pauseMgr),
-				executor.WithCapacityManager(cm),
-				executor.WithLogger(logger.StdlibLogger(ctx)),
-				executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			sched, err := executor.NewScheduler(
+				executor.WithSchedulerRateLimiter(rl),
+				executor.WithSchedulerStateManager(redis_state.MustRunServiceV2(sm)),
+				executor.WithSchedulerPauseManager(pauseMgr),
+				executor.WithSchedulerCapacityManager(cm),
+				executor.WithSchedulerLogger(logger.StdlibLogger(ctx)),
+				executor.WithSchedulerUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 					if test.executorUseConstraintAPI != nil {
 						return test.executorUseConstraintAPI(ctx, accountID)
 					}
 
 					return true
 				}),
+				executor.WithSchedulerClock(clock),
+			)
+			require.NoError(t, err)
+
+			exec, err := executor.NewExecutor(
+				executor.WithScheduler(sched),
+				executor.WithAssignedQueueShard(shard),
+				executor.WithQueue(q),
+				executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
+				executor.WithPauseManager(pauseMgr),
+				executor.WithLogger(logger.StdlibLogger(ctx)),
 				executor.WithClock(clock),
 			)
 			require.NoError(t, err)

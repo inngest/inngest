@@ -190,7 +190,10 @@ func TestScheduleRaceCondition(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	sched, err := executor.NewScheduler(executor.WithSchedulerTraceReader(dbcqrs))
+	require.NoError(t, err)
 	exec, err := executor.NewExecutor(
+		executor.WithScheduler(sched),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
@@ -199,7 +202,6 @@ func TestScheduleRaceCondition(t *testing.T) {
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTraceReader(dbcqrs),
 		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
@@ -364,7 +366,10 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	sched, err := executor.NewScheduler(executor.WithSchedulerTraceReader(dbcqrs))
+	require.NoError(t, err)
 	exec, err := executor.NewExecutor(
+		executor.WithScheduler(sched),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
@@ -373,7 +378,6 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTraceReader(dbcqrs),
 	)
 	require.NoError(t, err)
 
@@ -573,7 +577,10 @@ func TestFinalize(t *testing.T) {
 
 	testQueue := newFakeQueue(rq)
 
+	sched, err := executor.NewScheduler(executor.WithSchedulerTraceReader(dbcqrs))
+	require.NoError(t, err)
 	exec, err := executor.NewExecutor(
+		executor.WithScheduler(sched),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(testQueue),
@@ -582,7 +589,6 @@ func TestFinalize(t *testing.T) {
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTraceReader(dbcqrs),
 	)
 	require.NoError(t, err)
 
@@ -1435,7 +1441,10 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 
 	rl := ratelimit.New(ctx, unshardedClient.Global().Client(), "{ratelimit}:")
 
+	sched, err := executor.NewScheduler(executor.WithSchedulerRateLimiter(rl))
+	require.NoError(t, err)
 	exec, err := executor.NewExecutor(
+		executor.WithScheduler(sched),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
@@ -1444,7 +1453,6 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithRateLimiter(rl),
 	)
 	require.NoError(t, err)
 
@@ -1636,7 +1644,17 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 
 	fll := &fakeLimitLifecycle{}
 
+	sched, err := executor.NewScheduler(
+		executor.WithSchedulerFunctionBacklogSizeLimit(func(ctx context.Context, accountID, envID, fnID uuid.UUID) executor.BacklogSizeLimit {
+			return executor.BacklogSizeLimit{
+				Limit:   1,
+				Enforce: true,
+			}
+		}),
+	)
+	require.NoError(t, err)
 	exec, err := executor.NewExecutor(
+		executor.WithScheduler(sched),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
@@ -1647,12 +1665,6 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 
 		executor.WithLifecycleListeners(fll),
-		executor.WithFunctionBacklogSizeLimit(func(ctx context.Context, accountID, envID, fnID uuid.UUID) executor.BacklogSizeLimit {
-			return executor.BacklogSizeLimit{
-				Limit:   1,
-				Enforce: true,
-			}
-		}),
 	)
 	require.NoError(t, err)
 
@@ -1797,7 +1809,10 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	sched, err := executor.NewScheduler(executor.WithSchedulerTraceReader(dbcqrs))
+	require.NoError(t, err)
 	exec, err := executor.NewExecutor(
+		executor.WithScheduler(sched),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
@@ -1806,7 +1821,6 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTraceReader(dbcqrs),
 		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
@@ -1922,7 +1936,10 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	sched, err := executor.NewScheduler(executor.WithSchedulerTraceReader(dbcqrs))
+	require.NoError(t, err)
 	exec, err := executor.NewExecutor(
+		executor.WithScheduler(sched),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
@@ -1931,7 +1948,6 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTraceReader(dbcqrs),
 		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
