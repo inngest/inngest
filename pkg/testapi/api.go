@@ -24,7 +24,6 @@ type TestAPI struct {
 
 type Options struct {
 	QueueShardSelector queue.ShardSelector
-	Queue              queue.Queue
 	Executor           execution.Executor
 	StateManager       statev2.RunService
 	ResetAll           func()

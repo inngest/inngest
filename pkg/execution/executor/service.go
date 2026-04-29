@@ -625,11 +625,6 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	}
 
 	// timeout was extended, requeue eager cancellation.
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		l.Error("queue does not conform to queue manager")
-		return nil
-	}
 	requeueAt := jobStarteddAt.Add(*timeout)
 	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
 	jobID := ""
@@ -640,7 +635,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	}
 	jobID = fmt.Sprintf("%s:%s", "finish-timeout-extended", jobID)
 	item.JobID = &jobID
-	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
+	err = s.queue.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != queue.ErrQueueItemExists {
 		return err
@@ -711,11 +706,6 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		})
 	}
 	// timeout was extended, requeue eager cancellation.
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		l.Error("queue does not conform to queue manager")
-		return nil
-	}
 	requeueAt := jobEnqueuedAt.Add(*timeout)
 	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
 	jobID := ""
@@ -726,7 +716,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	}
 	jobID = fmt.Sprintf("%s:%s", "start-timeout-extended", jobID)
 	item.JobID = &jobID
-	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
+	err = s.queue.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != queue.ErrQueueItemExists {
 		return err
@@ -842,17 +832,12 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		return fmt.Errorf("expected queue manager for cancellation")
-	}
-
 	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
 
-	items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID.String(), from, c.StartedBefore)
+	items, err := shard.ItemsByPartition(ctx, c.FunctionID.String(), from, c.StartedBefore)
 	if err != nil {
 		return fmt.Errorf("error retrieving partition items: %w", err)
 	}

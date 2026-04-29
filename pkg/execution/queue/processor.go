@@ -51,6 +51,12 @@ func New(
 
 		QueueOptions: o,
 
+		queueProducer: NewProducer(queueShardClients, shardSelector, ProducerOpts{
+			clock:              o.Clock,
+			queueKindMapping:   o.queueKindMapping,
+			enableJobPromotion: o.enableJobPromotion,
+		}),
+
 		wg:                       &sync.WaitGroup{},
 		seqLeaseLock:             &sync.RWMutex{},
 		scavengerLeaseLock:       &sync.RWMutex{},
@@ -98,6 +104,8 @@ type queueProcessor struct {
 
 	queueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
+
+	queueProducer *QueueProducer
 
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
@@ -170,6 +178,10 @@ func (q *queueProcessor) GetShadowContinuations() map[string]ShadowContinuation 
 	defer q.shadowContinuesLock.Unlock()
 
 	return q.shadowContinues
+}
+
+func (q *queueProcessor) QueueProducer() Producer {
+	return q.queueProducer
 }
 
 func (q *queueProcessor) ClearShadowContinuations() {
@@ -330,9 +342,14 @@ func (q *queueProcessor) Requeue(ctx context.Context, shard QueueShard, i QueueI
 	return shard.Requeue(ctx, i, at, opts...)
 }
 
-// RequeueByJobID implements QueueManager.
+// RequeueByJobID implements Producer.
 func (q *queueProcessor) RequeueByJobID(ctx context.Context, shard QueueShard, jobID string, at time.Time) error {
-	return shard.RequeueByJobID(ctx, jobID, at)
+	return q.queueProducer.RequeueByJobID(ctx, shard, jobID, at)
+}
+
+// RequeueByJobID implements Producer.
+func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
+	return q.queueProducer.Enqueue(ctx, item, at, opts)
 }
 
 // TotalSystemQueueDepth implements QueueManager.

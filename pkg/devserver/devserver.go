@@ -410,9 +410,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create the batch manager. In production, a second BatchClient can be provided
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
-	croner := cron.NewRedisCronManager(queueShard, rq, l)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq.QueueProducer(), batch.WithLogger(l))
+	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq.QueueProducer())
+	croner := cron.NewRedisCronManager(queueShard, rq.QueueProducer(), l)
 
 	sn := singleton.New(ctx, map[string]*redis_state.QueueClient{
 		consts.DefaultQueueShardName: unshardedClient.Queue(),
@@ -483,7 +483,50 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
+	lifecycleListeners := []execution.LifecycleListener{
+		history.NewLifecycleListener(
+			nil,
+			hd,
+			hmw,
+		),
+		Lifecycle{
+			Cqrs:       dbcqrs,
+			Pb:         pb,
+			EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
+		},
+		run.NewTraceLifecycleListener(nil),
+	}
+
+	sched, err := executor.NewScheduler(
+		executor.WithSchedulerLogger(l),
+		executor.WithSchedulerStateManager(smv2),
+		executor.WithSchedulerPauseManager(pauseMgr),
+		executor.WithSchedulerProducer(rq),
+		executor.WithSchedulerJobQueueReader(rq),
+		executor.WithSchedulerTraceReader(dbcqrs),
+		executor.WithSchedulerTracerProvider(tp),
+		executor.WithSchedulerRateLimiter(rl),
+		executor.WithSchedulerDebouncer(debouncer),
+		executor.WithSchedulerSingletonManager(sn),
+		executor.WithSchedulerBatcher(batcher),
+		executor.WithSchedulerCapacityManager(cm),
+		executor.WithSchedulerUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+			return true
+		}),
+		executor.WithSchedulerEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
+			return false
+		}),
+		executor.WithSchedulerLifecycleListeners(lifecycleListeners...),
+		executor.WithSchedulerFunctionLoader(loader),
+		executor.WithSchedulerSemaphoreManager(semaphores),
+		executor.WithSchedulerShardSelector(shardSelector),
+	)
+	if err != nil {
+		return err
+	}
+
 	executorOpts := []executor.ExecutorOpt{
+		executor.WithScheduler(sched),
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
@@ -491,7 +534,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
-		executor.WithRateLimiter(rl),
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
@@ -502,21 +544,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}
 			return []byte(*opts.SigningKey), nil
 		}),
-		executor.WithLifecycleListeners(
-			append([]execution.LifecycleListener{
-				history.NewLifecycleListener(
-					nil,
-					hd,
-					hmw,
-				),
-				Lifecycle{
-					Cqrs:       dbcqrs,
-					Pb:         pb,
-					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
-				},
-				run.NewTraceLifecycleListener(nil),
-			}, metrics.NewLifecycleListeners()...)...,
-		),
+		executor.WithLifecycleListeners(lifecycleListeners...),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
 				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
@@ -535,12 +563,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithInvokeEventHandler(getInvokeEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithDebouncer(debouncer),
-		executor.WithSingletonManager(sn),
-		executor.WithBatcher(batcher),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTraceReader(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
@@ -550,20 +574,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-		executor.WithCapacityManager(cm),
-		executor.WithSemaphoreManager(semaphores),
-		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}),
-		executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
-			return false
-		}),
 	}
 
 	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
 		return err
 	}
+
+	// Wire the executor's invoke-finish callback so the scheduler's Finalize
+	// can fast-resume parent invokes.
+	sched.SetInvokeFinishHandler(exec.HandleInvokeFinish)
 
 	// Create an executor.
 	executorSvc := executor.NewService(
@@ -590,7 +610,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithExecutionManager(dbcqrs),
 		runner.WithPauseManager(pauseMgr),
 		runner.WithStateManager(sm),
-		runner.WithRunnerQueue(rq),
 		runner.WithBatchManager(batcher),
 		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
@@ -600,7 +619,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// The devserver embeds the event API.
 	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
 	ds.State = sm
-	ds.Queue = rq
 	ds.Executor = exec
 	ds.SemaphoreManager = semaphores
 	ds.CronSyncer = croner
@@ -618,7 +636,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 		Runner:         ds.Runner,
 		State:          ds.State,
-		Queue:          ds.Queue,
+		Queue:          rq,
 		EventHandler:   ds.HandleEvent,
 		Executor:       ds.Executor,
 		HistoryReader:  memory_reader.NewReader(),
@@ -649,7 +667,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
-			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			JobQueueReader:     rq,
 			Executor:           ds.Executor,
 			Queue:              rq,
 			QueueShardSelector: shardSelector,
@@ -739,7 +757,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	if testapi.ShouldEnable() {
 		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
 			QueueShardSelector: shardSelector,
-			Queue:              rq,
 			Executor:           exec,
 			StateManager:       smv2,
 			ResetAll: func() {

@@ -85,7 +85,7 @@ func WithHealthCheckLeadTimeSeconds(leadTime int) RedisCronManagerOpt {
 
 func NewRedisCronManager(
 	shard queue.QueueShard,
-	q queue.QueueManager,
+	q queue.Producer,
 	log logger.Logger,
 	opts ...RedisCronManagerOpt,
 ) CronManager {
@@ -103,7 +103,7 @@ func NewRedisCronManager(
 
 	manager := &redisCronManager{
 		shard: shard,
-		q:     q,
+		queue: q,
 		log:   log,
 		opt:   opt,
 	}
@@ -113,7 +113,7 @@ func NewRedisCronManager(
 
 type redisCronManager struct {
 	shard queue.QueueShard
-	q     queue.QueueManager
+	queue queue.Producer
 
 	log logger.Logger
 	opt redisCronManagerOpt
@@ -142,7 +142,7 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	at := time.Now()
 	jobID := ci.SyncID()
 
-	err := c.q.Enqueue(ctx, queue.Item{
+	err := c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: ci.WorkspaceID,
@@ -192,7 +192,7 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "queue", kind, "ci", ci)
 
-	err := c.q.Enqueue(ctx, queue.Item{
+	err := c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		Kind:        kind,
@@ -225,7 +225,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 
 	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "queue", kind, "now", now, "nextCheck", nextCheck)
 
-	err := c.q.Enqueue(ctx, queue.Item{
+	err := c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		Kind:        kind,
@@ -264,7 +264,7 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, expr, functionID, fnVersion))
 
 	// check if the jobID exists in the system queue.
-	exists, err := c.q.ItemExists(ctx, c.shard, jobID)
+	exists, err := c.shard.ItemExists(ctx, jobID)
 	if err != nil {
 		return CronHealthCheckStatus{}, fmt.Errorf("failed to check if item exits for health check: %w", err)
 	}
@@ -316,7 +316,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	// enqueue new schedule
 	maxAttempts := consts.MaxRetries + 1
 
-	err = c.q.Enqueue(ctx, queue.Item{
+	err = c.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: ci.WorkspaceID,

@@ -23,7 +23,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -86,12 +85,6 @@ func WithStateManager(sm state.Manager) func(s *svc) {
 	}
 }
 
-func WithRunnerQueue(q queue.Queue) func(s *svc) {
-	return func(s *svc) {
-		s.queue = q
-	}
-}
-
 func WithBatchManager(b batch.BatchManager) func(s *svc) {
 	return func(s *svc) {
 		s.batcher = b
@@ -140,8 +133,6 @@ type svc struct {
 	state state.Manager
 	// pauses allows management of pauses, used to resume function runs on matching events.
 	pm pauses.Manager
-	// queue allows the scheduling of new functions.
-	queue queue.Queue
 	// batcher handles batch operations
 	batcher batch.BatchManager
 	// croner handles cron operations
@@ -165,13 +156,6 @@ func (s *svc) Pre(ctx context.Context) error {
 
 	if s.state == nil {
 		s.state, err = s.config.State.Service.Concrete.SingleClusterManager(ctx, nil)
-		if err != nil {
-			return err
-		}
-	}
-
-	if s.queue == nil {
-		s.queue, err = s.config.Queue.Service.Concrete.Queue()
 		if err != nil {
 			return err
 		}

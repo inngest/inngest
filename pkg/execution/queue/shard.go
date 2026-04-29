@@ -21,14 +21,14 @@ type QueueShard interface {
 	ShardAssignmentConfig() ShardAssignmentConfig
 }
 
-func (q *queueProcessor) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
+func (q *QueueProducer) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
 	l := logger.StdlibLogger(ctx)
 
-	shard := q.primaryQueueShard
+	var shard QueueShard
 	switch {
 	// If the caller wants us to enqueue the job to a specific queue shard, use that.
 	case shardName != "":
-		foundShard, ok := q.queueShardClients[shardName]
+		foundShard, ok := q.queueShards[shardName]
 		if !ok {
 			return shard, fmt.Errorf("tried to force invalid queue shard %q", shardName)
 		}
