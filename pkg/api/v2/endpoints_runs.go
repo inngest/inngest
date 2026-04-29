@@ -23,3 +23,14 @@ func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTr
 
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get function trace is not yet implemented")
 }
+
+func (s *Service) GetFunctionTraceSpan(ctx context.Context, req *apiv2.GetFunctionTraceSpanRequest) (*apiv2.GetFunctionTraceSpanResponse, error) {
+	if req.RunId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")
+	}
+	if req.SpanId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Span ID is required")
+	}
+
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get function trace span is not yet implemented")
+}
