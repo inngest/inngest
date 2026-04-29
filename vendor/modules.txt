@@ -976,7 +976,7 @@ github.com/lib/pq/internal/proto
 github.com/lib/pq/oid
 github.com/lib/pq/pqerror
 github.com/lib/pq/scram
-# github.com/liushuangls/go-anthropic/v2 v2.18.0
+# github.com/liushuangls/go-anthropic/v2 v2.19.0
 ## explicit; go 1.23.0
 github.com/liushuangls/go-anthropic/v2
 # github.com/lmittmann/tint v1.1.3
