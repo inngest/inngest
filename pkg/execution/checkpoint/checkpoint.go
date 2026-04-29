@@ -164,12 +164,12 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				_, err := c.State.SaveStep(ctx, input.Metadata.ID, op.ID, []byte(output))
 				if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 					// Ignore.
-					l.Warn("duplicate checkpoint step", "id", input.Metadata.ID)
+					l.Warn("duplicate checkpoint step", "id", input.Metadata.ID, "name", op.UserDefinedName())
 					continue
 				}
 				if err != nil {
-					l.Error("error saving checkpointed step state", "error", err)
-					return fmt.Errorf("failed to save step %s: %w", op.ID, err)
+					l.Error("error saving checkpointed step state", "name", op.UserDefinedName(), "error", err)
+					return fmt.Errorf("failed to save step %s (%s): %w", op.ID, op.UserDefinedName(), err)
 				}
 			}
 
