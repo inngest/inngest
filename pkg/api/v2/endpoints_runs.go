@@ -78,21 +78,28 @@ func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTr
 	}, nil
 }
 
+func (s *Service) GetFunctionTraceSpan(ctx context.Context, req *apiv2.GetFunctionTraceSpanRequest) (*apiv2.GetFunctionTraceSpanResponse, error) {
+	if req.RunId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")
+	}
+	if req.SpanId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Span ID is required")
+	}
+
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get function trace span is not yet implemented")
+}
+
 func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOutput bool) *apiv2.FunctionRun {
 	startedAt := timestamppb.New(run.RunStartedAt)
 
 	result := &apiv2.FunctionRun{
-		Id:      run.RunID.String(),
-		TraceId: "",
+		Id: run.RunID.String(),
 		Function: &apiv2.FunctionRef{
-			Id:   fn.ID.String(),
-			Slug: fn.Slug,
+			Id:   fn.Slug,
 			Name: fn.Function.Name,
 		},
 		App: &apiv2.AppRef{
-			Id:         fn.AppID.String(),
-			ExternalId: fn.AppID.String(),
-			Name:       "",
+			Id: fn.AppID.String(),
 		},
 		Status:    toFunctionRunStatus(run.Status),
 		QueuedAt:  startedAt,
@@ -100,9 +107,7 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOu
 		Trigger: &apiv2.RunTrigger{
 			EventIds: []string{run.EventID.String()},
 			IsBatch:  run.BatchID != nil,
-			SourceId: optionalString(run.EventID.String()),
 		},
-		HasAi: false,
 	}
 
 	if run.BatchID != nil {
@@ -115,7 +120,8 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOu
 
 	if run.EndedAt != nil {
 		result.EndedAt = timestamppb.New(*run.EndedAt)
-		result.DurationMs = uint64(run.EndedAt.Sub(run.RunStartedAt) / time.Millisecond)
+		duration := uint64(run.EndedAt.Sub(run.RunStartedAt) / time.Millisecond)
+		result.DurationMs = &duration
 	}
 
 	if includeOutput {
