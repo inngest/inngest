@@ -12,7 +12,7 @@ Before being able to run the app for the first time, you need to follow the step
 
 - Set up the [Cloud monorepo](https://github.com/inngest/monorepo) and have all backend services running locally
 - [Node.js](https://nodejs.org/en/download/)
-- Join the company's Vercel account
+- Install 1Password Desktop App
 
 ### Instructions
 
@@ -21,9 +21,7 @@ Before being able to run the app for the first time, you need to follow the step
    [Corepack](https://nodejs.org/docs/latest-v18.x/api/corepack.html) by running
    `corepack enable; corepack prepare`
 3. Install dependencies by running `pnpm install`
-4. Link local project to our `ui` Vercel project by running `pnpm vercel link -p ui`
-   - Make sure the command prints out `Linked to inngest/ui` and not a `ui` project in your personal scope
-5. Download environment variables by running `pnpm env:pull`
+4. Setup local environment variables following [this guide](https://www.notion.so/inngest/Setup-env-local-for-development-351b64753bbd8068bceed9825558ec33?source=copy_link)
 
 ## Developing
 
@@ -83,32 +81,6 @@ $ pnpm format
 Staged files are automatically formatted when committing.
 
 We recommend using an [editor integration for Prettier](https://prettier.io/docs/en/editors.html).
-
-### Environment Variables
-
-Environment variables are managed with the [Vercel CLI](https://vercel.com/docs/cli/env). Use the
-following commands to manage them:
-
-```sh
-# Link the project on Vercel
-$ pnpm vercel link -p ui # and follow the steps
-
-# Download development environment variables for running the app locally
-$ pnpm env:pull
-
-# Add a new environment variable
-$ pnpm env:add
-
-# Remove an environment variable
-$ pnpm env:rm
-```
-
-Check the [Tanstack Start Documentation](https://tanstack.com/start/latest/docs/framework/react/overview)
-for more information.
-
-You should **never commit environment variables** to the repository. If you need to add a new
-environment variable, add it with the `pnpm env:add` command and then download it with the
-`pnpm env:pull` command.
 
 ### Sign In
 
