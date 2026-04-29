@@ -51,10 +51,10 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
+	"github.com/inngest/inngest/pkg/util/strtimeout"
 	"github.com/inngest/inngestgo"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
-	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
@@ -593,11 +593,11 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 	for _, c := range req.Function.Cancel {
 		expires := e.now().Add(consts.CancelTimeout)
 		if c.Timeout != nil {
-			dur, err := str2duration.ParseDuration(*c.Timeout)
+			parsedExpires, err := strtimeout.ParseTimeout(*c.Timeout, e.now)
 			if err != nil {
-				return fmt.Errorf("error parsing cancel duration: %w", err)
+				return fmt.Errorf("error parsing cancel timeout: %w", err)
 			}
-			expires = e.now().Add(dur)
+			expires = parsedExpires
 		}
 
 		// The triggering event ID should be the first ID in the batch.

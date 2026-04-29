@@ -84,6 +84,9 @@ type CapacityAcquireRequest struct {
 	// FunctionID is used for identifying the function.
 	FunctionID uuid.UUID
 
+	// AppID is included for lifecycle reporting.
+	AppID uuid.UUID
+
 	// Configuration represents the latest known constraint configuration (a subset of the function config).
 	//
 	// The server _may_ reject calls if it has recently seen a newer configuration. This is expected for a short
@@ -179,6 +182,12 @@ type CapacityAcquireResponse struct {
 
 	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
 	FairnessReduction int
+
+	// Usage contains per-constraint capacity usage after this acquire operation.
+	// Each entry corresponds to a constraint in sorted execution order (not
+	// necessarily the caller's original slice order, as constraints are sorted
+	// before evaluation).
+	Usage []ConstraintUsage
 
 	RetryAfter time.Time
 

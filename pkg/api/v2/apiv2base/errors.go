@@ -17,10 +17,12 @@ const (
 	ErrorInvalidRequest     = "invalid_request"
 	ErrorMissingField       = "missing_field"
 	ErrorInvalidFieldFormat = "invalid_field_format"
+	ErrorEnvNameAmbiguous   = "env_name_ambiguous"
 
 	// 401 Unauthorized errors
 	ErrorAuthorizationHeaderMissing = "authorization_header_missing"
 	ErrorInvalidSigningKey          = "invalid_signing_key"
+	ErrorInvalidAPIKey              = "invalid_api_key"
 
 	// 403 Forbidden errors
 	ErrorAccessDenied = "access_denied"
@@ -35,6 +37,7 @@ const (
 	// 422 Unprocessable Entity errors
 	ErrorFunctionDebounced = "function_debounced"
 	ErrorFunctionSkipped   = "function_skipped"
+	ErrorAppSyncFailed     = "app_sync_failed"
 
 	// 404 Not Found errors
 	// ErrorNotFound is the generic not found error code used across multiple APIs.
@@ -106,7 +109,7 @@ func httpToGRPCStatus(httpCode int) codes.Code {
 	case http.StatusConflict:
 		return codes.AlreadyExists
 	case http.StatusUnprocessableEntity:
-		return codes.InvalidArgument
+		return codes.FailedPrecondition
 	case http.StatusTooManyRequests:
 		return codes.ResourceExhausted
 	case http.StatusInternalServerError:

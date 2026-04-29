@@ -42,7 +42,7 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
         },
         header: col.name,
         id: col.name,
-        size: COLUMN_SIZE_BY_TYPE[col.type] ?? DEFAULT_COLUMN_SIZE,
+        minSize: COLUMN_SIZE_BY_TYPE[col.type] ?? DEFAULT_COLUMN_SIZE,
       }),
     );
   }, [data?.columns]);
