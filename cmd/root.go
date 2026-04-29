@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inngest/inngest/cmd/conformance"
 	"github.com/inngest/inngest/cmd/devserver"
 	"github.com/inngest/inngest/cmd/start"
 	"github.com/inngest/inngest/cmd/version"
@@ -75,7 +74,6 @@ func execute() {
 
 		Flags: globalFlags,
 		Commands: []*cli.Command{
-			conformance.Command(),
 			devserver.Command(),
 			version.Command(),
 			start.Command(),
