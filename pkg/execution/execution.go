@@ -40,6 +40,22 @@ type Scheduler interface {
 	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 
 	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
+
+	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
+	Cancel(ctx context.Context, id sv2.ID, r CancelRequest) error
+
+	// Finalize performs run finalization, which involves sending the function
+	// finished/failed event and deleting state.
+	Finalize(ctx context.Context, opts FinalizeOpts) error
+
+	// SetFinalizer sets the function which publishes finalization events on
+	// run completion.
+	SetFinalizer(f FinalizePublisher)
+
+	// SetInvokeFinishHandler wires a fast-resume callback used by Finalize to
+	// resume parent invokes immediately rather than waiting for the pub/sub
+	// event handler.
+	SetInvokeFinishHandler(fn func(ctx context.Context, evt event.TrackedEvent) error)
 }
 
 // Executor manages executing actions.  It interfaces over a state store to save
@@ -123,20 +139,11 @@ type Executor interface {
 	// functions.  This specific codepath always converts from sync -> async.
 	HandleGenerator(ctx context.Context, i RunContext, gen state.GeneratorOpcode) error
 
-	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
-	Cancel(ctx context.Context, id sv2.ID, r CancelRequest) error
-
-	Finalize(ctx context.Context, opts FinalizeOpts) error
-
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
 
 	CloseLifecycleListeners(ctx context.Context)
-
-	// SetFinalizer sets the function which publishes finalization events on
-	// run completion
-	SetFinalizer(f FinalizePublisher)
 
 	// InvokeFailHandler invokes the invoke fail handler.
 	InvokeFailHandler(context.Context, InvokeFailHandlerOpts) error

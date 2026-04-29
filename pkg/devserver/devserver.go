@@ -517,6 +517,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			return false
 		}),
 		executor.WithSchedulerLifecycleListeners(lifecycleListeners...),
+		executor.WithSchedulerFunctionLoader(loader),
+		executor.WithSchedulerSemaphoreManager(semaphores),
+		executor.WithSchedulerShardSelector(shardSelector),
 	)
 	if err != nil {
 		return err
@@ -571,13 +574,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-		executor.WithSemaphoreManager(semaphores),
 	}
 
 	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
 		return err
 	}
+
+	// Wire the executor's invoke-finish callback so the scheduler's Finalize
+	// can fast-resume parent invokes.
+	sched.SetInvokeFinishHandler(exec.HandleInvokeFinish)
 
 	// Create an executor.
 	executorSvc := executor.NewService(

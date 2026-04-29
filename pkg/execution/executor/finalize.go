@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -31,9 +33,69 @@ import (
 // that the function's final status is correct.
 const cancelationGracePeriod = 10 * time.Second
 
+// Cancel cancels an in-progress function run, preventing any enqueued or future
+// steps from running.
+func (s *scheduler) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
+	l := s.log.With(
+		"run_id", id.RunID.String(),
+		"workflow_id", id.FunctionID.String(),
+	)
+
+	md, err := s.smv2.LoadMetadata(ctx, id)
+	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("unable to load run: %w", err)
+	}
+
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier: md.ID,
+		Attempt:    0,
+	})
+
+	// We need events to finalize the function.
+	evts, err := s.smv2.LoadEvents(ctx, id)
+	if errors.Is(err, state.ErrEventNotFound) {
+		// If the event has gone, another thread cancelled the function.
+		l.Warn("cancel: events not found but metadata exists, skipping finalize")
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("unable to load run events: %w", err)
+	}
+
+	// We need the function slug.
+	f, err := s.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if err != nil {
+		return fmt.Errorf("unable to load function: %w", err)
+	}
+
+	if err := s.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: md,
+		Response: execution.FinalizeResponse{
+			Type:           execution.FinalizeResponseDriver,
+			DriverResponse: state.DriverResponse{},
+		},
+		Optional: execution.FinalizeOptional{
+			FnSlug:      f.Function.GetSlug(),
+			InputEvents: evts,
+			Cancel:      true,
+			Reason:      "cancel",
+		},
+	}); err != nil {
+		l.Error("error running finish handler", "error", err)
+	}
+	for _, lc := range s.lifecycles {
+		go lc.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
+	}
+
+	return nil
+}
+
 // Finalize performs run finalization, which involves sending the function
 // finished/failed event and deleting state.
-func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
+func (s *scheduler) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
 	ctx = context.WithoutCancel(ctx)
 	l := logger.StdlibLogger(ctx)
 
@@ -43,8 +105,8 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		endTimeOffset = cancelationGracePeriod
 	}
 
-	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:       e.now(),
+	err := s.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+		EndTime:       s.now(),
 		EndTimeOffset: endTimeOffset,
 		Debug:         &tracing.SpanDebugData{Location: "executor.finalize"},
 		Metadata:      &opts.Metadata,
@@ -64,7 +126,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	// If there are no input events, fetch them.
 	if len(opts.Optional.InputEvents) == 0 {
-		opts.Optional.InputEvents, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
+		opts.Optional.InputEvents, err = s.smv2.LoadEvents(ctx, opts.Metadata.ID)
 		if err != nil {
 			l.Warn(
 				"error loading run events to finalize",
@@ -80,7 +142,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	// run.  We must release them here, before state deletion, so that the semaphore info
 	// from run metadata is still available.  The run ID is used as the idempotency key to
 	// guarantee safe retries.
-	if e.semaphoreManager == nil && len(opts.Metadata.Config.Semaphores) > 0 {
+	if s.semaphoreManager == nil && len(opts.Metadata.Config.Semaphores) > 0 {
 		l.Error(
 			"semaphore manager is nil but run holds semaphores, leading to deadlock",
 			"run_id", opts.Metadata.ID.RunID,
@@ -88,7 +150,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
-	if e.semaphoreManager != nil && len(opts.Metadata.Config.Semaphores) > 0 {
+	if s.semaphoreManager != nil && len(opts.Metadata.Config.Semaphores) > 0 {
 		for _, sem := range opts.Metadata.Config.Semaphores {
 			if sem.Release != constraintapi.SemaphoreReleaseManual {
 				continue
@@ -96,7 +158,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 			// Retry semaphore release — a failure here means the semaphore is permanently
 			// held, which deadlocks all future runs waiting on capacity.
 			_, releaseErr := util.WithRetry(ctx, "release-semaphore", func(ctx context.Context) (struct{}, error) {
-				return struct{}{}, e.semaphoreManager.ReleaseSemaphore(
+				return struct{}{}, s.semaphoreManager.ReleaseSemaphore(
 					ctx,
 					opts.Metadata.ID.Tenant.AccountID,
 					sem.ID,
@@ -117,7 +179,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	}
 
 	// Delete the function state in every case.
-	err = e.smv2.Delete(ctx, opts.Metadata.ID)
+	err = s.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
 		l.Error(
 			"error deleting state in finalize",
@@ -133,20 +195,23 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		},
 	})
 
-	e.finalizeRemoveJobs(ctx, opts)
+	s.finalizeRemoveJobs(ctx, opts)
 
 	// finalizeEvents creates function finished events, and also attempts to fast-resume
 	// any parent function that invoked this run.
-	return e.finalizeEvents(ctx, opts)
+	return s.finalizeEvents(ctx, opts)
 }
 
 // finalizeRemoveJobs removes any other jobs for a finalized run, as the function is
 // marked as finished and no other jobs need to execute.
-func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.FinalizeOpts) {
+func (s *scheduler) finalizeRemoveJobs(ctx context.Context, opts execution.FinalizeOpts) {
 	l := logger.StdlibLogger(ctx)
 
-	// XXX: can we use e.assignedQueueShard here?
-	shard, err := e.shardFinder(
+	if s.shardFinder == nil {
+		return
+	}
+
+	shard, err := s.shardFinder(
 		ctx,
 		opts.Metadata.ID.Tenant.AccountID,
 		nil,
@@ -157,9 +222,6 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
 	// outstanding jobs from the queue, if possible.
-	//
-	// XXX: Remove this typecast and normalize queue interface to a single package
-	// Find all items for the current function run.
 	jobs, err := shard.RunJobs(
 		ctx,
 		opts.Metadata.ID.Tenant.EnvID,
@@ -199,29 +261,25 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 	}
 }
 
-func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOpts) error {
-	if e.finishHandler == nil {
-		// the finishHandler handles sending finalization events.
+func (s *scheduler) finalizeEvents(ctx context.Context, opts execution.FinalizeOpts) error {
+	if s.finishHandler == nil {
 		return nil
 	}
 
 	var (
-		// Track whether this run was an invoke.
 		isInvoke bool
 		fnSlug   = opts.Optional.FnSlug
 		evts     = opts.Optional.InputEvents
 	)
 
-	// Find the function slug.
 	if fnSlug == "" {
-		fn, err := e.fl.LoadFunction(ctx, opts.Metadata.ID.Tenant.EnvID, opts.Metadata.ID.FunctionID)
+		fn, err := s.fl.LoadFunction(ctx, opts.Metadata.ID.Tenant.EnvID, opts.Metadata.ID.FunctionID)
 		if err != nil {
 			return err
 		}
 		fnSlug = fn.Function.Slug
 	}
 
-	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
 		evt, err := event.NewEvent(e)
@@ -231,8 +289,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		inputEvents[n] = *evt
 	}
 
-	// Prepare events that we must send
-	now := e.now()
+	now := s.now()
 	base := &functionFinishedData{
 		FunctionID: fnSlug,
 		RunID:      opts.Metadata.ID.RunID,
@@ -240,36 +297,28 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	}
 	base.setResponse(opts.Response)
 
-	// We'll send many events - some for each items in the batch.  This ensures that invoke works
-	// for batched functions.
 	freshEvents := []event.Event{}
 	for n, runEvt := range inputEvents {
 		if runEvt.Name == event.FnFailedName || runEvt.Name == event.FnFinishedName {
-			// Don't recursively trigger internal finish handlers.
 			continue
 		}
 
 		invokeID := correlationID(runEvt)
 		if invokeID == nil && n > 0 {
-			// We only send function finish events for either the first event in a batch or for
-			// all events with a correlation ID.
 			continue
 		}
 
 		isInvoke = true
 
-		// Copy the base data to set the event.
 		copied := *base
 		copied.Event = runEvt.Map()
 		copied.InvokeCorrelationID = invokeID
 		data := copied.Map()
 
-		// Add a status field.
 		data[consts.InngestEventDataPrefix] = map[string]any{
 			"status": opts.Status(),
 		}
 
-		// Add an `inngest/function.finished` event.
 		freshEvents = append(freshEvents, event.Event{
 			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
 			Name:      event.FnFinishedName,
@@ -280,15 +329,14 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		switch opts.Status() {
 		case enums.StepStatusCancelled:
 			freshEvents = append(freshEvents, event.Event{
-				ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
+				ID:        opts.Metadata.ID.RunID.String(),
 				Name:      event.FnCancelledName,
 				Timestamp: now.UnixMilli(),
 				Data:      data,
 			})
 		case enums.StepStatusFailed:
-			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
 			freshEvents = append(freshEvents, event.Event{
-				ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
+				ID:        opts.Metadata.ID.RunID.String(),
 				Name:      event.FnFailedName,
 				Timestamp: now.UnixMilli(),
 				Data:      data,
@@ -297,12 +345,9 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	}
 
 	// For each event, if this has a correlation ID attempt to resume
-	// the invoke parent within a goroutine.
-	//
-	// Note that sending the event will trigger the event handler pub/sub
-	// listener which _also_ attempts to do this;  however, this introduces
-	// some small delay due to message stream latency.
-	if isInvoke {
+	// the invoke parent within a goroutine.  If no fast-resume callback is
+	// configured, the regular event handler pub/sub flow handles it.
+	if isInvoke && s.invokeFinishHandler != nil {
 		for _, evt := range freshEvents {
 			tracked := event.BaseTrackedEvent{
 				ID:          ulid.MustParse(evt.ID),
@@ -311,7 +356,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 				WorkspaceID: opts.Metadata.ID.Tenant.EnvID,
 			}
 			service.Go(func() {
-				err := e.HandleInvokeFinish(context.WithoutCancel(ctx), tracked)
+				err := s.invokeFinishHandler(context.WithoutCancel(ctx), tracked)
 				if err != nil && !errors.Is(err, ErrNoCorrelationID) {
 					logger.From(ctx).Error("error fast resuming invoke", "error", err)
 				}
@@ -319,15 +364,10 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		}
 	}
 
-	return e.finishHandler(ctx, opts.Metadata.ID, freshEvents)
+	return s.finishHandler(ctx, opts.Metadata.ID, freshEvents)
 }
 
 func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
-	// We're explicitly not setting any output span reference here and passing
-	// `nil` instead. We do this because we need to be setting the function
-	// output twice - once for the execution itself and once for the run span -
-	// in order to appropriately filter this in Cloud and other data stores.
-
 	switch f.Response.Type {
 	case execution.FinalizeResponseAPI:
 		return apiAttributes(f.Response.APIResponse)
@@ -353,7 +393,6 @@ func apiAttributes(res apiresult.APIResult) *meta.SerializableAttrs {
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &compactHeaders)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &res.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(res.Body)))
-	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
 	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(res.Body)))
 
 	return rawAttrs
@@ -363,9 +402,8 @@ func runCompleteAttrs(gen state.GeneratorOpcode) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
 	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, inngestgo.Ptr(200)) // Must be to have this code.  It's an async fn.
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, inngestgo.Ptr(200))
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(gen.Data)))
-	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
 	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(gen.Data)))
 
 	rawAttrs = rawAttrs.Merge(tracing.GeneratorAttrs(&gen))

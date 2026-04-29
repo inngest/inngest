@@ -183,6 +183,34 @@ func WithSchedulerEnableBatchingInstrumentation(ebi func(ctx context.Context, ac
 	}
 }
 
+func WithSchedulerFunctionLoader(fl state.FunctionLoader) SchedulerOpt {
+	return func(s *scheduler) error {
+		s.fl = fl
+		return nil
+	}
+}
+
+func WithSchedulerFinishHandler(f execution.FinalizePublisher) SchedulerOpt {
+	return func(s *scheduler) error {
+		s.finishHandler = f
+		return nil
+	}
+}
+
+func WithSchedulerSemaphoreManager(sm constraintapi.SemaphoreManager) SchedulerOpt {
+	return func(s *scheduler) error {
+		s.semaphoreManager = sm
+		return nil
+	}
+}
+
+func WithSchedulerShardSelector(sel queue.ShardSelector) SchedulerOpt {
+	return func(s *scheduler) error {
+		s.shardFinder = sel
+		return nil
+	}
+}
+
 type scheduler struct {
 	log               logger.Logger
 	conditionalTracer itrace.ConditionalTracer
@@ -205,6 +233,35 @@ type scheduler struct {
 
 	clock      clockwork.Clock
 	lifecycles []execution.LifecycleListener
+
+	// fields below support Cancel and Finalize.
+	fl               state.FunctionLoader
+	finishHandler    execution.FinalizePublisher
+	semaphoreManager constraintapi.SemaphoreManager
+	shardFinder      queue.ShardSelector
+
+	// invokeFinishHandler optionally provides a fast-resume path for invoke
+	// pauses when an executor is paired with this scheduler.  When nil, parent
+	// invokes are still resumed via the regular event handler pub/sub flow.
+	invokeFinishHandler func(ctx context.Context, evt event.TrackedEvent) error
+}
+
+// SetInvokeFinishHandler wires a fast-resume callback used by Finalize to
+// resume parent invokes immediately rather than waiting for the pub/sub event
+// handler.  Typically called by the executor after construction so the
+// scheduler can delegate back into executor-internal logic.
+func (s *scheduler) SetInvokeFinishHandler(fn func(ctx context.Context, evt event.TrackedEvent) error) {
+	s.invokeFinishHandler = fn
+}
+
+// SetFinalizer sets the finish handler used to publish finalization events.
+func (s *scheduler) SetFinalizer(f execution.FinalizePublisher) {
+	s.finishHandler = f
+}
+
+// AddLifecycleListener appends a lifecycle listener.
+func (s *scheduler) AddLifecycleListener(l execution.LifecycleListener) {
+	s.lifecycles = append(s.lifecycles, l)
 }
 
 func (s *scheduler) now() time.Time {

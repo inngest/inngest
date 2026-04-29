@@ -16,14 +16,12 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
-	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -68,6 +66,7 @@ var (
 	ErrRuntimeRegistered          = fmt.Errorf("runtime is already registered")
 	ErrNoStateManager             = fmt.Errorf("no state manager provided")
 	ErrNoPauseManager             = fmt.Errorf("no pause manager provided")
+	ErrNoScheduler                = fmt.Errorf("no scheduler provided")
 	ErrNoActionLoader             = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver            = fmt.Errorf("runtime driver for action not found")
 	ErrFunctionDebounced          = fmt.Errorf("function debounced")
@@ -138,6 +137,10 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 		return nil, ErrNoPauseManager
 	}
 
+	if m.Scheduler == nil {
+		return nil, ErrNoScheduler
+	}
+
 	if m.httpClient == nil {
 		// Default to the secure client.
 		m.httpClient = exechttp.Client(exechttp.SecureDialerOpts{})
@@ -155,7 +158,7 @@ type ExecutorOpt func(m execution.Executor) error
 
 func WithScheduler(sched execution.Scheduler) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).sched = sched
+		e.(*executor).Scheduler = sched
 		return nil
 	}
 }
@@ -221,13 +224,6 @@ func WithLogger(l logger.Logger) ExecutorOpt {
 	}
 }
 
-func WithFinalizer(f execution.FinalizePublisher) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).SetFinalizer(f)
-		return nil
-	}
-}
-
 func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).invokeFailHandler = f
@@ -261,15 +257,6 @@ func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
 func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).stateSizeLimit = limit
-		return nil
-	}
-}
-
-// WithSemaphoreManager assigns a semaphore manager to the executor, used to release
-// from semaphores when functions end (for fn concurrency)
-func WithSemaphoreManager(sm constraintapi.SemaphoreManager) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).semaphoreManager = sm
 		return nil
 	}
 }
@@ -407,6 +394,10 @@ func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 
 // executor represents a built-in executor for running workflows.
 type executor struct {
+	// Embedded so Scheduler methods (Schedule, Cancel, Finalize, etc.) are
+	// auto-promoted onto *executor without manual delegators.
+	execution.Scheduler
+
 	log logger.Logger
 
 	// exprAggregator is an expression aggregator used to parse and aggregate expressions
@@ -416,17 +407,10 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
-	// sched handles scheduling concerns (Schedule, AppendAndScheduleBatch,
-	// RetrieveAndScheduleBatch). The executor delegates these calls to it.
-	sched execution.Scheduler
-
 	queue queue.Queue
-
-	semaphoreManager constraintapi.SemaphoreManager
 
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	finishHandler       execution.FinalizePublisher
 	invokeFailHandler   execution.InvokeFailHandler
 	handleInvokeEvent   execution.HandleInvokeEvent
 	cancellationChecker cancellation.Checker
@@ -460,22 +444,6 @@ type executor struct {
 	clock             clockwork.Clock
 
 	conditionalTracer itrace.ConditionalTracer
-}
-
-func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
-	return e.sched.Schedule(ctx, req)
-}
-
-func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *execution.BatchExecOpts) error {
-	return e.sched.AppendAndScheduleBatch(ctx, fn, bi, opts)
-}
-
-func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
-	return e.sched.RetrieveAndScheduleBatch(ctx, fn, payload, opts)
-}
-
-func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
-	e.finishHandler = f
 }
 
 func (e *executor) SetInvokeFailHandler(f execution.InvokeFailHandler) {
@@ -1948,67 +1916,6 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 		StepName:       resumeData.StepName,
 		IdempotencyKey: correlationID,
 	})
-}
-
-// Cancel cancels an in-progress function.
-func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
-	l := e.log.With(
-		"run_id", id.RunID.String(),
-		"workflow_id", id.FunctionID.String(),
-	)
-
-	md, err := e.smv2.LoadMetadata(ctx, id)
-	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("unable to load run: %w", err)
-	}
-
-	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-		Identifier: md.ID,
-		Attempt:    0,
-	})
-
-	// We need events to finalize the function.
-	evts, err := e.smv2.LoadEvents(ctx, id)
-	if errors.Is(err, state.ErrEventNotFound) {
-		// If the event has gone, another thread cancelled the function.
-		l.Warn("cancel: events not found but metadata exists, skipping finalize")
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("unable to load run events: %w", err)
-	}
-
-	// We need the function slug.
-	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
-	if err != nil {
-		return fmt.Errorf("unable to load function: %w", err)
-	}
-
-	if err := e.Finalize(ctx, execution.FinalizeOpts{
-		Metadata: md,
-		// Always, when called from the executor, as this handles async
-		// finalization.
-		Response: execution.FinalizeResponse{
-			Type:           execution.FinalizeResponseDriver,
-			DriverResponse: state.DriverResponse{}, // empty.
-		},
-		Optional: execution.FinalizeOptional{
-			FnSlug:      f.Function.GetSlug(),
-			InputEvents: evts,
-			Cancel:      true,
-			Reason:      "cancel",
-		},
-	}); err != nil {
-		l.Error("error running finish handler", "error", err)
-	}
-	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
-	}
-
-	return nil
 }
 
 // ResumePauseTimeout times out a step.  This is used to reusme a pause from timeout when:
