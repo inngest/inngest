@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inngest/inngest/cmd/debug"
 	"github.com/inngest/inngest/cmd/devserver"
 	"github.com/inngest/inngest/cmd/start"
 	"github.com/inngest/inngest/cmd/version"
@@ -78,7 +77,7 @@ func execute() {
 			devserver.Command(),
 			version.Command(),
 			start.Command(),
-			debug.Command(),
+			alpha(),
 		},
 	}
 
