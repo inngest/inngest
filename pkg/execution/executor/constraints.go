@@ -35,6 +35,7 @@ const (
 func WithConstraints[T any](
 	ctx context.Context,
 	now time.Time,
+	requestTime time.Time,
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
@@ -106,6 +107,7 @@ func WithConstraints[T any](
 	checkResult, err := CheckConstraints(
 		ctx,
 		now,
+		requestTime,
 		capacityManager,
 		useConstraintAPI,
 		req,
@@ -369,6 +371,7 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 func CheckConstraints(
 	ctx context.Context,
 	now time.Time,
+	requestTime time.Time,
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
@@ -419,6 +422,7 @@ func CheckConstraints(
 		Constraints:       constraints,
 		Amount:            1,
 		CurrentTime:       now,
+		RequestTime:       requestTime,
 		Duration:          ScheduleLeaseDuration,
 		MaximumLifetime:   5 * time.Minute, // This lease should be short!
 		Source:            source,
