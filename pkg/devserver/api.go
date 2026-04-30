@@ -355,9 +355,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 	// Get a list of all functions
 	existing, _ := tx.GetFunctionsByAppInternalID(ctx, appID)
-	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
-	// this set.
-	seen := map[uuid.UUID]struct{}{}
 
 	// Parse, validate, and enrich functions via the shared registration pipeline.
 	processed, err := registration.ProcessFunctions(ctx, r, registration.ProcessOpts{
@@ -370,14 +367,37 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
+	// Pre-compute the set of function IDs the new sync will produce, then
+	// archive any existing function for this app that isn't in the set.
+	//
+	// This MUST happen before the insert/update loop below: function IDs are
+	// derived deterministically from (Name + serve URL), so when an SDK's
+	// URL changes (random ports across test runs, new proxy in front of an
+	// app, etc.) the same logical function gets a fresh UUID. The old row
+	// keeps its (app_id, slug) pair active, and the partial unique index
+	// (functions_app_id_slug_active_key) would otherwise reject the new
+	// row's INSERT before we get a chance to archive the predecessor.
+	seen := make(map[uuid.UUID]struct{}, len(processed.Functions))
+	for _, df := range processed.Functions {
+		seen[df.Function.ID] = struct{}{}
+	}
+	earlyDeletes := []uuid.UUID{}
+	for _, fn := range existing {
+		if _, ok := seen[fn.ID]; !ok {
+			earlyDeletes = append(earlyDeletes, fn.ID)
+		}
+	}
+	if len(earlyDeletes) > 0 {
+		if err = tx.DeleteFunctionsByIDs(ctx, earlyDeletes); err != nil {
+			return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
+		}
+	}
+
 	for _, df := range processed.Functions {
 		fn := &df.Function
 
 		// Ensure function version is at least 1 and incremented on re-sync
 		fn.FunctionVersion = max(fn.FunctionVersion, 1)
-
-		// Mark as seen.
-		seen[fn.ID] = struct{}{}
 
 		fnExists := false
 		var currentFn *inngest.Function
@@ -462,20 +482,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		Modified: true,
 		AppID:    &appID,
 		SyncID:   &syncID,
-	}
-
-	// Remove all unseen functions.
-	deletes := []uuid.UUID{}
-	for _, fn := range existing {
-		if _, ok := seen[fn.ID]; !ok {
-			deletes = append(deletes, fn.ID)
-		}
-	}
-	if len(deletes) == 0 {
-		return reply, nil
-	}
-	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
-		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
 	return reply, nil
 }
