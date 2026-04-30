@@ -83,6 +83,9 @@ SELECT * FROM functions WHERE id = $1;
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = $1 AND archived_at IS NULL;
 
+-- name: GetFunctionByAppIDAndSlug :one
+SELECT * FROM functions WHERE app_id = $1 AND slug = $2 AND archived_at IS NULL;
+
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = $1, archived_at = NULL WHERE id = $2 RETURNING *;
 

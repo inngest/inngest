@@ -32,6 +32,7 @@ type Querier interface {
 	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
 	GetEventsIDbound(ctx context.Context, arg GetEventsIDboundParams) ([]*Event, error)
 	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*GetExecutionSpanByStepIDAndAttemptRow, error)
+	GetFunctionByAppIDAndSlug(ctx context.Context, arg GetFunctionByAppIDAndSlugParams) (*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunctionRunRow, error)

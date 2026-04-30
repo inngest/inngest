@@ -158,6 +158,17 @@ func (pq *pgQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*db.Fu
 	return functionFromPG(r), nil
 }
 
+func (pq *pgQuerier) GetFunctionByAppIDAndSlug(ctx context.Context, appID uuid.UUID, slug string) (*db.Function, error) {
+	r, err := pq.q.GetFunctionByAppIDAndSlug(ctx, sqlc.GetFunctionByAppIDAndSlugParams{
+		AppID: appID,
+		Slug:  slug,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return functionFromPG(r), nil
+}
+
 func (pq *pgQuerier) GetFunctions(ctx context.Context) ([]*db.Function, error) {
 	rows, err := pq.q.GetFunctions(ctx)
 	if err != nil {

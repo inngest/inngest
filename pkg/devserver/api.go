@@ -367,19 +367,25 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
-	// Pre-compute the set of function IDs the new sync will produce, then
-	// archive any existing function for this app that isn't in the set.
+	// Resolve each new function to its persisted row by (app_id, slug) — the
+	// natural identity per the partial unique index — and rewrite the SDK's
+	// freshly-minted UUID to whatever was persisted. This makes URL rotation
+	// (which changes the deterministic UUID via Function.URI) a no-op: the
+	// existing row is reused and the old UUID stays the canonical handle for
+	// any function_runs / history rows that already reference it.
 	//
-	// This MUST happen before the insert/update loop below: function IDs are
-	// derived deterministically from (Name + serve URL), so when an SDK's
-	// URL changes (random ports across test runs, new proxy in front of an
-	// app, etc.) the same logical function gets a fresh UUID. The old row
-	// keeps its (app_id, slug) pair active, and the partial unique index
-	// (functions_app_id_slug_active_key) would otherwise reject the new
-	// row's INSERT before we get a chance to archive the predecessor.
+	// After resolution, the seen set is used to archive functions that are
+	// no longer present in this sync. Doing the archival before the
+	// insert/update loop also guards against a cross-product edge case
+	// (slug rename combined with URL change) where the predecessor would
+	// otherwise still be active when the new row's INSERT runs.
 	seen := make(map[uuid.UUID]struct{}, len(processed.Functions))
-	for _, df := range processed.Functions {
-		seen[df.Function.ID] = struct{}{}
+	for i := range processed.Functions {
+		fn := &processed.Functions[i].Function
+		if persisted, err := tx.GetActiveFunctionByAppAndSlug(ctx, appID, fn.Slug); err == nil && persisted != nil {
+			fn.ID = persisted.ID
+		}
+		seen[fn.ID] = struct{}{}
 	}
 	earlyDeletes := []uuid.UUID{}
 	for _, fn := range existing {

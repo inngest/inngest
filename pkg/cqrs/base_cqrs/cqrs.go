@@ -1093,6 +1093,15 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 	return domainToCQRS(fn, domainFunction), nil
 }
 
+func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appID uuid.UUID, slug string) (*cqrs.Function, error) {
+	fn, err := w.q.GetFunctionByAppIDAndSlug(ctx, appID, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainToCQRS(fn, domainFunction), nil
+}
+
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	fns, err := w.q.GetFunctions(ctx)
 	if err != nil {

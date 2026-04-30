@@ -621,6 +621,30 @@ func (q *Queries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg Ge
 	return &i, err
 }
 
+const getFunctionByAppIDAndSlug = `-- name: GetFunctionByAppIDAndSlug :one
+SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE app_id = ? AND slug = ? AND archived_at IS NULL
+`
+
+type GetFunctionByAppIDAndSlugParams struct {
+	AppID uuid.UUID
+	Slug  string
+}
+
+func (q *Queries) GetFunctionByAppIDAndSlug(ctx context.Context, arg GetFunctionByAppIDAndSlugParams) (*Function, error) {
+	row := q.db.QueryRowContext(ctx, getFunctionByAppIDAndSlug, arg.AppID, arg.Slug)
+	var i Function
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Name,
+		&i.Slug,
+		&i.Config,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return &i, err
+}
+
 const getFunctionByID = `-- name: GetFunctionByID :one
 SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE id = ?
 `
