@@ -5542,9 +5542,19 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	return ref, nil
 }
 
+// true for pause-backed opcodes — ones the server resumes later
+// via a timer, event, signal, or external call completion
 func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 	for _, op := range ops {
-		if op.Op == enums.OpcodeStepPlanned {
+		switch op.Op {
+		case
+			enums.OpcodeAIGateway,
+			enums.OpcodeGateway,
+			enums.OpcodeInvokeFunction,
+			enums.OpcodeSleep,
+			enums.OpcodeStepPlanned,
+			enums.OpcodeWaitForEvent,
+			enums.OpcodeWaitForSignal:
 			return true
 		}
 	}
