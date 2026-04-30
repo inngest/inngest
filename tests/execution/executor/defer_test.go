@@ -32,175 +32,85 @@ import (
 
 // TestFinalizeEmitsDeferredStartEvents verifies that when a run with defers
 // is finalized, the executor emits an inngest/deferred.start event for each
-// defer whose ScheduleStatus is AfterRun.
+// defer whose ScheduleStatus is AfterRun (and none for Cancelled).
 func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
-	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
+	r := require.New(t)
+	infra := newDeferTestInfra(t)
+	ctx := infra.ctx
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
-	require.NoError(t, err)
-	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
-	loader := dbcqrs.(state.FunctionLoader)
-
-	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-
-	fn := inngest.Function{
-		ID:              fnID,
-		FunctionVersion: 1,
-		Name:            "test-fn",
-		Slug:            "test-fn",
-		Steps: []inngest.Step{
-			{ID: "step-1", Name: "step-1", URI: "/step-1"},
-		},
-	}
-
-	config, err := json.Marshal(fn)
-	require.NoError(t, err)
-
-	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{ID: appID, Name: "test-app"})
-	require.NoError(t, err)
-
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
-		ID: fnID, AppID: appID, Name: fn.Name, Slug: fn.Slug, Config: string(config),
-	})
-	require.NoError(t, err)
-
-	_, shardedRc, err := createInmemoryRedis(t)
-	require.NoError(t, err)
-	defer shardedRc.Close()
-
-	_, unshardedRc, err := createInmemoryRedis(t)
-	require.NoError(t, err)
-	defer unshardedRc.Close()
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: shardedRc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-		BatchClient:            shardedRc,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-	})
-
-	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
-
-	var sm state.Manager
-	sm, err = redis_state.New(ctx,
-		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithPauseDeleter(pauseMgr),
-	)
-	require.NoError(t, err)
-	smv2 := redis_state.MustRunServiceV2(sm)
-
-	queueOpts := []queue.QueueOpt{queue.WithIdempotencyTTL(time.Hour)}
-	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
-
-	rq, err := queue.New(
-		ctx, "test-queue", queueShard,
-		map[string]queue.QueueShard{queueShard.Name(): queueShard},
-		shardSelector, queueOpts...,
-	)
-	require.NoError(t, err)
-
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauseMgr),
-		executor.WithQueue(rq),
-		executor.WithLogger(logger.StdlibLogger(ctx)),
-		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-	)
-	require.NoError(t, err)
-
+	exec := infra.newExecutor(t, nil)
 	var capturedEvents []event.Event
 	exec.SetFinalizer(func(ctx context.Context, id statev2.ID, events []event.Event) error {
 		capturedEvents = append(capturedEvents, events...)
 		return nil
 	})
 
-	now := time.Now()
-	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
-
-	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
-		Function:    fn,
-		At:          &now,
-		AccountID:   aID,
-		WorkspaceID: wsID,
-		AppID:       appID,
-		Events: []event.TrackedEvent{
-			event.NewBaseTrackedEventWithID(event.Event{
-				Name: "test/event",
-			}, evtID),
-		},
-	})
-	require.NoError(t, err)
+	run := infra.scheduleRun(t, exec)
 
 	// Nested input verifies the event carries structured JSON rather than a stringified payload.
 	nestedInputJSON := `{"user":{"id":"u_123","meta":{"role":"admin","tags":["a","b"]}},"score":0.87}`
-	activeDefer := statev2.Defer{
+	r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-score",
 		HashedID:       "hash-active",
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(nestedInputJSON),
-	}
-	cancelledDefer := statev2.Defer{
+	}))
+	r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-cleanup",
 		HashedID:       "hash-cancelled",
 		ScheduleStatus: statev2.ScheduleStatusCancelled,
 		Input:          json.RawMessage(`{}`),
-	}
+	}))
 
-	require.NoError(t, smv2.SaveDefer(ctx, run.ID, activeDefer))
-	require.NoError(t, smv2.SaveDefer(ctx, run.ID, cancelledDefer))
-
-	err = exec.Finalize(ctx, execution.FinalizeOpts{
+	err := exec.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: *run,
 		Response: execution.FinalizeResponse{
 			Type:        execution.FinalizeResponseRunComplete,
 			RunComplete: state.GeneratorOpcode{Op: enums.OpcodeRunComplete},
 		},
 		Optional: execution.FinalizeOptional{
-			FnSlug: fn.Slug,
+			FnSlug: infra.fn.Slug,
 		},
 	})
-	require.NoError(t, err)
+	r.NoError(err)
 
-	var deferredEvents []event.Event
+	// Collect every deferred.start fn_slug so we can assert presence/absence
+	// in one shot. Asserting an exact slice catches both the length and the
+	// negative-case (cancelled defer must not emit) regression at once.
+	var deferredFnSlugs []string
+	var activeData map[string]any
 	for _, evt := range capturedEvents {
-		if evt.Name == "inngest/deferred.start" {
-			deferredEvents = append(deferredEvents, evt)
+		if evt.Name != "inngest/deferred.start" {
+			continue
+		}
+		raw, err := json.Marshal(evt.Data)
+		r.NoError(err)
+		var data map[string]any
+		r.NoError(json.Unmarshal(raw, &data))
+		inn := data["_inngest"].(map[string]any)
+		slug := inn["fn_slug"].(string)
+		deferredFnSlugs = append(deferredFnSlugs, slug)
+		if slug == "onDefer-score" {
+			activeData = data
 		}
 	}
 
-	// Only the active defer should produce an event; the cancelled one should not.
-	require.Len(t, deferredEvents, 1, "expected exactly one inngest/deferred.start event")
+	r.Equal([]string{"onDefer-score"}, deferredFnSlugs,
+		"only the AfterRun defer should emit deferred.start; cancelled must not")
+	r.NotNil(activeData)
 
-	evt := deferredEvents[0]
-	evtData, err := json.Marshal(evt.Data)
-	require.NoError(t, err)
+	inn := activeData["_inngest"].(map[string]any)
+	r.Equal(infra.fn.Slug, inn["parent_fn_slug"])
+	r.Equal(run.ID.RunID.String(), inn["parent_run_id"])
 
-	var data map[string]any
-	require.NoError(t, json.Unmarshal(evtData, &data))
-
-	inngestData := data["_inngest"].(map[string]any)
-	require.Equal(t, "onDefer-score", inngestData["fn_slug"])
-	require.Equal(t, fn.Slug, inngestData["parent_fn_slug"])
-	require.Equal(t, run.ID.RunID.String(), inngestData["parent_run_id"])
-
-	user, ok := data["user"].(map[string]any)
-	require.True(t, ok, "data.user should be a JSON object, got %T", data["user"])
-	require.Equal(t, "u_123", user["id"])
+	user, ok := activeData["user"].(map[string]any)
+	r.True(ok, "data.user should be a JSON object, got %T", activeData["user"])
+	r.Equal("u_123", user["id"])
 	meta, ok := user["meta"].(map[string]any)
-	require.True(t, ok, "data.user.meta should be a JSON object, got %T", user["meta"])
-	require.Equal(t, "admin", meta["role"])
-	require.Equal(t, []any{"a", "b"}, meta["tags"])
-	require.Equal(t, 0.87, data["score"])
+	r.True(ok, "data.user.meta should be a JSON object, got %T", user["meta"])
+	r.Equal("admin", meta["role"])
+	r.Equal([]any{"a", "b"}, meta["tags"])
+	r.Equal(0.87, activeData["score"])
 }
 
 // deferTestInfra holds the shared state manager, queue, and loader used by the
