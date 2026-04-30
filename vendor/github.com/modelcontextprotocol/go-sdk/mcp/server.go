@@ -1026,11 +1026,18 @@ func (s *Server) Connect(ctx context.Context, t Transport, opts *ServerSessionOp
 	}
 
 	s.opts.Logger.Info("server connecting")
-	ss, err := connect(ctx, t, s, state, onClose)
+	ss, err := connect(ctx, t, s, state, onClose, s.opts.Logger)
 	if err != nil {
 		s.opts.Logger.Error("server connect error", "error", err)
 		return nil, err
 	}
+
+	// Start keepalive before returning the session to avoid race conditions with Close.
+	// This is safe because the spec allows sending pings before initialization (see ServerSession.handle for details).
+	if s.opts.KeepAlive > 0 {
+		ss.startKeepalive(ss.server.opts.KeepAlive)
+	}
+
 	return ss, nil
 }
 
@@ -1057,9 +1064,6 @@ func (ss *ServerSession) initialized(ctx context.Context, params *InitializedPar
 	if wasInitd {
 		ss.server.opts.Logger.Error("duplicate initialized notification")
 		return nil, fmt.Errorf("duplicate %q received", notificationInitialized)
-	}
-	if ss.server.opts.KeepAlive > 0 {
-		ss.startKeepalive(ss.server.opts.KeepAlive)
 	}
 	if h := ss.server.opts.InitializedHandler; h != nil {
 		h(ctx, serverRequestFor(ss, params))
@@ -1110,7 +1114,7 @@ type ServerSession struct {
 	server          *Server
 	conn            *jsonrpc2.Connection
 	mcpConn         Connection
-	keepaliveCancel context.CancelFunc // TODO: theory around why keepaliveCancel need not be guarded
+	keepaliveCancel context.CancelFunc
 
 	mu    sync.Mutex
 	state ServerSessionState
@@ -1504,7 +1508,8 @@ func (ss *ServerSession) setLevel(_ context.Context, params *SetLoggingLevelPara
 func (ss *ServerSession) Close() error {
 	if ss.keepaliveCancel != nil {
 		// Note: keepaliveCancel access is safe without a mutex because:
-		// 1. keepaliveCancel is only written once during startKeepalive (happens-before all Close calls)
+		// 1. keepaliveCancel is only written once during Server.Connect (through startKeepalive),
+		//    which happens before any code that may call Close from another goroutine
 		// 2. context.CancelFunc is safe to call multiple times and from multiple goroutines
 		// 3. The keepalive goroutine calls Close on ping failure, but this is safe since
 		//    Close is idempotent and conn.Close() handles concurrent calls correctly
@@ -1526,7 +1531,7 @@ func (ss *ServerSession) Wait() error {
 
 // startKeepalive starts the keepalive mechanism for this server session.
 func (ss *ServerSession) startKeepalive(interval time.Duration) {
-	startKeepalive(ss, interval, &ss.keepaliveCancel)
+	startKeepalive(ss, interval, &ss.keepaliveCancel, ss.server.opts.Logger)
 }
 
 // pageToken is the internal structure for the opaque pagination cursor.

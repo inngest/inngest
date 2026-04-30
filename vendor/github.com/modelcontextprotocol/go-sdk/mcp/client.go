@@ -253,7 +253,7 @@ func (c *Client) capabilities(protocolVersion string) *ClientCapabilities {
 // server, calls or notifications will return an error wrapping
 // [ErrConnectionClosed].
 func (c *Client) Connect(ctx context.Context, t Transport, opts *ClientSessionOptions) (cs *ClientSession, err error) {
-	cs, err = connect(ctx, t, c, (*clientSessionState)(nil), nil)
+	cs, err = connect(ctx, t, c, (*clientSessionState)(nil), nil, c.opts.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,8 @@ func (cs *ClientSession) ID() string {
 // Close is idempotent and concurrency safe.
 func (cs *ClientSession) Close() error {
 	// Note: keepaliveCancel access is safe without a mutex because:
-	// 1. keepaliveCancel is only written once during startKeepalive (happens-before all Close calls)
+	// 1. keepaliveCancel is only written once during Client.Connect (through startKeepalive),
+	//    which happens before any code that may call Close from another goroutine
 	// 2. context.CancelFunc is safe to call multiple times and from multiple goroutines
 	// 3. The keepalive goroutine calls Close on ping failure, but this is safe since
 	//    Close is idempotent and conn.Close() handles concurrent calls correctly
@@ -404,7 +405,7 @@ func (cs *ClientSession) registerElicitationWaiter(elicitationID string) (await 
 
 // startKeepalive starts the keepalive mechanism for this client session.
 func (cs *ClientSession) startKeepalive(interval time.Duration) {
-	startKeepalive(cs, interval, &cs.keepaliveCancel)
+	startKeepalive(cs, interval, &cs.keepaliveCancel, cs.client.opts.Logger)
 }
 
 // AddRoots adds the given roots to the client,

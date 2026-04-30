@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/modelcontextprotocol/go-sdk/internal/util"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
 )
@@ -34,6 +35,10 @@ type ClientIDMetadataDocumentConfig struct {
 type DynamicClientRegistrationConfig struct {
 	// Metadata to be used in dynamic client registration request as per
 	// https://datatracker.ietf.org/doc/html/rfc7591#section-2.
+	//
+	// If Metadata.ApplicationType is empty, it will be inferred from
+	// Metadata.RedirectURIs. When set, it will be validated against the inferred type
+	// and an error will be returned if they conflict.
 	Metadata *oauthex.ClientRegistrationMetadata
 }
 
@@ -150,6 +155,12 @@ func NewAuthorizationCodeHandler(config *AuthorizationCodeHandlerConfig) (*Autho
 		} else if !slices.Contains(dCfg.Metadata.RedirectURIs, config.RedirectURL) {
 			return nil, fmt.Errorf("RedirectURL %q is not in the list of allowed redirect URIs for dynamic client registration", config.RedirectURL)
 		}
+		applicationType := inferApplicationType(dCfg.Metadata.RedirectURIs)
+		if dCfg.Metadata.ApplicationType == "" {
+			dCfg.Metadata.ApplicationType = applicationType
+		} else if dCfg.Metadata.ApplicationType != applicationType {
+			return nil, fmt.Errorf("application type %q conflicts with the application type inferred from redirect URIs", dCfg.Metadata.ApplicationType)
+		}
 	}
 	if config.RedirectURL == "" {
 		// If the RedirectURL was supposed to be set by the dynamic client registration,
@@ -168,6 +179,36 @@ func isNonRootHTTPSURL(u string) bool {
 		return false
 	}
 	return pu.Scheme == "https" && pu.Path != ""
+}
+
+// inferApplicationType returns an application type based on the redirect URIs.
+func inferApplicationType(redirectURIs []string) string {
+	hasNative := false
+	hasWeb := false
+	for _, uri := range redirectURIs {
+		u, err := url.Parse(uri)
+		if err != nil {
+			return ""
+		}
+		switch u.Scheme {
+		case "http", "https":
+			if util.IsLoopback(u.Hostname()) {
+				hasNative = true
+			} else {
+				hasWeb = true
+			}
+		default:
+			hasNative = true
+		}
+	}
+
+	if hasNative && hasWeb {
+		return ""
+	}
+	if hasNative {
+		return "native"
+	}
+	return "web"
 }
 
 // Authorize performs the authorization flow.

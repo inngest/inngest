@@ -10,11 +10,14 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
+	"github.com/modelcontextprotocol/go-sdk/internal/util"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 )
 
@@ -52,9 +55,17 @@ type SSEHandler struct {
 }
 
 // SSEOptions specifies options for an [SSEHandler].
-// for now, it is empty, but may be extended in future.
-// https://github.com/modelcontextprotocol/go-sdk/issues/507
-type SSEOptions struct{}
+type SSEOptions struct {
+	// DisableLocalhostProtection disables automatic DNS rebinding protection.
+	// By default, requests arriving via a localhost address (127.0.0.1, [::1])
+	// that have a non-localhost Host header are rejected with 403 Forbidden.
+	// This protects against DNS rebinding attacks regardless of whether the
+	// server is listening on localhost specifically or on 0.0.0.0.
+	//
+	// Only disable this if you understand the security implications.
+	// See: https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices#local-mcp-server-compromise
+	DisableLocalhostProtection bool
+}
 
 // NewSSEHandler returns a new [SSEHandler] that creates and manages MCP
 // sessions created via incoming HTTP requests.
@@ -179,9 +190,27 @@ func (t *SSEServerTransport) Connect(context.Context) (Connection, error) {
 }
 
 func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	sessionID := req.URL.Query().Get("sessionid")
+	// DNS rebinding protection: auto-enabled for localhost servers.
+	// See: https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices#local-mcp-server-compromise
+	if !h.opts.DisableLocalhostProtection && disablelocalhostprotection != "1" {
+		if localAddr, ok := req.Context().Value(http.LocalAddrContextKey).(net.Addr); ok && localAddr != nil {
+			if util.IsLoopback(localAddr.String()) && !util.IsLoopback(req.Host) {
+				http.Error(w, fmt.Sprintf("Forbidden: invalid Host header %q", req.Host), http.StatusForbidden)
+				return
+			}
+		}
+	}
 
-	// TODO: consider checking Content-Type here. For now, we are lax.
+	// Validate 'Content-Type' header.
+	if req.Method == http.MethodPost {
+		mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+		if err != nil || mediaType != "application/json" {
+			http.Error(w, "Content-Type must be 'application/json'", http.StatusUnsupportedMediaType)
+			return
+		}
+	}
+
+	sessionID := req.URL.Query().Get("sessionid")
 
 	// For POST requests, the message body is a message to send to a session.
 	if req.Method == http.MethodPost {

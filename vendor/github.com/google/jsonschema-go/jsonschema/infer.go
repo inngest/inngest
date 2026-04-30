@@ -7,6 +7,7 @@
 package jsonschema
 
 import (
+	"encoding"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -199,13 +200,11 @@ func forType(t reflect.Type, seen map[reflect.Type]bool, ignore bool, schemas ma
 		// Unrestricted
 
 	case reflect.Map:
-		if t.Key().Kind() != reflect.String {
+		if t.Key().Kind() != reflect.String && !t.Key().Implements(reflect.TypeFor[encoding.TextMarshaler]()) {
 			if ignore {
 				return nil, nil // ignore
 			}
 			return nil, fmt.Errorf("unsupported map key type %v", t.Key().Kind())
-		}
-		if t.Key().Kind() != reflect.String {
 		}
 		s.Type = "object"
 		s.AdditionalProperties, err = forType(t.Elem(), seen, ignore, schemas)
