@@ -166,36 +166,6 @@ type acquireScriptResponse struct {
 	RetryAt              int                       `json:"ra"`
 	Debug                flexibleStringArray       `json:"d"`
 	CacheHit             int                       `json:"ch"`
-	ConstraintUsage      []constraintUsageResponse `json:"cu"`
-}
-
-type constraintUsageResponse struct {
-	Limit int `json:"l"`
-	Usage int `json:"u"`
-}
-
-func buildConstraintUsage(
-	parsedUsage []constraintUsageResponse,
-	sortedConstraints []ConstraintItem,
-) ([]ConstraintUsage, error) {
-	if len(parsedUsage) == 0 {
-		return nil, nil
-	}
-
-	if len(parsedUsage) != len(sortedConstraints) {
-		return nil, fmt.Errorf("expected %d constraint usage entries, got %d", len(sortedConstraints), len(parsedUsage))
-	}
-
-	constraintUsage := make([]ConstraintUsage, 0, len(parsedUsage))
-	for i, v := range parsedUsage {
-		constraintUsage = append(constraintUsage, ConstraintUsage{
-			Constraint: sortedConstraints[i],
-			Limit:      v.Limit,
-			Used:       v.Usage,
-		})
-	}
-
-	return constraintUsage, nil
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -441,11 +411,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		},
 	})
 
-	constraintUsage, err := buildConstraintUsage(parsedResponse.ConstraintUsage, sortedConstraints)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "invalid constraint usage response: %w", err)
-	}
-
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
@@ -463,7 +428,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 				Duration:             req.Duration,
 				Source:               req.Source,
 				GrantedLeases:        leases,
-				Usage:                constraintUsage,
 			})
 			if err != nil {
 				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
@@ -549,7 +513,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			LimitingConstraints:  limitingConstraints,
 			ExhaustedConstraints: exhaustedConstraints,
 			FairnessReduction:    parsedResponse.FairnessReduction,
-			Usage:                constraintUsage,
 			RetryAfter:           retryAfter,
 			internalDebugState:   parsedResponse,
 		}, nil
@@ -569,7 +532,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			ExhaustedConstraints: exhaustedConstraints,
 			RetryAfter:           retryAfter,
 			FairnessReduction:    parsedResponse.FairnessReduction,
-			Usage:                constraintUsage,
 			internalDebugState:   parsedResponse,
 		}, nil
 
