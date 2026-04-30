@@ -41,6 +41,9 @@ type BacklogConcurrencyKey struct {
 }
 
 type BacklogThrottle struct {
+	// Scope controls whether this throttle applies to the function, environment, or account.
+	Scope enums.ThrottleScope `json:"s,omitempty"`
+
 	// ThrottleKey is the hashed evaluated throttle key (e.g. hash("customer1")) or function ID (e.g. hash(fnID))
 	ThrottleKey string `json:"tk,omitempty"`
 
@@ -91,6 +94,11 @@ func (b QueueBacklog) IsOutdated(constraints PartitionConstraintConfig) enums.Qu
 	// Throttle removed - move items back to default backlog
 	if b.Throttle != nil && constraints.Throttle == nil {
 		return enums.QueueNormalizeReasonThrottleRemoved
+	}
+
+	// Throttle scope changed - move from old throttle key backlogs to the new throttle scope backlogs
+	if b.Throttle != nil && constraints.Throttle != nil && b.Throttle.Scope != constraints.Throttle.Scope {
+		return enums.QueueNormalizeReasonThrottleKeyChanged
 	}
 
 	// Throttle key changed - move from old throttle key backlogs to the new throttle key backlogs
@@ -201,6 +209,7 @@ func ItemBacklog(ctx context.Context, i QueueItem) QueueBacklog {
 		// This is always specified, even if no key was configured in the function definition.
 		// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
 		b.Throttle = &BacklogThrottle{
+			Scope:                     i.Data.Throttle.Scope,
 			ThrottleKey:               i.Data.Throttle.Key,
 			ThrottleKeyExpressionHash: i.Data.Throttle.KeyExpressionHash,
 		}
@@ -278,6 +287,12 @@ type ThrottleKeyInput struct {
 	// EvaluatedValue is the evaluated value of the expression (e.g. "customer1").
 	// Only used when Expression is non-empty.
 	EvaluatedValue string
+
+	// Scope is the throttle scope (function, env, or account).
+	Scope enums.ThrottleScope
+
+	// ScopeID is the UUID of the entity (function, env, or account) that the throttle applies to.
+	ScopeID uuid.UUID
 }
 
 // BuildBacklogID constructs a backlog ID from its component parts, matching the format
@@ -296,8 +311,13 @@ func BuildBacklogID(functionID uuid.UUID, start bool, throttle *ThrottleKeyInput
 	if throttle != nil && start {
 		exprHash := util.XXHash(throttle.Expression)
 
-		// Throttle key: hashID(fnID) or hashID(fnID)-hashID(evaluatedValue)
-		throttleKey := HashID(context.Background(), functionID.String())
+		scopeID := throttle.ScopeID
+		if scopeID == uuid.Nil {
+			scopeID = functionID
+		}
+
+		// Throttle key: hashID(scopeID) or hashID(scopeID)-hashID(evaluatedValue).
+		throttleKey := HashID(context.Background(), throttleScopeKey(throttle.Scope, scopeID))
 		if throttle.Expression != "" {
 			throttleKey = throttleKey + "-" + HashID(context.Background(), throttle.EvaluatedValue)
 		}
