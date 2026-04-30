@@ -87,7 +87,7 @@ export function MetricColumnHeader({
             metric={metric}
             pointsLeft={pointsLeft}
             range={range}
-            collapsible={false}
+            isPopover
             onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
           />
         </PopoverContent>

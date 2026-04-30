@@ -241,14 +241,6 @@ export function VariantsTable({
             onClick={onOpenInsights}
           />
 
-          <Button
-            kind="primary"
-            appearance="solid"
-            size="small"
-            label="Compare"
-            disabled
-          />
-
           <Popover>
             <PopoverTrigger asChild>
               <Button

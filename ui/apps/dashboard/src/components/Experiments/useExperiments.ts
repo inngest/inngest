@@ -10,8 +10,9 @@ import type {
   ExperimentListItem,
   ExperimentScoringConfig,
   ExperimentScoringMetric,
-  TimeRangePreset,
 } from '@inngest/components/Experiments';
+
+export type ExperimentTimeRange = { from: Date; to: Date };
 
 const EXPERIMENTS_CACHE_MS = 5 * 60 * 1000;
 
@@ -169,21 +170,23 @@ const experimentInsightsQueryDoc = graphql(`
 export function useExperimentInsightsQuery(
   functionID: string,
   experimentName: string,
-  preset: TimeRangePreset,
+  range: ExperimentTimeRange,
+  options: { enabled?: boolean } = {},
 ) {
   const client = useClient();
   const environment = useEnvironment();
+  const fromIso = range.from.toISOString();
+  const toIso = range.to.toISOString();
 
   const queryFn = useCallback(async (): Promise<string> => {
-    const { from, to } = presetToRange(preset);
     const data = await runQuery(client, experimentInsightsQueryDoc, {
       workspaceID: environment.id,
       functionID,
       experimentName,
-      timeRange: { from: from.toISOString(), to: to.toISOString() },
+      timeRange: { from: fromIso, to: toIso },
     });
     return data.experimentInsightsQuery;
-  }, [client, environment.id, functionID, experimentName, preset]);
+  }, [client, environment.id, functionID, experimentName, fromIso, toIso]);
 
   return useQuery<string>({
     queryKey: [
@@ -191,9 +194,11 @@ export function useExperimentInsightsQuery(
       environment.id,
       functionID,
       experimentName,
-      preset,
+      fromIso,
+      toIso,
     ],
     queryFn,
+    enabled: options.enabled ?? true,
     staleTime: EXPERIMENTS_CACHE_MS,
     gcTime: EXPERIMENTS_CACHE_MS,
   });
@@ -229,23 +234,19 @@ const updateExperimentScoringConfigMutation = graphql(`
   }
 `);
 
-function presetToRange(preset: TimeRangePreset): { from: Date; to: Date } {
-  const to = new Date();
-  const hours = preset === '24h' ? 24 : preset === '7d' ? 24 * 7 : 24 * 30;
-  return { from: new Date(to.getTime() - hours * 60 * 60 * 1000), to };
-}
-
 export function useExperimentDetail(
   functionID: string,
   experimentName: string,
-  preset: TimeRangePreset,
+  range: ExperimentTimeRange,
   variantFilter: string | null,
+  options: { enabled?: boolean } = {},
 ) {
   const client = useClient();
   const environment = useEnvironment();
+  const fromIso = range.from.toISOString();
+  const toIso = range.to.toISOString();
 
   const queryFn = useCallback(async (): Promise<ExperimentDetail | null> => {
-    const { from, to } = presetToRange(preset);
     const result = await client
       .query(
         experimentDetailQuery,
@@ -253,7 +254,7 @@ export function useExperimentDetail(
           workspaceID: environment.id,
           functionID,
           experimentName,
-          timeRange: { from: from.toISOString(), to: to.toISOString() },
+          timeRange: { from: fromIso, to: toIso },
           variantFilter: variantFilter || null,
         },
         { requestPolicy: 'network-only' },
@@ -290,7 +291,8 @@ export function useExperimentDetail(
     environment.id,
     functionID,
     experimentName,
-    preset,
+    fromIso,
+    toIso,
     variantFilter,
   ]);
 
@@ -300,10 +302,12 @@ export function useExperimentDetail(
       environment.id,
       functionID,
       experimentName,
-      preset,
+      fromIso,
+      toIso,
       variantFilter,
     ],
     queryFn,
+    enabled: options.enabled ?? true,
     staleTime: EXPERIMENTS_CACHE_MS,
     gcTime: EXPERIMENTS_CACHE_MS,
   });

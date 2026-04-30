@@ -97,6 +97,7 @@ export function MetricAccordionItem({
   range,
   defaultExpanded = false,
   collapsible = true,
+  isPopover = false,
 }: {
   metric: ExperimentScoringMetric;
   onUpdate: (patch: Partial<ExperimentScoringMetric>) => void;
@@ -105,77 +106,69 @@ export function MetricAccordionItem({
   range?: MetricRange;
   defaultExpanded?: boolean;
   collapsible?: boolean;
+  isPopover?: boolean;
 }) {
   const [internalExpanded, setInternalExpanded] = useState(
     defaultExpanded ?? false,
   );
-  const expanded = collapsible ? internalExpanded : true;
-  const toggle = collapsible ? () => setInternalExpanded((v) => !v) : undefined;
+  const expanded = isPopover ? true : collapsible ? internalExpanded : true;
+  const toggle =
+    !isPopover && collapsible
+      ? () => setInternalExpanded((v) => !v)
+      : undefined;
 
   return (
     <div className="border-subtle rounded-md border">
-      <div className="flex items-center gap-2 px-3 py-2">
-        <Switch
-          checked={metric.enabled}
-          onCheckedChange={(checked: boolean) => onUpdate({ enabled: checked })}
-          disabled={disabled}
-          className="shrink-0 scale-75"
-        />
-
-        <button
-          type="button"
-          className={cn(
-            'min-w-0 flex-1 truncate text-left text-sm',
-            metric.enabled ? 'text-basis' : 'text-muted',
-            !collapsible && 'cursor-default',
-          )}
-          onClick={toggle}
-        >
-          {metric.displayName}
-        </button>
-
-        <div className="border-subtle flex shrink-0 items-center gap-1 rounded border px-1">
-          <Button
-            kind="secondary"
-            appearance="ghost"
-            size="small"
-            icon={<RiSubtractLine className="h-3 w-3" />}
-            disabled={disabled || metric.points <= 0}
-            onClick={() => onUpdate({ points: Math.max(0, metric.points - 1) })}
+      {!isPopover && (
+        <div className="flex items-center gap-2 px-3 py-2">
+          <EnableSwitch
+            checked={metric.enabled}
+            onCheckedChange={(checked) => onUpdate({ enabled: checked })}
+            disabled={disabled}
           />
-          <PointsInput
-            value={metric.points}
-            maxValue={metric.points + pointsLeft}
-            onChange={(v) => onUpdate({ points: v })}
-          />
-          <span className="text-muted text-xs">pts</span>
-          <Button
-            kind="secondary"
-            appearance="ghost"
-            size="small"
-            icon={<RiAddLine className="h-3 w-3" />}
-            disabled={disabled || pointsLeft <= 0}
-            onClick={() => onUpdate({ points: metric.points + 1 })}
-          />
-        </div>
 
-        {collapsible && (
           <button
             type="button"
-            className="text-muted shrink-0"
+            className={cn(
+              'min-w-0 flex-1 truncate text-left text-sm',
+              metric.enabled ? 'text-basis' : 'text-muted',
+              !collapsible && 'cursor-default',
+            )}
             onClick={toggle}
           >
-            {expanded ? (
-              <RiArrowUpSLine className="h-4 w-4" />
-            ) : (
-              <RiArrowDownSLine className="h-4 w-4" />
-            )}
+            {metric.displayName}
           </button>
-        )}
-      </div>
+
+          <PointsControl
+            points={metric.points}
+            pointsLeft={pointsLeft}
+            onChange={(points) => onUpdate({ points })}
+            disabled={disabled}
+          />
+
+          {collapsible && (
+            <button
+              type="button"
+              className="text-muted shrink-0"
+              onClick={toggle}
+            >
+              {expanded ? (
+                <RiArrowUpSLine className="h-4 w-4" />
+              ) : (
+                <RiArrowDownSLine className="h-4 w-4" />
+              )}
+            </button>
+          )}
+        </div>
+      )}
 
       {expanded && (
-        <div className="bg-canvasSubtle border-subtle flex flex-col gap-3 rounded-b-md border-t px-3 pb-3 pt-3">
+        <div
+          className={cn(
+            'flex flex-col gap-3 px-3 pb-3 pt-3',
+            !isPopover && 'bg-canvasSubtle border-subtle rounded-b-md border-t',
+          )}
+        >
           <Input
             label="Name"
             inngestSize="small"
@@ -185,36 +178,36 @@ export function MetricAccordionItem({
             disabled={disabled}
           />
 
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <span className="text-basis text-sm font-medium">
-                Min. & Max scores
-              </span>
-              <div className="flex items-center gap-1">
-                <InfoTooltip>
-                  Snap min and max to the range observed in this time window.
-                </InfoTooltip>
-                <Button
-                  kind="secondary"
-                  appearance="ghost"
-                  size="small"
-                  label="Fit to data"
-                  disabled={
-                    disabled ||
-                    !range ||
-                    (metric.minValue === roundMetricValue(range.min) &&
-                      metric.maxValue === roundMetricValue(range.max))
-                  }
-                  onClick={() =>
-                    range &&
-                    onUpdate({
-                      minValue: roundMetricValue(range.min),
-                      maxValue: roundMetricValue(range.max),
-                    })
-                  }
+          {isPopover && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-basis text-sm font-medium">
+                  Include metrics
+                </span>
+                <EnableSwitch
+                  checked={metric.enabled}
+                  onCheckedChange={(checked) => onUpdate({ enabled: checked })}
+                  disabled={disabled}
                 />
               </div>
-            </div>
+              <div className="flex items-center justify-between">
+                <span className="text-basis text-sm font-medium">
+                  Point allocation
+                </span>
+                <PointsControl
+                  points={metric.points}
+                  pointsLeft={pointsLeft}
+                  onChange={(points) => onUpdate({ points })}
+                  disabled={disabled}
+                />
+              </div>
+            </>
+          )}
+
+          <div className="flex flex-col gap-1">
+            <span className="text-basis text-sm font-medium">
+              Min. & Max scores
+            </span>
             <p className="text-muted mb-2 text-xs">
               Assign the lowest &amp; highest score for this metric
             </p>
@@ -225,7 +218,7 @@ export function MetricAccordionItem({
                   inngestSize="small"
                   className="bg-canvasBase"
                   type="number"
-                  value={metric.minValue}
+                  value={roundMetricValue(metric.minValue)}
                   onChange={(e) =>
                     onUpdate({ minValue: parseFloat(e.target.value) || 0 })
                   }
@@ -238,7 +231,7 @@ export function MetricAccordionItem({
                   inngestSize="small"
                   className="bg-canvasBase"
                   type="number"
-                  value={metric.maxValue}
+                  value={roundMetricValue(metric.maxValue)}
                   onChange={(e) =>
                     onUpdate({ maxValue: parseFloat(e.target.value) || 0 })
                   }
@@ -248,22 +241,48 @@ export function MetricAccordionItem({
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={metric.invert}
-                onChange={(e) => onUpdate({ invert: e.target.checked })}
-                disabled={disabled}
-                className="accent-primary-moderate h-3.5 w-3.5 rounded"
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={metric.invert}
+                  onChange={(e) => onUpdate({ invert: e.target.checked })}
+                  disabled={disabled}
+                  className="accent-primary-moderate h-3.5 w-3.5 rounded"
+                />
+                <span className="text-basis text-xs">Invert</span>
+              </label>
+              <InfoTooltip>
+                Enable when a lower metric value represents better performance
+                (for example, latency or error rate). The score will be inverted
+                so smaller values map to the max score.
+              </InfoTooltip>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                kind="secondary"
+                appearance="outlined"
+                size="small"
+                label="Fit to data"
+                disabled={
+                  disabled ||
+                  !range ||
+                  (metric.minValue === roundMetricValue(range.min) &&
+                    metric.maxValue === roundMetricValue(range.max))
+                }
+                onClick={() =>
+                  range &&
+                  onUpdate({
+                    minValue: roundMetricValue(range.min),
+                    maxValue: roundMetricValue(range.max),
+                  })
+                }
               />
-              <span className="text-basis text-xs">Invert</span>
-            </label>
-            <InfoTooltip>
-              Enable when a lower metric value represents better performance
-              (for example, latency or error rate). The score will be inverted
-              so smaller values map to the max score.
-            </InfoTooltip>
+              <InfoTooltip>
+                Snap min and max to the range observed in this time window.
+              </InfoTooltip>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -401,5 +420,64 @@ function PointsInput({
       onBlur={handleBlur}
       disabled={disabled}
     />
+  );
+}
+
+function EnableSwitch({
+  checked,
+  onCheckedChange,
+  disabled,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Switch
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      disabled={disabled}
+      className="shrink-0 scale-75"
+    />
+  );
+}
+
+function PointsControl({
+  points,
+  pointsLeft,
+  onChange,
+  disabled,
+}: {
+  points: number;
+  pointsLeft: number;
+  onChange: (points: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="border-subtle flex shrink-0 items-center gap-1 rounded border px-1">
+      <Button
+        kind="secondary"
+        appearance="ghost"
+        size="small"
+        icon={<RiSubtractLine className="h-3 w-3" />}
+        disabled={disabled || points <= 0}
+        onClick={() => onChange(Math.max(0, points - 1))}
+      />
+      <PointsInput
+        value={points}
+        maxValue={points + pointsLeft}
+        onChange={onChange}
+        disabled={disabled}
+      />
+      <span className="text-muted text-xs">pts</span>
+      <Button
+        kind="secondary"
+        appearance="ghost"
+        size="small"
+        icon={<RiAddLine className="h-3 w-3" />}
+        disabled={disabled || pointsLeft <= 0}
+        onClick={() => onChange(points + 1)}
+      />
+    </div>
   );
 }

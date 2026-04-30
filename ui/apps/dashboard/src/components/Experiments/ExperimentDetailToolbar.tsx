@@ -1,34 +1,21 @@
 import { useMemo, useState } from 'react';
 import {
-  Select,
   SelectWithSearch,
   type Option,
 } from '@inngest/components/Select/Select';
-import type { TimeRangePreset } from '@inngest/components/Experiments';
+import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
+import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 
 import { colorForVariant } from '@/lib/experiments/colors';
 
 type Props = {
-  preset: TimeRangePreset;
-  onPresetChange: (p: TimeRangePreset) => void;
+  range: RangeChangeProps;
+  onRangeChange: (r: RangeChangeProps) => void;
+  daysAgoMax: number;
   selectedVariants: string[];
   onSelectedVariantsChange: (v: string[]) => void;
   availableVariants: string[];
 };
-
-const TIME_OPTIONS = [
-  { id: '24h', name: 'Last 24 hours' },
-  { id: '7d', name: 'Last 7 days' },
-  { id: '30d', name: 'Last 30 days' },
-] as const satisfies readonly { id: TimeRangePreset; name: string }[];
-
-const DEFAULT_TIME_OPTION = TIME_OPTIONS[0];
-
-const TIME_PRESET_SET = new Set<string>(TIME_OPTIONS.map((o) => o.id));
-
-function isTimeRangePreset(id: string): id is TimeRangePreset {
-  return TIME_PRESET_SET.has(id);
-}
 
 function VariantMultiSelect({
   availableVariants,
@@ -120,35 +107,21 @@ function VariantMultiSelect({
 }
 
 export function ExperimentDetailToolbar({
-  preset,
-  onPresetChange,
+  range,
+  onRangeChange,
+  daysAgoMax,
   selectedVariants,
   onSelectedVariantsChange,
   availableVariants,
 }: Props) {
-  const selectedTimeOption =
-    TIME_OPTIONS.find((o) => o.id === preset) ?? DEFAULT_TIME_OPTION;
-
   return (
     <div className="flex items-center gap-2">
-      <Select
-        label="Time range"
-        isLabelVisible={false}
-        value={selectedTimeOption}
-        onChange={(opt: Option) => {
-          if (isTimeRangePreset(opt.id)) onPresetChange(opt.id);
-        }}
-        size="small"
-      >
-        <Select.Button size="small">{selectedTimeOption.name}</Select.Button>
-        <Select.Options>
-          {TIME_OPTIONS.map((opt) => (
-            <Select.Option key={opt.id} option={opt}>
-              {opt.name}
-            </Select.Option>
-          ))}
-        </Select.Options>
-      </Select>
+      <TimeFilter
+        defaultValue={range}
+        daysAgoMax={daysAgoMax}
+        minDuration={{ hours: 24 }}
+        onDaysChange={onRangeChange}
+      />
 
       <VariantMultiSelect
         availableVariants={availableVariants}
