@@ -39,6 +39,8 @@ type Props = {
   // queries scope by function ID server-side; passing nothing would silently
   // merge data across all matching functions.
   functionID: string;
+  functionName: string;
+  functionSlug: string;
 };
 
 const INFO_PANEL = 'Info';
@@ -55,7 +57,12 @@ function rangeToTimeRange(range: RangeChangeProps): ExperimentTimeRange {
   return { from: subtractDuration(to, range.duration), to };
 }
 
-export function ExperimentDetailPage({ experimentName, functionID }: Props) {
+export function ExperimentDetailPage({
+  experimentName,
+  functionID,
+  functionName,
+  functionSlug,
+}: Props) {
   const environment = useEnvironment();
 
   const [{ data: accountData }] = useQuery({
@@ -185,6 +192,13 @@ export function ExperimentDetailPage({ experimentName, functionID }: Props) {
           {
             text: 'All experiments',
             href: pathCreator.experiments({ envSlug: environment.slug }),
+          },
+          {
+            text: functionName,
+            href: pathCreator.function({
+              envSlug: environment.slug,
+              functionSlug,
+            }),
           },
           { text: experimentName },
         ]}
