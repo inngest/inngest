@@ -343,6 +343,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("could not create constraint API: %w", err)
 	}
 
+	// Wrap the manager in the in-process constraint cache so the dev server
+	// matches production shape. Min TTL 1s, max TTL 3min.
+	cachedCM := constraintapi.NewConstraintCache(
+		constraintapi.WithConstraintCacheClock(clockwork.NewRealClock()),
+		constraintapi.WithConstraintCacheManager(cm),
+		constraintapi.WithConstraintCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+			return true, time.Second, 3 * time.Minute
+		}),
+	)
+
 	queueOpts := []queue.QueueOpt{
 		queue.WithRunMode(runMode),
 		queue.WithIdempotencyTTL(time.Hour),
@@ -372,9 +382,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			return queue.PartitionPausedInfo{}
 		}),
 		queue.WithConditionalTracer(conditionalQueueTracer),
-		queue.WithCapacityManager(cm),
+		queue.WithCapacityManager(cachedCM),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-		queue.WithCapacityManager(cm),
+		queue.WithCapacityManager(cachedCM),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 	}
 
@@ -550,7 +560,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-		executor.WithCapacityManager(cm),
+		executor.WithCapacityManager(cachedCM),
 		executor.WithSemaphoreManager(semaphores),
 		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return true
@@ -786,7 +796,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			ShardSelector:   shardSelector,
 			Port:            ds.Opts.DebugAPIPort,
 			PauseManager:    pauseMgr,
-			CapacityManager: cm,
+			CapacityManager: cachedCM,
 			// Dependencies for batching, singleton, and debounce insights
 			BatchManager:   batcher,
 			SingletonStore: sn,

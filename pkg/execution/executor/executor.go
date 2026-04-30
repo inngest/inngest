@@ -829,10 +829,20 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	l.Optional(req.AccountID, "schedule").Debug("hitting constraint API")
 
+	// requestTime is the original event ReceivedAt. It stays constant across
+	// retries of the same event, which lets the constraint API's idempotency
+	// handling kick in by bypassing in-process cache entries that were
+	// populated after the event was received.
+	var requestTime time.Time
+	if len(req.Events) > 0 {
+		requestTime = req.Events[0].GetReceivedAt()
+	}
+
 	// Check constraints and acquire lease
 	md, err := WithConstraints(
 		ctx,
 		e.now(),
+		requestTime,
 		e.capacityManager,
 		e.useConstraintAPI,
 		req,
@@ -1280,6 +1290,10 @@ func (e *executor) schedule(
 	}
 
 	runTimestamp := runID.Timestamp()
+	var scheduleTypePtr *enums.ScheduleType
+	if req.ScheduleType != enums.ScheduleTypeUnknown {
+		scheduleTypePtr = &req.ScheduleType
+	}
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1289,6 +1303,8 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
+			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
+			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
@@ -5526,9 +5542,19 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	return ref, nil
 }
 
+// true for pause-backed opcodes — ones the server resumes later
+// via a timer, event, signal, or external call completion
 func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 	for _, op := range ops {
-		if op.Op == enums.OpcodeStepPlanned {
+		switch op.Op {
+		case
+			enums.OpcodeAIGateway,
+			enums.OpcodeGateway,
+			enums.OpcodeInvokeFunction,
+			enums.OpcodeSleep,
+			enums.OpcodeStepPlanned,
+			enums.OpcodeWaitForEvent,
+			enums.OpcodeWaitForSignal:
 			return true
 		}
 	}
