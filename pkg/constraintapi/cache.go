@@ -42,6 +42,11 @@ type constraintCache struct {
 type constraintCacheItem struct {
 	constraint ConstraintItem
 	retryAfter time.Time
+	// addedAt records the wall-clock time at which this cache entry was created.
+	// Callers can pass CapacityAcquireRequest.RequestTime to bypass entries that
+	// were added after the underlying work was originally received, which prevents
+	// silent drops on retries of work that predates a cached "exhausted" decision.
+	addedAt time.Time
 }
 
 type ConstraintCacheOption func(c *constraintCache)
@@ -131,6 +136,28 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 
 		// Cache hit - this constraint is exhausted
 		val := item.Value()
+
+		// Skip the cache when the caller's request was originally received before
+		// this cache entry was added. This is the silent-drop-on-retry guard: a
+		// retry of work received at T0 should not be denied by a cache entry that
+		// was populated at T1 > T0. We fall through to the underlying manager so
+		// the actual constraint state is checked.
+		if !req.RequestTime.IsZero() && val.addedAt.After(req.RequestTime) {
+			tags := map[string]any{
+				"op":              "skipped_stale",
+				"source_location": req.Source.Location.String(),
+				"source_service":  req.Source.Service.String(),
+				"constraint":      ci.MetricsIdentifier(),
+			}
+			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+				tags["function_id"] = req.FunctionID
+			}
+			metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, item.TTL(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+			continue
+		}
 
 		recentlyLimited = append(recentlyLimited, ci)
 		if val.retryAfter.After(retryAfter) {
@@ -223,6 +250,7 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			&constraintCacheItem{
 				retryAfter: res.RetryAfter,
 				constraint: ci,
+				addedAt:    l.clock.Now(),
 			},
 			cacheTTL,
 		)

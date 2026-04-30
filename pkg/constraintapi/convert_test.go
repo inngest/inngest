@@ -1478,6 +1478,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
+				RequestTime: timestamppb.New(time.Time{}),
 			},
 		},
 		{
@@ -1525,6 +1526,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
+				RequestTime: timestamppb.New(time.Time{}),
 			},
 		},
 		{

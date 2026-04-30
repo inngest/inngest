@@ -150,6 +150,19 @@ type CapacityAcquireRequest struct {
 	// RequestAttempt is the current request attempt. For retries, this should be > 0.
 	// This is mainly used for instrumentation.
 	RequestAttempt int
+
+	// RequestTime is the time at which the underlying work was originally received
+	// (e.g. the event ReceivedAt for run scheduling). Unlike CurrentTime, it is
+	// stable across retries of the same work item.
+	//
+	// The in-process constraint cache uses RequestTime to bypass cache entries that
+	// were populated after the work was received: if a retry of an event predates
+	// a cached "exhausted" decision, the cache is skipped so the actual constraint
+	// state is re-checked rather than silently denying the request.
+	//
+	// May be zero, in which case the cache treats the request as unanchored and
+	// honors any non-expired entry.
+	RequestTime time.Time
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).
