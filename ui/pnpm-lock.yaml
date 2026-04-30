@@ -99,7 +99,7 @@ importers:
     dependencies:
       '@clerk/tanstack-react-start':
         specifier: ^0.29.1
-        version: 0.29.11(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 0.29.11(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@graphql-typed-document-node/core':
         specifier: ^3.2.0
         version: 3.2.0(graphql@16.13.2)
@@ -156,16 +156,16 @@ importers:
         version: 5.100.5(react@19.2.5)
       '@tanstack/react-router':
         specifier: ^1.158.1
-        version: 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-router-devtools':
         specifier: ^1.158.1
-        version: 1.166.13(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.16)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.166.13(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.17)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-router-ssr-query':
         specifier: ^1.158.1
-        version: 1.166.12(@tanstack/query-core@5.100.5)(@tanstack/react-query@5.100.5(react@19.2.5))(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.16)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.166.12(@tanstack/query-core@5.100.5)(@tanstack/react-query@5.100.5(react@19.2.5))(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-start':
         specifier: ^1.158.1
-        version: 1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+        version: 1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -355,13 +355,13 @@ importers:
         version: 5.100.5(react@19.2.5)
       '@tanstack/react-router':
         specifier: ^1.158.1
-        version: 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-router-devtools':
         specifier: ^1.158.1
-        version: 1.166.13(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.16)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.166.13(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.17)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-start':
         specifier: ^1.158.1
-        version: 1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+        version: 1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -406,8 +406,8 @@ importers:
         specifier: 4.0.1
         version: 4.0.1(@reduxjs/toolkit@1.9.7(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.5)(redux@4.2.1))(react@19.2.5))(graphql-request@7.4.0(graphql@16.13.2))(graphql-tag@2.12.6(graphql@16.13.2))(graphql@16.13.2)
       '@rsbuild/core':
-        specifier: 2.0.1
-        version: 2.0.1
+        specifier: 2.0.2
+        version: 2.0.2
       '@tanstack/eslint-config':
         specifier: 0.4.0
         version: 0.4.0(@typescript-eslint/utils@8.59.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
@@ -473,7 +473,7 @@ importers:
     dependencies:
       '@clerk/tanstack-react-start':
         specifier: ^0.29.0
-        version: 0.29.11(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 0.29.11(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@graphql-typed-document-node/core':
         specifier: ^3.2.0
         version: 3.2.0(graphql@16.13.2)
@@ -487,17 +487,17 @@ importers:
         specifier: ^5.66.5
         version: 5.100.5(react@19.2.5)
       '@tanstack/react-router':
-        specifier: 1.168.24
-        version: 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: 1.168.25
+        version: 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-router-devtools':
         specifier: 1.166.13
-        version: 1.166.13(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.16)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.166.13(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.17)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-router-ssr-query':
         specifier: 1.166.12
-        version: 1.166.12(@tanstack/query-core@5.100.5)(@tanstack/react-query@5.100.5(react@19.2.5))(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.16)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.166.12(@tanstack/query-core@5.100.5)(@tanstack/react-query@5.100.5(react@19.2.5))(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-start':
-        specifier: 1.167.49
-        version: 1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+        specifier: 1.167.50
+        version: 1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
       '@team-plain/typescript-sdk':
         specifier: ^3.0.1
         version: 3.9.0
@@ -666,7 +666,7 @@ importers:
         version: 5.100.5(react@19.2.5)
       '@tanstack/react-router':
         specifier: ^1.132.47
-        version: 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -4696,8 +4696,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@rsbuild/core@2.0.1':
-    resolution: {integrity: sha512-5TwUpb10Y+VYaYH8oLL/rfJGrhxrk16BiGzv101kzaMPT60MtOXgjEUTxztbjRuq0ifbtRJ/w7rsIZQ4VziWYg==}
+  '@rsbuild/core@2.0.2':
+    resolution: {integrity: sha512-0Vo1W0ZekQ6jTIaSqiG/dgMrYXcKP/eUDNad87NhxfMfu/S5xZT8fk0AEMMk49IyvIIE56uw2Ua6rw8mnZtM+Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -5229,22 +5229,22 @@ packages:
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
 
-  '@tanstack/react-router@1.168.24':
-    resolution: {integrity: sha512-CQWd9ywDZU6icG65SrjJMzWcNg/ehBKFxfxYssKSuELk0eM9SzJxJ3JBI760kdLXIsXewOX9PHpJDknxC/R5Ag==}
+  '@tanstack/react-router@1.168.25':
+    resolution: {integrity: sha512-4U/E76dc+fYuLixjV1RLNfqrkQoexSL8MqGNpIHOodtvY3fMPGaALrvDVtBDQYBEU4z5r5fHaV6+kclWAVFP9A==}
     engines: {node: '>=20.19'}
     peerDependencies:
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
 
-  '@tanstack/react-start-client@1.166.42':
-    resolution: {integrity: sha512-p8i9HNvVz3QnzBMoVqx7qp1HaMzqiNStVpD+cOGlVi93cxx9CVMDZnOECwe5cIXVuAC3WW4+eB5+5vK8VEWdbg==}
+  '@tanstack/react-start-client@1.166.43':
+    resolution: {integrity: sha512-7quJs9kGbX+Vxa8FJ4mg1oRnUkumL21lUzM05ESeGZPDvPqwF58YL5nrq52o5X46gL9fbI8wDLKgJcwByAHNhA==}
     engines: {node: '>=22.12.0'}
     peerDependencies:
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
 
-  '@tanstack/react-start-rsc@0.0.28':
-    resolution: {integrity: sha512-rSEXRHAyP1iKTyzawdm2N44m1y9lP+f4K/BnTTGv2R9jPALmWXQZHWYw3mevjzGiXw2TTzQEZ0tJFuXc64MywQ==}
+  '@tanstack/react-start-rsc@0.0.29':
+    resolution: {integrity: sha512-nMdtylzgoQvQNH0zfT6ZZRzzgyMMiPxOxI3ElY+A79vq0ZJOaqvzownh/e7XIMv/AngWcx38CgnQkM1rfMtSFg==}
     engines: {node: '>=22.12.0'}
     peerDependencies:
       '@rspack/core': '>=2.0.0-0'
@@ -5260,15 +5260,15 @@ packages:
       react-server-dom-rspack:
         optional: true
 
-  '@tanstack/react-start-server@1.166.43':
-    resolution: {integrity: sha512-tfKFhDCiH8HNCwGFxkiuZsXIi68SHa+5/0i4bO7JCpPzy3FprVdcCJX0Vs0izaNcP8FVKs/TzRAzDilL42Tdlw==}
+  '@tanstack/react-start-server@1.166.44':
+    resolution: {integrity: sha512-ro3s8zWJ0WgWgSkb7VZWyelPrdKvBYImeR5xubqYgP0IRVfmnbYSCY0yZQPNFmv825hv8qMiK4y6NPez7BJRRg==}
     engines: {node: '>=22.12.0'}
     peerDependencies:
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
 
-  '@tanstack/react-start@1.167.49':
-    resolution: {integrity: sha512-zGIfVklhLHXeFPrAK7dCdjeFilAu+/ZC6+Hwq5ltMN/IXVmkddoSkDx9+63xYCMkHm+oujLd56phZ/kd3A2n3g==}
+  '@tanstack/react-start@1.167.50':
+    resolution: {integrity: sha512-WvYvqC+nV0e0ewK1uH8GecC6KixlDm9vk3pdhmgphIFAM/D5iQOZvO3W3e4UW36o0ViAV1rB6Onoqy6ivN8rkA==}
     engines: {node: '>=22.12.0'}
     hasBin: true
     peerDependencies:
@@ -5304,8 +5304,8 @@ packages:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  '@tanstack/router-core@1.168.16':
-    resolution: {integrity: sha512-2lkWNMzDWWxVqTf9Y54DH1ceZOrGrOGzx9CFVMq8gQSOxhr3x3+otjVei1Rlx4xmsCc4yCqccqjun5wDtE9MZA==}
+  '@tanstack/router-core@1.168.17':
+    resolution: {integrity: sha512-VDq7HCqRK3sdpxoETwYoTXTaYi+OVQC197g1fdzaiZBUmhntfjn+PQc15OzTqNNhf8Menk6r6ftmuphybMKdig==}
     engines: {node: '>=20.19'}
     hasBin: true
 
@@ -5319,17 +5319,17 @@ packages:
       csstype:
         optional: true
 
-  '@tanstack/router-generator@1.166.35':
-    resolution: {integrity: sha512-d3tdUTf6QRjMW4V2P91mE8OR0haHgGktkLOs3zQmirEokQhu2qgoVfcSxLF6DfmMR6smvDjwdeMdy2sudImuFQ==}
+  '@tanstack/router-generator@1.166.36':
+    resolution: {integrity: sha512-ce8Sg+ONwdd483kXJBYhTcdIAjEwSlWUOkoLsgPdNUIfA05hdnd9JkNnM4X1OnzpFL8/+TBSMo4WYQp9CHhDPg==}
     engines: {node: '>=20.19'}
 
-  '@tanstack/router-plugin@1.167.27':
-    resolution: {integrity: sha512-3jl+9I6bgSqAhwIDU2ps4pjhaEy2kugXvZ/dCAE6zF+pYEuRkNr8GA7bpoboZqdAtbceyZ2sLgX6aB7VQvHGUg==}
+  '@tanstack/router-plugin@1.167.28':
+    resolution: {integrity: sha512-O23ba7JaKvx5Eu0l6iTpknu79QcdkMmoW1VtZdsZe5NoQ6dHHru6caoapDc/uOxmz7h7VYfSuLjs/UYg7EA1cA==}
     engines: {node: '>=20.19'}
     hasBin: true
     peerDependencies:
       '@rsbuild/core': '>=1.0.2 || ^2.0.0'
-      '@tanstack/react-router': ^1.168.24
+      '@tanstack/react-router': ^1.168.25
       vite: '>=5.4.16'
       vite-plugin-solid: ^2.11.10 || ^3.0.0-0
       webpack: '>=5.92.0'
@@ -5356,8 +5356,8 @@ packages:
     resolution: {integrity: sha512-VkY0u7ax/GD0qU6ZLLnfPC+UMxVzxRbvZp4yV4iUSXjgJZ/siAT5/QlLm9FEDJ9QDoC0VD9W7f00tKKreUI7Ng==}
     engines: {node: '>=20.19'}
 
-  '@tanstack/start-client-core@1.167.19':
-    resolution: {integrity: sha512-lyzA0hzSRKN+vl6093kX8GXnI4XVPDX5x5siWn0CGfmw4/+8l5dRU4Q7QVeWy7xu6JAZCV/gzdDs+nIm50YK7Q==}
+  '@tanstack/start-client-core@1.167.20':
+    resolution: {integrity: sha512-QKBAr/TZlJaBFfveNSuycCJDrwE15cukUm5ogpS9e6xNBy6TMDFTWbfAoLKk8qV8TalxyGbUKjUp6YwWE+KMXQ==}
     engines: {node: '>=22.12.0'}
     hasBin: true
 
@@ -5365,8 +5365,8 @@ packages:
     resolution: {integrity: sha512-Y6QSlGiLga8cHfvxGGaonXIlt2bIUTVdH6AMjmpMp7+ANNCp+N96GQbjjhLye3JkaxDfP68x5iZA8NK4imgRig==}
     engines: {node: '>=22.12.0'}
 
-  '@tanstack/start-plugin-core@1.169.5':
-    resolution: {integrity: sha512-gbPmbelQI7aLWxJn5M5XPoGvFKMf3rRU7J3RXNB9WO5lfrNVTEltKV6zBsW7HuJGxIspJRhsrA1c0AtjTsJAvw==}
+  '@tanstack/start-plugin-core@1.169.6':
+    resolution: {integrity: sha512-UhsPkfIi4/8OoJFSYd0MduxjilGYBttHdgqeJCeFZfr/UCV05q28VynUx+zuIG3Pe3Mj2+SKQhQqoJAFPk8nLA==}
     engines: {node: '>=22.12.0'}
     peerDependencies:
       '@rsbuild/core': ^2.0.0
@@ -5377,13 +5377,13 @@ packages:
       vite:
         optional: true
 
-  '@tanstack/start-server-core@1.167.21':
-    resolution: {integrity: sha512-G1tWw4lCCjPhyzUT+kMf2NyBS9i5mTlHoElvQBRYu2TvYbUStqnDhEha5apKWkuQWSucw2lM9V61JHucMFsZwg==}
+  '@tanstack/start-server-core@1.167.22':
+    resolution: {integrity: sha512-oTJ/bu5pFuX5vh0OqRfZdXLWauOKIY1w3X+Q9iL6NQ38mhnWGmCVgMxAk+wX7KGSdjmXokpSNbBXTaxk9fcQLA==}
     engines: {node: '>=22.12.0'}
     hasBin: true
 
-  '@tanstack/start-storage-context@1.166.30':
-    resolution: {integrity: sha512-2hnpn1n2ls6NbsviNSLl/iD5y+WK45XGFgHDMUnzsUMEf5jXKUoQNSmmcjh+Lhtg+Ag7XOwOs4utXvm0OkevMQ==}
+  '@tanstack/start-storage-context@1.166.31':
+    resolution: {integrity: sha512-HwwPixGNenX1mXJwjJBgWHdxuDj9JHclcbYGeJ130oK2gcyo4RX7AdVsGKV9BCdjv81nODyPYHA9GLzxkp6xfg==}
     engines: {node: '>=22.12.0'}
 
   '@tanstack/store@0.9.3':
@@ -11269,7 +11269,7 @@ packages:
   vite-tsconfig-paths@6.1.1:
     resolution: {integrity: sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg==}
     peerDependencies:
-      vite: '>=6.2.7'
+      vite: '>=4.5.11'
 
   vite@8.0.10:
     resolution: {integrity: sha512-rZuUu9j6J5uotLDs+cAA4O5H4K1SfPliUlQwqa6YEwSrWDZzP4rhm00oJR5snMewjxF5V/K3D4kctsUTsIU9Mw==}
@@ -12437,26 +12437,26 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  '@clerk/tanstack-react-start@0.29.11(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@clerk/tanstack-react-start@0.29.11(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@clerk/backend': 2.33.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clerk/clerk-react': 5.61.6(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clerk/shared': 3.47.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clerk/types': 4.101.23(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start': 1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start': 1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
       tslib: 2.8.1
 
-  '@clerk/tanstack-react-start@0.29.11(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@clerk/tanstack-react-start@0.29.11(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@clerk/backend': 2.33.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clerk/clerk-react': 5.61.6(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clerk/shared': 3.47.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clerk/types': 4.101.23(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start': 1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start': 1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
       tslib: 2.8.1
@@ -15703,7 +15703,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.2':
     optional: true
 
-  '@rsbuild/core@2.0.1':
+  '@rsbuild/core@2.0.2':
     dependencies:
       '@rspack/core': 2.0.0(@swc/helpers@0.5.21)
       '@swc/helpers': 0.5.21
@@ -16408,56 +16408,56 @@ snapshots:
       '@tanstack/query-core': 5.100.5
       react: 19.2.5
 
-  '@tanstack/react-router-devtools@1.166.13(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.16)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@tanstack/react-router-devtools@1.166.13(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.17)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/router-devtools-core': 1.167.3(@tanstack/router-core@1.168.16)(csstype@3.2.3)
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/router-devtools-core': 1.167.3(@tanstack/router-core@1.168.17)(csstype@3.2.3)
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
     optionalDependencies:
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/router-core': 1.168.17
     transitivePeerDependencies:
       - csstype
 
-  '@tanstack/react-router-ssr-query@1.166.12(@tanstack/query-core@5.100.5)(@tanstack/react-query@5.100.5(react@19.2.5))(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.16)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@tanstack/react-router-ssr-query@1.166.12(@tanstack/query-core@5.100.5)(@tanstack/react-query@5.100.5(react@19.2.5))(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@tanstack/query-core': 5.100.5
       '@tanstack/react-query': 5.100.5(react@19.2.5)
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/router-ssr-query-core': 1.168.0(@tanstack/query-core@5.100.5)(@tanstack/router-core@1.168.16)
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/router-ssr-query-core': 1.168.0(@tanstack/query-core@5.100.5)(@tanstack/router-core@1.168.17)
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
     transitivePeerDependencies:
       - '@tanstack/router-core'
 
-  '@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@tanstack/history': 1.161.6
       '@tanstack/react-store': 0.9.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/router-core': 1.168.17
       isbot: 5.1.39
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  '@tanstack/react-start-client@1.166.42(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@tanstack/react-start-client@1.166.43(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/router-core': 1.168.16
-      '@tanstack/start-client-core': 1.167.19
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/router-core': 1.168.17
+      '@tanstack/start-client-core': 1.167.20
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  '@tanstack/react-start-rsc@0.0.28(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/react-start-rsc@0.0.29(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start-server': 1.166.43(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start-server': 1.166.44(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/router-core': 1.168.17
       '@tanstack/router-utils': 1.161.7
-      '@tanstack/start-client-core': 1.167.19
+      '@tanstack/start-client-core': 1.167.20
       '@tanstack/start-fn-stubs': 1.161.6
-      '@tanstack/start-plugin-core': 1.169.5(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
-      '@tanstack/start-server-core': 1.167.21(crossws@0.4.5(srvx@0.11.15))
-      '@tanstack/start-storage-context': 1.166.30
+      '@tanstack/start-plugin-core': 1.169.6(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/start-server-core': 1.167.22(crossws@0.4.5(srvx@0.11.15))
+      '@tanstack/start-storage-context': 1.166.31
       pathe: 2.0.3
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
@@ -16471,17 +16471,17 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/react-start-rsc@0.0.28(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/react-start-rsc@0.0.29(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start-server': 1.166.43(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start-server': 1.166.44(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/router-core': 1.168.17
       '@tanstack/router-utils': 1.161.7
-      '@tanstack/start-client-core': 1.167.19
+      '@tanstack/start-client-core': 1.167.20
       '@tanstack/start-fn-stubs': 1.161.6
-      '@tanstack/start-plugin-core': 1.169.5(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
-      '@tanstack/start-server-core': 1.167.21(crossws@0.4.5(srvx@0.11.15))
-      '@tanstack/start-storage-context': 1.166.30
+      '@tanstack/start-plugin-core': 1.169.6(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/start-server-core': 1.167.22(crossws@0.4.5(srvx@0.11.15))
+      '@tanstack/start-storage-context': 1.166.31
       pathe: 2.0.3
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
@@ -16495,33 +16495,33 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/react-start-server@1.166.43(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@tanstack/react-start-server@1.166.44(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@tanstack/history': 1.161.6
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/router-core': 1.168.16
-      '@tanstack/start-client-core': 1.167.19
-      '@tanstack/start-server-core': 1.167.21(crossws@0.4.5(srvx@0.11.15))
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/router-core': 1.168.17
+      '@tanstack/start-client-core': 1.167.20
+      '@tanstack/start-server-core': 1.167.22(crossws@0.4.5(srvx@0.11.15))
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/react-start@1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/react-start@1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start-client': 1.166.42(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start-rsc': 0.0.28(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
-      '@tanstack/react-start-server': 1.166.43(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start-client': 1.166.43(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start-rsc': 0.0.29(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/react-start-server': 1.166.44(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/router-utils': 1.161.7
-      '@tanstack/start-client-core': 1.167.19
-      '@tanstack/start-plugin-core': 1.169.5(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
-      '@tanstack/start-server-core': 1.167.21(crossws@0.4.5(srvx@0.11.15))
+      '@tanstack/start-client-core': 1.167.20
+      '@tanstack/start-plugin-core': 1.169.6(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/start-server-core': 1.167.22(crossws@0.4.5(srvx@0.11.15))
       pathe: 2.0.3
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
     optionalDependencies:
-      '@rsbuild/core': 2.0.1
+      '@rsbuild/core': 2.0.2
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3)
     transitivePeerDependencies:
       - '@rspack/core'
@@ -16531,21 +16531,21 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/react-start@1.167.49(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/react-start@1.167.50(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start-client': 1.166.42(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@tanstack/react-start-rsc': 0.0.28(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
-      '@tanstack/react-start-server': 1.166.43(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start-client': 1.166.43(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tanstack/react-start-rsc': 0.0.29(@rsbuild/core@2.0.2)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/react-start-server': 1.166.44(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/router-utils': 1.161.7
-      '@tanstack/start-client-core': 1.167.19
-      '@tanstack/start-plugin-core': 1.169.5(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
-      '@tanstack/start-server-core': 1.167.21(crossws@0.4.5(srvx@0.11.15))
+      '@tanstack/start-client-core': 1.167.20
+      '@tanstack/start-plugin-core': 1.169.6(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/start-server-core': 1.167.22(crossws@0.4.5(srvx@0.11.15))
       pathe: 2.0.3
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
     optionalDependencies:
-      '@rsbuild/core': 2.0.1
+      '@rsbuild/core': 2.0.2
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3)
     transitivePeerDependencies:
       - '@rspack/core'
@@ -16574,25 +16574,25 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  '@tanstack/router-core@1.168.16':
+  '@tanstack/router-core@1.168.17':
     dependencies:
       '@tanstack/history': 1.161.6
       cookie-es: 3.1.1
       seroval: 1.5.2
       seroval-plugins: 1.5.2(seroval@1.5.2)
 
-  '@tanstack/router-devtools-core@1.167.3(@tanstack/router-core@1.168.16)(csstype@3.2.3)':
+  '@tanstack/router-devtools-core@1.167.3(@tanstack/router-core@1.168.17)(csstype@3.2.3)':
     dependencies:
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/router-core': 1.168.17
       clsx: 2.1.1
       goober: 2.1.18(csstype@3.2.3)
     optionalDependencies:
       csstype: 3.2.3
 
-  '@tanstack/router-generator@1.166.35':
+  '@tanstack/router-generator@1.166.36':
     dependencies:
       '@babel/types': 7.29.0
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/router-core': 1.168.17
       '@tanstack/router-utils': 1.161.7
       '@tanstack/virtual-file-routes': 1.161.7
       jiti: 2.6.1
@@ -16602,7 +16602,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-plugin@1.167.27(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/router-plugin@1.167.28(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/plugin-syntax-jsx': 7.28.6(@babel/core@7.29.0)
@@ -16610,22 +16610,22 @@ snapshots:
       '@babel/template': 7.28.6
       '@babel/traverse': 7.29.0
       '@babel/types': 7.29.0
-      '@tanstack/router-core': 1.168.16
-      '@tanstack/router-generator': 1.166.35
+      '@tanstack/router-core': 1.168.17
+      '@tanstack/router-generator': 1.166.36
       '@tanstack/router-utils': 1.161.7
       '@tanstack/virtual-file-routes': 1.161.7
       chokidar: 3.6.0
       unplugin: 3.0.0
       zod: 3.25.76
     optionalDependencies:
-      '@rsbuild/core': 2.0.1
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@rsbuild/core': 2.0.2
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3)
       webpack: 5.106.2(esbuild@0.28.0)
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-plugin@1.167.27(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/router-plugin@1.167.28(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/plugin-syntax-jsx': 7.28.6(@babel/core@7.29.0)
@@ -16633,25 +16633,25 @@ snapshots:
       '@babel/template': 7.28.6
       '@babel/traverse': 7.29.0
       '@babel/types': 7.29.0
-      '@tanstack/router-core': 1.168.16
-      '@tanstack/router-generator': 1.166.35
+      '@tanstack/router-core': 1.168.17
+      '@tanstack/router-generator': 1.166.36
       '@tanstack/router-utils': 1.161.7
       '@tanstack/virtual-file-routes': 1.161.7
       chokidar: 3.6.0
       unplugin: 3.0.0
       zod: 3.25.76
     optionalDependencies:
-      '@rsbuild/core': 2.0.1
-      '@tanstack/react-router': 1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@rsbuild/core': 2.0.2
+      '@tanstack/react-router': 1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3)
       webpack: 5.106.2(esbuild@0.28.0)
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-ssr-query-core@1.168.0(@tanstack/query-core@5.100.5)(@tanstack/router-core@1.168.16)':
+  '@tanstack/router-ssr-query-core@1.168.0(@tanstack/query-core@5.100.5)(@tanstack/router-core@1.168.17)':
     dependencies:
       '@tanstack/query-core': 5.100.5
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/router-core': 1.168.17
 
   '@tanstack/router-utils@1.161.7':
     dependencies:
@@ -16667,27 +16667,27 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/start-client-core@1.167.19':
+  '@tanstack/start-client-core@1.167.20':
     dependencies:
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/router-core': 1.168.17
       '@tanstack/start-fn-stubs': 1.161.6
-      '@tanstack/start-storage-context': 1.166.30
+      '@tanstack/start-storage-context': 1.166.31
       seroval: 1.5.2
 
   '@tanstack/start-fn-stubs@1.161.6': {}
 
-  '@tanstack/start-plugin-core@1.169.5(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/start-plugin-core@1.169.6(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
       '@babel/code-frame': 7.27.1
       '@babel/core': 7.29.0
       '@babel/types': 7.29.0
       '@rolldown/pluginutils': 1.0.0-beta.40
-      '@tanstack/router-core': 1.168.16
-      '@tanstack/router-generator': 1.166.35
-      '@tanstack/router-plugin': 1.167.27(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/router-core': 1.168.17
+      '@tanstack/router-generator': 1.166.36
+      '@tanstack/router-plugin': 1.167.28(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
       '@tanstack/router-utils': 1.161.7
-      '@tanstack/start-client-core': 1.167.19
-      '@tanstack/start-server-core': 1.167.21(crossws@0.4.5(srvx@0.11.15))
+      '@tanstack/start-client-core': 1.167.20
+      '@tanstack/start-server-core': 1.167.22(crossws@0.4.5(srvx@0.11.15))
       cheerio: 1.2.0
       exsolve: 1.0.8
       lightningcss: 1.32.0
@@ -16702,7 +16702,7 @@ snapshots:
       xmlbuilder2: 4.0.3
       zod: 3.25.76
     optionalDependencies:
-      '@rsbuild/core': 2.0.1
+      '@rsbuild/core': 2.0.2
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3)
     transitivePeerDependencies:
       - '@tanstack/react-router'
@@ -16711,18 +16711,18 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/start-plugin-core@1.169.5(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
+  '@tanstack/start-plugin-core@1.169.6(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(crossws@0.4.5(srvx@0.11.15))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))':
     dependencies:
       '@babel/code-frame': 7.27.1
       '@babel/core': 7.29.0
       '@babel/types': 7.29.0
       '@rolldown/pluginutils': 1.0.0-beta.40
-      '@tanstack/router-core': 1.168.16
-      '@tanstack/router-generator': 1.166.35
-      '@tanstack/router-plugin': 1.167.27(@rsbuild/core@2.0.1)(@tanstack/react-router@1.168.24(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
+      '@tanstack/router-core': 1.168.17
+      '@tanstack/router-generator': 1.166.36
+      '@tanstack/router-plugin': 1.167.28(@rsbuild/core@2.0.2)(@tanstack/react-router@1.168.25(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(webpack@5.106.2(esbuild@0.28.0))
       '@tanstack/router-utils': 1.161.7
-      '@tanstack/start-client-core': 1.167.19
-      '@tanstack/start-server-core': 1.167.21(crossws@0.4.5(srvx@0.11.15))
+      '@tanstack/start-client-core': 1.167.20
+      '@tanstack/start-server-core': 1.167.22(crossws@0.4.5(srvx@0.11.15))
       cheerio: 1.2.0
       exsolve: 1.0.8
       lightningcss: 1.32.0
@@ -16737,7 +16737,7 @@ snapshots:
       xmlbuilder2: 4.0.3
       zod: 3.25.76
     optionalDependencies:
-      '@rsbuild/core': 2.0.1
+      '@rsbuild/core': 2.0.2
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3)
     transitivePeerDependencies:
       - '@tanstack/react-router'
@@ -16746,20 +16746,20 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/start-server-core@1.167.21(crossws@0.4.5(srvx@0.11.15))':
+  '@tanstack/start-server-core@1.167.22(crossws@0.4.5(srvx@0.11.15))':
     dependencies:
       '@tanstack/history': 1.161.6
-      '@tanstack/router-core': 1.168.16
-      '@tanstack/start-client-core': 1.167.19
-      '@tanstack/start-storage-context': 1.166.30
+      '@tanstack/router-core': 1.168.17
+      '@tanstack/start-client-core': 1.167.20
+      '@tanstack/start-storage-context': 1.166.31
       h3-v2: h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15))
       seroval: 1.5.2
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/start-storage-context@1.166.30':
+  '@tanstack/start-storage-context@1.166.31':
     dependencies:
-      '@tanstack/router-core': 1.168.16
+      '@tanstack/router-core': 1.168.17
 
   '@tanstack/store@0.9.3': {}
 
