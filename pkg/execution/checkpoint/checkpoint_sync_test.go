@@ -720,7 +720,7 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 	// Finalize must be called for this run with the RunComplete response type.
 	mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
 		return opts.Metadata.ID == testData.metadata.ID &&
-			opts.Response.Type == execution.FinalizeResponseRunComplete
+			opts.Response.Type == execution.FinalizeResponseAPI
 	})).Return(nil)
 
 	// Registered so the async goroutine in checkpoint.go (`go MetricsProvider.OnFnFinished`)
@@ -733,6 +733,66 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 
 	mocks.state.AssertNotCalled(t, "SaveStep", ctx, testData.metadata.ID, "step-defer", mock.Anything)
 	mocks.state.AssertNotCalled(t, "UpdateMetadata", mock.Anything, mock.Anything, mock.Anything)
+
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+	mocks.executor.AssertExpectations(t)
+}
+
+// TestCheckpointSyncSteps_DeferAdd_RunCompleteFirstStillSavesDefer pins the
+// ordering invariant: DeferAdd/DeferCancel must drain before RunComplete even
+// when the SDK delivers them in the opposite order. Without the priority
+// reorder, RunComplete's Finalize would delete state before SaveDefer ran,
+// silently dropping the deferred run.
+func TestCheckpointSyncSteps_DeferAdd_RunCompleteFirstStillSavesDefer(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+
+	ops := []state.GeneratorOpcode{
+		{
+			ID:   "run-complete",
+			Op:   enums.OpcodeRunComplete,
+			Data: json.RawMessage(`{"data": {"status_code": 200}}`),
+		},
+		{
+			ID: "step-defer",
+			Op: enums.OpcodeDeferAdd,
+			Opts: map[string]any{
+				"fn_slug": "onDefer-score",
+				"input":   map[string]any{},
+			},
+		},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+	var saveDeferAt, finalizeAt int
+	var calls int
+
+	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
+		return d.HashedID == "step-defer" && d.FnSlug == "onDefer-score"
+	})).Run(func(args mock.Arguments) {
+		calls++
+		saveDeferAt = calls
+	}).Return(nil)
+
+	mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
+		return opts.Metadata.ID == testData.metadata.ID &&
+			opts.Response.Type == execution.FinalizeResponseAPI
+	})).Run(func(args mock.Arguments) {
+		calls++
+		finalizeAt = calls
+	}).Return(nil)
+
+	mocks.metrics.On("OnFnFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.RunStatusCompleted)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	r.NoError(err)
+
+	r.NotZero(saveDeferAt, "SaveDefer must be called")
+	r.NotZero(finalizeAt, "Finalize must be called")
+	r.Less(saveDeferAt, finalizeAt, "SaveDefer must run before Finalize so LoadDefers can read the record")
 
 	mocks.state.AssertExpectations(t)
 	mocks.tracer.AssertExpectations(t)

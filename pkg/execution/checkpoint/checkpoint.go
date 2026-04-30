@@ -147,7 +147,24 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	// at some point in the future.
 	onChangeToAsync := sync.OnceFunc(func() { c.updateSpanAsync(ctx, input) })
 
+	// Drain priority opcodes before the rest.
+	//
+	// NOTE: This assumes that ops are processed sequentially. If they aren't,
+	// then priority order would only decrease the chance of a race, but not
+	// eliminate it.
+	ordered := make([]state.GeneratorOpcode, 0, len(input.Steps))
 	for _, op := range input.Steps {
+		if enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+	for _, op := range input.Steps {
+		if !enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+
+	for _, op := range ordered {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, input.Metadata.ID)
 

@@ -65,3 +65,23 @@ func OpcodeIsLazy(o Opcode) bool {
 	}
 	return false
 }
+
+// OpcodeIsPriority reports whether the opcode must be processed before
+// non-priority opcodes in the same batch.
+func OpcodeIsPriority(o Opcode) bool {
+	switch o {
+	case OpcodeWaitForEvent:
+		// Prioritize in case the user wrote an invoke-esque "[WaitForEvent,
+		// SendEvent]" pattern. For example, they want to wait for an event
+		// that's sent by a function triggered by the SendEvent. If we don't
+		// finish processing the WaitForEvent before the SendEvent does its
+		// thing, then we may miss the event.
+		return true
+	case OpcodeDeferAdd, OpcodeDeferCancel:
+		// Prioritize in case the SDK returned something like "[DeferAdd,
+		// RunComplete]". If we don't finish processing the DeferAdd before
+		// finalizing the run, then we'll won't send the defer event.
+		return true
+	}
+	return false
+}

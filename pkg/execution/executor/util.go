@@ -69,20 +69,9 @@ func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
 	}
 
 	for _, op := range opcodes {
-		switch op.Op {
-		case enums.OpcodeWaitForEvent:
-			// Prioritize in case the user wrote an invoke-esque "[WaitForEvent,
-			// SendEvent]" pattern. For example, they want to wait for an event
-			// that's sent by a function triggered by the SendEvent. If we don't
-			// finish processing the WaitForEvent before the SendEvent does its
-			// thing, then we may miss the event.
+		if enums.OpcodeIsPriority(op.Op) {
 			groups.PriorityGroup.Opcodes = append(groups.PriorityGroup.Opcodes, op)
-		case enums.OpcodeDeferAdd, enums.OpcodeDeferCancel:
-			// Prioritize in case the SDK returned something like "[DeferAdd,
-			// RunComplete]". If we don't finish processing the DeferAdd before
-			// finalizing the run, then we'll won't send the defer event.
-			groups.PriorityGroup.Opcodes = append(groups.PriorityGroup.Opcodes, op)
-		default:
+		} else {
 			groups.OtherGroup.Opcodes = append(groups.OtherGroup.Opcodes, op)
 		}
 	}
