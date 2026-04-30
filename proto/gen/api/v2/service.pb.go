@@ -715,7 +715,7 @@ type RunTrigger struct {
 	EventName     *string                `protobuf:"bytes,2,opt,name=event_name,json=eventName,proto3,oneof" json:"event_name,omitempty"`
 	IsBatch       bool                   `protobuf:"varint,3,opt,name=is_batch,json=isBatch,proto3" json:"is_batch,omitempty"`
 	BatchId       *string                `protobuf:"bytes,4,opt,name=batch_id,json=batchId,proto3,oneof" json:"batch_id,omitempty"`
-	CronSchedule  *string                `protobuf:"bytes,6,opt,name=cron_schedule,json=cronSchedule,proto3,oneof" json:"cron_schedule,omitempty"`
+	CronSchedule  *string                `protobuf:"bytes,5,opt,name=cron_schedule,json=cronSchedule,proto3,oneof" json:"cron_schedule,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3603,7 +3603,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"event_name\x18\x02 \x01(\tH\x00R\teventName\x88\x01\x01\x12\x19\n" +
 	"\bis_batch\x18\x03 \x01(\bR\aisBatch\x12\x1e\n" +
 	"\bbatch_id\x18\x04 \x01(\tH\x01R\abatchId\x88\x01\x01\x12(\n" +
-	"\rcron_schedule\x18\x06 \x01(\tH\x02R\fcronSchedule\x88\x01\x01B\r\n" +
+	"\rcron_schedule\x18\x05 \x01(\tH\x02R\fcronSchedule\x88\x01\x01B\r\n" +
 	"\v_event_nameB\v\n" +
 	"\t_batch_idB\x10\n" +
 	"\x0e_cron_schedule\"\x99\x04\n" +

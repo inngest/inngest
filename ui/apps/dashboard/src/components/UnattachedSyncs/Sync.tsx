@@ -3,6 +3,7 @@ import { RiErrorWarningLine } from '@remixicon/react';
 
 import { AppGitCard } from '@/components/Apps/AppGitCard/AppGitCard';
 import { AppInfoCard } from '@/components/Apps/AppInfoCard/AppInfoCard';
+import { SyncErrorMessage } from '@/components/Apps/SyncErrorMessage';
 import { useSync } from './useSync';
 
 type Props = {
@@ -45,7 +46,7 @@ export const Sync = ({ syncID }: Props) => {
       <div className="mx-auto w-full max-w-[1200px] p-4">
         {sync.error && (
           <Alert className="mb-4" severity="error">
-            {sync.error}
+            <SyncErrorMessage error={sync.error} />
           </Alert>
         )}
 

@@ -506,6 +506,15 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		require.True(t, resp.Data.ChildrenTruncated)
 		require.Empty(t, resp.Data.Children)
 	})
+
+	t.Run("validates missing span ID", func(t *testing.T) {
+		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{
+			RunId: runID.String(),
+		})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Span ID is required")
+	})
 }
 
 func mustEncodeSpanIdentifier(t *testing.T, id cqrs.SpanIdentifier) string {
