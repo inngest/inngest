@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-
 func TestService_Health(t *testing.T) {
 	service := NewService(ServiceOptions{})
 
@@ -218,5 +217,75 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 		fromTime := timestamppb.New(asTime)
 		require.Equal(t, timestamp.Seconds, fromTime.Seconds)
 		require.Equal(t, timestamp.Nanos, fromTime.Nanos)
+	})
+}
+
+func TestService_GetFunctionRun(t *testing.T) {
+	service := NewService(ServiceOptions{})
+
+	t.Run("returns not implemented for valid request", func(t *testing.T) {
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "Get function run is not yet implemented")
+	})
+
+	t.Run("requires run id", func(t *testing.T) {
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "Run ID is required")
+	})
+}
+
+func TestService_GetFunctionTrace(t *testing.T) {
+	service := NewService(ServiceOptions{})
+
+	t.Run("returns not implemented for valid request", func(t *testing.T) {
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
+		})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Get function trace is not yet implemented")
+	})
+
+	t.Run("validates missing run ID", func(t *testing.T) {
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Run ID is required")
+	})
+}
+
+func TestService_GetFunctionTraceSpan(t *testing.T) {
+	service := NewService(ServiceOptions{})
+
+	t.Run("returns not implemented for valid request", func(t *testing.T) {
+		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{
+			RunId:  "01hp1zx8m3ng9vp6qn0xk7j4cy",
+			SpanId: "span-1",
+		})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Get function trace span is not yet implemented")
+	})
+
+	t.Run("validates missing run ID", func(t *testing.T) {
+		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Run ID is required")
+	})
+
+	t.Run("validates missing span ID", func(t *testing.T) {
+		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{
+			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
+		})
+		require.Nil(t, resp)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Span ID is required")
 	})
 }

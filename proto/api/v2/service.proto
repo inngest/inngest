@@ -1269,7 +1269,7 @@ message RunTrigger {
   optional string event_name = 2;
   bool is_batch = 3;
   optional string batch_id = 4;
-  optional string cron_schedule = 6;
+  optional string cron_schedule = 5;
 }
 
 message FunctionRun {
