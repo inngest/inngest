@@ -278,6 +278,36 @@ func TestSaveDefer_OverwritesAfterRun(t *testing.T) {
 		"non-cancelled defer should be overwritten by a subsequent SaveDefer")
 }
 
+// Regression: cjson cannot distinguish empty objects from empty arrays, so a
+// raw `{}` Input round-tripped through setDeferStatus.lua would re-encode as
+// `[]`. SaveDefer normalizes `{}` → nil before marshalling to defuse this; this
+// test pins that normalization in place.
+func TestSetDeferStatus_EmptyObjectInputDoesNotBecomeArray(t *testing.T) {
+	ctx := context.Background()
+	v2svc, id := newDeferTestRunService(t)
+
+	d := statev2.Defer{
+		FnSlug:         "onDefer-score",
+		HashedID:       "hash-step-1",
+		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		Input:          json.RawMessage(`{}`),
+	}
+	require.NoError(t, v2svc.SaveDefer(ctx, id, d))
+	require.NoError(t, v2svc.SetDeferStatus(ctx, id, d.HashedID, statev2.ScheduleStatusCancelled))
+
+	defers, err := v2svc.LoadDefers(ctx, id)
+	require.NoError(t, err)
+	got := defers[d.HashedID]
+
+	require.Equal(t, statev2.ScheduleStatusCancelled, got.ScheduleStatus)
+	require.NotEqual(t, "[]", string(got.Input),
+		"cjson regression: empty-object Input must not round-trip as `[]`")
+	// SaveDefer normalizes `{}` → nil, which marshals as JSON null.
+	if len(got.Input) > 0 {
+		require.JSONEq(t, `null`, string(got.Input))
+	}
+}
+
 func TestSaveDefer_FirstWriteWhenMissing(t *testing.T) {
 	ctx := context.Background()
 	v2svc, id := newDeferTestRunService(t)
