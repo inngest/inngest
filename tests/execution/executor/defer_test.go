@@ -680,92 +680,110 @@ func (i *deferTestInfra) scheduleRun(t *testing.T, exec execution.Executor) *sta
 }
 
 // TestDeferAdd_ExecutorAndCheckpointProduceSameDefer drives an OpcodeDeferAdd
-// through executor.Execute, CheckpointSyncSteps, and CheckpointAsyncSteps and
-// asserts the resulting Defer record is identical across all three paths.
+// through executor.Execute, CheckpointSyncSteps, and CheckpointAsyncSteps. It
+// asserts each path produces the same expected Defer record.
+//
+// We added this test because we had a regression where Defer worked in
+// non-checkpointing codepaths but not in checkpointing.
 func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	infra := newDeferTestInfra(t)
 	ctx := infra.ctx
 
 	op := state.GeneratorOpcode{
-		Op: enums.OpcodeDeferAdd,
 		ID: "step-defer",
+		Op: enums.OpcodeDeferAdd,
 		Opts: map[string]any{
 			"fn_slug": "onDefer-score",
 			"input":   map[string]any{"user_id": "u_123"},
 		},
 	}
-
-	driver := &mockDriverV1{
-		t:        t,
-		response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&op}},
+	expected := statev2.Defer{
+		FnSlug:         "onDefer-score",
+		HashedID:       op.ID,
+		Input:          json.RawMessage(`{"user_id":"u_123"}`),
+		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 	}
-	execA := infra.newExecutor(t, driver)
-	runA := infra.scheduleRun(t, execA)
-	_, err := execA.Execute(ctx, state.Identifier{
-		WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID,
-	}, queue.Item{
-		WorkspaceID: infra.wsID,
-		Kind:        queue.KindStart,
-		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID},
-		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: op.ID}},
-	}, inngest.Edge{Incoming: "$trigger", Outgoing: op.ID})
-	require.NoError(t, err)
 
-	execB := infra.newExecutor(t, nil)
-	runB := infra.scheduleRun(t, execB)
-	cp := infra.newCheckpointer(t, execB)
-	err = cp.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
-		RunID:     runB.ID.RunID,
-		FnID:      infra.fnID,
-		AppID:     infra.appID,
-		AccountID: infra.aID,
-		EnvID:     infra.wsID,
-		Metadata:  runB,
-		Steps:     []state.GeneratorOpcode{op},
-	})
-	require.NoError(t, err)
+	cases := []struct {
+		name string
+		run  func(t *testing.T) statev2.ID
+	}{
+		{
+			name: "executor",
+			run: func(t *testing.T) statev2.ID {
+				driver := &mockDriverV1{
+					response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&op}},
+					t:        t,
+				}
+				exec := infra.newExecutor(t, driver)
+				run := infra.scheduleRun(t, exec)
+				_, err := exec.Execute(ctx, state.Identifier{
+					WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID,
+				}, queue.Item{
+					Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
+					Kind:        queue.KindStart,
+					Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: op.ID}},
+					WorkspaceID: infra.wsID,
+				}, inngest.Edge{Incoming: "$trigger", Outgoing: op.ID})
+				require.NoError(t, err)
+				return run.ID
+			},
+		},
+		{
+			name: "sync-checkpoint",
+			run: func(t *testing.T) statev2.ID {
+				exec := infra.newExecutor(t, nil)
+				run := infra.scheduleRun(t, exec)
+				cp := infra.newCheckpointer(t, exec)
+				err := cp.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
+					AccountID: infra.aID,
+					AppID:     infra.appID,
+					EnvID:     infra.wsID,
+					FnID:      infra.fnID,
+					Metadata:  run,
+					RunID:     run.ID.RunID,
+					Steps:     []state.GeneratorOpcode{op},
+				})
+				require.NoError(t, err)
+				return run.ID
+			},
+		},
+		{
+			name: "async-checkpoint",
+			run: func(t *testing.T) statev2.ID {
+				exec := infra.newExecutor(t, nil)
+				run := infra.scheduleRun(t, exec)
+				cp := infra.newCheckpointer(t, exec)
+				// No QueueItemRef → async path skips the ResetAttemptsByJobID call.
+				err := cp.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
+					AccountID: infra.aID,
+					EnvID:     infra.wsID,
+					FnID:      infra.fnID,
+					RunID:     run.ID.RunID,
+					Steps:     []state.GeneratorOpcode{op},
+				})
+				require.NoError(t, err)
+				return run.ID
+			},
+		},
+	}
 
-	execC := infra.newExecutor(t, nil)
-	runC := infra.scheduleRun(t, execC)
-	cp = infra.newCheckpointer(t, execC)
-	err = cp.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
-		RunID:     runC.ID.RunID,
-		FnID:      infra.fnID,
-		AccountID: infra.aID,
-		EnvID:     infra.wsID,
-		Steps:     []state.GeneratorOpcode{op},
-		// No QueueItemRef → async path skips the ResetAttemptsByJobID call.
-	})
-	require.NoError(t, err)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := require.New(t)
+			runID := c.run(t)
 
-	defersA, err := infra.smv2.LoadDefers(ctx, runA.ID)
-	require.NoError(t, err)
-	defersB, err := infra.smv2.LoadDefers(ctx, runB.ID)
-	require.NoError(t, err)
-	defersC, err := infra.smv2.LoadDefers(ctx, runC.ID)
-	require.NoError(t, err)
+			defers, err := infra.smv2.LoadDefers(ctx, runID)
+			r.NoError(err)
+			r.Len(defers, 1)
+			r.Equal(expected, defers[op.ID])
 
-	require.Len(t, defersA, 1)
-	require.Len(t, defersB, 1)
-	require.Len(t, defersC, 1)
-
-	// Every path should produce the same Defer record. The defers map is keyed
-	// by the hashed step ID, which is identical across runs (`step-defer`).
-	require.Equal(t, defersA[op.ID], defersB[op.ID],
-		"executor path and sync-checkpoint path must produce identical Defer records")
-	require.Equal(t, defersA[op.ID], defersC[op.ID],
-		"executor path and async-checkpoint path must produce identical Defer records")
-
-	// Step memoization should also be consistent (null payload in all paths).
-	stepsA, err := infra.smv2.LoadSteps(ctx, runA.ID)
-	require.NoError(t, err)
-	stepsB, err := infra.smv2.LoadSteps(ctx, runB.ID)
-	require.NoError(t, err)
-	stepsC, err := infra.smv2.LoadSteps(ctx, runC.ID)
-	require.NoError(t, err)
-	require.Equal(t, json.RawMessage("null"), stepsA[op.ID])
-	require.Equal(t, json.RawMessage("null"), stepsB[op.ID])
-	require.Equal(t, json.RawMessage("null"), stepsC[op.ID])
+			steps, err := infra.smv2.LoadSteps(ctx, runID)
+			r.NoError(err)
+			r.Equal(json.RawMessage("null"), steps[op.ID],
+				"DeferAdd should memoize the step with a null payload")
+		})
+	}
 }
 
 // TestDeferCancel_ExecutorAndCheckpointProduceSameDefer exercises DeferCancel
@@ -841,9 +859,9 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	require.NoError(t, err)
 
 	for name, runID := range map[string]statev2.ID{
-		"executor":    runA.ID,
-		"sync-ckpt":   runB.ID,
-		"async-ckpt":  runC.ID,
+		"executor":   runA.ID,
+		"sync-ckpt":  runB.ID,
+		"async-ckpt": runC.ID,
 	} {
 		defers, err := infra.smv2.LoadDefers(ctx, runID)
 		require.NoError(t, err, name)
