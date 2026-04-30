@@ -31,7 +31,7 @@ import (
 )
 
 func TestDeferAddSavesDefer(t *testing.T) {
-	ctx := context.Background()
+	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestDeferAddSavesDefer(t *testing.T) {
 // is finalized, the executor emits an inngest/deferred.start event for each
 // defer whose ScheduleStatus is AfterRun.
 func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
-	ctx := context.Background()
+	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
@@ -373,7 +373,7 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 // TestDeferCancelUpdatesDeferStatus verifies that when the executor processes
 // an OpcodeDeferCancel, it flips the existing defer's ScheduleStatus to Cancelled.
 func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
-	ctx := context.Background()
+	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
@@ -536,7 +536,7 @@ type deferTestInfra struct {
 
 func newDeferTestInfra(t *testing.T) *deferTestInfra {
 	t.Helper()
-	ctx := context.Background()
+	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
@@ -788,8 +788,11 @@ func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 
 // TestDeferCancel_ExecutorAndCheckpointProduceSameDefer exercises DeferCancel
 // via all three paths (executor, sync checkpoint, async checkpoint) against
-// runs that have been pre-seeded with a matching defer. All three paths must
-// flip ScheduleStatus to Cancelled while preserving every other field.
+// runs pre-seeded with a matching defer. Each path must flip ScheduleStatus
+// to Cancelled while preserving every other field.
+//
+// We added this test because we had a regression where DeferCancel worked in
+// non-checkpointing codepaths but not in checkpointing.
 func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	infra := newDeferTestInfra(t)
 	ctx := infra.ctx
@@ -801,78 +804,96 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	seed := statev2.Defer{
 		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
+		ScheduleStatus: statev2.ScheduleStatusAfterRun,
 	}
+	expected := seed
+	expected.ScheduleStatus = statev2.ScheduleStatusCancelled
 
 	cancelOp := state.GeneratorOpcode{
-		Op: enums.OpcodeDeferCancel,
 		ID: cancelStepID,
+		Op: enums.OpcodeDeferCancel,
 		Opts: map[string]any{
 			"target_hashed_id": deferStepID,
 		},
 	}
 
-	driver := &mockDriverV1{
-		t:        t,
-		response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&cancelOp}},
+	paths := []struct {
+		name string
+		run  func(t *testing.T) statev2.ID
+	}{
+		{
+			name: "executor",
+			run: func(t *testing.T) statev2.ID {
+				driver := &mockDriverV1{
+					response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&cancelOp}},
+					t:        t,
+				}
+				exec := infra.newExecutor(t, driver)
+				run := infra.scheduleRun(t, exec)
+				require.NoError(t, infra.smv2.SaveDefer(ctx, run.ID, seed))
+				_, err := exec.Execute(ctx, state.Identifier{
+					WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID,
+				}, queue.Item{
+					Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
+					Kind:        queue.KindStart,
+					Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
+					WorkspaceID: infra.wsID,
+				}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
+				require.NoError(t, err)
+				return run.ID
+			},
+		},
+		{
+			name: "sync-checkpoint",
+			run: func(t *testing.T) statev2.ID {
+				exec := infra.newExecutor(t, nil)
+				run := infra.scheduleRun(t, exec)
+				require.NoError(t, infra.smv2.SaveDefer(ctx, run.ID, seed))
+				cp := infra.newCheckpointer(t, exec)
+				err := cp.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
+					AccountID: infra.aID,
+					AppID:     infra.appID,
+					EnvID:     infra.wsID,
+					FnID:      infra.fnID,
+					Metadata:  run,
+					RunID:     run.ID.RunID,
+					Steps:     []state.GeneratorOpcode{cancelOp},
+				})
+				require.NoError(t, err)
+				return run.ID
+			},
+		},
+		{
+			name: "async-checkpoint",
+			run: func(t *testing.T) statev2.ID {
+				exec := infra.newExecutor(t, nil)
+				run := infra.scheduleRun(t, exec)
+				require.NoError(t, infra.smv2.SaveDefer(ctx, run.ID, seed))
+				cp := infra.newCheckpointer(t, exec)
+				err := cp.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
+					AccountID: infra.aID,
+					EnvID:     infra.wsID,
+					FnID:      infra.fnID,
+					RunID:     run.ID.RunID,
+					Steps:     []state.GeneratorOpcode{cancelOp},
+				})
+				require.NoError(t, err)
+				return run.ID
+			},
+		},
 	}
-	execA := infra.newExecutor(t, driver)
-	runA := infra.scheduleRun(t, execA)
-	require.NoError(t, infra.smv2.SaveDefer(ctx, runA.ID, seed))
-	_, err := execA.Execute(ctx, state.Identifier{
-		WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID,
-	}, queue.Item{
-		WorkspaceID: infra.wsID,
-		Kind:        queue.KindStart,
-		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: runA.ID.RunID, AccountID: infra.aID},
-		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
-	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
-	require.NoError(t, err)
 
-	execB := infra.newExecutor(t, nil)
-	runB := infra.scheduleRun(t, execB)
-	require.NoError(t, infra.smv2.SaveDefer(ctx, runB.ID, seed))
-	cp := infra.newCheckpointer(t, execB)
-	err = cp.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
-		RunID:     runB.ID.RunID,
-		FnID:      infra.fnID,
-		AppID:     infra.appID,
-		AccountID: infra.aID,
-		EnvID:     infra.wsID,
-		Metadata:  runB,
-		Steps:     []state.GeneratorOpcode{cancelOp},
-	})
-	require.NoError(t, err)
+	for _, p := range paths {
+		t.Run(p.name, func(t *testing.T) {
+			r := require.New(t)
+			runID := p.run(t)
 
-	execC := infra.newExecutor(t, nil)
-	runC := infra.scheduleRun(t, execC)
-	require.NoError(t, infra.smv2.SaveDefer(ctx, runC.ID, seed))
-	cp = infra.newCheckpointer(t, execC)
-	err = cp.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
-		RunID:     runC.ID.RunID,
-		FnID:      infra.fnID,
-		AccountID: infra.aID,
-		EnvID:     infra.wsID,
-		Steps:     []state.GeneratorOpcode{cancelOp},
-	})
-	require.NoError(t, err)
-
-	for name, runID := range map[string]statev2.ID{
-		"executor":   runA.ID,
-		"sync-ckpt":  runB.ID,
-		"async-ckpt": runC.ID,
-	} {
-		defers, err := infra.smv2.LoadDefers(ctx, runID)
-		require.NoError(t, err, name)
-		require.Len(t, defers, 1, name)
-		d := defers[deferStepID]
-		require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus,
-			"%s: status should be Cancelled", name)
-		require.Equal(t, seed.FnSlug, d.FnSlug, "%s: FnSlug must be preserved", name)
-		require.Equal(t, seed.HashedID, d.HashedID, "%s: HashedID must be preserved", name)
-		require.JSONEq(t, string(seed.Input), string(d.Input),
-			"%s: Input must be preserved across status update", name)
+			defers, err := infra.smv2.LoadDefers(ctx, runID)
+			r.NoError(err)
+			r.Len(defers, 1)
+			r.Equal(expected, defers[deferStepID])
+		})
 	}
 }
 
