@@ -19,13 +19,16 @@ import (
 // Service implements the V2 API service for gRPC with grpc-gateway
 type Service struct {
 	apiv2.UnimplementedV2Server
-	signingKeys    SigningKeysProvider
-	eventKeys      EventKeysProvider
-	functions      FunctionProvider
-	executor       FunctionScheduler
-	eventPublisher EventPublisher
-	rateLimiter    RateLimitProvider
-	base           *apiv2base.Base
+	signingKeys          SigningKeysProvider
+	eventKeys            EventKeysProvider
+	functions            FunctionProvider
+	executor             FunctionScheduler
+	eventPublisher       EventPublisher
+	rateLimiter          RateLimitProvider
+	appSyncer            AppSyncer
+	serverKind           string
+	appSyncAllowInsecure bool
+	base                 *apiv2base.Base
 }
 
 // ServiceOptions contains configuration for the V2 service
@@ -36,6 +39,11 @@ type ServiceOptions struct {
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
 	RateLimitProvider   RateLimitProvider
+	AppSyncer           AppSyncer
+	ServerKind          string
+
+	// AppSyncAllowInsecureHTTP permits in-band sync to use http:// URLs.
+	AppSyncAllowInsecureHTTP bool
 }
 
 func NewService(opts ServiceOptions) *Service {
@@ -44,13 +52,16 @@ func NewService(opts ServiceOptions) *Service {
 		rateLimiter = noopRateLimitProvider{}
 	}
 	return &Service{
-		signingKeys:    opts.SigningKeysProvider,
-		eventKeys:      opts.EventKeysProvider,
-		functions:      opts.Functions,
-		executor:       opts.Executor,
-		eventPublisher: opts.EventPublisher,
-		rateLimiter:    rateLimiter,
-		base:           apiv2base.NewBase(),
+		signingKeys:          opts.SigningKeysProvider,
+		eventKeys:            opts.EventKeysProvider,
+		functions:            opts.Functions,
+		executor:             opts.Executor,
+		eventPublisher:       opts.EventPublisher,
+		rateLimiter:          rateLimiter,
+		appSyncer:            opts.AppSyncer,
+		serverKind:           opts.ServerKind,
+		appSyncAllowInsecure: opts.AppSyncAllowInsecureHTTP,
+		base:                 apiv2base.NewBase(),
 	}
 }
 

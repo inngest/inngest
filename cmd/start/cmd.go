@@ -120,6 +120,11 @@ func Command() *cli.Command {
 				Name:     "no-ui",
 				Usage:    "Disable the web UI and GraphQL API endpoint",
 			},
+			&cli.BoolFlag{
+				Category: "Advanced",
+				Name:     "allow-insecure-http",
+				Usage:    "Permit app syncs against http:// SDK URLs (default: https only)",
+			},
 		},
 	}
 
