@@ -672,11 +672,15 @@ func TestCheckpointSyncSteps_DeferAdd(t *testing.T) {
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err)
 
-	mocks.state.AssertExpectations(t)
 	// No discovery step should be enqueued (the SDK is driving the run).
 	mocks.queue.AssertNotCalled(t, "Enqueue")
 	// DeferAdd is a sync opcode — no async mode transition should fire.
 	mocks.tracer.AssertNotCalled(t, "UpdateSpan")
+
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+	mocks.executor.AssertExpectations(t)
 }
 
 // TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep asserts that when
@@ -713,9 +717,15 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 		return d.HashedID == "step-defer" && d.FnSlug == "onDefer-score"
 	})).Return(nil)
 
-	// Finalize goes through Executor.Finalize.
-	mocks.executor.On("Finalize", ctx, mock.AnythingOfType("execution.FinalizeOpts")).Return(nil)
+	// Finalize must be called for this run with the RunComplete response type.
+	mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
+		return opts.Metadata.ID == testData.metadata.ID &&
+			opts.Response.Type == execution.FinalizeResponseRunComplete
+	})).Return(nil)
 
+	// Registered so the async goroutine in checkpoint.go (`go MetricsProvider.OnFnFinished`)
+	// doesn't panic on an unmocked call. Not asserted: the goroutine races against
+	// the test's return, matching the convention in TestCheckpointSyncSteps_ThreeStepRuns.
 	mocks.metrics.On("OnFnFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.RunStatusCompleted)
 
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
@@ -723,7 +733,10 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 
 	mocks.state.AssertNotCalled(t, "SaveStep", ctx, testData.metadata.ID, "step-defer", mock.Anything)
 	mocks.state.AssertNotCalled(t, "UpdateMetadata", mock.Anything, mock.Anything, mock.Anything)
+
 	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
 	mocks.executor.AssertExpectations(t)
 }
 
@@ -751,9 +764,13 @@ func TestCheckpointSyncSteps_DeferCancel(t *testing.T) {
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err)
 
-	mocks.state.AssertExpectations(t)
 	mocks.queue.AssertNotCalled(t, "Enqueue")
 	mocks.tracer.AssertNotCalled(t, "UpdateSpan")
+
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+	mocks.executor.AssertExpectations(t)
 }
 
 // TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID asserts that a
@@ -771,6 +788,9 @@ func TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID(t *testing.T) {
 
 	mocks, testData := setupSyncCheckpointTest(t, op)
 
+	// SaveStep runs before validation in the current sync handler, so even
+	// the error path memoizes the cancel step. Pin that ordering: a regression
+	// that moved validation earlier would silently violate it.
 	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
 
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
@@ -778,6 +798,11 @@ func TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID(t *testing.T) {
 	require.Contains(err.Error(), "TargetHashedID")
 
 	mocks.state.AssertNotCalled(t, "SetDeferStatus", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+	mocks.executor.AssertExpectations(t)
 }
 
 //
