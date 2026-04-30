@@ -797,6 +797,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
 		RequestAttempt:       uint32(req.RequestAttempt),
+		RequestTime:          timestamppb.New(req.RequestTime),
 	}
 }
 
@@ -836,6 +837,11 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 	var currentTime time.Time
 	if pbReq.CurrentTime != nil {
 		currentTime = pbReq.CurrentTime.AsTime()
+	}
+
+	var requestTime time.Time
+	if pbReq.RequestTime != nil {
+		requestTime = pbReq.RequestTime.AsTime()
 	}
 
 	var duration time.Duration
@@ -879,6 +885,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt:       int(pbReq.RequestAttempt),
+		RequestTime:          requestTime,
 	}, nil
 }
 
@@ -902,21 +909,12 @@ func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityA
 		exhaustedConstraints[i] = ConstraintItemToProto(constraint)
 	}
 
-	var usage []*pb.ConstraintUsage
-	if len(resp.Usage) > 0 {
-		usage = make([]*pb.ConstraintUsage, len(resp.Usage))
-		for i, u := range resp.Usage {
-			usage[i] = ConstraintUsageToProto(u)
-		}
-	}
-
 	return &pb.CapacityAcquireResponse{
 		Leases:               leases,
 		LimitingConstraints:  limitingConstraints,
 		ExhaustedConstraints: exhaustedConstraints,
 		RetryAfter:           timestamppb.New(resp.RetryAfter),
 		FairnessReduction:    int32(resp.FairnessReduction),
-		Usage:                usage,
 	}
 }
 
@@ -949,21 +947,12 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 		retryAfter = pbResp.RetryAfter.AsTime()
 	}
 
-	var usage []ConstraintUsage
-	if len(pbResp.Usage) > 0 {
-		usage = make([]ConstraintUsage, len(pbResp.Usage))
-		for i, u := range pbResp.Usage {
-			usage[i] = ConstraintUsageFromProto(u)
-		}
-	}
-
 	return &CapacityAcquireResponse{
 		Leases:               leases,
 		LimitingConstraints:  limitingConstraints,
 		ExhaustedConstraints: exhaustedConstraints,
 		RetryAfter:           retryAfter,
 		FairnessReduction:    int(pbResp.FairnessReduction),
-		Usage:                usage,
 	}, nil
 }
 
