@@ -472,10 +472,11 @@ type StreamQuery struct {
 }
 
 type ThrottleConfiguration struct {
-	Burst  int     `json:"burst"`
-	Key    *string `json:"key,omitempty"`
-	Limit  int     `json:"limit"`
-	Period string  `json:"period"`
+	Burst  int           `json:"burst"`
+	Key    *string       `json:"key,omitempty"`
+	Limit  int           `json:"limit"`
+	Period string        `json:"period"`
+	Scope  ThrottleScope `json:"scope"`
 }
 
 type UpdateAppInput struct {
@@ -1273,5 +1274,48 @@ func (e *StreamType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e StreamType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ThrottleScope string
+
+const (
+	ThrottleScopeAccount     ThrottleScope = "ACCOUNT"
+	ThrottleScopeEnvironment ThrottleScope = "ENVIRONMENT"
+	ThrottleScopeFunction    ThrottleScope = "FUNCTION"
+)
+
+var AllThrottleScope = []ThrottleScope{
+	ThrottleScopeAccount,
+	ThrottleScopeEnvironment,
+	ThrottleScopeFunction,
+}
+
+func (e ThrottleScope) IsValid() bool {
+	switch e {
+	case ThrottleScopeAccount, ThrottleScopeEnvironment, ThrottleScopeFunction:
+		return true
+	}
+	return false
+}
+
+func (e ThrottleScope) String() string {
+	return string(e)
+}
+
+func (e *ThrottleScope) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ThrottleScope(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ThrottleScope", str)
+	}
+	return nil
+}
+
+func (e ThrottleScope) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

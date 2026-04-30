@@ -51,6 +51,7 @@ func ToFunctionConfiguration(fn *inngest.Function, planConcurrencyLimit int) *Fu
 			Burst: int(fn.Throttle.Burst),
 			Key:   fn.Throttle.Key,
 			Limit: int(fn.Throttle.Limit),
+			Scope: mapThrottleScope(fn.Throttle.Scope),
 
 			// TODO: We need a custom "time.Duration to string" function that
 			// formats it more closely to what we want. For example,
@@ -139,6 +140,19 @@ func mapScope(internalEnum enums.ConcurrencyScope) ConcurrencyScope {
 		return gqlEnum
 	}
 	return ConcurrencyScopeFunction
+}
+
+func mapThrottleScope(internalEnum enums.ThrottleScope) ThrottleScope {
+	var enumMapping = map[enums.ThrottleScope]ThrottleScope{
+		enums.ThrottleScopeFn:      ThrottleScopeFunction,
+		enums.ThrottleScopeEnv:     ThrottleScopeEnvironment,
+		enums.ThrottleScopeAccount: ThrottleScopeAccount,
+	}
+
+	if gqlEnum, ok := enumMapping[internalEnum]; ok {
+		return gqlEnum
+	}
+	return ThrottleScopeFunction
 }
 
 func mapSingletonMode(internalEnum enums.SingletonMode) SingletonMode {

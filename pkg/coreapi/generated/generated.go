@@ -563,6 +563,7 @@ type ComplexityRoot struct {
 		Key    func(childComplexity int) int
 		Limit  func(childComplexity int) int
 		Period func(childComplexity int) int
+		Scope  func(childComplexity int) int
 	}
 
 	UserlandSpan struct {
@@ -3198,6 +3199,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ThrottleConfiguration.Period(childComplexity), true
 
+	case "ThrottleConfiguration.scope":
+		if e.complexity.ThrottleConfiguration.Scope == nil {
+			break
+		}
+
+		return e.complexity.ThrottleConfiguration.Scope(childComplexity), true
+
 	case "UserlandSpan.resourceAttrs":
 		if e.complexity.UserlandSpan.ResourceAttrs == nil {
 			break
@@ -3865,6 +3873,13 @@ type ThrottleConfiguration {
   key: String
   limit: Int!
   period: String!
+  scope: ThrottleScope!
+}
+
+enum ThrottleScope {
+  ACCOUNT
+  ENVIRONMENT
+  FUNCTION
 }
 
 type SingletonConfiguration {
@@ -10452,6 +10467,8 @@ func (ec *executionContext) fieldContext_FunctionConfiguration_throttle(ctx cont
 				return ec.fieldContext_ThrottleConfiguration_limit(ctx, field)
 			case "period":
 				return ec.fieldContext_ThrottleConfiguration_period(ctx, field)
+			case "scope":
+				return ec.fieldContext_ThrottleConfiguration_scope(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ThrottleConfiguration", field.Name)
 		},
@@ -21430,6 +21447,50 @@ func (ec *executionContext) fieldContext_ThrottleConfiguration_period(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _ThrottleConfiguration_scope(ctx context.Context, field graphql.CollectedField, obj *models.ThrottleConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ThrottleConfiguration_scope(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Scope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.ThrottleScope)
+	fc.Result = res
+	return ec.marshalNThrottleScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐThrottleScope(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ThrottleConfiguration_scope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ThrottleConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ThrottleScope does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _UserlandSpan_spanName(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserlandSpan_spanName(ctx, field)
 	if err != nil {
@@ -28616,6 +28677,13 @@ func (ec *executionContext) _ThrottleConfiguration(ctx context.Context, sel ast.
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "scope":
+
+			out.Values[i] = ec._ThrottleConfiguration_scope(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -30431,6 +30499,16 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNThrottleScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐThrottleScope(ctx context.Context, v interface{}) (models.ThrottleScope, error) {
+	var res models.ThrottleScope
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNThrottleScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐThrottleScope(ctx context.Context, sel ast.SelectionSet, v models.ThrottleScope) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
