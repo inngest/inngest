@@ -1,10 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { InlineCode } from '@inngest/components/Code';
+import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
-import {
-  ExperimentsBlankState,
-  type TimeRangePreset,
-} from '@inngest/components/Experiments';
+import { ExperimentsBlankState } from '@inngest/components/Experiments';
 import {
   HelperPanelControl,
   HelperPanelFrame,
@@ -12,7 +10,9 @@ import {
 } from '@inngest/components/HelperPanelControl';
 import { Header } from '@inngest/components/Header/Header';
 import { Skeleton } from '@inngest/components/Skeleton';
+import { subtractDuration } from '@inngest/components/utils/date';
 import { RiFlaskLine, RiListOrdered2 } from '@remixicon/react';
+import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { ExperimentDetailToolbar } from '@/components/Experiments/ExperimentDetailToolbar';
@@ -23,9 +23,11 @@ import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSi
 import {
   useExperimentDetail,
   useExperimentInsightsQuery,
+  type ExperimentTimeRange,
 } from '@/components/Experiments/useExperiments';
 import { useScoringConfig } from '@/components/Experiments/useScoringConfig';
 import { VariantsTable } from '@/components/Experiments/VariantsTable';
+import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { insightsUrl } from '@/lib/experiments/insightsUrl';
 import { findExtremum, scoreVariants } from '@/lib/experiments/score';
 import { pathCreator } from '@/utils/urls';
@@ -43,20 +45,61 @@ const INFO_PANEL = 'Info';
 const SCORING_PANEL = 'Scoring formula';
 type PanelKey = typeof INFO_PANEL | typeof SCORING_PANEL;
 
+// TimeFilter's longest preset is "Last 30 days". Don't default the range
+// past that even if the account's history retention is longer.
+const MAX_DEFAULT_DAYS = 30;
+
+function rangeToTimeRange(range: RangeChangeProps): ExperimentTimeRange {
+  if (range.type === 'absolute') return { from: range.start, to: range.end };
+  const to = new Date();
+  return { from: subtractDuration(to, range.duration), to };
+}
+
 export function ExperimentDetailPage({ experimentName, functionID }: Props) {
   const environment = useEnvironment();
 
-  const [preset, setPreset] = useState<TimeRangePreset>('24h');
+  const [{ data: accountData }] = useQuery({
+    query: GetAccountEntitlementsDocument,
+  });
+  const daysAgoMax = accountData?.account.entitlements.history.limit || 7;
+
+  // Defaults to the longest preset the user's plan can select. Initialized
+  // lazily once entitlements arrive so the default reflects their plan rather
+  // than a guess; until then, the body renders a skeleton.
+  const [range, setRange] = useState<RangeChangeProps | null>(null);
+  useEffect(() => {
+    if (accountData && range === null) {
+      const days = Math.min(daysAgoMax, MAX_DEFAULT_DAYS);
+      setRange({ type: 'relative', duration: { days } });
+    }
+  }, [accountData, daysAgoMax, range]);
+
   const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(INFO_PANEL);
 
-  const detail = useExperimentDetail(functionID, experimentName, preset, null);
+  const queryRange = useMemo<ExperimentTimeRange>(() => {
+    if (!range) {
+      // Placeholder while entitlements load; queries are disabled below.
+      const to = new Date();
+      return { from: subtractDuration(to, { hours: 24 }), to };
+    }
+    return rangeToTimeRange(range);
+  }, [range]);
+
+  const detail = useExperimentDetail(
+    functionID,
+    experimentName,
+    queryRange,
+    null,
+    { enabled: range !== null },
+  );
   const scoring = useScoringConfig(functionID, experimentName);
   const insightsQuery = useExperimentInsightsQuery(
     functionID,
     experimentName,
-    preset,
+    queryRange,
+    { enabled: range !== null },
   );
 
   const togglePanel = useCallback((key: PanelKey) => {
@@ -151,79 +194,95 @@ export function ExperimentDetailPage({ experimentName, functionID }: Props) {
         <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-10 pt-4">
           <h1 className="text-basis text-lg font-semibold">{experimentName}</h1>
 
-          <ExperimentDetailToolbar
-            preset={preset}
-            onPresetChange={setPreset}
-            selectedVariants={selectedVariants}
-            onSelectedVariantsChange={setSelectedVariants}
-            availableVariants={availableVariants}
-          />
-
-          {(detail.isPending || scoring.isPending) && (
-            <Skeleton className="h-96 w-full rounded-lg" />
-          )}
-
-          {detail.error && (
-            <ErrorCard error={detail.error} reset={() => detail.refetch()} />
-          )}
-          {scoring.error && (
-            <ErrorCard error={scoring.error} reset={() => scoring.refetch()} />
-          )}
-
-          {!detail.isPending && !detail.error && detail.data === null && (
-            <ExperimentsBlankState
-              title="No runs in this time range"
-              description="Try selecting a wider time range."
-              onRefresh={detail.refetch}
-            />
-          )}
-
-          {filteredDetail &&
-            scoring.metrics &&
-            scoredVariants &&
-            (filteredDetail.variants.length === 0 ? (
-              <ExperimentsBlankState
-                title="No variant data yet"
-                description={
-                  <>
-                    Once your function emits runs for this experiment via{' '}
-                    <InlineCode>group.experiment()</InlineCode>, variant metrics
-                    will appear here.
-                  </>
-                }
-                onRefresh={detail.refetch}
+          {range === null ? (
+            <>
+              <Skeleton className="h-8 w-72 rounded-lg" />
+              <Skeleton className="h-96 w-full rounded-lg" />
+            </>
+          ) : (
+            <>
+              <ExperimentDetailToolbar
+                range={range}
+                onRangeChange={setRange}
+                daysAgoMax={daysAgoMax}
+                selectedVariants={selectedVariants}
+                onSelectedVariantsChange={setSelectedVariants}
+                availableVariants={availableVariants}
               />
-            ) : (
-              <div className="@container">
-                <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
-                  <ScoreSummaryCard
-                    className="col-span-full"
-                    scoredVariants={scoredVariants}
-                    metrics={scoring.metrics}
-                  />
 
-                  {enabledMetrics.map((metric) => (
-                    <MetricPanel
-                      key={metric.key}
-                      metric={metric}
-                      variants={filteredDetail.variants}
-                    />
-                  ))}
+              {(detail.isPending || scoring.isPending) && (
+                <Skeleton className="h-96 w-full rounded-lg" />
+              )}
 
-                  <VariantsTable
-                    className="col-span-full"
-                    scoredVariants={scoredVariants}
-                    scoringConfig={scoring.metrics}
-                    metricRanges={metricRanges}
-                    onUpdateMetric={scoring.updateMetric}
-                    pointsLeft={scoring.pointsLeft}
-                    onOpenInsights={onOpenInsights}
-                    showInactive={showInactive}
-                    onShowInactiveChange={setShowInactive}
+              {detail.error && (
+                <ErrorCard
+                  error={detail.error}
+                  reset={() => detail.refetch()}
+                />
+              )}
+              {scoring.error && (
+                <ErrorCard
+                  error={scoring.error}
+                  reset={() => scoring.refetch()}
+                />
+              )}
+
+              {!detail.isPending && !detail.error && detail.data === null && (
+                <ExperimentsBlankState
+                  title="No runs in this time range"
+                  description="Try selecting a wider time range."
+                  onRefresh={detail.refetch}
+                />
+              )}
+
+              {filteredDetail &&
+                scoring.metrics &&
+                scoredVariants &&
+                (filteredDetail.variants.length === 0 ? (
+                  <ExperimentsBlankState
+                    title="No variant data yet"
+                    description={
+                      <>
+                        Once your function emits runs for this experiment via{' '}
+                        <InlineCode>group.experiment()</InlineCode>, variant
+                        metrics will appear here.
+                      </>
+                    }
+                    onRefresh={detail.refetch}
                   />
-                </div>
-              </div>
-            ))}
+                ) : (
+                  <div className="@container">
+                    <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
+                      <ScoreSummaryCard
+                        className="col-span-full"
+                        scoredVariants={scoredVariants}
+                        metrics={scoring.metrics}
+                      />
+
+                      {enabledMetrics.map((metric) => (
+                        <MetricPanel
+                          key={metric.key}
+                          metric={metric}
+                          variants={filteredDetail.variants}
+                        />
+                      ))}
+
+                      <VariantsTable
+                        className="col-span-full"
+                        scoredVariants={scoredVariants}
+                        scoringConfig={scoring.metrics}
+                        metricRanges={metricRanges}
+                        onUpdateMetric={scoring.updateMetric}
+                        pointsLeft={scoring.pointsLeft}
+                        onOpenInsights={onOpenInsights}
+                        showInactive={showInactive}
+                        onShowInactiveChange={setShowInactive}
+                      />
+                    </div>
+                  </div>
+                ))}
+            </>
+          )}
         </div>
 
         {activePanel && (

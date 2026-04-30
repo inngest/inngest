@@ -10,5 +10,4 @@ export type {
   ExperimentScoringMetric,
   VariantMetric,
   VariantWeight,
-  TimeRangePreset,
 } from './types';

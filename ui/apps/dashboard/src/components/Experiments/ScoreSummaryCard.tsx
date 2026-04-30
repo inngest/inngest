@@ -17,6 +17,7 @@ import { computeChartSizing, truncateCenter } from '@/lib/experiments/chart';
 import { colorForMetric } from '@/lib/experiments/colors';
 import type { ScoredVariant } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
+import { ScoreCalculationExplainer } from './ScoreCalculationExplainer';
 import { VariantAxisTick } from './VariantAxisTick';
 
 type BackgroundLineProps = {
@@ -101,7 +102,10 @@ export function ScoreSummaryCard({
       contentClassName="overflow-visible"
     >
       <Card.Header className="rounded-t-md border-b-0 py-2 pl-3 pr-2">
-        <span className="text-basis text-sm font-medium">Score Summary</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-basis text-sm font-medium">Score Summary</span>
+          <ScoreCalculationExplainer />
+        </div>
       </Card.Header>
       <Card.Content className="flex gap-6 rounded-b-md px-2 py-0">
         <div className="min-w-0 flex-1">
@@ -135,6 +139,7 @@ export function ScoreSummaryCard({
               />
               <Legend
                 verticalAlign="bottom"
+                align="left"
                 height={24}
                 iconType="circle"
                 iconSize={8}

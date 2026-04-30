@@ -59,5 +59,3 @@ export type ExperimentScoringConfig = {
   metrics: ExperimentScoringMetric[];
   updatedAt: Date;
 };
-
-export type TimeRangePreset = '24h' | '7d' | '30d';
