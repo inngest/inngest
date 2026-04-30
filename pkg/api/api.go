@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -311,7 +312,38 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 // Invoke creates an event to invoke a specific function.
 func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
-	// XXX: In OSS self hosting, check signing keys here.
+	if a.requireKeys && len(a.localEventKeys) == 0 {
+		a.log.Error("rejecting invoke; event keys are required to invoke functions securely")
+		w.Header().Add("Content-Type", "application/json")
+		a.writeResponse(w, apiResponse{
+			StatusCode: http.StatusServiceUnavailable,
+			Error:      "Event keys are required to invoke functions securely",
+		})
+		return
+	}
+
+	if len(a.localEventKeys) > 0 {
+		key := r.Header.Get("Authorization")
+		if len(key) > 7 && strings.ToUpper(key[0:6]) == "BEARER" {
+			key = key[7:]
+		}
+
+		var found bool
+		for _, k := range a.localEventKeys {
+			if k == key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			w.Header().Add("Content-Type", "application/json")
+			a.writeResponse(w, apiResponse{
+				StatusCode: http.StatusUnauthorized,
+				Error:      "Unauthorized",
+			})
+			return
+		}
+	}
 
 	// Get the function slug from the route parameter.   This is the function
 	// we'll invoke.  Any request is passed as the event data to the function.
