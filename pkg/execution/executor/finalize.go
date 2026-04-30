@@ -3,7 +3,6 @@ package executor
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -121,20 +120,33 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	}
 
 	// Load defers BEFORE Delete — they live in state and won't survive it.
-	// Retry on transient failures because once we proceed past this point and
-	// Delete wipes state, the defers are unrecoverable. If load still fails,
-	// bail out and let the caller retry Finalize rather than silently dropping
-	// the deferred runs.
+	// Retry on transient failures so the events get a chance to publish even
+	// when Redis is briefly unavailable. The events themselves publish later
+	// in finalizeEvents, alongside function.finished — see buildDeferEvents.
 	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers", func(ctx context.Context) (map[string]sv2.Defer, error) {
 		return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
 	}, util.NewRetryConf())
 	if deferErr != nil {
 		l.Error(
-			"error loading defers to finalize, skipping state delete so finalize can be retried",
+			"error loading defers to finalize",
 			"error", deferErr,
 			"run_id", opts.Metadata.ID.RunID,
 		)
 		return fmt.Errorf("error loading defers to finalize: %w", deferErr)
+	}
+
+	// Build defer events from the loaded map BEFORE Delete (resolves fnSlug
+	// using the in-memory function loader, not state). The actual publish
+	// happens in finalizeEvents so all finalize-time events go through a
+	// single finishHandler call.
+	deferEvents, err := e.buildDeferEvents(ctx, opts, defers)
+	if err != nil {
+		l.Error(
+			"error building deferred start events",
+			"error", err,
+			"run_id", opts.Metadata.ID.RunID,
+		)
+		return fmt.Errorf("error building deferred start events: %w", err)
 	}
 
 	// Delete the function state in every case.
@@ -154,17 +166,28 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		},
 	})
 
-	e.finalizeDefers(ctx, opts, defers)
 	e.finalizeRemoveJobs(ctx, opts)
 
 	// finalizeEvents creates function finished events, and also attempts to fast-resume
-	// any parent function that invoked this run.
-	return e.finalizeEvents(ctx, opts)
+	// any parent function that invoked this run. Defer events are published as
+	// part of the same finishHandler call.
+	return e.finalizeEvents(ctx, opts, deferEvents)
 }
 
-func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOpts, defers map[string]sv2.Defer) {
-	if e.finishHandler == nil || len(defers) == 0 {
-		return
+// buildDeferEvents constructs the inngest/deferred.start events for every
+// AfterRun defer in `defers`. It does no publishing — the events are returned
+// for the caller (Finalize) to fold into the single finishHandler call inside
+// finalizeEvents.
+//
+// Per-defer validation failures (Validate, status filter, malformed Input)
+// log and skip the bad record. They are not fatal to the batch.
+func (e *executor) buildDeferEvents(
+	ctx context.Context,
+	opts execution.FinalizeOpts,
+	defers map[string]sv2.Defer,
+) ([]event.Event, error) {
+	if len(defers) == 0 {
+		return nil, nil
 	}
 
 	// Resolve the parent function's slug. opts.Optional.FnSlug is an optimization
@@ -173,8 +196,7 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 	if fnSlug == "" {
 		fn, err := e.fl.LoadFunction(ctx, opts.Metadata.ID.Tenant.EnvID, opts.Metadata.ID.FunctionID)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("error loading function for deferred events", "error", err, "run_id", opts.Metadata.ID.RunID)
-			return
+			return nil, fmt.Errorf("error loading function for deferred events: %w", err)
 		}
 		fnSlug = fn.Function.Slug
 	}
@@ -197,21 +219,30 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 			continue
 		}
 
-		// Deterministic event ID so retrying Finalize doesn't produce
-		// duplicate inngest/deferred.start events (and duplicate deferred runs).
-		// Same (run, fn_slug, defer step) always hashes to the same ULID.
-		// We intentionally overwrite the full 16 bytes (including the time
-		// prefix) so the ID stays stable across retries; the event carries its
-		// own Timestamp field, so losing ULID sortability is acceptable here.
-		idHash := sha1.Sum([]byte(opts.Metadata.ID.RunID.String() + ":" + d.FnSlug + ":" + d.HashedID))
-		var eventID ulid.ULID
-		copy(eventID[:], idHash[:16])
+		// Deterministic event ID so any duplicate-publish path dedupes on the
+		// runner side (runner.go uses event.ID as the schedule idempotency key).
+		// Time prefix is the parent run's start so the ULID stays well-formed.
+		seed := []byte(opts.Metadata.ID.RunID.String() + d.HashedID)
+		eventID, err := util.DeterministicULID(ulid.Time(opts.Metadata.ID.RunID.Time()), seed)
+		if err != nil {
+			// Unreachable
+			logger.StdlibLogger(ctx).Error(
+				"error generating deferred event ID",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+				"unreachable", true,
+			)
+			continue
+		}
 
 		data := map[string]any{}
 		if len(d.Input) > 0 {
 			if err := json.Unmarshal(d.Input, &data); err != nil {
-				logger.StdlibLogger(ctx).Error("deferred input is not a JSON object",
-					"error", err, "run_id", opts.Metadata.ID.RunID)
+				logger.StdlibLogger(ctx).Error(
+					"deferred input is not a JSON object",
+					"error", err,
+					"run_id", opts.Metadata.ID.RunID,
+				)
 				continue
 			}
 			if data == nil {
@@ -227,8 +258,11 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 			ParentRunID:  opts.Metadata.ID.RunID.String(),
 		}
 		if err := meta.Validate(); err != nil {
-			logger.StdlibLogger(ctx).Error("invalid deferred event metadata",
-				"error", err, "run_id", opts.Metadata.ID.RunID)
+			logger.StdlibLogger(ctx).Error(
+				"invalid deferred event metadata",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+			)
 			continue
 		}
 		data[consts.InngestEventDataPrefix] = meta
@@ -241,14 +275,7 @@ func (e *executor) finalizeDefers(ctx context.Context, opts execution.FinalizeOp
 		})
 	}
 
-	if len(events) > 0 {
-		if err := e.finishHandler(ctx, opts.Metadata.ID, events); err != nil {
-			// State is already deleted, so a Finalize retry can't recover these
-			// defers. We intentionally swallow the error: a failed defer publish
-			// should not fail the parent run.
-			logger.StdlibLogger(ctx).Error("error publishing deferred start events", "error", err)
-		}
-	}
+	return events, nil
 }
 
 // finalizeRemoveJobs removes any other jobs for a finalized run, as the function is
@@ -305,7 +332,7 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 	}
 }
 
-func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOpts) error {
+func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOpts, extraEvents []event.Event) error {
 	if e.finishHandler == nil {
 		// the finishHandler handles sending finalization events.
 		return nil
@@ -424,6 +451,10 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			})
 		}
 	}
+
+	// Append extra events (e.g. inngest/deferred.start) AFTER the invoke
+	// goroutine loop so they aren't dispatched to HandleInvokeFinish.
+	freshEvents = append(freshEvents, extraEvents...)
 
 	return e.finishHandler(ctx, opts.Metadata.ID, freshEvents)
 }
