@@ -67,10 +67,12 @@ function TimelineV4Wrapper({
   runID,
   trace,
   orgName,
+  functionSlug,
 }: {
   runID: string;
   trace: Trace;
   orgName?: string;
+  functionSlug?: string;
 }) {
   const { selectStep } = useStepSelection({ runID });
 
@@ -85,8 +87,8 @@ function TimelineV4Wrapper({
 
   // Convert V3 trace to V4 TimelineData
   const timelineData = useMemo(
-    () => traceToTimelineData(trace, { runID, orgName }),
-    [trace, runID, orgName]
+    () => traceToTimelineData(trace, { runID, orgName, functionSlug }),
+    [trace, runID, orgName, functionSlug]
   );
 
   // Handle step selection - look up the trace and emit to global selection
@@ -312,7 +314,12 @@ export const RunDetailsV4 = ({
                 node: waiting ? (
                   <Waiting />
                 ) : traceReady ? (
-                  <TimelineV4Wrapper runID={runID} trace={runData.trace} orgName={orgName} />
+                  <TimelineV4Wrapper
+                    runID={runID}
+                    trace={runData.trace}
+                    orgName={orgName}
+                    functionSlug={runData.fn.slug}
+                  />
                 ) : null,
               },
             ]}

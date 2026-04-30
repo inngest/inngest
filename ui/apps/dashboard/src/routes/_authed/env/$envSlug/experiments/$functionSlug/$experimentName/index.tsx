@@ -6,21 +6,17 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useFunction } from '@/queries/functions';
 
 export const Route = createFileRoute(
-  '/_authed/env/$envSlug/functions/$slug/experiments/$experimentName/',
+  '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/',
 )({
-  component: NestedExperimentComponent,
+  component: ExperimentDetailRoute,
 });
 
-function NestedExperimentComponent() {
-  const { slug, experimentName } = Route.useParams();
+function ExperimentDetailRoute() {
+  const { functionSlug, experimentName } = Route.useParams();
   const experimentsEnabled = useBooleanFlag('experimentation-steps');
 
-  // Resolve the slug to a function ID. ExperimentDetailPage filters its
-  // queries by function ID so two functions sharing an experiment name don't
-  // collapse into a single set of metrics. The function detail header
-  // (parent route) also issues this query, so urql will dedupe it.
   const [{ data, fetching }] = useFunction({
-    functionSlug: decodeURIComponent(slug),
+    functionSlug: decodeURIComponent(functionSlug),
   });
   const functionID = data?.workspace.workflow?.id ?? null;
 

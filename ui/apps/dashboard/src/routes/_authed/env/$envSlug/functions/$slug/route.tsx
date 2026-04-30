@@ -162,12 +162,6 @@ function FunctionComponent() {
                 },
               ]
             : []),
-          {
-            children: 'Experiments',
-            href: `/env/${envSlug}/functions/${encodeURIComponent(
-              slug,
-            )}/experiments`,
-          },
         ]}
       />
       <Outlet />

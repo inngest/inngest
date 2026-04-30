@@ -473,8 +473,11 @@ function BarHoverCardContent({
 function ExperimentBadge({ metadata }: { metadata?: TimelineBarProps['experimentMetadata'] }) {
   const { pathCreator } = usePathCreator();
   const href =
-    pathCreator.experiment && metadata?.experimentName
-      ? pathCreator.experiment({ experimentName: metadata.experimentName })
+    pathCreator.experiment && metadata?.experimentName && metadata?.functionSlug
+      ? pathCreator.experiment({
+          experimentName: metadata.experimentName,
+          functionSlug: metadata.functionSlug,
+        })
       : null;
 
   const badgeClass =
