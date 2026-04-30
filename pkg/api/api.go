@@ -324,7 +324,7 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 
 	if len(a.localEventKeys) > 0 {
 		key := r.Header.Get("Authorization")
-		if len(key) > 7 && strings.ToUpper(key[0:6]) == "BEARER" {
+		if len(key) > 7 && strings.ToUpper(key[0:7]) == "BEARER " {
 			key = key[7:]
 		}
 
