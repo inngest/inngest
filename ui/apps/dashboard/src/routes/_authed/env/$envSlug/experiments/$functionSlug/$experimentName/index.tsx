@@ -15,27 +15,30 @@ function ExperimentDetailRoute() {
   const { functionSlug, experimentName } = Route.useParams();
   const experimentsEnabled = useBooleanFlag('experimentation-steps');
 
+  const decodedFunctionSlug = decodeURIComponent(functionSlug);
   const [{ data, fetching }] = useFunction({
-    functionSlug: decodeURIComponent(functionSlug),
+    functionSlug: decodedFunctionSlug,
   });
-  const functionID = data?.workspace.workflow?.id ?? null;
+  const fn = data?.workspace.workflow;
 
   if (experimentsEnabled.isReady && !experimentsEnabled.value) {
     return <NotFound />;
   }
 
-  if (!fetching && functionID === null) {
+  if (!fetching && !fn) {
     return <NotFound />;
   }
 
-  if (functionID === null) {
+  if (!fn) {
     return null;
   }
 
   return (
     <ExperimentDetailPage
       experimentName={decodeURIComponent(experimentName)}
-      functionID={functionID}
+      functionID={fn.id}
+      functionName={fn.name}
+      functionSlug={decodedFunctionSlug}
     />
   );
 }
