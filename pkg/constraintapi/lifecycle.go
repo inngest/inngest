@@ -12,6 +12,7 @@ import (
 type OnCapacityLeaseAcquiredData struct {
 	AccountID  uuid.UUID
 	EnvID      uuid.UUID
+	AppID      uuid.UUID
 	FunctionID uuid.UUID
 
 	Configuration ConstraintConfig

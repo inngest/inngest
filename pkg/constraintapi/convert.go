@@ -495,7 +495,7 @@ func SemaphoreFromProto(pbSem *pb.Semaphore) Semaphore {
 		ID:         pbSem.Id,
 		UsageValue: pbSem.UsageValue,
 		Weight:     pbSem.Weight,
-		Release: SemaphoreReleaseModeFromProto(pbSem.Release),
+		Release:    SemaphoreReleaseModeFromProto(pbSem.Release),
 	}
 }
 
@@ -516,7 +516,7 @@ func SemaphoreConstraintFromProto(pbConstraint *pb.SemaphoreConstraint) Semaphor
 		ID:         pbConstraint.Id,
 		UsageValue: pbConstraint.UsageValue,
 		Weight:     pbConstraint.Weight,
-		Release: SemaphoreReleaseModeFromProto(pbConstraint.Release),
+		Release:    SemaphoreReleaseModeFromProto(pbConstraint.Release),
 	}
 }
 
@@ -784,6 +784,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		IdempotencyKey:       req.IdempotencyKey,
 		AccountId:            req.AccountID.String(),
 		EnvId:                req.EnvID.String(),
+		AppId:                req.AppID.String(),
 		FunctionId:           req.FunctionID.String(),
 		Configuration:        ConstraintConfigToProto(req.Configuration),
 		Constraints:          constraints,
@@ -796,6 +797,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
 		RequestAttempt:       uint32(req.RequestAttempt),
+		RequestTime:          timestamppb.New(req.RequestTime),
 	}
 }
 
@@ -814,6 +816,14 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		return nil, fmt.Errorf("invalid env ID: %w", err)
 	}
 
+	var appID uuid.UUID
+	if pbReq.AppId != "" {
+		appID, err = uuid.Parse(pbReq.AppId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid app ID: %w", err)
+		}
+	}
+
 	functionID, err := uuid.Parse(pbReq.FunctionId)
 	if err != nil {
 		return nil, fmt.Errorf("invalid function ID: %w", err)
@@ -827,6 +837,11 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 	var currentTime time.Time
 	if pbReq.CurrentTime != nil {
 		currentTime = pbReq.CurrentTime.AsTime()
+	}
+
+	var requestTime time.Time
+	if pbReq.RequestTime != nil {
+		requestTime = pbReq.RequestTime.AsTime()
 	}
 
 	var duration time.Duration
@@ -857,6 +872,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		IdempotencyKey:       pbReq.IdempotencyKey,
 		AccountID:            accountID,
 		EnvID:                envID,
+		AppID:                appID,
 		FunctionID:           functionID,
 		Configuration:        ConstraintConfigFromProto(pbReq.Configuration),
 		Constraints:          constraints,
@@ -869,6 +885,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt:       int(pbReq.RequestAttempt),
+		RequestTime:          requestTime,
 	}, nil
 }
 

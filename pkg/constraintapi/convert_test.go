@@ -1389,6 +1389,7 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 func TestCapacityAcquireRequestConversion(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
+	appID := uuid.New()
 	functionID := uuid.New()
 	currentTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	kindConcurrency := ConstraintKindConcurrency
@@ -1404,6 +1405,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "test-key-123",
 				AccountID:      accountID,
 				EnvID:          envID,
+				AppID:          appID,
 				FunctionID:     functionID,
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
@@ -1442,6 +1444,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "test-key-123",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
+				AppId:          appID.String(),
 				FunctionId:     functionID.String(),
 				Configuration: &pb.ConstraintConfig{
 					FunctionVersion: 1,
@@ -1475,6 +1478,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
+				RequestTime: timestamppb.New(time.Time{}),
 			},
 		},
 		{
@@ -1483,6 +1487,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "minimal",
 				AccountID:      accountID,
 				EnvID:          envID,
+				AppID:          appID,
 				FunctionID:     functionID,
 				Configuration: ConstraintConfig{
 					RateLimit: []RateLimitConfig{},
@@ -1499,6 +1504,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "minimal",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
+				AppId:          appID.String(),
 				FunctionId:     functionID.String(),
 				Configuration: &pb.ConstraintConfig{
 					FunctionVersion: 0,
@@ -1520,6 +1526,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
+				RequestTime: timestamppb.New(time.Time{}),
 			},
 		},
 		{

@@ -275,6 +275,8 @@ type ScheduleRequest struct {
 	DebugSessionID *ulid.ULID
 	// DebugRunID is the ID of the debugger run that this function is being scheduled from.
 	DebugRunID *ulid.ULID
+	// ScheduleType describes how this run was triggered.
+	ScheduleType enums.ScheduleType
 	// RequestVersion represents the executor request versioning/hashing style
 	// used to manage state.
 	//
