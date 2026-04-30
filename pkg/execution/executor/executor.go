@@ -830,8 +830,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	l.Optional(req.AccountID, "schedule").Debug("hitting constraint API")
 
 	// requestTime is the original event ReceivedAt. It stays constant across
-	// retries of the same event so the constraint cache can bypass entries that
-	// were populated after the event was received (avoiding silent drops).
+	// retries of the same event, which lets the constraint API's idempotency
+	// handling kick in by bypassing in-process cache entries that were
+	// populated after the event was received.
 	var requestTime time.Time
 	if len(req.Events) > 0 {
 		requestTime = req.Events[0].GetReceivedAt()

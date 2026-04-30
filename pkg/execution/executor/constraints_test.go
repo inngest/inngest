@@ -109,6 +109,12 @@ func TestScheduleConstraintCacheDoesNotDropRetriesOnExhaustion(t *testing.T) {
 
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
+	// Lifecycle hooks let us count how many times the underlying manager's
+	// Acquire actually ran - useful to distinguish "cache hit" (no manager
+	// call) from "cache bypass + manager limited" (manager call returns no
+	// leases).
+	lifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+
 	// Production-shaped capacity manager: real Lua-driven Redis logic, fake
 	// clock so we can advance past the rate-limit window deterministically.
 	// Idempotency TTLs are set to the minimum (1s, the floor for Redis EX);
@@ -121,6 +127,7 @@ func TestScheduleConstraintCacheDoesNotDropRetriesOnExhaustion(t *testing.T) {
 		constraintapi.WithOperationIdempotencyTTL(time.Second),
 		constraintapi.WithConstraintCheckIdempotencyTTL(time.Second),
 		constraintapi.WithCheckIdempotencyTTL(time.Second),
+		constraintapi.WithLifecycles(lifecycles),
 	)
 	require.NoError(t, err)
 
@@ -180,7 +187,6 @@ func TestScheduleConstraintCacheDoesNotDropRetriesOnExhaustion(t *testing.T) {
 		Events:      []event.TrackedEvent{evt},
 	}
 
-	idempotencyKey := "schedule-idempotency"
 	tracer := trace.NoopConditionalTracer()
 
 	scheduleCalls := 0
@@ -189,48 +195,74 @@ func TestScheduleConstraintCacheDoesNotDropRetriesOnExhaustion(t *testing.T) {
 		return nil, nil
 	}
 
-	// First attempt: consumes the only allowed call in the rate-limit
+	runAttempt := func(now, requestTime time.Time, idempotencyKey string) error {
+		_, err := WithConstraints(
+			ctx,
+			now,
+			requestTime,
+			cache,
+			useConstraintAPI,
+			req,
+			tracer,
+			idempotencyKey,
+			scheduleFn,
+		)
+		return err
+	}
+
+	// Attempt 1 - warmup. Consumes the only allowed call in the rate-limit
 	// window, exhausts the constraint, and populates the in-process cache
 	// with addedAt = T0 + 100ms.
-	_, err = WithConstraints(
-		ctx,
-		firstAttemptNow,
-		receivedAt,
-		cache,
-		useConstraintAPI,
-		req,
-		tracer,
-		idempotencyKey,
-		scheduleFn,
-	)
-	require.NoError(t, err, "first attempt should pass (lease granted, capacity then exhausted)")
-	require.Equal(t, 1, scheduleCalls, "first attempt should run the schedule fn once")
+	require.NoError(t, runAttempt(firstAttemptNow, receivedAt, "warmup-key"),
+		"warmup attempt should pass (lease granted, capacity then exhausted)")
+	require.Equal(t, 1, scheduleCalls, "warmup attempt should run the schedule fn once")
+	require.Equal(t, 1, len(lifecycles.AcquireCalls), "warmup must reach the manager")
 
-	// Advance past the rate-limit window in the manager's fake clock; also
-	// FastForward miniredis so the Lua-script idempotency keys (EX 1s) have
-	// expired and the second Acquire actually re-runs GCRA. The in-process
-	// cache entry is still alive: ccache uses real wall-clock time and only
-	// milliseconds have elapsed in real time.
+	// Attempt 2 - old event (RequestTime predates addedAt) with a fresh
+	// idempotency key. The cache is bypassed because RequestTime < addedAt,
+	// but the rate-limit window is still active in Redis: GCRA inside the
+	// capacity manager rejects the request, so the schedule is denied.
+	// This verifies the manager's per-request handling kicks in once the
+	// cache has stepped aside.
+	require.ErrorIs(t,
+		runAttempt(clock.Now(), receivedAt, "fresh-key"),
+		ErrFunctionRateLimited,
+		"old event with different idempotency key must be limited by the capacity manager (GCRA window active)",
+	)
+	require.Equal(t, 1, scheduleCalls, "manager-limited attempt must not run the schedule fn")
+	require.Equal(t, 2, len(lifecycles.AcquireCalls),
+		"old event with different idempotency key must reach the manager (cache bypassed)")
+
+	// Attempt 3 - new event whose RequestTime is later than the cache
+	// entry's addedAt. The cache must answer here without consulting the
+	// manager: the AcquireCalls counter does not advance.
+	newRequestTime := firstAttemptNow.Add(50 * time.Millisecond)
+	require.ErrorIs(t,
+		runAttempt(clock.Now(), newRequestTime, "new-event-key"),
+		ErrFunctionRateLimited,
+		"new event (RequestTime > addedAt) must be limited by the in-process cache",
+	)
+	require.Equal(t, 1, scheduleCalls, "cache-limited attempt must not run the schedule fn")
+	require.Equal(t, 2, len(lifecycles.AcquireCalls),
+		"new event must NOT reach the manager (cache hit)")
+
+	// Attempt 4 - retry of the original event after the rate-limit window
+	// has elapsed. Advance past the rate-limit window in the manager's fake
+	// clock; FastForward miniredis so the Lua-script idempotency keys
+	// (EX 1s) have expired and the second Acquire actually re-runs GCRA.
+	// The in-process cache entry is still alive: ccache uses real
+	// wall-clock time and only milliseconds have elapsed in real time.
+	//
+	// Because RequestTime (T0) < addedAt (T0 + 100ms), the cache is
+	// bypassed and the underlying manager grants a fresh lease. Without
+	// the fix this hits the cached "exhausted" entry and silently drops
+	// the event with ErrFunctionRateLimited.
 	clock.Advance(2 * time.Second)
 	r.FastForward(2 * time.Second)
-	retryNow := clock.Now() // T0 + 2.1s
-
-	// Retry: same event, same idempotency key, RequestTime unchanged at T0.
-	// Because RequestTime (T0) < addedAt (T0 + 100ms), the cache must be
-	// bypassed so the underlying manager grants a fresh lease. Without the
-	// fix this hits the cached "exhausted" entry and silently drops the
-	// event with ErrFunctionRateLimited.
-	_, err = WithConstraints(
-		ctx,
-		retryNow,
-		receivedAt, // unchanged across retries
-		cache,
-		useConstraintAPI,
-		req,
-		tracer,
-		idempotencyKey,
-		scheduleFn,
+	require.NoError(t,
+		runAttempt(clock.Now(), receivedAt, "warmup-key"),
+		"retry must not be silently rate limited from a stale cache entry",
 	)
-	require.NoError(t, err, "retry must not be silently rate limited from a stale cache entry")
 	require.Equal(t, 2, scheduleCalls, "retry should run the schedule fn (cache bypassed, manager re-consulted)")
+	require.Equal(t, 3, len(lifecycles.AcquireCalls), "retry must reach the manager")
 }

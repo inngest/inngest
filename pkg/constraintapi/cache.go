@@ -44,8 +44,9 @@ type constraintCacheItem struct {
 	retryAfter time.Time
 	// addedAt records the wall-clock time at which this cache entry was created.
 	// Callers can pass CapacityAcquireRequest.RequestTime to bypass entries that
-	// were added after the underlying work was originally received, which prevents
-	// silent drops on retries of work that predates a cached "exhausted" decision.
+	// were added after the underlying work was originally received, allowing the
+	// capacity manager's idempotency handling to take effect even when the
+	// in-process cache is deployed.
 	addedAt time.Time
 }
 
@@ -138,10 +139,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		val := item.Value()
 
 		// Skip the cache when the caller's request was originally received before
-		// this cache entry was added. This is the silent-drop-on-retry guard: a
-		// retry of work received at T0 should not be denied by a cache entry that
-		// was populated at T1 > T0. We fall through to the underlying manager so
-		// the actual constraint state is checked.
+		// this cache entry was added. This lets the capacity manager's idempotency
+		// handling take effect even when the in-process cache is deployed: a retry
+		// of work received at T0 falls through to the manager rather than being
+		// answered by a cache entry populated at T1 > T0.
 		if !req.RequestTime.IsZero() && val.addedAt.After(req.RequestTime) {
 			tags := map[string]any{
 				"op":              "skipped_stale",

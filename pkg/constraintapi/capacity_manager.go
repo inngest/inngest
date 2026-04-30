@@ -155,10 +155,9 @@ type CapacityAcquireRequest struct {
 	// (e.g. the event ReceivedAt for run scheduling). Unlike CurrentTime, it is
 	// stable across retries of the same work item.
 	//
-	// The in-process constraint cache uses RequestTime to bypass cache entries that
-	// were populated after the work was received: if a retry of an event predates
-	// a cached "exhausted" decision, the cache is skipped so the actual constraint
-	// state is re-checked rather than silently denying the request.
+	// The in-process constraint cache uses RequestTime to bypass entries that
+	// were populated after the work was received, allowing the capacity manager's
+	// idempotency handling to take effect even when the cache is deployed.
 	//
 	// May be zero, in which case the cache treats the request as unanchored and
 	// honors any non-expired entry.
