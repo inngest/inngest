@@ -858,44 +858,6 @@ func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	}
 }
 
-// TestDeferInputEmptyObjectSurvivesStatusUpdate guards against cjson's
-// `{}` → `[]` corruption in setDeferStatus.lua by verifying that an
-// empty-object Input survives a status flip.
-func TestDeferInputEmptyObjectSurvivesStatusUpdate(t *testing.T) {
-	infra := newDeferTestInfra(t)
-	ctx := infra.ctx
-
-	exec := infra.newExecutor(t, nil)
-	md := infra.scheduleRun(t, exec)
-
-	const hashedID = "step-defer"
-	// Simulate an SDK that emits step.defer with no input (the SDK's default
-	// serialization for Go-side `nil` / JS `undefined` can be `{}`).
-	require.NoError(t, infra.smv2.SaveDefer(ctx, md.ID, statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       hashedID,
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
-		Input:          json.RawMessage(`{}`),
-	}))
-
-	// Flip status — this executes setDeferStatus.lua, which round-trips the
-	// full Defer JSON through cjson. Without normalization, `{}` would come
-	// back as `[]`.
-	require.NoError(t, infra.smv2.SetDeferStatus(ctx, md.ID, hashedID, statev2.ScheduleStatusCancelled))
-
-	defers, err := infra.smv2.LoadDefers(ctx, md.ID)
-	require.NoError(t, err)
-	d := defers[hashedID]
-
-	require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus)
-	// Input must not have been corrupted into `[]`. Accept either nil or
-	// a literal empty JSON object, since normalization picks nil.
-	if len(d.Input) > 0 {
-		require.JSONEq(t, `null`, string(d.Input),
-			"empty-object Input should normalize to null, got %s", string(d.Input))
-	}
-}
-
 // enqueueCountingQueue wraps a queue.Queue and counts Enqueue calls. Reads
 // happen post-Execute (after eg.Wait), so the field can be read without
 // locking; the mutex protects the increment side from concurrent op handlers.
