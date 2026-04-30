@@ -1,10 +1,12 @@
 package syscode
 
 const (
+	CodeAppIDMismatch             = "app_id_mismatch"
 	CodeBatchIfExpressionInvalid  = "batch_if_expression_invalid"
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
 	CodeBatchSizeInvalid          = "batch_size_invalid"
 	CodeBatchTimeoutInvalid       = "batch_timeout_invalid"
+	CodeCloudflareMitigated       = "cloudflare_mitigated"
 	CodeComboUnsupported          = "combo_unsupported"
 	CodeConcurrencyLimitInvalid   = "concurrency_limit_invalid"
 	CodeConfigInvalid             = "config_invalid"
@@ -13,12 +15,15 @@ const (
 	CodeHTTPMissingHeader         = "http_missing_header"
 	CodeHTTPNotOK                 = "http_not_ok"
 	CodeHTTPUnreachable           = "http_unreachable"
+	CodeMalformedResponse         = "malformed_response"
 	CodeNotSDK                    = "not_sdk"
 	CodeOutputTooLarge            = "output_too_large"
 	CodePlanUpgradeRequired       = "plan_upgrade_required"
+	CodeRedirectDenied            = "redirect_denied"
 	CodeRequestTooLong            = "request_duration_too_long"
 	CodeSigVerificationFailed     = "sig_verification_failed"
 	CodeSyncAlreadyPending        = "sync_already_pending"
+	CodeURLSchemeDenied           = "url_scheme_denied"
 	CodeUnknown                   = "unknown"
 
 	// Connect

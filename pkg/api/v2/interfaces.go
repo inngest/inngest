@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -77,4 +79,9 @@ type RunsReader interface {
 type FunctionTraceReader interface {
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error)
+}
+
+// AppSyncer persists an in-band sync result. Dev server and cloud differ.
+type AppSyncer interface {
+	ProcessSync(ctx context.Context, req sdk.RegisterRequest) (*sync.Reply, error)
 }
