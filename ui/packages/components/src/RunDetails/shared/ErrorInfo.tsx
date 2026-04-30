@@ -1,11 +1,13 @@
+import { LinkElement } from '@inngest/components/DetailsCard/Element';
+import { useShared } from '@inngest/components/SharedContext/SharedContext';
+import type { InngestStatus } from '@inngest/components/SharedContext/useInngestStatus';
+import {
+  getStatusBackgroundClass,
+  getStatusTextClass,
+} from '@inngest/components/Status/statusClasses';
+import { Table } from '@inngest/components/Table';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { createColumnHelper } from '@tanstack/react-table';
-
-import { LinkElement } from '../DetailsCard/Element';
-import { useShared } from '../SharedContext/SharedContext';
-import type { InngestStatus } from '../SharedContext/useInngestStatus';
-import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
-import { Table } from '../Table';
-import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 type ErrorTable = {
   system: string;

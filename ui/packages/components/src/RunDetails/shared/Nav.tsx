@@ -1,18 +1,17 @@
-import { RiArrowDownSLine, RiExternalLinkLine, RiShareForward2Line } from '@remixicon/react';
-import { useRouter, type LinkComponentProps } from '@tanstack/react-router';
-
-import { Button } from '../Button';
-import { SplitButton } from '../Button/SplitButton';
+import { Button } from '@inngest/components/Button';
+import { SplitButton } from '@inngest/components/Button/SplitButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../DropdownMenu';
-import { Link } from '../Link';
-import { useShared } from '../SharedContext/SharedContext';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
-import { usePathCreator } from '../SharedContext/usePathCreator';
+} from '@inngest/components/DropdownMenu';
+import { Link } from '@inngest/components/Link';
+import { useShared } from '@inngest/components/SharedContext/SharedContext';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
+import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
+import { RiArrowDownSLine, RiExternalLinkLine, RiShareForward2Line } from '@remixicon/react';
+import { useRouter, type LinkComponentProps } from '@tanstack/react-router';
 
 type NavProps = {
   standalone: boolean;

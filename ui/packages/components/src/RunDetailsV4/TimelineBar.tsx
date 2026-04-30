@@ -41,7 +41,7 @@ import type {
   TimelineBarProps,
   TimingDetail,
 } from './TimelineBar.types';
-import { formatDuration } from './runDetailsUtils';
+import { formatDuration } from '../RunDetails/shared/utils';
 import { formatLabel } from './utils/formatting';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 

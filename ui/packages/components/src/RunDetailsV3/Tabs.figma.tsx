@@ -1,7 +1,7 @@
 import React from 'react';
 import figma from '@figma/code-connect';
 
-import { Tabs } from './Tabs';
+import { Tabs } from '../RunDetails/shared/Tabs';
 
 figma.connect(
   Tabs,

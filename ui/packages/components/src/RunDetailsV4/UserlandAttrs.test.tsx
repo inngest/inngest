@@ -8,8 +8,8 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { UserlandAttrs } from './UserlandAttrs';
-import type { UserlandSpanType } from './types';
+import { UserlandAttrs } from '../RunDetails/shared/UserlandAttrs';
+import type { UserlandSpanType } from '../RunDetails/shared/types';
 
 afterEach(() => {
   cleanup();

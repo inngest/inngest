@@ -1,41 +1,63 @@
 import { useEffect, useState } from 'react';
-import { Button as NewButton } from '@inngest/components/Button';
+import { AITrace } from '@inngest/components/AI/AITrace';
+import { parseAIOutput } from '@inngest/components/AI/utils';
 import { Button } from '@inngest/components/Button/Button';
-import { RiArrowRightSLine } from '@remixicon/react';
-
-import { AITrace } from '../AI/AITrace';
-import { parseAIOutput } from '../AI/utils';
 import {
   CodeElement,
   ElementWrapper,
+  IDElement,
   LinkElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
-import { RerunModal as NewRerunModal, RerunModal } from '../Rerun/RerunModal';
-import { useShared } from '../SharedContext/SharedContext';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
-import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
-import { usePathCreator } from '../SharedContext/usePathCreator';
-import { Time } from '../Time';
-import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
-import { formatMilliseconds, toMaybeDate } from '../utils/date';
+} from '@inngest/components/DetailsCard/Element';
+import { Pill } from '@inngest/components/Pill/Pill';
+import { RerunModal } from '@inngest/components/Rerun/RerunModal';
+import { useShared } from '@inngest/components/SharedContext/SharedContext';
+import { useGetTraceResult } from '@inngest/components/SharedContext/useGetTraceResult';
+import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
+import {
+  getStatusBackgroundClass,
+  getStatusTextClass,
+} from '@inngest/components/Status/statusClasses';
+import { Time } from '@inngest/components/Time';
+import type { SpanMetadataKind } from '@inngest/components/generated';
+import {
+  usePrettyErrorBody,
+  usePrettyJson,
+  usePrettyShortError,
+} from '@inngest/components/hooks/usePrettyJson';
+import { toMaybeDate } from '@inngest/components/utils/date';
+import { RiArrowRightSLine } from '@remixicon/react';
+
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
+import { TabLabelWithLoadedIndicator } from './TabLabelWithLoadedIndicator';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import {
+  isExperimentMetadata,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
+  type SpanMetadataScope,
   type StepInfoInvoke,
   type StepInfoSignal,
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
-import { maybeBooleanToString, type StepInfoType } from './utils';
+import { useJustFinishedLoading } from './useJustFinishedLoading';
+import { formatDuration, maybeBooleanToString, type StepInfoType } from './utils';
+
+const STEP_OP_LABELS: Record<string, string> = {
+  RUN: 'step.run',
+  INVOKE: 'step.invoke',
+  SLEEP: 'step.sleep',
+  WAIT_FOR_EVENT: 'step.waitForEvent',
+  AI_GATEWAY: 'step.ai',
+  WAIT_FOR_SIGNAL: 'step.waitForSignal',
+};
 
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
@@ -46,7 +68,17 @@ const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
-      <ElementWrapper label="Run">
+      <ElementWrapper label="Function">
+        <LinkElement href={pathCreator.function({ functionSlug: stepInfo.functionID })}>
+          {stepInfo.functionID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggering Event ID">
+        <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.triggeringEventID })}>
+          {stepInfo.triggeringEventID}
+        </LinkElement>
+      </ElementWrapper>
+      <ElementWrapper label="Triggered Run ID">
         {stepInfo.runID ? (
           <LinkElement href={pathCreator.runPopout({ runID: stepInfo.runID })}>
             {stepInfo.runID}
@@ -61,6 +93,13 @@ const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
       <ElementWrapper label="Timed out">
         <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
       </ElementWrapper>
+      {stepInfo.returnEventID && (
+        <ElementWrapper label="Return Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.returnEventID })}>
+            {stepInfo.returnEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
     </>
   );
 };
@@ -75,6 +114,7 @@ const SleepInfo = ({ stepInfo }: { stepInfo: StepInfoSleep }) => {
 };
 
 const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
+  const { pathCreator } = usePathCreator();
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
@@ -87,6 +127,13 @@ const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
       <ElementWrapper label="Timed out">
         <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
       </ElementWrapper>
+      {stepInfo.foundEventID && (
+        <ElementWrapper label="Matched Event ID">
+          <LinkElement href={pathCreator.eventPopout({ eventID: stepInfo.foundEventID })}>
+            {stepInfo.foundEventID}
+          </LinkElement>
+        </ElementWrapper>
+      )}
       <ElementWrapper className="w-full" label="Match expression">
         {stepInfo.expression ? (
           <CodeElement value={stepInfo.expression} />
@@ -131,13 +178,13 @@ export const StepInfo = ({
   pollInterval: initialPollInterval,
   tracesPreviewEnabled,
   debug = false,
-  newStack = false,
+  isDurableEndpoint,
 }: {
   selectedStep: StepInfoType;
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
   debug?: boolean;
-  newStack?: boolean;
+  isDurableEndpoint?: boolean;
 }) => {
   const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
@@ -150,14 +197,11 @@ export const StepInfo = ({
     preview: tracesPreviewEnabled,
   });
 
-  const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
-
   useEffect(() => {
     result && setPollInterval(undefined);
   }, [result]);
 
-  const delayText = formatMilliseconds(
+  const delayText = formatDuration(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
 
@@ -165,7 +209,7 @@ export const StepInfo = ({
   const endedAt = toMaybeDate(trace.endedAt);
   const duration = startedAt ? (endedAt ?? new Date()).getTime() - startedAt.getTime() : 0;
 
-  const durationText = duration > 0 ? formatMilliseconds(duration) : '-';
+  const durationText = duration > 0 ? formatDuration(duration) : '-';
 
   const stepKindInfo = getStepKindInfo({
     stepInfo: trace.stepInfo,
@@ -176,8 +220,46 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
+  const justFinishedLoading = useJustFinishedLoading(loading);
+  const showRerunFromStep =
+    !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
 
-  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+  const responseHeaderMetadata = trace.metadata?.filter(
+    (md) => md.kind === 'inngest.response_headers'
+  );
+
+  // TODO: remove metadata handling once all response header
+  // data in history uses the response field. (After 2026-06-03)
+  const responseHeaderData = responseHeaderMetadata?.length
+    ? responseHeaderMetadata
+    : trace.response
+    ? [
+        {
+          kind: 'inngest.response_headers' as SpanMetadataKind,
+          values: {
+            ...Object.fromEntries(
+              Object.entries(trace.response?.headers ?? {}).map(([k, v]) => [
+                k,
+                Array.isArray(v) ? v.join(', ') : v,
+              ])
+            ),
+            'Status Code': trace.response.statusCode.toString(),
+          },
+          updatedAt: trace.endedAt ?? trace.startedAt ?? trace.queuedAt,
+          scope: 'step_attempt' as SpanMetadataScope,
+        },
+      ]
+    : [];
+
+  const nonHeaderMetadata = trace.metadata?.filter(
+    (md) => md.kind !== 'inngest.response_headers' && !isExperimentMetadata(md)
+  );
+
+  const experimentMetadataList = trace.metadata?.filter(isExperimentMetadata);
+
+  const experimentMetadata = experimentMetadataList?.[0];
+
+  const hasNoData = !loading && !prettyInput && !prettyOutput && !result?.error;
 
   let emptyStateMessage = 'No output available';
   if (loading) {
@@ -200,46 +282,36 @@ export const StepInfo = ({
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
+          {trace.attempts !== null && trace.attempts > 0 && (
+            <span data-testid="retry-attempt-badge">
+              <Pill
+                className={`${getStatusBackgroundClass(trace.status)} ${getStatusTextClass(
+                  trace.status
+                )}`}
+              >
+                {trace.attempts} {trace.attempts === 1 ? 'retry' : 'retries'}
+              </Pill>
+            </span>
+          )}
         </div>
-        {!debug &&
-          runID &&
-          trace.stepID &&
-          (!cloud || prettyInput) &&
-          (newStack ? (
-            <>
-              <NewButton
-                kind="primary"
-                appearance="outlined"
-                size="medium"
-                label="Rerun from step"
-                onClick={() => setRerunModalOpen(true)}
-              />
-              <NewRerunModal
-                open={rerunModalOpen}
-                setOpen={setRerunModalOpen}
-                runID={runID}
-                stepID={trace.stepID}
-                input={prettyInput || result?.input || ''}
-              />
-            </>
-          ) : (
-            <>
-              <Button
-                kind="primary"
-                appearance="outlined"
-                size="medium"
-                label="Rerun from step"
-                onClick={() => setRerunModalOpen(true)}
-              />
-              <RerunModal
-                open={rerunModalOpen}
-                setOpen={setRerunModalOpen}
-                runID={runID}
-                stepID={trace.stepID}
-                input={prettyInput || result?.input || ''}
-              />
-            </>
-          ))}
+        {showRerunFromStep && (
+          <>
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              label="Rerun from step"
+              onClick={() => setRerunModalOpen(true)}
+            />
+            <RerunModal
+              open={rerunModalOpen}
+              setOpen={setRerunModalOpen}
+              runID={runID}
+              stepID={trace.stepID!}
+              input={prettyInput || result?.input || ''}
+            />
+          </>
+        )}
       </div>
 
       {expanded && (
@@ -276,7 +348,30 @@ export const StepInfo = ({
             <TextElement>{durationText}</TextElement>
           </ElementWrapper>
 
+          {trace.stepOp && (
+            <ElementWrapper label="Step Type">
+              <CodeElement value={STEP_OP_LABELS[trace.stepOp] ?? trace.stepOp} />
+            </ElementWrapper>
+          )}
+
           {stepKindInfo}
+
+          {experimentMetadata && (
+            <>
+              <ElementWrapper label="Experiment name">
+                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+              </ElementWrapper>
+              <ElementWrapper label="Variant">
+                <TextElement>{experimentMetadata.values.variant_selected}</TextElement>
+              </ElementWrapper>
+            </>
+          )}
+
+          {debug && trace.debugRunID && (
+            <ElementWrapper label="Debug Run ID">
+              <IDElement>{trace.debugRunID}</IDElement>
+            </ElementWrapper>
+          )}
 
           {aiOutput && <AITrace aiOutput={aiOutput} />}
         </div>
@@ -292,12 +387,30 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(metadataIsEnabled && trace.metadata?.length
+              ...(responseHeaderData?.length
+                ? [
+                    {
+                      label: 'Headers',
+                      id: 'headers',
+                      node: <MetadataAttrs metadata={responseHeaderData} />,
+                    },
+                  ]
+                : []),
+              ...(experimentMetadataList?.length
+                ? [
+                    {
+                      label: 'Experiment',
+                      id: 'experiment',
+                      node: <MetadataAttrs metadata={experimentMetadataList} />,
+                    },
+                  ]
+                : []),
+              ...(nonHeaderMetadata?.length
                 ? [
                     {
                       label: 'Metadata',
                       id: 'metadata',
-                      node: <MetadataAttrs metadata={trace.metadata} />,
+                      node: <MetadataAttrs metadata={nonHeaderMetadata} />,
                     },
                   ]
                 : []),
@@ -316,19 +429,29 @@ export const StepInfo = ({
               <Tabs
                 defaultActive={result?.error ? 'error' : 'output'}
                 tabs={[
-                  ...(prettyInput
+                  ...(prettyInput || loading
                     ? [
                         {
-                          label: 'Input',
+                          label: (
+                            <TabLabelWithLoadedIndicator
+                              label="Input"
+                              justFinished={justFinishedLoading}
+                            />
+                          ),
                           id: 'input',
                           node: <IO title="Step Input" raw={prettyInput} loading={loading} />,
                         },
                       ]
                     : []),
-                  ...(prettyOutput
+                  ...(prettyOutput || loading
                     ? [
                         {
-                          label: 'Output',
+                          label: (
+                            <TabLabelWithLoadedIndicator
+                              label="Output"
+                              justFinished={justFinishedLoading}
+                            />
+                          ),
                           id: 'output',
                           node: <IO title="Step Output" raw={prettyOutput} loading={loading} />,
                         },
@@ -337,7 +460,12 @@ export const StepInfo = ({
                   ...(result?.error
                     ? [
                         {
-                          label: 'Error details',
+                          label: (
+                            <TabLabelWithLoadedIndicator
+                              label="Error details"
+                              justFinished={justFinishedLoading}
+                            />
+                          ),
                           id: 'error',
                           node: (
                             <IO
@@ -350,12 +478,30 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(metadataIsEnabled && trace.metadata?.length
+                  ...(responseHeaderData?.length
+                    ? [
+                        {
+                          label: 'Headers',
+                          id: 'headers',
+                          node: <MetadataAttrs metadata={responseHeaderData} />,
+                        },
+                      ]
+                    : []),
+                  ...(experimentMetadataList?.length
+                    ? [
+                        {
+                          label: 'Experiment',
+                          id: 'experiment',
+                          node: <MetadataAttrs metadata={experimentMetadataList} />,
+                        },
+                      ]
+                    : []),
+                  ...(nonHeaderMetadata?.length
                     ? [
                         {
                           label: 'Metadata',
                           id: 'metadata',
-                          node: <MetadataAttrs metadata={trace.metadata} />,
+                          node: <MetadataAttrs metadata={nonHeaderMetadata} />,
                         },
                       ]
                     : []),

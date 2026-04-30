@@ -9,13 +9,13 @@ import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { RunInfo as NewRunInfo, RunInfo } from './RunInfo';
-import { StepInfo } from './StepInfo';
-import { Tabs } from './Tabs';
+import { RunInfo } from '../RunDetails/shared/RunInfo';
+import { StepInfo } from '../RunDetails/shared/StepInfo';
+import { Tabs } from '../RunDetails/shared/Tabs';
 import { Timeline } from './Timeline';
-import { TopInfo } from './TopInfo';
-import { Waiting } from './Waiting';
-import { useDynamicRunData, useStepSelection } from './utils';
+import { TopInfo } from '../RunDetails/shared/TopInfo';
+import { Waiting } from '../RunDetails/shared/Waiting';
+import { useDynamicRunData, useStepSelection } from '../RunDetails/shared/utils';
 
 //
 // userland traces can land after the run is completed
@@ -27,7 +27,6 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
-  newStack?: boolean;
 };
 
 const MIN_HEIGHT = 586;
@@ -53,7 +52,6 @@ export const RunDetailsV3 = ({
   standalone,
   pollInterval: initialPollInterval,
   initialRunData,
-  newStack = false,
 }: Props) => {
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
@@ -160,6 +158,7 @@ export const RunDetailsV3 = ({
   const {
     data: resultData,
     error: resultError,
+    loading: resultLoading,
     refetch: refetchResult,
   } = useGetTraceResult({
     traceID: outputID,
@@ -218,25 +217,14 @@ export const RunDetailsV3 = ({
       <div ref={containerRef} className="flex flex-row">
         <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
           <div ref={runInfoRef} className="px-4">
-            {newStack ? (
-              <NewRunInfo
-                className="mb-4"
-                initialRunData={initialRunData}
-                run={nullishToLazy(runData)}
-                runID={runID}
-                standalone={standalone}
-                result={resultData}
-              />
-            ) : (
-              <RunInfo
-                className="mb-4"
-                initialRunData={initialRunData}
-                run={nullishToLazy(runData)}
-                runID={runID}
-                standalone={standalone}
-                result={resultData}
-              />
-            )}
+            <RunInfo
+              className="mb-4"
+              initialRunData={initialRunData}
+              run={nullishToLazy(runData)}
+              runID={runID}
+              standalone={standalone}
+              result={resultData}
+            />
             {showError && (
               <ErrorCard
                 error={runError || resultError}
@@ -286,7 +274,6 @@ export const RunDetailsV3 = ({
               selectedStep={selectedStep}
               pollInterval={pollInterval}
               tracesPreviewEnabled={tracesPreviewEnabled}
-              newStack={newStack}
             />
           ) : (
             <TopInfo
@@ -294,6 +281,7 @@ export const RunDetailsV3 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
+              resultLoading={resultLoading}
               trace={runData?.trace}
             />
           )}

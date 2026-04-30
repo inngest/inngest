@@ -1,5 +1,5 @@
-import { type CodeBlockAction } from '../CodeBlock';
-import { NewCodeBlock } from '../NewCodeBlock/NewCodeBlock';
+import { type CodeBlockAction } from '@inngest/components/CodeBlock';
+import { NewCodeBlock } from '@inngest/components/NewCodeBlock/NewCodeBlock';
 
 export type IOProps = {
   title: string;

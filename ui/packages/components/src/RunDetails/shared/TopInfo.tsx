@@ -1,10 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { RiArrowRightSLine } from '@remixicon/react';
-import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
-
-import { Alert } from '../Alert';
 import {
   CodeElement,
   ElementWrapper,
@@ -12,20 +8,26 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/Element';
-import { ErrorCard } from '../Error/ErrorCard';
-import { InvokeModal } from '../InvokeButton';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
-import type { TraceResult } from '../SharedContext/useGetTraceResult';
-import { useInvokeRun } from '../SharedContext/useInvokeRun';
-import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
-import { IconCloudArrowDown } from '../icons/CloudArrowDown';
-import { devServerURL, useDevServer } from '../utils/useDevServer';
+} from '@inngest/components/DetailsCard/Element';
+import { ErrorCard } from '@inngest/components/Error/ErrorCard';
+import { InvokeModal } from '@inngest/components/InvokeButton';
+import type { TraceResult } from '@inngest/components/SharedContext/useGetTraceResult';
+import { useInvokeRun } from '@inngest/components/SharedContext/useInvokeRun';
+import { usePrettyErrorBody, usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
+import { IconCloudArrowDown } from '@inngest/components/icons/CloudArrowDown';
+import { getCronTriggerMetadata } from '@inngest/components/utils/cronTrigger';
+import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
+import { RiArrowRightSLine } from '@remixicon/react';
+import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
+import { TabLabelWithLoadedIndicator } from './TabLabelWithLoadedIndicator';
 import { Tabs } from './Tabs';
 import type { Trace } from './types';
+import { useJustFinishedLoading } from './useJustFinishedLoading';
 
 type TopInfoProps = {
   slug?: string;
@@ -34,6 +36,7 @@ type TopInfoProps = {
   runID: string;
   resultLoading?: boolean;
   trace?: Trace;
+  isDurableEndpoint?: boolean;
 };
 
 export type Trigger = {
@@ -91,6 +94,7 @@ export const TopInfo = ({
   result,
   resultLoading,
   trace,
+  isDurableEndpoint,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
@@ -110,9 +114,6 @@ export const TopInfo = ({
     retry: 3,
   });
 
-  const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
-
   const prettyPayload = useMemo(() => {
     try {
       const data = trigger?.payloads?.map((p) => JSON.parse(p));
@@ -123,8 +124,16 @@ export const TopInfo = ({
     }
   }, [trigger?.payloads]);
 
+  const cronMetadata = useMemo(
+    () => getCronTriggerMetadata(trigger?.payloads),
+    [trigger?.payloads]
+  );
+
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
+
+  const traceLoading = isPending || !!resultLoading;
+  const justFinishedLoading = useJustFinishedLoading(traceLoading);
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -163,37 +172,41 @@ export const TopInfo = ({
           )}
         </div>
 
-        <Button
-          kind="primary"
-          appearance="outlined"
-          size="medium"
-          iconSide="right"
-          label="Invoke"
-          loading={invokeLoading}
-          disabled={invokeLoading}
-          onClick={() => {
-            setInvokeOpen(true);
-          }}
-        />
+        {!isDurableEndpoint && (
+          <>
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              iconSide="right"
+              label="Invoke"
+              loading={invokeLoading}
+              disabled={invokeLoading}
+              onClick={() => {
+                setInvokeOpen(true);
+              }}
+            />
 
-        {invokeError && <Alert severity="error">{invokeError.message}</Alert>}
-        <InvokeModal
-          doesFunctionAcceptPayload={true}
-          isOpen={invokeOpen}
-          onCancel={() => setInvokeOpen(false)}
-          onConfirm={async ({ data, user }) => {
-            const res = await invoke({
-              functionSlug: slug || '',
-              data,
-              user,
-            });
+            {invokeError && <Alert severity="error">{invokeError.message}</Alert>}
+            <InvokeModal
+              doesFunctionAcceptPayload={true}
+              isOpen={invokeOpen}
+              onCancel={() => setInvokeOpen(false)}
+              onConfirm={async ({ data, user }) => {
+                const res = await invoke({
+                  functionSlug: slug || '',
+                  data,
+                  user,
+                });
 
-            if (res?.data) {
-              setInvokeOpen(false);
-              toast.success('Function invoked');
-            }
-          }}
-        />
+                if (res?.data) {
+                  setInvokeOpen(false);
+                  toast.success('Function invoked');
+                }
+              }}
+            />
+          </>
+        )}
       </div>
 
       {expanded && (
@@ -230,6 +243,20 @@ export const TopInfo = ({
                   <TimeElement date={new Date(trigger.timestamp)} />
                 )}
               </ElementWrapper>
+              {cronMetadata.scheduledAt && (
+                <ElementWrapper label="Scheduled for">
+                  {isPending ? (
+                    <SkeletonElement />
+                  ) : (
+                    <TimeElement date={cronMetadata.scheduledAt} />
+                  )}
+                </ElementWrapper>
+              )}
+              {cronMetadata.fireAt && (
+                <ElementWrapper label="Fired at">
+                  {isPending ? <SkeletonElement /> : <TimeElement date={cronMetadata.fireAt} />}
+                </ElementWrapper>
+              )}
             </>
           )}
           {type === 'BATCH' && (
@@ -260,10 +287,15 @@ export const TopInfo = ({
         <Tabs
           defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
           tabs={[
-            ...(prettyPayload
+            ...(prettyPayload || isPending || resultLoading
               ? [
                   {
-                    label: 'Input',
+                    label: (
+                      <TabLabelWithLoadedIndicator
+                        label="Input"
+                        justFinished={justFinishedLoading}
+                      />
+                    ),
                     id: 'input',
                     node: (
                       <IO
@@ -276,10 +308,15 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(prettyOutput
+            ...(prettyOutput || isPending || resultLoading
               ? [
                   {
-                    label: 'Output',
+                    label: (
+                      <TabLabelWithLoadedIndicator
+                        label="Output"
+                        justFinished={justFinishedLoading}
+                      />
+                    ),
                     id: 'output',
                     node: (
                       <IO title="Output" raw={prettyOutput} loading={isPending || resultLoading} />
@@ -290,7 +327,12 @@ export const TopInfo = ({
             ...(result?.error
               ? [
                   {
-                    label: 'Error details',
+                    label: (
+                      <TabLabelWithLoadedIndicator
+                        label="Error details"
+                        justFinished={justFinishedLoading}
+                      />
+                    ),
                     id: 'error',
                     node: (
                       <IO
@@ -303,7 +345,7 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(metadataIsEnabled && trace?.metadata?.length
+            ...(trace?.metadata?.length
               ? [
                   {
                     label: 'Metadata',

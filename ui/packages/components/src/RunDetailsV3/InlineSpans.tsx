@@ -6,8 +6,8 @@ import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { GroupSpan } from './GroupSpan';
 import { Span } from './Span';
-import { type Trace } from './types';
-import { createSpanWidths, formatDuration, getSpanName } from './utils';
+import { type Trace } from '../RunDetails/shared/types';
+import { createSpanWidths, formatDuration, getSpanName } from '../RunDetails/shared/utils';
 
 type Props = {
   className?: string;

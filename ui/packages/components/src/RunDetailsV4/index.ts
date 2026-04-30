@@ -23,7 +23,7 @@ export { Timeline } from './Timeline';
 export { RunDetailsV4 } from './RunDetailsV4';
 
 // Utilities
-export { formatDuration } from './runDetailsUtils';
+export { formatDuration } from '../RunDetails/shared/utils';
 export { formatLabel } from './utils/formatting';
 export { calculateBarPosition, calculateDuration, TIMELINE_CONSTANTS } from './utils/timing';
 export { traceToTimelineData } from './utils/traceConversion';

@@ -1,9 +1,8 @@
 import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
+import { AlertModal } from '@inngest/components/Modal';
+import { useCancelRun } from '@inngest/components/SharedContext/useCancelRun';
 import { toast } from 'sonner';
-
-import { Alert } from '../Alert';
-import { AlertModal } from '../Modal';
-import { useCancelRun } from '../SharedContext/useCancelRun';
 
 type RerunProps = {
   runID: string;

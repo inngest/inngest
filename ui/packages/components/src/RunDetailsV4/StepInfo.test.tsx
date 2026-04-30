@@ -9,8 +9,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
-import { StepInfo } from './StepInfo';
-import type { StepInfoWait, Trace } from './types';
+import { StepInfo } from '../RunDetails/shared/StepInfo';
+import type { StepInfoWait, Trace } from '../RunDetails/shared/types';
 
 // jsdom doesn't provide ResizeObserver
 beforeAll(() => {
@@ -64,23 +64,23 @@ vi.mock('../Rerun/RerunModal', () => ({
   RerunModal: () => null,
 }));
 
-vi.mock('./ErrorInfo', () => ({
+vi.mock('../RunDetails/shared/ErrorInfo', () => ({
   ErrorInfo: () => null,
 }));
 
-vi.mock('./IO', () => ({
+vi.mock('../RunDetails/shared/IO', () => ({
   IO: () => null,
 }));
 
-vi.mock('./MetadataAttrs', () => ({
+vi.mock('../RunDetails/shared/MetadataAttrs', () => ({
   MetadataAttrs: () => null,
 }));
 
-vi.mock('./UserlandAttrs', () => ({
+vi.mock('../RunDetails/shared/UserlandAttrs', () => ({
   UserlandAttrs: () => null,
 }));
 
-vi.mock('./Tabs', () => ({
+vi.mock('../RunDetails/shared/Tabs', () => ({
   Tabs: () => null,
 }));
 

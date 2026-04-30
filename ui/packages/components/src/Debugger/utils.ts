@@ -1,4 +1,4 @@
-import type { Trace } from '../RunDetailsV3/types';
+import type { Trace } from '../RunDetails/shared/types';
 
 //
 // A set of helpers to constuct a debug run trace from a set of related debug runs

@@ -13,7 +13,7 @@ import type {
   TimelineBarData,
   TimelineData,
 } from '../TimelineBar.types';
-import { traceWalk } from '../runDetailsUtils';
+import { traceWalk } from '../../RunDetails/shared/utils';
 import {
   isExperimentMetadata,
   isStepInfoRun,
@@ -21,7 +21,7 @@ import {
   type SpanMetadataInngestHTTPTiming,
   type SpanMetadataInngestTiming,
   type Trace,
-} from '../types';
+} from '../../RunDetails/shared/types';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**

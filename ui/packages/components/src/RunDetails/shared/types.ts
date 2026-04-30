@@ -1,3 +1,9 @@
+import type {
+  SpanMetadataKind as GeneratedSpanMetadataKind,
+  SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
+  Warnings,
+} from '@inngest/components/generated/index';
+
 export type Trace = {
   attempts: number | null;
   childrenSpans?: Trace[];
@@ -18,21 +24,27 @@ export type Trace = {
   debugRunID?: string | null;
   debugSessionID?: string | null;
   metadata?: SpanMetadata[];
+  response?: ResponseInfo | null;
 };
 
-export type SpanMetadataKind =
-  | `inngest.http`
-  | `inngest.ai`
-  | `inngest.warnings`
-  | SpanMetadataKindUserland;
+export type ResponseInfo = {
+  statusCode: number;
+  headers: Record<string, string | string[]>;
+};
 
-export type SpanMetadataKindUserland = `userland.${string}`;
+export type SpanMetadataKind = GeneratedSpanMetadataKind;
+
+export type SpanMetadataKindUserland = GeneratedSpanMetadataKindUserland;
 
 export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trace';
 
 export type SpanMetadata =
   | SpanMetadataInngestAI
+  | SpanMetadataInngestExperiment
   | SpanMetadataInngestHTTP
+  | SpanMetadataInngestHTTPTiming
+  | SpanMetadataInngestTiming
+  | SpanMetadataInngestResponseHeaders
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
   | SpanMetadataUnknown;
@@ -47,6 +59,19 @@ export type SpanMetadataInngestAI = {
     model: string;
     system: string;
     operation_name: string;
+  };
+};
+
+export type SpanMetadataInngestExperiment = {
+  scope: SpanMetadataScope;
+  kind: 'inngest.experiment';
+  updatedAt: string;
+  values: {
+    experiment_name: string;
+    variant_selected: string;
+    selection_strategy: string;
+    available_variants?: string[];
+    variant_weights?: Record<string, number>;
   };
 };
 
@@ -66,11 +91,44 @@ export type SpanMetadataInngestHTTP = {
   };
 };
 
+export type SpanMetadataInngestHTTPTiming = {
+  scope: 'step_attempt';
+  kind: 'inngest.http.timing';
+  updatedAt: string;
+  values: {
+    dns_lookup_ms: number;
+    tcp_connection_ms: number;
+    tls_handshake_ms: number;
+    server_processing_ms: number;
+    content_transfer_ms: number;
+    total_ms: number;
+  };
+};
+
+export type SpanMetadataInngestTiming = {
+  scope: 'step_attempt';
+  kind: 'inngest.timing';
+  updatedAt: string;
+  values: {
+    queue_delay_ms?: number;
+    system_latency_ms?: number;
+    network_total_ms?: number;
+    total_inngest_ms?: number;
+  };
+};
+
+export type SpanMetadataInngestResponseHeaders = {
+  scope: 'extended_trace' | 'step_attempt';
+  kind: 'inngest.response_headers';
+  updatedAt: string;
+  values: Record<string, string>;
+};
+
 export type SpanMetadataInngestWarnings = {
   scope: SpanMetadataScope;
   kind: 'inngest.warnings';
   updatedAt: string;
-  values: Record<string, string>;
+  values: Warnings;
 };
 
 export type SpanMetadataUserland = {
@@ -166,4 +224,8 @@ export function isStepInfoSignal(stepInfo: Trace['stepInfo']): stepInfo is StepI
   }
 
   return 'signal' in stepInfo;
+}
+
+export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInngestExperiment {
+  return md.kind === 'inngest.experiment';
 }

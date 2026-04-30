@@ -1,5 +1,5 @@
-import { type Trace } from './types';
-import { formatDuration } from './utils';
+import { type Trace } from '../RunDetails/shared/types';
+import { formatDuration } from '../RunDetails/shared/utils';
 
 type TimelineHeaderProps = {
   trace: Trace;

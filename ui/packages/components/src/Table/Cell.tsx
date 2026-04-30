@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSparkling2Fill } from '@remixicon/react';
 
-import { useDynamicRunData } from '../RunDetailsV3/utils';
+import { useDynamicRunData } from '../RunDetails/shared/utils';
 
 const cellStyles = 'text-basis text-sm';
 

@@ -5,8 +5,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { InlineSpans } from './InlineSpans';
 import { StepType } from './StepType';
 import { TimelineHeader } from './TimelineHeader';
-import { type Trace } from './types';
-import { getSpanName, traceHasChildren, useStepSelection } from './utils';
+import { type Trace } from '../RunDetails/shared/types';
+import { getSpanName, traceHasChildren, useStepSelection } from '../RunDetails/shared/utils';
 
 type Props = {
   depth: number;
