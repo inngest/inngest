@@ -128,7 +128,7 @@ func TestV2InvokeFunctionIdempotency(t *testing.T) {
 	// First invoke with idempotency key
 	resp1, err := postInvoke(ctx, appID, fnID, map[string]any{
 		"data":            map[string]any{"key": "value"},
-		"idempotency_key": "test-key-1",
+		"idempotencyKey": "test-key-1",
 	})
 	r.NoError(err)
 	defer resp1.Body.Close()
@@ -143,7 +143,7 @@ func TestV2InvokeFunctionIdempotency(t *testing.T) {
 	// Second invoke with same idempotency key → 409
 	resp2, err := postInvoke(ctx, appID, fnID, map[string]any{
 		"data":            map[string]any{"key": "value"},
-		"idempotency_key": "test-key-1",
+		"idempotencyKey": "test-key-1",
 	})
 	r.NoError(err)
 	defer resp2.Body.Close()
@@ -158,7 +158,7 @@ func TestV2InvokeFunctionIdempotency(t *testing.T) {
 	// Third invoke with different idempotency key → 200
 	resp3, err := postInvoke(ctx, appID, fnID, map[string]any{
 		"data":            map[string]any{"key": "value"},
-		"idempotency_key": "test-key-2",
+		"idempotencyKey": "test-key-2",
 	})
 	r.NoError(err)
 	defer resp3.Body.Close()

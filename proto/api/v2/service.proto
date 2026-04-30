@@ -1010,7 +1010,7 @@ service V2 {
 
   rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
     option (google.api.http) = {
-      post: "/apps/{app_id}/functions/{function_id}/invoke",
+      post: "/apps/{appId}/functions/{functionId}/invoke",
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -1437,7 +1437,7 @@ message PatchEnvsResponse {
 }
 
 message InvokeFunctionRequest {
-  string function_id = 1 [
+  string functionId = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "The ID of the function to invoke"
       example: "\"my-app-hello-world\""
@@ -1449,13 +1449,13 @@ message InvokeFunctionRequest {
       example: "{\"message\": \"Hello, World!\"}"
     }
   ];
-  optional string idempotency_key = 3 [
+  optional string idempotencyKey = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Optional idempotency key to handle duplicate requests within a given idempotency period."
       example: "\"user-action-123\""
     }
   ];
-  string app_id = 4 [
+  string appId = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "The ID of the app containing the function"
       example: "\"my-app\""
@@ -1470,23 +1470,23 @@ message InvokeFunctionResponse {
 }
 
 message InvokeFunctionData {
-  string run_id = 1 [
+  string runId = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Unique identifier for this function execution"
       example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
     }
   ];
-  google.protobuf.Timestamp queued_at = 2 [
+  google.protobuf.Timestamp queuedAt = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Timestamp when the function execution was enqueued"
     }
   ];
-  optional google.protobuf.Timestamp started_at = 3 [
+  optional google.protobuf.Timestamp startedAt = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Timestamp when the function execution started (if started)"
     }
   ];
-  optional google.protobuf.Timestamp completed_at = 4 [
+  optional google.protobuf.Timestamp completedAt = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Timestamp when the function execution completed (if finished)"
     }
