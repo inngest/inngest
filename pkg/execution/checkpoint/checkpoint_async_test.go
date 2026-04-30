@@ -232,6 +232,11 @@ func TestAsyncStepWithMetadataCreatesMetadataSpans(t *testing.T) {
 	require.True(hasMetadata, "Expected a metadata span")
 }
 
+// Note: there's intentionally no async equivalent of
+// TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep. Async checkpoints
+// can't bundle RunComplete — checkpointAsyncSteps's switch returns
+// "cannot checkpoint opcode" for OpcodeRunComplete (see checkpoint.go).
+
 // TestCheckpointAsyncSteps_DeferAdd asserts that the async checkpoint path
 // handles OpcodeDeferAdd the same way the sync path does: memoize the step
 // with null data and persist a Defer record. No discovery step is enqueued;
@@ -264,6 +269,8 @@ func TestCheckpointAsyncSteps_DeferAdd(t *testing.T) {
 	require.NoError(err)
 
 	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
 }
 
 // TestCheckpointAsyncSteps_DeferCancel asserts the async cancel path:
@@ -290,6 +297,8 @@ func TestCheckpointAsyncSteps_DeferCancel(t *testing.T) {
 	require.NoError(err)
 
 	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
 }
 
 //
