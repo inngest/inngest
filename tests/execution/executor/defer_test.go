@@ -223,6 +223,13 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 // be used.
 func (i *deferTestInfra) newExecutor(t *testing.T, driver *mockDriverV1) execution.Executor {
 	t.Helper()
+	return i.newExecutorWithQueue(t, i.rq, driver)
+}
+
+// newExecutorWithQueue is newExecutor with an overridable queue, used by the
+// discovery-enqueue tests that wrap the shared queue in enqueueCountingQueue.
+func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, driver *mockDriverV1) execution.Executor {
+	t.Helper()
 	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
 		return i.queueShard, nil
 	}
@@ -230,7 +237,7 @@ func (i *deferTestInfra) newExecutor(t *testing.T, driver *mockDriverV1) executi
 	opts := []executor.ExecutorOpt{
 		executor.WithStateManager(i.smv2),
 		executor.WithPauseManager(i.pauseMgr),
-		executor.WithQueue(i.rq),
+		executor.WithQueue(q),
 		executor.WithLogger(logger.StdlibLogger(i.ctx)),
 		executor.WithFunctionLoader(i.loader),
 		executor.WithAssignedQueueShard(i.queueShard),
@@ -514,9 +521,14 @@ func (q *enqueueCountingQueue) Enqueue(ctx context.Context, item queue.Item, at 
 // piggybacked onto RunComplete, DeferAdd does NOT enqueue a discovery step.
 // Without this gating, the discovery would be orphaned because RunComplete
 // finalizes (deletes state) immediately after.
+//
+// It also asserts the defer was actually saved on this path: an early-return
+// regression that skipped SaveDefer would still produce zero enqueues, but
+// would prevent Finalize from emitting a deferred.start event for the defer.
+// Observing the event therefore proves SaveDefer ran before state cleanup.
 func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
+	r := require.New(t)
 	infra := newDeferTestInfra(t)
-
 	countingQ := &enqueueCountingQueue{Queue: infra.rq}
 
 	stepID := "step-defer"
@@ -542,27 +554,18 @@ func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
 		},
 	}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return infra.queueShard, nil
-	}
+	exec := infra.newExecutorWithQueue(t, countingQ, driver)
 
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(infra.smv2),
-		executor.WithPauseManager(infra.pauseMgr),
-		executor.WithQueue(countingQ),
-		executor.WithLogger(logger.StdlibLogger(infra.ctx)),
-		executor.WithFunctionLoader(infra.loader),
-		executor.WithAssignedQueueShard(infra.queueShard),
-		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithDriverV1(driver),
-	)
-	require.NoError(t, err)
+	var capturedEvents []event.Event
+	exec.SetFinalizer(func(ctx context.Context, id statev2.ID, events []event.Event) error {
+		capturedEvents = append(capturedEvents, events...)
+		return nil
+	})
 
 	run := infra.scheduleRun(t, exec)
 	countBeforeExecute := countingQ.enqueues
 
-	_, err = exec.Execute(infra.ctx, state.Identifier{
+	_, err := exec.Execute(infra.ctx, state.Identifier{
 		WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID,
 	}, queue.Item{
 		WorkspaceID: infra.wsID,
@@ -570,11 +573,26 @@ func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
 		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
 		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: stepID}},
 	}, inngest.Edge{Incoming: "$trigger", Outgoing: stepID})
-	require.NoError(t, err)
+	r.NoError(err)
 
 	enqueuesDuringExecute := countingQ.enqueues - countBeforeExecute
-	require.Equal(t, 0, enqueuesDuringExecute,
+	r.Equal(0, enqueuesDuringExecute,
 		"DeferAdd should not enqueue discovery when piggybacked onto RunComplete; got %d enqueues", enqueuesDuringExecute)
+
+	var deferredFnSlugs []string
+	for _, evt := range capturedEvents {
+		if evt.Name != "inngest/deferred.start" {
+			continue
+		}
+		raw, err := json.Marshal(evt.Data)
+		r.NoError(err)
+		var data map[string]any
+		r.NoError(json.Unmarshal(raw, &data))
+		inn := data["_inngest"].(map[string]any)
+		deferredFnSlugs = append(deferredFnSlugs, inn["fn_slug"].(string))
+	}
+	r.Equal([]string{"onDefer-score"}, deferredFnSlugs,
+		"piggybacked DeferAdd must persist the defer; the deferred.start event is the post-Finalize evidence")
 }
 
 // TestDeferAdd_BareOpEnqueuesDiscovery is the inverse of
@@ -583,8 +601,8 @@ func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
 // "Shouldn't happen" in normal operation (the SDK piggybacks lazy ops), but
 // the fallback path must stay safe.
 func TestDeferAdd_BareOpEnqueuesDiscovery(t *testing.T) {
+	r := require.New(t)
 	infra := newDeferTestInfra(t)
-
 	countingQ := &enqueueCountingQueue{Queue: infra.rq}
 
 	stepID := "step-defer"
@@ -605,27 +623,11 @@ func TestDeferAdd_BareOpEnqueuesDiscovery(t *testing.T) {
 		},
 	}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return infra.queueShard, nil
-	}
-
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(infra.smv2),
-		executor.WithPauseManager(infra.pauseMgr),
-		executor.WithQueue(countingQ),
-		executor.WithLogger(logger.StdlibLogger(infra.ctx)),
-		executor.WithFunctionLoader(infra.loader),
-		executor.WithAssignedQueueShard(infra.queueShard),
-		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithDriverV1(driver),
-	)
-	require.NoError(t, err)
-
+	exec := infra.newExecutorWithQueue(t, countingQ, driver)
 	run := infra.scheduleRun(t, exec)
 	countBeforeExecute := countingQ.enqueues
 
-	_, err = exec.Execute(infra.ctx, state.Identifier{
+	_, err := exec.Execute(infra.ctx, state.Identifier{
 		WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID,
 	}, queue.Item{
 		WorkspaceID: infra.wsID,
@@ -633,16 +635,16 @@ func TestDeferAdd_BareOpEnqueuesDiscovery(t *testing.T) {
 		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
 		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: stepID}},
 	}, inngest.Edge{Incoming: "$trigger", Outgoing: stepID})
-	require.NoError(t, err)
+	r.NoError(err)
 
 	enqueuesDuringExecute := countingQ.enqueues - countBeforeExecute
-	require.Equal(t, 1, enqueuesDuringExecute,
+	r.Equal(1, enqueuesDuringExecute,
 		"bare DeferAdd should enqueue exactly one discovery step; got %d enqueues", enqueuesDuringExecute)
 
 	defers, err := infra.smv2.LoadDefers(infra.ctx, run.ID)
-	require.NoError(t, err)
-	require.Contains(t, defers, stepID, "defer should be persisted even on bare-op path")
-	require.Equal(t, statev2.ScheduleStatusAfterRun, defers[stepID].ScheduleStatus)
+	r.NoError(err)
+	r.Contains(defers, stepID, "defer should be persisted even on bare-op path")
+	r.Equal(statev2.ScheduleStatusAfterRun, defers[stepID].ScheduleStatus)
 }
 
 // TestDeferCancel_BareOpEnqueuesDiscovery is the DeferCancel counterpart: a
@@ -651,8 +653,8 @@ func TestDeferAdd_BareOpEnqueuesDiscovery(t *testing.T) {
 // branch is actually reached (an error there would short-circuit before the
 // lazyOpHasHost check).
 func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
+	r := require.New(t)
 	infra := newDeferTestInfra(t)
-
 	countingQ := &enqueueCountingQueue{Queue: infra.rq}
 
 	const (
@@ -676,28 +678,12 @@ func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 		},
 	}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return infra.queueShard, nil
-	}
-
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(infra.smv2),
-		executor.WithPauseManager(infra.pauseMgr),
-		executor.WithQueue(countingQ),
-		executor.WithLogger(logger.StdlibLogger(infra.ctx)),
-		executor.WithFunctionLoader(infra.loader),
-		executor.WithAssignedQueueShard(infra.queueShard),
-		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithDriverV1(driver),
-	)
-	require.NoError(t, err)
-
+	exec := infra.newExecutorWithQueue(t, countingQ, driver)
 	run := infra.scheduleRun(t, exec)
 
 	// Pre-seed the target defer; otherwise SetDeferStatus would error out
 	// before the bare-op fallback branch is reached.
-	require.NoError(t, infra.smv2.SaveDefer(infra.ctx, run.ID, statev2.Defer{
+	r.NoError(infra.smv2.SaveDefer(infra.ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
 		ScheduleStatus: statev2.ScheduleStatusAfterRun,
@@ -706,7 +692,7 @@ func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 
 	countBeforeExecute := countingQ.enqueues
 
-	_, err = exec.Execute(infra.ctx, state.Identifier{
+	_, err := exec.Execute(infra.ctx, state.Identifier{
 		WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID,
 	}, queue.Item{
 		WorkspaceID: infra.wsID,
@@ -714,14 +700,14 @@ func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
 		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
 	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
-	require.NoError(t, err)
+	r.NoError(err)
 
 	enqueuesDuringExecute := countingQ.enqueues - countBeforeExecute
-	require.Equal(t, 1, enqueuesDuringExecute,
+	r.Equal(1, enqueuesDuringExecute,
 		"bare DeferCancel should enqueue exactly one discovery step; got %d enqueues", enqueuesDuringExecute)
 
 	defers, err := infra.smv2.LoadDefers(infra.ctx, run.ID)
-	require.NoError(t, err)
-	require.Equal(t, statev2.ScheduleStatusCancelled, defers[deferStepID].ScheduleStatus,
+	r.NoError(err)
+	r.Equal(statev2.ScheduleStatusCancelled, defers[deferStepID].ScheduleStatus,
 		"defer status should be Cancelled even on bare-op path")
 }
