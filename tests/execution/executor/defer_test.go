@@ -30,173 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeferAddSavesDefer(t *testing.T) {
-	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
-
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
-	require.NoError(t, err)
-	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
-	loader := dbcqrs.(state.FunctionLoader)
-
-	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-
-	fn := inngest.Function{
-		ID:              fnID,
-		FunctionVersion: 1,
-		Name:            "test-fn",
-		Slug:            "test-fn",
-		Steps: []inngest.Step{
-			{
-				ID:   "step-defer",
-				Name: "step-defer",
-				URI:  "/step-defer",
-			},
-		},
-	}
-
-	config, err := json.Marshal(fn)
-	require.NoError(t, err)
-
-	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
-		ID:   appID,
-		Name: "test-app",
-	})
-	require.NoError(t, err)
-
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
-		ID:     fnID,
-		AppID:  appID,
-		Name:   fn.Name,
-		Slug:   fn.Slug,
-		Config: string(config),
-	})
-	require.NoError(t, err)
-
-	_, shardedRc, err := createInmemoryRedis(t)
-	require.NoError(t, err)
-	defer shardedRc.Close()
-
-	_, unshardedRc, err := createInmemoryRedis(t)
-	require.NoError(t, err)
-	defer unshardedRc.Close()
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: shardedRc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-		BatchClient:            shardedRc,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-	})
-
-	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
-
-	var sm state.Manager
-	sm, err = redis_state.New(ctx,
-		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithPauseDeleter(pauseMgr),
-	)
-	require.NoError(t, err)
-	smv2 := redis_state.MustRunServiceV2(sm)
-
-	queueOpts := []queue.QueueOpt{queue.WithIdempotencyTTL(time.Hour)}
-	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
-
-	rq, err := queue.New(
-		ctx,
-		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{queueShard.Name(): queueShard},
-		shardSelector,
-		queueOpts...,
-	)
-	require.NoError(t, err)
-
-	stepID := "step-defer"
-	mockDriver := &mockDriverV1{
-		t: t,
-		response: &state.DriverResponse{
-			StatusCode: 206,
-			Generator: []*state.GeneratorOpcode{{
-				Op: enums.OpcodeDeferAdd,
-				ID: stepID,
-				Opts: map[string]any{
-					"fn_slug": "onDefer-score",
-					"input":   map[string]any{"user_id": "u_123"},
-				},
-			}},
-		},
-	}
-
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauseMgr),
-		executor.WithQueue(rq),
-		executor.WithLogger(logger.StdlibLogger(ctx)),
-		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithDriverV1(mockDriver),
-	)
-	require.NoError(t, err)
-
-	now := time.Now()
-	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
-
-	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
-		Function:    fn,
-		At:          &now,
-		AccountID:   aID,
-		WorkspaceID: wsID,
-		AppID:       appID,
-		Events: []event.TrackedEvent{
-			event.NewBaseTrackedEventWithID(event.Event{
-				Name: "test/event",
-			}, evtID),
-		},
-	})
-	require.NoError(t, err)
-
-	_, err = exec.Execute(ctx, state.Identifier{
-		WorkflowID: fnID,
-		RunID:      run.ID.RunID,
-		AccountID:  aID,
-	}, queue.Item{
-		WorkspaceID: wsID,
-		Kind:        queue.KindStart,
-		Identifier: state.Identifier{
-			WorkflowID: fnID,
-			RunID:      run.ID.RunID,
-			AccountID:  aID,
-		},
-		Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: stepID}},
-	}, inngest.Edge{
-		Incoming: "$trigger",
-		Outgoing: stepID,
-	})
-	require.NoError(t, err)
-
-	steps, err := smv2.LoadSteps(ctx, run.ID)
-	require.NoError(t, err)
-	require.Contains(t, steps, stepID, "step.defer should be memoized")
-	require.Equal(t, json.RawMessage("null"), steps[stepID], "memoized data should be null")
-
-	defers, err := smv2.LoadDefers(ctx, run.ID)
-	require.NoError(t, err)
-	require.Len(t, defers, 1, "expected exactly one defer")
-
-	d := defers[stepID]
-	require.Equal(t, "onDefer-score", d.FnSlug)
-	require.Equal(t, statev2.ScheduleStatusAfterRun, d.ScheduleStatus)
-	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input))
-}
-
 // TestFinalizeEmitsDeferredStartEvents verifies that when a run with defers
 // is finalized, the executor emits an inngest/deferred.start event for each
 // defer whose ScheduleStatus is AfterRun.
@@ -370,152 +203,6 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	require.Equal(t, 0.87, data["score"])
 }
 
-// TestDeferCancelUpdatesDeferStatus verifies that when the executor processes
-// an OpcodeDeferCancel, it flips the existing defer's ScheduleStatus to Cancelled.
-func TestDeferCancelUpdatesDeferStatus(t *testing.T) {
-	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
-
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
-	require.NoError(t, err)
-	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
-	loader := dbcqrs.(state.FunctionLoader)
-
-	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-
-	fn := inngest.Function{
-		ID:              fnID,
-		FunctionVersion: 1,
-		Name:            "test-fn",
-		Slug:            "test-fn",
-		Steps: []inngest.Step{
-			{ID: "step-defer", Name: "step-defer", URI: "/step-defer"},
-		},
-	}
-
-	config, err := json.Marshal(fn)
-	require.NoError(t, err)
-
-	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{ID: appID, Name: "test-app"})
-	require.NoError(t, err)
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
-		ID: fnID, AppID: appID, Name: fn.Name, Slug: fn.Slug, Config: string(config),
-	})
-	require.NoError(t, err)
-
-	_, shardedRc, err := createInmemoryRedis(t)
-	require.NoError(t, err)
-	defer shardedRc.Close()
-
-	_, unshardedRc, err := createInmemoryRedis(t)
-	require.NoError(t, err)
-	defer unshardedRc.Close()
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: shardedRc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-		BatchClient:            shardedRc,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-	})
-
-	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
-
-	var sm state.Manager
-	sm, err = redis_state.New(ctx,
-		redis_state.WithShardedClient(shardedClient),
-		redis_state.WithPauseDeleter(pauseMgr),
-	)
-	require.NoError(t, err)
-	smv2 := redis_state.MustRunServiceV2(sm)
-
-	queueOpts := []queue.QueueOpt{queue.WithIdempotencyTTL(time.Hour)}
-	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
-
-	rq, err := queue.New(
-		ctx, "test-queue", queueShard,
-		map[string]queue.QueueShard{queueShard.Name(): queueShard},
-		shardSelector, queueOpts...,
-	)
-	require.NoError(t, err)
-
-	// The DeferAdd step and the DeferCancel step have DIFFERENT hashed IDs.
-	// DeferCancel identifies the target defer by target_hashed_id, not by
-	// the cancel step's own gen.ID.
-	deferStepID := "step-defer"
-	cancelStepID := "step-cancel"
-
-	mockDriver := &mockDriverV1{
-		t: t,
-		response: &state.DriverResponse{
-			StatusCode: 206,
-			Generator: []*state.GeneratorOpcode{{
-				Op: enums.OpcodeDeferCancel,
-				ID: cancelStepID,
-				Opts: map[string]any{
-					"target_hashed_id": deferStepID,
-				},
-			}},
-		},
-	}
-
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauseMgr),
-		executor.WithQueue(rq),
-		executor.WithLogger(logger.StdlibLogger(ctx)),
-		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
-		executor.WithDriverV1(mockDriver),
-	)
-	require.NoError(t, err)
-
-	now := time.Now()
-	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
-
-	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
-		Function: fn, At: &now, AccountID: aID, WorkspaceID: wsID, AppID: appID,
-		Events: []event.TrackedEvent{
-			event.NewBaseTrackedEventWithID(event.Event{Name: "test/event"}, evtID),
-		},
-	})
-	require.NoError(t, err)
-
-	// Pre-seed a defer as if DeferAdd had already run.
-	require.NoError(t, smv2.SaveDefer(ctx, run.ID, statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       deferStepID,
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
-		Input:          json.RawMessage(`{"user_id":"u_123"}`),
-	}))
-
-	_, err = exec.Execute(ctx, state.Identifier{
-		WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID,
-	}, queue.Item{
-		WorkspaceID: wsID,
-		Kind:        queue.KindStart,
-		Identifier:  state.Identifier{WorkflowID: fnID, RunID: run.ID.RunID, AccountID: aID},
-		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
-	}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
-	require.NoError(t, err)
-
-	defers, err := smv2.LoadDefers(ctx, run.ID)
-	require.NoError(t, err)
-	require.Len(t, defers, 1)
-
-	d := defers[deferStepID]
-	require.Equal(t, "onDefer-score", d.FnSlug, "FnSlug should be preserved")
-	require.Equal(t, statev2.ScheduleStatusCancelled, d.ScheduleStatus, "status should be Cancelled")
-	require.JSONEq(t, `{"user_id":"u_123"}`, string(d.Input), "Input should be preserved")
-}
-
 // deferTestInfra holds the shared state manager, queue, and loader used by the
 // checkpoint-vs-executor consistency tests so each test can spin up 3 runs
 // against the same backing store.
@@ -679,13 +366,13 @@ func (i *deferTestInfra) scheduleRun(t *testing.T, exec execution.Executor) *sta
 	return run
 }
 
-// TestDeferAdd_ExecutorAndCheckpointProduceSameDefer drives an OpcodeDeferAdd
-// through executor.Execute, CheckpointSyncSteps, and CheckpointAsyncSteps. It
-// asserts each path produces the same expected Defer record.
+// TestDeferAdd drives an OpcodeDeferAdd through executor.Execute,
+// CheckpointSyncSteps, and CheckpointAsyncSteps. It asserts each path produces
+// the same expected Defer record.
 //
 // We added this test because we had a regression where Defer worked in
 // non-checkpointing codepaths but not in checkpointing.
-func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
+func TestDeferAdd(t *testing.T) {
 	infra := newDeferTestInfra(t)
 	ctx := infra.ctx
 
@@ -786,14 +473,14 @@ func TestDeferAdd_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
 	}
 }
 
-// TestDeferCancel_ExecutorAndCheckpointProduceSameDefer exercises DeferCancel
-// via all three paths (executor, sync checkpoint, async checkpoint) against
-// runs pre-seeded with a matching defer. Each path must flip ScheduleStatus
-// to Cancelled while preserving every other field.
+// TestDeferCancel exercises DeferCancel via all three paths (executor, sync
+// checkpoint, async checkpoint) against runs pre-seeded with a matching defer.
+// Each path must flip ScheduleStatus to Cancelled while preserving every other
+// field.
 //
 // We added this test because we had a regression where DeferCancel worked in
 // non-checkpointing codepaths but not in checkpointing.
-func TestDeferCancel_ExecutorAndCheckpointProduceSameDefer(t *testing.T) {
+func TestDeferCancel(t *testing.T) {
 	infra := newDeferTestInfra(t)
 	ctx := infra.ctx
 
