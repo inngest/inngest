@@ -1,5 +1,12 @@
 import { makeValueTypeLabel, repeatArrayBrackets } from '../../../typeUtil';
-import type { ArrayNode, ObjectNode, SchemaNode, TupleNode, ValueNode } from '../../../types';
+import type {
+  ArrayNode,
+  ObjectNode,
+  SchemaNode,
+  TableNode,
+  TupleNode,
+  ValueNode,
+} from '../../../types';
 import { ObjectRow } from '../../ObjectRow';
 import { TupleRow } from '../../TupleRow';
 import { ValueRow } from '../../ValueRow';
@@ -47,7 +54,7 @@ export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.Reac
 // Identifies the first non-array schema node.
 function computeNestedTerminal(element: SchemaNode): {
   bracketLayers: number;
-  terminal: ObjectNode | TupleNode | ValueNode | null;
+  terminal: ObjectNode | TupleNode | ValueNode | TableNode | null;
 } {
   let bracketLayers = 1;
   let cursor: SchemaNode | undefined = element;
@@ -69,7 +76,13 @@ function labelForNestedValue(bracketLayers: number, value: ValueNode): string {
 }
 
 function mkObjectNode(node: ArrayNode, terminal: ObjectNode): ObjectNode {
-  return { kind: 'object', name: node.name, path: node.path, children: terminal.children };
+  return {
+    kind: 'object',
+    name: node.name,
+    path: node.path,
+    type: terminal.type,
+    children: terminal.children,
+  };
 }
 
 function mkTupleNode(node: ArrayNode, terminal: TupleNode): TupleNode {
