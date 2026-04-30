@@ -3460,6 +3460,15 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	return nil
 }
 
+// sanitizeLogValue strips CR/LF from a user-supplied string before logging
+// to defuse log injection (CodeQL "log entries created from user input").
+// Used at the few sites that log SDK-controlled identifiers like step IDs.
+func sanitizeLogValue(v string) string {
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+	return v
+}
+
 // handleGeneratorDiscoveryRequest handles OpcodeDiscoveryRequest, which
 // indicates that the SDK is requesting new work to be scheduled, typically
 // after checkpointing or in an effort to recover from non-determinism.
@@ -3508,7 +3517,10 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 
 	// Bare DeferAdd shouldn't happen — the SDK piggybacks it onto a host op.
 	// Log and enqueue discovery as a fallback so the run can progress.
-	e.log.Error("DeferAdd received without a host op; enqueuing discovery as fallback", "step_id", gen.ID)
+	e.log.Error(
+		"DeferAdd received without a host op; enqueuing discovery as fallback",
+		"step_id", sanitizeLogValue(gen.ID),
+	)
 	groupID := uuid.New().String()
 	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
 }
@@ -3535,7 +3547,10 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 
 	// Bare DeferCancel shouldn't happen — the SDK piggybacks it onto a host op.
 	// Log and enqueue discovery as a fallback so the run can progress.
-	e.log.Error("DeferCancel received without a host op; enqueuing discovery as fallback", "step_id", gen.ID)
+	e.log.Error(
+		"DeferCancel received without a host op; enqueuing discovery as fallback",
+		"step_id", sanitizeLogValue(gen.ID),
+	)
 	groupID := uuid.New().String()
 	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
 }
