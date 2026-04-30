@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,6 +45,36 @@ func TestURI(t *testing.T) {
 
 	actual := fn.URI()
 	require.EqualValues(t, *expected, *actual)
+}
+
+func TestThrottleJSONScope(t *testing.T) {
+	t.Run("defaults to function scope", func(t *testing.T) {
+		throttle := &Throttle{}
+		err := json.Unmarshal([]byte(`{"limit":2,"period":"1m","burst":1}`), throttle)
+		require.NoError(t, err)
+		require.Equal(t, enums.ThrottleScopeFn, throttle.Scope)
+
+		byt, err := json.Marshal(throttle)
+		require.NoError(t, err)
+		require.NotContains(t, string(byt), `"scope"`)
+	})
+
+	t.Run("accepts and marshals shared scopes", func(t *testing.T) {
+		throttle := &Throttle{}
+		err := json.Unmarshal([]byte(`{"limit":2,"period":"1m","burst":1,"scope":"env"}`), throttle)
+		require.NoError(t, err)
+		require.Equal(t, enums.ThrottleScopeEnv, throttle.Scope)
+
+		byt, err := json.Marshal(throttle)
+		require.NoError(t, err)
+		require.Contains(t, string(byt), `"scope":"env"`)
+	})
+
+	t.Run("rejects unknown scopes", func(t *testing.T) {
+		throttle := &Throttle{}
+		err := json.Unmarshal([]byte(`{"limit":2,"period":"1m","burst":1,"scope":"global"}`), throttle)
+		require.Error(t, err)
+	})
 }
 
 func TestValidate(t *testing.T) {
@@ -119,6 +150,35 @@ func TestValidate(t *testing.T) {
 			err := f.Validate(context.Background())
 			require.NotNil(t, err)
 			require.Contains(t, err.Error(), "Functions must contain one step")
+		})
+
+		t.Run("With an invalid throttle key", func(t *testing.T) {
+			f := Function{
+				Name: "hi",
+				Triggers: []Trigger{
+					{
+						EventTrigger: &EventTrigger{
+							Event: "fail",
+						},
+					},
+				},
+				Throttle: &Throttle{
+					Limit:  1,
+					Period: time.Minute,
+					Key:    strptr("invalid because not a string"),
+				},
+				Steps: []Step{
+					{
+						ID:   "step",
+						Name: "Function body",
+						URI:  "http://lol/what.xml.api",
+					},
+				},
+			}
+
+			err := f.Validate(context.Background())
+			require.NotNil(t, err)
+			require.Contains(t, err.Error(), "Invalid throttle key")
 		})
 	})
 }
