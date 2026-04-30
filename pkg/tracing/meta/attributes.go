@@ -32,7 +32,7 @@ var Attrs = struct {
 	FunctionVersion     attr[*int]
 	RunID               attr[*ulid.ULID]
 	ReplayOriginalRunID attr[*ulid.ULID]
-	RunScheduleType     attr[*string]
+	RunScheduleType     attr[*enums.ScheduleType]
 	SkipReason          attr[*enums.SkipReason]
 	SkipExistingRunID   attr[*string]
 
@@ -187,7 +187,7 @@ var Attrs = struct {
 	ResponseSteps:                      JsonAttr[ResponseOps]("response.step.ops"),
 	RunID:                              ULIDAttr("run.id"),
 	ReplayOriginalRunID:                ULIDAttr("run.replay_original_run_id"),
-	RunScheduleType:                    StringAttr("run.schedule_type"),
+	RunScheduleType:                    TextAttr[enums.ScheduleType]("run.schedule_type"),
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
 	StartedAt:                          TimeAttr("started_at"),

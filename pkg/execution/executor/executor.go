@@ -1280,8 +1280,8 @@ func (e *executor) schedule(
 	}
 
 	runTimestamp := runID.Timestamp()
-	var scheduleTypePtr *string
-	if req.ScheduleType != "" {
+	var scheduleTypePtr *enums.ScheduleType
+	if req.ScheduleType != enums.ScheduleTypeUnknown {
 		scheduleTypePtr = &req.ScheduleType
 	}
 	runSpanOpts := &tracing.CreateSpanOptions{

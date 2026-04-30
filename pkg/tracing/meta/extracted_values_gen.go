@@ -33,7 +33,7 @@ type ExtractedValues struct {
 	FunctionVersion *int
 	RunID *ulid.ULID
 	ReplayOriginalRunID *ulid.ULID
-	RunScheduleType *string
+	RunScheduleType *enums.ScheduleType
 	SkipReason *enums.SkipReason
 	SkipExistingRunID *string
 	IsDurableEndpointRun *bool
