@@ -33,6 +33,7 @@ type redisRequestState struct {
 	OperationIdempotencyKey string    `json:"k,omitempty"`
 	EnvID                   uuid.UUID `json:"e,omitempty"`
 	FunctionID              uuid.UUID `json:"f,omitempty"`
+	AppID                   uuid.UUID `json:"ai,omitempty"`
 
 	// SortedConstraints represents the list of constraints
 	// included in the request sorted to execute in the expected
@@ -76,6 +77,7 @@ func buildRequestState(req *CapacityAcquireRequest) (
 		OperationIdempotencyKey: req.IdempotencyKey,
 		EnvID:                   req.EnvID,
 		FunctionID:              req.FunctionID,
+		AppID:                   req.AppID,
 		RequestedAmount:         req.Amount,
 		MaximumLifetimeMillis:   req.MaximumLifetime.Milliseconds(),
 		ConfigVersion:           req.Configuration.FunctionVersion,
