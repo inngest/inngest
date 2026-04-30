@@ -118,12 +118,27 @@ func MarshalV1(
 		}
 	}
 
+	defers, err := sl.LoadDefers(ctx, md.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading defers in driver marshaller: %w", err)
+	}
+
+	deferEntries := make(map[string]SDKDeferEntry, len(defers))
+	for hashedID, d := range defers {
+		deferEntries[hashedID] = SDKDeferEntry{
+			// AfterRun defers haven't been enqueued yet, so the SDK can still
+			// cancel them. Already-scheduled defers cannot cancel.
+			Cancellable: d.ScheduleStatus == sv2.ScheduleStatusAfterRun,
+		}
+	}
+
 	req := &SDKRequest{
 		// For backcompat, we always send `Event`, but `Events` could be made
 		// empty if the overall request size is too large.
 		Event:   evts[0],
 		Events:  evts,
 		Actions: map[string]any{},
+		Defers:  deferEntries,
 		Context: &SDKRequestContext{
 			UseAPI:       true,
 			FunctionID:   md.ID.FunctionID,
