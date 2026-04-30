@@ -6,7 +6,7 @@ export type PathCreator = {
   app: (params: { externalAppID: string }) => Route;
   eventPopout: (params: { eventID: string }) => Route;
   eventType?: (params: { eventName: string }) => Route;
-  experiment?: (params: { experimentName: string }) => Route;
+  experiment?: (params: { experimentName: string; functionSlug: string }) => Route;
   function: (params: { functionSlug: string }) => Route;
   runPopout: (params: { runID: string }) => Route;
   debugger: (params: {

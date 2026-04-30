@@ -170,18 +170,8 @@ export const pathCreator = {
       functionSlug,
     )}/cancellations`;
   },
-  experiment({
-    envSlug,
-    experimentName,
-  }: {
-    envSlug: string;
-    experimentName: string;
-  }) {
-    return `/env/${envSlug}/experiments/${encodeURIComponent(experimentName)}`;
-  },
-  // Nested under the function so it stays consistent with Functions/Runs/
-  // Replays and so two functions sharing an experiment name don't collide
-  // on the URL.
+  // The function slug is part of the URL so two functions sharing an
+  // experiment name don't collide.
   functionExperiment({
     envSlug,
     functionSlug,
@@ -191,9 +181,9 @@ export const pathCreator = {
     functionSlug: string;
     experimentName: string;
   }) {
-    return `/env/${envSlug}/functions/${encodeURIComponent(
+    return `/env/${envSlug}/experiments/${encodeURIComponent(
       functionSlug,
-    )}/experiments/${encodeURIComponent(experimentName)}`;
+    )}/${encodeURIComponent(experimentName)}`;
   },
   experiments({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/experiments`;
