@@ -161,33 +161,38 @@ func TestSetDeferStatus_PreservesFields(t *testing.T) {
 	r.Equal(expected, defers[original.HashedID])
 }
 
-// Regression: cjson cannot distinguish empty objects from empty arrays, so a
-// raw `{}` Input round-tripped through setDeferStatus.lua would re-encode as
-// `[]`. SaveDefer normalizes `{}` → nil before marshalling to defuse this; this
-// test pins that normalization in place.
-func TestSetDeferStatus_EmptyObjectInputDoesNotBecomeArray(t *testing.T) {
-	ctx := context.Background()
-	v2svc, id := newDeferTestRunService(t)
-
-	d := statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       "hash-step-1",
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
-		Input:          json.RawMessage(`{}`),
+// Ensure that updating the defer status doesn't corrupt the input
+func TestSetDeferStatus_InputRoundTripsByteForByte(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"empty object", `{}`},
+		{"nested empty object", `{"user_id":"u_123","options":{}}`},
+		// 9007199254740993 is 2^53 + 1, the first integer that can't be
+		// represented exactly as a float64. cjson would round it down to 2^53.
+		{"integer above 2^53", `{"external_id":9007199254740993,"requested_at_ns":1735689600000000000}`},
 	}
-	require.NoError(t, v2svc.SaveDefer(ctx, id, d))
-	require.NoError(t, v2svc.SetDeferStatus(ctx, id, d.HashedID, statev2.ScheduleStatusCancelled))
 
-	defers, err := v2svc.LoadDefers(ctx, id)
-	require.NoError(t, err)
-	got := defers[d.HashedID]
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := require.New(t)
+			ctx := context.Background()
+			v2svc, id := newDeferTestRunService(t)
 
-	require.Equal(t, statev2.ScheduleStatusCancelled, got.ScheduleStatus)
-	require.NotEqual(t, "[]", string(got.Input),
-		"cjson regression: empty-object Input must not round-trip as `[]`")
-	// SaveDefer normalizes `{}` → nil, which marshals as JSON null.
-	if len(got.Input) > 0 {
-		require.JSONEq(t, `null`, string(got.Input))
+			d := statev2.Defer{
+				FnSlug:         "onDefer-score",
+				HashedID:       "hash-step-1",
+				ScheduleStatus: statev2.ScheduleStatusAfterRun,
+				Input:          json.RawMessage(tc.input),
+			}
+			r.NoError(v2svc.SaveDefer(ctx, id, d))
+			r.NoError(v2svc.SetDeferStatus(ctx, id, d.HashedID, statev2.ScheduleStatusCancelled))
+
+			defers, err := v2svc.LoadDefers(ctx, id)
+			r.NoError(err)
+			r.Equal(tc.input, string(defers[d.HashedID].Input))
+		})
 	}
 }
 

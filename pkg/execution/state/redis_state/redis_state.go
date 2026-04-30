@@ -1,7 +1,6 @@
 package redis_state
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha1"
 	"embed"
@@ -547,6 +546,16 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 	return &meta, nil
 }
 
+// deferMeta is the cjson-safe subset of statev2.Defer stored under the
+// `meta:<hashedID>` field. Input lives in `input:<hashedID>` and is never
+// decoded by Lua, sidestepping cjson's empty-object → array and >2^53 integer
+// precision bugs.
+type deferMeta struct {
+	FnSlug         string
+	HashedID       string
+	ScheduleStatus statev2.ScheduleStatus
+}
+
 func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]statev2.Defer, error) {
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
@@ -558,11 +567,32 @@ func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uu
 		return nil, err
 	}
 
-	defers := make(map[string]statev2.Defer, len(rmap))
-	for hashedID, raw := range rmap {
-		var d statev2.Defer
-		if err := json.Unmarshal([]byte(raw), &d); err != nil {
-			return nil, err
+	// Demux meta:<H> and input:<H> fields into a single Defer per H.
+	metas := make(map[string]deferMeta, len(rmap)/2)
+	inputs := make(map[string]string, len(rmap)/2)
+	for field, raw := range rmap {
+		switch {
+		case strings.HasPrefix(field, "meta:"):
+			hashedID := strings.TrimPrefix(field, "meta:")
+			var meta deferMeta
+			if err := json.Unmarshal([]byte(raw), &meta); err != nil {
+				return nil, err
+			}
+			metas[hashedID] = meta
+		case strings.HasPrefix(field, "input:"):
+			inputs[strings.TrimPrefix(field, "input:")] = raw
+		}
+	}
+
+	defers := make(map[string]statev2.Defer, len(metas))
+	for hashedID, meta := range metas {
+		d := statev2.Defer{
+			FnSlug:         meta.FnSlug,
+			HashedID:       meta.HashedID,
+			ScheduleStatus: meta.ScheduleStatus,
+		}
+		if raw, ok := inputs[hashedID]; ok && len(raw) > 0 {
+			d.Input = json.RawMessage(raw)
 		}
 		defers[hashedID] = d
 	}
@@ -801,19 +831,16 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
-	// Normalize an empty-object Input to nil so the cjson round-trip inside
-	// setDeferStatus.lua doesn't re-encode `{}` as `[]` (cjson cannot
-	// distinguish an empty map from an empty array).
-	if bytes.Equal(bytes.TrimSpace(d.Input), []byte("{}")) {
-		d.Input = nil
-	}
-
-	data, err := json.Marshal(d)
+	metaJSON, err := json.Marshal(deferMeta{
+		FnSlug:         d.FnSlug,
+		HashedID:       d.HashedID,
+		ScheduleStatus: d.ScheduleStatus,
+	})
 	if err != nil {
 		return err
 	}
 
-	args, err := StrSlice([]any{d.HashedID, string(data), int(statev2.ScheduleStatusCancelled)})
+	args, err := StrSlice([]any{d.HashedID, string(metaJSON), string(d.Input), int(statev2.ScheduleStatusCancelled)})
 	if err != nil {
 		return err
 	}
