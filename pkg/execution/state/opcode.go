@@ -20,6 +20,7 @@ import (
 var (
 	ErrStepInputTooLarge  = fmt.Errorf("step input size is greater than the limit")
 	ErrStepOutputTooLarge = fmt.Errorf("step output size is greater than the limit")
+	ErrDeferInputTooLarge = fmt.Errorf("defer input size is greater than the limit")
 )
 
 type GeneratorOpcode struct {
@@ -358,12 +359,12 @@ func (d *DeferAddOpts) Validate() error {
 	if len(d.Input) == 0 {
 		return fmt.Errorf("Input is required")
 	}
-	if len(d.Input) > consts.MaxStepInputSize {
-		// Mirrors the GeneratorOpcode.Validate() check on step inputs —
-		// prevents a malicious or buggy SDK from storing arbitrarily large
-		// payloads in Redis (per defer × per run) and inflating them into
-		// the deferred.start event bus on Finalize.
-		return ErrStepInputTooLarge
+	if len(d.Input) > consts.MaxDeferInputSize {
+		// Mirrors the GeneratorOpcode.Validate() check on step inputs. Prevents
+		// a malicious or buggy SDK from storing arbitrarily large payloads in
+		// Redis (per defer × per run) and inflating them into the
+		// deferred.start event bus on Finalize.
+		return ErrDeferInputTooLarge
 	}
 	return nil
 }

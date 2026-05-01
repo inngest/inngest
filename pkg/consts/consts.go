@@ -74,6 +74,9 @@ const (
 	// MaxDefersPerRun is the maximum number of defers allowed per function run.
 	MaxDefersPerRun = 20
 
+	// MaxDeferInputSize is the maximum size of the Input payload on a single defer.
+	MaxDeferInputSize = 1024 * 1024 * 4 // 4MB
+
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
