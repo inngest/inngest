@@ -14,8 +14,6 @@ type State struct {
 	Events []json.RawMessage
 	// Steps stores all step inputs/outputs.
 	Steps map[string]json.RawMessage
-
-	Defers map[string]Defer
 }
 
 type Defer struct {
@@ -46,7 +44,7 @@ func (d Defer) Validate() error {
 		return fmt.Errorf("FnSlug is required")
 	}
 	if d.HashedID == "" {
-		return fmt.Errorf("HashedId is required")
+		return fmt.Errorf("HashedID is required")
 	}
 	if d.ScheduleStatus == ScheduleStatusUnknown {
 		return fmt.Errorf("ScheduleStatus is required")

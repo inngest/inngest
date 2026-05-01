@@ -252,12 +252,16 @@ func (e *executor) buildDeferEvents(
 			}
 		}
 
-		meta := event.DeferredStartMetadata{
+		// Local variable name avoids shadowing the imported `meta` package
+		// (see top of file). A future addition that uses meta.NewAttrSet
+		// or similar inside this loop would otherwise fail to compile in
+		// a non-obvious way.
+		deferredMeta := event.DeferredStartMetadata{
 			FnSlug:       d.FnSlug,
 			ParentFnSlug: fnSlug,
 			ParentRunID:  opts.Metadata.ID.RunID.String(),
 		}
-		if err := meta.Validate(); err != nil {
+		if err := deferredMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(
 				"invalid deferred event metadata",
 				"error", err,
@@ -265,7 +269,7 @@ func (e *executor) buildDeferEvents(
 			)
 			continue
 		}
-		data[consts.InngestEventDataPrefix] = meta
+		data[consts.InngestEventDataPrefix] = deferredMeta
 
 		events = append(events, event.Event{
 			ID:        eventID.String(),
