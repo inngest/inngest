@@ -6,6 +6,7 @@ import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
 import { useSchemas } from './SchemasContext/SchemasContext';
 import { useSchemasInUse } from './useSchemasInUse';
+import { tableEntries } from './tableSchemas';
 
 export function SchemaExplorer() {
   const [search, setSearch] = useState('');
@@ -34,6 +35,14 @@ export function SchemaExplorer() {
       ref={containerRef}
     >
       <>
+        <div className="text-light text-xs font-medium uppercase">
+          Available Tables
+        </div>
+        <div className="flex flex-col gap-1">
+          {tableEntries.map((tableEntry) => (
+            <SchemaViewer key={tableEntry.key} node={tableEntry.node} />
+          ))}
+        </div>
         {schemasInUse.length > 0 && (
           <div className="mb-3 flex flex-col gap-2">
             <div className="text-light text-xs font-medium uppercase">
@@ -45,7 +54,7 @@ export function SchemaExplorer() {
           </div>
         )}
         <div className="text-light text-xs font-medium uppercase">
-          All Schemas
+          Event Schemas
         </div>
         <Search
           inngestSize="base"
