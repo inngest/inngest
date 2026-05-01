@@ -65,8 +65,6 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -484,8 +482,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
-
 	tp := tracing.NewSqlcTracerProvider(adapter.Q())
 
 	url := opts.Config.CoreAPI.Addr
@@ -517,7 +513,6 @@ func start(ctx context.Context, opts StartOpts) error {
 				history.NewLifecycleListener(
 					nil,
 					hd,
-					hmw,
 				),
 				Lifecycle{
 					Cqrs:       dbcqrs,
@@ -608,7 +603,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
+	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, nil)
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
@@ -631,7 +626,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Queue:          ds.Queue,
 		EventHandler:   ds.HandleEvent,
 		Executor:       ds.Executor,
-		HistoryReader:  memory_reader.NewReader(),
+		HistoryReader:  base_cqrs.NewHistoryReader(adapter),
 		DisableGraphQL: &opts.NoUI,
 		ConnectOpts: connectv0.Opts{
 			GroupManager:               connectionManager,
