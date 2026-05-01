@@ -3263,12 +3263,6 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
-	if nonLazy == 0 {
-		// Batch is all lazy ops with no host to drive forward progress.
-		// Lazy handlers will enqueue a discovery step as a fallback.
-		ctx = setBareLazyBatch(ctx)
-	}
-
 	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
@@ -3510,7 +3504,7 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 		return fmt.Errorf("error saving defer: %w", err)
 	}
 
-	if isBareLazyBatch(ctx) {
+	if runCtx.OnlyHasLazyOps() {
 		// Unreachable. Only happens if the SDK sends a lazy op without
 		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
 		// "[StepRun, DeferAdd]").
@@ -3554,7 +3548,7 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
 
-	if isBareLazyBatch(ctx) {
+	if runCtx.OnlyHasLazyOps() {
 		// Unreachable. Only happens if the SDK sends a lazy op without
 		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
 		// "[StepRun, DeferAdd]").
@@ -5576,25 +5570,6 @@ func emitCheckpointTraces(ctx context.Context) bool {
 	return ok
 }
 
-// Lazy ops (DeferAdd/DeferCancel) normally piggyback on a host op (StepRun,
-// RunComplete, etc.) that drives forward progress. The "bare" case — a batch
-// of only lazy ops with no host — shouldn't happen in practice; the SDK
-// always emits lazy ops alongside a host. This flag marks that unusual case
-// so the lazy handlers know they have to enqueue their own discovery step
-// as a fallback. The default (flag absent → false) means "has host," which
-// is the common case. See enums.OpcodeIsLazy.
-type bareLazyBatchValT struct{}
-
-var bareLazyBatchVal = bareLazyBatchValT{}
-
-func setBareLazyBatch(ctx context.Context) context.Context {
-	return context.WithValue(ctx, bareLazyBatchVal, true)
-}
-
-func isBareLazyBatch(ctx context.Context) bool {
-	ok, _ := ctx.Value(bareLazyBatchVal).(bool)
-	return ok
-}
 
 // emitExperimentMetadataFromOpts extracts experiment context from an opcode's
 // opts (populated by the SDK inside group.experiment() variant callbacks) and,
