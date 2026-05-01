@@ -202,7 +202,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 	defer server.Close()
 
 	var (
-		inProgress, total int32
+		inProgress, total, completed int32
 
 		numEvents  = 3
 		fnDuration = 5
@@ -235,6 +235,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 			<-time.After(time.Duration(fnDuration) * time.Second)
 
 			atomic.AddInt32(&inProgress, -1)
+			atomic.AddInt32(&completed, 1)
 			return true, nil
 		},
 	)
@@ -270,17 +271,22 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 	// Eventually the fn starts.
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&inProgress) == 3
-	}, 2*time.Second, 50*time.Millisecond)
+	}, 10*time.Second, 50*time.Millisecond)
 
-	expectedTime := time.Duration((numEvents+1)*fnDuration) * time.Second
-
-	for i := int64(0); i < expectedTime.Milliseconds(); i++ {
-		<-time.After(time.Millisecond)
+	// The duplicate key can sit behind the queue requeue extension before it
+	// becomes eligible after the first key-0 run completes.
+	deadline := time.Now().Add(time.Duration((numEvents+1)*fnDuration)*time.Second + queue.PartitionConcurrencyLimitRequeueExtension*time.Duration(numEvents+1) + 5*time.Second)
+	for time.Now().Before(deadline) {
 		// We should never have more than 3 functions running.
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgress), int32(numEvents))
+		if atomic.LoadInt32(&completed) == int32(numEvents+1) {
+			break
+		}
+		<-time.After(200 * time.Millisecond)
 	}
 
 	require.EqualValues(t, numEvents+1, atomic.LoadInt32(&total))
+	require.EqualValues(t, numEvents+1, atomic.LoadInt32(&completed))
 }
 
 // TestConcurrency_ScopeFunction_Key_Fn asserts that keys in function concurrency work as expected,
