@@ -31,10 +31,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestFinalizeEmitsDeferredStartEvents verifies that when a run with defers
-// is finalized, the executor emits an inngest/deferred.start event for each
+// TestFinalizeEmitsDeferredScheduleEvents verifies that when a run with defers
+// is finalized, the executor emits an inngest/deferred.schedule event for each
 // defer whose ScheduleStatus is AfterRun (and none for Cancelled).
-func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
+func TestFinalizeEmitsDeferredScheduleEvents(t *testing.T) {
 	r := require.New(t)
 	infra := newDeferTestInfra(t)
 	ctx := infra.ctx
@@ -75,13 +75,13 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	})
 	r.NoError(err)
 
-	// Collect every deferred.start fn_slug so we can assert presence/absence
+	// Collect every deferred.schedule fn_slug so we can assert presence/absence
 	// in one shot. Asserting an exact slice catches both the length and the
 	// negative-case (cancelled defer must not emit) regression at once.
 	var deferredFnSlugs []string
 	var activeData map[string]any
 	for _, evt := range capturedEvents {
-		if evt.Name != "inngest/deferred.start" {
+		if evt.Name != "inngest/deferred.schedule" {
 			continue
 		}
 		raw, err := json.Marshal(evt.Data)
@@ -97,7 +97,7 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	}
 
 	r.Equal([]string{"onDefer-score"}, deferredFnSlugs,
-		"only the AfterRun defer should emit deferred.start; cancelled must not")
+		"only the AfterRun defer should emit deferred.schedule; cancelled must not")
 	r.NotNil(activeData)
 
 	inn := activeData["_inngest"].(map[string]any)
@@ -175,17 +175,17 @@ func TestFinalizeContinuesOnLoadDefersError(t *testing.T) {
 	r.NoError(err, "Finalize must complete despite LoadDefers failure")
 
 	// function.finished must still publish; defer events must not.
-	var sawFnFinished, sawDeferredStart bool
+	var sawFnFinished, sawDeferredSchedule bool
 	for _, evt := range capturedEvents {
 		if evt.Name == event.FnFinishedName {
 			sawFnFinished = true
 		}
-		if evt.Name == "inngest/deferred.start" {
-			sawDeferredStart = true
+		if evt.Name == "inngest/deferred.schedule" {
+			sawDeferredSchedule = true
 		}
 	}
 	r.True(sawFnFinished, "function.finished must publish even when LoadDefers fails")
-	r.False(sawDeferredStart, "no defer events should be published when LoadDefers fails")
+	r.False(sawDeferredSchedule, "no defer events should be published when LoadDefers fails")
 }
 
 // deferTestInfra holds the shared state manager, queue, and loader used by the
@@ -599,7 +599,7 @@ func (q *enqueueCountingQueue) Enqueue(ctx context.Context, item queue.Item, at 
 //
 // It also asserts the defer was actually saved on this path: an early-return
 // regression that skipped SaveDefer would still produce zero enqueues, but
-// would prevent Finalize from emitting a deferred.start event for the defer.
+// would prevent Finalize from emitting a deferred.schedule event for the defer.
 // Observing the event therefore proves SaveDefer ran before state cleanup.
 func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
 	r := require.New(t)
@@ -656,7 +656,7 @@ func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
 
 	var deferredFnSlugs []string
 	for _, evt := range capturedEvents {
-		if evt.Name != "inngest/deferred.start" {
+		if evt.Name != "inngest/deferred.schedule" {
 			continue
 		}
 		raw, err := json.Marshal(evt.Data)
@@ -667,7 +667,7 @@ func TestDeferAdd_WithRunCompleteSkipsDiscovery(t *testing.T) {
 		deferredFnSlugs = append(deferredFnSlugs, inn["fn_slug"].(string))
 	}
 	r.Equal([]string{"onDefer-score"}, deferredFnSlugs,
-		"piggybacked DeferAdd must persist the defer; the deferred.start event is the post-Finalize evidence")
+		"piggybacked DeferAdd must persist the defer; the deferred.schedule event is the post-Finalize evidence")
 }
 
 // TestDeferAdd_BareOpEnqueuesDiscovery is the inverse of
