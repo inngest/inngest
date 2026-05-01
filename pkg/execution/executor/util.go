@@ -69,6 +69,9 @@ func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
 	}
 
 	for _, op := range opcodes {
+		if op == nil {
+			continue
+		}
 		if enums.OpcodeIsPriority(op.Op) {
 			groups.PriorityGroup.Opcodes = append(groups.PriorityGroup.Opcodes, op)
 		} else {

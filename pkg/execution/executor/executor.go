@@ -3259,6 +3259,10 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// We pass this down in context, unfortunately.
 	if nonLazy > 1 {
 		for _, op := range resp.Generator {
+			if op == nil {
+				// Just in case, because panics are bad
+				continue
+			}
 			if op.Op == enums.OpcodeStepRun {
 				ctx = setEmitCheckpointTraces(ctx)
 				break
@@ -3372,9 +3376,31 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
 	case enums.OpcodeDeferAdd:
-		return e.handleGeneratorDeferAdd(ctx, runCtx, gen, edge)
+		err := e.handleGeneratorDeferAdd(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer add",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
 	case enums.OpcodeDeferCancel:
-		return e.handleGeneratorDeferCancel(ctx, runCtx, gen, edge)
+		err := e.handleGeneratorDeferCancel(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer cancel",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -3547,6 +3573,12 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
 	}
 
+	// If the SDK emits `[DeferAdd("X"), DeferCancel("X")]` in one response, the
+	// two ops race within the priority group's errgroup. If DeferCancel runs
+	// first it will error. We don't guard against this here (e.g. by writing a
+	// cancelled tombstone when the defer is absent) because emitting an
+	// DeferAdd and DeferCancel for the same hashed ID in a single response is
+	// an SDK bug, and the cost of handling it isn't worth the complexity.
 	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, enums.DeferStatusCancelled); err != nil {
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
@@ -5572,7 +5604,6 @@ func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
 }
-
 
 // emitExperimentMetadataFromOpts extracts experiment context from an opcode's
 // opts (populated by the SDK inside group.experiment() variant callbacks) and,
