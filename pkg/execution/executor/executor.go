@@ -3263,8 +3263,10 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
-	if nonLazy > 0 {
-		ctx = setLazyOpHasHost(ctx)
+	if nonLazy == 0 {
+		// Batch is all lazy ops with no host to drive forward progress.
+		// Lazy handlers will enqueue a discovery step as a fallback.
+		ctx = setBareLazyBatch(ctx)
 	}
 
 	for _, group := range groups.All() {
@@ -3508,18 +3510,32 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 		return fmt.Errorf("error saving defer: %w", err)
 	}
 
-	if lazyOpHasHost(ctx) {
-		return nil
+	if isBareLazyBatch(ctx) {
+		// Unreachable. Only happens if the SDK sends a lazy op without
+		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
+		// "[StepRun, DeferAdd]").
+		e.log.Error(
+			"DeferAdd received without a host op; enqueuing discovery as fallback",
+			"step_id", sanitizeLogValue(gen.ID),
+			"unreachable", true,
+		)
+		groupID := uuid.New().String()
+
+		// Enqueue a discovery step so the run doesn't hang. This is necessary
+		// because lazy ops don't normally get a discovery step.
+		return e.maybeEnqueueDiscoveryStep(
+			state.WithGroupID(ctx, groupID),
+			runCtx,
+			gen,
+			edge,
+			groupID,
+			hasPendingSteps,
+		)
 	}
 
-	// Bare DeferAdd shouldn't happen — the SDK piggybacks it onto a host op.
-	// Log and enqueue discovery as a fallback so the run can progress.
-	e.log.Error(
-		"DeferAdd received without a host op; enqueuing discovery as fallback",
-		"step_id", sanitizeLogValue(gen.ID),
-	)
-	groupID := uuid.New().String()
-	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
+	// Common case: a host op in this batch will drive forward progress.
+	// We just recorded state and bow out.
+	return nil
 }
 
 func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
@@ -3538,18 +3554,30 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
 
-	if lazyOpHasHost(ctx) {
-		return nil
+	if isBareLazyBatch(ctx) {
+		// Unreachable. Only happens if the SDK sends a lazy op without
+		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
+		// "[StepRun, DeferAdd]").
+		e.log.Error(
+			"DeferCancel received without a host op; enqueuing discovery as fallback",
+			"step_id", sanitizeLogValue(gen.ID),
+			"unreachable", true,
+		)
+		groupID := uuid.New().String()
+
+		// Enqueue a discovery step so the run doesn't hang. This is necessary
+		// because lazy ops don't normally get a discovery step.
+		return e.maybeEnqueueDiscoveryStep(
+			state.WithGroupID(ctx, groupID),
+			runCtx,
+			gen,
+			edge,
+			groupID,
+			hasPendingSteps,
+		)
 	}
 
-	// Bare DeferCancel shouldn't happen — the SDK piggybacks it onto a host op.
-	// Log and enqueue discovery as a fallback so the run can progress.
-	e.log.Error(
-		"DeferCancel received without a host op; enqueuing discovery as fallback",
-		"step_id", sanitizeLogValue(gen.ID),
-	)
-	groupID := uuid.New().String()
-	return e.maybeEnqueueDiscoveryStep(state.WithGroupID(ctx, groupID), runCtx, gen, edge, groupID, hasPendingSteps)
+	return nil
 }
 
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
@@ -5548,19 +5576,23 @@ func emitCheckpointTraces(ctx context.Context) bool {
 	return ok
 }
 
-// Lazy ops piggyback on a host op that drives discovery; this flag tells lazy
-// handlers to skip their own enqueue. See enums.OpcodeIsLazy.
+// Lazy ops (DeferAdd/DeferCancel) normally piggyback on a host op (StepRun,
+// RunComplete, etc.) that drives forward progress. The "bare" case — a batch
+// of only lazy ops with no host — shouldn't happen in practice; the SDK
+// always emits lazy ops alongside a host. This flag marks that unusual case
+// so the lazy handlers know they have to enqueue their own discovery step
+// as a fallback. The default (flag absent → false) means "has host," which
+// is the common case. See enums.OpcodeIsLazy.
+type bareLazyBatchValT struct{}
 
-type lazyOpHasHostValT struct{}
+var bareLazyBatchVal = bareLazyBatchValT{}
 
-var lazyOpHasHostVal = lazyOpHasHostValT{}
-
-func setLazyOpHasHost(ctx context.Context) context.Context {
-	return context.WithValue(ctx, lazyOpHasHostVal, true)
+func setBareLazyBatch(ctx context.Context) context.Context {
+	return context.WithValue(ctx, bareLazyBatchVal, true)
 }
 
-func lazyOpHasHost(ctx context.Context) bool {
-	ok, _ := ctx.Value(lazyOpHasHostVal).(bool)
+func isBareLazyBatch(ctx context.Context) bool {
+	ok, _ := ctx.Value(bareLazyBatchVal).(bool)
 	return ok
 }
 
