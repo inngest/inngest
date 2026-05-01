@@ -1,4 +1,11 @@
 transport: serve
+cases:
+  - serve-introspection
+  - basic-invoke
+  - steps-serial
+  - retry-basic
+  - cancel-basic
+  - wait-for-event-basic
 sdk:
   url: http://127.0.0.1:3000/api/inngest
 dev:

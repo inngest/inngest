@@ -13,8 +13,9 @@ go run ./tests/conformance/golang
 
 The app serves:
 
-- `POST /api/inngest`
-- `GET /api/introspect`
+- `GET /api/inngest` for SDK inspection
+- `PUT /api/inngest` for SDK in-band sync
+- `POST /api/inngest` for function execution
 - `GET /health`
 
 By default it listens on `127.0.0.1:3000`.
@@ -30,14 +31,14 @@ INNGEST_SIGNING_KEY=7468697320697320612074657374206b6579 \
 ## Run doctor
 
 ```bash
-./inngest-bin conformance doctor \
+./inngest-bin alpha conformance doctor \
   --config ./tests/conformance/golang/inngest.conformance.yaml
 ```
 
 ## Run the current serve showcase
 
 ```bash
-./inngest-bin conformance run \
+./inngest-bin alpha conformance run \
   --config ./tests/conformance/golang/inngest.conformance.yaml \
   --report-out /tmp/golang-conformance-report.json
 ```

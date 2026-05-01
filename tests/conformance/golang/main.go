@@ -32,10 +32,16 @@ var (
 func main() {
 	addr := getenv("PORT", defaultAddr)
 	eventKey := getenv("INNGEST_EVENT_KEY", "test")
+	signingKey := getenv("INNGEST_SIGNING_KEY", "7468697320697320612074657374206b6579")
+	allowInBandSync := true
+	devMode := true
 
 	client, err := inngestgo.NewClient(inngestgo.ClientOpts{
-		AppID:    appID,
-		EventKey: inngestgo.StrPtr(eventKey),
+		AppID:           appID,
+		EventKey:        inngestgo.StrPtr(eventKey),
+		SigningKey:      inngestgo.StrPtr(signingKey),
+		AllowInBandSync: &allowInBandSync,
+		Dev:             &devMode,
 	})
 	if err != nil {
 		log.Fatalf("create client: %v", err)
@@ -46,12 +52,7 @@ func main() {
 	serve := client.Serve()
 	mux := http.NewServeMux()
 
-	// The conformance runner currently expects a conventional serve endpoint and
-	// a separate introspection endpoint. The Go SDK handler already responds to
-	// GET requests with introspection data, so we mount the same handler on both
-	// routes.
 	mux.Handle("/api/inngest", serve)
-	mux.Handle("/api/introspect", serve)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -173,10 +174,15 @@ func registerFunctions(client inngestgo.Client) {
 				return nil, err
 			}
 
-			// The runner expects the resumed event payload to be returned under a
+			result := any(payload)
+			if data, ok := payload["data"]; ok {
+				result = data
+			}
+
+			// The runner expects the resumed event data to be returned under a
 			// top-level result field.
 			return map[string]any{
-				"result": payload,
+				"result": result,
 			}, nil
 		},
 	)
