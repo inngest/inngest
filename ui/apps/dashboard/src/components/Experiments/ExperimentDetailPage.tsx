@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
@@ -10,8 +11,10 @@ import {
 } from '@inngest/components/HelperPanelControl';
 import { Header } from '@inngest/components/Header/Header';
 import { Skeleton } from '@inngest/components/Skeleton';
+import { TableBlankState } from '@inngest/components/Table';
+import { ExperimentsIcon } from '@inngest/components/icons/sections/Experiments';
 import { subtractDuration } from '@inngest/components/utils/date';
-import { RiFlaskLine, RiListOrdered2 } from '@remixicon/react';
+import { RiFlaskLine, RiListOrdered2, RiRefreshLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -30,6 +33,10 @@ import { VariantsTable } from '@/components/Experiments/VariantsTable';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { insightsUrl } from '@/lib/experiments/insightsUrl';
 import { findExtremum, scoreVariants } from '@/lib/experiments/score';
+import {
+  experimentTimeRangeToRangeChange,
+  type ExperimentTimeRange as ExperimentUrlTimeRange,
+} from '@/lib/experiments/urlState';
 import { pathCreator } from '@/utils/urls';
 
 type Props = {
@@ -41,6 +48,11 @@ type Props = {
   functionID: string;
   functionName: string;
   functionSlug: string;
+  timeRange: ExperimentUrlTimeRange;
+  hasTimeRangeSearch: boolean;
+  onTimeRangeChange: (range: RangeChangeProps) => void;
+  selectedVariants: string[];
+  onSelectedVariantsChange: (variants: string[]) => void;
 };
 
 const INFO_PANEL = 'Info';
@@ -62,35 +74,66 @@ export function ExperimentDetailPage({
   functionID,
   functionName,
   functionSlug,
+  timeRange,
+  hasTimeRangeSearch,
+  onTimeRangeChange,
+  selectedVariants,
+  onSelectedVariantsChange,
 }: Props) {
   const environment = useEnvironment();
 
   const [{ data: accountData }] = useQuery({
     query: GetAccountEntitlementsDocument,
   });
-  const daysAgoMax = accountData?.account.entitlements.history.limit || 7;
+  const daysAgoMax = accountData?.account.entitlements.history.limit ?? 7;
+  const rangeReady = hasTimeRangeSearch || accountData !== undefined;
+  const timeRangeType = timeRange.type;
+  const liveDurationMs =
+    timeRange.type === 'live' ? timeRange.durationMs : null;
+  const fixedFromTs = timeRange.type === 'fixed' ? timeRange.fromTs : null;
+  const fixedToTs = timeRange.type === 'fixed' ? timeRange.toTs : null;
 
-  // Defaults to the longest preset the user's plan can select. Initialized
-  // lazily once entitlements arrive so the default reflects their plan rather
-  // than a guess; until then, the body renders a skeleton.
-  const [range, setRange] = useState<RangeChangeProps | null>(null);
-  useEffect(() => {
-    if (accountData && range === null) {
-      const days = Math.min(daysAgoMax, MAX_DEFAULT_DAYS);
-      setRange({ type: 'relative', duration: { days } });
+  const range = useMemo<RangeChangeProps>(() => {
+    if (hasTimeRangeSearch) {
+      if (
+        timeRangeType === 'fixed' &&
+        fixedFromTs !== null &&
+        fixedToTs !== null
+      ) {
+        return experimentTimeRangeToRangeChange({
+          type: 'fixed',
+          fromTs: fixedFromTs,
+          toTs: fixedToTs,
+          preset: null,
+        });
+      }
+
+      if (liveDurationMs !== null) {
+        return experimentTimeRangeToRangeChange({
+          type: 'live',
+          durationMs: liveDurationMs,
+          preset: null,
+        });
+      }
     }
-  }, [accountData, daysAgoMax, range]);
 
-  const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
+    return {
+      type: 'relative',
+      duration: { days: Math.min(daysAgoMax, MAX_DEFAULT_DAYS) },
+    };
+  }, [
+    daysAgoMax,
+    fixedFromTs,
+    fixedToTs,
+    hasTimeRangeSearch,
+    liveDurationMs,
+    timeRangeType,
+  ]);
+
   const [showInactive, setShowInactive] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(INFO_PANEL);
 
   const queryRange = useMemo<ExperimentTimeRange>(() => {
-    if (!range) {
-      // Placeholder while entitlements load; queries are disabled below.
-      const to = new Date();
-      return { from: subtractDuration(to, { hours: 24 }), to };
-    }
     return rangeToTimeRange(range);
   }, [range]);
 
@@ -99,18 +142,18 @@ export function ExperimentDetailPage({
     experimentName,
     queryRange,
     null,
-    { enabled: range !== null },
+    { enabled: rangeReady },
   );
   const scoring = useScoringConfig(functionID, experimentName);
   const insightsQuery = useExperimentInsightsQuery(
     functionID,
     experimentName,
     queryRange,
-    { enabled: range !== null },
+    { enabled: rangeReady },
   );
 
   const togglePanel = useCallback((key: PanelKey) => {
-    setActivePanel((p) => (p === key ? null : key));
+    setActivePanel((panel) => (panel === key ? null : key));
   }, []);
 
   const availableVariants = useMemo(
@@ -118,19 +161,28 @@ export function ExperimentDetailPage({
     [detail.data],
   );
 
+  const selectedAvailableVariants = useMemo(() => {
+    if (selectedVariants.length === 0) return [];
+    const available = new Set(availableVariants);
+    return selectedVariants.filter((variant) => available.has(variant));
+  }, [availableVariants, selectedVariants]);
+
+  const hasUnavailableVariantSelection =
+    selectedVariants.length > 0 && selectedAvailableVariants.length === 0;
+
   const filteredDetail = useMemo(() => {
     if (!detail.data) return null;
     if (selectedVariants.length === 0) return detail.data;
     return {
       ...detail.data,
       variants: detail.data.variants.filter((v) =>
-        selectedVariants.includes(v.variantName),
+        selectedAvailableVariants.includes(v.variantName),
       ),
     };
-  }, [detail.data, selectedVariants]);
+  }, [detail.data, selectedAvailableVariants, selectedVariants.length]);
 
-  // Score each variant once so downstream panels (VariantsTable, ScoreSummaryCard,
-  // top-variant callout) share the same precomputed results.
+  // Score each variant once so downstream panels (VariantsTable,
+  // ScoreSummaryCard, top-variant callout) share the same precomputed results.
   const scoredVariants = useMemo(() => {
     if (!filteredDetail || !scoring.metrics) return null;
     return scoreVariants(filteredDetail.variants, scoring.metrics);
@@ -146,23 +198,23 @@ export function ExperimentDetailPage({
   // scoring inputs can offer a "fit to data" shortcut.
   const metricRanges = useMemo(() => {
     const map: Record<string, { min: number; max: number }> = {};
-    if (!scoredVariants) return map;
-    for (const { variant } of scoredVariants) {
-      for (const m of variant.metrics) {
-        const range = map[m.key];
+    if (!filteredDetail) return map;
+    for (const variant of filteredDetail.variants) {
+      for (const metric of variant.metrics) {
+        const range = map[metric.key];
         if (!range) {
-          map[m.key] = { min: m.avg, max: m.avg };
+          map[metric.key] = { min: metric.avg, max: metric.avg };
         } else {
-          if (m.avg < range.min) range.min = m.avg;
-          if (m.avg > range.max) range.max = m.avg;
+          if (metric.avg < range.min) range.min = metric.avg;
+          if (metric.avg > range.max) range.max = metric.avg;
         }
       }
     }
     return map;
-  }, [scoredVariants]);
+  }, [filteredDetail]);
 
   const enabledMetrics = useMemo(
-    () => (scoring.metrics ?? []).filter((m) => m.enabled),
+    () => (scoring.metrics ?? []).filter((metric) => metric.enabled),
     [scoring.metrics],
   );
 
@@ -208,7 +260,7 @@ export function ExperimentDetailPage({
         <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-10 pt-4">
           <h1 className="text-basis text-lg font-semibold">{experimentName}</h1>
 
-          {range === null ? (
+          {!rangeReady ? (
             <>
               <Skeleton className="h-8 w-72 rounded-lg" />
               <Skeleton className="h-96 w-full rounded-lg" />
@@ -217,10 +269,10 @@ export function ExperimentDetailPage({
             <>
               <ExperimentDetailToolbar
                 range={range}
-                onRangeChange={setRange}
+                onRangeChange={onTimeRangeChange}
                 daysAgoMax={daysAgoMax}
                 selectedVariants={selectedVariants}
-                onSelectedVariantsChange={setSelectedVariants}
+                onSelectedVariantsChange={onSelectedVariantsChange}
                 availableVariants={availableVariants}
               />
 
@@ -234,6 +286,7 @@ export function ExperimentDetailPage({
                   reset={() => detail.refetch()}
                 />
               )}
+
               {scoring.error && (
                 <ErrorCard
                   error={scoring.error}
@@ -253,17 +306,43 @@ export function ExperimentDetailPage({
                 scoring.metrics &&
                 scoredVariants &&
                 (filteredDetail.variants.length === 0 ? (
-                  <ExperimentsBlankState
-                    title="No variant data yet"
-                    description={
-                      <>
-                        Once your function emits runs for this experiment via{' '}
-                        <InlineCode>group.experiment()</InlineCode>, variant
-                        metrics will appear here.
-                      </>
-                    }
-                    onRefresh={detail.refetch}
-                  />
+                  hasUnavailableVariantSelection ? (
+                    <TableBlankState
+                      icon={<ExperimentsIcon />}
+                      title="No selected variants in this time range"
+                      description="Clear the variant filter or choose a wider time range."
+                      actions={
+                        <>
+                          <Button
+                            kind="primary"
+                            appearance="solid"
+                            label="Clear variant filter"
+                            onClick={() => onSelectedVariantsChange([])}
+                          />
+                          <Button
+                            kind="primary"
+                            appearance="outlined"
+                            label="Refresh"
+                            icon={<RiRefreshLine />}
+                            iconSide="left"
+                            onClick={() => detail.refetch()}
+                          />
+                        </>
+                      }
+                    />
+                  ) : (
+                    <ExperimentsBlankState
+                      title="No variant data yet"
+                      description={
+                        <>
+                          Once your function emits runs for this experiment via{' '}
+                          <InlineCode>group.experiment()</InlineCode>, variant
+                          metrics will appear here.
+                        </>
+                      }
+                      onRefresh={detail.refetch}
+                    />
+                  )
                 ) : (
                   <div className="@container">
                     <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
@@ -303,7 +382,9 @@ export function ExperimentDetailPage({
           <aside className="border-subtle flex w-[360px] shrink-0 flex-col overflow-hidden border-l">
             <HelperPanelFrame
               title={activePanel}
-              icon={helperItems.find((i) => i.title === activePanel)?.icon}
+              icon={
+                helperItems.find((item) => item.title === activePanel)?.icon
+              }
               onClose={() => setActivePanel(null)}
             >
               {activePanel === INFO_PANEL && detail.data && (
