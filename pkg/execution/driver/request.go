@@ -8,9 +8,13 @@ import (
 )
 
 type SDKRequest struct {
-	Event   map[string]any     `json:"event"`
-	Events  []map[string]any   `json:"events"`
-	Actions map[string]any     `json:"steps"`
+	Event   map[string]any   `json:"event"`
+	Events  []map[string]any `json:"events"`
+	Actions map[string]any   `json:"steps"`
+
+	// For the "defer" opcodes
+	Defers map[string]SDKDeferEntry `json:"defers"`
+
 	Context *SDKRequestContext `json:"ctx"`
 	// Version indicates the version used to manage the SDK request context.
 	//
@@ -19,6 +23,19 @@ type SDKRequest struct {
 
 	// DEPRECATED: NOTE: This is moved into SDKRequestContext for V3+/Non-TS SDKs
 	UseAPI bool `json:"use_api"`
+}
+
+// SDKDeferEntry tells the SDK that a deferred run is already registered for the
+// given hashed ID, so it should not re-report `OpcodeDeferAdd` for it.
+type SDKDeferEntry struct {
+	// Abortable indicates the SDK may emit `OpcodeDeferCancel` for this
+	// entry. It signifies that the deferred run hasn't queued yet, so it can be
+	// aborted.
+	//
+	// Note that this is different than run cancellation on an already-queued
+	// run. Aborting a deferred run simply will mean no run will ever exist
+	// (e.g. no run ID).
+	Abortable bool `json:"abortable"`
 }
 
 type SDKRequestContext struct {

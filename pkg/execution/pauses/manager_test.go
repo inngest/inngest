@@ -8,6 +8,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -409,4 +410,13 @@ func (m *mockRunService) LoadV1Metadata(ctx context.Context, id statev2.ID) (*st
 
 func (m *mockRunService) Duplicate(ctx context.Context, source statev2.State, destID statev2.ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error {
 	return nil
+}
+func (m *mockRunService) SaveDefer(ctx context.Context, id statev2.ID, d statev2.Defer) error {
+	return nil
+}
+func (m *mockRunService) SetDeferStatus(ctx context.Context, id statev2.ID, hashedID string, status enums.DeferStatus) error {
+	return nil
+}
+func (m *mockRunService) LoadDefers(ctx context.Context, id statev2.ID) (map[string]statev2.Defer, error) {
+	return nil, nil
 }

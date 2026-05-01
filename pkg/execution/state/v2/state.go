@@ -4,10 +4,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
+	"github.com/inngest/inngest/pkg/enums"
 )
 
 var (
 	ErrMetadataNotFound = fmt.Errorf("metadata not found")
+
+	// ErrDeferLimitExceeded is returned by SaveDefer when adding a new defer
+	// would exceed consts.MaxDefersPerRun for the run. Updates to an existing
+	// hashedID never trip this.
+	ErrDeferLimitExceeded = fmt.Errorf("defer limit per run exceeded")
 )
 
 type State struct {
@@ -16,6 +23,42 @@ type State struct {
 	Events []json.RawMessage
 	// Steps stores all step inputs/outputs.
 	Steps map[string]json.RawMessage
+}
+
+type Defer struct {
+	// Fully-qualified function slug (`{app-slug}-{fn-slug}`) of the
+	// `onDefer` Inngest function that will handle this deferred run.
+	FnSlug string
+
+	// Hashed defer ID
+	HashedID string
+
+	// Status for scheduling the deferred run:
+	// - Already scheduled?
+	// - Schedule after the parent run ends?
+	// - Never schedule (i.e. aborted)?
+	//
+	// Aborted is terminal within a run: once a defer transitions to
+	// DeferStatusAborted, it stays there. The Lua-level SaveDefer silently
+	// no-ops any subsequent write for the same hashedID. There is no "unabort"
+	// path: same hashedID + cancel is final.
+	ScheduleStatus enums.DeferStatus
+
+	// Data passed to the defer
+	Input json.RawMessage
+}
+
+func (d Defer) Validate() error {
+	if d.FnSlug == "" {
+		return fmt.Errorf("FnSlug is required")
+	}
+	if d.HashedID == "" {
+		return fmt.Errorf("HashedID is required")
+	}
+	if d.ScheduleStatus == enums.DeferStatusUnknown {
+		return fmt.Errorf("ScheduleStatus is required")
+	}
+	return nil
 }
 
 // OpID is the hashed ID for a single step.  This is currently a SHA1

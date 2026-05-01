@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -3183,6 +3184,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	nonLazy := nonLazyOpCount(resp.Generator)
+
 	{
 		// The following code helps with parallelism and the V2 -> V3 executor changes
 		var update *sv2.MutableConfig
@@ -3195,7 +3198,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 				StartedAt:      i.md.Config.StartedAt,
 			}
 		}
-		if len(resp.Generator) > 1 {
+		if nonLazy > 1 {
 			if !i.md.Config.ForceStepPlan {
 				// With parallelism, we currently instruct the SDK to disable immediate execution,
 				// enforcing that every step becomes pre-planned.
@@ -3254,8 +3257,12 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// When this happens, we ALWAYS need to create a trace for each step.
 	//
 	// We pass this down in context, unfortunately.
-	if len(resp.Generator) > 1 {
+	if nonLazy > 1 {
 		for _, op := range resp.Generator {
+			if op == nil {
+				// Just in case, because panics are bad
+				continue
+			}
 			if op.Op == enums.OpcodeStepRun {
 				ctx = setEmitCheckpointTraces(ctx)
 				break
@@ -3294,6 +3301,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					e.log.Error(
 						"panic in handleGenerator",
 						"error", r,
+						"stack", string(debug.Stack()),
 					)
 				}
 			}()
@@ -3367,6 +3375,32 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferAdd:
+		err := e.handleGeneratorDeferAdd(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer add",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
+	case enums.OpcodeDeferCancel:
+		err := e.handleGeneratorDeferCancel(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer cancel",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -3448,6 +3482,15 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	return nil
 }
 
+// sanitizeLogValue strips CR/LF from a user-supplied string before logging
+// to defuse log injection (CodeQL "log entries created from user input").
+// Used at the few sites that log SDK-controlled identifiers like step IDs.
+func sanitizeLogValue(v string) string {
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+	return v
+}
+
 // handleGeneratorDiscoveryRequest handles OpcodeDiscoveryRequest, which
 // indicates that the SDK is requesting new work to be scheduled, typically
 // after checkpointing or in an effort to recover from non-determinism.
@@ -3466,6 +3509,104 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 		groupID,
 		false,
 	)
+}
+
+func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		return err
+	}
+
+	opts, err := gen.DeferAddOpts()
+	if err != nil {
+		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
+	}
+
+	d := sv2.Defer{
+		FnSlug:         opts.FnSlug,
+		HashedID:       gen.ID,
+		ScheduleStatus: enums.DeferStatusAfterRun,
+		Input:          opts.Input,
+	}
+
+	if err := e.smv2.SaveDefer(ctx, runCtx.Metadata().ID, d); err != nil {
+		return fmt.Errorf("error saving defer: %w", err)
+	}
+
+	if runCtx.OnlyHasLazyOps() {
+		// Unreachable. Only happens if the SDK sends a lazy op without
+		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
+		// "[StepRun, DeferAdd]").
+		e.log.Error(
+			"DeferAdd received without a host op; enqueuing discovery as fallback",
+			"step_id", sanitizeLogValue(gen.ID),
+			"unreachable", true,
+		)
+		groupID := uuid.New().String()
+
+		// Enqueue a discovery step so the run doesn't hang. This is necessary
+		// because lazy ops don't normally get a discovery step.
+		return e.maybeEnqueueDiscoveryStep(
+			state.WithGroupID(ctx, groupID),
+			runCtx,
+			gen,
+			edge,
+			groupID,
+			hasPendingSteps,
+		)
+	}
+
+	// Common case: a host op in this batch will drive forward progress.
+	// We just recorded state and bow out.
+	return nil
+}
+
+func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// Memoize with null data so the SDK doesn't re-emit this opcode on resume.
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		return err
+	}
+
+	opts, err := gen.DeferCancelOpts()
+	if err != nil {
+		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
+	}
+
+	// If the SDK emits `[DeferAdd("X"), DeferCancel("X")]` in one response, the
+	// two ops race within the priority group's errgroup. If DeferCancel runs
+	// first it will error. We don't guard against this here (e.g. by writing a
+	// cancelled tombstone when the defer is absent) because emitting an
+	// DeferAdd and DeferCancel for the same hashed ID in a single response is
+	// an SDK bug, and the cost of handling it isn't worth the complexity.
+	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
+		return fmt.Errorf("error cancelling defer: %w", err)
+	}
+
+	if runCtx.OnlyHasLazyOps() {
+		// Unreachable. Only happens if the SDK sends a lazy op without
+		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
+		// "[StepRun, DeferAdd]").
+		e.log.Error(
+			"DeferCancel received without a host op; enqueuing discovery as fallback",
+			"step_id", sanitizeLogValue(gen.ID),
+			"unreachable", true,
+		)
+		groupID := uuid.New().String()
+
+		// Enqueue a discovery step so the run doesn't hang. This is necessary
+		// because lazy ops don't normally get a discovery step.
+		return e.maybeEnqueueDiscoveryStep(
+			state.WithGroupID(ctx, groupID),
+			runCtx,
+			gen,
+			edge,
+			groupID,
+			hasPendingSteps,
+		)
+	}
+
+	return nil
 }
 
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step

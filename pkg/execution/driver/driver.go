@@ -8,6 +8,7 @@ import (
 
 	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -118,12 +119,27 @@ func MarshalV1(
 		}
 	}
 
+	defers, err := sl.LoadDefers(ctx, md.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading defers in driver marshaller: %w", err)
+	}
+
+	deferEntries := make(map[string]SDKDeferEntry, len(defers))
+	for hashedID, d := range defers {
+		deferEntries[hashedID] = SDKDeferEntry{
+			// AfterRun defers haven't been enqueued yet, so the SDK can still
+			// cancel them. Already-scheduled defers cannot cancel.
+			Abortable: d.ScheduleStatus == enums.DeferStatusAfterRun,
+		}
+	}
+
 	req := &SDKRequest{
 		// For backcompat, we always send `Event`, but `Events` could be made
 		// empty if the overall request size is too large.
 		Event:   evts[0],
 		Events:  evts,
 		Actions: map[string]any{},
+		Defers:  deferEntries,
 		Context: &SDKRequestContext{
 			UseAPI:       true,
 			FunctionID:   md.ID.FunctionID,

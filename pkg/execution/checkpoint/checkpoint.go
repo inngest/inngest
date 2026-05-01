@@ -122,10 +122,14 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		return s.Op == enums.OpcodeRunComplete
 	})
 
-	// When we have >1 steps (parallel mode), we need to set ForceStepPlan to disable
-	// immediate execution in the SDK. This ensures that parallel steps are properly
-	// planned rather than executed immediately.
-	if len(input.Steps) > 1 && !input.Metadata.Config.ForceStepPlan {
+	// >1 non-lazy steps means parallel mode — see enums.OpcodeIsLazy.
+	nonLazyCount := 0
+	for _, s := range input.Steps {
+		if !enums.OpcodeIsLazy(s.Op) {
+			nonLazyCount++
+		}
+	}
+	if nonLazyCount > 1 && !input.Metadata.Config.ForceStepPlan {
 		if err := c.State.UpdateMetadata(ctx, input.Metadata.ID, state.MutableConfig{
 			ForceStepPlan:  true,
 			RequestVersion: input.Metadata.Config.RequestVersion,
@@ -143,7 +147,24 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	// at some point in the future.
 	onChangeToAsync := sync.OnceFunc(func() { c.updateSpanAsync(ctx, input) })
 
+	// Drain priority opcodes before the rest.
+	//
+	// NOTE: This assumes that ops are processed sequentially. If they aren't,
+	// then priority order would only decrease the chance of a race, but not
+	// eliminate it.
+	ordered := make([]state.GeneratorOpcode, 0, len(input.Steps))
 	for _, op := range input.Steps {
+		if enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+	for _, op := range input.Steps {
+		if !enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+
+	for _, op := range ordered {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, input.Metadata.ID)
 
@@ -296,6 +317,16 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error finalizing sync run", "error", err)
 			}
 
+		case enums.OpcodeDeferAdd:
+			if err := c.saveDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+				return err
+			}
+
+		case enums.OpcodeDeferCancel:
+			if err := c.cancelDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+				return err
+			}
+
 		default:
 			// This is an async opcode (sleep, waitForEvent, invoke, etc.) that causes
 			// the run to transition from sync to async mode. Track this on the run span
@@ -435,6 +466,16 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
 
+		case enums.OpcodeDeferAdd:
+			if err := c.saveDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+				return err
+			}
+
+		case enums.OpcodeDeferCancel:
+			if err := c.cancelDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+				return err
+			}
+
 		default:
 			// Return an error
 			l.Error("unimplemented checkpoint op", "op", op.Op)
@@ -505,6 +546,67 @@ func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result ap
 		},
 		Optional: execution.FinalizeOptional{},
 	})
+}
+
+// cancelDeferFromOp memoizes the cancel step (with null data) and flips the
+// target Defer's ScheduleStatus to Cancelled. Mirrors the executor's
+// handleGeneratorDeferCancel without enqueueing a discovery step (the SDK is
+// still driving the run).
+func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
+	if !runComplete {
+		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) &&
+			!errors.Is(err, state.ErrIdempotentResponse) {
+			l.Error("error saving checkpointed DeferCancel step state", "error", err)
+			return fmt.Errorf("failed to save DeferCancel step %s: %w", op.ID, err)
+		}
+	}
+
+	opts, err := op.DeferCancelOpts()
+	if err != nil {
+		l.Error("error parsing DeferCancel opts in checkpoint", "error", err)
+		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
+	}
+
+	if err := c.State.SetDeferStatus(ctx, id, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
+		l.Error("error cancelling defer in checkpoint", "error", err)
+		return fmt.Errorf("error cancelling defer: %w", err)
+	}
+
+	return nil
+}
+
+// saveDeferFromOp memoizes the step (with null data) and persists a Defer
+// record for an OpcodeDeferAdd observed during checkpointing. Mirrors the
+// executor's handleGeneratorDeferAdd, without enqueueing a discovery step
+// (the SDK is still driving the run).
+func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
+	if !runComplete {
+		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) &&
+			!errors.Is(err, state.ErrIdempotentResponse) {
+			l.Error("error saving checkpointed DeferAdd step state", "error", err)
+			return fmt.Errorf("failed to save DeferAdd step %s: %w", op.ID, err)
+		}
+	}
+
+	opts, err := op.DeferAddOpts()
+	if err != nil {
+		l.Error("error parsing DeferAdd opts in checkpoint", "error", err)
+		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
+	}
+
+	if err := c.State.SaveDefer(ctx, id, state.Defer{
+		FnSlug:         opts.FnSlug,
+		HashedID:       op.ID,
+		ScheduleStatus: enums.DeferStatusAfterRun,
+		Input:          opts.Input,
+	}); err != nil {
+		l.Error("error saving defer in checkpoint", "error", err)
+		return fmt.Errorf("error saving defer: %w", err)
+	}
+
+	return nil
 }
 
 func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

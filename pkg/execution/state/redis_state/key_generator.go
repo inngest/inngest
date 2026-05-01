@@ -38,6 +38,9 @@ type RunStateKeyGenerator interface {
 	// run.
 	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
 
+	// Defers returns the key used to store the run's Defer records, keyed
+	// by each defer's hashed step ID.
+	Defers(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 }
 
 type runStateKeyGenerator struct {
@@ -72,6 +75,10 @@ func (s runStateKeyGenerator) Events(ctx context.Context, isSharded bool, fnID u
 
 func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
+}
+
+func (s runStateKeyGenerator) Defers(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:defers:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {

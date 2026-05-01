@@ -24,9 +24,11 @@ type OpcodeGroup struct {
 	ShouldStartHistoryGroup bool
 }
 
-// OpcodeGroups are groups opcodes by their type, helping to run `waitForEvent`
-// opcodes first. This is used to ensure that we save wait triggers as soon as
-// possible, as well as capturing expression errors early.
+// OpcodeGroups groups opcodes by processing priority. The priority group runs
+// first so waitForEvent triggers are saved immediately (capturing expression
+// errors early) and lazy ops like DeferAdd/DeferCancel — which the SDK
+// piggybacks onto other ops — drain before RunComplete can finalize and delete
+// state.
 type OpcodeGroups struct {
 	// PriorityGroup is a group of opcodes that should be processed first.
 	PriorityGroup OpcodeGroup
@@ -36,9 +38,24 @@ type OpcodeGroups struct {
 	OtherGroup OpcodeGroup
 }
 
+// nonLazyOpCount returns the count used to gate parallel-step behavior — see
+// enums.OpcodeIsLazy. Nil entries are skipped to mirror handleGeneratorGroup.
+func nonLazyOpCount(opcodes []*state.GeneratorOpcode) int {
+	n := 0
+	for _, op := range opcodes {
+		if op == nil {
+			continue
+		}
+		if !enums.OpcodeIsLazy(op.Op) {
+			n++
+		}
+	}
+	return n
+}
+
 // opGroups groups opcodes by their type.
 func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
-	shouldStartHistoryGroup := len(opcodes) > 1
+	shouldStartHistoryGroup := nonLazyOpCount(opcodes) > 1
 
 	groups := OpcodeGroups{
 		PriorityGroup: OpcodeGroup{
@@ -52,7 +69,10 @@ func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
 	}
 
 	for _, op := range opcodes {
-		if op.Op == enums.OpcodeWaitForEvent {
+		if op == nil {
+			continue
+		}
+		if enums.OpcodeIsPriority(op.Op) {
 			groups.PriorityGroup.Opcodes = append(groups.PriorityGroup.Opcodes, op)
 		} else {
 			groups.OtherGroup.Opcodes = append(groups.OtherGroup.Opcodes, op)

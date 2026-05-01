@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -63,6 +64,13 @@ type RunService interface {
 	// Step inputs must be loaded separately from the source backend since State.Steps
 	// only contains step outputs.
 	Duplicate(ctx context.Context, source State, destID ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error
+
+	SaveDefer(ctx context.Context, id ID, d Defer) error
+	// SetDeferStatus atomically updates only the ScheduleStatus field of an
+	// existing Defer. It returns an error if no defer exists with the given
+	// hashedID. Prefer this over reading a full Defer, mutating, and calling
+	// SaveDefer — that pattern races against concurrent SaveDefer writes.
+	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
@@ -106,6 +114,8 @@ type StateLoader interface {
 
 	// StreamState returns all state without loading in-memory
 	// StreamState(ctx context.Context, id ID) (io.Reader, error)
+
+	LoadDefers(ctx context.Context, id ID) (map[string]Defer, error)
 }
 
 //
