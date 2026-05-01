@@ -84,8 +84,18 @@ SELECT * FROM functions WHERE id = ?;
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = ? AND archived_at IS NULL;
 
--- name: GetFunctionByAppIDAndSlug :one
-SELECT * FROM functions WHERE app_id = ? AND slug = ? AND archived_at IS NULL;
+-- name: GetFunctionByAppNameAndSlug :one
+-- Look up a function by the app's user-facing name, not its internal UUID.
+-- The dev server derives app UUIDs from different inputs at different sites
+-- (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+-- row even when the function exists. Joining on apps.name routes through the
+-- one identifier that's stable across both paths.
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = ?
+  AND functions.slug = ?
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ?, archived_at = NULL WHERE id = ? RETURNING *;

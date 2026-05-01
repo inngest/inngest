@@ -598,17 +598,27 @@ func (q *Queries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg Ge
 	return &i, err
 }
 
-const getFunctionByAppIDAndSlug = `-- name: GetFunctionByAppIDAndSlug :one
-SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE app_id = $1 AND slug = $2 AND archived_at IS NULL
+const getFunctionByAppNameAndSlug = `-- name: GetFunctionByAppNameAndSlug :one
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.archived_at FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = $1
+  AND functions.slug = $2
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL
 `
 
-type GetFunctionByAppIDAndSlugParams struct {
-	AppID uuid.UUID
-	Slug  string
+type GetFunctionByAppNameAndSlugParams struct {
+	Name string
+	Slug string
 }
 
-func (q *Queries) GetFunctionByAppIDAndSlug(ctx context.Context, arg GetFunctionByAppIDAndSlugParams) (*Function, error) {
-	row := q.db.QueryRowContext(ctx, getFunctionByAppIDAndSlug, arg.AppID, arg.Slug)
+// Look up a function by the app's user-facing name, not its internal UUID.
+// The dev server derives app UUIDs from different inputs at different sites
+// (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+// row even when the function exists. Joining on apps.name routes through the
+// one identifier that's stable across both paths.
+func (q *Queries) GetFunctionByAppNameAndSlug(ctx context.Context, arg GetFunctionByAppNameAndSlugParams) (*Function, error) {
+	row := q.db.QueryRowContext(ctx, getFunctionByAppNameAndSlug, arg.Name, arg.Slug)
 	var i Function
 	err := row.Scan(
 		&i.ID,

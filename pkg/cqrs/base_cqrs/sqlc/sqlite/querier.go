@@ -32,7 +32,12 @@ type Querier interface {
 	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
 	GetEventsIDbound(ctx context.Context, arg GetEventsIDboundParams) ([]*Event, error)
 	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*GetExecutionSpanByStepIDAndAttemptRow, error)
-	GetFunctionByAppIDAndSlug(ctx context.Context, arg GetFunctionByAppIDAndSlugParams) (*Function, error)
+	// Look up a function by the app's user-facing name, not its internal UUID.
+	// The dev server derives app UUIDs from different inputs at different sites
+	// (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+	// row even when the function exists. Joining on apps.name routes through the
+	// one identifier that's stable across both paths.
+	GetFunctionByAppNameAndSlug(ctx context.Context, arg GetFunctionByAppNameAndSlugParams) (*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunctionRunRow, error)

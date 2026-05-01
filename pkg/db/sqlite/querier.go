@@ -159,10 +159,10 @@ func (sq *sqliteQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*d
 	return functionFromSQLite(r), nil
 }
 
-func (sq *sqliteQuerier) GetFunctionByAppIDAndSlug(ctx context.Context, appID uuid.UUID, slug string) (*db.Function, error) {
-	r, err := sq.q.GetFunctionByAppIDAndSlug(ctx, sqlc.GetFunctionByAppIDAndSlugParams{
-		AppID: appID,
-		Slug:  slug,
+func (sq *sqliteQuerier) GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*db.Function, error) {
+	r, err := sq.q.GetFunctionByAppNameAndSlug(ctx, sqlc.GetFunctionByAppNameAndSlugParams{
+		Name: appName,
+		Slug: slug,
 	})
 	if err != nil {
 		return nil, err

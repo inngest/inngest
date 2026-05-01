@@ -34,7 +34,7 @@ type Querier interface {
 	GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
-	GetFunctionByAppIDAndSlug(ctx context.Context, appID uuid.UUID, slug string) (*Function, error)
+	GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
 	UpsertFunction(ctx context.Context, arg UpsertFunctionParams) (*Function, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)

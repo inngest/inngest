@@ -286,10 +286,10 @@ func (q NormalizedQueries) GetFunctionBySlug(ctx context.Context, slug string) (
 	return function.ToSQLite()
 }
 
-func (q NormalizedQueries) GetFunctionByAppIDAndSlug(ctx context.Context, arg sqlc_sqlite.GetFunctionByAppIDAndSlugParams) (*sqlc_sqlite.Function, error) {
-	function, err := q.db.GetFunctionByAppIDAndSlug(ctx, GetFunctionByAppIDAndSlugParams{
-		AppID: arg.AppID,
-		Slug:  arg.Slug,
+func (q NormalizedQueries) GetFunctionByAppNameAndSlug(ctx context.Context, arg sqlc_sqlite.GetFunctionByAppNameAndSlugParams) (*sqlc_sqlite.Function, error) {
+	function, err := q.db.GetFunctionByAppNameAndSlug(ctx, GetFunctionByAppNameAndSlugParams{
+		Name: arg.Name,
+		Slug: arg.Slug,
 	})
 	if err != nil {
 		return nil, err

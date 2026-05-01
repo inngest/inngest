@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -400,8 +401,18 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	seen := make(map[uuid.UUID]struct{}, len(processed.Functions))
 	for i := range processed.Functions {
 		fn := &processed.Functions[i].Function
-		if persisted, err := tx.GetActiveFunctionByAppAndSlug(ctx, appID, fn.Slug); err == nil && persisted != nil {
+		persisted, err := tx.GetActiveFunctionByAppAndSlug(ctx, r.AppName, fn.Slug)
+		switch {
+		case err == nil && persisted != nil:
 			fn.ID = persisted.ID
+		case errors.Is(err, sql.ErrNoRows):
+			// Not persisted yet — keep the SDK-minted UUID.
+		default:
+			// A transient lookup failure here would silently leave fn.ID as the
+			// SDK UUID, archive the persisted row via the earlyDeletes loop
+			// below, and insert a fresh row — orphaning function_runs and
+			// history that reference the old UUID. Abort the sync instead.
+			return nil, publicerr.Wrap(err, 500, "Error resolving persisted function by slug")
 		}
 		seen[fn.ID] = struct{}{}
 	}

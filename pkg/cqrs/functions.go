@@ -49,14 +49,18 @@ type FunctionReader interface {
 	// GetFunctionByInternalUUID returns a function given the internal ID.
 	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*Function, error)
 	// GetActiveFunctionByAppAndSlug returns an active (non-archived) function
-	// given its parent app's internal UUID and the function's slug.
+	// given its parent app's user-facing name and the function's slug.
 	//
-	// (app_id, slug) is the natural identity of a function — see the partial
-	// unique index `functions_app_id_slug_active_key`. Prefer this over
-	// GetFunctionByInternalUUID when the caller has the slug rather than a
-	// specific UUID, since the function UUID can rotate across resyncs (the
-	// dev server's deterministic-UUID scheme depends on the SDK's serve URL).
-	GetActiveFunctionByAppAndSlug(ctx context.Context, appID uuid.UUID, slug string) (*Function, error)
+	// Keyed on app name (not internal UUID) because the dev server derives app
+	// UUIDs from different inputs across paths — placeholder rows hash the URL,
+	// post-sync rows hash the name — so a UUID-keyed lookup can miss the row
+	// the caller actually wants. The name is the one identifier that's stable
+	// across both paths.
+	//
+	// (app_id, slug) remains the natural identity at the storage layer (see the
+	// partial unique index `functions_app_id_slug_active_key`); this method is
+	// the caller-facing lookup that resolves to the right `app_id` via name.
+	GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
 }
 
 // DevFunctionManager is a development-only function manager
