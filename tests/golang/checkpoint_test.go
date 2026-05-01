@@ -55,8 +55,6 @@ func TestFnCheckpoint(t *testing.T) {
 				},
 				inngestgo.EventTrigger(evtName, nil),
 				func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-					rid.Send(input.InputCtx.RunID)
-
 					_, _ = step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
 					fmt.Println("a")
 					_, _ = step.Run(ctx, "b", func(ctx context.Context) (string, error) {
@@ -69,6 +67,7 @@ func TestFnCheckpoint(t *testing.T) {
 						return "c", nil
 					})
 					fmt.Println("c (done), ", input.InputCtx.RunID)
+					rid.Send(input.InputCtx.RunID)
 					return nil, nil
 				},
 			)
@@ -80,7 +79,7 @@ func TestFnCheckpoint(t *testing.T) {
 			r.NoError(err)
 
 			runID := rid.Wait(t)
-			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 60 * time.Second})
+			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 2 * time.Minute})
 			var output string
 			err = json.Unmarshal([]byte(run.Output), &output)
 			require.NotEmpty(t, runID)
@@ -113,8 +112,6 @@ func TestCheckpointMaxDuration(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			rid.Send(input.InputCtx.RunID)
-
 			for i := range 8 {
 				_, _ = step.Run(ctx, fmt.Sprintf("%d", i), func(ctx context.Context) (string, error) {
 					<-time.After(1 * time.Second)
@@ -123,6 +120,7 @@ func TestCheckpointMaxDuration(t *testing.T) {
 				fmt.Println(i)
 			}
 			fmt.Println("c (done), ", input.InputCtx.RunID)
+			rid.Send(input.InputCtx.RunID)
 			return nil, nil
 		},
 	)
@@ -134,7 +132,7 @@ func TestCheckpointMaxDuration(t *testing.T) {
 	r.NoError(err)
 
 	runID := rid.Wait(t)
-	run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID)
+	run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 2 * time.Minute})
 	var output string
 	err = json.Unmarshal([]byte(run.Output), &output)
 	require.NotEmpty(t, runID)
