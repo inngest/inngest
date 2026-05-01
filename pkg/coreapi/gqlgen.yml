@@ -12,6 +12,7 @@ model:
 resolver:
   filename: pkg/coreapi/graph/resolvers/resolver.go
   type: Resolver
+  preserve_resolver: true
 
 struct_tag: json
 

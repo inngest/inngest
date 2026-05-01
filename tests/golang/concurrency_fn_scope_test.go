@@ -34,11 +34,9 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency",
-			Concurrency: &inngestgo.ConfigConcurrency{
-				Step: []inngestgo.ConfigStepConcurrency{
-					{
-						Limit: 1,
-					},
+			Concurrency: []inngestgo.ConfigStepConcurrency{
+				{
+					Limit: 1,
 				},
 			},
 		},
@@ -110,12 +108,10 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency",
-			Concurrency: &inngestgo.ConfigConcurrency{
-				Step: []inngestgo.ConfigStepConcurrency{
-					{
-						Limit: 1,
-						Scope: enums.ConcurrencyScopeFn,
-					},
+			Concurrency: []inngestgo.ConfigStepConcurrency{
+				{
+					Limit: 1,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		},
@@ -135,12 +131,10 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency-v2",
-			Concurrency: &inngestgo.ConfigConcurrency{
-				Step: []inngestgo.ConfigStepConcurrency{
-					{
-						Limit: 1,
-						Scope: enums.ConcurrencyScopeFn,
-					},
+			Concurrency: []inngestgo.ConfigStepConcurrency{
+				{
+					Limit: 1,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		},
@@ -206,12 +200,10 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency",
-			Concurrency: &inngestgo.ConfigConcurrency{
-				Step: []inngestgo.ConfigStepConcurrency{
-					{
-						Limit: 1,
-						Key:   inngestgo.StrPtr("event.data.num"),
-					},
+			Concurrency: []inngestgo.ConfigStepConcurrency{
+				{
+					Limit: 1,
+					Key:   inngestgo.StrPtr("event.data.num"),
 				},
 			},
 		},
@@ -296,15 +288,13 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "multiple-fn-concurrency",
-			Concurrency: &inngestgo.ConfigConcurrency{
-				Step: []inngestgo.ConfigStepConcurrency{
-					{
-						Limit: limit,
-					},
-					{
-						Limit: 1,
-						Key:   inngestgo.StrPtr("event.data.num"),
-					},
+			Concurrency: []inngestgo.ConfigStepConcurrency{
+				{
+					Limit: limit,
+				},
+				{
+					Limit: 1,
+					Key:   inngestgo.StrPtr("event.data.num"),
 				},
 			},
 			Retries: inngestgo.IntPtr(0),

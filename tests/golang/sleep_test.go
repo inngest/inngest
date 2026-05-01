@@ -178,11 +178,11 @@ func TestSleepFudging(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "test-sleep-fudge",
-			Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
+			Concurrency: []inngestgo.ConfigStepConcurrency{
 				{
 					Limit: 1,
 				},
-			}},
+			},
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

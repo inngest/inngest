@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/tests/client"
 
 	"github.com/inngest/inngestgo"
@@ -14,9 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestFnConcurrency tests function-level concurrency via semaphores.
-// Unlike step concurrency, the limit is held for the ENTIRE run — across
-// all steps. Only one run should execute at a time with limit=1.
+// TestFnConcurrency tests step concurrency with limit=1 scoped to the function.
+// Only one step should execute at a time with limit=1.
 func TestFnConcurrency(t *testing.T) {
 	c := client.New(t)
 	c.ResetAll(t)
@@ -37,11 +37,10 @@ func TestFnConcurrency(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency-test",
-			Concurrency: &inngestgo.ConfigConcurrency{
-				Fn: []inngestgo.ConfigFnConcurrency{
-					{
-						Limit: 1,
-					},
+			Concurrency: []inngestgo.ConfigStepConcurrency{
+				{
+					Limit: 1,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 			Retries: inngestgo.IntPtr(0),
@@ -50,24 +49,15 @@ func TestFnConcurrency(t *testing.T) {
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			fmt.Println("Running fn concurrency test", *input.Event.ID)
 
-			// Step 1
-			_, _ = step.Run(ctx, "step-1", func(ctx context.Context) (any, error) {
-				// Do this once.
+			_, _ = step.Run(ctx, "work", func(ctx context.Context) (any, error) {
 				next := atomic.AddInt32(&inProgress, 1)
-				// With fn concurrency limit=1, we should never have more than 1 run active
-				require.Less(t, next, int32(2), "fn concurrency violated: more than 1 run active")
+				require.Less(t, next, int32(2), "step concurrency violated: more than 1 step active")
 
-				<-time.After(time.Duration(fnDuration/2) * time.Second)
-				return "step-1-done", nil
+				<-time.After(time.Duration(fnDuration) * time.Second)
+				atomic.AddInt32(&inProgress, -1)
+				return "done", nil
 			})
 
-			// Step 2 — the semaphore should still be held from step 1
-			_, _ = step.Run(ctx, "step-2", func(ctx context.Context) (any, error) {
-				<-time.After(time.Duration(fnDuration/2) * time.Second)
-				return "step-2-done", nil
-			})
-
-			atomic.AddInt32(&inProgress, -1)
 			atomic.AddInt32(&total, 1)
 			return true, nil
 		},
@@ -131,12 +121,11 @@ func TestFnConcurrency_Key(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency-key-test",
-			Concurrency: &inngestgo.ConfigConcurrency{
-				Fn: []inngestgo.ConfigFnConcurrency{
-					{
-						Limit: 1,
-						Key:   inngestgo.StrPtr("event.data.customer_id"),
-					},
+			Concurrency: []inngestgo.ConfigStepConcurrency{
+				{
+					Limit: 1,
+					Scope: enums.ConcurrencyScopeFn,
+					Key:   inngestgo.StrPtr("event.data.customer_id"),
 				},
 			},
 			Retries: inngestgo.IntPtr(0),
