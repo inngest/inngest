@@ -511,7 +511,7 @@ func TestFinalize(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -788,7 +788,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -797,7 +797,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     targetFnID,
 		AppID:  appID,
 		Name:   targetFn.Name,
@@ -988,7 +988,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -1181,7 +1181,7 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -1373,7 +1373,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -1574,7 +1574,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,

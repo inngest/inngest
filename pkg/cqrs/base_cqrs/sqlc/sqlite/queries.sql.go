@@ -621,6 +621,40 @@ func (q *Queries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg Ge
 	return &i, err
 }
 
+const getFunctionByAppNameAndSlug = `-- name: GetFunctionByAppNameAndSlug :one
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.archived_at FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = ?
+  AND functions.slug = ?
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL
+`
+
+type GetFunctionByAppNameAndSlugParams struct {
+	Name string
+	Slug string
+}
+
+// Look up a function by the app's user-facing name, not its internal UUID.
+// The dev server derives app UUIDs from different inputs at different sites
+// (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+// row even when the function exists. Joining on apps.name routes through the
+// one identifier that's stable across both paths.
+func (q *Queries) GetFunctionByAppNameAndSlug(ctx context.Context, arg GetFunctionByAppNameAndSlugParams) (*Function, error) {
+	row := q.db.QueryRowContext(ctx, getFunctionByAppNameAndSlug, arg.Name, arg.Slug)
+	var i Function
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Name,
+		&i.Slug,
+		&i.Config,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return &i, err
+}
+
 const getFunctionByID = `-- name: GetFunctionByID :one
 SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE id = ?
 `
@@ -1904,48 +1938,6 @@ func (q *Queries) InsertEventBatch(ctx context.Context, arg InsertEventBatchPara
 	return err
 }
 
-const insertFunction = `-- name: InsertFunction :one
-
-
-INSERT INTO functions
-	(id, app_id, name, slug, config, created_at) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING id, app_id, name, slug, config, created_at, archived_at
-`
-
-type InsertFunctionParams struct {
-	ID        uuid.UUID
-	AppID     uuid.UUID
-	Name      string
-	Slug      string
-	Config    string
-	CreatedAt time.Time
-}
-
-// functions
-//
-// note - this is very basic right now.
-func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) (*Function, error) {
-	row := q.db.QueryRowContext(ctx, insertFunction,
-		arg.ID,
-		arg.AppID,
-		arg.Name,
-		arg.Slug,
-		arg.Config,
-		arg.CreatedAt,
-	)
-	var i Function
-	err := row.Scan(
-		&i.ID,
-		&i.AppID,
-		&i.Name,
-		&i.Slug,
-		&i.Config,
-		&i.CreatedAt,
-		&i.ArchivedAt,
-	)
-	return &i, err
-}
-
 const insertFunctionFinish = `-- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes
 	(run_id, status, output, completed_step_count, created_at) VALUES
@@ -2572,6 +2564,55 @@ func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, err
 		&i.Url,
 		&i.Method,
 		&i.AppVersion,
+	)
+	return &i, err
+}
+
+const upsertFunction = `-- name: UpsertFunction :one
+
+
+INSERT INTO functions
+	(id, app_id, name, slug, config, created_at) VALUES
+	(?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET
+	app_id = excluded.app_id,
+	name = excluded.name,
+	slug = excluded.slug,
+	config = excluded.config,
+	archived_at = NULL
+RETURNING id, app_id, name, slug, config, created_at, archived_at
+`
+
+type UpsertFunctionParams struct {
+	ID        uuid.UUID
+	AppID     uuid.UUID
+	Name      string
+	Slug      string
+	Config    string
+	CreatedAt time.Time
+}
+
+// functions
+//
+// note - this is very basic right now.
+func (q *Queries) UpsertFunction(ctx context.Context, arg UpsertFunctionParams) (*Function, error) {
+	row := q.db.QueryRowContext(ctx, upsertFunction,
+		arg.ID,
+		arg.AppID,
+		arg.Name,
+		arg.Slug,
+		arg.Config,
+		arg.CreatedAt,
+	)
+	var i Function
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Name,
+		&i.Slug,
+		&i.Config,
+		&i.CreatedAt,
+		&i.ArchivedAt,
 	)
 	return &i, err
 }

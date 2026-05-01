@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -373,9 +374,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 	// Get a list of all functions
 	existing, _ := tx.GetFunctionsByAppInternalID(ctx, appID)
-	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
-	// this set.
-	seen := map[uuid.UUID]struct{}{}
 
 	// Parse, validate, and enrich functions via the shared registration pipeline.
 	processed, err := registration.ProcessFunctions(ctx, r, registration.ProcessOpts{
@@ -388,14 +386,53 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
+	// Resolve each new function to its persisted row by (app_id, slug) — the
+	// natural identity per the partial unique index — and rewrite the SDK's
+	// freshly-minted UUID to whatever was persisted. This makes URL rotation
+	// (which changes the deterministic UUID via Function.URI) a no-op: the
+	// existing row is reused and the old UUID stays the canonical handle for
+	// any function_runs / history rows that already reference it.
+	//
+	// After resolution, the seen set is used to archive functions that are
+	// no longer present in this sync. Doing the archival before the
+	// insert/update loop also guards against a cross-product edge case
+	// (slug rename combined with URL change) where the predecessor would
+	// otherwise still be active when the new row's INSERT runs.
+	seen := make(map[uuid.UUID]struct{}, len(processed.Functions))
+	for i := range processed.Functions {
+		fn := &processed.Functions[i].Function
+		persisted, err := tx.GetActiveFunctionByAppAndSlug(ctx, r.AppName, fn.Slug)
+		switch {
+		case err == nil && persisted != nil:
+			fn.ID = persisted.ID
+		case errors.Is(err, sql.ErrNoRows):
+			// Not persisted yet — keep the SDK-minted UUID.
+		default:
+			// A transient lookup failure here would silently leave fn.ID as the
+			// SDK UUID, archive the persisted row via the earlyDeletes loop
+			// below, and insert a fresh row — orphaning function_runs and
+			// history that reference the old UUID. Abort the sync instead.
+			return nil, publicerr.Wrap(err, 500, "Error resolving persisted function by slug")
+		}
+		seen[fn.ID] = struct{}{}
+	}
+	earlyDeletes := []uuid.UUID{}
+	for _, fn := range existing {
+		if _, ok := seen[fn.ID]; !ok {
+			earlyDeletes = append(earlyDeletes, fn.ID)
+		}
+	}
+	if len(earlyDeletes) > 0 {
+		if err = tx.DeleteFunctionsByIDs(ctx, earlyDeletes); err != nil {
+			return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
+		}
+	}
+
 	for _, df := range processed.Functions {
 		fn := &df.Function
 
 		// Ensure function version is at least 1 and incremented on re-sync
 		fn.FunctionVersion = max(fn.FunctionVersion, 1)
-
-		// Mark as seen.
-		seen[fn.ID] = struct{}{}
 
 		fnExists := false
 		var currentFn *inngest.Function
@@ -443,7 +480,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			continue
 		}
 
-		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = tx.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fn.ID,
 			Name:      fn.Name,
 			Slug:      fn.Slug,
@@ -480,20 +517,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		Modified: true,
 		AppID:    &appID,
 		SyncID:   &syncID,
-	}
-
-	// Remove all unseen functions.
-	deletes := []uuid.UUID{}
-	for _, fn := range existing {
-		if _, ok := seen[fn.ID]; !ok {
-			deletes = append(deletes, fn.ID)
-		}
-	}
-	if len(deletes) == 0 {
-		return reply, nil
-	}
-	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
-		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
 	return reply, nil
 }
