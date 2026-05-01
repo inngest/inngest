@@ -458,17 +458,33 @@ func (s *Span) IsRecording() bool {
 	return true
 }
 
-// official one doesn't actually set the status, but we'll just do it here
-// for convinence's sake.
+// RecordError sets the span status to error and tracks an error event.
 func (s *Span) RecordError(err error, opts ...trace.EventOption) {
-	s.Lock()
-	defer s.Unlock()
-
-	s.AddEvent(err.Error(), opts...)
-	s.SetStatus(codes.Error, err.Error())
+	s.setStatus(codes.Error, err.Error())
 }
 
+// SetStatus sets the span status.  If this contains an error, this will
+// be tracked as an event, plus an Inngest error attribute.
 func (s *Span) SetStatus(code codes.Code, desc string) {
+	s.setStatus(code, desc)
+
+	switch code {
+	case codes.Error:
+		s.AddEvent("error",
+			trace.WithTimestamp(time.Now()),
+			trace.WithAttributes(
+				attribute.String("desc", desc),
+			),
+		)
+
+		// Set string attribute, so that we have atties as well as an event.  We do this
+		// as events are (sometimes, depending on datastores) not stored.
+		s.SetAttributes(attribute.String("internal.error", desc))
+	}
+}
+
+// setStatus sets the status without recording an internal event.
+func (s *Span) setStatus(code codes.Code, desc string) {
 	s.Lock()
 	defer s.Unlock()
 	s.status = tracesdk.Status{
