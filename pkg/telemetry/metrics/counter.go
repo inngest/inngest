@@ -184,6 +184,15 @@ func IncrSpanExportDataLoss(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrSpanExportMissingRunID(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_export_missing_run_id_total",
+		Description: "Total number of spans exported without a run_id, keyed by fallback identifier",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

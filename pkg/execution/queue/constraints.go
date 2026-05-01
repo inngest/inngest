@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -232,9 +233,16 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
+	var appID uuid.UUID
+	if len(items) > 0 {
+		appID = items[0].Data.Identifier.AppID
+	}
+
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-		AccountID:            *shadowPart.AccountID,
-		EnvID:                *shadowPart.EnvID,
+		AccountID: *shadowPart.AccountID,
+		EnvID:     *shadowPart.EnvID,
+		// TODO: Make appID available to backlog
+		AppID:                appID,
 		IdempotencyKey:       operationIdempotencyKey,
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
@@ -422,6 +430,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID: *shadowPart.AccountID,
 		EnvID:     *shadowPart.EnvID,
+		AppID:     item.Data.Identifier.AppID,
 		// TODO: Double check if the item ID works for idempotency:
 		// - Consistent across the same attempt
 		// - Do we need to re-evaluate per retry?

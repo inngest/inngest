@@ -317,6 +317,64 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 	assert.WithinDuration(t, finishedAt, got.FunctionFinish.CreatedAt.Time, time.Second)
 }
 
+// TestFunctionRunWithoutFinish guards the read path for a run that has been
+// inserted but has not completed yet. On Postgres, the generated
+// FunctionFinish struct uses bare non-nullable types (string, int32,
+// time.Time), so a LEFT JOIN with no matching finish row would cause
+// sql.Rows.Scan to fail ("converting NULL to string is unsupported") unless
+// the query COALESCEs the finish columns. Without the COALESCE guards,
+// GET /v1/runs/:runID returns 500 for every in-flight run.
+func TestFunctionRunWithoutFinish(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+	runID := ulid.Make()
+	eventID := ulid.Make()
+	now := time.Now().UTC()
+
+	require.NoError(t, q.InsertFunctionRun(ctx, db.InsertFunctionRunParams{
+		RunID:           runID,
+		RunStartedAt:    now,
+		FunctionID:      uuid.New(),
+		FunctionVersion: 1,
+		TriggerType:     "event",
+		EventID:         eventID,
+		Cron:            sql.NullString{},
+		WorkspaceID:     uuid.New(),
+	}))
+
+	// Single-row read: the query that backs GET /v1/runs/:runID.
+	// Status/Output are the canonical "has finished" signals. The other
+	// finish columns (CompletedStepCount, CreatedAt) are coalesced to
+	// non-NULL defaults and their Valid flag is not a contract.
+	got, err := q.GetFunctionRun(ctx, runID)
+	require.NoError(t, err, "GetFunctionRun must not fail for an in-flight run")
+	assert.Equal(t, runID, got.FunctionRun.RunID)
+	assert.False(t, got.FunctionFinish.Status.Valid, "active run has no finish yet")
+	assert.False(t, got.FunctionFinish.Output.Valid)
+
+	// List reads follow the same LEFT JOIN shape and must also survive.
+	all, err := q.GetFunctionRuns(ctx)
+	require.NoError(t, err, "GetFunctionRuns must not fail when a run has no finish")
+	require.Len(t, all, 1)
+	assert.Equal(t, runID, all[0].FunctionRun.RunID)
+	assert.False(t, all[0].FunctionFinish.Status.Valid)
+	assert.False(t, all[0].FunctionFinish.Output.Valid)
+
+	tb, err := q.GetFunctionRunsTimebound(ctx, db.GetFunctionRunsTimeboundParams{
+		After:  now.Add(-time.Hour),
+		Before: now.Add(time.Hour),
+		Limit:  10,
+	})
+	require.NoError(t, err, "GetFunctionRunsTimebound must not fail when a run has no finish")
+	require.Len(t, tb, 1)
+	assert.Equal(t, runID, tb[0].FunctionRun.RunID)
+	assert.False(t, tb[0].FunctionFinish.Status.Valid)
+	assert.False(t, tb[0].FunctionFinish.Output.Valid)
+}
+
 func TestEventBatchRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()

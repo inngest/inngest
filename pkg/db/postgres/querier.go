@@ -309,7 +309,14 @@ func (pq *pgQuerier) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*db.F
 	if err != nil {
 		return nil, err
 	}
-	return functionRunRowFromPG(&r.FunctionRun, &r.FunctionFinish), nil
+	finish := sqlc.FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	return functionRunRowFromPG(&r.FunctionRun, &finish), nil
 }
 
 func (pq *pgQuerier) GetFunctionRuns(ctx context.Context) ([]*db.FunctionRunRow, error) {
@@ -319,7 +326,14 @@ func (pq *pgQuerier) GetFunctionRuns(ctx context.Context) ([]*db.FunctionRunRow,
 	}
 	out := make([]*db.FunctionRunRow, len(rows))
 	for i, r := range rows {
-		out[i] = functionRunRowFromPG(&r.FunctionRun, &r.FunctionFinish)
+		finish := sqlc.FunctionFinish{
+			RunID:              r.FunctionRun.RunID,
+			Status:             r.FinishStatus,
+			Output:             r.FinishOutput,
+			CompletedStepCount: r.FinishCompletedStepCount,
+			CreatedAt:          r.FinishCreatedAt,
+		}
+		out[i] = functionRunRowFromPG(&r.FunctionRun, &finish)
 	}
 	return out, nil
 }
@@ -360,7 +374,14 @@ func (pq *pgQuerier) GetFunctionRunsTimebound(ctx context.Context, arg db.GetFun
 	}
 	out := make([]*db.FunctionRunRow, len(rows))
 	for i, r := range rows {
-		out[i] = functionRunRowFromPG(&r.FunctionRun, &r.FunctionFinish)
+		finish := sqlc.FunctionFinish{
+			RunID:              r.FunctionRun.RunID,
+			Status:             r.FinishStatus,
+			Output:             r.FinishOutput,
+			CompletedStepCount: r.FinishCompletedStepCount,
+			CreatedAt:          r.FinishCreatedAt,
+		}
+		out[i] = functionRunRowFromPG(&r.FunctionRun, &finish)
 	}
 	return out, nil
 }

@@ -29,8 +29,8 @@ dockers:
     use: buildx
     dockerfile: 'Dockerfile.goreleaser'
     image_templates:
-    - "ghcr.io/avido-ai/inngest:latest-amd64"
     - "ghcr.io/avido-ai/inngest:{{ .Tag }}-amd64"
+    - "{{ if not .Prerelease }}ghcr.io/avido-ai/inngest:latest-amd64{{ end }}"
     build_flag_templates:
     - "--pull"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -45,8 +45,8 @@ dockers:
     use: buildx
     dockerfile: 'Dockerfile.goreleaser'
     image_templates:
-    - "ghcr.io/avido-ai/inngest:latest-arm64v8"
     - "ghcr.io/avido-ai/inngest:{{ .Tag }}-arm64v8"
+    - "{{ if not .Prerelease }}ghcr.io/avido-ai/inngest:latest-arm64v8{{ end }}"
     build_flag_templates:
     - "--pull"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -55,10 +55,10 @@ dockers:
     - "--label=org.opencontainers.image.version={{.Version}}"
     - "--platform=linux/arm64"
 docker_manifests:
-  - name_template: ghcr.io/avido-ai/inngest:latest
+  - name_template: "{{ if not .Prerelease }}ghcr.io/avido-ai/inngest:latest{{ end }}"
     image_templates:
-      - ghcr.io/avido-ai/inngest:latest-amd64
-      - ghcr.io/avido-ai/inngest:latest-arm64v8
+      - "{{ if not .Prerelease }}ghcr.io/avido-ai/inngest:latest-amd64{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/avido-ai/inngest:latest-arm64v8{{ end }}"
   - name_template: ghcr.io/avido-ai/inngest:{{ .Tag }}
     image_templates:
       - ghcr.io/avido-ai/inngest:{{ .Tag }}-amd64

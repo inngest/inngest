@@ -39,7 +39,7 @@ function InsightsTable({
       cellClassName={cellClassName}
       columns={columns}
       data={data}
-      enableColumnSizing
+      enableColumnDynamicSizing
       selectedCell={selectedCell}
       onCellClick={onCellClick}
     />

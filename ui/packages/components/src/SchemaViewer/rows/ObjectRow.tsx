@@ -1,13 +1,19 @@
+import { RiFileCopyLine } from '@remixicon/react';
+
 import { cn } from '../../utils/classNames';
+import { useRenderAdornment } from '../AdornmentContext';
 import { useExpansion } from '../ExpansionContext';
-import type { ObjectNode, SchemaNode, ValueNode } from '../types';
+import { useComputeType } from '../TypeContext';
+import type { ObjectNode } from '../types';
 import { CollapsibleRowWidget } from './CollapsibleRowWidget';
 import { Row } from './Row';
-import { ValueRow } from './ValueRow';
+import { collectAllExpandablePaths, getTypeLabel, handleCopyValue } from './utils';
 
 export type ObjectRowProps = { node: ObjectNode; typeLabelOverride?: string };
 
-export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.ReactElement {
+export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
+  const computeType = useComputeType();
+  const renderAdornment = useRenderAdornment();
   const { isExpanded, toggleRecursive } = useExpansion();
 
   const open = isExpanded(node.path);
@@ -17,19 +23,36 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
     toggleRecursive(node.path, allDescendantPaths);
   };
 
+  const baseLabel = getTypeLabel(node);
+  const typeText = computeType(node, baseLabel);
+
   return (
     <div className="flex flex-col gap-1">
       <div
-        className="hover:bg-canvasSubtle flex cursor-pointer items-center rounded"
+        className="hover:bg-canvasSubtle group flex cursor-pointer items-center justify-between gap-2 rounded px-1 py-0.5"
         onClick={handleToggle}
       >
         <CollapsibleRowWidget open={open} />
-        <div className="-ml-0.5 flex-1">
-          <ValueRow
-            boldName={open}
-            node={makeFauxValueNode(node)}
-            typeLabelOverride={typeLabelOverride ?? ''}
-          />
+        <span className={'text-subtle overflow-hidden text-ellipsis whitespace-nowrap text-sm'}>
+          {node.name}
+        </span>
+        <button
+          className={cn(
+            'hover:bg-canvasBase min-w-sm rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100'
+          )}
+          onClick={handleCopyValue(node)}
+          type="button"
+          aria-label="Copy value"
+        >
+          <RiFileCopyLine className="text-subtle h-3 w-3" />
+        </button>
+        <div className="ml-auto flex items-baseline gap-1.5">
+          <span className="text-muted min-w-0 whitespace-nowrap font-mono text-xs capitalize">
+            {typeText}
+          </span>
+          <span className="self-baseline align-baseline text-xs leading-none">
+            {renderAdornment(node, typeText)}
+          </span>
         </div>
       </div>
       {open && (
@@ -51,32 +74,4 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
       )}
     </div>
   );
-}
-
-function makeFauxValueNode(node: SchemaNode): ValueNode {
-  return { kind: 'value', name: node.name, path: node.path, type: 'object' };
-}
-
-function collectAllExpandablePaths(node: SchemaNode): string[] {
-  const paths: string[] = [];
-
-  function traverse(n: SchemaNode) {
-    if (n.kind === 'object') {
-      paths.push(n.path);
-      n.children.forEach(traverse);
-    } else if (n.kind === 'array') {
-      paths.push(n.path);
-      traverse(n.element);
-    } else if (n.kind === 'tuple') {
-      paths.push(n.path);
-      n.elements.forEach(traverse);
-    }
-  }
-
-  // Start with children to avoid adding the current node's path
-  if (node.kind === 'object') {
-    node.children.forEach(traverse);
-  }
-
-  return paths;
 }

@@ -52,7 +52,6 @@ func TestNewMetricsAPI(t *testing.T) {
 			checkAPI: func(t *testing.T, api *MetricsAPI) {
 				assert.NotNil(t, api.Router)
 				assert.NotNil(t, api.queueGauge)
-				assert.NotNil(t, api.registry)
 				assert.Contains(t, api.queueGauge.Desc().String(), "inngest_queue_depth")
 			},
 		},
@@ -266,29 +265,27 @@ func TestMetricsAPI_prometheusIntegration(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Verify metric is registered
-		metricFamilies, err := api.registry.Gather()
-		require.NoError(t, err)
-		require.Len(t, metricFamilies, 1)
-
-		// Check metric family details
-		mf := metricFamilies[0]
-		assert.Equal(t, "inngest_queue_depth", mf.GetName())
-		assert.Equal(t, "Total depth of all system queues including backlog and ready state items", mf.GetHelp())
-
 		// Make a request to update the metric
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		api.Router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
 
-		// Verify the metric value was updated
-		metricFamilies, err = api.registry.Gather()
+		// Verify metric is registered and has the correct value via the registry
+		metricFamilies, err := registry.Gather()
 		require.NoError(t, err)
-		require.Len(t, metricFamilies, 1)
-		require.Len(t, metricFamilies[0].GetMetric(), 1)
 
-		metric := metricFamilies[0].GetMetric()[0]
-		assert.Equal(t, float64(12345), metric.GetGauge().GetValue())
+		var found bool
+		for _, mf := range metricFamilies {
+			if mf.GetName() == "inngest_queue_depth" {
+				found = true
+				assert.Equal(t, "Total depth of all system queues including backlog and ready state items", mf.GetHelp())
+				require.Len(t, mf.GetMetric(), 1)
+				assert.Equal(t, float64(12345), mf.GetMetric()[0].GetGauge().GetValue())
+				break
+			}
+		}
+		assert.True(t, found, "inngest_queue_depth metric family not found in registry")
 	})
 }
 
