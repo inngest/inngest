@@ -293,11 +293,7 @@ func (s SignalOpts) Expires() (time.Time, error) {
 		return time.Now().AddDate(1, 0, 0), nil
 	}
 
-	dur, err := str2duration.ParseDuration(s.Timeout)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return time.Now().Add(dur), nil
+	return strtimeout.ParseTimeout(s.Timeout, time.Now)
 }
 
 func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
@@ -339,11 +335,7 @@ func (i InvokeFunctionOpts) Expires() (time.Time, error) {
 		return time.Now().AddDate(1, 0, 0), nil
 	}
 
-	dur, err := str2duration.ParseDuration(i.Timeout)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return time.Now().Add(dur), nil
+	return strtimeout.ParseTimeout(i.Timeout, time.Now)
 }
 
 type SleepOpts struct {

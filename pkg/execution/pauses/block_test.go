@@ -251,10 +251,16 @@ func (m *mockBufferer) PausesSince(ctx context.Context, index Index, since time.
 func (m *mockBufferer) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	// Create a copy of pauses to avoid race conditions
-	pausesCopy := make([]*state.Pause, len(m.pauses))
-	copy(pausesCopy, m.pauses)
-	return &mockPauseIterator{pauses: pausesCopy}, nil
+	var filtered []*state.Pause
+	for _, p := range m.pauses {
+		if since.IsZero() || p.CreatedAt.After(since) {
+			filtered = append(filtered, p)
+		}
+	}
+	if limit > 0 && int64(len(filtered)) > limit {
+		filtered = filtered[:limit]
+	}
+	return &mockPauseIterator{pauses: filtered}, nil
 }
 
 func (m *mockBufferer) PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error) {
