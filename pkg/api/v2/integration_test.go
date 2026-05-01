@@ -236,6 +236,27 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.Contains(t, err.Error(), "Function ID is required")
 	})
 
+	t.Run("invoke function with missing app ID", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		data, err := structpb.NewStruct(map[string]interface{}{
+			"message": "Hello, World!",
+		})
+		require.NoError(t, err)
+
+		req := &apiv2.InvokeFunctionRequest{
+			FunctionId: "hello-world",
+			Data:       data,
+		}
+
+		resp, err := client.InvokeFunction(ctx, req)
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "App ID is required")
+	})
+
 	t.Run("invoke function with missing data", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -251,6 +272,46 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, resp)
 		require.Contains(t, err.Error(), "Input data is required")
+	})
+
+	t.Run("get function run returns not implemented", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		resp, err := client.GetFunctionRun(ctx, &apiv2.GetFunctionRunRequest{
+			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
+		})
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+
+	t.Run("get function trace returns not implemented", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		resp, err := client.GetFunctionTrace(ctx, &apiv2.GetFunctionTraceRequest{
+			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
+		})
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
+	})
+
+	t.Run("get function trace span returns not implemented", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		resp, err := client.GetFunctionTraceSpan(ctx, &apiv2.GetFunctionTraceSpanRequest{
+			RunId:  "01hp1zx8m3ng9vp6qn0xk7j4cy",
+			SpanId: "span-1",
+		})
+
+		require.Error(t, err)
+		require.Nil(t, resp)
+		require.Contains(t, err.Error(), "not_implemented")
 	})
 
 }

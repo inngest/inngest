@@ -31,7 +31,10 @@ const (
 	V2_CreateWebhook_FullMethodName           = "/api.v2.V2/CreateWebhook"
 	V2_ListWebhooks_FullMethodName            = "/api.v2.V2/ListWebhooks"
 	V2_PatchEnv_FullMethodName                = "/api.v2.V2/PatchEnv"
+	V2_GetFunctionRun_FullMethodName          = "/api.v2.V2/GetFunctionRun"
 	V2_SyncApp_FullMethodName                 = "/api.v2.V2/SyncApp"
+	V2_GetFunctionTrace_FullMethodName        = "/api.v2.V2/GetFunctionTrace"
+	V2_GetFunctionTraceSpan_FullMethodName    = "/api.v2.V2/GetFunctionTraceSpan"
 	V2_InvokeFunction_FullMethodName          = "/api.v2.V2/InvokeFunction"
 )
 
@@ -52,7 +55,10 @@ type V2Client interface {
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
 	PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error)
+	GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
+	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
+	GetFunctionTraceSpan(ctx context.Context, in *GetFunctionTraceSpanRequest, opts ...grpc.CallOption) (*GetFunctionTraceSpanResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
 }
 
@@ -184,10 +190,40 @@ func (c *v2Client) PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...gr
 	return out, nil
 }
 
+func (c *v2Client) GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFunctionRunResponse)
+	err := c.cc.Invoke(ctx, V2_GetFunctionRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SyncAppResponse)
 	err := c.cc.Invoke(ctx, V2_SyncApp_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFunctionTraceResponse)
+	err := c.cc.Invoke(ctx, V2_GetFunctionTrace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetFunctionTraceSpan(ctx context.Context, in *GetFunctionTraceSpanRequest, opts ...grpc.CallOption) (*GetFunctionTraceSpanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFunctionTraceSpanResponse)
+	err := c.cc.Invoke(ctx, V2_GetFunctionTraceSpan_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +257,10 @@ type V2Server interface {
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
 	PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error)
+	GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
+	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
+	GetFunctionTraceSpan(context.Context, *GetFunctionTraceSpanRequest) (*GetFunctionTraceSpanResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
@@ -269,8 +308,17 @@ func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest)
 func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PatchEnv not implemented")
 }
+func (UnimplementedV2Server) GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFunctionRun not implemented")
+}
 func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncApp not implemented")
+}
+func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFunctionTrace not implemented")
+}
+func (UnimplementedV2Server) GetFunctionTraceSpan(context.Context, *GetFunctionTraceSpanRequest) (*GetFunctionTraceSpanResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFunctionTraceSpan not implemented")
 }
 func (UnimplementedV2Server) InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvokeFunction not implemented")
@@ -512,6 +560,24 @@ func _V2_PatchEnv_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_GetFunctionRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFunctionRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetFunctionRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetFunctionRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetFunctionRun(ctx, req.(*GetFunctionRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_SyncApp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SyncAppRequest)
 	if err := dec(in); err != nil {
@@ -526,6 +592,42 @@ func _V2_SyncApp_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).SyncApp(ctx, req.(*SyncAppRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetFunctionTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFunctionTraceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetFunctionTrace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetFunctionTrace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetFunctionTrace(ctx, req.(*GetFunctionTraceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetFunctionTraceSpan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFunctionTraceSpanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetFunctionTraceSpan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetFunctionTraceSpan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetFunctionTraceSpan(ctx, req.(*GetFunctionTraceSpanRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -604,8 +706,20 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_PatchEnv_Handler,
 		},
 		{
+			MethodName: "GetFunctionRun",
+			Handler:    _V2_GetFunctionRun_Handler,
+		},
+		{
 			MethodName: "SyncApp",
 			Handler:    _V2_SyncApp_Handler,
+		},
+		{
+			MethodName: "GetFunctionTrace",
+			Handler:    _V2_GetFunctionTrace_Handler,
+		},
+		{
+			MethodName: "GetFunctionTraceSpan",
+			Handler:    _V2_GetFunctionTraceSpan_Handler,
 		},
 		{
 			MethodName: "InvokeFunction",
