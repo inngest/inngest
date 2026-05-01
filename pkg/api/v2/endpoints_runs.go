@@ -139,6 +139,7 @@ func (s *Service) GetFunctionTraceSpan(ctx context.Context, req *apiv2.GetFuncti
 }
 
 func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOutput bool) *apiv2.FunctionRun {
+	queuedAt := timestamppb.New(ulid.Time(run.RunID.Time()))
 	startedAt := timestamppb.New(run.RunStartedAt)
 
 	result := &apiv2.FunctionRun{
@@ -151,7 +152,7 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOu
 			Id: appRefID(fn),
 		},
 		Status:    toFunctionRunStatus(run.Status),
-		QueuedAt:  startedAt,
+		QueuedAt:  queuedAt,
 		StartedAt: startedAt,
 		Trigger: &apiv2.RunTrigger{
 			EventIds: []string{run.EventID.String()},
@@ -336,8 +337,11 @@ func toTraceSpanStatus(status models.RunTraceSpanStatus) apiv2.TraceSpanStatus {
 	switch status {
 	case models.RunTraceSpanStatusCompleted:
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED
-	case models.RunTraceSpanStatusFailed, models.RunTraceSpanStatusCancelled, models.RunTraceSpanStatusSkipped:
+	case models.RunTraceSpanStatusFailed:
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_FAILED
+	case models.RunTraceSpanStatusCancelled, models.RunTraceSpanStatusSkipped:
+		// TODO(api-v2): Add CANCELLED and SKIPPED trace status enum values to the v2 contract.
+		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_UNKNOWN
 	case models.RunTraceSpanStatusWaiting, models.RunTraceSpanStatusQueued:
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_WAITING
 	default:

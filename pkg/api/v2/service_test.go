@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/headers"
@@ -309,6 +310,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, runID.String(), resp.Data.Id)
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data.Status)
+		require.Equal(t, ulid.Time(runID.Time()).UTC(), resp.Data.QueuedAt.AsTime())
+		require.Equal(t, startedAt, resp.Data.StartedAt.AsTime())
 		require.Equal(t, "test-fn", resp.Data.Function.Id)
 		require.Equal(t, "Test function", resp.Data.Function.Name)
 		require.Equal(t, "my-app", resp.Data.App.Id)
@@ -333,6 +336,16 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.Nil(t, resp)
 		require.Contains(t, err.Error(), "Run ID must be a valid ULID")
 	})
+}
+
+func TestToTraceSpanStatus(t *testing.T) {
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, toTraceSpanStatus(models.RunTraceSpanStatusCompleted))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_FAILED, toTraceSpanStatus(models.RunTraceSpanStatusFailed))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_WAITING, toTraceSpanStatus(models.RunTraceSpanStatusWaiting))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_WAITING, toTraceSpanStatus(models.RunTraceSpanStatusQueued))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_RUNNING, toTraceSpanStatus(models.RunTraceSpanStatusRunning))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_UNKNOWN, toTraceSpanStatus(models.RunTraceSpanStatusCancelled))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_UNKNOWN, toTraceSpanStatus(models.RunTraceSpanStatusSkipped))
 }
 
 func TestService_GetFunctionTrace(t *testing.T) {
