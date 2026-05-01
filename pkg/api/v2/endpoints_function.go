@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -29,6 +30,14 @@ import (
 func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionRequest) (*apiv2.InvokeFunctionResponse, error) {
 	if err := validateInvokeRequest(ctx, req); err != nil {
 		return nil, err
+	}
+
+	// URI-decode path parameters to handle encoded characters (e.g. %2F for slashes)
+	if decoded, err := url.PathUnescape(req.FunctionId); err == nil {
+		req.FunctionId = decoded
+	}
+	if decoded, err := url.PathUnescape(req.AppId); err == nil {
+		req.AppId = decoded
 	}
 
 	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_InvokeFunction_FullMethodName); result.Limited {
