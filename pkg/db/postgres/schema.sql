@@ -419,12 +419,6 @@ CREATE INDEX idx_history_run_id_created ON public.history USING btree (run_id, c
 CREATE INDEX idx_spans_account_status_time ON public.spans USING btree (account_id, status, start_time);
 
 --
--- Name: idx_spans_active_start_time; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_spans_active_start_time ON public.spans USING btree (start_time) WHERE ((debug_run_id IS NULL) AND ((status IS NULL) OR (status <> 'Skipped'::text)));
-
---
 -- Name: idx_spans_name_start_time_dynamic_span_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -441,18 +435,6 @@ CREATE INDEX idx_spans_run_id ON public.spans USING btree (run_id);
 --
 
 CREATE INDEX idx_spans_run_id_dynamic_start_time ON public.spans USING btree (run_id, dynamic_span_id, start_time);
-
---
--- Name: idx_spans_run_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_spans_run_status ON public.spans USING btree (run_id, status);
-
---
--- Name: idx_spans_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_spans_status ON public.spans USING btree (status);
 
 --
 -- Name: idx_traces_trace_id; Type: INDEX; Schema: public; Owner: -

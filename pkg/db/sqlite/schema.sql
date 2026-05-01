@@ -171,8 +171,6 @@ CREATE TABLE spans (
 );
 CREATE INDEX idx_spans_run_id ON spans(run_id);
 CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);
-CREATE INDEX idx_spans_status ON spans(status);
-CREATE INDEX idx_spans_run_status ON spans(run_id, status);
 CREATE INDEX idx_spans_account_status_time ON spans(account_id, status, start_time);
 CREATE TABLE worker_connections (
     account_id CHAR(36) NOT NULL,
