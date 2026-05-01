@@ -8,22 +8,32 @@ import { isDark } from '@inngest/components/utils/theme';
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { borderColor } from '@/utils/tailwind';
-import { getLineChartOptions, lineColors, seriesOptions } from './utils';
+import type { EntityLookup } from './Dashboard';
+import {
+  getLineChartOptions,
+  getXAxis,
+  lineColors,
+  seriesOptions,
+} from './utils';
+
+const zeroID = '00000000-0000-0000-0000-000000000000';
 
 type Props = {
-  accountConcurrency: VolumeMetricsQuery['accountConcurrency'] | undefined;
+  workspace: VolumeMetricsQuery['workspace'] | undefined;
+  entities: EntityLookup;
   limit?: number;
   isMarketplace: boolean;
 };
 
 export function AccountConcurrency({
-  accountConcurrency,
+  workspace,
+  entities,
   limit,
   isMarketplace = false,
 }: Props) {
   let option = {};
-  if (accountConcurrency) {
-    option = createChartOption({ limit, accountConcurrency });
+  if (workspace) {
+    option = createChartOption({ limit, workspace, entities });
   }
 
   return (
@@ -68,24 +78,32 @@ export function AccountConcurrency({
 
 function createChartOption({
   limit,
-  accountConcurrency,
+  workspace,
+  entities,
 }: {
   limit: number | undefined;
-  accountConcurrency: VolumeMetricsQuery['accountConcurrency'];
+  workspace: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
 }): React.ComponentProps<typeof Chart>['option'] {
   const dark = isDark();
+  const runningMetrics = workspace.accountStepRunning.metrics;
 
-  const series: LineSeriesOption[] = [
-    {
+  const series: LineSeriesOption[] = runningMetrics
+    .filter(({ id }) => id !== zeroID)
+    .map((f, i) => ({
       ...seriesOptions,
-      name: 'Account Concurrency',
-      data: accountConcurrency.data.map(({ value }) => value),
+      name: entities[f.id]?.name,
+      data: f.data.map(({ value }) => value),
       itemStyle: {
-        color: resolveColor(lineColors[0][0], dark, lineColors[0]?.[1]),
+        color: resolveColor(
+          lineColors[i % lineColors.length][0],
+          dark,
+          lineColors[0]?.[1],
+        ),
       },
+      stack: 'total',
       areaStyle: { opacity: 0.3 },
-    },
-  ];
+    }));
 
   if (limit) {
     series.push({
@@ -115,14 +133,16 @@ function createChartOption({
     });
   }
 
-  const xAxisData = accountConcurrency.data.map(({ bucket }) => bucket);
+  const legendData = runningMetrics.length
+    ? runningMetrics
+        .filter(({ id }) => id !== zeroID)
+        .map(({ id }) => ({ name: entities[id]?.name }))
+    : ['No Data Found'];
 
   return getLineChartOptions(
     {
       series,
-      xAxis: {
-        data: xAxisData,
-      },
+      xAxis: getXAxis(runningMetrics),
       yAxis: {
         max: ({ max }: { max: number }) => {
           if (limit && max < limit) {
@@ -137,6 +157,6 @@ function createChartOption({
         },
       },
     },
-    [{ name: 'Account Concurrency' }],
+    legendData,
   );
 }

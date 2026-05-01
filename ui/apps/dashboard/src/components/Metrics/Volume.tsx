@@ -33,8 +33,8 @@ export type MetricsFilters = {
   isMarketplace: boolean;
 };
 
-// accountConcurrency is the unscoped account-level gauge, read directly as a single series.
-// This avoids the gauge stacking problem where per-function maxes are summed (SYS-722).
+// TODO: The `accountConcurrency` field in this query is no longer used by AccountConcurrency
+// (which now uses workspace.stepRunning). Remove it once confirmed no other consumers depend on it.
 const GetVolumeMetrics = graphql(`
   query VolumeMetrics(
     $workspaceId: ID!
@@ -209,6 +209,27 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
+      accountStepRunning: scopedMetrics(
+        filter: {
+          name: "steps_running"
+          scope: FN
+          from: $from
+          functionIDs: $functionIDs
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
+      }
+    }
+    workspace(id: $workspaceId) {
       concurrency: scopedMetrics(
         filter: {
           name: "concurrency_limit_reached_total"
@@ -268,6 +289,7 @@ export const MetricsVolume = ({
   selectedFns = [],
   autoRefresh = false,
   entities,
+  functions,
   scope,
   concurrencyLimit,
   isMarketplace = false,
@@ -327,7 +349,8 @@ export const MetricsVolume = ({
               isMarketplace={isMarketplace}
             />
             <AccountConcurrency
-              accountConcurrency={data?.accountConcurrency}
+              workspace={data?.workspace}
+              entities={functions}
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
