@@ -576,6 +576,13 @@ func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uu
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
+	// rmap will contain 2 keys for each defer. For example:
+	// {
+	// 	"input:hash-abc": "{\"user_id\":\"u_123\"}",
+	// 	"meta:hash-abc": "{\"FnSlug\":\"onDefer-score\",\"HashedID\":\"hash-abc\",\"ScheduleStatus\":1}",
+	// 	"input:hash-def": "{\"user_id\":\"u_456\"}",
+	// 	"meta:hash-def": "{\"FnSlug\":\"onDefer-score\",\"HashedID\":\"hash-def\",\"ScheduleStatus\":1}",
+	// }
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Hgetall().Key(fnRunState.kg.Defers(ctx, isSharded, fnID, runID)).Build()
 	}).AsStrMap()
@@ -583,20 +590,22 @@ func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uu
 		return nil, err
 	}
 
-	// Demux meta:<H> and input:<H> fields into a single Defer per H. SaveDefer
-	// enforces consts.MaxDefersPerRun at write time, so any excess here is a
-	// bug or misuse of the hash. Log loudly and truncate. We pick the kept
-	// hashedIDs by sorted order so two LoadDefers calls against the same
-	// underlying state always return the same defers; selecting during random
-	// rmap iteration would silently fan out to different deferred runs.
+	// Demux meta:<hashedID> and input:<hashedID> fields into a single Defer per
+	// hashedID. SaveDefer enforces consts.MaxDefersPerRun at write time, so any
+	// excess here is a bug or misuse of the hash. Log loudly and truncate. We
+	// pick the kept hashedIDs by sorted order so two LoadDefers calls against
+	// the same underlying state always return the same defers; selecting during
+	// random rmap iteration would silently fan out to different deferred runs.
 	rawMetas := make(map[string]string, len(rmap)/2)
 	inputs := make(map[string]string, len(rmap)/2)
 	for field, raw := range rmap {
 		switch {
 		case strings.HasPrefix(field, "meta:"):
-			rawMetas[strings.TrimPrefix(field, "meta:")] = raw
+			hashedID := strings.TrimPrefix(field, "meta:")
+			rawMetas[hashedID] = raw
 		case strings.HasPrefix(field, "input:"):
-			inputs[strings.TrimPrefix(field, "input:")] = raw
+			hashedID := strings.TrimPrefix(field, "input:")
+			inputs[hashedID] = raw
 		}
 	}
 
