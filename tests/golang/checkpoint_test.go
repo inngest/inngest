@@ -33,9 +33,10 @@ func TestFnCheckpoint(t *testing.T) {
 		},
 	}
 
+	// Keep the middle delay above, but not equal to, the custom 1s batch interval below.
 	delays := []time.Duration{
 		time.Millisecond,
-		time.Second,
+		1500 * time.Millisecond,
 		2 * time.Second,
 	}
 
