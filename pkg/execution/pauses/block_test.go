@@ -2503,7 +2503,7 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              3,
 		CompactionGarbageRatio: 0.5,
-		CompactionSample:       1.0,
+		CompactionSample:       0,
 		CompactionLeaser:       leaser,
 		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },

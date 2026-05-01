@@ -75,6 +75,12 @@ func (c *ConstraintApiDebugLifecycles) OnCapacityLeaseReleased(ctx context.Conte
 	return nil
 }
 
+func (c *ConstraintApiDebugLifecycles) ExtendCallCount() int {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return len(c.ExtendCalls)
+}
+
 func (c *ConstraintApiDebugLifecycles) Reset() {
 	c.l.Lock()
 	defer c.l.Unlock()

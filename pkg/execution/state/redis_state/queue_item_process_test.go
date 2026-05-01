@@ -439,7 +439,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			clock.Advance(time.Second)
 			require.Eventually(t, func() bool {
-				return len(cmLifecycles.ExtendCalls) > 0
+				return cmLifecycles.ExtendCallCount() > 0
 			}, 2*time.Second, 10*time.Millisecond)
 
 			// Release the capacity early
