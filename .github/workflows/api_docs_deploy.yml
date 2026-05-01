@@ -1,5 +1,8 @@
 name: API Docs deploy
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -23,7 +26,7 @@ jobs:
           submodules: true
 
       # Provides Go, protoc, and protoc-gen-openapiv2 — all required by `make docs`.
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/nix-installer-action@v22
       - uses: nicknovitski/nix-develop@v1.2.1
 
       # Set up Node 24 + pnpm for the api-docs build.
