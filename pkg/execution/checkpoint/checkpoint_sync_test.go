@@ -644,7 +644,7 @@ func TestSyncStepNonVariantOptsEmitsNoExperimentMetadata(t *testing.T) {
 
 // TestCheckpointSyncSteps_DeferAdd asserts that a sync checkpoint containing
 // an OpcodeDeferAdd memoizes the step with null data and persists a Defer
-// record with ScheduleStatusAfterRun — matching the executor's non-checkpoint
+// record with DeferStatusAfterRun — matching the executor's non-checkpoint
 // handleGeneratorDeferAdd path.
 func TestCheckpointSyncSteps_DeferAdd(t *testing.T) {
 	ctx := context.Background()
@@ -665,7 +665,7 @@ func TestCheckpointSyncSteps_DeferAdd(t *testing.T) {
 	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
 		return d.FnSlug == "onDefer-score" &&
 			d.HashedID == "step-defer" &&
-			d.ScheduleStatus == state.ScheduleStatusAfterRun &&
+			d.ScheduleStatus == enums.DeferStatusAfterRun &&
 			string(d.Input) == `{"user_id":"u_123"}`
 	})).Return(nil)
 
@@ -819,7 +819,7 @@ func TestCheckpointSyncSteps_DeferCancel(t *testing.T) {
 
 	// The cancel step memoizes itself (cancel's own hash, not the target's).
 	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
-	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", state.ScheduleStatusCancelled).Return(nil)
+	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusCancelled).Return(nil)
 
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err)

@@ -568,7 +568,7 @@ func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
 	}
 
-	if err := c.State.SetDeferStatus(ctx, id, opts.TargetHashedID, state.ScheduleStatusCancelled); err != nil {
+	if err := c.State.SetDeferStatus(ctx, id, opts.TargetHashedID, enums.DeferStatusCancelled); err != nil {
 		l.Error("error cancelling defer in checkpoint", "error", err)
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
@@ -599,7 +599,7 @@ func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id s
 	if err := c.State.SaveDefer(ctx, id, state.Defer{
 		FnSlug:         opts.FnSlug,
 		HashedID:       op.ID,
-		ScheduleStatus: state.ScheduleStatusAfterRun,
+		ScheduleStatus: enums.DeferStatusAfterRun,
 		Input:          opts.Input,
 	}); err != nil {
 		l.Error("error saving defer in checkpoint", "error", err)

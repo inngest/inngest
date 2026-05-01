@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -257,7 +258,7 @@ func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
 	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
 }
 
-func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status state.ScheduleStatus) error {
+func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
 	return v.mgr.SetDeferStatus(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hashedID, status)
 }
 

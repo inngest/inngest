@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
+	"github.com/inngest/inngest/pkg/enums"
 )
 
 var (
@@ -37,10 +39,10 @@ type Defer struct {
 	// - Never schedule (i.e. cancelled)?
 	//
 	// Cancelled is terminal within a run: once a defer transitions to
-	// ScheduleStatusCancelled, it stays there. The Lua-level SaveDefer silently
+	// DeferStatusCancelled, it stays there. The Lua-level SaveDefer silently
 	// no-ops any subsequent write for the same hashedID. There is no "uncancel"
 	// path: same hashedID + cancel is final.
-	ScheduleStatus ScheduleStatus
+	ScheduleStatus enums.DeferStatus
 
 	// Data passed to the defer
 	Input json.RawMessage
@@ -53,27 +55,11 @@ func (d Defer) Validate() error {
 	if d.HashedID == "" {
 		return fmt.Errorf("HashedID is required")
 	}
-	if d.ScheduleStatus == ScheduleStatusUnknown {
+	if d.ScheduleStatus == enums.DeferStatusUnknown {
 		return fmt.Errorf("ScheduleStatus is required")
 	}
 	return nil
 }
-
-type ScheduleStatus int
-
-const (
-	// Unused
-	ScheduleStatusUnknown ScheduleStatus = iota
-
-	// Already scheduled (when defer is configured to run immediately)
-	ScheduleStatusScheduled
-
-	// Schedule after parent run ends
-	ScheduleStatusAfterRun
-
-	// Will not schedule. Terminal — no transition out.
-	ScheduleStatusCancelled
-)
 
 // OpID is the hashed ID for a single step.  This is currently a SHA1
 // hash of the step name and step's index, though may be lowered to an 8

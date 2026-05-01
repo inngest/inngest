@@ -3499,7 +3499,7 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 	d := sv2.Defer{
 		FnSlug:         opts.FnSlug,
 		HashedID:       gen.ID,
-		ScheduleStatus: sv2.ScheduleStatusAfterRun,
+		ScheduleStatus: enums.DeferStatusAfterRun,
 		Input:          opts.Input,
 	}
 
@@ -3547,7 +3547,7 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
 	}
 
-	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, sv2.ScheduleStatusCancelled); err != nil {
+	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, enums.DeferStatusCancelled); err != nil {
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
 

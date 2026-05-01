@@ -8,6 +8,7 @@ import (
 
 	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -128,7 +129,7 @@ func MarshalV1(
 		deferEntries[hashedID] = SDKDeferEntry{
 			// AfterRun defers haven't been enqueued yet, so the SDK can still
 			// cancel them. Already-scheduled defers cannot cancel.
-			Cancellable: d.ScheduleStatus == sv2.ScheduleStatusAfterRun,
+			Cancellable: d.ScheduleStatus == enums.DeferStatusAfterRun,
 		}
 	}
 

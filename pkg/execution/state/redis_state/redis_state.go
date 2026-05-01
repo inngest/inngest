@@ -562,9 +562,14 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 // nested objects, large ints, slices that could be empty, freeform
 // user data — must live in a separate hash field like Input does.
 type deferMeta struct {
-	FnSlug         string
-	HashedID       string
-	ScheduleStatus statev2.ScheduleStatus
+	FnSlug   string
+	HashedID string
+
+	// Must stay int, not enums.DeferStatus: the enum's MarshalJSON renders
+	// as a string, but saveDefer.lua/setDeferStatus.lua compare and rewrite
+	// this field as a number via cjson. Conversion to the typed enum happens
+	// at the LoadDefers/SaveDefer boundary.
+	ScheduleStatus int
 }
 
 func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]statev2.Defer, error) {
@@ -636,7 +641,7 @@ func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uu
 		d := statev2.Defer{
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
-			ScheduleStatus: meta.ScheduleStatus,
+			ScheduleStatus: enums.DeferStatus(meta.ScheduleStatus),
 		}
 		if raw, ok := inputs[hashedID]; ok && len(raw) > 0 {
 			d.Input = json.RawMessage(raw)
@@ -881,7 +886,7 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	metaJSON, err := json.Marshal(deferMeta{
 		FnSlug:         d.FnSlug,
 		HashedID:       d.HashedID,
-		ScheduleStatus: d.ScheduleStatus,
+		ScheduleStatus: int(d.ScheduleStatus),
 	})
 	if err != nil {
 		return err
@@ -891,7 +896,7 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 		d.HashedID,
 		string(metaJSON),
 		string(d.Input),
-		int(statev2.ScheduleStatusCancelled),
+		int(enums.DeferStatusCancelled),
 		consts.MaxDefersPerRun,
 	})
 	if err != nil {
@@ -913,7 +918,7 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	return nil
 }
 
-func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hashedID string, status statev2.ScheduleStatus) error {
+func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hashedID string, status enums.DeferStatus) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetDeferStatus"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
