@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -111,6 +112,80 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	r.Equal("admin", meta["role"])
 	r.Equal([]any{"a", "b"}, meta["tags"])
 	r.Equal(0.87, activeData["score"])
+}
+
+// loadDefersFailingState wraps a real statev2.RunService and fails LoadDefers
+// only. All other RunService methods delegate via the embedded interface.
+type loadDefersFailingState struct {
+	statev2.RunService
+	err error
+}
+
+func (s *loadDefersFailingState) LoadDefers(ctx context.Context, id statev2.ID) (map[string]statev2.Defer, error) {
+	return nil, s.err
+}
+
+// If LoadDefers fails then we should still continue finalizing. It's better to
+// miss the deferred runs than to block the run from finalizing.
+func TestFinalizeContinuesOnLoadDefersError(t *testing.T) {
+	r := require.New(t)
+	infra := newDeferTestInfra(t)
+	ctx := infra.ctx
+
+	// Wrap smv2 so LoadDefers always fails. Schedule and other methods still
+	// hit the real miniredis-backed impl via the embedded interface.
+	failingState := &loadDefersFailingState{
+		RunService: infra.smv2,
+		err:        errors.New("simulated redis outage during LoadDefers"),
+	}
+
+	// Build executor with the failing wrapper. Can't use infra.newExecutor —
+	// it wires the unwrapped smv2.
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return infra.queueShard, nil
+	}
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(failingState),
+		executor.WithPauseManager(infra.pauseMgr),
+		executor.WithQueue(infra.rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(infra.loader),
+		executor.WithAssignedQueueShard(infra.queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+	)
+	r.NoError(err)
+
+	var capturedEvents []event.Event
+	exec.SetFinalizer(func(ctx context.Context, id statev2.ID, events []event.Event) error {
+		capturedEvents = append(capturedEvents, events...)
+		return nil
+	})
+
+	run := infra.scheduleRun(t, exec)
+
+	err = exec.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *run,
+		Response: execution.FinalizeResponse{
+			Type:        execution.FinalizeResponseRunComplete,
+			RunComplete: state.GeneratorOpcode{Op: enums.OpcodeRunComplete},
+		},
+		Optional: execution.FinalizeOptional{FnSlug: infra.fn.Slug},
+	})
+	r.NoError(err, "Finalize must complete despite LoadDefers failure")
+
+	// function.finished must still publish; defer events must not.
+	var sawFnFinished, sawDeferredStart bool
+	for _, evt := range capturedEvents {
+		if evt.Name == event.FnFinishedName {
+			sawFnFinished = true
+		}
+		if evt.Name == "inngest/deferred.start" {
+			sawDeferredStart = true
+		}
+	}
+	r.True(sawFnFinished, "function.finished must publish even when LoadDefers fails")
+	r.False(sawDeferredStart, "no defer events should be published when LoadDefers fails")
 }
 
 // deferTestInfra holds the shared state manager, queue, and loader used by the

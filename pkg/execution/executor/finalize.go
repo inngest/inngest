@@ -121,18 +121,19 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	// Load defers BEFORE Delete — they live in state and won't survive it.
 	// Retry on transient failures so the events get a chance to publish even
-	// when Redis is briefly unavailable. The events themselves publish later
-	// in finalizeEvents, alongside function.finished — see buildDeferEvents.
+	// when Redis is briefly unavailable. Defer-related failures are
+	// best-effort: log and continue with no defer events rather than blocking
+	// Finalize. The downstream cleanup (Delete, finalizeRemoveJobs,
+	// finalizeEvents for function.X) must still run regardless.
 	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers", func(ctx context.Context) (map[string]sv2.Defer, error) {
 		return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
 	}, util.NewRetryConf())
 	if deferErr != nil {
 		l.Error(
-			"error loading defers to finalize",
+			"error loading defers to finalize; continuing without defer events",
 			"error", deferErr,
 			"run_id", opts.Metadata.ID.RunID,
 		)
-		return fmt.Errorf("error loading defers to finalize: %w", deferErr)
 	}
 
 	// Build defer events from the loaded map BEFORE Delete (resolves fnSlug
@@ -142,11 +143,10 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	deferEvents, err := e.buildDeferEvents(ctx, opts, defers)
 	if err != nil {
 		l.Error(
-			"error building deferred start events",
+			"error building deferred start events; continuing without defer events",
 			"error", err,
 			"run_id", opts.Metadata.ID.RunID,
 		)
-		return fmt.Errorf("error building deferred start events: %w", err)
 	}
 
 	// Delete the function state in every case.
