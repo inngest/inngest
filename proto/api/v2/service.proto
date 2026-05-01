@@ -1237,7 +1237,7 @@ enum FunctionRunStatus {
 }
 
 enum TraceSpanStatus {
-  TRACE_SPAN_STATUS_UNSPECIFIED = 0;
+  TRACE_SPAN_STATUS_UNKNOWN = 0;
   TRACE_SPAN_STATUS_RUNNING = 1;
   TRACE_SPAN_STATUS_COMPLETED = 2;
   TRACE_SPAN_STATUS_FAILED = 3;
@@ -1269,7 +1269,7 @@ message RunTrigger {
   optional string event_name = 2;
   bool is_batch = 3;
   optional string batch_id = 4;
-  optional string cron_schedule = 6;
+  optional string cron_schedule = 5;
 }
 
 message FunctionRun {
@@ -1295,9 +1295,11 @@ message GetFunctionRunResponse {
   ResponseMetadata metadata = 2;
 }
 
-message TraceResponse {
-  int32 status_code = 1;
-  map<string, string> headers = 2;
+message TraceSpanMetadata {
+  string scope = 1;
+  string kind = 2;
+  map<string, string> values = 3;
+  google.protobuf.Timestamp updated_at = 4;
 }
 
 message TraceSpan {
@@ -1312,7 +1314,7 @@ message TraceSpan {
   optional google.protobuf.Timestamp ended_at = 9;
   optional google.protobuf.Struct input = 10;
   optional google.protobuf.Struct output = 11;
-  optional TraceResponse response = 12;
+  repeated TraceSpanMetadata metadata = 12;
   repeated TraceSpan children = 13;
   bool children_truncated = 14;
 }
