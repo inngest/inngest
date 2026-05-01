@@ -4,32 +4,11 @@ import {
   getExperimentTimeRangeDates,
   getExperimentUrlState,
   parseVariantTemplateVariable,
-  parseExperimentScoringFormula,
-  serializeExperimentScoringFormula,
   serializeVariantTemplateVariable,
-  setExperimentPanelSearch,
-  setExperimentScoringFormulaSearch,
-  setExperimentShowInactiveSearch,
   setExperimentTimeRangeSearch,
   setExperimentVariantsSearch,
   validateExperimentDetailSearch,
 } from './urlState';
-import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
-
-const metric = (
-  overrides: Partial<ExperimentScoringMetric>,
-): ExperimentScoringMetric => ({
-  key: 'latency',
-  enabled: true,
-  points: 100,
-  minValue: 0,
-  maxValue: 100,
-  invert: true,
-  labelBest: 'Fastest',
-  labelWorst: 'Slowest',
-  displayName: 'Latency',
-  ...overrides,
-});
 
 describe('experiment URL state', () => {
   it('uses the default shared view when no search params are present', () => {
@@ -42,10 +21,6 @@ describe('experiment URL state', () => {
         preset: '24h',
       },
       selectedVariants: [],
-      showInactive: false,
-      panel: 'info',
-      scoreFormula: null,
-      scoreFormulaParam: undefined,
     });
   });
 
@@ -156,97 +131,17 @@ describe('experiment URL state', () => {
     expect(state.selectedVariants).toEqual(['control', 'treatment']);
   });
 
-  it('writes variant, show-inactive, and panel params while preserving others', () => {
-    const withVariants = setExperimentVariantsSearch({ keep: 'me' }, [
+  it('writes variant params while preserving others', () => {
+    const next = setExperimentVariantsSearch({ keep: 'me' }, [
       'control',
       'treatment',
     ]);
-    const withInactive = setExperimentShowInactiveSearch(withVariants, true);
-    const withPanel = setExperimentPanelSearch(withInactive, 'scoring');
 
-    expect(withPanel).toEqual({
+    expect(next).toEqual({
       keep: 'me',
       tpl_var_variant: 'control,treatment',
-      show_inactive: true,
-      panel: 'scoring',
     });
 
-    expect(setExperimentVariantsSearch(withPanel, [])).toEqual({
-      keep: 'me',
-      show_inactive: true,
-      panel: 'scoring',
-    });
-    expect(setExperimentShowInactiveSearch(withPanel, false)).toEqual({
-      keep: 'me',
-      tpl_var_variant: 'control,treatment',
-      panel: 'scoring',
-    });
-    expect(setExperimentPanelSearch(withPanel, 'info')).toEqual({
-      keep: 'me',
-      tpl_var_variant: 'control,treatment',
-      show_inactive: true,
-    });
-  });
-
-  it('supports closing the helper panel from the URL', () => {
-    const state = getExperimentUrlState(
-      validateExperimentDetailSearch({ panel: 'none' }),
-    );
-
-    expect(state.panel).toBe('none');
-  });
-
-  it('round-trips score_formula state', () => {
-    const metrics = [
-      metric({ key: 'latency' }),
-      metric({
-        key: 'tokens',
-        enabled: false,
-        points: 25,
-        minValue: 10,
-        maxValue: 50,
-        invert: false,
-        labelBest: 'Cheapest',
-        labelWorst: 'Most expensive',
-        displayName: 'Token count',
-      }),
-    ];
-    const serialized = serializeExperimentScoringFormula(metrics);
-
-    expect(parseExperimentScoringFormula(serialized)).toEqual({ metrics });
-    expect(
-      getExperimentUrlState(
-        validateExperimentDetailSearch({ score_formula: serialized }),
-      ),
-    ).toMatchObject({
-      scoreFormula: { metrics },
-      scoreFormulaParam: serialized,
-    });
-  });
-
-  it('round-trips partial score_formula overrides', () => {
-    const formula = [{ key: 'latency', points: 25, minValue: 5 }];
-    const serialized = serializeExperimentScoringFormula(formula);
-
-    expect(parseExperimentScoringFormula(serialized)).toEqual({
-      metrics: formula,
-    });
-  });
-
-  it('ignores invalid score_formula state', () => {
-    expect(parseExperimentScoringFormula('v1:not-json')).toBeNull();
-    expect(parseExperimentScoringFormula('v2:{"m":[]}')).toBeNull();
-  });
-
-  it('writes score_formula while preserving other params', () => {
-    const metrics = [metric({ key: 'latency' })];
-    const serialized = serializeExperimentScoringFormula(metrics);
-    const next = setExperimentScoringFormulaSearch({ keep: 'me' }, serialized);
-
-    expect(next.keep).toBe('me');
-    expect(next.score_formula).toBe(serialized);
-    expect(setExperimentScoringFormulaSearch(next, undefined)).toEqual({
-      keep: 'me',
-    });
+    expect(setExperimentVariantsSearch(next, [])).toEqual({ keep: 'me' });
   });
 });

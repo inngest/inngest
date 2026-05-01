@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AnyVariables, Client, TypedDocumentNode } from 'urql';
 import { useClient } from 'urql';
 
@@ -8,6 +8,8 @@ import { graphql } from '@/gql';
 import type {
   ExperimentDetail,
   ExperimentListItem,
+  ExperimentScoringConfig,
+  ExperimentScoringMetric,
 } from '@inngest/components/Experiments';
 
 export type ExperimentTimeRange = { from: Date; to: Date };
@@ -22,6 +24,17 @@ async function runQuery<Result, Variables extends AnyVariables>(
   const result = await client
     .query(doc, variables, { requestPolicy: 'network-only' })
     .toPromise();
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error('No data returned');
+  return result.data;
+}
+
+async function runMutation<Result, Variables extends AnyVariables>(
+  client: Client,
+  doc: TypedDocumentNode<Result, Variables>,
+  variables: Variables,
+): Promise<Result> {
+  const result = await client.mutation(doc, variables).toPromise();
   if (result.error) throw result.error;
   if (!result.data) throw new Error('No data returned');
   return result.data;
@@ -110,6 +123,34 @@ const experimentDetailQuery = graphql(`
   }
 `);
 
+const experimentScoringConfigQuery = graphql(`
+  query GetExperimentScoringConfig(
+    $workspaceID: ID!
+    $functionID: ID!
+    $experimentName: String!
+  ) {
+    experimentScoringConfig(
+      workspaceID: $workspaceID
+      functionID: $functionID
+      experimentName: $experimentName
+    ) {
+      experimentName
+      updatedAt
+      metrics {
+        key
+        enabled
+        points
+        minValue
+        maxValue
+        invert
+        labelBest
+        labelWorst
+        displayName
+      }
+    }
+  }
+`);
+
 const experimentInsightsQueryDoc = graphql(`
   query GetExperimentInsightsQuery(
     $workspaceID: ID!
@@ -163,6 +204,36 @@ export function useExperimentInsightsQuery(
   });
 }
 
+const updateExperimentScoringConfigMutation = graphql(`
+  mutation UpdateExperimentScoringConfig(
+    $workspaceID: ID!
+    $functionID: ID!
+    $experimentName: String!
+    $metrics: [ExperimentScoringMetricInput!]!
+  ) {
+    updateExperimentScoringConfig(
+      workspaceID: $workspaceID
+      functionID: $functionID
+      experimentName: $experimentName
+      metrics: $metrics
+    ) {
+      experimentName
+      updatedAt
+      metrics {
+        key
+        enabled
+        points
+        minValue
+        maxValue
+        invert
+        labelBest
+        labelWorst
+        displayName
+      }
+    }
+  }
+`);
+
 export function useExperimentDetail(
   functionID: string,
   experimentName: string,
@@ -190,7 +261,10 @@ export function useExperimentDetail(
       )
       .toPromise();
 
-    // Empty experiment ranges currently surface as this GraphQL error.
+    // The server returns null when an experiment has no runs in the selected
+    // time range. The GraphQL field is non-nullable, so urql surfaces this as
+    // a "null which the schema does not allow" error. Treat it as empty data
+    // rather than propagating as an error to the UI.
     const isNoDataInRange = result.error?.graphQLErrors.some((e) =>
       e.message.includes('null which the schema does not allow'),
     );
@@ -236,5 +310,83 @@ export function useExperimentDetail(
     enabled: options.enabled ?? true,
     staleTime: EXPERIMENTS_CACHE_MS,
     gcTime: EXPERIMENTS_CACHE_MS,
+  });
+}
+
+export function useExperimentScoringConfig(
+  functionID: string,
+  experimentName: string,
+) {
+  const client = useClient();
+  const environment = useEnvironment();
+
+  const queryFn = useCallback(async (): Promise<ExperimentScoringConfig> => {
+    const data = await runQuery(client, experimentScoringConfigQuery, {
+      workspaceID: environment.id,
+      functionID,
+      experimentName,
+    });
+    const c = data.experimentScoringConfig;
+    return {
+      experimentName: c.experimentName,
+      updatedAt: new Date(c.updatedAt),
+      metrics: c.metrics,
+    };
+  }, [client, environment.id, functionID, experimentName]);
+
+  return useQuery<ExperimentScoringConfig>({
+    queryKey: [
+      'experiment-scoring',
+      environment.id,
+      functionID,
+      experimentName,
+    ],
+    queryFn,
+    staleTime: EXPERIMENTS_CACHE_MS,
+    gcTime: EXPERIMENTS_CACHE_MS,
+  });
+}
+
+export function useUpdateExperimentScoringConfig(
+  functionID: string,
+  experimentName: string,
+) {
+  const client = useClient();
+  const environment = useEnvironment();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: [
+      'experiment-scoring-update',
+      environment.id,
+      functionID,
+      experimentName,
+    ],
+    mutationFn: async (
+      metrics: ExperimentScoringMetric[],
+    ): Promise<ExperimentScoringConfig> => {
+      const data = await runMutation(
+        client,
+        updateExperimentScoringConfigMutation,
+        {
+          workspaceID: environment.id,
+          functionID,
+          experimentName,
+          metrics,
+        },
+      );
+      const c = data.updateExperimentScoringConfig;
+      return {
+        experimentName: c.experimentName,
+        updatedAt: new Date(c.updatedAt),
+        metrics: c.metrics,
+      };
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        ['experiment-scoring', environment.id, functionID, experimentName],
+        data,
+      );
+    },
   });
 }

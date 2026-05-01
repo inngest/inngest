@@ -1,12 +1,9 @@
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
-import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import { subtractDuration } from '@inngest/components/utils/date';
 
 type TimeRangePreset = '24h' | '7d' | '30d';
 
 export const EXPERIMENT_DEFAULT_TIME_PRESET = '24h' satisfies TimeRangePreset;
-
-export type ExperimentDetailPanel = 'info' | 'scoring' | 'none';
 
 export type ExperimentLiveTimeRange = {
   type: 'live';
@@ -30,28 +27,11 @@ export type ExperimentDetailSearchParams = {
   to_ts?: number;
   live?: boolean;
   tpl_var_variant?: string | string[];
-  show_inactive?: boolean;
-  panel?: ExperimentDetailPanel;
-  score_formula?: string;
 };
-
-export type ExperimentScoringFormula = {
-  metrics: ExperimentScoringFormulaMetric[];
-};
-
-export type ExperimentScoringFormulaMetric = Pick<
-  ExperimentScoringMetric,
-  'key'
-> &
-  Partial<Omit<ExperimentScoringMetric, 'key'>>;
 
 export type ExperimentUrlState = {
   timeRange: ExperimentTimeRange;
   selectedVariants: string[];
-  showInactive: boolean;
-  panel: ExperimentDetailPanel;
-  scoreFormula: ExperimentScoringFormula | null;
-  scoreFormulaParam?: string;
 };
 
 const TIME_PRESET_DURATIONS_MS: Record<TimeRangePreset, number> = {
@@ -65,7 +45,6 @@ const MINUTE_MS = 60 * SECOND_MS;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const PRESET_MATCH_TOLERANCE_MS = 60 * 1000;
-const SCORE_FORMULA_VERSION_PREFIX = 'v1:';
 
 export function isTimeRangePreset(value: unknown): value is TimeRangePreset {
   return value === '24h' || value === '7d' || value === '30d';
@@ -79,9 +58,6 @@ export function validateExperimentDetailSearch(
     to_ts: readTimestamp(search.to_ts),
     live: readBoolean(search.live),
     tpl_var_variant: readStringOrStringArray(search.tpl_var_variant),
-    show_inactive: readBoolean(search.show_inactive),
-    panel: readPanel(search.panel),
-    score_formula: readString(search.score_formula),
   };
 }
 
@@ -91,10 +67,6 @@ export function getExperimentUrlState(
   return {
     timeRange: getExperimentTimeRange(search),
     selectedVariants: parseVariantTemplateVariable(search.tpl_var_variant),
-    showInactive: search.show_inactive === true,
-    panel: search.panel ?? 'info',
-    scoreFormula: parseExperimentScoringFormula(search.score_formula),
-    scoreFormulaParam: search.score_formula,
   };
 }
 
@@ -191,64 +163,6 @@ export function setExperimentVariantsSearch(
       : undefined,
   );
   return next;
-}
-
-export function setExperimentShowInactiveSearch(
-  prev: Record<string, unknown>,
-  showInactive: boolean,
-): Record<string, unknown> {
-  const next = { ...prev };
-  applyOptionalParam(next, 'show_inactive', showInactive ? true : undefined);
-  return next;
-}
-
-export function setExperimentPanelSearch(
-  prev: Record<string, unknown>,
-  panel: ExperimentDetailPanel,
-): Record<string, unknown> {
-  const next = { ...prev };
-  applyOptionalParam(next, 'panel', panel === 'info' ? undefined : panel);
-  return next;
-}
-
-export function setExperimentScoringFormulaSearch(
-  prev: Record<string, unknown>,
-  formulaParam: string | undefined,
-): Record<string, unknown> {
-  const next = { ...prev };
-  applyOptionalParam(next, 'score_formula', formulaParam);
-  return next;
-}
-
-export function serializeExperimentScoringFormula(
-  metrics: ExperimentScoringFormulaMetric[],
-): string {
-  return `${SCORE_FORMULA_VERSION_PREFIX}${JSON.stringify({
-    m: metrics.map(serializeFormulaMetric),
-  })}`;
-}
-
-export function parseExperimentScoringFormula(
-  value: string | undefined,
-): ExperimentScoringFormula | null {
-  if (!value?.startsWith(SCORE_FORMULA_VERSION_PREFIX)) return null;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value.slice(SCORE_FORMULA_VERSION_PREFIX.length));
-  } catch {
-    return null;
-  }
-
-  if (!isRecord(parsed) || !Array.isArray(parsed.m)) return null;
-
-  const metrics: ExperimentScoringFormulaMetric[] = [];
-  for (const item of parsed.m) {
-    const metric = parseFormulaMetric(item);
-    if (metric) metrics.push(metric);
-  }
-
-  return { metrics };
 }
 
 export function serializeVariantTemplateVariable(variants: string[]): string {
@@ -361,16 +275,6 @@ function readBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function readPanel(value: unknown): ExperimentDetailPanel | undefined {
-  return value === 'info' || value === 'scoring' || value === 'none'
-    ? value
-    : undefined;
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
 function readStringOrStringArray(
   value: unknown,
 ): string | string[] | undefined {
@@ -428,60 +332,4 @@ function splitEscapedList(value: string): string[] {
   if (escaping) current += '\\';
   values.push(current);
   return values;
-}
-
-function serializeFormulaMetric(
-  metric: ExperimentScoringFormulaMetric,
-): Record<string, unknown> {
-  const item: Record<string, unknown> = { k: metric.key };
-
-  if (metric.enabled !== undefined) item.e = metric.enabled;
-  if (metric.points !== undefined) item.p = metric.points;
-  if (metric.minValue !== undefined) item.min = metric.minValue;
-  if (metric.maxValue !== undefined) item.max = metric.maxValue;
-  if (metric.invert !== undefined) item.inv = metric.invert;
-  if (metric.labelBest !== undefined) item.best = metric.labelBest;
-  if (metric.labelWorst !== undefined) item.worst = metric.labelWorst;
-  if (metric.displayName !== undefined) item.name = metric.displayName;
-
-  return item;
-}
-
-function parseFormulaMetric(
-  value: unknown,
-): ExperimentScoringFormulaMetric | null {
-  if (!isRecord(value)) return null;
-
-  const key = readString(value.k);
-  if (!key) return null;
-
-  const enabled = readBoolean(value.e);
-  const points = readFormulaNumber(value.p);
-  const minValue = readFormulaNumber(value.min);
-  const maxValue = readFormulaNumber(value.max);
-  const invert = readBoolean(value.inv);
-  const labelBest = readString(value.best);
-  const labelWorst = readString(value.worst);
-  const displayName = readString(value.name);
-
-  const metric: ExperimentScoringFormulaMetric = { key };
-  if (enabled !== undefined) metric.enabled = enabled;
-  if (points !== undefined) metric.points = Math.max(0, Math.round(points));
-  if (minValue !== undefined) metric.minValue = minValue;
-  if (maxValue !== undefined) metric.maxValue = maxValue;
-  if (invert !== undefined) metric.invert = invert;
-  if (labelBest !== undefined) metric.labelBest = labelBest;
-  if (labelWorst !== undefined) metric.labelWorst = labelWorst;
-  if (displayName !== undefined) metric.displayName = displayName;
-
-  return Object.keys(metric).length > 1 ? metric : null;
-}
-
-function readFormulaNumber(value: unknown): number | undefined {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
-  return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

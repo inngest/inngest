@@ -1,18 +1,9 @@
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
-import {
-  ExperimentsBlankState,
-  type ExperimentScoringMetric,
-} from '@inngest/components/Experiments';
+import { ExperimentsBlankState } from '@inngest/components/Experiments';
 import {
   HelperPanelControl,
   HelperPanelFrame,
@@ -35,23 +26,15 @@ import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSi
 import {
   useExperimentDetail,
   useExperimentInsightsQuery,
-  type ExperimentTimeRange as ExperimentQueryTimeRange,
+  type ExperimentTimeRange,
 } from '@/components/Experiments/useExperiments';
+import { useScoringConfig } from '@/components/Experiments/useScoringConfig';
 import { VariantsTable } from '@/components/Experiments/VariantsTable';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { insightsUrl } from '@/lib/experiments/insightsUrl';
-import {
-  getPointsLeft,
-  getScoringMetricsForFormula,
-  serializeScoringFormulaOverrides,
-  updateScoringMetric,
-} from '@/lib/experiments/scoringFormula';
 import { findExtremum, scoreVariants } from '@/lib/experiments/score';
 import {
   experimentTimeRangeToRangeChange,
-  serializeExperimentScoringFormula,
-  type ExperimentDetailPanel,
-  type ExperimentScoringFormula,
   type ExperimentTimeRange as ExperimentUrlTimeRange,
 } from '@/lib/experiments/urlState';
 import { pathCreator } from '@/utils/urls';
@@ -70,55 +53,20 @@ type Props = {
   onTimeRangeChange: (range: RangeChangeProps) => void;
   selectedVariants: string[];
   onSelectedVariantsChange: (variants: string[]) => void;
-  showInactive: boolean;
-  onShowInactiveChange: (showInactive: boolean) => void;
-  activePanel: ExperimentDetailPanel;
-  onActivePanelChange: (panel: ExperimentDetailPanel) => void;
-  scoreFormula: ExperimentScoringFormula | null;
-  scoreFormulaParam?: string;
-  onScoringFormulaChange: (formulaParam: string | undefined) => void;
 };
 
-const PANEL_TITLES = {
-  info: 'Info',
-  scoring: 'Scoring formula',
-} as const satisfies Record<Exclude<ExperimentDetailPanel, 'none'>, string>;
-type PanelKey = keyof typeof PANEL_TITLES;
-type RelativeDuration = Extract<
-  RangeChangeProps,
-  { type: 'relative' }
->['duration'];
+const INFO_PANEL = 'Info';
+const SCORING_PANEL = 'Scoring formula';
+type PanelKey = typeof INFO_PANEL | typeof SCORING_PANEL;
 
-const SCORE_FORMULA_URL_SYNC_DEBOUNCE_MS = 350;
+// TimeFilter's longest preset is "Last 30 days". Don't default the range
+// past that even if the account's history retention is longer.
 const MAX_DEFAULT_DAYS = 30;
 
-function rangeToTimeRange(range: RangeChangeProps): ExperimentQueryTimeRange {
+function rangeToTimeRange(range: RangeChangeProps): ExperimentTimeRange {
   if (range.type === 'absolute') return { from: range.start, to: range.end };
   const to = new Date();
   return { from: subtractDuration(to, range.duration), to };
-}
-
-function getDurationScopeKey(duration: RelativeDuration): string {
-  const { days, hours, minutes, months, seconds, weeks, years } = duration;
-  return `${years ?? 0}:${months ?? 0}:${weeks ?? 0}:${days ?? 0}:${
-    hours ?? 0
-  }:${minutes ?? 0}:${seconds ?? 0}`;
-}
-
-function getScoringScopeKey({
-  functionID,
-  experimentName,
-  range,
-}: {
-  functionID: string;
-  experimentName: string;
-  range: RangeChangeProps;
-}) {
-  const timeRangeKey =
-    range.type === 'absolute'
-      ? `absolute:${range.start.getTime()}:${range.end.getTime()}`
-      : `relative:${getDurationScopeKey(range.duration)}`;
-  return `${functionID}:${experimentName}:${timeRangeKey}`;
 }
 
 export function ExperimentDetailPage({
@@ -131,13 +79,6 @@ export function ExperimentDetailPage({
   onTimeRangeChange,
   selectedVariants,
   onSelectedVariantsChange,
-  showInactive,
-  onShowInactiveChange,
-  activePanel,
-  onActivePanelChange,
-  scoreFormula,
-  scoreFormulaParam,
-  onScoringFormulaChange,
 }: Props) {
   const environment = useEnvironment();
 
@@ -189,7 +130,12 @@ export function ExperimentDetailPage({
     timeRangeType,
   ]);
 
-  const queryRange = useMemo(() => rangeToTimeRange(range), [range]);
+  const [showInactive, setShowInactive] = useState(false);
+  const [activePanel, setActivePanel] = useState<PanelKey | null>(INFO_PANEL);
+
+  const queryRange = useMemo<ExperimentTimeRange>(() => {
+    return rangeToTimeRange(range);
+  }, [range]);
 
   const detail = useExperimentDetail(
     functionID,
@@ -198,6 +144,7 @@ export function ExperimentDetailPage({
     null,
     { enabled: rangeReady },
   );
+  const scoring = useScoringConfig(functionID, experimentName);
   const insightsQuery = useExperimentInsightsQuery(
     functionID,
     experimentName,
@@ -205,104 +152,9 @@ export function ExperimentDetailPage({
     { enabled: rangeReady },
   );
 
-  const activePanelKey = activePanel === 'none' ? null : activePanel;
-
-  const urlScoringMetrics = useMemo(() => {
-    if (!detail.data) return null;
-    return getScoringMetricsForFormula({
-      detail: detail.data,
-      formula: scoreFormula,
-    });
-  }, [detail.data, scoreFormula]);
-
-  const defaultScoringMetrics = useMemo(() => {
-    if (!detail.data) return null;
-    return getScoringMetricsForFormula({
-      detail: detail.data,
-      formula: null,
-    });
-  }, [detail.data]);
-
-  const serializedUrlScoringMetrics = useMemo(() => {
-    if (!urlScoringMetrics || urlScoringMetrics.length === 0) return undefined;
-    return serializeExperimentScoringFormula(urlScoringMetrics);
-  }, [urlScoringMetrics]);
-
-  const [draftScoringMetrics, setDraftScoringMetrics] = useState<
-    ExperimentScoringMetric[] | null
-  >(null);
-  const [pendingScoringFormula, setPendingScoringFormula] = useState<{
-    param: string | undefined;
-    scopeKey: string;
-  } | null>(null);
-  const scoringScopeKey = getScoringScopeKey({
-    functionID,
-    experimentName,
-    range,
-  });
-
-  useEffect(() => {
-    if (!pendingScoringFormula) return;
-    if (pendingScoringFormula.scopeKey !== scoringScopeKey) return;
-
-    const timeoutID = window.setTimeout(() => {
-      onScoringFormulaChange(pendingScoringFormula.param);
-    }, SCORE_FORMULA_URL_SYNC_DEBOUNCE_MS);
-
-    return () => window.clearTimeout(timeoutID);
-  }, [onScoringFormulaChange, pendingScoringFormula, scoringScopeKey]);
-
-  useEffect(() => {
-    if (!urlScoringMetrics) {
-      setDraftScoringMetrics(null);
-      setPendingScoringFormula(null);
-      return;
-    }
-
-    if (pendingScoringFormula) {
-      if (pendingScoringFormula.scopeKey !== scoringScopeKey) {
-        setPendingScoringFormula(null);
-      } else if (scoreFormulaParam !== pendingScoringFormula.param) {
-        return;
-      } else {
-        setPendingScoringFormula(null);
-      }
-    }
-
-    setDraftScoringMetrics((prev) => {
-      if (
-        prev &&
-        serializedUrlScoringMetrics &&
-        serializeExperimentScoringFormula(prev) === serializedUrlScoringMetrics
-      ) {
-        return prev;
-      }
-
-      return urlScoringMetrics;
-    });
-  }, [
-    pendingScoringFormula,
-    scoreFormulaParam,
-    scoringScopeKey,
-    serializedUrlScoringMetrics,
-    urlScoringMetrics,
-  ]);
-
-  const scoringMetrics = draftScoringMetrics ?? urlScoringMetrics;
-  const deferredScoringMetrics = useDeferredValue(scoringMetrics);
-  const visualScoringMetrics = deferredScoringMetrics ?? scoringMetrics;
-
-  const pointsLeft = useMemo(
-    () => (scoringMetrics ? getPointsLeft(scoringMetrics) : 100),
-    [scoringMetrics],
-  );
-
-  const togglePanel = useCallback(
-    (key: PanelKey) => {
-      onActivePanelChange(activePanel === key ? 'none' : key);
-    },
-    [activePanel, onActivePanelChange],
-  );
+  const togglePanel = useCallback((key: PanelKey) => {
+    setActivePanel((panel) => (panel === key ? null : key));
+  }, []);
 
   const availableVariants = useMemo(
     () => detail.data?.variants.map((v) => v.variantName) ?? [],
@@ -329,12 +181,12 @@ export function ExperimentDetailPage({
     };
   }, [detail.data, selectedAvailableVariants, selectedVariants.length]);
 
-  // Score each variant once so downstream panels (VariantsTable, ScoreSummaryCard,
-  // top-variant callout) share the same precomputed results.
+  // Score each variant once so downstream panels (VariantsTable,
+  // ScoreSummaryCard, top-variant callout) share the same precomputed results.
   const scoredVariants = useMemo(() => {
-    if (!filteredDetail || !visualScoringMetrics) return null;
-    return scoreVariants(filteredDetail.variants, visualScoringMetrics);
-  }, [filteredDetail, visualScoringMetrics]);
+    if (!filteredDetail || !scoring.metrics) return null;
+    return scoreVariants(filteredDetail.variants, scoring.metrics);
+  }, [filteredDetail, scoring.metrics]);
 
   const topVariantName = useMemo(() => {
     if (!scoredVariants) return null;
@@ -348,13 +200,13 @@ export function ExperimentDetailPage({
     const map: Record<string, { min: number; max: number }> = {};
     if (!filteredDetail) return map;
     for (const variant of filteredDetail.variants) {
-      for (const m of variant.metrics) {
-        const range = map[m.key];
+      for (const metric of variant.metrics) {
+        const range = map[metric.key];
         if (!range) {
-          map[m.key] = { min: m.avg, max: m.avg };
+          map[metric.key] = { min: metric.avg, max: metric.avg };
         } else {
-          if (m.avg < range.min) range.min = m.avg;
-          if (m.avg > range.max) range.max = m.avg;
+          if (metric.avg < range.min) range.min = metric.avg;
+          if (metric.avg > range.max) range.max = metric.avg;
         }
       }
     }
@@ -362,26 +214,8 @@ export function ExperimentDetailPage({
   }, [filteredDetail]);
 
   const enabledMetrics = useMemo(
-    () => (visualScoringMetrics ?? []).filter((m) => m.enabled),
-    [visualScoringMetrics],
-  );
-
-  const handleUpdateMetric = useCallback(
-    (key: string, patch: Partial<ExperimentScoringMetric>) => {
-      if (!scoringMetrics || !defaultScoringMetrics) return;
-
-      const next = updateScoringMetric(scoringMetrics, key, patch);
-      const formulaParam = serializeScoringFormulaOverrides(
-        next,
-        defaultScoringMetrics,
-      );
-      setDraftScoringMetrics(next);
-      setPendingScoringFormula({
-        param: formulaParam,
-        scopeKey: scoringScopeKey,
-      });
-    },
-    [defaultScoringMetrics, scoringMetrics, scoringScopeKey],
+    () => (scoring.metrics ?? []).filter((metric) => metric.enabled),
+    [scoring.metrics],
   );
 
   const onOpenInsights = useCallback(() => {
@@ -392,14 +226,14 @@ export function ExperimentDetailPage({
 
   const helperItems: HelperItem[] = [
     {
-      title: PANEL_TITLES.info,
+      title: INFO_PANEL,
       icon: <RiFlaskLine className="h-4 w-4" />,
-      action: () => togglePanel('info'),
+      action: () => togglePanel(INFO_PANEL),
     },
     {
-      title: PANEL_TITLES.scoring,
+      title: SCORING_PANEL,
       icon: <RiListOrdered2 className="h-4 w-4" />,
-      action: () => togglePanel('scoring'),
+      action: () => togglePanel(SCORING_PANEL),
     },
   ];
 
@@ -442,7 +276,7 @@ export function ExperimentDetailPage({
                 availableVariants={availableVariants}
               />
 
-              {detail.isPending && (
+              {(detail.isPending || scoring.isPending) && (
                 <Skeleton className="h-96 w-full rounded-lg" />
               )}
 
@@ -450,6 +284,13 @@ export function ExperimentDetailPage({
                 <ErrorCard
                   error={detail.error}
                   reset={() => detail.refetch()}
+                />
+              )}
+
+              {scoring.error && (
+                <ErrorCard
+                  error={scoring.error}
+                  reset={() => scoring.refetch()}
                 />
               )}
 
@@ -462,8 +303,7 @@ export function ExperimentDetailPage({
               )}
 
               {filteredDetail &&
-                scoringMetrics &&
-                visualScoringMetrics &&
+                scoring.metrics &&
                 scoredVariants &&
                 (filteredDetail.variants.length === 0 ? (
                   hasUnavailableVariantSelection ? (
@@ -509,7 +349,7 @@ export function ExperimentDetailPage({
                       <ScoreSummaryCard
                         className="col-span-full"
                         scoredVariants={scoredVariants}
-                        metrics={visualScoringMetrics}
+                        metrics={scoring.metrics}
                       />
 
                       {enabledMetrics.map((metric) => (
@@ -523,13 +363,13 @@ export function ExperimentDetailPage({
                       <VariantsTable
                         className="col-span-full"
                         scoredVariants={scoredVariants}
-                        scoringConfig={scoringMetrics}
+                        scoringConfig={scoring.metrics}
                         metricRanges={metricRanges}
-                        onUpdateMetric={handleUpdateMetric}
-                        pointsLeft={pointsLeft}
+                        onUpdateMetric={scoring.updateMetric}
+                        pointsLeft={scoring.pointsLeft}
                         onOpenInsights={onOpenInsights}
                         showInactive={showInactive}
-                        onShowInactiveChange={onShowInactiveChange}
+                        onShowInactiveChange={setShowInactive}
                       />
                     </div>
                   </div>
@@ -538,39 +378,34 @@ export function ExperimentDetailPage({
           )}
         </div>
 
-        {activePanelKey && (
+        {activePanel && (
           <aside className="border-subtle flex w-[360px] shrink-0 flex-col overflow-hidden border-l">
             <HelperPanelFrame
-              title={PANEL_TITLES[activePanelKey]}
+              title={activePanel}
               icon={
-                helperItems.find(
-                  (i) => i.title === PANEL_TITLES[activePanelKey],
-                )?.icon
+                helperItems.find((item) => item.title === activePanel)?.icon
               }
-              onClose={() => onActivePanelChange('none')}
+              onClose={() => setActivePanel(null)}
             >
-              {activePanelKey === 'info' && detail.data && (
+              {activePanel === INFO_PANEL && detail.data && (
                 <InfoSidebar
                   detail={detail.data}
                   topVariantName={topVariantName}
                 />
               )}
-              {activePanelKey === 'scoring' && scoringMetrics && (
+              {activePanel === SCORING_PANEL && scoring.metrics && (
                 <ScoringFormulaSidebar
-                  metrics={scoringMetrics}
+                  metrics={scoring.metrics}
                   metricRanges={metricRanges}
-                  onUpdateMetric={handleUpdateMetric}
-                  pointsLeft={pointsLeft}
+                  onUpdateMetric={scoring.updateMetric}
+                  pointsLeft={scoring.pointsLeft}
                 />
               )}
             </HelperPanelFrame>
           </aside>
         )}
 
-        <HelperPanelControl
-          items={helperItems}
-          activeTitle={activePanelKey ? PANEL_TITLES[activePanelKey] : null}
-        />
+        <HelperPanelControl items={helperItems} activeTitle={activePanel} />
       </div>
     </>
   );

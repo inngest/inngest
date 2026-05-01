@@ -8,13 +8,9 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import {
   getExperimentUrlState,
   hasExperimentTimeRangeSearch,
-  setExperimentPanelSearch,
-  setExperimentScoringFormulaSearch,
-  setExperimentShowInactiveSearch,
   setExperimentTimeRangeSearch,
   setExperimentVariantsSearch,
   validateExperimentDetailSearch,
-  type ExperimentDetailPanel,
 } from '@/lib/experiments/urlState';
 import { useFunction } from '@/queries/functions';
 
@@ -53,36 +49,6 @@ function ExperimentDetailRoute() {
     [navigate],
   );
 
-  const updateShowInactive = useCallback(
-    (showInactive: boolean) => {
-      navigate({
-        search: (prev) => setExperimentShowInactiveSearch(prev, showInactive),
-        replace: true,
-      });
-    },
-    [navigate],
-  );
-
-  const updateActivePanel = useCallback(
-    (panel: ExperimentDetailPanel) => {
-      navigate({
-        search: (prev) => setExperimentPanelSearch(prev, panel),
-        replace: true,
-      });
-    },
-    [navigate],
-  );
-
-  const updateScoringFormula = useCallback(
-    (formulaParam: string | undefined) => {
-      navigate({
-        search: (prev) => setExperimentScoringFormulaSearch(prev, formulaParam),
-        replace: true,
-      });
-    },
-    [navigate],
-  );
-
   const decodedFunctionSlug = decodeURIComponent(functionSlug);
   const [{ data, fetching }] = useFunction({
     functionSlug: decodedFunctionSlug,
@@ -112,13 +78,6 @@ function ExperimentDetailRoute() {
       onTimeRangeChange={updateTimeRange}
       selectedVariants={urlState.selectedVariants}
       onSelectedVariantsChange={updateSelectedVariants}
-      showInactive={urlState.showInactive}
-      onShowInactiveChange={updateShowInactive}
-      activePanel={urlState.panel}
-      onActivePanelChange={updateActivePanel}
-      scoreFormula={urlState.scoreFormula}
-      scoreFormulaParam={urlState.scoreFormulaParam}
-      onScoringFormulaChange={updateScoringFormula}
     />
   );
 }
