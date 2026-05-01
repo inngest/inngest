@@ -65,7 +65,7 @@ overrides:
   h3-v2: npm:h3@2.0.1-rc.20
   dompurify@<=3.3.2: 3.4.1
   srvx@<=0.11.13: 0.11.15
-  protobufjs@<=8.0.1: 8.0.2
+  protobufjs@<=8.0.1: 8.0.3
   uuid@<14.0.0: 14.0.0
   '@clerk/shared@<3.47.4': 4.8.5
 
@@ -9673,8 +9673,8 @@ packages:
   property-information@7.1.0:
     resolution: {integrity: sha512-TwEZ+X+yCJmYfL7TPUOcvBZ4QfoT5YenQiJuX//0th53DE6w0xxLEtfK3iyryQFddXuvkIk51EEgrJQ0WJkOmQ==}
 
-  protobufjs@8.0.2:
-    resolution: {integrity: sha512-TNF0rhMsp+g21us9R2aj3iA7JY9pG7G/3zyRiULl6NS+AurvgQ7iWA203QcykDGSosHxMsV+K6GTR15RBWw1bA==}
+  protobufjs@8.0.3:
+    resolution: {integrity: sha512-LBYnMWkKLB8fE/ljROPDbCl7mgLSlI+oBe1fAAr5MTqFg4TIi0tYrVVurJvQggOjnUYMQtEZBjrej59ojMNTHQ==}
     engines: {node: '>=12.0.0'}
 
   proxy-addr@2.0.7:
@@ -13200,7 +13200,7 @@ snapshots:
     dependencies:
       lodash.camelcase: 4.3.0
       long: 5.3.2
-      protobufjs: 8.0.2
+      protobufjs: 8.0.3
       yargs: 17.7.2
 
   '@headlessui/react@1.7.19(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
@@ -14545,7 +14545,7 @@ snapshots:
       '@opentelemetry/sdk-logs': 0.215.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-metrics': 2.7.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.7.0(@opentelemetry/api@1.9.1)
-      protobufjs: 8.0.2
+      protobufjs: 8.0.3
 
   '@opentelemetry/propagator-b3@2.7.0(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -21914,7 +21914,7 @@ snapshots:
 
   property-information@7.1.0: {}
 
-  protobufjs@8.0.2:
+  protobufjs@8.0.3:
     dependencies:
       '@types/node': 24.12.2
       long: 5.3.2
