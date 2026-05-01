@@ -347,13 +347,7 @@ fragmentLoop:
 			}
 		}
 
-		if attrs, ok := fragment["attributes"].(string); ok {
-			fragmentAttr := map[string]any{}
-			if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
-				logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
-				return nil, err
-			}
-
+		if fragmentAttr, attrErr := extractFragmentAttrs(fragment); attrErr == nil {
 			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
 
 			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
@@ -373,6 +367,8 @@ fragmentLoop:
 					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
 				}
 			}
+		} else if fragment["attributes"] != nil {
+			logger.StdlibLogger(ctx).Error("error extracting span attributes", "error", attrErr)
 		}
 	}
 
@@ -578,9 +574,18 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 	}
 
 	for _, fragment := range fragments {
-		attrs, ok := fragment["attributes"].(string)
-		if !ok {
-			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind, no attributes")
+		attrsMap, attrsErr := extractFragmentAttrs(fragment)
+		if attrsErr != nil {
+			logger.StdlibLogger(ctx).Error("error extracting metadata span attributes", "error", attrsErr)
+			continue
+		}
+
+		// Roundtrip through JSON is intentional: Scope and Opcode are enumer-
+		// generated int types with custom JSON unmarshalers that convert string
+		// representations (e.g. "step") to typed values.
+		attrsBytes, err := json.Marshal(attrsMap)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error marshalling metadata span attributes", "error", err)
 			continue
 		}
 
@@ -590,7 +595,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 			Op     *metadata.Opcode `json:"_inngest.metadata.op"`
 			Values *string          `json:"_inngest.metadata.values"`
 		}
-		if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+		if err := json.Unmarshal(attrsBytes, &fragmentAttr); err != nil {
 			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span attributes", "error", err)
 			return nil, err
 		}
@@ -631,8 +636,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 		}
 
 		var fragmentMetadata metadata.Values
-		err := json.Unmarshal([]byte(*fragmentAttr.Values), &fragmentMetadata)
-		if err != nil {
+		if err = json.Unmarshal([]byte(*fragmentAttr.Values), &fragmentMetadata); err != nil {
 			logger.StdlibLogger(ctx).Error("error unmarshalling span metadata", "error", err)
 			return nil, err
 		}

@@ -1970,3 +1970,54 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 
 	return cm, cleanup
 }
+
+func TestExtractFragmentAttrs(t *testing.T) {
+	t.Run("string value (SQLite)", func(t *testing.T) {
+		fragment := map[string]any{
+			"attributes": `{"_inngest.step.id":"fetch-items","_inngest.step.attempt":0}`,
+		}
+		got, err := extractFragmentAttrs(fragment)
+		require.NoError(t, err)
+		require.Equal(t, "fetch-items", got["_inngest.step.id"])
+	})
+
+	t.Run("map value (PostgreSQL)", func(t *testing.T) {
+		fragment := map[string]any{
+			"attributes": map[string]any{
+				"_inngest.step.id":      "fetch-items",
+				"_inngest.step.attempt": float64(0),
+			},
+		}
+		got, err := extractFragmentAttrs(fragment)
+		require.NoError(t, err)
+		require.Equal(t, "fetch-items", got["_inngest.step.id"])
+	})
+
+	t.Run("nil value", func(t *testing.T) {
+		fragment := map[string]any{"attributes": nil}
+		_, err := extractFragmentAttrs(fragment)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "nil")
+	})
+
+	t.Run("missing key", func(t *testing.T) {
+		fragment := map[string]any{}
+		_, err := extractFragmentAttrs(fragment)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "nil")
+	})
+
+	t.Run("invalid JSON string", func(t *testing.T) {
+		fragment := map[string]any{"attributes": "not-json"}
+		_, err := extractFragmentAttrs(fragment)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unmarshal")
+	})
+
+	t.Run("unexpected type", func(t *testing.T) {
+		fragment := map[string]any{"attributes": 42}
+		_, err := extractFragmentAttrs(fragment)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unexpected")
+	})
+}
