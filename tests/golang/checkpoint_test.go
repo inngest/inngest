@@ -80,8 +80,7 @@ func TestFnCheckpoint(t *testing.T) {
 			r.NoError(err)
 
 			runID := rid.Wait(t)
-			t.Logf("waiting for COMPLETED: config=%+v delay=%v runID=%s", cfg, delay, runID)
-			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 120 * time.Second})
+			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 60 * time.Second})
 			var output string
 			err = json.Unmarshal([]byte(run.Output), &output)
 			require.NotEmpty(t, runID)
