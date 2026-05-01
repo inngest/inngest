@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeferredStartMetadataValidate(t *testing.T) {
+func TestDeferredScheduleMetadataValidate(t *testing.T) {
 	valid := DeferredScheduleMetadata{
 		FnSlug:       "score",
 		ParentFnSlug: "app-parent-fn",
