@@ -435,21 +435,21 @@ func request_V2_InvokeFunction_0(ctx context.Context, marshaler runtime.Marshale
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
 	}
-	val, ok := pathParams["app_id"]
+	val, ok := pathParams["appId"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "app_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "appId")
 	}
 	protoReq.AppId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "app_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "appId", err)
 	}
-	val, ok = pathParams["function_id"]
+	val, ok = pathParams["functionId"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "function_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "functionId")
 	}
 	protoReq.FunctionId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "function_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "functionId", err)
 	}
 	msg, err := client.InvokeFunction(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -464,21 +464,21 @@ func local_request_V2_InvokeFunction_0(ctx context.Context, marshaler runtime.Ma
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["app_id"]
+	val, ok := pathParams["appId"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "app_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "appId")
 	}
 	protoReq.AppId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "app_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "appId", err)
 	}
-	val, ok = pathParams["function_id"]
+	val, ok = pathParams["functionId"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "function_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "functionId")
 	}
 	protoReq.FunctionId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "function_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "functionId", err)
 	}
 	msg, err := server.InvokeFunction(ctx, &protoReq)
 	return msg, metadata, err
@@ -736,7 +736,7 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/InvokeFunction", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/invoke"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/InvokeFunction", runtime.WithHTTPPathPattern("/apps/{appId}/functions/{functionId}/invoke"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -998,7 +998,7 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/InvokeFunction", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/invoke"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/InvokeFunction", runtime.WithHTTPPathPattern("/apps/{appId}/functions/{functionId}/invoke"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1027,7 +1027,7 @@ var (
 	pattern_V2_ListWebhooks_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"env", "webhooks"}, ""))
 	pattern_V2_PatchEnv_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"envs", "id"}, ""))
 	pattern_V2_SyncApp_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"apps", "app_id", "syncs"}, ""))
-	pattern_V2_InvokeFunction_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"apps", "app_id", "functions", "function_id", "invoke"}, ""))
+	pattern_V2_InvokeFunction_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"apps", "appId", "functions", "functionId", "invoke"}, ""))
 )
 
 var (

@@ -2090,10 +2090,10 @@ func (x *PatchEnvsResponse) GetMetadata() *ResponseMetadata {
 
 type InvokeFunctionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	FunctionId     string                 `protobuf:"bytes,1,opt,name=functionId,proto3" json:"functionId,omitempty"`
 	Data           *structpb.Struct       `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	IdempotencyKey *string                `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3,oneof" json:"idempotency_key,omitempty"`
-	AppId          string                 `protobuf:"bytes,4,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	IdempotencyKey *string                `protobuf:"bytes,3,opt,name=idempotencyKey,proto3,oneof" json:"idempotencyKey,omitempty"`
+	AppId          string                 `protobuf:"bytes,4,opt,name=appId,proto3" json:"appId,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2210,10 +2210,10 @@ func (x *InvokeFunctionResponse) GetMetadata() *ResponseMetadata {
 
 type InvokeFunctionData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	QueuedAt      *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
-	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=runId,proto3" json:"runId,omitempty"`
+	QueuedAt      *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=queuedAt,proto3" json:"queuedAt,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=startedAt,proto3,oneof" json:"startedAt,omitempty"`
+	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=completedAt,proto3,oneof" json:"completedAt,omitempty"`
 	Result        *string                `protobuf:"bytes,5,opt,name=result,proto3,oneof" json:"result,omitempty"`
 	Error         *string                `protobuf:"bytes,6,opt,name=error,proto3,oneof" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2672,27 +2672,28 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_isArchived\"j\n" +
 	"\x11PatchEnvsResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x84\x04\n" +
-	"\x15InvokeFunctionRequest\x12\\\n" +
-	"\vfunction_id\x18\x01 \x01(\tB;\x92A82 The ID of the function to invokeJ\x14\"my-app-hello-world\"R\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x80\x04\n" +
+	"\x15InvokeFunctionRequest\x12[\n" +
+	"\n" +
+	"functionId\x18\x01 \x01(\tB;\x92A82 The ID of the function to invokeJ\x14\"my-app-hello-world\"R\n" +
 	"functionId\x12\x86\x01\n" +
-	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructBY\x92AV26JSON object containing the input data for the functionJ\x1c{\"message\": \"Hello, World!\"}R\x04data\x12\x9e\x01\n" +
-	"\x0fidempotency_key\x18\x03 \x01(\tBp\x92Am2XOptional idempotency key to handle duplicate requests within a given idempotency period.J\x11\"user-action-123\"H\x00R\x0eidempotencyKey\x88\x01\x01\x12O\n" +
-	"\x06app_id\x18\x04 \x01(\tB8\x92A52)The ID of the app containing the functionJ\b\"my-app\"R\x05appIdB\x12\n" +
-	"\x10_idempotency_key\"~\n" +
+	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructBY\x92AV26JSON object containing the input data for the functionJ\x1c{\"message\": \"Hello, World!\"}R\x04data\x12\x9d\x01\n" +
+	"\x0eidempotencyKey\x18\x03 \x01(\tBp\x92Am2XOptional idempotency key to handle duplicate requests within a given idempotency period.J\x11\"user-action-123\"H\x00R\x0eidempotencyKey\x88\x01\x01\x12N\n" +
+	"\x05appId\x18\x04 \x01(\tB8\x92A52)The ID of the app containing the functionJ\b\"my-app\"R\x05appIdB\x11\n" +
+	"\x0f_idempotencyKey\"~\n" +
 	"\x16InvokeFunctionResponse\x12.\n" +
 	"\x04data\x18\x01 \x01(\v2\x1a.api.v2.InvokeFunctionDataR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xba\x06\n" +
-	"\x12InvokeFunctionData\x12g\n" +
-	"\x06run_id\x18\x01 \x01(\tBP\x92AM2-Unique identifier for this function executionJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\x12p\n" +
-	"\tqueued_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB7\x92A422Timestamp when the function execution was enqueuedR\bqueuedAt\x12\x7f\n" +
-	"\n" +
-	"started_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB?\x92A<2:Timestamp when the function execution started (if started)H\x00R\tstartedAt\x88\x01\x01\x12\x86\x01\n" +
-	"\fcompleted_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampBB\x92A?2=Timestamp when the function execution completed (if finished)H\x01R\vcompletedAt\x88\x01\x01\x12\xb9\x01\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xb4\x06\n" +
+	"\x12InvokeFunctionData\x12f\n" +
+	"\x05runId\x18\x01 \x01(\tBP\x92AM2-Unique identifier for this function executionJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\x12o\n" +
+	"\bqueuedAt\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB7\x92A422Timestamp when the function execution was enqueuedR\bqueuedAt\x12~\n" +
+	"\tstartedAt\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB?\x92A<2:Timestamp when the function execution started (if started)H\x00R\tstartedAt\x88\x01\x01\x12\x85\x01\n" +
+	"\vcompletedAt\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampBB\x92A?2=Timestamp when the function execution completed (if finished)H\x01R\vcompletedAt\x88\x01\x01\x12\xb9\x01\n" +
 	"\x06result\x18\x05 \x01(\tB\x9b\x01\x92A\x97\x012aJSON string containing the function result (only available for completed synchronous invocations)J2\"{\\\"success\\\": true, \\\"data\\\": \\\"Hello, World!\\\"}\"H\x02R\x06result\x88\x01\x01\x12N\n" +
-	"\x05error\x18\x06 \x01(\tB3\x92A02.Error message if the function execution failedH\x03R\x05error\x88\x01\x01B\r\n" +
-	"\v_started_atB\x0f\n" +
-	"\r_completed_atB\t\n" +
+	"\x05error\x18\x06 \x01(\tB3\x92A02.Error message if the function execution failedH\x03R\x05error\x88\x01\x01B\f\n" +
+	"\n" +
+	"_startedAtB\x0e\n" +
+	"\f_completedAtB\t\n" +
 	"\a_resultB\b\n" +
 	"\x06_error\"\xa1\x01\n" +
 	"\x0eSyncAppRequest\x12,\n" +
@@ -2719,7 +2720,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\x8dN\n" +
+	"\x04DENY\x10\x012\x8bN\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2981,8 +2982,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xf1\v\n" +
-	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\x9f\v\x92A\xe3\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xef\v\n" +
+	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\x9d\v\x92A\xe3\n" +
 	"\x12\x0fInvoke function\x1a\x81\x01Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request bodyJn\n" +
 	"\x03200\x12g\n" +
 	"9Function invoked synchronously and has finished executing\x12*\n" +
@@ -3019,7 +3020,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invokeB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x020:\x01*\"+/apps/{appId}/functions/{functionId}/invokeB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -3133,9 +3134,9 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	44, // 43: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
 	38, // 44: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
 	8,  // 45: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	43, // 46: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	43, // 47: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	43, // 48: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	43, // 46: api.v2.InvokeFunctionData.queuedAt:type_name -> google.protobuf.Timestamp
+	43, // 47: api.v2.InvokeFunctionData.startedAt:type_name -> google.protobuf.Timestamp
+	43, // 48: api.v2.InvokeFunctionData.completedAt:type_name -> google.protobuf.Timestamp
 	41, // 49: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
 	8,  // 50: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
 	42, // 51: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
