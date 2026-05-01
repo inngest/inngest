@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -12,6 +13,7 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 
+	"github.com/inngest/inngest/pkg/consts"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 )
@@ -194,6 +196,48 @@ func TestSetDeferStatus_InputRoundTripsByteForByte(t *testing.T) {
 			r.Equal(tc.input, string(defers[d.HashedID].Input))
 		})
 	}
+}
+
+// SaveDefer must reject new hashedIDs once the per-run limit is reached, but
+// re-saves of an existing hashedID (legitimate SDK retransmits) must still go
+// through.
+func TestSaveDefer_LimitPerRun(t *testing.T) {
+	r := require.New(t)
+	ctx := context.Background()
+	v2svc, id := newDeferTestRunService(t)
+
+	for i := 0; i < consts.MaxDefersPerRun; i++ {
+		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       fmt.Sprintf("hash-step-%d", i),
+			ScheduleStatus: statev2.ScheduleStatusAfterRun,
+			Input:          json.RawMessage(`{}`),
+		}))
+	}
+
+	// One past the limit: reject.
+	err := v2svc.SaveDefer(ctx, id, statev2.Defer{
+		FnSlug:         "onDefer-score",
+		HashedID:       "hash-step-overflow",
+		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		Input:          json.RawMessage(`{}`),
+	})
+	r.ErrorIs(err, statev2.ErrDeferLimitExceeded)
+
+	// Update of an existing hashedID must still succeed at the cap.
+	r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+		FnSlug:         "onDefer-score",
+		HashedID:       "hash-step-0",
+		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		Input:          json.RawMessage(`{"updated":true}`),
+	}))
+
+	defers, err := v2svc.LoadDefers(ctx, id)
+	r.NoError(err)
+	r.Len(defers, consts.MaxDefersPerRun)
+	r.JSONEq(`{"updated":true}`, string(defers["hash-step-0"].Input))
+	_, ok := defers["hash-step-overflow"]
+	r.False(ok, "rejected defer must not appear in LoadDefers")
 }
 
 func TestSaveDefer_FirstWriteWhenMissing(t *testing.T) {

@@ -71,6 +71,9 @@ const (
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 
+	// MaxDefersPerRun is the maximum number of defers allowed per function run.
+	MaxDefersPerRun = 20
+
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
@@ -151,7 +154,7 @@ const (
 	// a connect worker does not specify MaxWorkerConcurrency.
 	DefaultWorkerConcurrency int64 = 1000
 
-	ConnectWorkerHeartbeatInterval = 10 * time.Second
+	ConnectWorkerHeartbeatInterval  = 10 * time.Second
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
 	ConnectGCThreshold              = 5 * time.Minute
 
