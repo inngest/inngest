@@ -23,7 +23,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 	defer server.Close()
 
 	var (
-		inProgress, total int32
+		inProgress, total, completed int32
 
 		numEvents  = 3
 		fnDuration = 2
@@ -40,6 +40,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		require.Less(t, next, int32(2))
 		<-time.After(time.Duration(fnDuration) * time.Second)
 		atomic.AddInt32(&inProgress, -1)
+		atomic.AddInt32(&completed, 1)
 		return true, nil
 	}
 
@@ -98,12 +99,15 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		return atomic.LoadInt32(&inProgress) == 1
 	}, 2*time.Second, 50*time.Millisecond)
 
-	for i := 0; i < ((numEvents*2)*fnDuration)+5; i++ {
-		<-time.After(time.Second)
+	deadline := time.Now().Add(time.Duration(numEvents*2*fnDuration)*time.Second + queue.PartitionConcurrencyLimitRequeueExtension*time.Duration(numEvents*2) + 5*time.Second)
+	for time.Now().Before(deadline) {
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgress), int32(1))
+		if atomic.LoadInt32(&completed) == int32(numEvents*2) {
+			break
+		}
+		<-time.After(200 * time.Millisecond)
 	}
 
-	require.Eventually(t, func() bool {
-		return atomic.LoadInt32(&total) == 6
-	}, queue.PartitionConcurrencyLimitRequeueExtension/2, time.Millisecond*10)
+	require.EqualValues(t, numEvents*2, atomic.LoadInt32(&total))
+	require.EqualValues(t, numEvents*2, atomic.LoadInt32(&completed))
 }
