@@ -11,14 +11,15 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "format": "prettier --write src",
-    "preinstall": "npx only-allow pnpm"
+    "preinstall": "npx only-allow pnpm",
+    "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.158.1",
     "@tanstack/react-start": "^1.158.1",
     "fumadocs-core": "^16.0.0",
     "fumadocs-mdx": "^14.0.0",
-    "fumadocs-openapi": "^10.0.0",
+    "fumadocs-openapi": "10.6.8",
     "fumadocs-ui": "^16.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

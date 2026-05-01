@@ -10,7 +10,7 @@
             },
             "type": "object"
           },
-          "idempotency_key": {
+          "idempotencyKey": {
             "description": "Optional idempotency key to handle duplicate requests within a given idempotency period.",
             "example": "user-action-123",
             "type": "string"
@@ -165,7 +165,7 @@
       },
       "v2CreateWebhookRequest": {
         "properties": {
-          "event_filter": {
+          "eventFilter": {
             "$ref": "#/components/schemas/v2EventFilter"
           },
           "name": {
@@ -397,7 +397,7 @@
       },
       "v2InvokeFunctionData": {
         "properties": {
-          "completed_at": {
+          "completedAt": {
             "description": "Timestamp when the function execution completed (if finished)",
             "format": "date-time",
             "type": "string"
@@ -406,7 +406,7 @@
             "description": "Error message if the function execution failed",
             "type": "string"
           },
-          "queued_at": {
+          "queuedAt": {
             "description": "Timestamp when the function execution was enqueued",
             "format": "date-time",
             "type": "string"
@@ -416,12 +416,12 @@
             "example": "{\"success\": true, \"data\": \"Hello, World!\"}",
             "type": "string"
           },
-          "run_id": {
+          "runId": {
             "description": "Unique identifier for this function execution",
             "example": "01hp1zx8m3ng9vp6qn0xk7j4cy",
             "type": "string"
           },
-          "started_at": {
+          "startedAt": {
             "description": "Timestamp when the function execution started (if started)",
             "format": "date-time",
             "type": "string"
@@ -485,11 +485,11 @@
       },
       "v2ResponseMetadata": {
         "properties": {
-          "cached_until": {
+          "cachedUntil": {
             "format": "date-time",
             "type": "string"
           },
-          "fetched_at": {
+          "fetchedAt": {
             "format": "date-time",
             "type": "string"
           }
@@ -519,7 +519,7 @@
       },
       "v2SyncAppData": {
         "properties": {
-          "app_id": {
+          "appId": {
             "description": "App ID",
             "type": "string"
           },
@@ -568,7 +568,7 @@
           "environment": {
             "type": "string"
           },
-          "event_filter": {
+          "eventFilter": {
             "$ref": "#/components/schemas/v2EventFilter"
           },
           "id": {
@@ -630,7 +630,7 @@
                       },
                       "metadata": {
                         "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
+                        "fetchedAt": "2024-01-20T14:22:33Z"
                       }
                     }
                   }
@@ -701,7 +701,7 @@
         ]
       }
     },
-    "/apps/{app_id}/functions/{function_id}/invoke": {
+    "/apps/{appId}/functions/{functionId}/invoke": {
       "post": {
         "description": "Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request body",
         "operationId": "V2_InvokeFunction",
@@ -709,7 +709,7 @@
           {
             "description": "The ID of the app containing the function",
             "in": "path",
-            "name": "app_id",
+            "name": "appId",
             "required": true,
             "schema": {
               "type": "string"
@@ -718,7 +718,7 @@
           {
             "description": "The ID of the function to invoke",
             "in": "path",
-            "name": "function_id",
+            "name": "functionId",
             "required": true,
             "schema": {
               "type": "string"
@@ -849,7 +849,7 @@
         ]
       }
     },
-    "/apps/{app_id}/syncs": {
+    "/apps/{appId}/syncs": {
       "post": {
         "description": "Sync an app at the provided URL.",
         "operationId": "V2_SyncApp",
@@ -857,7 +857,7 @@
           {
             "description": "App ID",
             "in": "path",
-            "name": "app_id",
+            "name": "appId",
             "required": true,
             "schema": {
               "type": "string"
@@ -1209,7 +1209,7 @@
                       ],
                       "metadata": {
                         "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
+                        "fetchedAt": "2024-01-20T14:22:33Z"
                       },
                       "page": {
                         "hasMore": false,
@@ -1344,7 +1344,7 @@
                       },
                       "metadata": {
                         "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
+                        "fetchedAt": "2024-01-20T14:22:33Z"
                       }
                     }
                   }
@@ -1601,7 +1601,7 @@
                       ],
                       "metadata": {
                         "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
+                        "fetchedAt": "2024-01-20T14:22:33Z"
                       },
                       "page": {
                         "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
@@ -1759,7 +1759,7 @@
                       ],
                       "metadata": {
                         "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
+                        "fetchedAt": "2024-01-20T14:22:33Z"
                       },
                       "page": {
                         "cursor": null,
@@ -1918,7 +1918,7 @@
                       ],
                       "metadata": {
                         "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
+                        "fetchedAt": "2024-01-20T14:22:33Z"
                       },
                       "page": {
                         "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
@@ -2053,7 +2053,7 @@
                       },
                       "metadata": {
                         "cachedUntil": null,
-                        "fetched_at": "2024-01-20T14:22:33Z"
+                        "fetchedAt": "2024-01-20T14:22:33Z"
                       }
                     }
                   }
