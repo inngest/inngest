@@ -94,6 +94,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # We block on goreleaser to not track any failed releases
+    needs: [check-release-type, goreleaser]
     steps:
       - uses: actions/checkout@v4
         with:
