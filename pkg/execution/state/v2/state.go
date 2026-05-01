@@ -6,7 +6,14 @@ import (
 	"fmt"
 )
 
-var ErrMetadataNotFound = fmt.Errorf("metadata not found")
+var (
+	ErrMetadataNotFound = fmt.Errorf("metadata not found")
+
+	// ErrDeferLimitExceeded is returned by SaveDefer when adding a new defer
+	// would exceed consts.MaxDefersPerRun for the run. Updates to an existing
+	// hashedID never trip this.
+	ErrDeferLimitExceeded = fmt.Errorf("defer limit per run exceeded")
+)
 
 type State struct {
 	Metadata Metadata

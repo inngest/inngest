@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util/rueidisconn"
@@ -576,25 +578,61 @@ func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uu
 		return nil, err
 	}
 
-	// Demux meta:<H> and input:<H> fields into a single Defer per H.
-	metas := make(map[string]deferMeta, len(rmap)/2)
+	// Demux meta:<H> and input:<H> fields into a single Defer per H. SaveDefer
+	// enforces consts.MaxDefersPerRun at write time, so any excess here is a
+	// bug or misuse of the hash. Log loudly and truncate. We pick the kept
+	// hashedIDs by sorted order so two LoadDefers calls against the same
+	// underlying state always return the same defers; selecting during random
+	// rmap iteration would silently fan out to different deferred runs.
+	rawMetas := make(map[string]string, len(rmap)/2)
 	inputs := make(map[string]string, len(rmap)/2)
 	for field, raw := range rmap {
 		switch {
 		case strings.HasPrefix(field, "meta:"):
-			hashedID := strings.TrimPrefix(field, "meta:")
-			var meta deferMeta
-			if err := json.Unmarshal([]byte(raw), &meta); err != nil {
-				return nil, err
-			}
-			metas[hashedID] = meta
+			rawMetas[strings.TrimPrefix(field, "meta:")] = raw
 		case strings.HasPrefix(field, "input:"):
 			inputs[strings.TrimPrefix(field, "input:")] = raw
 		}
 	}
 
-	defers := make(map[string]statev2.Defer, len(metas))
-	for hashedID, meta := range metas {
+	hashedIDs := make([]string, 0, len(rawMetas))
+	for hashedID := range rawMetas {
+		hashedIDs = append(hashedIDs, hashedID)
+	}
+	if len(hashedIDs) > consts.MaxDefersPerRun {
+		// This should be impossible since SaveDefer enforces the limit at write
+		// time. But we'll be defensive by loudly logging and truncating.
+		logger.StdlibLogger(ctx).Error(
+			"defer count exceeds per-run limit",
+			"account_id", accountId,
+			"fn_id", fnID,
+			"hash_field_count", len(rmap),
+			"limit", consts.MaxDefersPerRun,
+			"run_id", runID,
+			"unreachable", true,
+		)
+
+		// Sort the hashedIDs to make the truncation deterministic. However,
+		// this is still flawed. If we do mistakenly insert past the limit and
+		// hit this code path, it's possible that a new defer's (past the limit)
+		// hashed ID is sorted before an existing defer. We felt this downside
+		// was acceptable because the chance is extremely rare (either a
+		// SaveDefer bug or the limit changing during the life of a function
+		// run).
+		//
+		// We should rethink this tradeoff if MaxDefersPerRun becomes dynamic
+		// (e.g. an entitlement). If we did that, the best solution might be to
+		// "pin" it at the start of the function run (e.g. add it to run state).
+		slices.Sort(hashedIDs)
+		hashedIDs = hashedIDs[:consts.MaxDefersPerRun]
+	}
+
+	defers := make(map[string]statev2.Defer, len(hashedIDs))
+	for _, hashedID := range hashedIDs {
+		var meta deferMeta
+		if err := json.Unmarshal([]byte(rawMetas[hashedID]), &meta); err != nil {
+			return nil, err
+		}
 		d := statev2.Defer{
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
@@ -849,12 +887,18 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 		return err
 	}
 
-	args, err := StrSlice([]any{d.HashedID, string(metaJSON), string(d.Input), int(statev2.ScheduleStatusCancelled)})
+	args, err := StrSlice([]any{
+		d.HashedID,
+		string(metaJSON),
+		string(d.Input),
+		int(statev2.ScheduleStatusCancelled),
+		consts.MaxDefersPerRun,
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = retriableScripts["saveDefer"].Exec(
+	result, err := retriableScripts["saveDefer"].Exec(
 		redis_telemetry.WithScriptName(ctx, "saveDefer"),
 		r,
 		[]string{fnRunState.kg.Defers(ctx, isSharded, fnID, runID)},
@@ -862,6 +906,9 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error saving defer: %w", err)
+	}
+	if result == -1 {
+		return fmt.Errorf("%w: %d", statev2.ErrDeferLimitExceeded, consts.MaxDefersPerRun)
 	}
 	return nil
 }

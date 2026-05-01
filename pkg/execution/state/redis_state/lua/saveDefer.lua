@@ -1,5 +1,6 @@
 --[[
-Atomically save a Defer record, refusing to resurrect a cancelled one.
+Atomically save a Defer record, refusing to resurrect a cancelled one and
+refusing to add new defers beyond the per-run limit.
 
 Stores meta and Input as two separate hash fields so SetDeferStatus never
 round-trips Input through cjson (which corrupts nested empty objects and
@@ -14,15 +15,20 @@ SaveDefer for the same hashedID is a deliberate no-op, including a hypothetical
 "cancel then re-add" pattern. Re-adding after cancel within a run is not a
 supported SDK flow: same hashedID + cancel is final.
 
+The per-run limit applies only to *new* hashedIDs. Re-saves of an existing
+hashedID (legitimate SDK retransmits) are always allowed through.
+
 KEYS[1] - defers hash key
 ARGV[1] - hashedID
 ARGV[2] - meta JSON ({FnSlug, HashedID, ScheduleStatus} only)
-ARGV[3] - raw Input bytes (HSET verbatim — never decoded by Lua)
+ARGV[3] - raw Input bytes (HSET verbatim, never decoded by Lua)
 ARGV[4] - integer ScheduleStatusCancelled
+ARGV[5] - integer max defers per run
 
 Output:
-  1: written
-  0: no-op (existing record is already cancelled)
+   1: written
+   0: no-op (existing record is already cancelled)
+  -1: no-op (per-run defer limit exceeded)
 ]]
 
 local defersKey      = KEYS[1]
@@ -30,6 +36,7 @@ local hashedID       = ARGV[1]
 local metaPayload    = ARGV[2]
 local inputPayload   = ARGV[3]
 local cancelledValue = tonumber(ARGV[4])
+local maxDefers      = tonumber(ARGV[5])
 
 local metaField  = "meta:" .. hashedID
 local inputField = "input:" .. hashedID
@@ -39,6 +46,14 @@ if existing then
     local prev = cjson.decode(existing)
     if prev.ScheduleStatus == cancelledValue then
         return 0
+    end
+else
+    -- New defer; enforce the per-run limit. Each defer occupies two fields
+    -- (meta:<hashedID> + input:<hashedID>) written atomically by this script,
+    -- so HLEN / 2 is the current defer count.
+    local total = redis.call("HLEN", defersKey)
+    if total / 2 >= maxDefers then
+        return -1
     end
 end
 
