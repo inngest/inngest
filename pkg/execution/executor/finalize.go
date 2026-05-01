@@ -200,15 +200,12 @@ func (e *executor) buildDeferEvents(
 		return nil, nil
 	}
 
-	// Resolve the parent function's slug. opts.Optional.FnSlug is an optimization
-	// hint and may be empty — fall back to loading the function, same as finalizeEvents.
 	fnSlug := opts.Optional.FnSlug
 	if fnSlug == "" {
-		fn, err := e.fl.LoadFunction(ctx, opts.Metadata.ID.Tenant.EnvID, opts.Metadata.ID.FunctionID)
-		if err != nil {
-			return nil, fmt.Errorf("error loading function for deferred events: %w", err)
-		}
-		fnSlug = fn.Function.Slug
+		fnSlug = opts.Metadata.Config.FunctionSlug()
+	}
+	if fnSlug == "" {
+		return nil, fmt.Errorf("function slug missing from run metadata for deferred events")
 	}
 
 	now := e.now()
