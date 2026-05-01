@@ -47,7 +47,7 @@ func TestQueueExtendLease(t *testing.T) {
 		p := osqueue.ItemPartition(ctx, item)
 
 		now := clock.Now()
-		id, err := shard.Lease(ctx, item, time.Second, clock.Now())
+		id, _, err := shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -158,7 +158,7 @@ func TestQueueExtendLease(t *testing.T) {
 		require.NotEmpty(t, fnPart.ID)
 
 		// Lease the item.
-		id, err := shard.Lease(ctx, item, time.Second, clock.Now())
+		id, _, err := shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, id)
 
@@ -243,7 +243,7 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+	leaseID, _, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 	require.NoError(t, err)
 	require.NotNil(t, leaseID)
 

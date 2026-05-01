@@ -46,6 +46,12 @@ type AsyncCheckpointer interface {
 	CheckpointAsyncSteps(context.Context, AsyncCheckpoint) error
 }
 
+var ErrStaleDispatch = errors.New("stale dispatch")
+
+type queueItemLoader interface {
+	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
+}
+
 type Opts struct {
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
@@ -388,6 +394,10 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
+	if err := c.validateAsyncDispatch(ctx, input); err != nil {
+		return err
+	}
+
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, md.ID)
@@ -459,6 +469,38 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), ref.JobID()); err != nil {
 		l.Error("error resetting queue item attempts", "error", err)
 		return err
+	}
+
+	return nil
+}
+
+func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) error {
+	if input.DispatchID == "" {
+		return nil
+	}
+
+	ref := queueref.Decode(input.QueueItemRef)
+	if ref[0] == "" {
+		return fmt.Errorf("%w: missing queue item reference", ErrStaleDispatch)
+	}
+
+	loader, ok := c.Queue.(queueItemLoader)
+	if !ok {
+		// Fail-closed: an SDK echoing dispatch_id has opted in to fencing, so
+		// not being able to validate must abort the write rather than silently
+		// fall back to 400 (which the SDK would not treat as terminal).
+		return fmt.Errorf("%w: queue does not support dispatch validation", ErrStaleDispatch)
+	}
+
+	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
+	if errors.Is(err, queue.ErrQueueItemNotFound) {
+		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
+	}
+	if err != nil {
+		return err
+	}
+	if item.DispatchID == nil || item.DispatchID.String() != input.DispatchID {
+		return fmt.Errorf("%w: dispatch ID mismatch", ErrStaleDispatch)
 	}
 
 	return nil

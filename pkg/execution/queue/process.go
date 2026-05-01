@@ -70,6 +70,9 @@ func (q *queueProcessor) ProcessItem(
 	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
 	jobCtx = WithShardID(jobCtx, q.primaryQueueShard.Name())
 	jobCtx = WithJobID(jobCtx, qi.ID)
+	if qi.DispatchID != nil {
+		jobCtx = WithDispatchID(jobCtx, qi.DispatchID.String())
+	}
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)

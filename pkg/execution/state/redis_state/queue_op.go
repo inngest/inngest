@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -155,6 +156,14 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 	// Unset any lease ID as this is requeued.
 	i.LeaseID = nil
+	// Rotate DispatchID so the next dispatch supersedes the previous one.
+	// Any in-flight SDK process from the prior dispatch will fail server-side
+	// validation when it POSTs its next async checkpoint.
+	newDispatchID, err := ulid.New(ulid.Timestamp(now.UTC()), rnd)
+	if err != nil {
+		return fmt.Errorf("error generating dispatch id: %w", err)
+	}
+	i.DispatchID = &newDispatchID
 	// Update the At timestamp.
 	// NOTE: This does no priority factorization or FIFO for function ordering,
 	// eg. adjusting AtMS based off of function run time.
