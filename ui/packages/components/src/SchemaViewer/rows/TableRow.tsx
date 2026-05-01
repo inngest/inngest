@@ -1,17 +1,15 @@
-import { RiFileCopyLine } from '@remixicon/react';
-
 import { cn } from '../../utils/classNames';
 import { useRenderAdornment } from '../AdornmentContext';
 import { useExpansion } from '../ExpansionContext';
 import { useComputeType } from '../TypeContext';
-import type { ObjectNode } from '../types';
+import type { SchemaNode, TableNode } from '../types';
 import { CollapsibleRowWidget } from './CollapsibleRowWidget';
 import { Row } from './Row';
-import { collectAllExpandablePaths, getTypeLabel, handleCopyValue } from './utils';
+import { getTypeLabel } from './utils';
 
-export type ObjectRowProps = { node: ObjectNode; typeLabelOverride?: string };
+export type TableRowProps = { node: TableNode; typeLabelOverride?: string };
 
-export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
+export function TableRow({ node }: TableRowProps): React.ReactElement {
   const computeType = useComputeType();
   const renderAdornment = useRenderAdornment();
   const { isExpanded, toggleRecursive } = useExpansion();
@@ -36,16 +34,6 @@ export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
         <span className={'text-subtle overflow-hidden text-ellipsis whitespace-nowrap text-sm'}>
           {node.name}
         </span>
-        <button
-          className={cn(
-            'hover:bg-canvasBase min-w-sm rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100'
-          )}
-          onClick={handleCopyValue(node)}
-          type="button"
-          aria-label="Copy value"
-        >
-          <RiFileCopyLine className="text-subtle h-3 w-3" />
-        </button>
         <div className="ml-auto flex items-baseline gap-1.5">
           <span className="text-muted min-w-0 whitespace-nowrap font-mono text-xs capitalize">
             {typeText}
@@ -74,4 +62,28 @@ export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
       )}
     </div>
   );
+}
+
+function collectAllExpandablePaths(node: SchemaNode): string[] {
+  const paths: string[] = [];
+
+  function traverse(n: SchemaNode) {
+    if (n.kind === 'object') {
+      paths.push(n.path);
+      n.children.forEach(traverse);
+    } else if (n.kind === 'array') {
+      paths.push(n.path);
+      traverse(n.element);
+    } else if (n.kind === 'tuple') {
+      paths.push(n.path);
+      n.elements.forEach(traverse);
+    }
+  }
+
+  // Start with children to avoid adding the current node's path
+  if (node.kind === 'object') {
+    node.children.forEach(traverse);
+  }
+
+  return paths;
 }

@@ -102,6 +102,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 
 	// Create grpc-gateway mux for HTTP REST endpoints with custom error handler
 	gwmux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, newResponseEnumMarshaler()),
 		runtime.WithErrorHandler(base.CustomErrorHandler()),
 		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
 			// forward standard headers
