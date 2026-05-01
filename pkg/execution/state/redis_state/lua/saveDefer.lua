@@ -9,6 +9,11 @@ Without atomicity a retried DeferAdd can undo an interleaved DeferCancel:
 T1 SaveDefer → T2 SetDeferStatus(Cancelled) → T3 retry of T1 would silently
 overwrite. Reading and writing inside one Lua invocation closes the race.
 
+A cancelled record is sticky for the lifetime of the run: any subsequent
+SaveDefer for the same hashedID is a deliberate no-op, including a hypothetical
+"cancel then re-add" pattern. Re-adding after cancel within a run is not a
+supported SDK flow: same hashedID + cancel is final.
+
 KEYS[1] - defers hash key
 ARGV[1] - hashedID
 ARGV[2] - meta JSON ({FnSlug, HashedID, ScheduleStatus} only)

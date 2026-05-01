@@ -30,6 +30,11 @@ type Defer struct {
 	// - Already scheduled?
 	// - Schedule after the parent run ends?
 	// - Never schedule (i.e. cancelled)?
+	//
+	// Cancelled is terminal within a run: once a defer transitions to
+	// ScheduleStatusCancelled, it stays there. The Lua-level SaveDefer silently
+	// no-ops any subsequent write for the same hashedID. There is no "uncancel"
+	// path: same hashedID + cancel is final.
 	ScheduleStatus ScheduleStatus
 
 	// Data the user passed to `step.defer`
@@ -61,7 +66,7 @@ const (
 	// Schedule after parent run ends
 	ScheduleStatusAfterRun
 
-	// Will not schedule
+	// Will not schedule. Terminal — no transition out.
 	ScheduleStatusCancelled
 )
 
