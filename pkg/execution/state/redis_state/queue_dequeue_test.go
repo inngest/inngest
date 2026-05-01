@@ -106,7 +106,7 @@ func TestQueueDequeue(t *testing.T) {
 		require.NotEmpty(t, fnPart.ID)
 
 		// Lease the first item, pretending it's in progress.
-		_, err = shard.Lease(ctx, itemA, 10*time.Second, clock.Now())
+		_, _, err = shard.Lease(ctx, itemA, 10*time.Second, clock.Now())
 		require.NoError(t, err)
 
 		// Note: Originally, this test used the concurrency key queue for testing Dequeue(),
@@ -207,7 +207,7 @@ func TestQueueDequeue(t *testing.T) {
 			}, start, osqueue.EnqueueOpts{})
 			require.Nil(t, err)
 
-			id, err := shard.Lease(ctx, item, 10*time.Second, time.Now())
+			id, _, err := shard.Lease(ctx, item, 10*time.Second, time.Now())
 			require.NoError(t, err)
 			require.NotEmpty(t, id)
 
@@ -248,7 +248,7 @@ func TestQueueDequeue(t *testing.T) {
 
 		p := osqueue.QueuePartition{FunctionID: &item.FunctionID}
 
-		id, err := shard.Lease(ctx, item, time.Second, time.Now())
+		id, _, err := shard.Lease(ctx, item, time.Second, time.Now())
 		require.NoError(t, err)
 
 		t.Run("The lease exists in the partition queue", func(t *testing.T) {
@@ -364,7 +364,7 @@ func TestQueueDequeue(t *testing.T) {
 		itemCountMatches(1)
 		concurrencyItemCountMatches(0)
 
-		_, err = shard.Lease(ctx, item, time.Second, time.Now())
+		_, _, err = shard.Lease(ctx, item, time.Second, time.Now())
 		require.NoError(t, err)
 
 		itemCountMatches(0)
@@ -431,7 +431,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+	leaseID, _, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 	require.NoError(t, err)
 	require.NotNil(t, leaseID)
 

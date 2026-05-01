@@ -60,7 +60,7 @@ func TestQueueScavenge(t *testing.T) {
 
 		leaseExpiry := clock.Now().Add(5 * time.Second)
 
-		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+		leaseID, _, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -131,7 +131,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.NoError(t, err)
 
 		// Lease item in legacy/fallback mode (do not disable lease checks)
-		leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+		leaseID, _, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -191,11 +191,11 @@ func TestQueueScavenge(t *testing.T) {
 		leaseExpiry2 := clock.Now().Add(3 * time.Second)
 		require.NotEqual(t, leaseExpiry, leaseExpiry2)
 
-		leaseID1, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now())
+		leaseID1, _, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID1)
 
-		leaseID2, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now())
+		leaseID2, _, err := shard.Lease(ctx, item2, 3*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID2)
 
@@ -245,11 +245,11 @@ func TestQueueScavenge(t *testing.T) {
 		require.NoError(t, err)
 
 		// Perform initial lease only to the new index
-		leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now())
+		leaseID, _, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
-		leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
+		leaseID2, _, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID2)
 
@@ -306,11 +306,11 @@ func TestQueueScavenge(t *testing.T) {
 			require.NoError(t, err)
 
 			// Perform initial lease only to the new index
-			leaseID, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now())
+			leaseID, _, err := shard.Lease(ctx, item1, 3*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			leaseID2, err := shard.Lease(ctx, item2, 2*time.Second, clock.Now())
+			leaseID2, _, err := shard.Lease(ctx, item2, 2*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID2)
 
@@ -371,11 +371,11 @@ func TestQueueScavenge(t *testing.T) {
 			require.NoError(t, err)
 
 			// Perform initial lease only to the new index
-			leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now())
+			leaseID, _, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
+			leaseID2, _, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID2)
 
@@ -447,11 +447,11 @@ func TestQueueScavenge(t *testing.T) {
 			require.NoError(t, err)
 
 			// Perform initial lease only to the new index
-			leaseID, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now())
+			leaseID, _, err := shard.Lease(ctx, item1, 2*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			leaseID2, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
+			leaseID2, _, err := shard.Lease(ctx, item2, 5*time.Second, clock.Now())
 			require.NoError(t, err)
 			require.NotNil(t, leaseID2)
 
@@ -520,7 +520,7 @@ func TestQueueScavenge(t *testing.T) {
 
 		// Simulate existing lease valid for another second
 		leaseExpiry := clock.Now().Add(5 * time.Second)
-		leaseID, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now())
+		leaseID, _, err := shard.Lease(ctx, item1, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -583,7 +583,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.Equal(t, 0, item.ScavengeCount)
 
 		// Lease the item and let it expire
-		_, err = shard.Lease(ctx, item, 5*time.Second, clock.Now())
+		_, _, err = shard.Lease(ctx, item, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 
 		clock.Advance(6 * time.Second)
@@ -600,7 +600,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.Equal(t, 1, requeued.ScavengeCount)
 
 		// Lease and expire again to verify accumulation
-		_, err = shard.Lease(ctx, *requeued, 5*time.Second, clock.Now())
+		_, _, err = shard.Lease(ctx, *requeued, 5*time.Second, clock.Now())
 		require.NoError(t, err)
 
 		clock.Advance(6 * time.Second)

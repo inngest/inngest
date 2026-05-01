@@ -223,6 +223,7 @@ type checkpointAsyncSteps struct {
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
 	QueueItemRef string                  `json:"qi_id"`
+	DispatchID   string                  `json:"dispatch_id"`
 	Steps        []state.GeneratorOpcode `json:"steps"`
 	// Timestamp is the unix-millisecond epoch when the request was created.
 	Timestamp int `json:"ts"`

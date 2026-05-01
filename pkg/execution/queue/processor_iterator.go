@@ -226,6 +226,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	}
 
 	var leaseID *ulid.ULID
+	var dispatchID *ulid.ULID
 	switch constraintRes.LimitingConstraint {
 	// If no constraints were hit (or we didn't invoke the Constraint API)
 	case enums.QueueConstraintNotLimited:
@@ -238,15 +239,23 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		//
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
-		leaseID, err = Duration(ctx, p.Queue.Shard().Name(), "lease", p.Queue.Clock().Now(), func(ctx context.Context) (*ulid.ULID, error) {
-			return p.Queue.Shard().Lease(
+		type leaseIDs struct {
+			leaseID    *ulid.ULID
+			dispatchID *ulid.ULID
+		}
+		var ids leaseIDs
+		ids, err = Duration(ctx, p.Queue.Shard().Name(), "lease", p.Queue.Clock().Now(), func(ctx context.Context) (leaseIDs, error) {
+			lid, did, err := p.Queue.Shard().Lease(
 				ctx,
 				*item,
 				QueueLeaseDuration,
 				p.StaticTime,
 				leaseOptions...,
 			)
+			return leaseIDs{leaseID: lid, dispatchID: did}, err
 		})
+		leaseID = ids.leaseID
+		dispatchID = ids.dispatchID
 		// NOTE: If this loop ends in an error, we must _always_ release an item from the
 		// semaphore to free capacity.  This will happen automatically when the worker
 		// finishes processing a queue item on success.
@@ -497,6 +506,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	// There should always be capacity on this queue as we track capacity via
 	// a semaphore.
 	item.LeaseID = leaseID
+	item.DispatchID = dispatchID
 
 	// increase success counter.
 	p.CtrSuccess.Add(1)
