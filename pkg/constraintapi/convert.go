@@ -797,7 +797,6 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
 		RequestAttempt:       uint32(req.RequestAttempt),
-		RequestTime:          timestamppb.New(req.RequestTime),
 	}
 }
 
@@ -837,11 +836,6 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 	var currentTime time.Time
 	if pbReq.CurrentTime != nil {
 		currentTime = pbReq.CurrentTime.AsTime()
-	}
-
-	var requestTime time.Time
-	if pbReq.RequestTime != nil {
-		requestTime = pbReq.RequestTime.AsTime()
 	}
 
 	var duration time.Duration
@@ -885,7 +879,6 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt:       int(pbReq.RequestAttempt),
-		RequestTime:          requestTime,
 	}, nil
 }
 

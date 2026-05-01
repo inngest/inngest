@@ -1615,7 +1615,6 @@ type CapacityAcquireRequest struct {
 	BlockingThreshold    *durationpb.Duration   `protobuf:"bytes,13,opt,name=blocking_threshold,json=blockingThreshold,proto3" json:"blocking_threshold,omitempty"`
 	Source               *LeaseSource           `protobuf:"bytes,14,opt,name=source,proto3" json:"source,omitempty"`
 	RequestAttempt       uint32                 `protobuf:"varint,15,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
-	RequestTime          *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=request_time,json=requestTime,proto3" json:"request_time,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1760,13 +1759,6 @@ func (x *CapacityAcquireRequest) GetRequestAttempt() uint32 {
 		return x.RequestAttempt
 	}
 	return 0
-}
-
-func (x *CapacityAcquireRequest) GetRequestTime() *timestamppb.Timestamp {
-	if x != nil {
-		return x.RequestTime
-	}
-	return nil
 }
 
 type CapacityAcquireResponse struct {
@@ -2570,7 +2562,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x12fairness_reduction\x18\x04 \x01(\x05R\x11fairnessReduction\x12;\n" +
 	"\vretry_after\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"retryAfter\x12U\n" +
-	"\x15exhausted_constraints\x18\x06 \x03(\v2 .constraintapi.v1.ConstraintItemR\x14exhaustedConstraints\"\xcf\a\n" +
+	"\x15exhausted_constraints\x18\x06 \x03(\v2 .constraintapi.v1.ConstraintItemR\x14exhaustedConstraints\"\x90\a\n" +
 	"\x16CapacityAcquireRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -2590,8 +2582,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x10maximum_lifetime\x18\f \x01(\v2\x19.google.protobuf.DurationR\x0fmaximumLifetime\x12H\n" +
 	"\x12blocking_threshold\x18\r \x01(\v2\x19.google.protobuf.DurationR\x11blockingThreshold\x125\n" +
 	"\x06source\x18\x0e \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
-	"\x0frequest_attempt\x18\x0f \x01(\rR\x0erequestAttempt\x12=\n" +
-	"\frequest_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\vrequestTime\x1a>\n" +
+	"\x0frequest_attempt\x18\x0f \x01(\rR\x0erequestAttempt\x1a>\n" +
 	"\x10LeaseRunIdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x03\n" +
@@ -2805,38 +2796,37 @@ var file_constraintapi_v1_service_proto_depIdxs = []int32{
 	39, // 35: constraintapi.v1.CapacityAcquireRequest.maximum_lifetime:type_name -> google.protobuf.Duration
 	39, // 36: constraintapi.v1.CapacityAcquireRequest.blocking_threshold:type_name -> google.protobuf.Duration
 	22, // 37: constraintapi.v1.CapacityAcquireRequest.source:type_name -> constraintapi.v1.LeaseSource
-	38, // 38: constraintapi.v1.CapacityAcquireRequest.request_time:type_name -> google.protobuf.Timestamp
-	21, // 39: constraintapi.v1.CapacityAcquireResponse.leases:type_name -> constraintapi.v1.CapacityLease
-	19, // 40: constraintapi.v1.CapacityAcquireResponse.limiting_constraints:type_name -> constraintapi.v1.ConstraintItem
-	38, // 41: constraintapi.v1.CapacityAcquireResponse.retry_after:type_name -> google.protobuf.Timestamp
-	19, // 42: constraintapi.v1.CapacityAcquireResponse.exhausted_constraints:type_name -> constraintapi.v1.ConstraintItem
-	20, // 43: constraintapi.v1.CapacityAcquireResponse.usage:type_name -> constraintapi.v1.ConstraintUsage
-	39, // 44: constraintapi.v1.CapacityExtendLeaseRequest.duration:type_name -> google.protobuf.Duration
-	22, // 45: constraintapi.v1.CapacityExtendLeaseRequest.source:type_name -> constraintapi.v1.LeaseSource
-	38, // 46: constraintapi.v1.CapacityExtendLeaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
-	22, // 47: constraintapi.v1.CapacityReleaseRequest.source:type_name -> constraintapi.v1.LeaseSource
-	38, // 48: constraintapi.v1.CapacityReleaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
-	23, // 49: constraintapi.v1.ConstraintAPI.Check:input_type -> constraintapi.v1.CapacityCheckRequest
-	25, // 50: constraintapi.v1.ConstraintAPI.Acquire:input_type -> constraintapi.v1.CapacityAcquireRequest
-	27, // 51: constraintapi.v1.ConstraintAPI.ExtendLease:input_type -> constraintapi.v1.CapacityExtendLeaseRequest
-	29, // 52: constraintapi.v1.ConstraintAPI.Release:input_type -> constraintapi.v1.CapacityReleaseRequest
-	31, // 53: constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreSetCapacityRequest
-	32, // 54: constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreAdjustCapacityRequest
-	33, // 55: constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreGetCapacityRequest
-	35, // 56: constraintapi.v1.ConstraintAPI.ReleaseSemaphore:input_type -> constraintapi.v1.SemaphoreReleaseRequest
-	24, // 57: constraintapi.v1.ConstraintAPI.Check:output_type -> constraintapi.v1.CapacityCheckResponse
-	26, // 58: constraintapi.v1.ConstraintAPI.Acquire:output_type -> constraintapi.v1.CapacityAcquireResponse
-	28, // 59: constraintapi.v1.ConstraintAPI.ExtendLease:output_type -> constraintapi.v1.CapacityExtendLeaseResponse
-	30, // 60: constraintapi.v1.ConstraintAPI.Release:output_type -> constraintapi.v1.CapacityReleaseResponse
-	36, // 61: constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreResponse
-	36, // 62: constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreResponse
-	34, // 63: constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreGetCapacityResponse
-	36, // 64: constraintapi.v1.ConstraintAPI.ReleaseSemaphore:output_type -> constraintapi.v1.SemaphoreResponse
-	57, // [57:65] is the sub-list for method output_type
-	49, // [49:57] is the sub-list for method input_type
-	49, // [49:49] is the sub-list for extension type_name
-	49, // [49:49] is the sub-list for extension extendee
-	0,  // [0:49] is the sub-list for field type_name
+	21, // 38: constraintapi.v1.CapacityAcquireResponse.leases:type_name -> constraintapi.v1.CapacityLease
+	19, // 39: constraintapi.v1.CapacityAcquireResponse.limiting_constraints:type_name -> constraintapi.v1.ConstraintItem
+	38, // 40: constraintapi.v1.CapacityAcquireResponse.retry_after:type_name -> google.protobuf.Timestamp
+	19, // 41: constraintapi.v1.CapacityAcquireResponse.exhausted_constraints:type_name -> constraintapi.v1.ConstraintItem
+	20, // 42: constraintapi.v1.CapacityAcquireResponse.usage:type_name -> constraintapi.v1.ConstraintUsage
+	39, // 43: constraintapi.v1.CapacityExtendLeaseRequest.duration:type_name -> google.protobuf.Duration
+	22, // 44: constraintapi.v1.CapacityExtendLeaseRequest.source:type_name -> constraintapi.v1.LeaseSource
+	38, // 45: constraintapi.v1.CapacityExtendLeaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
+	22, // 46: constraintapi.v1.CapacityReleaseRequest.source:type_name -> constraintapi.v1.LeaseSource
+	38, // 47: constraintapi.v1.CapacityReleaseRequest.lease_issued_at:type_name -> google.protobuf.Timestamp
+	23, // 48: constraintapi.v1.ConstraintAPI.Check:input_type -> constraintapi.v1.CapacityCheckRequest
+	25, // 49: constraintapi.v1.ConstraintAPI.Acquire:input_type -> constraintapi.v1.CapacityAcquireRequest
+	27, // 50: constraintapi.v1.ConstraintAPI.ExtendLease:input_type -> constraintapi.v1.CapacityExtendLeaseRequest
+	29, // 51: constraintapi.v1.ConstraintAPI.Release:input_type -> constraintapi.v1.CapacityReleaseRequest
+	31, // 52: constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreSetCapacityRequest
+	32, // 53: constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreAdjustCapacityRequest
+	33, // 54: constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity:input_type -> constraintapi.v1.SemaphoreGetCapacityRequest
+	35, // 55: constraintapi.v1.ConstraintAPI.ReleaseSemaphore:input_type -> constraintapi.v1.SemaphoreReleaseRequest
+	24, // 56: constraintapi.v1.ConstraintAPI.Check:output_type -> constraintapi.v1.CapacityCheckResponse
+	26, // 57: constraintapi.v1.ConstraintAPI.Acquire:output_type -> constraintapi.v1.CapacityAcquireResponse
+	28, // 58: constraintapi.v1.ConstraintAPI.ExtendLease:output_type -> constraintapi.v1.CapacityExtendLeaseResponse
+	30, // 59: constraintapi.v1.ConstraintAPI.Release:output_type -> constraintapi.v1.CapacityReleaseResponse
+	36, // 60: constraintapi.v1.ConstraintAPI.SetSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreResponse
+	36, // 61: constraintapi.v1.ConstraintAPI.AdjustSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreResponse
+	34, // 62: constraintapi.v1.ConstraintAPI.GetSemaphoreCapacity:output_type -> constraintapi.v1.SemaphoreGetCapacityResponse
+	36, // 63: constraintapi.v1.ConstraintAPI.ReleaseSemaphore:output_type -> constraintapi.v1.SemaphoreResponse
+	56, // [56:64] is the sub-list for method output_type
+	48, // [48:56] is the sub-list for method input_type
+	48, // [48:48] is the sub-list for extension type_name
+	48, // [48:48] is the sub-list for extension extendee
+	0,  // [0:48] is the sub-list for field type_name
 }
 
 func init() { file_constraintapi_v1_service_proto_init() }

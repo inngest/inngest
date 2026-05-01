@@ -42,12 +42,6 @@ type constraintCache struct {
 type constraintCacheItem struct {
 	constraint ConstraintItem
 	retryAfter time.Time
-	// addedAt records the wall-clock time at which this cache entry was created.
-	// Callers can pass CapacityAcquireRequest.RequestTime to bypass entries that
-	// were added after the underlying work was originally received, allowing the
-	// capacity manager's idempotency handling to take effect even when the
-	// in-process cache is deployed.
-	addedAt time.Time
 }
 
 type ConstraintCacheOption func(c *constraintCache)
@@ -137,28 +131,6 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 
 		// Cache hit - this constraint is exhausted
 		val := item.Value()
-
-		// Skip the cache when the caller's request was originally received before
-		// this cache entry was added. This lets the capacity manager's idempotency
-		// handling take effect even when the in-process cache is deployed: a retry
-		// of work received at T0 falls through to the manager rather than being
-		// answered by a cache entry populated at T1 > T0.
-		if !req.RequestTime.IsZero() && val.addedAt.After(req.RequestTime) {
-			tags := map[string]any{
-				"op":              "skipped_stale",
-				"source_location": req.Source.Location.String(),
-				"source_service":  req.Source.Service.String(),
-				"constraint":      ci.MetricsIdentifier(),
-			}
-			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
-				tags["function_id"] = req.FunctionID
-			}
-			metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, item.TTL(), metrics.HistogramOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-			})
-			continue
-		}
 
 		recentlyLimited = append(recentlyLimited, ci)
 		if val.retryAfter.After(retryAfter) {
@@ -251,7 +223,6 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			&constraintCacheItem{
 				retryAfter: res.RetryAfter,
 				constraint: ci,
-				addedAt:    l.clock.Now(),
 			},
 			cacheTTL,
 		)
