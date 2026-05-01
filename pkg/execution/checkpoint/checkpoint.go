@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -83,6 +84,12 @@ type checkpointer struct {
 
 func (c checkpointer) Metrics() MetricsProvider {
 	return c.MetricsProvider
+}
+
+func sanitizeLogValue(v string) string {
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+	return v
 }
 
 // CheckpointSyncSteps handles the checkpointing of new steps via sync, HTTP-based functions
@@ -162,14 +169,15 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				// async.  Therefore, we onl want to save state if we don't have a complete opcode,
 				// as all complete functions will never re-enter.
 				_, err := c.State.SaveStep(ctx, input.Metadata.ID, op.ID, []byte(output))
+				stepName := sanitizeLogValue(op.UserDefinedName())
 				if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 					// Ignore.
-					l.Warn("duplicate checkpoint step", "id", input.Metadata.ID, "name", op.UserDefinedName())
+					l.Warn("duplicate checkpoint step", "id", input.Metadata.ID, "name", stepName)
 					continue
 				}
 				if err != nil {
-					l.Error("error saving checkpointed step state", "name", op.UserDefinedName(), "error", err)
-					return fmt.Errorf("failed to save step %s (%s): %w", op.ID, op.UserDefinedName(), err)
+					l.Error("error saving checkpointed step state", "name", stepName, "error", err)
+					return fmt.Errorf("failed to save step %s (%s): %w", op.ID, stepName, err)
 				}
 			}
 
