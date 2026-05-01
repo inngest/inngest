@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
@@ -143,11 +144,11 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOu
 	result := &apiv2.FunctionRun{
 		Id: run.RunID.String(),
 		Function: &apiv2.FunctionRef{
-			Id:   fn.Slug,
+			Id:   functionRefID(fn),
 			Name: fn.Function.Name,
 		},
 		App: &apiv2.AppRef{
-			Id: fn.AppID.String(),
+			Id: appRefID(fn),
 		},
 		Status:    toFunctionRunStatus(run.Status),
 		QueuedAt:  startedAt,
@@ -177,6 +178,23 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOu
 	}
 
 	return result
+}
+
+func functionRefID(fn inngest.DeployedFunction) string {
+	if fn.Function.Slug != "" {
+		return fn.Function.Slug
+	}
+	if fn.AppName != "" {
+		return strings.TrimPrefix(fn.Slug, fn.AppName+"-")
+	}
+	return fn.Slug
+}
+
+func appRefID(fn inngest.DeployedFunction) string {
+	if fn.AppName != "" {
+		return fn.AppName
+	}
+	return fn.AppID.String()
 }
 
 func toFunctionRunStatus(status enums.RunStatus) apiv2.FunctionRunStatus {

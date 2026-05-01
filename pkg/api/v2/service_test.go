@@ -278,11 +278,13 @@ func TestService_GetFunctionRun(t *testing.T) {
 	service := NewService(ServiceOptions{
 		Functions: stubFunctionProvider{
 			fn: inngest.DeployedFunction{
-				ID:    functionID,
-				Slug:  "my-app-test-fn",
-				AppID: appID,
+				ID:      functionID,
+				Slug:    "my-app-test-fn",
+				AppID:   appID,
+				AppName: "my-app",
 				Function: inngest.Function{
 					Name: "Test function",
+					Slug: "test-fn",
 				},
 			},
 		},
@@ -307,9 +309,9 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, runID.String(), resp.Data.Id)
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data.Status)
-		require.Equal(t, "my-app-test-fn", resp.Data.Function.Id)
+		require.Equal(t, "test-fn", resp.Data.Function.Id)
 		require.Equal(t, "Test function", resp.Data.Function.Name)
-		require.Equal(t, appID.String(), resp.Data.App.Id)
+		require.Equal(t, "my-app", resp.Data.App.Id)
 		require.NotNil(t, resp.Data.Output)
 		require.Equal(t, true, resp.Data.Output.Fields["ok"].GetBoolValue())
 		require.NotNil(t, resp.Data.DurationMs)
