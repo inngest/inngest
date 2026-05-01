@@ -109,7 +109,7 @@ CREATE TABLE public.function_runs (
 --
 
 CREATE TABLE public.functions (
-    id character(36),
+    id character(36) NOT NULL,
     app_id character(36),
     name character varying NOT NULL,
     slug character varying NOT NULL,
@@ -317,6 +317,13 @@ ALTER TABLE ONLY public.event_batches
     ADD CONSTRAINT event_batches_pkey PRIMARY KEY (id);
 
 --
+-- Name: functions functions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.functions
+    ADD CONSTRAINT functions_pkey PRIMARY KEY (id);
+
+--
 -- Name: goose_db_version goose_db_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -399,6 +406,24 @@ CREATE INDEX idx_function_runs_run_id ON public.function_runs USING btree (run_i
 --
 
 CREATE INDEX idx_function_runs_timebound ON public.function_runs USING btree (run_started_at DESC, function_id);
+
+--
+-- Name: idx_functions_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_functions_active ON public.functions USING btree (app_id) WHERE (archived_at IS NULL);
+
+--
+-- Name: idx_functions_app_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_functions_app_id ON public.functions USING btree (app_id);
+
+--
+-- Name: idx_functions_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_functions_slug ON public.functions USING btree (slug) WHERE (archived_at IS NULL);
 
 --
 -- Name: idx_history_id; Type: INDEX; Schema: public; Owner: -
