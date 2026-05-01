@@ -94,12 +94,16 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		return atomic.LoadInt32(&inProgress) == 1
 	}, 2*time.Second, 50*time.Millisecond)
 
-	for i := 0; i < ((numEvents*2)*fnDuration)+5; i++ {
+	// Account for requeue delays between runs: each run takes fnDuration seconds
+	// and may incur up to PartitionConcurrencyLimitRequeueExtension delay.
+	totalRuns := numEvents * 2
+	requeueDelay := int(queue.PartitionConcurrencyLimitRequeueExtension.Seconds())
+	for i := 0; i < (totalRuns*(fnDuration+requeueDelay))+5; i++ {
 		<-time.After(time.Second)
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgress), int32(1))
 	}
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&total) == 6
-	}, queue.PartitionConcurrencyLimitRequeueExtension/2, time.Millisecond*10)
+	}, 3*queue.PartitionConcurrencyLimitRequeueExtension, time.Millisecond*100)
 }

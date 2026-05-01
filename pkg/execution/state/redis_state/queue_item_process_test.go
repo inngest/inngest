@@ -223,6 +223,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 					case <-time.After(time.Second):
 						// Ensure we tick the extend at least once
 						clock.Advance(time.Second)
+						r.SetTime(clock.Now())
 					}
 				}
 			}()
@@ -337,6 +338,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 					case <-time.After(100 * time.Millisecond):
 						// Advance by the full lease extension interval to trigger both tickers simultaneously
 						clock.Advance(leaseExtendInterval)
+						r.SetTime(clock.Now())
 					}
 				}
 			}()
@@ -448,6 +450,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 					case <-time.After(time.Second):
 						// Ensure we tick the extend at least once
 						clock.Advance(time.Second)
+						r.SetTime(clock.Now())
 					}
 				}
 			}()

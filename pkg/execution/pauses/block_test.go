@@ -2503,10 +2503,12 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              3,
 		CompactionGarbageRatio: 0.5,
-		CompactionSample:       1.0,
-		CompactionLeaser:       leaser,
-		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
-		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		// Disable automatic compaction on deletes to prevent background goroutines
+		// from racing with the test's manual compact() calls.
+		CompactionSample:      -1,
+		CompactionLeaser:      leaser,
+		DeleteAfterFlush:      func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
