@@ -550,6 +550,15 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 // `meta:<hashedID>` field. Input lives in `input:<hashedID>` and is never
 // decoded by Lua, sidestepping cjson's empty-object → array and >2^53 integer
 // precision bugs.
+//
+// DO NOT add fields here without first verifying they are cjson-safe.
+// `lua/setDeferStatus.lua` round-trips this entire struct through
+// cjson.decode → mutate → cjson.encode on every cancel; cjson cannot
+// distinguish empty Lua tables from empty arrays (`{}` round-trips as
+// `[]`) and loses precision on integers above 2^53. Safe field types are
+// strings and small ints (status enums, bounded counts). Anything else —
+// nested objects, large ints, slices that could be empty, freeform
+// user data — must live in a separate hash field like Input does.
 type deferMeta struct {
 	FnSlug         string
 	HashedID       string
