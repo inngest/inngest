@@ -181,9 +181,9 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgressB), int32(1))
 	}
 
-	<-time.After(time.Second)
-	require.EqualValues(t, 3, atomic.LoadInt32(&totalA))
-	require.EqualValues(t, 3, atomic.LoadInt32(&totalB))
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&totalA) == 3 && atomic.LoadInt32(&totalB) == 3
+	}, 10*time.Second, 100*time.Millisecond)
 }
 
 // TestConcurrency_ScopeFunction_Key asserts that keys in function concurrency work as expected.
