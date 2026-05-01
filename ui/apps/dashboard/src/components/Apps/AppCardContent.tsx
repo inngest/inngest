@@ -4,6 +4,7 @@ import { HorizontalPillList } from '@inngest/components/Pill/HorizontalPillList'
 import { methodTypes, type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
 
+import { SyncErrorMessage } from '@/components/Apps/SyncErrorMessage';
 import { syncKind, syncStatusText } from '@/components/Apps/SyncStatusPill';
 import { pathCreator } from '@/utils/urls';
 import type { FlattenedApp } from './useApps';
@@ -26,9 +27,14 @@ const getAppCardContent = ({
   const status = app.isArchived
     ? 'Archived'
     : syncStatusText[statusKey] ?? null;
-
   const footerHeaderTitle = app.error ? (
-    `Error: ${app.error}`
+    <>
+      Error:{' '}
+      <SyncErrorMessage
+        error={app.error}
+        onLinkClick={(event) => event.stopPropagation()}
+      />
+    </>
   ) : app.functionCount === 0 ? (
     'There are currently no functions registered at this URL.'
   ) : (

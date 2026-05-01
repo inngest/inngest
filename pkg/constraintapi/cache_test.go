@@ -1141,6 +1141,118 @@ func TestCache(t *testing.T) {
 				require.LessOrEqual(t, smallCache.cache.ItemCount(), 3, "cache should not exceed max size")
 			},
 		},
+		{
+			name: "should bypass cache when RequestTime predates addedAt, hit it otherwise",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				accountConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				}
+
+				config := ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: ConcurrencyConfig{
+						AccountConcurrency: 1,
+					},
+				}
+
+				// T0: prime the cache. The first Acquire takes the only slot
+				// and exhausts the constraint - the cache wrapper records the
+				// item with addedAt = clock.Now() = T0.
+				cachePopulationTime := deps.clock.Now()
+				res, err := deps.cache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           fnID,
+					Source:               LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+					IdempotencyKey:       "acq-prime",
+					Configuration:        config,
+					Constraints:          []ConstraintItem{accountConcurrency},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item-prime"},
+					CurrentTime:          cachePopulationTime,
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 1)
+				require.Len(t, res.ExhaustedConstraints, 1)
+				require.NotNil(t, deps.cache.cache.Get(accountConcurrency.CacheKey(accountID, envID, fnID)),
+					"sanity: cache must be populated after exhausting the constraint")
+				require.Equal(t, 1, len(deps.lifecycles.AcquireCalls), "sanity: priming Acquire should hit the manager once")
+
+				// Case 1: RequestTime < addedAt
+				// Models a retry of work that was originally received before
+				// the cache entry was added. The cache must be bypassed and
+				// the underlying manager re-consulted.
+				_, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           fnID,
+					Source:               LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+					IdempotencyKey:       "acq-stale",
+					Configuration:        config,
+					Constraints:          []ConstraintItem{accountConcurrency},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item-stale"},
+					CurrentTime:          deps.clock.Now(),
+					RequestTime:          cachePopulationTime.Add(-time.Second), // before addedAt
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Equal(t, 2, len(deps.lifecycles.AcquireCalls),
+					"RequestTime < addedAt must bypass the cache (manager called again)")
+
+				// Case 2: RequestTime >= addedAt
+				// Models a fresh request that arrived after the rate limit
+				// decision was cached. The cache should answer.
+				callsBefore := len(deps.lifecycles.AcquireCalls)
+				_, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           fnID,
+					Source:               LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+					IdempotencyKey:       "acq-fresh",
+					Configuration:        config,
+					Constraints:          []ConstraintItem{accountConcurrency},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item-fresh"},
+					CurrentTime:          deps.clock.Now(),
+					RequestTime:          cachePopulationTime.Add(time.Millisecond), // after addedAt
+					Duration:             3 * time.Second,
+					MaximumLifetime:      time.Minute,
+				})
+				require.NoError(t, err)
+				require.Equal(t, callsBefore, len(deps.lifecycles.AcquireCalls),
+					"RequestTime >= addedAt must use the cache (manager not called)")
+
+				// Case 3: RequestTime == zero time
+				// Callers that don't anchor a request time should get the
+				// pre-existing behavior: the cache answers when populated.
+				callsBefore = len(deps.lifecycles.AcquireCalls)
+				_, err = deps.cache.Acquire(ctx, &CapacityAcquireRequest{
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           fnID,
+					Source:               LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+					IdempotencyKey:       "acq-zero",
+					Configuration:        config,
+					Constraints:          []ConstraintItem{accountConcurrency},
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item-zero"},
+					CurrentTime:          deps.clock.Now(),
+					// RequestTime intentionally left zero.
+					Duration:        3 * time.Second,
+					MaximumLifetime: time.Minute,
+				})
+				require.NoError(t, err)
+				require.Equal(t, callsBefore, len(deps.lifecycles.AcquireCalls),
+					"RequestTime == zero must use the cache (manager not called)")
+			},
+		},
 	}
 
 	for _, tc := range cases {

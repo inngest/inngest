@@ -35,6 +35,7 @@ import { Route as authSignInSplatRouteImport } from './routes/(auth)/sign-in.$'
 import { Route as authOrganizationListSplatRouteImport } from './routes/(auth)/organization-list.$'
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from './routes/_authed/env/$envSlug/route'
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from './routes/_authed/settings/integrations/index'
+import { Route as AuthedSettingsApiKeysIndexRouteImport } from './routes/_authed/settings/api-keys/index'
 import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from './routes/_authed/intent/setup-aws-marketplace/index'
 import { Route as AuthedIntentCreateWebhookIndexRouteImport } from './routes/_authed/intent/create-webhook/index'
 import { Route as AuthedIntegrationsVercelIndexRouteImport } from './routes/_authed/integrations/vercel/index'
@@ -230,6 +231,12 @@ const AuthedSettingsIntegrationsIndexRoute =
   AuthedSettingsIntegrationsIndexRouteImport.update({
     id: '/integrations/',
     path: '/integrations/',
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any)
+const AuthedSettingsApiKeysIndexRoute =
+  AuthedSettingsApiKeysIndexRouteImport.update({
+    id: '/api-keys/',
+    path: '/api-keys/',
     getParentRoute: () => AuthedSettingsRouteRoute,
   } as any)
 const AuthedIntentSetupAwsMarketplaceIndexRoute =
@@ -645,6 +652,7 @@ export interface FileRoutesByFullPath {
   '/integrations/vercel/': typeof AuthedIntegrationsVercelIndexRoute
   '/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
+  '/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
   '/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
@@ -731,6 +739,7 @@ export interface FileRoutesByTo {
   '/integrations/vercel': typeof AuthedIntegrationsVercelIndexRoute
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
+  '/settings/api-keys': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute
   '/env/$envSlug/apps': typeof AuthedEnvEnvSlugAppsIndexRoute
   '/env/$envSlug/debugger': typeof AuthedEnvEnvSlugDebuggerIndexRoute
@@ -815,6 +824,7 @@ export interface FileRoutesById {
   '/_authed/integrations/vercel/': typeof AuthedIntegrationsVercelIndexRoute
   '/_authed/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/_authed/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
+  '/_authed/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/_authed/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
   '/_authed/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/_authed/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
@@ -907,6 +917,7 @@ export interface FileRouteTypes {
     | '/integrations/vercel/'
     | '/intent/create-webhook/'
     | '/intent/setup-aws-marketplace/'
+    | '/settings/api-keys/'
     | '/settings/integrations/'
     | '/env/$envSlug/apps/$externalID'
     | '/env/$envSlug/apps/sync-new'
@@ -993,6 +1004,7 @@ export interface FileRouteTypes {
     | '/integrations/vercel'
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
+    | '/settings/api-keys'
     | '/settings/integrations'
     | '/env/$envSlug/apps'
     | '/env/$envSlug/debugger'
@@ -1076,6 +1088,7 @@ export interface FileRouteTypes {
     | '/_authed/integrations/vercel/'
     | '/_authed/intent/create-webhook/'
     | '/_authed/intent/setup-aws-marketplace/'
+    | '/_authed/settings/api-keys/'
     | '/_authed/settings/integrations/'
     | '/_authed/env/$envSlug/apps/$externalID'
     | '/_authed/env/$envSlug/apps/sync-new'
@@ -1333,6 +1346,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/settings/integrations/'
       preLoaderRoute: typeof AuthedSettingsIntegrationsIndexRouteImport
+      parentRoute: typeof AuthedSettingsRouteRoute
+    }
+    '/_authed/settings/api-keys/': {
+      id: '/_authed/settings/api-keys/'
+      path: '/api-keys'
+      fullPath: '/settings/api-keys/'
+      preLoaderRoute: typeof AuthedSettingsApiKeysIndexRouteImport
       parentRoute: typeof AuthedSettingsRouteRoute
     }
     '/_authed/intent/setup-aws-marketplace/': {
@@ -1843,6 +1863,7 @@ const AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren =
 interface AuthedSettingsRouteRouteChildren {
   AuthedSettingsOrganizationSplatRoute: typeof AuthedSettingsOrganizationSplatRoute
   AuthedSettingsUserSplatRoute: typeof AuthedSettingsUserSplatRoute
+  AuthedSettingsApiKeysIndexRoute: typeof AuthedSettingsApiKeysIndexRoute
   AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute
   AuthedSettingsIntegrationsNeonStepRouteRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren
   AuthedSettingsIntegrationsSupabaseStepRouteRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren
@@ -1863,6 +1884,7 @@ interface AuthedSettingsRouteRouteChildren {
 const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
   AuthedSettingsOrganizationSplatRoute: AuthedSettingsOrganizationSplatRoute,
   AuthedSettingsUserSplatRoute: AuthedSettingsUserSplatRoute,
+  AuthedSettingsApiKeysIndexRoute: AuthedSettingsApiKeysIndexRoute,
   AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
   AuthedSettingsIntegrationsNeonStepRouteRoute:
     AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren,

@@ -323,6 +323,9 @@ local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 -- Again, this ONLY includes retry times for exhausted constraints.
 retryAt = 0
 
+-- Track per-constraint usage after granting (mirrors check.lua pattern)
+local constraintUsage = {}
+
 -- Update constraint state
 for i, value in ipairs(constraints) do
 	local constraintRetryAt = 0
@@ -373,6 +376,34 @@ for i, value in ipairs(constraints) do
 			constraintCapacity = math.floor(remaining / weight)
 		end
 	end
+
+	-- Collect post-grant usage per constraint (mirrors check.lua pattern)
+	local usage = {}
+	if value.k == 1 then
+		-- rate limit: use actual usage from GCRA result
+		usage["l"] = value.r.l
+		local rlCheck = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
+		usage["u"] = rlCheck["u"]
+	elseif value.k == 2 then
+		-- concurrency
+		usage["l"] = value.c.l
+		usage["u"] = math.max(math.min(value.c.l - constraintCapacity, value.c.l or 0), 0)
+	elseif value.k == 3 then
+		-- throttle: read actual state to avoid bogus values on skipGCRA path
+		usage["l"] = value.t.l
+		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+		local throttleCheck = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
+		local throttleRemaining = throttleCheck["remaining"] or 0
+		usage["u"] = math.max(math.min(value.t.l - throttleRemaining, value.t.l or 0), 0)
+	elseif value.k == 4 then
+		-- semaphore: read actual usage counter directly (not derived from slot count,
+		-- which has a unit mismatch for weight > 1)
+		local currentUsage = tonumber(call("GET", value.sem.k)) or 0
+		local capacity = tonumber(call("GET", value.sem.ck)) or 0
+		usage["l"] = capacity
+		usage["u"] = math.max(math.min(currentUsage, capacity), 0)
+	end
+	table.insert(constraintUsage, usage)
 
 	-- If we used up capacity after the update,
 	-- add constraint to exhausted constraints
@@ -454,7 +485,7 @@ end
 
 -- Construct result
 
----@type { s: integer, lc: integer[], ec: integer[], fr: integer, r: integer, g: integer, l: { lid: string, lik: string }[] }
+---@type { s: integer, lc: integer[], ec: integer[], fr: integer, r: integer, g: integer, l: { lid: string, lik: string }[], cu: {}[] }
 local result = {}
 
 result["s"] = 3
@@ -467,6 +498,7 @@ result["ra"] = retryAt -- include retryAt to hint when next capacity is availabl
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
 result["ch"] = 0
+result["cu"] = constraintUsage
 
 local encoded = cjson.encode(result)
 

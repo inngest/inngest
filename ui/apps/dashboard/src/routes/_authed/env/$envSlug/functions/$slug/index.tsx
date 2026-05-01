@@ -2,7 +2,6 @@ import FunctionRunRateLimitChart from '@/components/Functions/FunctionRateLimitC
 import type { UsageMetrics } from '@/components/Functions/FunctionRunsChart';
 import FunctionRunsChart from '@/components/Functions/FunctionRunsChart';
 import FunctionThroughputChart from '@/components/Functions/FunctionThroughputChart';
-import LatestFailedFunctionRuns from '@/components/Functions/LatestFailedFunctionRuns';
 import SDKRequestThroughputChart from '@/components/Functions/SDKRequestThroughput';
 import StepBacklogChart from '@/components/Functions/StepBacklogChart';
 import StepsRunningChart from '@/components/Functions/StepsRunningChart';
@@ -209,12 +208,6 @@ function RouteComponent() {
             startTime={calculatedStartTime.toISOString()}
             endTime={endTime ?? currentTime.toISOString()}
           />
-          <div className="my-4 px-6">
-            <LatestFailedFunctionRuns
-              environmentSlug={envSlug}
-              functionSlug={functionSlug}
-            />
-          </div>
         </main>
         <aside className="border-subtle bg-canvasSubtle overflow-y-auto">
           <Sentry.ErrorBoundary

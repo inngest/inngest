@@ -325,6 +325,7 @@ local accountLeasesArgs = {}
 local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"
 local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 retryAt = 0
+local constraintUsage = {}
 for i, value in ipairs(constraints) do
 	local constraintRetryAt = 0
 	local constraintCapacity = 0
@@ -363,6 +364,27 @@ for i, value in ipairs(constraints) do
 			constraintCapacity = math.floor(remaining / weight)
 		end
 	end
+	local usage = {}
+	if value.k == 1 then
+		usage["l"] = value.r.l
+		local rlCheck = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
+		usage["u"] = rlCheck["u"]
+	elseif value.k == 2 then
+		usage["l"] = value.c.l
+		usage["u"] = math.max(math.min(value.c.l - constraintCapacity, value.c.l or 0), 0)
+	elseif value.k == 3 then
+		usage["l"] = value.t.l
+		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+		local throttleCheck = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
+		local throttleRemaining = throttleCheck["remaining"] or 0
+		usage["u"] = math.max(math.min(value.t.l - throttleRemaining, value.t.l or 0), 0)
+	elseif value.k == 4 then
+		local currentUsage = tonumber(call("GET", value.sem.k)) or 0
+		local capacity = tonumber(call("GET", value.sem.ck)) or 0
+		usage["l"] = capacity
+		usage["u"] = math.max(math.min(currentUsage, capacity), 0)
+	end
+	table.insert(constraintUsage, usage)
 	if constraintCapacity <= 0 then
 		if not exhaustedSet[i] then
 			exhaustedSet[i] = true
@@ -420,6 +442,7 @@ result["ra"] = retryAt
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
 result["ch"] = 0
+result["cu"] = constraintUsage
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded

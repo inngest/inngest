@@ -127,12 +127,14 @@ function KeyComponent() {
                   />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem
-                    onSelect={() => setIsEditKeyNameModalVisible(true)}
-                  >
-                    <RiPencilLine className="h-4 w-4" />
-                    Edit name
-                  </DropdownMenuItem>
+                  {!isIntegration && (
+                    <DropdownMenuItem
+                      onSelect={() => setIsEditKeyNameModalVisible(true)}
+                    >
+                      <RiPencilLine className="h-4 w-4" />
+                      Edit name
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onSelect={() => setIsDeleteKeyModalVisible(true)}
                     className="text-error"

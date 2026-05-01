@@ -17,10 +17,12 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/deploy"
+	"github.com/inngest/inngest/pkg/enums"
 	cronpkg "github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
@@ -269,6 +271,89 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.Len(t, fnVersions, 1)
 		require.Contains(t, fnVersions, sdkFunction2.Name)
 		require.Equal(t, fnVersions[sdkFunction2.Name], 2)
+	})
+}
+
+func TestRegister_BlockedSDKVersion(t *testing.T) {
+	ctx := context.Background()
+
+	sdkFunction := sdk.SDKFunction{
+		Name: "Test Function",
+		Slug: "test-function",
+		Triggers: []inngest.Trigger{
+			{
+				EventTrigger: &inngest.EventTrigger{Event: "test/event"},
+			},
+		},
+		Steps: map[string]sdk.SDKStep{
+			"step-1": {
+				ID:   "step-1",
+				Name: "test step",
+				Runtime: map[string]any{
+					"url": "http://localhost:3000/api/inngest",
+				},
+			},
+		},
+	}
+
+	newRequest := func(version string) sdk.RegisterRequest {
+		return sdk.RegisterRequest{
+			URL:       "http://localhost:3000/api/inngest",
+			AppName:   "blocked-sdk-app",
+			SDK:       fmt.Sprintf("js:%s", version),
+			V:         "1",
+			Functions: []sdk.SDKFunction{sdkFunction},
+		}
+	}
+
+	t.Run("blocked versions are rejected and persisted as sync errors", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		api := &devapi{devserver: ds}
+
+		_, err := api.register(ctx, newRequest("v3.35.0"))
+		require.Error(t, err)
+
+		var publicErr publicerr.Error
+		require.ErrorAs(t, err, &publicErr)
+		require.Contains(t, publicErr.Message, "known security vulnerability")
+
+		app, err := ds.Data.GetAppByName(ctx, consts.DevServerEnvID, "blocked-sdk-app")
+		require.NoError(t, err)
+		require.True(t, app.Error.Valid)
+		require.Equal(t, deploy.DeployErrBlockedSDKVersion.Error(), app.Error.String)
+		require.Equal(t, "v3.35.0", app.SdkVersion)
+	})
+
+	t.Run("blocked check runs before successful checksum short circuit", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		api := &devapi{devserver: ds}
+		req := newRequest("v3.35.0")
+
+		sum, err := req.Checksum()
+		require.NoError(t, err)
+
+		_, err = ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:          inngest.DeterministicAppUUID(req.AppName),
+			Name:        req.AppName,
+			SdkLanguage: req.SDKLanguage(),
+			SdkVersion:  req.SDKVersion(),
+			Checksum:    sum,
+			Url:         req.URL,
+			Method:      enums.AppMethodServe.String(),
+		})
+		require.NoError(t, err)
+
+		_, err = api.register(ctx, req)
+		require.Error(t, err)
+
+		var publicErr publicerr.Error
+		require.ErrorAs(t, err, &publicErr)
+		require.Contains(t, publicErr.Message, "known security vulnerability")
+
+		app, err := ds.Data.GetAppByName(ctx, consts.DevServerEnvID, req.AppName)
+		require.NoError(t, err)
+		require.True(t, app.Error.Valid)
+		require.Equal(t, deploy.DeployErrBlockedSDKVersion.Error(), app.Error.String)
 	})
 }
 
