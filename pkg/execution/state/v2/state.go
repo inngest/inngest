@@ -21,7 +21,7 @@ type Defer struct {
 	// `onDefer` Inngest function that will handle this deferred run.
 	FnSlug string
 
-	// Hashed step ID
+	// Hashed defer ID
 	HashedID string
 
 	// Status for scheduling the deferred run:
@@ -35,7 +35,7 @@ type Defer struct {
 	// path: same hashedID + cancel is final.
 	ScheduleStatus ScheduleStatus
 
-	// Data the user passed to `step.defer`
+	// Data passed to the defer
 	Input json.RawMessage
 }
 
