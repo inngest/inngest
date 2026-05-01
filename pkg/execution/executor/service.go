@@ -312,14 +312,6 @@ func (s *svc) Run(ctx context.Context) error {
 	})
 }
 
-func (s *svc) Stop(ctx context.Context) error {
-	s.exec.CloseLifecycleListeners(ctx)
-
-	// Wait for all in-flight queue runs to finish
-	s.wg.Wait()
-	return nil
-}
-
 func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error) {
 	payload, err := queue.GetEdge(item)
 	if err != nil {

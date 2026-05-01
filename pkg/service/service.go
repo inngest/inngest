@@ -18,7 +18,8 @@ import (
 var (
 	defaultTimeout = 30 * time.Second
 
-	ErrPreTimeout = fmt.Errorf("service.Pre did not end within the given timeout")
+	ErrPreTimeout  = fmt.Errorf("service.Pre did not end within the given timeout")
+	ErrStopTimeout = errors.New("service did not clean up within timeout")
 )
 
 var wg conc.WaitGroup
@@ -219,7 +220,16 @@ func run(ctx context.Context, stop func(), s Service) error {
 
 func stop(ctx context.Context, s Service) error {
 	l := logger.StdlibLogger(ctx).With("service", s.Name())
-	stopCh := make(chan error)
+	timeout := stopTimeout(s)
+	stopCh := make(chan error, 1)
+
+	// Give the service's Stop() 80% of the budget so the remaining 20%
+	// is available for the global waitgroup drain (service.Go goroutines
+	// like capacity lease releases).  The outer time.After(timeout) acts
+	// as the hard safety-net for the entire stop sequence.
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), timeout*4/5)
+	defer stopCancel()
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -228,8 +238,7 @@ func stop(ctx context.Context, s Service) error {
 		}()
 
 		l.Info("service cleaning up")
-		// Create a new context that's not cancelled.
-		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
+		if err := s.Stop(stopCtx); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 			stopCh <- err
 			return
 		}
@@ -241,8 +250,9 @@ func stop(ctx context.Context, s Service) error {
 	}()
 
 	select {
-	case <-time.After(stopTimeout(s)):
-		return fmt.Errorf("service did not clean up within timeout")
+	case <-time.After(timeout):
+		stopCancel()
+		return ErrStopTimeout
 	case stopErr := <-stopCh:
 		if stopErr != nil {
 			return stopErr
