@@ -344,7 +344,28 @@ func TestWaitInvalidExpression(t *testing.T) {
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
-	c.WaitForRunStatus(ctx, t, "FAILED", rid.Wait(t))
+	runID := rid.Wait(t)
+
+	// Some queue/storage combinations do not fail the invalid expression until a
+	// matching event is processed, so keep sending the waited-for event instead
+	// of relying on pause setup timing.
+	sendCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-sendCtx.Done():
+				return
+			case <-ticker.C:
+				_, _ = inngestClient.Send(context.Background(), &event.Event{Name: "dummy"})
+			}
+		}
+	}()
+
+	c.WaitForRunStatus(ctx, t, "FAILED", runID, client.WaitForRunStatusOpts{Timeout: time.Minute})
 }
 
 func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
