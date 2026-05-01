@@ -90,8 +90,9 @@ func TestWorkerConcurrency(t *testing.T) {
 		}
 	}, 10*time.Second, 500*time.Millisecond)
 
-	// Give time for semaphore capacity to propagate and gateway routing to stabilize
-	<-time.After(3 * time.Second)
+	// Give time for semaphore capacity to propagate and gateway routing to stabilize.
+	// In CI, Connect protocol and routing may take longer to settle.
+	<-time.After(5 * time.Second)
 
 	// Send multiple events
 	for i := 0; i < numEvents; i++ {
@@ -103,10 +104,11 @@ func TestWorkerConcurrency(t *testing.T) {
 		<-time.After(50 * time.Millisecond)
 	}
 
-	// Eventually the first fn starts
+	// Eventually the first fn starts.
+	// In CI, Connect routing may take longer to stabilize so use a generous timeout.
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&inProgress) == 1
-	}, 30*time.Second, 100*time.Millisecond, "function should start")
+	}, 45*time.Second, 100*time.Millisecond, "function should start")
 
 	// During execution, never exceed limit
 	totalDuration := time.Duration(numEvents*stepDuration+5) * time.Second

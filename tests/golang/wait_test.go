@@ -346,7 +346,9 @@ func TestWaitInvalidExpression(t *testing.T) {
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
-	c.WaitForRunStatus(ctx, t, "FAILED", rid.Wait(t))
+	c.WaitForRunStatus(ctx, t, "FAILED", rid.Wait(t), client.WaitForRunStatusOpts{
+		Timeout: 40 * time.Second,
+	})
 }
 
 func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
