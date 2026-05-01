@@ -68,11 +68,11 @@ export const FailedFunctions = ({
           appearance="outlined"
           icon={<RiArrowRightUpLine />}
           iconSide="left"
-          label="View all"
+          label="Open in Insights"
           to={
-            `${pathCreator.runs({
+            `${pathCreator.insights({
               envSlug: env.slug,
-            })}?filterStatus=%5B"FAILED"%5D` as FileRouteTypes['to']
+            })}?template_id=recent-function-failures` as FileRouteTypes['to']
           }
         />
       </div>

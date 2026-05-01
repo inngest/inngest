@@ -20,6 +20,7 @@ import { useDeepLinkHandler } from '@/components/Insights/useDeepLinkHandler';
 
 export type InsightsSearchParams = {
   query_id?: string;
+  template_id?: string;
 };
 
 export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
@@ -27,6 +28,7 @@ export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
   validateSearch: (search: Record<string, unknown>): InsightsSearchParams => {
     return {
       query_id: search?.query_id as string | undefined,
+      template_id: search?.template_id as string | undefined,
     };
   },
 });

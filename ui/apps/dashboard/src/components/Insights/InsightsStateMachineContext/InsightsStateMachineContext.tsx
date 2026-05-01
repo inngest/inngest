@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
@@ -22,21 +29,25 @@ const InsightsStateMachineContext =
 
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
+  onAutoRunConsumed?: () => void;
   onQueryChange: (query: string) => void;
   onQueryNameChange: (name: string) => void;
   query: string;
   queryName: string;
   renderChildren: boolean;
+  runOnMount?: boolean;
   tabId: string;
 };
 
 export function InsightsStateMachineContextProvider({
   children,
+  onAutoRunConsumed,
   onQueryChange,
   onQueryNameChange,
   query,
   queryName,
   renderChildren,
+  runOnMount,
   tabId,
 }: InsightsStateMachineContextProviderProps) {
   const { fetchInsights } = useFetchInsights();
@@ -58,6 +69,20 @@ export function InsightsStateMachineContextProvider({
   const runQuery = useCallback(() => {
     refetch();
   }, [refetch]);
+
+  // Fire `runQuery` exactly once per tab when a tab is created with a seeded
+  // query that should execute automatically (e.g. the "Open in Insights"
+  // deep link). Gated on `renderChildren` so we don't run inactive tabs, and
+  // on a ref so toggling the tab active/inactive can't refire it.
+  const hasAutoRunRef = useRef(false);
+  useEffect(() => {
+    if (hasAutoRunRef.current) return;
+    if (!runOnMount || !renderChildren) return;
+
+    hasAutoRunRef.current = true;
+    refetch();
+    onAutoRunConsumed?.();
+  }, [runOnMount, renderChildren, refetch, onAutoRunConsumed]);
 
   return (
     <InsightsStateMachineContext.Provider
