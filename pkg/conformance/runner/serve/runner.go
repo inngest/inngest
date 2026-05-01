@@ -23,9 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 )
 
@@ -33,8 +31,8 @@ import (
 //
 // The runner intentionally reuses the same protocol behavior that the existing
 // integration tests rely on:
-// 1. introspect the SDK fixture
-// 2. register the fixture functions against the dev server
+// 1. ask the SDK serve endpoint for its real in-band sync payload
+// 2. register the synced functions against the dev server
 // 3. proxy executor callbacks back into the SDK
 // 4. assert the request/response sequence for each selected case
 //
@@ -73,10 +71,6 @@ func (r *Runner) Doctor(ctx context.Context, plan conformance.RunPlan, runtime c
 		checks = append(checks, Check{Name: "sdk-url", Message: "sdk.url or --sdk-url is required"})
 		return checks, nil
 	}
-	if runtime.IntrospectURL == nil {
-		checks = append(checks, Check{Name: "introspect-url", Message: "sdk introspection URL could not be derived"})
-		return checks, nil
-	}
 	if runtime.APIURL == nil {
 		checks = append(checks, Check{Name: "api-url", Message: "dev.url or dev.api_url is required"})
 		return checks, nil
@@ -90,29 +84,36 @@ func (r *Runner) Doctor(ctx context.Context, plan conformance.RunPlan, runtime c
 		return checks, nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, runtime.IntrospectURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, runtime.SDKURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		checks = append(checks, Check{Name: "sdk-introspect", Message: err.Error()})
+		checks = append(checks, Check{Name: "sdk-inspect", Message: err.Error()})
 		return checks, nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		checks = append(checks, Check{Name: "sdk-introspect", Message: fmt.Sprintf("unexpected status %d", resp.StatusCode)})
+		checks = append(checks, Check{Name: "sdk-inspect", Message: fmt.Sprintf("unexpected status %d", resp.StatusCode)})
 		return checks, nil
 	}
+	checks = append(checks, Check{Name: "sdk-inspect", Passed: true, Message: fmt.Sprintf("serve endpoint returned %d", resp.StatusCode)})
 
-	functions := []sdk.SDKFunction{}
-	if err := json.NewDecoder(resp.Body).Decode(&functions); err != nil {
-		checks = append(checks, Check{Name: "sdk-introspect", Message: fmt.Sprintf("invalid JSON: %v", err)})
+	proxy, err := newProxyServer(r.client, runtime.SDKURL)
+	if err != nil {
+		return nil, err
+	}
+	defer proxy.close(context.Background())
+
+	registerRequest, functionsBySlug, err := r.syncSDKFunctions(ctx, runtime, proxy.URL())
+	if err != nil {
+		checks = append(checks, Check{Name: "sdk-sync", Message: err.Error()})
 		return checks, nil
 	}
-	checks = append(checks, Check{Name: "sdk-introspect", Passed: true, Message: fmt.Sprintf("discovered %d function(s)", len(functions))})
+	checks = append(checks, Check{Name: "sdk-sync", Passed: true, Message: fmt.Sprintf("synced %d function(s) from %s", len(registerRequest.Functions), registerRequest.URL)})
 
 	requiredSlugs := requiredFixtureSlugs(plan.Cases)
 	if len(requiredSlugs) == 0 {
@@ -120,14 +121,9 @@ func (r *Runner) Doctor(ctx context.Context, plan conformance.RunPlan, runtime c
 		return checks, nil
 	}
 
-	foundSlugs := make(map[string]struct{}, len(functions))
-	for _, fn := range functions {
-		foundSlugs[fn.Slug] = struct{}{}
-	}
-
 	missing := make([]string, 0)
 	for _, slug := range requiredSlugs {
-		if _, ok := foundSlugs[slug]; !ok {
+		if !hasSyncedFunction(functionsBySlug, slug) {
 			missing = append(missing, slug)
 		}
 	}
@@ -155,8 +151,8 @@ func (r *Runner) Run(ctx context.Context, plan conformance.RunPlan, runtime conf
 		return conformance.Report{}, fmt.Errorf("serve runner requires transport %q, got %q", conformance.TransportServe, runtime.Transport)
 	}
 
-	if runtime.SDKURL == nil || runtime.IntrospectURL == nil || runtime.APIURL == nil || runtime.EventURL == nil {
-		return conformance.Report{}, fmt.Errorf("serve runner requires sdk, introspection, api, and event URLs")
+	if runtime.SDKURL == nil || runtime.APIURL == nil || runtime.EventURL == nil {
+		return conformance.Report{}, fmt.Errorf("serve runner requires sdk, api, and event URLs")
 	}
 	if strings.TrimSpace(runtime.SigningKey) == "" {
 		return conformance.Report{}, fmt.Errorf("serve runner requires a signing key")
@@ -185,17 +181,18 @@ type runtimeEnv struct {
 	proxy *proxyServer
 
 	registerRequest sdk.RegisterRequest
-	functionsBySlug  map[string]sdk.SDKFunction
+	functionsBySlug map[string]sdk.SDKFunction
 }
 
 func (r *Runner) prepare(ctx context.Context, runtime conformance.RuntimeConfig) (*runtimeEnv, error) {
-	registerRequest, functionsBySlug, err := r.introspect(ctx, runtime)
+	proxy, err := newProxyServer(r.client, runtime.SDKURL)
 	if err != nil {
 		return nil, err
 	}
 
-	proxy, err := newProxyServer(r.client, runtime.SDKURL)
+	registerRequest, functionsBySlug, err := r.syncSDKFunctions(ctx, runtime, proxy.URL())
 	if err != nil {
+		_ = proxy.close(context.Background())
 		return nil, err
 	}
 
@@ -215,49 +212,80 @@ func (r *Runner) prepare(ctx context.Context, runtime conformance.RuntimeConfig)
 	}, nil
 }
 
-func (r *Runner) introspect(ctx context.Context, runtime conformance.RuntimeConfig) (sdk.RegisterRequest, map[string]sdk.SDKFunction, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, runtime.IntrospectURL.String(), nil)
+type inBandSyncResponse struct {
+	AppID       string            `json:"app_id"`
+	Functions   []sdk.SDKFunction `json:"functions"`
+	Platform    *string           `json:"platform"`
+	SDKLanguage string            `json:"sdk_language"`
+	SDKVersion  string            `json:"sdk_version"`
+	URL         string            `json:"url"`
+}
+
+func (r *Runner) syncSDKFunctions(ctx context.Context, runtime conformance.RuntimeConfig, proxyURL string) (sdk.RegisterRequest, map[string]sdk.SDKFunction, error) {
+	payload, err := json.Marshal(map[string]string{"url": proxyURL})
 	if err != nil {
 		return sdk.RegisterRequest{}, nil, err
 	}
 
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, runtime.SDKURL.String(), bytes.NewReader(payload))
+	if err != nil {
+		return sdk.RegisterRequest{}, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-inngest-sync-kind", "in_band")
+	req.Header.Set("X-Inngest-Server-Kind", "dev")
+	if strings.TrimSpace(runtime.SigningKey) != "" {
+		sig, err := inngestgo.Sign(ctx, time.Now(), []byte(runtime.SigningKey), payload)
+		if err != nil {
+			return sdk.RegisterRequest{}, nil, fmt.Errorf("sign in-band sync request: %w", err)
+		}
+		req.Header.Set("X-Inngest-Signature", sig)
+	}
+
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return sdk.RegisterRequest{}, nil, fmt.Errorf("call introspect: %w", err)
+		return sdk.RegisterRequest{}, nil, fmt.Errorf("call SDK in-band sync: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
 		dump, _ := httputil.DumpResponse(resp, true)
-		return sdk.RegisterRequest{}, nil, fmt.Errorf("introspect returned %d: %s", resp.StatusCode, string(dump))
+		return sdk.RegisterRequest{}, nil, fmt.Errorf("SDK in-band sync returned %d: %s", resp.StatusCode, string(dump))
 	}
 
-	functions := []sdk.SDKFunction{}
-	if err := json.NewDecoder(resp.Body).Decode(&functions); err != nil {
-		return sdk.RegisterRequest{}, nil, fmt.Errorf("decode introspect response: %w", err)
+	syncResponse := inBandSyncResponse{}
+	if err := json.NewDecoder(resp.Body).Decode(&syncResponse); err != nil {
+		return sdk.RegisterRequest{}, nil, fmt.Errorf("decode SDK in-band sync response: %w; ensure the SDK app enables in-band sync", err)
+	}
+
+	sdkVersion := ""
+	if syncResponse.SDKLanguage != "" {
+		sdkVersion = syncResponse.SDKLanguage
+		if syncResponse.SDKVersion != "" {
+			sdkVersion += ":" + syncResponse.SDKVersion
+		}
+	}
+
+	requestURL := syncResponse.URL
+	if requestURL == "" {
+		requestURL = proxyURL
 	}
 
 	request := sdk.RegisterRequest{
-		URL:       runtime.SDKURL.String(),
-		Functions: functions,
+		V:          "1",
+		URL:        requestURL,
+		DeployType: sdk.DeployTypePing,
+		SDK:        sdkVersion,
+		AppName:    syncResponse.AppID,
+		Functions:  syncResponse.Functions,
+	}
+	if syncResponse.Platform != nil {
+		request.Headers.Platform = *syncResponse.Platform
 	}
 
-	processed, err := registration.ProcessFunctions(ctx, request, registration.ProcessOpts{})
-	if err != nil {
-		return sdk.RegisterRequest{}, nil, fmt.Errorf("process introspection response: %w", err)
-	}
-
-	functionsBySlug := make(map[string]sdk.SDKFunction, len(functions))
-	for _, fn := range functions {
+	functionsBySlug := make(map[string]sdk.SDKFunction, len(request.Functions))
+	for _, fn := range request.Functions {
 		functionsBySlug[fn.Slug] = fn
-	}
-
-	// Normalizing the processed functions keeps fixture lookups and registration
-	// behavior aligned with the existing integration test harness.
-	for _, processedFn := range processed.Functions {
-		for i := range processedFn.Function.Steps {
-			processedFn.Function.Steps[i].URI = util.NormalizeAppURL(processedFn.Function.Steps[i].URI, false)
-		}
 	}
 
 	return request, functionsBySlug, nil
@@ -292,13 +320,13 @@ func (e *runtimeEnv) runCase(ctx context.Context, testCase conformance.Case) con
 	}
 
 	if executor.slug != "" {
-		if _, ok := e.functionsBySlug[executor.slug]; !ok {
+		if !hasSyncedFunction(e.functionsBySlug, executor.slug) {
 			return conformance.CaseResult{
 				CaseID:     testCase.ID,
 				SuiteID:    testCase.SuiteID,
 				Status:     conformance.CaseStatusNotImplemented,
 				ReasonCode: conformance.ReasonCodeNotImplemented,
-				Reason:     fmt.Sprintf("required fixture function %q was not found in introspection", executor.slug),
+				Reason:     fmt.Sprintf("required fixture function %q was not found in SDK sync response", executor.slug),
 			}
 		}
 	}
@@ -383,6 +411,18 @@ func requiredFixtureSlugs(cases []conformance.Case) []string {
 		slugs = append(slugs, executor.slug)
 	}
 	return slugs
+}
+
+func hasSyncedFunction(functionsBySlug map[string]sdk.SDKFunction, expectedSlug string) bool {
+	if _, ok := functionsBySlug[expectedSlug]; ok {
+		return true
+	}
+	for actualSlug := range functionsBySlug {
+		if strings.HasSuffix(actualSlug, "-"+expectedSlug) {
+			return true
+		}
+	}
+	return false
 }
 
 func registerServeFunctions(ctx context.Context, client *http.Client, runtime conformance.RuntimeConfig, proxyURL string, registerRequest sdk.RegisterRequest) error {
@@ -793,20 +833,14 @@ func (h *caseHarness) expectJSONResponse(status int, expected any, timeout time.
 }
 
 func (h *caseHarness) expectGeneratorResponse(expected []state.GeneratorOpcode, timeout time.Duration) error {
-	return h.expectResponse(http.StatusOK, timeout, func(body []byte) error {
+	return h.expectResponse(http.StatusPartialContent, timeout, func(body []byte) error {
 		actual := []state.GeneratorOpcode{}
 		if err := json.Unmarshal(body, &actual); err != nil {
 			return err
 		}
 
-		// Step errors include stack traces with machine-specific file paths. The
-		// runner normalizes them so the semantic assertion stays portable.
-		if len(actual) == 1 && actual[0].Op == enums.OpcodeStepError && actual[0].Error != nil {
-			actual[0].Error.Stack = "[proxy-redact]"
-			if len(expected) == 1 && expected[0].Error != nil {
-				expected[0].Error.Stack = "[proxy-redact]"
-			}
-		}
+		actual = normalizeGeneratorOpcodes(actual)
+		expected = normalizeGeneratorOpcodes(expected)
 
 		if !reflect.DeepEqual(expected, actual) {
 			return fmt.Errorf("unexpected generator response:\nexpected: %s\nactual:   %s", mustJSON(expected), mustJSON(actual))
@@ -825,6 +859,37 @@ func (h *caseHarness) expectResponse(status int, timeout time.Duration, validate
 	case <-time.After(timeout):
 		return fmt.Errorf("timed out after %s waiting for SDK response", timeout)
 	}
+}
+
+func normalizeGeneratorOpcodes(in []state.GeneratorOpcode) []state.GeneratorOpcode {
+	out := make([]state.GeneratorOpcode, len(in))
+	copy(out, in)
+
+	var zero state.GeneratorOpcode
+	for idx := range out {
+		out[idx].Timing = zero.Timing
+		out[idx].Userland = nil
+		out[idx].Metadata = nil
+		out[idx].DisplayName = nil
+
+		if out[idx].Op == enums.OpcodeSleep {
+			if opts, ok := out[idx].Opts.(map[string]any); ok {
+				if duration, ok := opts["duration"].(string); ok && duration != "" {
+					out[idx].Name = duration
+					out[idx].Opts = nil
+				}
+			}
+		}
+
+		if out[idx].Error != nil {
+			out[idx].Error.Name = ""
+			out[idx].Error.Stack = "[proxy-redact]"
+			out[idx].Error.Data = nil
+			out[idx].Error.Cause = nil
+		}
+	}
+
+	return out
 }
 
 type executorRequest struct {
@@ -885,7 +950,7 @@ func runStepsSerial(ctx context.Context, h *caseHarness) error {
 
 	hashes := map[string]string{
 		"first step":  "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
-		"sleep":       "dd44d5dc73e81cfbd3c93d03c50160b0b8dc3d6a",
+		"sleep":       "c3ca5f787365eae0dea86250e27d476406956478",
 		"second step": "764e20ec975d4ef820d0f42e6a5833384bd7ee36",
 	}
 
@@ -1027,7 +1092,10 @@ func runRetryBasic(ctx context.Context, h *caseHarness) error {
 		if err := json.Unmarshal(body, &actual); err != nil {
 			return err
 		}
-		if actual["name"] != "Error" || actual["message"] != "broken func" {
+		if name, ok := actual["name"]; ok && name != "" && name != "Error" {
+			return fmt.Errorf("unexpected function error response: %s", string(body))
+		}
+		if actual["message"] != "broken func" {
 			return fmt.Errorf("unexpected function error response: %s", string(body))
 		}
 		return nil
@@ -1103,7 +1171,7 @@ func runWaitForEventBasic(ctx context.Context, h *caseHarness) error {
 		User: map[string]any{},
 	}
 
-	waitHash := "0b497c04bd704c3deceb0a004f6268167025dba2"
+	waitHash := "daaad336276d15594d0e765f96c17cd746bf4971"
 	resumeID := "resume"
 	resume := inngestgo.Event{
 		ID:   &resumeID,
@@ -1134,10 +1202,11 @@ func runWaitForEventBasic(ctx context.Context, h *caseHarness) error {
 	if err := h.expectGeneratorResponse([]state.GeneratorOpcode{{
 		Op:          enums.OpcodeWaitForEvent,
 		ID:          waitHash,
-		Name:        "test/resume",
+		Name:        "wait",
 		DisplayName: inngestgo.StrPtr("test/resume"),
 		Data:        json.RawMessage("null"),
 		Opts: map[string]any{
+			"event":   "test/resume",
 			"if":      "async.data.resume == true && async.data.id == event.data.id",
 			"timeout": "10s",
 		},

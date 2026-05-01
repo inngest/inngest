@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -133,9 +134,45 @@ func (f *serveFixture) Runtime() conformance.RuntimeConfig {
 func fixturesSDKHandler(f *serveFixture) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/introspect":
+		case r.Method == http.MethodGet && r.URL.Path == "/api/inngest":
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(f.t, json.NewEncoder(w).Encode(f.functions))
+			require.NoError(f.t, json.NewEncoder(w).Encode(map[string]any{
+				"schema_version": "2024-05-24",
+				"function_count": len(f.functions),
+				"mode":           "dev",
+			}))
+			return
+		case r.Method == http.MethodPut && r.URL.Path == "/api/inngest":
+			var syncReq struct {
+				URL string `json:"url"`
+			}
+			require.NoError(f.t, json.NewDecoder(r.Body).Decode(&syncReq))
+			require.NotEmpty(f.t, syncReq.URL)
+
+			functions := make([]sdk.SDKFunction, len(f.functions))
+			copy(functions, f.functions)
+			for idx := range functions {
+				for stepID, step := range functions[idx].Steps {
+					stepURL, err := url.Parse(syncReq.URL)
+					require.NoError(f.t, err)
+					values := stepURL.Query()
+					values.Set("fnId", functions[idx].Slug)
+					values.Set("step", "step")
+					stepURL.RawQuery = values.Encode()
+					step.Runtime["url"] = stepURL.String()
+					functions[idx].Steps[stepID] = step
+				}
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("x-inngest-sync-kind", "in_band")
+			require.NoError(f.t, json.NewEncoder(w).Encode(map[string]any{
+				"app_id":       "conformance-test",
+				"functions":    functions,
+				"sdk_language": "go",
+				"sdk_version":  "test",
+				"url":          syncReq.URL,
+			}))
 			return
 		case r.Method == http.MethodPost && r.URL.Path == "/api/inngest":
 			body, err := io.ReadAll(r.Body)
