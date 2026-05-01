@@ -68,6 +68,8 @@ func TestFnCheckpoint(t *testing.T) {
 						return "c", nil
 					})
 					fmt.Println("c (done), ", input.InputCtx.RunID)
+					// Publish the run ID after the final step so the status poll
+					// does not race checkpoint replay while the function is still running.
 					rid.Send(input.InputCtx.RunID)
 					return nil, nil
 				},
@@ -121,6 +123,8 @@ func TestCheckpointMaxDuration(t *testing.T) {
 				fmt.Println(i)
 			}
 			fmt.Println("c (done), ", input.InputCtx.RunID)
+			// Publish the run ID after the final step so the status poll does not
+			// race checkpoint replay while the function is still running.
 			rid.Send(input.InputCtx.RunID)
 			return nil, nil
 		},

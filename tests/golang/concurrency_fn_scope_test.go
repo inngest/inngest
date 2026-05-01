@@ -178,6 +178,8 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 		return atomic.LoadInt32(&inProgressA) == 1 && atomic.LoadInt32(&inProgressB) == 1
 	}, 3*time.Second, 50*time.Millisecond)
 
+	// Concurrency-limited runs can sit behind the queue requeue extension before
+	// becoming eligible again, so wait for completions while continuously checking the invariant.
 	deadline := time.Now().Add(time.Duration(numEvents*fnDuration)*time.Second + queue.PartitionConcurrencyLimitRequeueExtension*time.Duration(numEvents) + 5*time.Second)
 	for time.Now().Before(deadline) {
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgressA), int32(1))

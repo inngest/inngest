@@ -99,6 +99,8 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		return atomic.LoadInt32(&inProgress) == 1
 	}, 2*time.Second, 50*time.Millisecond)
 
+	// Concurrency-limited runs can sit behind the queue requeue extension before
+	// becoming eligible again, so wait for completions while continuously checking the invariant.
 	deadline := time.Now().Add(time.Duration(numEvents*2*fnDuration)*time.Second + queue.PartitionConcurrencyLimitRequeueExtension*time.Duration(numEvents*2) + 5*time.Second)
 	for time.Now().Before(deadline) {
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgress), int32(1))

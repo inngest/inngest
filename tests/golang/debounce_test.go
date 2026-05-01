@@ -207,6 +207,8 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// Let the future-timestamp event establish the debounce window before sending
+	// an older event that should not replace it.
 	<-time.After(3 * time.Second)
 
 	_, err = inngestClient.Send(context.Background(), DebounceEvent{

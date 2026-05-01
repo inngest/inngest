@@ -437,6 +437,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			// Advance the fake clock once, then wait for the extender to prove it
+			// ran before releasing the lease under test.
 			clock.Advance(time.Second)
 			require.Eventually(t, func() bool {
 				return cmLifecycles.ExtendCallCount() > 0
