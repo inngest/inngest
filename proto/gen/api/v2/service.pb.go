@@ -91,6 +91,8 @@ const (
 	TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED TraceSpanStatus = 2
 	TraceSpanStatus_TRACE_SPAN_STATUS_FAILED    TraceSpanStatus = 3
 	TraceSpanStatus_TRACE_SPAN_STATUS_WAITING   TraceSpanStatus = 4
+	TraceSpanStatus_TRACE_SPAN_STATUS_CANCELLED TraceSpanStatus = 5
+	TraceSpanStatus_TRACE_SPAN_STATUS_SKIPPED   TraceSpanStatus = 6
 )
 
 // Enum value maps for TraceSpanStatus.
@@ -101,6 +103,8 @@ var (
 		2: "TRACE_SPAN_STATUS_COMPLETED",
 		3: "TRACE_SPAN_STATUS_FAILED",
 		4: "TRACE_SPAN_STATUS_WAITING",
+		5: "TRACE_SPAN_STATUS_CANCELLED",
+		6: "TRACE_SPAN_STATUS_SKIPPED",
 	}
 	TraceSpanStatus_value = map[string]int32{
 		"TRACE_SPAN_STATUS_UNKNOWN":   0,
@@ -108,6 +112,8 @@ var (
 		"TRACE_SPAN_STATUS_COMPLETED": 2,
 		"TRACE_SPAN_STATUS_FAILED":    3,
 		"TRACE_SPAN_STATUS_WAITING":   4,
+		"TRACE_SPAN_STATUS_CANCELLED": 5,
+		"TRACE_SPAN_STATUS_SKIPPED":   6,
 	}
 )
 
@@ -3886,13 +3892,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1bFUNCTION_RUN_STATUS_RUNNING\x10\x02\x12!\n" +
 	"\x1dFUNCTION_RUN_STATUS_COMPLETED\x10\x03\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_FAILED\x10\x04\x12!\n" +
-	"\x1dFUNCTION_RUN_STATUS_CANCELLED\x10\x05*\xad\x01\n" +
+	"\x1dFUNCTION_RUN_STATUS_CANCELLED\x10\x05*\xed\x01\n" +
 	"\x0fTraceSpanStatus\x12\x1d\n" +
 	"\x19TRACE_SPAN_STATUS_UNKNOWN\x10\x00\x12\x1d\n" +
 	"\x19TRACE_SPAN_STATUS_RUNNING\x10\x01\x12\x1f\n" +
 	"\x1bTRACE_SPAN_STATUS_COMPLETED\x10\x02\x12\x1c\n" +
 	"\x18TRACE_SPAN_STATUS_FAILED\x10\x03\x12\x1d\n" +
-	"\x19TRACE_SPAN_STATUS_WAITING\x10\x04*\xf7\x01\n" +
+	"\x19TRACE_SPAN_STATUS_WAITING\x10\x04\x12\x1f\n" +
+	"\x1bTRACE_SPAN_STATUS_CANCELLED\x10\x05\x12\x1d\n" +
+	"\x19TRACE_SPAN_STATUS_SKIPPED\x10\x06*\xf7\x01\n" +
 	"\vTraceStepOp\x12\x1d\n" +
 	"\x19TRACE_STEP_OP_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11TRACE_STEP_OP_RUN\x10\x01\x12\x17\n" +
