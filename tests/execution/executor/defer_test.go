@@ -651,7 +651,7 @@ func TestDeferAdd_BareOpEnqueuesDiscovery(t *testing.T) {
 // bare [DeferCancel] with no host op should fall through to enqueue a discovery
 // step. Pre-seeds the target defer so SetDeferStatus succeeds and the bare-op
 // branch is actually reached (an error there would short-circuit before the
-// lazyOpHasHost check).
+// isBareLazyBatch check).
 func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 	r := require.New(t)
 	infra := newDeferTestInfra(t)
