@@ -454,11 +454,8 @@ function PointsControl({
   disabled?: boolean;
 }) {
   return (
-    <div className="border-subtle flex shrink-0 items-center gap-1 rounded border px-1">
-      <Button
-        kind="secondary"
-        appearance="ghost"
-        size="small"
+    <div className="border-subtle flex shrink-0 items-center gap-1 rounded border px-1.5 py-1">
+      <PointsStepperButton
         icon={<RiSubtractLine className="h-3 w-3" />}
         disabled={disabled || points <= 0}
         onClick={() => onChange(Math.max(0, points - 1))}
@@ -470,14 +467,32 @@ function PointsControl({
         disabled={disabled}
       />
       <span className="text-muted text-xs">pts</span>
-      <Button
-        kind="secondary"
-        appearance="ghost"
-        size="small"
+      <PointsStepperButton
         icon={<RiAddLine className="h-3 w-3" />}
         disabled={disabled || pointsLeft <= 0}
         onClick={() => onChange(points + 1)}
       />
     </div>
+  );
+}
+
+function PointsStepperButton({
+  icon,
+  disabled,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="text-muted hover:text-basis hover:bg-canvasSubtle flex h-4 w-4 shrink-0 items-center justify-center rounded-sm disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      {icon}
+    </button>
   );
 }
