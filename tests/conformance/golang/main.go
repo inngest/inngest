@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -194,15 +193,4 @@ func getenv(name, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-// The helper remains unused in the app flow today, but keeping a JSON encoder
-// nearby makes it easier to extend the fixture with ad hoc debug endpoints when
-// conformance cases grow.
-func mustJSON(value any) string {
-	byt, err := json.Marshal(value)
-	if err != nil {
-		panic(err)
-	}
-	return string(byt)
 }
