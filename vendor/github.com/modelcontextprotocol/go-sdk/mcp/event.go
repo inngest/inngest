@@ -29,14 +29,15 @@ const validateMemoryEventStore = false
 // An Event is a server-sent event.
 // See https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#fields.
 type Event struct {
-	Name string // the "event" field
-	ID   string // the "id" field
-	Data []byte // the "data" field
+	Name  string // the "event" field
+	ID    string // the "id" field
+	Data  []byte // the "data" field
+	Retry string // the "retry" field
 }
 
 // Empty reports whether the Event is empty.
 func (e Event) Empty() bool {
-	return e.Name == "" && e.ID == "" && len(e.Data) == 0
+	return e.Name == "" && e.ID == "" && len(e.Data) == 0 && e.Retry == ""
 }
 
 // writeEvent writes the event to w, and flushes.
@@ -47,6 +48,9 @@ func writeEvent(w io.Writer, evt Event) (int, error) {
 	}
 	if evt.ID != "" {
 		fmt.Fprintf(&b, "id: %s\n", evt.ID)
+	}
+	if evt.Retry != "" {
+		fmt.Fprintf(&b, "retry: %s\n", evt.Retry)
 	}
 	fmt.Fprintf(&b, "data: %s\n\n", string(evt.Data))
 	n, err := w.Write(b.Bytes())
@@ -63,9 +67,7 @@ func writeEvent(w io.Writer, evt Event) (int, error) {
 // TODO(rfindley): consider a different API here that makes failure modes more
 // apparent.
 func scanEvents(r io.Reader) iter.Seq2[Event, error] {
-	scanner := bufio.NewScanner(r)
-	const maxTokenSize = 1 * 1024 * 1024 // 1 MiB max line size
-	scanner.Buffer(nil, maxTokenSize)
+	reader := bufio.NewReader(r)
 
 	// TODO: investigate proper behavior when events are out of order, or have
 	// non-standard names.
@@ -73,6 +75,7 @@ func scanEvents(r io.Reader) iter.Seq2[Event, error] {
 		eventKey = []byte("event")
 		idKey    = []byte("id")
 		dataKey  = []byte("data")
+		retryKey = []byte("retry")
 	)
 
 	return func(yield func(Event, error) bool) {
@@ -89,58 +92,64 @@ func scanEvents(r io.Reader) iter.Seq2[Event, error] {
 			evt     Event
 			dataBuf *bytes.Buffer // if non-nil, preceding field was also data
 		)
-		flushData := func() {
+		yieldEvent := func() bool {
 			if dataBuf != nil {
 				evt.Data = dataBuf.Bytes()
 				dataBuf = nil
 			}
+			if evt.Empty() {
+				return true
+			}
+			if !yield(evt, nil) {
+				return false
+			}
+			evt = Event{}
+			return true
 		}
-		for scanner.Scan() {
-			line := scanner.Bytes()
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil && !errors.Is(err, io.EOF) {
+				yield(Event{}, fmt.Errorf("error reading event: %v", err))
+				return
+			}
+			line = bytes.TrimRight(line, "\r\n")
+			isEOF := errors.Is(err, io.EOF)
+
 			if len(line) == 0 {
-				flushData()
-				// \n\n is the record delimiter
-				if !evt.Empty() && !yield(evt, nil) {
+				if !yieldEvent() {
 					return
 				}
-				evt = Event{}
+				if isEOF {
+					return
+				}
 				continue
 			}
 			before, after, found := bytes.Cut(line, []byte{':'})
 			if !found {
-				yield(Event{}, fmt.Errorf("malformed line in SSE stream: %q", string(line)))
+				yield(Event{}, fmt.Errorf("%w: malformed line in SSE stream: %q", errMalformedEvent, string(line)))
 				return
-			}
-			if !bytes.Equal(before, dataKey) {
-				flushData()
 			}
 			switch {
 			case bytes.Equal(before, eventKey):
 				evt.Name = strings.TrimSpace(string(after))
 			case bytes.Equal(before, idKey):
 				evt.ID = strings.TrimSpace(string(after))
+			case bytes.Equal(before, retryKey):
+				evt.Retry = strings.TrimSpace(string(after))
 			case bytes.Equal(before, dataKey):
 				data := bytes.TrimSpace(after)
-				if dataBuf != nil {
-					dataBuf.WriteByte('\n')
-					dataBuf.Write(data)
-				} else {
+				if dataBuf == nil {
 					dataBuf = new(bytes.Buffer)
-					dataBuf.Write(data)
+				} else {
+					dataBuf.WriteByte('\n')
 				}
+				dataBuf.Write(data)
 			}
-		}
-		if err := scanner.Err(); err != nil {
-			if errors.Is(err, bufio.ErrTooLong) {
-				err = fmt.Errorf("event exceeded max line length of %d", maxTokenSize)
-			}
-			if !yield(Event{}, err) {
+
+			if isEOF {
+				yieldEvent()
 				return
 			}
-		}
-		flushData()
-		if !evt.Empty() {
-			yield(evt, nil)
 		}
 	}
 }
@@ -153,11 +162,9 @@ func scanEvents(r io.Reader) iter.Seq2[Event, error] {
 //
 // All of an EventStore's methods must be safe for use by multiple goroutines.
 type EventStore interface {
-	// Open prepares the event store for a given stream. It ensures that the
-	// underlying data structure for the stream is initialized, making it
-	// ready to store event streams.
-	//
-	// streamIDs must be globally unique.
+	// Open is called when a new stream is created. It may be used to ensure that
+	// the underlying data structure for the stream is initialized, making it
+	// ready to store and replay event streams.
 	Open(_ context.Context, sessionID, streamID string) error
 
 	// Append appends data for an outgoing event to given stream, which is part of the
@@ -166,6 +173,7 @@ type EventStore interface {
 
 	// After returns an iterator over the data for the given session and stream, beginning
 	// just after the given index.
+	//
 	// Once the iterator yields a non-nil error, it will stop.
 	// After's iterator must return an error immediately if any data after index was
 	// dropped; it must not return partial results.
@@ -174,6 +182,7 @@ type EventStore interface {
 
 	// SessionClosed informs the store that the given session is finished, along
 	// with all of its streams.
+	//
 	// A store cannot rely on this method being called for cleanup. It should institute
 	// additional mechanisms, such as timeouts, to reclaim storage.
 	SessionClosed(_ context.Context, sessionID string) error
@@ -191,12 +200,8 @@ type dataList struct {
 }
 
 func (dl *dataList) appendData(d []byte) {
-	// If we allowed empty data, we would consume memory without incrementing the size.
-	// We could of course account for that, but we keep it simple and assume there is no
-	// empty data.
-	if len(d) == 0 {
-		panic("empty data item")
-	}
+	// Empty data consumes memory but doesn't increment size. However, it should
+	// be rare.
 	dl.data = append(dl.data, d)
 	dl.size += len(d)
 }
@@ -306,6 +311,11 @@ func (s *MemoryEventStore) Append(_ context.Context, sessionID, streamID string,
 // ErrEventsPurged is the error that [EventStore.After] should return if the event just after the
 // index is no longer available.
 var ErrEventsPurged = errors.New("data purged")
+
+// errMalformedEvent is returned when an SSE event cannot be parsed due to format violations.
+// This is a hard error indicating corrupted data or protocol violations, as opposed to
+// transient I/O errors which may be retryable.
+var errMalformedEvent = errors.New("malformed event")
 
 // After implements [EventStore.After].
 func (s *MemoryEventStore) After(_ context.Context, sessionID, streamID string, index int) iter.Seq2[[]byte, error] {
