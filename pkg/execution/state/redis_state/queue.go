@@ -808,7 +808,7 @@ func (q *queue) Lease(
 	leaseDuration time.Duration,
 	now time.Time,
 	options ...osqueue.LeaseOptionFn,
-) (*ulid.ULID, error) {
+) (*ulid.ULID, *ulid.ULID, error) {
 	l := logger.StdlibLogger(ctx)
 
 	o := &osqueue.LeaseOptions{}
@@ -848,7 +848,12 @@ func (q *queue) Lease(
 
 	leaseID, err := ulid.New(ulid.Timestamp(now.Add(leaseDuration).UTC()), rnd)
 	if err != nil {
-		return nil, fmt.Errorf("error generating id: %w", err)
+		return nil, nil, fmt.Errorf("error generating id: %w", err)
+	}
+
+	dispatchID, err := ulid.New(ulid.Timestamp(now.UTC()), rnd)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error generating dispatch id: %w", err)
 	}
 
 	keys := []string{
@@ -863,9 +868,10 @@ func (q *queue) Lease(
 		o.ShadowPartition.PartitionID,
 		leaseID.String(),
 		now.UnixMilli(),
+		dispatchID.String(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	status, err := scripts["queue/lease"].Exec(
@@ -876,7 +882,7 @@ func (q *queue) Lease(
 	).ToInt64()
 	if err != nil {
 		span.RecordError(err)
-		return nil, fmt.Errorf("error leasing queue item: %w", err)
+		return nil, nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
 
 	itemDelay := item.ExpectedDelay()
@@ -928,13 +934,13 @@ func (q *queue) Lease(
 
 	switch status {
 	case 0:
-		return &leaseID, nil
+		return &leaseID, &dispatchID, nil
 	case -1:
-		return nil, osqueue.ErrQueueItemNotFound
+		return nil, nil, osqueue.ErrQueueItemNotFound
 	case -2:
-		return nil, osqueue.ErrQueueItemAlreadyLeased
+		return nil, nil, osqueue.ErrQueueItemAlreadyLeased
 	default:
-		return nil, fmt.Errorf("unknown response leasing item: %d", status)
+		return nil, nil, fmt.Errorf("unknown response leasing item: %d", status)
 	}
 }
 

@@ -27,8 +27,9 @@ import (
 type jobIDValType struct{ int }
 
 var (
-	jobCtxVal   = jobIDValType{0}
-	shardCtxVal = jobIDValType{1}
+	jobCtxVal      = jobIDValType{0}
+	shardCtxVal    = jobIDValType{1}
+	dispatchCtxVal = jobIDValType{2}
 )
 
 // WithJobID returns a context that stores the given job ID inside.
@@ -41,6 +42,14 @@ func WithShardID(ctx context.Context, shardID string) context.Context {
 	return context.WithValue(ctx, shardCtxVal, shardID)
 }
 
+// WithDispatchID returns a context that stores the dispatch ID minted on the
+// current lease. The driver echoes this to the SDK via MarshalV1, so the SDK
+// can include it on async checkpoint POSTs and the backend can detect a stale
+// dispatch when the queue item has been requeued.
+func WithDispatchID(ctx context.Context, dispatchID string) context.Context {
+	return context.WithValue(ctx, dispatchCtxVal, dispatchID)
+}
+
 // JobIDFromContext returns the job ID given the current context, or an
 // empty string if there's no job ID.
 func JobIDFromContext(ctx context.Context) string {
@@ -50,6 +59,13 @@ func JobIDFromContext(ctx context.Context) string {
 
 func ShardIDFromContext(ctx context.Context) string {
 	str, _ := ctx.Value(shardCtxVal).(string)
+	return str
+}
+
+// DispatchIDFromContext returns the dispatch ID for the current lease, or an
+// empty string if not set.
+func DispatchIDFromContext(ctx context.Context) string {
+	str, _ := ctx.Value(dispatchCtxVal).(string)
 	return str
 }
 
@@ -88,6 +104,11 @@ type QueueItem struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
 	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
+	// DispatchID is a ULID minted on Lease and rotated on Requeue, identifying
+	// which dispatch attempt is canonical. Echoed by the SDK on async
+	// checkpoint POSTs and validated server-side so a stale SDK process whose
+	// dispatch was superseded by a requeue can be detected and aborted.
+	DispatchID *ulid.ULID `json:"dispatchID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
 	Data Item `json:"data"`

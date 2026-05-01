@@ -100,6 +100,7 @@ func MarshalV1(
 	attempt int,
 	maxAttempts int,
 	queueItemRef string,
+	dispatchID string,
 ) ([]byte, error) {
 	rawEvts, err := sl.LoadEvents(ctx, md.ID)
 	if err != nil {
@@ -131,6 +132,7 @@ func MarshalV1(
 			StepID:       step.ID,
 			RunID:        md.ID.RunID,
 			QueueItemRef: queueItemRef,
+			DispatchID:   dispatchID,
 			Stack: &FunctionStack{
 				Stack:   md.Stack,
 				Current: stackIndex,

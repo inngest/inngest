@@ -142,14 +142,14 @@ func TestQueueOperations(t *testing.T) {
 
 	var leaseID *ulid.ULID
 	t.Run("Lease", func(t *testing.T) {
-		lID, err := shard.Lease(ctx, *item, 10*time.Second, clock.Now())
+		lID, _, err := shard.Lease(ctx, *item, 10*time.Second, clock.Now())
 		require.NoError(t, err)
 
 		require.NotNil(t, lID)
 		require.Equal(t, clock.Now().Add(10*time.Second).Truncate(time.Millisecond), lID.Timestamp())
 
 		t.Run("should not be possible to lease again", func(t *testing.T) {
-			_, err := shard.Lease(ctx, *item, 10*time.Second, clock.Now())
+			_, _, err := shard.Lease(ctx, *item, 10*time.Second, clock.Now())
 			require.Error(t, err)
 			require.ErrorIs(t, err, queue.ErrQueueItemAlreadyLeased)
 		})
@@ -178,8 +178,13 @@ func TestQueueOperations(t *testing.T) {
 	})
 
 	t.Run("Requeue", func(t *testing.T) {
+		preRequeue, err := shard.LoadQueueItem(ctx, item.ID)
+		require.NoError(t, err)
+		require.NotNil(t, preRequeue.DispatchID)
+		preDispatchID := preRequeue.DispatchID
+
 		requeueAt := clock.Now().Add(20 * time.Second)
-		err := shard.Requeue(ctx, *item, requeueAt)
+		err = shard.Requeue(ctx, *item, requeueAt)
 		require.NoError(t, err)
 
 		item.WallTimeMS = requeueAt.UnixMilli()
@@ -190,6 +195,10 @@ func TestQueueOperations(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Nil(t, loaded.LeaseID)
+		require.NotNil(t, loaded.DispatchID, "Requeue must mint a fresh DispatchID")
+		require.NotEqual(t, preDispatchID.String(), loaded.DispatchID.String(),
+			"Requeue must rotate DispatchID to invalidate stale in-flight dispatches (EXE-1552)")
+		item.DispatchID = loaded.DispatchID
 		require.Equal(t, *item, *loaded)
 
 		t.Run("should find item in queue when peeking", func(t *testing.T) {
@@ -202,7 +211,7 @@ func TestQueueOperations(t *testing.T) {
 	})
 
 	t.Run("Dequeue", func(t *testing.T) {
-		lID, err := shard.Lease(ctx, *item, 10*time.Second, clock.Now())
+		lID, _, err := shard.Lease(ctx, *item, 10*time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, lID)
 

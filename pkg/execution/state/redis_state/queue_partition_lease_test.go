@@ -161,7 +161,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			p := osqueue.QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
+				_, _, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 				require.NoError(t, err)
 			})
 
@@ -199,7 +199,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			p := osqueue.QueuePartition{AccountID: acctId, FunctionID: &itemA.FunctionID}
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
+				_, _, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 				require.NoError(t, err)
 			})
 
@@ -267,7 +267,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Run("Leases with capacity", func(t *testing.T) {
-				_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
+				_, _, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 				require.NoError(t, err)
 			})
 
@@ -309,7 +309,7 @@ func TestQueuePartitionLease(t *testing.T) {
 		// Use the new item's workflow ID
 		p := osqueue.QueuePartition{ID: itemA.FunctionID.String(), FunctionID: &itemA.FunctionID}
 
-		_, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
+		_, _, err = shard.Lease(ctx, itemA, 5*time.Second, time.Now())
 		require.NoError(t, err)
 
 		// Should work with skip

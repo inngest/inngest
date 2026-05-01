@@ -44,6 +44,8 @@ type AsyncCheckpoint struct {
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
 	QueueItemRef string `json:"qi_id"`
+	// DispatchID identifies the leased SDK dispatch that produced this checkpoint.
+	DispatchID string `json:"dispatch_id"`
 
 	// Plus auth data added from auth.  This is never exposed via JSON
 	// for security.
