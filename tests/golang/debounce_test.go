@@ -173,6 +173,8 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 	defer server.Close()
 
 	var counter int32
+	var calledWith atomic.Value
+	trigger := "test/sdk/debounce-out-of-order-ts"
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -182,10 +184,10 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 				Period: 5 * time.Second,
 			},
 		},
-		inngestgo.EventTrigger("test/sdk", nil),
+		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			fmt.Println("Debounced function ran", input.Event.Data.Name)
-			require.Equal(t, "future", input.Event.Data.Name)
+			calledWith.Store(input.Event.Data.Name)
 			atomic.AddInt32(&counter, 1)
 			return nil, nil
 		},
@@ -197,7 +199,7 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 	in_2_s := now.Add(time.Second * 2)
 
 	_, err = inngestClient.Send(context.Background(), DebounceEvent{
-		Name: "test/sdk",
+		Name: trigger,
 		Data: DebounceEventData{
 			Name: "future",
 		},
@@ -205,8 +207,10 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	<-time.After(3 * time.Second)
+
 	_, err = inngestClient.Send(context.Background(), DebounceEvent{
-		Name: "test/sdk",
+		Name: trigger,
 		Data: DebounceEventData{
 			Name: "now",
 		},
@@ -216,7 +220,8 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&counter) == 1
-	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+	}, 15*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+	require.Equal(t, "future", calledWith.Load())
 }
 
 func TestDebounce_Timeout(t *testing.T) {
