@@ -161,19 +161,19 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 		require.NoError(t, opts.Validate())
 	})
 
-	t.Run("rejects Input larger than MaxStepInputSize", func(t *testing.T) {
+	t.Run("rejects Input larger than MaxDeferInputSize", func(t *testing.T) {
 		// Build an Input one byte over the limit. Padding is filler — the
 		// validator only cares about byte length.
-		oversized := bytes.Repeat([]byte("x"), consts.MaxStepInputSize+1)
+		oversized := bytes.Repeat([]byte("x"), consts.MaxDeferInputSize+1)
 		opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(oversized)}
 		err := opts.Validate()
-		require.ErrorIs(t, err, ErrStepInputTooLarge,
+		require.ErrorIs(t, err, ErrDeferInputTooLarge,
 			"oversized defer Input must be rejected at validation, not silently stored in Redis")
 	})
 
-	t.Run("accepts Input at exactly MaxStepInputSize", func(t *testing.T) {
+	t.Run("accepts Input at exactly MaxDeferInputSize", func(t *testing.T) {
 		// Boundary: equal-to-limit must pass; only strictly greater fails.
-		atLimit := bytes.Repeat([]byte("x"), consts.MaxStepInputSize)
+		atLimit := bytes.Repeat([]byte("x"), consts.MaxDeferInputSize)
 		opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(atLimit)}
 		require.NoError(t, opts.Validate())
 	})
