@@ -3579,7 +3579,7 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 	// cancelled tombstone when the defer is absent) because emitting an
 	// DeferAdd and DeferCancel for the same hashed ID in a single response is
 	// an SDK bug, and the cost of handling it isn't worth the complexity.
-	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, enums.DeferStatusCancelled); err != nil {
+	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
 		return fmt.Errorf("error cancelling defer: %w", err)
 	}
 

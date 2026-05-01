@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _DeferStatusName = "unknownscheduledafter_runcancelled"
+const _DeferStatusName = "unknownscheduledafter_runaborted"
 
-var _DeferStatusIndex = [...]uint8{0, 7, 16, 25, 34}
+var _DeferStatusIndex = [...]uint8{0, 7, 16, 25, 32}
 
-const _DeferStatusLowerName = "unknownscheduledafter_runcancelled"
+const _DeferStatusLowerName = "unknownscheduledafter_runaborted"
 
 func (i DeferStatus) String() string {
 	if i < 0 || i >= DeferStatus(len(_DeferStatusIndex)-1) {
@@ -28,10 +28,10 @@ func _DeferStatusNoOp() {
 	_ = x[DeferStatusUnknown-(0)]
 	_ = x[DeferStatusScheduled-(1)]
 	_ = x[DeferStatusAfterRun-(2)]
-	_ = x[DeferStatusCancelled-(3)]
+	_ = x[DeferStatusAborted-(3)]
 }
 
-var _DeferStatusValues = []DeferStatus{DeferStatusUnknown, DeferStatusScheduled, DeferStatusAfterRun, DeferStatusCancelled}
+var _DeferStatusValues = []DeferStatus{DeferStatusUnknown, DeferStatusScheduled, DeferStatusAfterRun, DeferStatusAborted}
 
 var _DeferStatusNameToValueMap = map[string]DeferStatus{
 	_DeferStatusName[0:7]:        DeferStatusUnknown,
@@ -40,15 +40,15 @@ var _DeferStatusNameToValueMap = map[string]DeferStatus{
 	_DeferStatusLowerName[7:16]:  DeferStatusScheduled,
 	_DeferStatusName[16:25]:      DeferStatusAfterRun,
 	_DeferStatusLowerName[16:25]: DeferStatusAfterRun,
-	_DeferStatusName[25:34]:      DeferStatusCancelled,
-	_DeferStatusLowerName[25:34]: DeferStatusCancelled,
+	_DeferStatusName[25:32]:      DeferStatusAborted,
+	_DeferStatusLowerName[25:32]: DeferStatusAborted,
 }
 
 var _DeferStatusNames = []string{
 	_DeferStatusName[0:7],
 	_DeferStatusName[7:16],
 	_DeferStatusName[16:25],
-	_DeferStatusName[25:34],
+	_DeferStatusName[25:32],
 }
 
 // DeferStatusString retrieves an enum value from the enum constants string name.

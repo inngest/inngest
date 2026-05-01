@@ -2,13 +2,13 @@ package event
 
 import "errors"
 
-type DeferredStartMetadata struct {
+type DeferredScheduleMetadata struct {
 	FnSlug       string `json:"fn_slug"`
 	ParentFnSlug string `json:"parent_fn_slug"`
 	ParentRunID  string `json:"parent_run_id"`
 }
 
-func (m *DeferredStartMetadata) Validate() error {
+func (m *DeferredScheduleMetadata) Validate() error {
 	var errs []error
 	if m.FnSlug == "" {
 		errs = append(errs, errors.New("fn_slug is required"))

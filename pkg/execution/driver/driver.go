@@ -129,7 +129,7 @@ func MarshalV1(
 		deferEntries[hashedID] = SDKDeferEntry{
 			// AfterRun defers haven't been enqueued yet, so the SDK can still
 			// cancel them. Already-scheduled defers cannot cancel.
-			Cancellable: d.ScheduleStatus == enums.DeferStatusAfterRun,
+			Abortable: d.ScheduleStatus == enums.DeferStatusAfterRun,
 		}
 	}
 

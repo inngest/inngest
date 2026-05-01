@@ -88,7 +88,7 @@ func TestSaveDefer_DoesNotResurrectCancelled(t *testing.T) {
 	}
 
 	require.NoError(t, v2svc.SaveDefer(ctx, id, original))
-	require.NoError(t, v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusCancelled))
+	require.NoError(t, v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusAborted))
 
 	// T3: SDK retransmits the original DeferAdd. Must not error, must not resurrect.
 	require.NoError(t, v2svc.SaveDefer(ctx, id, original))
@@ -98,7 +98,7 @@ func TestSaveDefer_DoesNotResurrectCancelled(t *testing.T) {
 	require.Len(t, defers, 1)
 
 	got := defers[original.HashedID]
-	require.Equal(t, enums.DeferStatusCancelled, got.ScheduleStatus,
+	require.Equal(t, enums.DeferStatusAborted, got.ScheduleStatus,
 		"cancelled defer must not be resurrected by a retried DeferAdd")
 	require.Equal(t, original.FnSlug, got.FnSlug, "FnSlug must be preserved across the no-op")
 	require.JSONEq(t, string(original.Input), string(got.Input),
@@ -135,7 +135,7 @@ func TestSetDeferStatus_ErrorsOnMissing(t *testing.T) {
 	ctx := context.Background()
 	v2svc, id := newDeferTestRunService(t)
 
-	err := v2svc.SetDeferStatus(ctx, id, "missing-hashed-id", enums.DeferStatusCancelled)
+	err := v2svc.SetDeferStatus(ctx, id, "missing-hashed-id", enums.DeferStatusAborted)
 	r.Error(err, "expected SetDeferStatus to error when defer is missing")
 }
 
@@ -153,14 +153,14 @@ func TestSetDeferStatus_PreservesFields(t *testing.T) {
 		Input:          json.RawMessage(`{"user":{"id":"u_123"}}`),
 	}
 	r.NoError(v2svc.SaveDefer(ctx, id, original))
-	r.NoError(v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusCancelled))
+	r.NoError(v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusAborted))
 
 	defers, err := v2svc.LoadDefers(ctx, id)
 	r.NoError(err)
 	r.Len(defers, 1)
 
 	expected := original
-	expected.ScheduleStatus = enums.DeferStatusCancelled
+	expected.ScheduleStatus = enums.DeferStatusAborted
 	r.Equal(expected, defers[original.HashedID])
 }
 
@@ -190,7 +190,7 @@ func TestSetDeferStatus_InputRoundTripsByteForByte(t *testing.T) {
 				Input:          json.RawMessage(tc.input),
 			}
 			r.NoError(v2svc.SaveDefer(ctx, id, d))
-			r.NoError(v2svc.SetDeferStatus(ctx, id, d.HashedID, enums.DeferStatusCancelled))
+			r.NoError(v2svc.SetDeferStatus(ctx, id, d.HashedID, enums.DeferStatusAborted))
 
 			defers, err := v2svc.LoadDefers(ctx, id)
 			r.NoError(err)

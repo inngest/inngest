@@ -59,7 +59,7 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-cleanup",
 		HashedID:       "hash-cancelled",
-		ScheduleStatus: enums.DeferStatusCancelled,
+		ScheduleStatus: enums.DeferStatusAborted,
 		Input:          json.RawMessage(`{}`),
 	}))
 
@@ -487,7 +487,7 @@ func TestDeferCancel(t *testing.T) {
 		ScheduleStatus: enums.DeferStatusAfterRun,
 	}
 	expected := seed
-	expected.ScheduleStatus = enums.DeferStatusCancelled
+	expected.ScheduleStatus = enums.DeferStatusAborted
 
 	cancelOp := state.GeneratorOpcode{
 		ID: cancelStepID,
@@ -783,6 +783,6 @@ func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 
 	defers, err := infra.smv2.LoadDefers(infra.ctx, run.ID)
 	r.NoError(err)
-	r.Equal(enums.DeferStatusCancelled, defers[deferStepID].ScheduleStatus,
+	r.Equal(enums.DeferStatusAborted, defers[deferStepID].ScheduleStatus,
 		"defer status should be Cancelled even on bare-op path")
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func TestDeferredStartMetadataValidate(t *testing.T) {
-	valid := DeferredStartMetadata{
+	valid := DeferredScheduleMetadata{
 		FnSlug:       "score",
 		ParentFnSlug: "app-parent-fn",
 		ParentRunID:  "01ABCDEF",
@@ -19,7 +19,7 @@ func TestDeferredStartMetadataValidate(t *testing.T) {
 	})
 
 	t.Run("reports all missing fields at once", func(t *testing.T) {
-		m := DeferredStartMetadata{}
+		m := DeferredScheduleMetadata{}
 		err := m.Validate()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fn_slug")

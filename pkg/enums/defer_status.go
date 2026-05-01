@@ -15,5 +15,5 @@ const (
 	DeferStatusAfterRun
 
 	// Will not schedule. Terminal: no transition out.
-	DeferStatusCancelled
+	DeferStatusAborted
 )

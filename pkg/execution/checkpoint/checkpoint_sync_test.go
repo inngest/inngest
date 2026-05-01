@@ -819,7 +819,7 @@ func TestCheckpointSyncSteps_DeferCancel(t *testing.T) {
 
 	// The cancel step memoizes itself (cancel's own hash, not the target's).
 	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
-	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusCancelled).Return(nil)
+	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
 
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err)
