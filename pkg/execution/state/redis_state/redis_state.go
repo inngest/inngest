@@ -905,7 +905,7 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 		d.HashedID,
 		string(metaJSON),
 		string(d.Input),
-		int(enums.DeferStatusCancelled),
+		int(enums.DeferStatusAborted),
 		consts.MaxDefersPerRun,
 	})
 	if err != nil {

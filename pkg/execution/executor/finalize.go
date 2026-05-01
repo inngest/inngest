@@ -153,7 +153,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	deferEvents, err := e.buildDeferEvents(ctx, opts, defers)
 	if err != nil {
 		l.Error(
-			"error building deferred start events; continuing without defer events",
+			"error building deferred schedule events; continuing without defer events",
 			"error", err,
 			"run_id", opts.Metadata.ID.RunID,
 		)
@@ -184,7 +184,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	return e.finalizeEvents(ctx, opts, deferEvents)
 }
 
-// buildDeferEvents constructs the inngest/deferred.start events for every
+// buildDeferEvents constructs the inngest/deferred.schedule events for every
 // AfterRun defer in `defers`. It does no publishing — the events are returned
 // for the caller (Finalize) to fold into the single finishHandler call inside
 // finalizeEvents.
@@ -267,7 +267,7 @@ func (e *executor) buildDeferEvents(
 		// (see top of file). A future addition that uses meta.NewAttrSet
 		// or similar inside this loop would otherwise fail to compile in
 		// a non-obvious way.
-		deferredMeta := event.DeferredStartMetadata{
+		deferredMeta := event.DeferredScheduleMetadata{
 			FnSlug:       d.FnSlug,
 			ParentFnSlug: fnSlug,
 			ParentRunID:  opts.Metadata.ID.RunID.String(),
@@ -285,7 +285,7 @@ func (e *executor) buildDeferEvents(
 
 		events = append(events, event.Event{
 			ID:        eventID.String(),
-			Name:      "inngest/deferred.start",
+			Name:      consts.FnDeferScheduleName,
 			Timestamp: now.UnixMilli(),
 			Data:      data,
 		})
@@ -469,7 +469,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		}
 	}
 
-	// Append extra events (e.g. inngest/deferred.start) AFTER the invoke
+	// Append extra events (e.g. inngest/deferred.schedule) AFTER the invoke
 	// goroutine loop so they aren't dispatched to HandleInvokeFinish.
 	freshEvents = append(freshEvents, extraEvents...)
 

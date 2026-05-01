@@ -28,14 +28,14 @@ type SDKRequest struct {
 // SDKDeferEntry tells the SDK that a deferred run is already registered for the
 // given hashed ID, so it should not re-report `OpcodeDeferAdd` for it.
 type SDKDeferEntry struct {
-	// Cancellable indicates the SDK may emit `OpcodeDeferCancel` for this
+	// Abortable indicates the SDK may emit `OpcodeDeferCancel` for this
 	// entry. It signifies that the deferred run hasn't queued yet, so it can be
-	// cancelled.
+	// aborted.
 	//
 	// Note that this is different than run cancellation on an already-queued
-	// run. Cancelling a deferred run simply will mean no run will ever exist
+	// run. Aborting a deferred run simply will mean no run will ever exist
 	// (e.g. no run ID).
-	Cancellable bool `json:"cancellable"`
+	Abortable bool `json:"abortable"`
 }
 
 type SDKRequestContext struct {

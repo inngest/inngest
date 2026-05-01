@@ -290,7 +290,7 @@ func TestCheckpointAsyncSteps_DeferCancel(t *testing.T) {
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
 	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
-	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusCancelled).Return(nil)
+	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
 	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
 
 	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)

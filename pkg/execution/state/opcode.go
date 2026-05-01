@@ -404,7 +404,7 @@ func (d *DeferAddOpts) Validate() error {
 		// Mirrors the GeneratorOpcode.Validate() check on step inputs. Prevents
 		// a malicious or buggy SDK from storing arbitrarily large payloads in
 		// Redis (per defer × per run) and inflating them into the
-		// deferred.start event bus on Finalize.
+		// deferred.schedule event bus on Finalize.
 		return ErrDeferInputTooLarge
 	}
 	return nil
