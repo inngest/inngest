@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
+import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import type { QuerySnapshot } from '@/components/Insights/types';
@@ -74,7 +75,7 @@ export function useDeepLinkHandler({
         id: ulid(),
         isSnapshot: true,
         name: 'Experiment Query',
-        query: sqlFromUrl,
+        query: formatSQL(sqlFromUrl),
       };
       actions.createTabFromQuery(snapshot);
 

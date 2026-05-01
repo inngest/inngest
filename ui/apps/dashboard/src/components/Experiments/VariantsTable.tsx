@@ -276,7 +276,7 @@ export function VariantsTable({
 
       <div
         className={cn(
-          'border-subtle overflow-hidden rounded-md border',
+          'border-subtle overflow-x-auto rounded-md border',
           '[&_th]:border-subtle [&_th]:border-r [&_th:last-child]:border-r-0',
           '[&_td]:border-subtle [&_td]:border-r [&_td:last-child]:border-r-0',
           '[&_thead]:border-subtle [&_thead]:border-b',
