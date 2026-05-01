@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react';
 
-import type { ValueNode } from './types';
+import type { TypedNode } from './types';
 
-export type ComputeTypeFn = (node: ValueNode, baseLabel: string) => string;
+export type ComputeTypeFn = (node: TypedNode, baseLabel: string) => string;
 
 const defaultComputeType: ComputeTypeFn = (_node, baseLabel) => baseLabel;
 
