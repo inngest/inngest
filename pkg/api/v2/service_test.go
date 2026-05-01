@@ -517,7 +517,7 @@ func mustEncodeSpanIdentifier(t *testing.T, id cqrs.SpanIdentifier) string {
 	return base64.StdEncoding.EncodeToString(payload)
 }
 
-func TestService_GetFunctionTrace(t *testing.T) {
+func TestService_GetFunctionTraceNotImplemented(t *testing.T) {
 	service := NewService(ServiceOptions{})
 
 	t.Run("returns not implemented for valid request", func(t *testing.T) {

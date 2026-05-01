@@ -269,12 +269,7 @@ func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.R
 		result.EndedAt = timestamppb.New(*span.EndedAt)
 	}
 
-	if span.Response != nil {
-		result.Response = &apiv2.TraceResponse{
-			StatusCode: int32(span.Response.StatusCode),
-			Headers:    compactHeaders(span.Response.Headers),
-		}
-	}
+	result.Metadata = toTraceSpanMetadata(span.Metadata)
 
 	if includeOutput && span.OutputID != nil && *span.OutputID != "" {
 		output, err := loadTraceOutput(ctx, reader, *span.OutputID)
@@ -349,6 +344,39 @@ func toTraceStepOp(stepOp models.StepOp) apiv2.TraceStepOp {
 	}
 }
 
+func toTraceSpanMetadata(metadata []*models.SpanMetadata) []*apiv2.TraceSpanMetadata {
+	if len(metadata) == 0 {
+		return nil
+	}
+
+	result := make([]*apiv2.TraceSpanMetadata, 0, len(metadata))
+	for _, item := range metadata {
+		if item == nil {
+			continue
+		}
+
+		result = append(result, &apiv2.TraceSpanMetadata{
+			Scope:     item.Scope.String(),
+			Kind:      item.Kind.String(),
+			Values:    toTraceSpanMetadataValues(item.Values),
+			UpdatedAt: timestamppb.New(item.UpdatedAt),
+		})
+	}
+	return result
+}
+
+func toTraceSpanMetadataValues(values map[string]json.RawMessage) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make(map[string]string, len(values))
+	for key, value := range values {
+		result[key] = string(value)
+	}
+	return result
+}
+
 func traceDuration(span *models.RunTraceSpan) *uint64 {
 	if span.Duration != nil && *span.Duration >= 0 {
 		value := uint64(*span.Duration)
@@ -383,20 +411,4 @@ func loadTraceOutput(ctx context.Context, reader FunctionTraceReader, encodedID 
 		input:  jsonToStruct(json.RawMessage(data.Input)),
 		output: jsonToStruct(json.RawMessage(data.Data)),
 	}, nil
-}
-
-func compactHeaders(input map[string][]string) map[string]string {
-	if len(input) == 0 {
-		return nil
-	}
-
-	result := make(map[string]string, len(input))
-	for key, values := range input {
-		if len(values) == 0 {
-			continue
-		}
-		result[key] = values[0]
-	}
-
-	return result
 }
