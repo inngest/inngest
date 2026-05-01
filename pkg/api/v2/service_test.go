@@ -344,8 +344,8 @@ func TestToTraceSpanStatus(t *testing.T) {
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_WAITING, toTraceSpanStatus(models.RunTraceSpanStatusWaiting))
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_WAITING, toTraceSpanStatus(models.RunTraceSpanStatusQueued))
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_RUNNING, toTraceSpanStatus(models.RunTraceSpanStatusRunning))
-	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_UNKNOWN, toTraceSpanStatus(models.RunTraceSpanStatusCancelled))
-	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_UNKNOWN, toTraceSpanStatus(models.RunTraceSpanStatusSkipped))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_CANCELLED, toTraceSpanStatus(models.RunTraceSpanStatusCancelled))
+	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_SKIPPED, toTraceSpanStatus(models.RunTraceSpanStatusSkipped))
 }
 
 func TestService_GetFunctionTrace(t *testing.T) {

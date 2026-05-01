@@ -339,9 +339,10 @@ func toTraceSpanStatus(status models.RunTraceSpanStatus) apiv2.TraceSpanStatus {
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED
 	case models.RunTraceSpanStatusFailed:
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_FAILED
-	case models.RunTraceSpanStatusCancelled, models.RunTraceSpanStatusSkipped:
-		// TODO(api-v2): Add CANCELLED and SKIPPED trace status enum values to the v2 contract.
-		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_UNKNOWN
+	case models.RunTraceSpanStatusCancelled:
+		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_CANCELLED
+	case models.RunTraceSpanStatusSkipped:
+		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_SKIPPED
 	case models.RunTraceSpanStatusWaiting, models.RunTraceSpanStatusQueued:
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_WAITING
 	default:
