@@ -12,6 +12,10 @@ func constraintCommand() *cli.Command {
 		Usage:   "ConstraintAPI debugging commands",
 		Commands: []*cli.Command{
 			constraintapi.CheckCommand(),
+			constraintapi.GetAccountConcurrencyCommand(),
+			constraintapi.GetFunctionConcurrencyCommand(),
+			constraintapi.CountAccountLeasesCommand(),
+			constraintapi.CountAccountsCommand(),
 		},
 	}
 }
