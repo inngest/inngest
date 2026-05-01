@@ -399,6 +399,13 @@ func (d *DeferAddOpts) Validate() error {
 	if len(d.Input) == 0 {
 		return fmt.Errorf("Input is required")
 	}
+	if len(d.Input) > consts.MaxStepInputSize {
+		// Mirrors the GeneratorOpcode.Validate() check on step inputs —
+		// prevents a malicious or buggy SDK from storing arbitrarily large
+		// payloads in Redis (per defer × per run) and inflating them into
+		// the deferred.start event bus on Finalize.
+		return ErrStepInputTooLarge
+	}
 	return nil
 }
 
