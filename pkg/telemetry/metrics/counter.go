@@ -953,3 +953,17 @@ func IncrConstraintAPISemaphoreCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrDefersFinalizedCounter(ctx context.Context, status string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_finalized_total",
+		Description: "Total number of defers seen at run finalize, tagged by outcome status",
+		Tags:        opts.Tags,
+	})
+}

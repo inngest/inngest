@@ -260,7 +260,7 @@ func TestCheckpointAsyncSteps_DeferAdd(t *testing.T) {
 	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
 		return d.FnSlug == "onDefer-score" &&
 			d.HashedID == "step-defer" &&
-			d.ScheduleStatus == state.ScheduleStatusAfterRun &&
+			d.ScheduleStatus == enums.DeferStatusAfterRun &&
 			string(d.Input) == `{"user_id":"u_123"}`
 	})).Return(nil)
 	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
@@ -290,7 +290,7 @@ func TestCheckpointAsyncSteps_DeferCancel(t *testing.T) {
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
 	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
-	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", state.ScheduleStatusCancelled).Return(nil)
+	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusCancelled).Return(nil)
 	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
 
 	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
@@ -409,7 +409,7 @@ func (m *mockRunService) LoadDefers(ctx context.Context, id state.ID) (map[strin
 	return defers, args.Error(1)
 }
 
-func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status state.ScheduleStatus) error {
+func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
 	args := m.Called(ctx, id, hashedID, status)
 	return args.Error(0)
 }

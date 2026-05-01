@@ -119,15 +119,22 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 	}
 
-	// Load defers BEFORE Delete — they live in state and won't survive it.
-	// Retry on transient failures so the events get a chance to publish even
-	// when Redis is briefly unavailable. Defer-related failures are
-	// best-effort: log and continue with no defer events rather than blocking
-	// Finalize. The downstream cleanup (Delete, finalizeRemoveJobs,
+	// Load defers BEFORE Delete since they live in state and won't survive the
+	// deletion. Retry on transient failures so the events get a chance to
+	// publish even when Redis is briefly unavailable. Defer-related failures
+	// are best-effort: log and continue with no defer events rather than
+	// blocking Finalize. The downstream cleanup (Delete, finalizeRemoveJobs,
 	// finalizeEvents for function.X) must still run regardless.
-	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers", func(ctx context.Context) (map[string]sv2.Defer, error) {
-		return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
-	}, util.NewRetryConf())
+	loadDefersStart := e.now()
+	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers",
+		func(ctx context.Context) (map[string]sv2.Defer, error) {
+			return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
+		},
+		util.NewRetryConf(),
+	)
+	metrics.HistogramDefersLoadDuration(ctx, e.now().Sub(loadDefersStart), metrics.HistogramOpt{
+		PkgName: pkgName,
+	})
 	if deferErr != nil {
 		l.Error(
 			"error loading defers to finalize; continuing without defer events",
@@ -135,6 +142,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 			"run_id", opts.Metadata.ID.RunID,
 		)
 	}
+	metrics.HistogramDefersPerRun(ctx, int64(len(defers)), metrics.HistogramOpt{
+		PkgName: pkgName,
+	})
 
 	// Build defer events from the loaded map BEFORE Delete (resolves fnSlug
 	// using the in-memory function loader, not state). The actual publish
@@ -211,11 +221,13 @@ func (e *executor) buildDeferEvents(
 				"error", err,
 				"run_id", opts.Metadata.ID.RunID,
 			)
+			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
 		}
 
 		// TODO: what about an immediate execution mode?
-		if d.ScheduleStatus != sv2.ScheduleStatusAfterRun {
+		if d.ScheduleStatus != enums.DeferStatusAfterRun {
+			metrics.IncrDefersFinalizedCounter(ctx, d.ScheduleStatus.String(), metrics.CounterOpt{PkgName: pkgName})
 			continue
 		}
 
@@ -232,6 +244,7 @@ func (e *executor) buildDeferEvents(
 				"run_id", opts.Metadata.ID.RunID,
 				"unreachable", true,
 			)
+			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
 		}
 
@@ -243,6 +256,7 @@ func (e *executor) buildDeferEvents(
 					"error", err,
 					"run_id", opts.Metadata.ID.RunID,
 				)
+				metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 				continue
 			}
 			if data == nil {
@@ -267,6 +281,7 @@ func (e *executor) buildDeferEvents(
 				"error", err,
 				"run_id", opts.Metadata.ID.RunID,
 			)
+			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
 		}
 		data[consts.InngestEventDataPrefix] = deferredMeta
@@ -277,6 +292,7 @@ func (e *executor) buildDeferEvents(
 			Timestamp: now.UnixMilli(),
 			Data:      data,
 		})
+		metrics.IncrDefersFinalizedCounter(ctx, "after_run", metrics.CounterOpt{PkgName: pkgName})
 	}
 
 	return events, nil

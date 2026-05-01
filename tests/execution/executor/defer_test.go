@@ -53,13 +53,13 @@ func TestFinalizeEmitsDeferredStartEvents(t *testing.T) {
 	r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-score",
 		HashedID:       "hash-active",
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		ScheduleStatus: enums.DeferStatusAfterRun,
 		Input:          json.RawMessage(nestedInputJSON),
 	}))
 	r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-cleanup",
 		HashedID:       "hash-cancelled",
-		ScheduleStatus: statev2.ScheduleStatusCancelled,
+		ScheduleStatus: enums.DeferStatusCancelled,
 		Input:          json.RawMessage(`{}`),
 	}))
 
@@ -380,7 +380,7 @@ func TestDeferAdd(t *testing.T) {
 		FnSlug:         "onDefer-score",
 		HashedID:       op.ID,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		ScheduleStatus: enums.DeferStatusAfterRun,
 	}
 
 	cases := []struct {
@@ -484,10 +484,10 @@ func TestDeferCancel(t *testing.T) {
 		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		ScheduleStatus: enums.DeferStatusAfterRun,
 	}
 	expected := seed
-	expected.ScheduleStatus = statev2.ScheduleStatusCancelled
+	expected.ScheduleStatus = enums.DeferStatusCancelled
 
 	cancelOp := state.GeneratorOpcode{
 		ID: cancelStepID,
@@ -719,7 +719,7 @@ func TestDeferAdd_BareOpEnqueuesDiscovery(t *testing.T) {
 	defers, err := infra.smv2.LoadDefers(infra.ctx, run.ID)
 	r.NoError(err)
 	r.Contains(defers, stepID, "defer should be persisted even on bare-op path")
-	r.Equal(statev2.ScheduleStatusAfterRun, defers[stepID].ScheduleStatus)
+	r.Equal(enums.DeferStatusAfterRun, defers[stepID].ScheduleStatus)
 }
 
 // TestDeferCancel_BareOpEnqueuesDiscovery is the DeferCancel counterpart: a
@@ -761,7 +761,7 @@ func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 	r.NoError(infra.smv2.SaveDefer(infra.ctx, run.ID, statev2.Defer{
 		FnSlug:         "onDefer-score",
 		HashedID:       deferStepID,
-		ScheduleStatus: statev2.ScheduleStatusAfterRun,
+		ScheduleStatus: enums.DeferStatusAfterRun,
 		Input:          json.RawMessage(`{"user_id":"u_123"}`),
 	}))
 
@@ -783,6 +783,6 @@ func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 
 	defers, err := infra.smv2.LoadDefers(infra.ctx, run.ID)
 	r.NoError(err)
-	r.Equal(statev2.ScheduleStatusCancelled, defers[deferStepID].ScheduleStatus,
+	r.Equal(enums.DeferStatusCancelled, defers[deferStepID].ScheduleStatus,
 		"defer status should be Cancelled even on bare-op path")
 }

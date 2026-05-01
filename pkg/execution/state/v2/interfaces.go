@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -69,7 +70,7 @@ type RunService interface {
 	// existing Defer. It returns an error if no defer exists with the given
 	// hashedID. Prefer this over reading a full Defer, mutating, and calling
 	// SaveDefer — that pattern races against concurrent SaveDefer writes.
-	SetDeferStatus(ctx context.Context, id ID, hashedID string, status ScheduleStatus) error
+	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
