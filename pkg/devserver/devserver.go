@@ -412,7 +412,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// batch.NewMigratingBatchManager.
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
-	croner := cron.NewRedisCronManager(queueShard, rq, l)
+	croner := cron.NewManager(queueShard, rq, l)
 
 	sn := singleton.New(ctx, map[string]*redis_state.QueueClient{
 		consts.DefaultQueueShardName: unshardedClient.Queue(),
