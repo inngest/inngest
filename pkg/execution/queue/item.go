@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/constraintapi"
@@ -379,6 +380,9 @@ type Throttle struct {
 	// Period is the rate limit period, in seconds
 	Period int `json:"p"`
 
+	// Scope controls whether this throttle applies to the function, environment, or account.
+	Scope enums.ThrottleScope `json:"s,omitempty"`
+
 	// UnhashedThrottleKey is the raw value returned after evaluating the key expression, if configured.
 	// Otherwise, this is the function ID. In the case of evaluated keys, this may be large and should be truncated before usage.
 	UnhashedThrottleKey string `json:"-"`
@@ -633,12 +637,33 @@ func HashID(_ context.Context, id string) string {
 	return strconv.FormatUint(ui, 36)
 }
 
-func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Throttle, evtMap map[string]any) *Throttle {
+func throttleScopeID(id sv2.ID, scope enums.ThrottleScope) uuid.UUID {
+	switch scope {
+	case enums.ThrottleScopeAccount:
+		return id.Tenant.AccountID
+	case enums.ThrottleScopeEnv:
+		return id.Tenant.EnvID
+	default:
+		return id.FunctionID
+	}
+}
+
+func throttleScopeKey(scope enums.ThrottleScope, scopeID uuid.UUID) string {
+	if scope == enums.ThrottleScopeFn {
+		return scopeID.String()
+	}
+
+	return fmt.Sprintf("%s:%s", strings.ToLower(scope.String()), scopeID)
+}
+
+func GetThrottleConfig(ctx context.Context, id sv2.ID, throttle *inngest.Throttle, evtMap map[string]any) *Throttle {
 	if throttle == nil {
 		return nil
 	}
 
-	unhashedThrottleKey := fnID.String()
+	scope := throttle.Scope
+	scopeID := throttleScopeID(id, scope)
+	unhashedThrottleKey := throttleScopeKey(scope, scopeID)
 	throttleKey := HashID(ctx, unhashedThrottleKey)
 	var throttleExpr string
 	if throttle.Key != nil {
@@ -655,6 +680,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 		Limit:               int(throttle.Limit),
 		Burst:               int(throttle.Burst),
 		Period:              int(throttle.Period.Seconds()),
+		Scope:               scope,
 		UnhashedThrottleKey: unhashedThrottleKey,
 		KeyExpressionHash:   util.XXHash(throttleExpr),
 	}
@@ -753,7 +779,7 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			Limit:             int(fn.Throttle.Limit),
 			Burst:             int(fn.Throttle.Burst),
 			Period:            int(fn.Throttle.Period.Seconds()),
-			Scope:             enums.ThrottleScopeFn,
+			Scope:             fn.Throttle.Scope,
 			KeyExpressionHash: util.XXHash(throttleKey),
 		})
 	}

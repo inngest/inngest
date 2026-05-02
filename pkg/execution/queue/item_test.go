@@ -1,11 +1,14 @@
 package queue
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/assert"
@@ -171,6 +174,89 @@ func TestDelay(t *testing.T) {
 			require.Equal(t, test.expectedLeaseDelay, test.qi.LeaseDelay(test.now))
 		})
 	}
+}
+
+func TestGetThrottleConfig(t *testing.T) {
+	ctx := context.Background()
+	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	envID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	accountID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	id := sv2.ID{
+		FunctionID: fnID,
+		Tenant: sv2.Tenant{
+			EnvID:     envID,
+			AccountID: accountID,
+		},
+	}
+
+	t.Run("function scope preserves legacy key format", func(t *testing.T) {
+		key := "event.data.customer_id"
+		got := GetThrottleConfig(ctx, id, &inngest.Throttle{
+			Limit:  10,
+			Burst:  2,
+			Period: time.Minute,
+			Key:    &key,
+		}, map[string]any{
+			"data": map[string]any{
+				"customer_id": "cust_123",
+			},
+		})
+
+		require.NotNil(t, got)
+		require.Equal(t, enums.ThrottleScopeFn, got.Scope)
+		require.Equal(t, HashID(ctx, fnID.String())+"-"+HashID(ctx, "cust_123"), got.Key)
+		require.Equal(t, "cust_123", got.UnhashedThrottleKey)
+		require.Equal(t, util.XXHash(key), got.KeyExpressionHash)
+	})
+
+	t.Run("environment scope shares across function ids", func(t *testing.T) {
+		throttle := &inngest.Throttle{
+			Limit:  10,
+			Burst:  2,
+			Period: time.Minute,
+			Scope:  enums.ThrottleScopeEnv,
+		}
+		otherFunctionID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+		otherID := id
+		otherID.FunctionID = otherFunctionID
+
+		got := GetThrottleConfig(ctx, id, throttle, nil)
+		other := GetThrottleConfig(ctx, otherID, throttle, nil)
+
+		require.NotNil(t, got)
+		require.Equal(t, enums.ThrottleScopeEnv, got.Scope)
+		require.Equal(t, HashID(ctx, "env:"+envID.String()), got.Key)
+		require.Equal(t, got.Key, other.Key)
+	})
+
+	t.Run("account scope shares across environments", func(t *testing.T) {
+		key := "event.data.customer_id"
+		throttle := &inngest.Throttle{
+			Limit:  10,
+			Burst:  2,
+			Period: time.Minute,
+			Key:    &key,
+			Scope:  enums.ThrottleScopeAccount,
+		}
+		otherEnvID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+		otherID := id
+		otherID.Tenant.EnvID = otherEnvID
+		otherID.FunctionID = uuid.MustParse("66666666-6666-6666-6666-666666666666")
+
+		evt := map[string]any{
+			"data": map[string]any{
+				"customer_id": "cust_123",
+			},
+		}
+		got := GetThrottleConfig(ctx, id, throttle, evt)
+		other := GetThrottleConfig(ctx, otherID, throttle, evt)
+
+		require.NotNil(t, got)
+		require.Equal(t, enums.ThrottleScopeAccount, got.Scope)
+		require.Equal(t, HashID(ctx, "account:"+accountID.String())+"-"+HashID(ctx, "cust_123"), got.Key)
+		require.Equal(t, got.Key, other.Key)
+		require.Equal(t, util.XXHash(key), got.KeyExpressionHash)
+	})
 }
 
 func TestConvertToConstraintConfiguration(t *testing.T) {
@@ -477,6 +563,37 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 					CustomConcurrencyKeys: nil,
 				},
 				Throttle: nil,
+			},
+		},
+		{
+			name:               "function with environment scoped throttle",
+			accountConcurrency: 100,
+			fn: inngest.Function{
+				FunctionVersion: 9,
+				Throttle: &inngest.Throttle{
+					Limit:  20,
+					Burst:  5,
+					Period: 60 * time.Second,
+					Scope:  enums.ThrottleScopeEnv,
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 9,
+				RateLimit:       nil,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    100,
+					FunctionConcurrency:   0,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Limit:             20,
+						Burst:             5,
+						Period:            60,
+						Scope:             enums.ThrottleScopeEnv,
+						KeyExpressionHash: util.XXHash(""),
+					},
+				},
 			},
 		},
 	}

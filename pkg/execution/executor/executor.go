@@ -1153,7 +1153,7 @@ func (e *executor) schedule(
 	//
 	// Create throttle information prior to creating state.  This is used in the queue.
 	//
-	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
+	throttle := queue.GetThrottleConfig(ctx, metadata.ID, req.Function.Throttle, evtMap)
 
 	// Track skip reason and context for span attributes
 	var skipReason enums.SkipReason

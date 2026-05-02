@@ -743,6 +743,13 @@ A Sync’s payload MUST be the following JSON object:
       key?: string;
 
       /**
+       * An optional scope for the throttle bucket. By default, throttle limits are
+       * scoped to functions. Use "env" to share the bucket across functions in the
+       * same environment, or "account" to share it across environments in the account.
+       */
+      scope?: "fn" | "env" | "account";
+
+      /**
        * The maximum number of runs to allow per the given `period`.
        */
       limit: number;

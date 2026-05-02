@@ -175,6 +175,37 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "with account scoped throttle",
+			constraints: PartitionConstraintConfig{
+				FunctionVersion: 4,
+				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeAccount,
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "account-throttle-hash",
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 4,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:     0,
+					FunctionConcurrency:    0,
+					AccountRunConcurrency:  0,
+					FunctionRunConcurrency: 0,
+				},
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Scope:             enums.ThrottleScopeAccount,
+						Limit:             10,
+						Burst:             5,
+						Period:            60,
+						KeyExpressionHash: "account-throttle-hash",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -318,6 +349,94 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 					Burst:                     5,
 					Period:                    60,
 					ThrottleKeyExpressionHash: "new-throttle-expr-hash",
+				},
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+			},
+		},
+		{
+			name: "with environment scoped throttle",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
+					ThrottleKeyExpressionHash: "env-throttle-expr-hash",
+					ThrottleKey:               "env-throttle-key-value",
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "env-throttle-expr-hash",
+				},
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindThrottle,
+					Throttle: &constraintapi.ThrottleConstraint{
+						Scope:             enums.ThrottleScopeEnv,
+						KeyExpressionHash: "env-throttle-expr-hash",
+						EvaluatedKeyHash:  "env-throttle-key-value",
+					},
+				},
+			},
+		},
+		{
+			name: "throttle in backlog ignored when config has different scope",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
+					ThrottleKeyExpressionHash: "throttle-expr-hash",
+					ThrottleKey:               "throttle-key-value",
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeAccount,
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "throttle-expr-hash",
 				},
 			},
 			expected: []constraintapi.ConstraintItem{
