@@ -9,11 +9,14 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
+  useNavigate,
+  useRouterState,
 } from '@tanstack/react-router';
 
 import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import fontsCss from '@inngest/components/AppRoot/fonts.css?url';
 import StoreProvider from '@/components/StoreProvider';
+import { useAuthStatusQuery } from '@/store/authApi';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -53,12 +56,53 @@ export const Route = createRootRoute({
   component: RootComponent,
 });
 
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { data: authStatus, isLoading } = useAuthStatusQuery();
+  const navigate = useNavigate();
+  const routerState = useRouterState();
+  const pathname = routerState.location.pathname;
+
+  React.useEffect(() => {
+    if (isLoading || !authStatus) return;
+    if (
+      authStatus.authRequired &&
+      !authStatus.authenticated &&
+      pathname !== '/login'
+    ) {
+      navigate({ to: '/login' });
+    }
+    if (authStatus.authenticated && pathname === '/login') {
+      navigate({ to: '/' });
+    }
+  }, [authStatus, isLoading, pathname, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="bg-canvasBase flex h-screen w-full items-center justify-center">
+        <div className="text-muted text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  if (
+    authStatus?.authRequired &&
+    !authStatus.authenticated &&
+    pathname !== '/login'
+  ) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
 function RootComponent() {
   return (
     <RootDocument>
       <StoreProvider>
         <ThemeProvider attribute="class" defaultTheme="system">
-          <Outlet />
+          <AuthGate>
+            <Outlet />
+          </AuthGate>
           <Toaster
             toastOptions={{
               className: 'drop-shadow-lg',

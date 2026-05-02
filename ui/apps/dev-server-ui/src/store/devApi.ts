@@ -28,7 +28,10 @@ export interface ServerInfo extends z.output<typeof serverInfoSchema> {
 
 export const devApi = createApi({
   reducerPath: 'devApi',
-  baseQuery: fetchBaseQuery({ baseUrl: baseURL.toString() }),
+  baseQuery: fetchBaseQuery({
+    baseUrl: baseURL.toString(),
+    credentials: 'include',
+  }),
   endpoints: (builder) => ({
     info: builder.query<ServerInfo, void>({
       query() {

@@ -1,7 +1,18 @@
 import { Listbox } from '@headlessui/react';
 import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
+import { RiLogoutBoxRLine } from '@remixicon/react';
+
+import { useAuthStatusQuery, useLogoutMutation } from '@/store/authApi';
 
 export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
+  const { data: authStatus } = useAuthStatusQuery();
+  const [logout] = useLogoutMutation();
+
+  const handleLogout = async () => {
+    await logout().unwrap();
+    window.location.href = '/login';
+  };
+
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">
@@ -18,6 +29,16 @@ export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
               <div>Theme</div>
               <ModeSwitch />
             </Listbox.Option>
+            {authStatus?.authRequired && (
+              <Listbox.Option
+                value="logout"
+                className="text-muted mx-2 mb-2 flex h-8 cursor-pointer items-center gap-2 rounded px-2 text-[13px] hover:bg-canvasSubtle"
+                onClick={handleLogout}
+              >
+                <RiLogoutBoxRLine className="h-4 w-4" />
+                <div>Sign out</div>
+              </Listbox.Option>
+            )}
           </>
         </Listbox.Options>
       </div>

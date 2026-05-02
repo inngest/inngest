@@ -1,4 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
+import { authApi } from './authApi';
 import devApi from './devApi';
 import { api } from './generated';
 
@@ -6,6 +7,7 @@ export const store = configureStore({
   reducer: {
     [api.reducerPath]: api.reducer,
     [devApi.reducerPath]: devApi.reducer,
+    [authApi.reducerPath]: authApi.reducer,
   },
   middleware: (getDefaultMiddleware) => {
     const defaults = getDefaultMiddleware();
@@ -18,7 +20,11 @@ export const store = configureStore({
         : m,
     );
 
-    return fixedDefaults.concat(api.middleware, devApi.middleware);
+    return fixedDefaults.concat(
+      api.middleware,
+      devApi.middleware,
+      authApi.middleware,
+    );
   },
 });
 

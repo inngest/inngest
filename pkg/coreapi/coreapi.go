@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/config"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/consts"
@@ -35,6 +36,7 @@ type Options struct {
 	Data cqrs.Manager
 
 	AuthMiddleware func(http.Handler) http.Handler
+	HostAuthConfig *authn.HostAuthConfig
 	Config         config.Config
 	Logger         logger.Logger
 	Runner         runner.Runner
@@ -84,7 +86,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 	})
 	a.Use(
 		cors.Handler,
@@ -110,7 +112,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 
 		// TODO - Add option for enabling GraphQL Playground
 		a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
-		a.Handle("/gql", srv)
+		a.With(authn.HostAuthMiddleware(o.HostAuthConfig)).Handle("/gql", srv)
 	}
 
 	// V0 APIs

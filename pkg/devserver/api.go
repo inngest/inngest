@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
@@ -50,6 +51,7 @@ type devapi struct {
 type DevAPIOptions struct {
 	disableUI      bool
 	AuthMiddleware func(http.Handler) http.Handler
+	HostAuthConfig *authn.HostAuthConfig
 }
 
 func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
@@ -59,11 +61,11 @@ func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
 		devserver: d,
 		disableUI: o.disableUI,
 	}
-	api.addRoutes(o.AuthMiddleware)
+	api.addRoutes(o.AuthMiddleware, o.HostAuthConfig)
 	return api
 }
 
-func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
+func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler, hostAuthConfig *authn.HostAuthConfig) {
 	a.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			l := a.devserver.log.With("caller", a.devserver.Name())
@@ -73,6 +75,13 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 		return http.HandlerFunc(fn)
 	})
 	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
+
+	// Host auth endpoints - always accessible (no auth required)
+	a.Get("/auth/status", authn.HostAuthStatusHandler(hostAuthConfig))
+	if hostAuthConfig != nil && hostAuthConfig.IsEnabled() {
+		a.Post("/auth/login", authn.HostAuthLoginHandler(hostAuthConfig))
+		a.Post("/auth/logout", authn.HostAuthLogoutHandler(hostAuthConfig))
+	}
 
 	a.Post("/dev/traces", a.OTLPTrace) // Intentionally outside the AuthMiddleware
 
