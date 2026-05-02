@@ -132,7 +132,7 @@ importers:
         version: 4.9.0(react@19.2.5)
       '@segment/analytics-next':
         specifier: ^1.81.1
-        version: 1.83.0
+        version: 1.84.0
       '@sentry/tanstackstart-react':
         specifier: ^10.26.0
         version: 10.51.0(@opentelemetry/exporter-trace-otlp-http@0.215.0(@opentelemetry/api@1.9.1))(react@19.2.5)(rollup@4.60.2)
@@ -4773,14 +4773,14 @@ packages:
       '@reduxjs/toolkit': ^1.7.1 || ^2.0.0
       graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
 
-  '@segment/analytics-core@1.8.2':
-    resolution: {integrity: sha512-5FDy6l8chpzUfJcNlIcyqYQq4+JTUynlVoCeCUuVz+l+6W0PXg+ljKp34R4yLVCcY5VVZohuW+HH0VLWdwYVAg==}
+  '@segment/analytics-core@1.8.3':
+    resolution: {integrity: sha512-63X8e2DWb2ZnJ9S3H8iSOFnbeDXMkTGhA8kZG4eFAO07QBwBVyWo5BCpv6vmuOMEkv2le6t2FMg1p6ZeJQA/4A==}
 
   '@segment/analytics-generic-utils@1.2.0':
     resolution: {integrity: sha512-DfnW6mW3YQOLlDQQdR89k4EqfHb0g/3XvBXkovH1FstUN93eL1kfW9CsDcVQyH3bAC5ZsFyjA/o/1Q2j0QeoWw==}
 
-  '@segment/analytics-next@1.83.0':
-    resolution: {integrity: sha512-HsXo3YrcS57UvG8IpamXDIiveHhLHarOUOL80rWlwpJH7nXk6RDYgSWz0ejla5UDsLLfi8tKar0WkCp+0CyJJw==}
+  '@segment/analytics-next@1.84.0':
+    resolution: {integrity: sha512-V5scoCrhiTpRPOuBwNVpvE4KvHwrjgQ5fs282R72KiAZ0HoxmjLgReZYjZogBf7qq/c6VmQG3nidwh8PQGcY1A==}
 
   '@segment/analytics-page-tools@1.0.0':
     resolution: {integrity: sha512-o9OVB91qLB9qb0Bw1HfjmWm5AnrMNULRjx++4lBqLt8InKRX1urrRBparVlpj+yJA0sckN5ZcsfazRLuPgBYDQ==}
@@ -11288,7 +11288,7 @@ packages:
   vite-tsconfig-paths@6.1.1:
     resolution: {integrity: sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg==}
     peerDependencies:
-      vite: '>=4.5.11'
+      vite: '>=6.2.7'
 
   vite@8.0.10:
     resolution: {integrity: sha512-rZuUu9j6J5uotLDs+cAA4O5H4K1SfPliUlQwqa6YEwSrWDZzP4rhm00oJR5snMewjxF5V/K3D4kctsUTsIU9Mw==}
@@ -15787,7 +15787,7 @@ snapshots:
       graphql: 16.13.2
       graphql-request: 7.4.0(graphql@16.13.2)
 
-  '@segment/analytics-core@1.8.2':
+  '@segment/analytics-core@1.8.3':
     dependencies:
       '@lukeed/uuid': 2.0.1
       '@segment/analytics-generic-utils': 1.2.0
@@ -15798,10 +15798,10 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@segment/analytics-next@1.83.0':
+  '@segment/analytics-next@1.84.0':
     dependencies:
       '@lukeed/uuid': 2.0.1
-      '@segment/analytics-core': 1.8.2
+      '@segment/analytics-core': 1.8.3
       '@segment/analytics-generic-utils': 1.2.0
       '@segment/analytics-page-tools': 1.0.0
       '@segment/analytics.js-video-plugins': 0.2.1
