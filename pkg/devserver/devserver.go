@@ -406,9 +406,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 	croner := cron.NewRedisCronManager(queueShard, rq, l)
 
-	sn := singleton.New(ctx, map[string]*redis_state.QueueClient{
-		consts.DefaultQueueShardName: unshardedClient.Queue(),
-	}, shardRegistry)
+	sn := singleton.New(ctx, shardRegistry)
 
 	conditionalConnectTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
@@ -637,15 +635,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
-			CachingMiddleware:  caching,
-			FunctionReader:     ds.Data,
-			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
-			Executor:           ds.Executor,
-			Queue:              rq,
-			QueueShards:        shardRegistry,
-			Broadcaster:        broadcaster,
-			TraceReader:        ds.Data,
+			AuthMiddleware:    authn.SigningKeyMiddleware(opts.SigningKey),
+			CachingMiddleware: caching,
+			FunctionReader:    ds.Data,
+			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
+			Executor:          ds.Executor,
+			Queue:             rq,
+			QueueShards:       shardRegistry,
+			Broadcaster:       broadcaster,
+			TraceReader:       ds.Data,
 
 			AppCreator:        dbcqrs,
 			FunctionCreator:   dbcqrs,
@@ -729,10 +727,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if testapi.ShouldEnable() {
 		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
-			QueueShards:        shardRegistry,
-			Queue:              rq,
-			Executor:           exec,
-			StateManager:       smv2,
+			QueueShards:  shardRegistry,
+			Queue:        rq,
+			Executor:     exec,
+			StateManager: smv2,
 			ResetAll: func() {
 				// Only flush in-memory clusters if they exist
 				if shardedCluster != nil {
@@ -777,10 +775,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			Port:            ds.Opts.DebugAPIPort,
 			PauseManager:    pauseMgr,
 			CapacityManager: cm,
-			// Dependencies for batching, singleton, and debounce insights
-			BatchManager:   batcher,
-			SingletonStore: sn,
-			Debouncer:      debouncer,
+			// Dependencies for batching and debounce insights
+			BatchManager: batcher,
+			Debouncer:    debouncer,
 		}))
 	}
 
