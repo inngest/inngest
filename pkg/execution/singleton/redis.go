@@ -22,17 +22,17 @@ redis.call('del', KEYS[1])
 return v
 `
 
-func New(ctx context.Context, queueShards map[string]*redis_state.QueueClient, shardSelector queue.ShardSelector) Singleton {
+func New(ctx context.Context, queueShards map[string]*redis_state.QueueClient, shards queue.ShardRegistry) Singleton {
 	return &redisStore{
 		queueShards:     queueShards,
-		shardSelector:   shardSelector,
+		shards:          shards,
 		getAndDelScript: rueidis.NewLuaScript(getAndDeleteLua),
 	}
 }
 
 type redisStore struct {
 	queueShards     map[string]*redis_state.QueueClient
-	shardSelector   queue.ShardSelector
+	shards          queue.ShardRegistry
 	getAndDelScript *rueidis.Lua
 }
 
@@ -65,7 +65,7 @@ func (r *redisStore) GetCurrentRunID(ctx context.Context, key string, accountID 
 }
 
 func (r *redisStore) shardByAccount(ctx context.Context, accountID uuid.UUID) (*redis_state.QueueClient, error) {
-	selected, err := r.shardSelector(ctx, accountID, nil)
+	selected, err := r.shards.Resolve(ctx, accountID, nil)
 	if err != nil {
 		return nil, err
 	}
