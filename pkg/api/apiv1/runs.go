@@ -110,7 +110,7 @@ func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shard, err := a.opts.QueueShardSelector(ctx, auth.AccountID(), nil)
+	shard, err := a.opts.QueueShards.Resolve(ctx, auth.AccountID(), nil)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Internal server error"))
 		return

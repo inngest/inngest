@@ -14,7 +14,7 @@ import (
 )
 
 func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartitionRequest) (*pb.ShadowPartitionResponse, error) {
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
@@ -57,7 +57,7 @@ func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartiti
 }
 
 func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*pb.BacklogsResponse, error) {
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
@@ -92,7 +92,7 @@ func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*p
 }
 
 func (d *debugAPI) GetBacklogSize(ctx context.Context, req *pb.BacklogSizeRequest) (*pb.BacklogSizeResponse, error) {
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}

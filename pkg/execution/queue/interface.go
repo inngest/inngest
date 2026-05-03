@@ -54,12 +54,7 @@ type PartitionLeaseOptions struct{}
 
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
 
-type ShardAssingmentManager interface {
-	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
-}
-
 type QueueManager interface {
-	ShardAssingmentManager
 	JobQueueReader
 	Queue
 

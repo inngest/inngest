@@ -36,7 +36,7 @@ func NewDebugAPI(o Opts) service.Service {
 		queue:          o.Queue,
 		state:          o.State,
 		croner:         o.Cron,
-		findShard:      o.ShardSelector,
+		shards:         o.ShardRegistry,
 		pm:             o.PauseManager,
 		cm:             o.CapacityManager,
 		batchManager:   o.BatchManager,
@@ -54,7 +54,7 @@ type Opts struct {
 	PauseManager    pauses.Manager
 	CapacityManager constraintapi.CapacityManager
 
-	ShardSelector queue.ShardSelector
+	ShardRegistry queue.ShardRegistry
 
 	// Dependencies for batching, singleton, and debounce insights
 	BatchManager   batch.BatchManager
@@ -68,11 +68,9 @@ type debugAPI struct {
 	pb.DebugServer
 	port int
 
-	rpc       *grpc.Server
-	log       logger.Logger
-	findShard queue.ShardSelector
-
-	shards map[string]queue.QueueShard
+	rpc    *grpc.Server
+	log    logger.Logger
+	shards queue.ShardRegistry
 
 	db     cqrs.Manager
 	queue  queue.QueueManager

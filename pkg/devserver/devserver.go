@@ -387,20 +387,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	if err != nil {
+		return fmt.Errorf("could not create shard registry: %w", err)
 	}
 
-	rq, err := queue.New(
-		ctx,
-		"queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: queueShard,
-		},
-		shardSelector,
-		queueOpts...,
-	)
+	rq, err := queue.New(ctx, "queue", shardRegistry, queueOpts...)
 	if err != nil {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
@@ -416,7 +408,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	sn := singleton.New(ctx, map[string]*redis_state.QueueClient{
 		consts.DefaultQueueShardName: unshardedClient.Queue(),
-	}, shardSelector)
+	}, shardRegistry)
 
 	conditionalConnectTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
@@ -538,8 +530,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDebouncer(debouncer),
 		executor.WithSingletonManager(sn),
 		executor.WithBatcher(batcher),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
@@ -576,7 +567,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceDebouncer(debouncer),
 		executor.WithServiceCroner(croner),
 		executor.WithServiceLogger(l),
-		executor.WithServiceShardSelector(shardSelector),
+		executor.WithServiceShardRegistry(shardRegistry),
 		executor.WithServicePublisher(pb),
 		executor.WithServiceEnableKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
@@ -652,7 +643,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
 			Queue:              rq,
-			QueueShardSelector: shardSelector,
+			QueueShards:        shardRegistry,
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
@@ -738,7 +729,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if testapi.ShouldEnable() {
 		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
-			QueueShardSelector: shardSelector,
+			QueueShards:        shardRegistry,
 			Queue:              rq,
 			Executor:           exec,
 			StateManager:       smv2,
@@ -782,7 +773,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Queue:           rq,
 			State:           ds.State,
 			Cron:            croner,
-			ShardSelector:   shardSelector,
+			ShardRegistry:   shardRegistry,
 			Port:            ds.Opts.DebugAPIPort,
 			PauseManager:    pauseMgr,
 			CapacityManager: cm,
