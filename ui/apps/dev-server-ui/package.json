@@ -43,7 +43,7 @@
     "react-redux": "^9.0.0",
     "sonner": "^2.0.0",
     "srvx": "0.11.13",
-    "zod": "^3.22.4"
+    "zod": "^4.4.0"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "6.3.1",
