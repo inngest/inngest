@@ -102,7 +102,7 @@
     "concurrently": "9.2.1",
     "eslint": "9.39.4",
     "eslint-plugin-react-hooks": "5.2.0",
-    "postcss": "8.5.12",
+    "postcss": "8.5.13",
     "prettier": "3.8.3",
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",
