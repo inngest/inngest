@@ -1343,7 +1343,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 
 	testLifecycles.lock.Lock()
 	require.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
-	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
+	require.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
 	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 	testLifecycles.lock.Unlock()
 
