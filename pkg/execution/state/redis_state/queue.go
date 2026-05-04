@@ -801,7 +801,9 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 // other workers from working on this queue item at the same time.
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
-// lease duration. This returns the newly acquired lease ID on success.
+// lease duration. On success this returns the newly acquired lease ID and a
+// freshly minted dispatch ID; the dispatch ID is preserved across ExtendLease
+// and rotated by Requeue so stale SDK checkpoints can be rejected.
 func (q *queue) Lease(
 	ctx context.Context,
 	item osqueue.QueueItem,
