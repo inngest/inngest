@@ -117,11 +117,11 @@ func TestParallelPauseBackedOpsCoalesceDiscovery(t *testing.T) {
 
 	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{ID: appID, Name: "test-app"})
 	require.NoError(t, err)
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID: fnID, AppID: appID, Name: fn.Name, Slug: fn.Slug, Config: string(cfg),
 	})
 	require.NoError(t, err)
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID: targetFnID, AppID: appID, Name: targetFn.Name, Slug: targetFn.Slug, Config: string(targetCfg),
 	})
 	require.NoError(t, err)

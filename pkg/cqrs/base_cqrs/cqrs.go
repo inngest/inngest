@@ -1093,6 +1093,15 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 	return domainToCQRS(fn, domainFunction), nil
 }
 
+func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {
+	fn, err := w.q.GetFunctionByAppNameAndSlug(ctx, appName, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainToCQRS(fn, domainFunction), nil
+}
+
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	fns, err := w.q.GetFunctions(ctx)
 	if err != nil {
@@ -1121,8 +1130,8 @@ func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uu
 	return domainToCQRSList(fns, domainFunction), nil
 }
 
-func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
-	fn, err := w.q.InsertFunction(ctx, dbpkg.InsertFunctionParams{
+func (w wrapper) UpsertFunction(ctx context.Context, params cqrs.UpsertFunctionParams) (*cqrs.Function, error) {
+	fn, err := w.q.UpsertFunction(ctx, dbpkg.UpsertFunctionParams{
 		ID:        params.ID,
 		AppID:     params.AppID,
 		Name:      params.Name,
