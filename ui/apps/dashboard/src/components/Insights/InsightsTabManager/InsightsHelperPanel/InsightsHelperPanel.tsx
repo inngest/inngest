@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { RiCloseLine } from '@remixicon/react';
+import { HelperPanelFrame } from '@inngest/components/HelperPanelControl';
 
 import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
 import {
@@ -47,22 +47,13 @@ export function InsightsHelperPanel({
   if (content === null) return null;
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center justify-between border-b px-3">
-        <div className="flex flex-row items-center gap-2">
-          <InsightsHelperPanelIcon className="text-subtle" title={active} />
-          <div className="text-sm font-normal">{active}</div>
-        </div>
-        <button
-          aria-label="Close helper"
-          className="hover:bg-canvasSubtle hover:text-basis text-subtle -mr-1 flex h-8 w-8 items-center justify-center rounded-md transition-colors"
-          onClick={onClose}
-          type="button"
-        >
-          <RiCloseLine size={18} />
-        </button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
-    </div>
+    <HelperPanelFrame
+      title={active}
+      icon={<InsightsHelperPanelIcon className="text-subtle" title={active} />}
+      onClose={onClose}
+      contentClassName="overflow-hidden"
+    >
+      {content}
+    </HelperPanelFrame>
   );
 }
