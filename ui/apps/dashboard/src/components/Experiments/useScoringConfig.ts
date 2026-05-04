@@ -56,7 +56,6 @@ export function useScoringConfig(functionID: string, experimentName: string) {
     const serverMetrics = serverMetricsRef.current;
     if (!current || !serverMetrics) return;
     if (JSON.stringify(current) === JSON.stringify(serverMetrics)) return;
-    serverMetricsRef.current = current;
     mutateRef.current(current);
   }, DEBOUNCE_MS);
 
@@ -97,7 +96,7 @@ export function useScoringConfig(functionID: string, experimentName: string) {
     pointsLeft,
     isSaving: updateScoring.isPending,
     isPending: scoring.isPending,
-    error: scoring.error,
+    error: updateScoring.error ?? scoring.error,
     refetch: scoring.refetch,
   };
 }
