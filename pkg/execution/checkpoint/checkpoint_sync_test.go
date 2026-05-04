@@ -12,7 +12,9 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -841,6 +843,108 @@ func TestSyncStepMetadata(t *testing.T) {
 	})
 }
 
+// TestCheckpointSyncSteps_RunComplete asserts that an OpcodeRunComplete op:
+//   - is forwarded to Executor.Finalize with the correct StatusCode/Headers/Body;
+//   - fires Executor.RunFunctionFinishedLifecycle with the same StatusCode so the
+//     legacy OTel pipeline emits a terminal status
+func TestCheckpointSyncSteps_RunComplete(t *testing.T) {
+	cases := []struct {
+		name       string
+		statusCode int
+		wantErr    string
+	}{
+		{name: "success", statusCode: 200, wantErr: ""},
+		{name: "server error", statusCode: 500, wantErr: "invalid status code: 500"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			require := require.New(t)
+
+			body := json.RawMessage(`{"hello":"world"}`)
+			headers := map[string]string{"content-type": "application/json"}
+
+			wire, err := json.Marshal(apiresult.APIResult{
+				StatusCode: tc.statusCode,
+				Headers:    headers,
+				Body:       body,
+			})
+			require.NoError(err)
+
+			ops := []state.GeneratorOpcode{{
+				ID:   "run-complete-1",
+				Op:   enums.OpcodeRunComplete,
+				Data: wire,
+			}}
+
+			mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+			// matchAPIResult validates the StatusCode/Headers/Body that the
+			// checkpoint path forwards into Finalize and the lifecycle. This
+			// is the assertion the original bug needed: without it, a
+			// zero-valued APIResult passes silently.
+			matchAPIResult := func(want apiresult.APIResult) func(apiresult.APIResult) bool {
+				return func(got apiresult.APIResult) bool {
+					return got.StatusCode == want.StatusCode &&
+						string(got.Body) == string(want.Body) &&
+						got.Headers["content-type"] == want.Headers["content-type"]
+				}
+			}
+			expected := apiresult.APIResult{
+				StatusCode: tc.statusCode,
+				Headers:    headers,
+				Body:       body,
+			}
+
+			mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
+				return opts.Response.Type == execution.FinalizeResponseAPI &&
+					matchAPIResult(expected)(opts.Response.APIResponse)
+			})).Return(nil).Once()
+
+			mocks.executor.On(
+				"RunFunctionFinishedLifecycle",
+				ctx,
+				testData.metadata,
+				mock.AnythingOfType("queue.Item"),
+				mock.AnythingOfType("[]json.RawMessage"),
+				mock.MatchedBy(func(resp state.DriverResponse) bool {
+					if resp.StatusCode != tc.statusCode {
+						return false
+					}
+					out, ok := resp.Output.([]byte)
+					if !ok || string(out) != string(body) {
+						return false
+					}
+					if tc.wantErr == "" {
+						return resp.Err == nil
+					}
+					return resp.Err != nil && *resp.Err == tc.wantErr
+				}),
+			).Once()
+
+			mocks.metrics.On(
+				"OnFnFinished",
+				mock.Anything,
+				mock.AnythingOfType("checkpoint.MetricCardinality"),
+				enums.RunStatusCompleted,
+			).Once()
+
+			err = testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+			require.NoError(err)
+
+			// Wait briefly for the goroutine that fires OnFnFinished — it's
+			// dispatched with `go` and otherwise races AssertExpectations.
+			require.Eventually(func() bool {
+				return mocks.metrics.AssertCalled(t, "OnFnFinished", mock.Anything, mock.Anything, enums.RunStatusCompleted)
+			}, time.Second, 10*time.Millisecond)
+
+			mocks.executor.AssertExpectations(t)
+			mocks.metrics.AssertExpectations(t)
+		})
+	}
+}
+
 //
 //
 // Testing utils.
@@ -948,6 +1052,24 @@ func (m *mockExecutor) HandleGenerator(ctx context.Context, runCtx execution.Run
 func (m *mockExecutor) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
 	args := m.Called(ctx, opts)
 	return args.Error(0)
+}
+
+func (m *mockExecutor) RunFunctionFinishedLifecycle(
+	ctx context.Context,
+	md state.Metadata,
+	item queue.Item,
+	evts []json.RawMessage,
+	resp state.DriverResponse,
+) {
+	// Only record if a test has registered an expectation; otherwise no-op.
+	// This keeps existing tests (which don't exercise OpcodeRunComplete) from
+	// having to declare the call.
+	for _, c := range m.ExpectedCalls {
+		if c.Method == "RunFunctionFinishedLifecycle" {
+			m.Called(ctx, md, item, evts, resp)
+			return
+		}
+	}
 }
 
 // mockFnReader mocks the function reader interface
