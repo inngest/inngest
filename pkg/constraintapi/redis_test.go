@@ -69,6 +69,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		AccountID:            accountID,
 		EnvID:                envID,
 		FunctionID:           fnID,
+		AppID:                uuid.New(),
 		Amount:               1,
 		LeaseIdempotencyKeys: []string{leaseIdempotencyKey},
 		IdempotencyKey:       "event1",
@@ -232,6 +233,26 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "rel", "release-test"))
 		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "chk", checkHash))
 	})
+}
+
+func TestRedisRequestState_AppIDRoundTrip(t *testing.T) {
+	appID := uuid.New()
+
+	state := redisRequestState{
+		AppID: appID,
+	}
+
+	body, err := json.Marshal(state)
+	require.NoError(t, err)
+	require.Contains(t, string(body), `"ai":`)
+
+	var decoded redisRequestState
+	require.NoError(t, json.Unmarshal(body, &decoded))
+	require.Equal(t, appID, decoded.AppID)
+
+	var knownGood redisRequestState
+	require.NoError(t, json.Unmarshal([]byte(`{"ai":"`+appID.String()+`"}`), &knownGood))
+	require.Equal(t, appID, knownGood.AppID)
 }
 
 func TestRedisCapacityManager_Concurrency(t *testing.T) {

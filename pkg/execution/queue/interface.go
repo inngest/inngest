@@ -261,11 +261,6 @@ type ShardOperations interface {
 	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)
 	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
 	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
-
-	// CleanupStatusIndexes scans the status index sorted sets (start, in-progress, sleep) for
-	// a given function and removes orphaned entries that no longer have a corresponding queue item.
-	// This fixes index drift caused by RemoveQueueItem not cleaning up indexes.
-	CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (removed int64, err error)
 }
 
 type BacklogRefillOptions struct {

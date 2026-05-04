@@ -74,6 +74,37 @@ type BacklogRefillConstraintCheckResult struct {
 	RetryAfter time.Time
 }
 
+// enqueuedAtTime returns the wall-clock enqueue time for a queue item, or the
+// zero value when the item predates the EnqueuedAt schema field. Returning
+// zero is important: the constraint cache treats a zero RequestTime as
+// unanchored and falls back to its default behavior, so legacy items behave
+// the same as before.
+func enqueuedAtTime(item *QueueItem) time.Time {
+	if item == nil || item.EnqueuedAt == 0 {
+		return time.Time{}
+	}
+	return time.UnixMilli(item.EnqueuedAt)
+}
+
+// earliestEnqueuedAt returns the oldest EnqueuedAt across the items, used as
+// RequestTime on batched Acquire calls. Items already waiting in the queue
+// when the constraint cache populated an "exhausted" entry must bypass that
+// stale entry once capacity is freed; the cache compares cache addedAt
+// against RequestTime and only bypasses when RequestTime is older.
+func earliestEnqueuedAt(items []*QueueItem) time.Time {
+	var earliest time.Time
+	for _, item := range items {
+		t := enqueuedAtTime(item)
+		if t.IsZero() {
+			continue
+		}
+		if earliest.IsZero() || t.Before(earliest) {
+			earliest = t
+		}
+	}
+	return earliest
+}
+
 func ConvertLimitingConstraint(
 	constraints PartitionConstraintConfig,
 	limitingConstraints []constraintapi.ConstraintItem,
@@ -246,6 +277,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		IdempotencyKey:       operationIdempotencyKey,
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
+		RequestTime:          earliestEnqueuedAt(items),
 		Duration:             QueueLeaseDuration,
 		Constraints:          constraintsToCheck,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
@@ -441,6 +473,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		},
 		FunctionID:      *shadowPart.FunctionID,
 		CurrentTime:     now,
+		RequestTime:     enqueuedAtTime(item),
 		Duration:        QueueLeaseDuration,
 		Constraints:     constraintItems,
 		Configuration:   config,

@@ -3,6 +3,7 @@ package queue
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
@@ -1064,4 +1065,45 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 			assert.True(t, hasFunctionConcurrency, "Should always include function concurrency constraint")
 		})
 	}
+}
+
+func TestEnqueuedAtTime(t *testing.T) {
+	t.Run("zero EnqueuedAt returns zero time", func(t *testing.T) {
+		got := enqueuedAtTime(&QueueItem{})
+		assert.True(t, got.IsZero())
+	})
+
+	t.Run("nil item returns zero time", func(t *testing.T) {
+		got := enqueuedAtTime(nil)
+		assert.True(t, got.IsZero())
+	})
+
+	t.Run("populated EnqueuedAt converts from millis", func(t *testing.T) {
+		ts := time.Unix(1_700_000_000, 0)
+		got := enqueuedAtTime(&QueueItem{EnqueuedAt: ts.UnixMilli()})
+		assert.Equal(t, ts.UnixMilli(), got.UnixMilli())
+	})
+}
+
+func TestEarliestEnqueuedAt(t *testing.T) {
+	t.Run("empty slice returns zero time", func(t *testing.T) {
+		got := earliestEnqueuedAt(nil)
+		assert.True(t, got.IsZero())
+	})
+
+	t.Run("all-zero EnqueuedAt returns zero time", func(t *testing.T) {
+		got := earliestEnqueuedAt([]*QueueItem{{}, {}})
+		assert.True(t, got.IsZero())
+	})
+
+	t.Run("mixed legacy and populated items skips zeros and returns earliest", func(t *testing.T) {
+		newer := time.Unix(1_700_000_010, 0)
+		older := time.Unix(1_700_000_000, 0)
+		got := earliestEnqueuedAt([]*QueueItem{
+			{},
+			{EnqueuedAt: newer.UnixMilli()},
+			{EnqueuedAt: older.UnixMilli()},
+		})
+		assert.Equal(t, older.UnixMilli(), got.UnixMilli())
+	})
 }
