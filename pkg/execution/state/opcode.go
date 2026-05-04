@@ -195,6 +195,45 @@ func (g GeneratorOpcode) RunType() string {
 	return opts.Type
 }
 
+// Returns the SDK-side step type of the opcode for use in Insights.
+// This does not map 1-1 to Opcode. For example, many different SDK operations map to OpcodeStepRun.
+func (g GeneratorOpcode) StepType() enums.StepType {
+	switch g.RunType() {
+	case "step.sendEvent":
+		return enums.StepTypeSendEvent
+	case "step.sendSignal":
+		return enums.StepTypeSendSignal
+	case "step.ai.wrap":
+		return enums.StepTypeAiWrap
+	case "step.ai.infer":
+		return enums.StepTypeAiInfer
+	case "step.fetch":
+		return enums.StepTypeFetch
+	case "step.realtime.publish":
+		return enums.StepTypeRealtimePublish
+	case "group.experiment":
+		return enums.StepTypeGroupExperiment
+	}
+
+	switch g.Op {
+	case enums.OpcodeStepRun, enums.OpcodeStepError, enums.OpcodeStepFailed:
+		// Other explicit types are caught above via the RunType, but
+		// if the RunType is not set, we can default to StepTypeRun for backwards
+		// compatibility with older SDK versions that do not set the type.
+		return enums.StepTypeRun
+	case enums.OpcodeSleep:
+		return enums.StepTypeSleep
+	case enums.OpcodeWaitForEvent:
+		return enums.StepTypeWaitForEvent
+	case enums.OpcodeInvokeFunction:
+		return enums.StepTypeInvoke
+	case enums.OpcodeAIGateway:
+		return enums.StepTypeAiInfer
+	default:
+		return enums.StepTypeUnknown
+	}
+}
+
 func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 	opts := &RunOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
