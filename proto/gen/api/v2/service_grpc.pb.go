@@ -43,7 +43,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type V2Client interface {
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
-	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
+	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
+	// in the swagger definitions. This path is stripped by the convert-openapi tool.
 	XSchemaOnly(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*ErrorResponse, error)
 	CreatePartnerAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
 	CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
@@ -245,7 +247,9 @@ func (c *v2Client) InvokeFunction(ctx context.Context, in *InvokeFunctionRequest
 // for forward compatibility.
 type V2Server interface {
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
-	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
+	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
+	// in the swagger definitions. This path is stripped by the convert-openapi tool.
 	XSchemaOnly(context.Context, *HealthRequest) (*ErrorResponse, error)
 	CreatePartnerAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
 	CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error)
