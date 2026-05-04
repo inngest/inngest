@@ -1341,11 +1341,13 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	// This was the last unit of account + function concurrency, so we should see function concurrency as the constraint
 	require.Equal(t, enums.QueueConstraintFunctionConcurrency, limitingConstraint)
 
-	testLifecycles.lock.Lock()
-	require.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
-	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
-	require.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
-	testLifecycles.lock.Unlock()
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		testLifecycles.lock.Lock()
+		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
+		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
+		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+		testLifecycles.lock.Unlock()
+	}, 1*time.Second, 100*time.Millisecond)
 
 	require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 	cmLifecycles.Reset()
