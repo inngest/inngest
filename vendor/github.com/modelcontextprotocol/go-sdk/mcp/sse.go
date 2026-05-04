@@ -7,6 +7,7 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"net/http"
@@ -202,7 +203,8 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.Method != http.MethodGet {
-		http.Error(w, "invalid method", http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", "GET, POST")
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -215,7 +217,7 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	sessionID = randText()
+	sessionID = rand.Text()
 	endpoint, err := req.URL.Parse("?sessionid=" + sessionID)
 	if err != nil {
 		http.Error(w, "internal error: failed to create endpoint", http.StatusInternalServerError)
@@ -349,6 +351,14 @@ func (c *SSEClientTransport) Connect(ctx context.Context) (Connection, error) {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check HTTP status code before attempting to parse SSE events.
+	// This ensures proper error reporting for authentication failures (401),
+	// authorization failures (403), and other HTTP errors.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		resp.Body.Close()
+		return nil, fmt.Errorf("failed to connect: %s", http.StatusText(resp.StatusCode))
 	}
 
 	msgEndpoint, err := func() (*url.URL, error) {
