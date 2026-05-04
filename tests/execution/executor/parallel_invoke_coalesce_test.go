@@ -146,10 +146,8 @@ func TestParallelPauseBackedOpsCoalesceDiscovery(t *testing.T) {
 
 	queueOpts := []queue.QueueOpt{queue.WithIdempotencyTTL(time.Hour)}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -164,11 +162,7 @@ func TestParallelPauseBackedOpsCoalesceDiscovery(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{queueShard.Name(): queueShard},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -206,8 +200,7 @@ func TestParallelPauseBackedOpsCoalesceDiscovery(t *testing.T) {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTracerProvider(tp),
 		executor.WithInvokeEventHandler(func(ctx context.Context, evt event.TrackedEvent) error { return nil }),
 		executor.WithDriverV1(mockDriver),

@@ -18,7 +18,7 @@ import (
 
 func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
 	l := logger.StdlibLogger(ctx).With(
-		"queue_shard", q.primaryQueueShard.Name(),
+		"queue_shard", q.Shard().Name(),
 	)
 
 	for i := int32(0); i < q.numWorkers; i++ {
@@ -91,9 +91,10 @@ LOOP:
 
 func (q *queueProcessor) scan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
+	shard := q.Shard()
 
 	if q.capacity() == 0 || q.partitionCapacity() == 0 {
-		metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+		metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		return nil
 	}
 
@@ -123,7 +124,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"kind":        "accounts",
-					"queue_shard": q.primaryQueueShard.Name(),
+					"queue_shard": shard.Name(),
 				},
 			},
 		)
@@ -132,8 +133,8 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 		if len(q.runMode.ExclusiveAccounts) > 0 {
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
-			peeked, err := Duration(ctx, q.primaryQueueShard.Name(), "account_peek", q.Clock().Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-				return q.primaryQueueShard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+			peeked, err := Duration(ctx, shard.Name(), "account_peek", q.Clock().Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+				return shard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 			})
 			if err != nil {
 				return fmt.Errorf("could not peek accounts: %w", err)
@@ -176,7 +177,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"kind":        "accounts",
-					"queue_shard": q.primaryQueueShard.Name(),
+					"queue_shard": shard.Name(),
 				},
 			},
 		)
@@ -189,7 +190,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"kind":        "partitions",
-				"queue_shard": q.primaryQueueShard.Name(),
+				"queue_shard": shard.Name(),
 			},
 		},
 	)
@@ -206,7 +207,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"kind":        "partitions",
-				"queue_shard": q.primaryQueueShard.Name(),
+				"queue_shard": shard.Name(),
 			},
 		},
 	)
@@ -215,7 +216,7 @@ func (q *queueProcessor) scan(ctx context.Context) error {
 }
 
 func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uuid.UUID, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
-	partitions, err := q.primaryQueueShard.PeekAccountPartitions(ctx, accountID, peekLimit, peekUntil, q.isSequential())
+	partitions, err := q.Shard().PeekAccountPartitions(ctx, accountID, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
 		return fmt.Errorf("could not peek account partitions: %w", err)
 	}
@@ -225,7 +226,7 @@ func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uu
 
 // ScanGlobalPartitions scans the partiton of partitions across all fns.
 func (q *queueProcessor) ScanGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
-	partitions, err := q.primaryQueueShard.PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
+	partitions, err := q.Shard().PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
 	if err != nil {
 		return fmt.Errorf("could not peek global partitions: %w", err)
 	}
@@ -245,6 +246,7 @@ func (q *queueProcessor) processScannedPartitions(
 	}
 
 	l := logger.StdlibLogger(ctx)
+	shard := q.Shard()
 	l.Trace("processing partitions",
 		"peek_until", peekUntil.Format(time.StampMilli),
 		"partition", len(partitions),
@@ -254,7 +256,7 @@ func (q *queueProcessor) processScannedPartitions(
 
 	for _, ptr := range partitions {
 		if q.capacity() == 0 || !q.partitionSem.TryAcquire(1) {
-			metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+			metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 			return nil
 		}
 
@@ -265,7 +267,7 @@ func (q *queueProcessor) processScannedPartitions(
 			if q.capacity() == 0 {
 				// no longer any available workers for partition, so we can skip
 				// work
-				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 				return nil
 			}
 			err := q.ProcessPartition(ctx, &p, 0, false)
@@ -273,7 +275,7 @@ func (q *queueProcessor) processScannedPartitions(
 			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name(),
+					"queue_shard": shard.Name(),
 					"type":        "continuation",
 					"has_error":   err != nil,
 				},
