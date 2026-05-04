@@ -400,10 +400,12 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// otherwise still be active when the new row's INSERT runs.
 	seen := make(map[uuid.UUID]struct{}, len(processed.Functions))
 	for i := range processed.Functions {
-		fn := &processed.Functions[i].Function
+		df := &processed.Functions[i]
+		fn := &df.Function
 		persisted, err := tx.GetActiveFunctionByAppAndSlug(ctx, r.AppName, fn.Slug)
 		switch {
 		case err == nil && persisted != nil:
+			df.ID = persisted.ID
 			fn.ID = persisted.ID
 		case errors.Is(err, sql.ErrNoRows):
 			// Not persisted yet — keep the SDK-minted UUID.
