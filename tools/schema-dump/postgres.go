@@ -187,10 +187,6 @@ func normalizePostgresDump(raw string) string {
 		case strings.HasPrefix(trimmed, "\\unrestrict "):
 			continue
 		case strings.HasPrefix(trimmed, "-- Dumped from database version "):
-			// pg_dump embeds its own version in the dump header. The
-			// `postgres:16-alpine` image tag is mutable and minor-version
-			// bumps would otherwise produce spurious diffs in the committed
-			// schema file. The version is metadata, not schema.
 			continue
 		case strings.HasPrefix(trimmed, "-- Dumped by pg_dump version "):
 			continue

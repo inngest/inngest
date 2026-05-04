@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm install -g pnpm@10 && pnpm install",
+  "buildCommand": "pnpm run build && node scripts/build-vercel.mjs",
+  "outputDirectory": "dist"
+}
