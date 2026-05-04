@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/headers"
@@ -276,6 +277,46 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		}
 	}
 
+	method := enums.AppMethodServe
+	if r.IsConnect() {
+		method = enums.AppMethodConnect
+	}
+
+	appID := inngest.DeterministicAppUUID(r.AppName)
+	appParams := cqrs.UpsertAppParams{
+		// Use a deterministic ID for the app in dev.
+		ID:          appID,
+		Name:        r.AppName,
+		SdkLanguage: r.SDKLanguage(),
+		SdkVersion:  r.SDKVersion(),
+		Framework: sql.NullString{
+			String: r.Framework,
+			Valid:  r.Framework != "",
+		},
+		Url:        r.URL,
+		Checksum:   sum,
+		Method:     method.String(),
+		AppVersion: r.AppVersion,
+	}
+
+	if deploy.HasBlockedSDKVersion(r.SDKLanguage(), r.SDKVersion()) {
+		appParams.Error = sql.NullString{
+			String: deploy.DeployErrBlockedSDKVersion.Error(),
+			Valid:  true,
+		}
+
+		if _, err := a.devserver.Data.UpsertApp(ctx, appParams); err != nil {
+			return nil, publicerr.Wrap(err, 500, "Error updating app error")
+		}
+
+		return nil, publicerr.Error{
+			Code:    deploy.DeployErrBlockedSDKVersion.Error(),
+			Message: deploy.BlockedSDKVersionMessage(),
+			Status:  http.StatusBadRequest,
+			Err:     deploy.DeployErrBlockedSDKVersion,
+		}
+	}
+
 	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
@@ -303,35 +344,12 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// setup a list of crons to be upserted into the queue for scheduling
 	var crons []cron.CronItem
 
-	appID := inngest.DeterministicAppUUID(r.AppName)
-
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
 		return nil, publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
 	defer func() {
-		method := enums.AppMethodServe
-		if r.IsConnect() {
-			method = enums.AppMethodConnect
-		}
-
-		appParams := cqrs.UpsertAppParams{
-			// Use a deterministic ID for the app in dev.
-			ID:          appID,
-			Name:        r.AppName,
-			SdkLanguage: r.SDKLanguage(),
-			SdkVersion:  r.SDKVersion(),
-			Framework: sql.NullString{
-				String: r.Framework,
-				Valid:  r.Framework != "",
-			},
-			Url:        r.URL,
-			Checksum:   sum,
-			Method:     method.String(),
-			AppVersion: r.AppVersion,
-		}
-
 		// We want to save an app at the end, after handling each error.
 		if err != nil {
 			appParams.Error = sql.NullString{

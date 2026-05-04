@@ -542,8 +542,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 		metrics.IncrBacklogProcessedCounter(ctx, opts)
 		metrics.IncrQueueBacklogRefilledCounter(ctx, int64(len(res.RefilledItems)), opts)
 
-		shouldFireLifecyles := len(items) > 0 && len(constraintCheckRes.ItemsToRefill) == 0 && constraintCheckRes.LimitingConstraint != enums.QueueConstraintNotLimited
-		if shouldFireLifecyles {
+		if constraintCheckRes.LimitingConstraint != enums.QueueConstraintNotLimited {
 			// NOTE:
 			// we don't want to add an extended amount of time for requeue when there are
 			// contraint hits, so we make sure to check more often in order to admit items

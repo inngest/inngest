@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -71,6 +72,37 @@ type BacklogRefillConstraintCheckResult struct {
 	LimitingConstraint enums.QueueConstraint
 
 	RetryAfter time.Time
+}
+
+// enqueuedAtTime returns the wall-clock enqueue time for a queue item, or the
+// zero value when the item predates the EnqueuedAt schema field. Returning
+// zero is important: the constraint cache treats a zero RequestTime as
+// unanchored and falls back to its default behavior, so legacy items behave
+// the same as before.
+func enqueuedAtTime(item *QueueItem) time.Time {
+	if item == nil || item.EnqueuedAt == 0 {
+		return time.Time{}
+	}
+	return time.UnixMilli(item.EnqueuedAt)
+}
+
+// earliestEnqueuedAt returns the oldest EnqueuedAt across the items, used as
+// RequestTime on batched Acquire calls. Items already waiting in the queue
+// when the constraint cache populated an "exhausted" entry must bypass that
+// stale entry once capacity is freed; the cache compares cache addedAt
+// against RequestTime and only bypasses when RequestTime is older.
+func earliestEnqueuedAt(items []*QueueItem) time.Time {
+	var earliest time.Time
+	for _, item := range items {
+		t := enqueuedAtTime(item)
+		if t.IsZero() {
+			continue
+		}
+		if earliest.IsZero() || t.Before(earliest) {
+			earliest = t
+		}
+	}
+	return earliest
 }
 
 func ConvertLimitingConstraint(
@@ -232,12 +264,20 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
+	var appID uuid.UUID
+	if len(items) > 0 {
+		appID = items[0].Data.Identifier.AppID
+	}
+
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-		AccountID:            *shadowPart.AccountID,
-		EnvID:                *shadowPart.EnvID,
+		AccountID: *shadowPart.AccountID,
+		EnvID:     *shadowPart.EnvID,
+		// TODO: Make appID available to backlog
+		AppID:                appID,
 		IdempotencyKey:       operationIdempotencyKey,
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
+		RequestTime:          earliestEnqueuedAt(items),
 		Duration:             QueueLeaseDuration,
 		Constraints:          constraintsToCheck,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
@@ -422,6 +462,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID: *shadowPart.AccountID,
 		EnvID:     *shadowPart.EnvID,
+		AppID:     item.Data.Identifier.AppID,
 		// TODO: Double check if the item ID works for idempotency:
 		// - Consistent across the same attempt
 		// - Do we need to re-evaluate per retry?
@@ -432,6 +473,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		},
 		FunctionID:      *shadowPart.FunctionID,
 		CurrentTime:     now,
+		RequestTime:     enqueuedAtTime(item),
 		Duration:        QueueLeaseDuration,
 		Constraints:     constraintItems,
 		Configuration:   config,

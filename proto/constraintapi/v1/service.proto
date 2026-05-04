@@ -194,6 +194,7 @@ message CapacityAcquireRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string env_id = 3;
+  string app_id = 16;
   string function_id = 4;
   ConstraintConfig configuration = 5;
   repeated ConstraintItem constraints = 6;
@@ -206,6 +207,7 @@ message CapacityAcquireRequest {
   google.protobuf.Duration blocking_threshold = 13;
   LeaseSource source = 14;
   uint32 request_attempt = 15;
+  google.protobuf.Timestamp request_time = 17;
 }
 
 message CapacityAcquireResponse {

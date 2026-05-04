@@ -1,6 +1,6 @@
 import type { JSONSchema7TypeName as JSONSchemaTypeName } from 'json-schema';
 
-export type SchemaNodeKind = 'array' | 'object' | 'tuple' | 'value';
+export type SchemaNodeKind = 'array' | 'object' | 'tuple' | 'value' | 'table';
 
 export interface BaseNode {
   kind: SchemaNodeKind;
@@ -15,6 +15,12 @@ export interface ArrayNode extends BaseNode {
 
 export interface ObjectNode extends BaseNode {
   kind: 'object';
+  type?: JSONSchemaTypeName | 'unknown' | string;
+  children: SchemaNode[];
+}
+
+export interface TableNode extends BaseNode {
+  kind: 'table';
   children: SchemaNode[];
 }
 
@@ -25,10 +31,14 @@ export interface TupleNode extends BaseNode {
 
 export interface ValueNode extends BaseNode {
   kind: 'value';
-  type: JSONSchemaTypeName | JSONSchemaTypeName[] | 'unknown';
+  type: JSONSchemaTypeName | JSONSchemaTypeName[] | 'unknown' | string;
 }
 
-export type SchemaNode = ArrayNode | ObjectNode | TupleNode | ValueNode;
+export interface TypedNode extends BaseNode {
+  type?: JSONSchemaTypeName | JSONSchemaTypeName[] | 'unknown' | string;
+}
+
+export type SchemaNode = ArrayNode | ObjectNode | TupleNode | ValueNode | TableNode;
 
 export type {
   JSONSchema7 as JSONSchema,
