@@ -4,7 +4,7 @@ type Props = {
   x?: number;
   y?: number;
   payload?: { value?: string };
-  textAnchor?: string;
+  textAnchor?: 'end' | 'inherit' | 'middle' | 'start';
 };
 
 /**
