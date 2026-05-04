@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/cockroachdb/pebble/v2/bloom"
 	"github.com/cockroachdb/pebble/v2/vfs"
 	"github.com/google/uuid"
 )
@@ -27,6 +28,11 @@ type KVOpts[T Evaluable] struct {
 	FS vfs.FS
 	// Dir is the direcorty to store the KV data within.
 	Dir string
+	// BlockCacheSize is the size of the pebble block cache in bytes.  Defaults to 512MB.
+	BlockCacheSize int64
+	// DisableBloomFilter disables the bloom filter on L0 SSTs.  The filter is
+	// pointless with an in-memory FS since there are no disk reads to avoid.
+	DisableBloomFilter bool
 }
 
 // New returns a new temporary EvalKV KV store written to disk.
@@ -38,15 +44,36 @@ func NewKV[T Evaluable](o KVOpts[T]) (KV[T], error) {
 		o.FS = vfs.Default
 	}
 
-	db, err := pebble.Open(o.Dir, &pebble.Options{
-		FS: o.FS,
-		// cockroachdb defaults that should slightly help with faster writes
-		// https://github.com/cockroachdb/cockroach/blob/5a1f5da5bb3b2d962d8737848a4fca69f915dacb/pkg/storage/pebble.go#L668-L673
-		L0CompactionThreshold:       2,
+	cacheSize := o.BlockCacheSize
+	if cacheSize == 0 {
+		cacheSize = 512 << 20
+	}
+	blockCache := pebble.NewCache(cacheSize)
+
+	// closely following some of cockroachdb defaults
+	// https://github.com/cockroachdb/cockroach/blob/5a1f5da5bb3b2d962d8737848a4fca69f915dacb/pkg/storage/pebble.go#L668-L673
+	opts := &pebble.Options{
+		FS:                          o.FS,
+		Cache:                       blockCache,
+		DisableWAL:                  true,
+		L0CompactionThreshold:       8,
 		L0StopWritesThreshold:       1000,
 		MemTableSize:                64 << 20, // 64 MB
 		MemTableStopWritesThreshold: 4,
-	})
+		CompactionConcurrencyRange:  func() (int, int) { return 1, 4 },
+	}
+	l0 := pebble.LevelOptions{
+		BlockSize:      32 << 10,
+		IndexBlockSize: 256 << 10,
+	}
+	if !o.DisableBloomFilter {
+		l0.FilterPolicy = bloom.FilterPolicy(10)
+		l0.FilterType = pebble.TableFilter
+	}
+	opts.Levels[0] = l0
+	opts.Levels[0].EnsureL0Defaults()
+
+	db, err := pebble.Open(o.Dir, opts)
 	if err != nil {
 		return nil, err
 	}
