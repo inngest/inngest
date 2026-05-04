@@ -3,14 +3,21 @@ package queue
 import (
 	"context"
 	"fmt"
+	"maps"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
+	"golang.org/x/sync/errgroup"
 )
+
+// shardSelector returns a shard reference for the given queue item. It
+// applies a caller-supplied policy to route enqueues to different shards.
+type shardSelector func(ctx context.Context, accountID uuid.UUID, queueName *string) (QueueShard, error)
 
 // ShardRegistry is the read-only surface for components that need to look up
 // shards, fan out across the active set, or resolve a shard for a given
-// account/queue. It replaces the trio of (queueShardClients map, ShardSelector,
+// account/queue. It replaces the trio of (queueShardClients map, selector,
 // primaryQueueShard) that used to be passed independently into queue.New,
 // the executor, the singleton store, and various API surfaces.
 type ShardRegistry interface {
@@ -28,7 +35,7 @@ type ShardRegistry interface {
 	ByGroup(groupName string) []QueueShard
 
 	// Resolve picks a shard for a given enqueue, applying the registry's
-	// ShardSelector. Resolve errors if no selector has been configured.
+	// shard selector. Resolve errors if no selector has been configured.
 	Resolve(ctx context.Context, accountID uuid.UUID, queueName *string) (QueueShard, error)
 
 	// ForEach runs fn against every active shard concurrently, returning
@@ -60,61 +67,165 @@ type ShardRegistryController interface {
 	Add(shard QueueShard) error
 }
 
+// shardRegistry is the single ShardRegistryController implementation. It
+// manages a named shard topology, an optional primary shard, and delegates
+// Resolve to a caller-supplied selector. Construct via NewShardRegistry or,
+// for the single-shard case, NewSingleShardRegistry.
+type shardRegistry struct {
+	mu       sync.RWMutex
+	shards   map[string]QueueShard
+	primary  QueueShard
+	selector shardSelector
+}
+
+// ShardRegistryOpt configures a shardRegistry at construction.
+type ShardRegistryOpt func(*shardRegistry)
+
+// WithPrimary sets the initial primary shard. The shard must already be
+// present in the topology passed to NewShardRegistry; the constructor
+// enforces this. In shard-group mode where the primary is claimed at
+// runtime by the lease loop, omit this option and let the lease loop call
+// SetPrimary later.
+func WithPrimary(shard QueueShard) ShardRegistryOpt {
+	return func(r *shardRegistry) {
+		r.primary = shard
+	}
+}
+
+// WithShardSelector sets the selector used by Resolve to pick a shard for
+// a given enqueue. Required when the topology has more than one shard;
+// optional for the single-shard case (a default selector that always
+// returns the only shard is installed).
+func WithShardSelector(selector shardSelector) ShardRegistryOpt {
+	return func(r *shardRegistry) {
+		r.selector = selector
+	}
+}
+
+// NewShardRegistry constructs a registry with the given topology. Use
+// WithPrimary to set the leased primary up front (or call SetPrimary later)
+// and WithShardSelector to install a Resolve policy. Returns an error if
+// shards is empty, a provided primary is not in the topology, or no
+// selector was supplied (or the supplied selector was nil).
+func NewShardRegistry(
+	shards map[string]QueueShard,
+	opts ...ShardRegistryOpt,
+) (ShardRegistryController, error) {
+	if len(shards) == 0 {
+		return nil, fmt.Errorf("queue: NewShardRegistry requires at least one shard")
+	}
+	r := &shardRegistry{
+		shards: maps.Clone(shards),
+	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	if r.primary != nil {
+		if _, ok := r.shards[r.primary.Name()]; !ok {
+			return nil, fmt.Errorf("queue: primary shard %q not in topology", r.primary.Name())
+		}
+	}
+	if r.selector == nil {
+		return nil, fmt.Errorf("queue: NewShardRegistry requires a non-nil shard selector (use WithShardSelector)")
+	}
+	return r, nil
+}
+
 // NewSingleShardRegistry is a convenience constructor for the common
 // single-shard case (devserver, tests). It seeds the topology with the
-// shard, configures a selector that always returns it, and sets it as
-// the primary. Returns an error if shard is nil.
+// shard, sets it as the primary, and installs a selector that always
+// returns it. Returns an error if shard is nil.
 func NewSingleShardRegistry(shard QueueShard) (ShardRegistryController, error) {
 	if shard == nil {
 		return nil, fmt.Errorf("queue: NewSingleShardRegistry requires a non-nil shard")
 	}
-	return &singleShardRegistry{shard: shard}, nil
+	return NewShardRegistry(
+		map[string]QueueShard{shard.Name(): shard},
+		WithPrimary(shard),
+		WithShardSelector(func(context.Context, uuid.UUID, *string) (QueueShard, error) {
+			return shard, nil
+		}),
+	)
 }
 
-// singleShardRegistry holds a single, fixed shard. Topology mutations
-// (SetPrimary, Add) are no-ops or rejected — the shard is set at
-// construction and not updated.
-type singleShardRegistry struct {
-	shard QueueShard
+func (r *shardRegistry) Primary() QueueShard {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.primary
 }
 
-func (r *singleShardRegistry) Primary() QueueShard {
-	return r.shard
-}
-
-func (r *singleShardRegistry) ByName(name string) (QueueShard, error) {
-	if r.shard.Name() != name {
+func (r *shardRegistry) ByName(name string) (QueueShard, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	s, ok := r.shards[name]
+	if !ok {
 		return nil, ErrQueueShardNotFound
 	}
-	return r.shard, nil
+	return s, nil
 }
 
-func (r *singleShardRegistry) ByGroup(groupName string) []QueueShard {
-	if r.shard.ShardAssignmentConfig().ShardGroup != groupName {
+func (r *shardRegistry) ByGroup(groupName string) []QueueShard {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []QueueShard
+	for _, s := range r.shards {
+		if s.ShardAssignmentConfig().ShardGroup == groupName {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (r *shardRegistry) Resolve(ctx context.Context, accountID uuid.UUID, queueName *string) (QueueShard, error) {
+	return r.selector(ctx, accountID, queueName)
+}
+
+func (r *shardRegistry) ForEach(ctx context.Context, fn func(context.Context, QueueShard) error) error {
+	snapshot := r.snapshot()
+	eg, ctx := errgroup.WithContext(ctx)
+	for name, s := range snapshot {
+		eg.Go(func() error {
+			l := logger.StdlibLogger(ctx).With("shard_name", name)
+			if err := fn(logger.WithStdlib(ctx, l), s); err != nil {
+				return fmt.Errorf("shard %q: %w", name, err)
+			}
+			return nil
+		})
+	}
+	return eg.Wait()
+}
+
+// SetPrimary updates the leased primary shard. The shard must already be
+// in the registry — Add it first if not — so the registry stays the source
+// of truth for which shards are known. Pass nil to clear the primary.
+func (r *shardRegistry) SetPrimary(_ context.Context, shard QueueShard) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if shard == nil {
+		r.primary = nil
 		return nil
 	}
-	return []QueueShard{r.shard}
-}
-
-func (r *singleShardRegistry) Resolve(ctx context.Context, _ uuid.UUID, _ *string) (QueueShard, error) {
-	return r.shard, nil
-}
-
-func (r *singleShardRegistry) ForEach(ctx context.Context, fn func(context.Context, QueueShard) error) error {
-	l := logger.StdlibLogger(ctx).With("shard_name", r.shard.Name())
-	if err := fn(logger.WithStdlib(ctx, l), r.shard); err != nil {
-		return fmt.Errorf("shard %q: %w", r.shard.Name(), err)
+	if _, ok := r.shards[shard.Name()]; !ok {
+		return fmt.Errorf("queue: primary shard %q not in topology", shard.Name())
 	}
+	r.primary = shard
 	return nil
 }
 
-func (r *singleShardRegistry) SetPrimary(ctx context.Context, shard QueueShard) error {
-	if shard == nil || shard.Name() != r.shard.Name() {
-		return ErrQueueShardNotFound
+func (r *shardRegistry) Add(shard QueueShard) error {
+	if shard == nil {
+		return fmt.Errorf("queue: cannot add nil shard")
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.shards[shard.Name()] = shard
 	return nil
 }
 
-func (r *singleShardRegistry) Add(shard QueueShard) error {
-	return fmt.Errorf("single shard registry does not support Add")
+func (r *shardRegistry) snapshot() map[string]QueueShard {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return maps.Clone(r.shards)
 }
+
+var _ ShardRegistryController = (*shardRegistry)(nil)

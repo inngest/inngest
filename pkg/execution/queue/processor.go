@@ -97,8 +97,8 @@ type queueProcessor struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 
-	// shards owns the {shards map, ShardSelector, primary} trio. Topology
-	// can be mutated at runtime via shards.SetPrimary.
+	// shards owns the {shards map, selector, primary} trio. Topology can be
+	// mutated at runtime via shards.SetPrimary.
 	shards QueueShardRegistry
 
 	// quit is a channel that any method can send on to trigger termination

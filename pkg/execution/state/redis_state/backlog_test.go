@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
@@ -1273,6 +1274,125 @@ func TestBacklogSize(t *testing.T) {
 	require.NoError(t, err)
 
 	require.EqualValues(t, count, size)
+}
+
+func TestPartitionBacklogSize(t *testing.T) {
+	r1, rc1 := initRedis(t)
+	defer rc1.Close()
+
+	r2, rc2 := initRedis(t)
+	defer rc2.Close()
+
+	ctx := context.Background()
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelInfo))
+	ctx = logger.WithStdlib(ctx, l)
+
+	clock := clockwork.NewFakeClock()
+
+	opts := []osqueue.QueueOpt{
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	}
+
+	shard1 := shardFromClient("one", rc1, opts...)
+	shard2 := shardFromClient("two", rc2, opts...)
+	queueShards := mapFromShards(shard1, shard2)
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	testcases := []struct {
+		name   string
+		num    int
+		rotate bool
+	}{
+		{
+			name: "enqueue on one shard",
+			num:  100,
+		},
+		{
+			name:   "enqueue on both shards",
+			num:    200,
+			rotate: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			r1.FlushAll()
+			r2.FlushAll()
+
+			registry1, err := osqueue.NewShardRegistry(queueShards, osqueue.WithShardSelector(alwaysSelectShard(shard1)), osqueue.WithPrimary(shard1))
+			require.NoError(t, err)
+			q1, err := osqueue.New(
+				ctx,
+				"q1",
+				registry1,
+				opts...,
+			)
+			require.NoError(t, err)
+			registry2, err := osqueue.NewShardRegistry(queueShards, osqueue.WithShardSelector(alwaysSelectShard(shard2)), osqueue.WithPrimary(shard2))
+			require.NoError(t, err)
+			q2, err := osqueue.New(
+				ctx,
+				"q2",
+				registry2,
+				opts...,
+			)
+			require.NoError(t, err)
+
+			for i := range tc.num {
+				id := fmt.Sprintf("test%d", i)
+				item := osqueue.QueueItem{
+					ID:          id,
+					FunctionID:  fnID,
+					WorkspaceID: wsID,
+					Data: osqueue.Item{
+						WorkspaceID: wsID,
+						Kind:        osqueue.KindEdge,
+						Identifier: state.Identifier{
+							AccountID:       acctId,
+							WorkspaceID:     wsID,
+							WorkflowID:      fnID,
+							WorkflowVersion: 1,
+						},
+						CustomConcurrencyKeys: []state.CustomConcurrency{
+							{
+								Key:   id,
+								Hash:  hashConcurrencyKey(id),
+								Limit: 10,
+							},
+						},
+					},
+				}
+
+				if tc.rotate {
+					// enqueue to both queues, simulate queue migrations
+					switch i % 2 {
+					case 0:
+						_, err := shard1.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
+						require.NoError(t, err)
+					case 1:
+						_, err := shard2.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
+						require.NoError(t, err)
+					}
+				} else {
+					_, err := shard1.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
+					require.NoError(t, err)
+				}
+			}
+
+			// NOTE: should return the same result regardless of which shard initiated the instrumentation
+			size1, err := q1.PartitionBacklogSize(ctx, fnID.String())
+			require.NoError(t, err)
+			require.EqualValues(t, int64(tc.num), size1)
+
+			size2, err := q2.PartitionBacklogSize(ctx, fnID.String())
+			require.NoError(t, err)
+			require.EqualValues(t, int64(tc.num), size2)
+		})
+	}
 }
 
 func TestShadowPartitionFunctionBacklog(t *testing.T) {
