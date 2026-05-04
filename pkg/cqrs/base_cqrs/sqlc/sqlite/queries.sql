@@ -53,10 +53,17 @@ UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
 
 -- note - this is very basic right now.
--- name: InsertFunction :one
+-- name: UpsertFunction :one
 INSERT INTO functions
 	(id, app_id, name, slug, config, created_at) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING *;
+	(?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET
+	app_id = excluded.app_id,
+	name = excluded.name,
+	slug = excluded.slug,
+	config = excluded.config,
+	archived_at = NULL
+RETURNING *;
 
 -- name: GetFunctions :many
 SELECT functions.*
@@ -76,6 +83,19 @@ SELECT * FROM functions WHERE id = ?;
 
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = ? AND archived_at IS NULL;
+
+-- name: GetFunctionByAppNameAndSlug :one
+-- Look up a function by the app's user-facing name, not its internal UUID.
+-- The dev server derives app UUIDs from different inputs at different sites
+-- (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+-- row even when the function exists. Joining on apps.name routes through the
+-- one identifier that's stable across both paths.
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = ?
+  AND functions.slug = ?
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ?, archived_at = NULL WHERE id = ? RETURNING *;

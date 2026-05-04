@@ -20,15 +20,6 @@ CREATE TABLE apps (
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL
 , "method" VARCHAR(32) NOT NULL DEFAULT 'serve', "app_version" VARCHAR);
-CREATE TABLE functions (
-	-- id CHAR(36) PRIMARY KEY, -- ADD this when https://github.com/duckdb/duckdb/issues/1631 is fixed.
-	id CHAR(36),
-	app_id CHAR(36),
-	name VARCHAR NOT NULL,
-	slug VARCHAR NOT NULL,
-	config VARCHAR NOT NULL,
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-, archived_at TIMESTAMP);
 CREATE TABLE events (
 	internal_id BLOB,
 	-- cannot use CHAR(26) for ulids, nor primary keys for null ter
@@ -210,3 +201,15 @@ CREATE TABLE worker_connections (
 
     PRIMARY KEY(id, app_name)
 );
+CREATE TABLE IF NOT EXISTS "functions" (
+	id CHAR(36) PRIMARY KEY,
+	app_id CHAR(36),
+	name VARCHAR NOT NULL,
+	slug VARCHAR NOT NULL,
+	config VARCHAR NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	archived_at TIMESTAMP
+);
+CREATE UNIQUE INDEX functions_app_id_slug_active_key
+    ON functions (app_id, slug)
+    WHERE archived_at IS NULL;
