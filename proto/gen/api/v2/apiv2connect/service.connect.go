@@ -68,7 +68,9 @@ const (
 // V2Client is a client for the api.v2.V2 service.
 type V2Client interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
-	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
+	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
+	// in the swagger definitions. This path is stripped by the convert-openapi tool.
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
@@ -273,7 +275,9 @@ func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.I
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
-	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
+	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
+	// in the swagger definitions. This path is stripped by the convert-openapi tool.
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
