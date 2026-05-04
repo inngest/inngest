@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
@@ -19,6 +20,18 @@ var (
 
 type Singleton interface {
 	HandleSingleton(ctx context.Context, key string, c inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error)
+}
+
+func New(ctx context.Context, shards queue.ShardRegistry) Singleton {
+	return &store{shards: shards}
+}
+
+type store struct {
+	shards queue.ShardRegistry
+}
+
+func (s *store) HandleSingleton(ctx context.Context, key string, cfg inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
+	return singleton(ctx, s.shards, key, cfg, accountID)
 }
 
 // SingletonKey returns the singleton key given a function ID, singleton config,
@@ -52,12 +65,16 @@ func hash(res any, id uuid.UUID) string {
 // - If the mode is SingletonModeSkip, it returns the currently held run ID without modifying the lock.
 //
 // - If the mode is SingletonModeCancel, it attempts to release the lock and returns the run ID that was released.
-func singleton(ctx context.Context, store SingletonStore, key string, s inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
+func singleton(ctx context.Context, shards queue.ShardRegistry, key string, s inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
+	shard, err := shards.Resolve(ctx, accountID, nil)
+	if err != nil {
+		return nil, err
+	}
 	switch s.Mode {
 	case enums.SingletonModeSkip:
-		return store.GetCurrentRunID(ctx, key, accountID)
+		return shard.SingletonGetRunID(ctx, key)
 	case enums.SingletonModeCancel:
-		return store.ReleaseSingleton(ctx, key, accountID)
+		return shard.SingletonReleaseRunID(ctx, key)
 	default:
 		return nil, fmt.Errorf("singleton mode %d not implemented", s.Mode)
 	}
