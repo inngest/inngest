@@ -1,15 +1,12 @@
 import { ElementWrapper, TextElement } from '../DetailsCard/Element';
-import { getAIInfo, type ExperimentalAI } from './utils';
+import type { AIInfo } from './utils';
 
-export const AITrace = ({ aiOutput }: { aiOutput?: ExperimentalAI }) => {
-  if (!aiOutput) {
+export const AITrace = ({ aiInfo }: { aiInfo?: AIInfo }) => {
+  if (!aiInfo) {
     return null;
   }
-  const { promptTokens, completionTokens, totalTokens, model } = getAIInfo(aiOutput);
+  const { inputTokens, outputTokens, totalTokens, model } = aiInfo;
 
-  //
-  // upstream parsing is quite forgiving,
-  // only show ai metadata it actually exists
   return (
     <>
       {model && (
@@ -17,14 +14,14 @@ export const AITrace = ({ aiOutput }: { aiOutput?: ExperimentalAI }) => {
           <TextElement>{model}</TextElement>
         </ElementWrapper>
       )}
-      {typeof promptTokens === 'number' && (
-        <ElementWrapper label="Prompt Tokens">
-          <TextElement>{promptTokens}</TextElement>
+      {typeof inputTokens === 'number' && (
+        <ElementWrapper label="Input Tokens">
+          <TextElement>{inputTokens}</TextElement>
         </ElementWrapper>
       )}
-      {typeof completionTokens === 'number' && (
-        <ElementWrapper label="Completion Tokens">
-          <TextElement>{completionTokens}</TextElement>
+      {typeof outputTokens === 'number' && (
+        <ElementWrapper label="Output Tokens">
+          <TextElement>{outputTokens}</TextElement>
         </ElementWrapper>
       )}
       {typeof totalTokens === 'number' && (
