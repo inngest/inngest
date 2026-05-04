@@ -170,7 +170,11 @@ func NewAggregateEvaluator[T Evaluable](
 
 				return reflect.ValueOf(val).Elem().Interface().(T), err
 			},
-			FS: vfs.NewMem(),
+			// No FS specified: use in-memory storage with reduced settings since
+			// a block cache and bloom filters are pointless without disk reads.
+			FS:                 vfs.NewMem(),
+			BlockCacheSize:     8 << 20,
+			DisableBloomFilter: true,
 		}
 		// Attempt to unmarshal an empty byte slice, ensuring that we have
 		// a concrete type instead of an interface.
