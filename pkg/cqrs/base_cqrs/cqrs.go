@@ -1626,85 +1626,9 @@ func toCQRSRun(run dbpkg.FunctionRun, finish dbpkg.FunctionFinish) *cqrs.Functio
 // Trace
 //
 
-func (w wrapper) InsertSpan(ctx context.Context, span *cqrs.Span) error {
-	params := &dbpkg.InsertTraceParams{
-		Timestamp:       span.Timestamp,
-		TimestampUnixMs: span.Timestamp.UnixMilli(),
-		TraceID:         span.TraceID,
-		SpanID:          span.SpanID,
-		SpanName:        span.SpanName,
-		SpanKind:        span.SpanKind,
-		ServiceName:     span.ServiceName,
-		ScopeName:       span.ScopeName,
-		ScopeVersion:    span.ScopeVersion,
-		Duration:        int64(span.Duration / time.Millisecond),
-		StatusCode:      span.StatusCode,
-	}
-
-	if span.RunID != nil {
-		params.RunID = *span.RunID
-	}
-	if span.ParentSpanID != nil {
-		params.ParentSpanID = sql.NullString{String: *span.ParentSpanID, Valid: true}
-	}
-	if span.TraceState != nil {
-		params.TraceState = sql.NullString{String: *span.TraceState, Valid: true}
-	}
-	if byt, err := json.Marshal(span.ResourceAttributes); err == nil {
-		params.ResourceAttributes = byt
-	}
-	if byt, err := json.Marshal(span.SpanAttributes); err == nil {
-		params.SpanAttributes = byt
-	}
-	if byt, err := json.Marshal(span.Events); err == nil {
-		params.Events = byt
-	}
-	if byt, err := json.Marshal(span.Links); err == nil {
-		params.Links = byt
-	}
-	if span.StatusMessage != nil {
-		params.StatusMessage = sql.NullString{String: *span.StatusMessage, Valid: true}
-	}
-
-	return w.q.InsertTrace(ctx, *params)
-}
-
-func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
-	runid, err := ulid.Parse(run.RunID)
-	if err != nil {
-		return fmt.Errorf("error parsing runID as ULID: %w", err)
-	}
-
-	params := dbpkg.InsertTraceRunParams{
-		AccountID:   run.AccountID,
-		WorkspaceID: run.WorkspaceID,
-		AppID:       run.AppID,
-		FunctionID:  run.FunctionID,
-		TraceID:     []byte(run.TraceID),
-		SourceID:    run.SourceID,
-		RunID:       runid,
-		QueuedAt:    run.QueuedAt.UnixMilli(),
-		StartedAt:   run.StartedAt.UnixMilli(),
-		EndedAt:     run.EndedAt.UnixMilli(),
-		Status:      run.Status.ToCode(),
-		TriggerIds:  []byte{},
-		Output:      run.Output,
-		IsDebounce:  run.IsDebounce,
-		HasAi:       run.HasAI,
-	}
-
-	if run.BatchID != nil {
-		params.BatchID = *run.BatchID
-	}
-	if run.CronSchedule != nil {
-		params.CronSchedule = sql.NullString{String: *run.CronSchedule, Valid: true}
-	}
-	if len(run.TriggerIDs) > 0 {
-		params.TriggerIds = []byte(strings.Join(run.TriggerIDs, ","))
-	}
-
-	return w.q.InsertTraceRun(ctx, params)
-}
+// Trace insertions (single-row InsertSpan/InsertTraceRun and the bulk
+// InsertSpans/InsertTraceRuns paths along with their goqu builders) live in
+// trace_inserts.go to keep this file focused on read paths and aggregation.
 
 type traceRunCursorFilter struct {
 	ID    string

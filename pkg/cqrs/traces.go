@@ -396,6 +396,14 @@ type TraceWriter interface {
 	InsertSpan(ctx context.Context, span *Span) error
 	// InsertTraceRun writes a trace based function run into the backing store
 	InsertTraceRun(ctx context.Context, run *TraceRun) error
+	// InsertSpans writes a batch of trace spans into the backing store in a
+	// single multi-row INSERT per chunk. Empty input is a no-op. Used by the
+	// OTLP ingestion path to amortise per-row round-trips.
+	InsertSpans(ctx context.Context, spans []*Span) error
+	// InsertTraceRuns writes a batch of trace-based function runs into the
+	// backing store in a single multi-row upsert per chunk. Preserves the
+	// per-row ON CONFLICT semantics of InsertTraceRun.
+	InsertTraceRuns(ctx context.Context, runs []*TraceRun) error
 }
 
 type TraceReadWriterDev interface {

@@ -138,7 +138,7 @@ export function DateTimeInput({
       if (!(error instanceof ZodError)) {
         return;
       }
-      const errorCode = error.errors?.[0]?.code;
+      const errorCode = error.issues?.[0]?.code;
       if (errorCode === 'too_big' || errorCode === 'too_small') {
         setInputValue(value);
       }

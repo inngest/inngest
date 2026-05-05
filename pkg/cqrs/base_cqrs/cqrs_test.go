@@ -1534,6 +1534,251 @@ func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
 	})
 }
 
+func TestCQRSInsertTraceRunsBatch(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+
+	t.Run("empty batch is a no-op", func(t *testing.T) {
+		require.NoError(t, cm.InsertTraceRuns(ctx, nil))
+		require.NoError(t, cm.InsertTraceRuns(ctx, []*cqrs.TraceRun{}))
+	})
+
+	t.Run("inserts multiple runs in one call", func(t *testing.T) {
+		triggerID := ulid.Make()
+		runs := make([]*cqrs.TraceRun, 3)
+		runIDs := make([]string, 3)
+		for i := range runs {
+			runID := ulid.Make()
+			runIDs[i] = runID.String()
+			runs[i] = &cqrs.TraceRun{
+				AccountID:   accountID,
+				WorkspaceID: workspaceID,
+				AppID:       appID,
+				FunctionID:  functionID,
+				TraceID:     "trace-batch-" + runID.String(),
+				RunID:       runID.String(),
+				QueuedAt:    time.Now(),
+				StartedAt:   time.Now(),
+				EndedAt:     time.Now(),
+				TriggerIDs:  []string{triggerID.String()},
+				Status:      1,
+			}
+		}
+
+		require.NoError(t, cm.InsertTraceRuns(ctx, runs))
+
+		got, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		require.Len(t, got, 3)
+
+		gotIDs := make([]string, len(got))
+		for i, r := range got {
+			gotIDs[i] = r.RunID
+		}
+		for _, id := range runIDs {
+			assert.Contains(t, gotIDs, id)
+		}
+	})
+
+	t.Run("upsert preserves has_ai=true on conflict", func(t *testing.T) {
+		runID := ulid.Make()
+		triggerID := ulid.Make()
+		base := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-upsert-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+			HasAI:       true,
+		}
+		require.NoError(t, cm.InsertTraceRuns(ctx, []*cqrs.TraceRun{base}))
+
+		// Upsert the same run with HasAI=false; the CASE expression in the
+		// ON CONFLICT clause should preserve the existing HasAI=true value.
+		updated := *base
+		updated.HasAI = false
+		require.NoError(t, cm.InsertTraceRuns(ctx, []*cqrs.TraceRun{&updated}))
+
+		got, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		assert.True(t, got[0].HasAI, "HasAI should remain true after upsert")
+	})
+
+	t.Run("batch_id round-trips through bulk insert", func(t *testing.T) {
+		// Postgres' trace_runs.batch_id column is BYTEA; the single-row path in
+		// pkg/db/postgres/querier.go:646 converts ulid.ULID -> []byte via [:].
+		// Without an equivalent dialect-aware conversion in the bulk path,
+		// the postgres driver would reject ulid.ULID's Valuer (string)
+		// against BYTEA and drop the whole batch.
+		runID := ulid.Make()
+		batchID := ulid.Make()
+		triggerID := ulid.Make()
+		run := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-batchid-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+			BatchID:     &batchID,
+		}
+		require.NoError(t, cm.InsertTraceRuns(ctx, []*cqrs.TraceRun{run}))
+
+		got, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		require.NotNil(t, got[0].BatchID)
+		assert.Equal(t, batchID.String(), got[0].BatchID.String())
+	})
+
+	t.Run("malformed run id does not drop the rest of the batch", func(t *testing.T) {
+		triggerID := ulid.Make()
+		validIDs := []string{ulid.Make().String(), ulid.Make().String()}
+		runs := []*cqrs.TraceRun{
+			{
+				AccountID:   accountID,
+				WorkspaceID: workspaceID,
+				AppID:       appID,
+				FunctionID:  functionID,
+				TraceID:     "trace-good-1-" + validIDs[0],
+				RunID:       validIDs[0],
+				QueuedAt:    time.Now(),
+				StartedAt:   time.Now(),
+				EndedAt:     time.Now(),
+				TriggerIDs:  []string{triggerID.String()},
+				Status:      1,
+			},
+			{
+				AccountID:   accountID,
+				WorkspaceID: workspaceID,
+				AppID:       appID,
+				FunctionID:  functionID,
+				TraceID:     "trace-bad-" + ulid.Make().String(),
+				RunID:       "not-a-ulid",
+				QueuedAt:    time.Now(),
+				StartedAt:   time.Now(),
+				EndedAt:     time.Now(),
+				TriggerIDs:  []string{triggerID.String()},
+				Status:      1,
+			},
+			{
+				AccountID:   accountID,
+				WorkspaceID: workspaceID,
+				AppID:       appID,
+				FunctionID:  functionID,
+				TraceID:     "trace-good-2-" + validIDs[1],
+				RunID:       validIDs[1],
+				QueuedAt:    time.Now(),
+				StartedAt:   time.Now(),
+				EndedAt:     time.Now(),
+				TriggerIDs:  []string{triggerID.String()},
+				Status:      1,
+			},
+		}
+
+		err := cm.InsertTraceRuns(ctx, runs)
+		require.Error(t, err, "malformed run should surface a per-row build error")
+		require.Contains(t, err.Error(), "not-a-ulid")
+
+		got, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		require.Len(t, got, 2, "valid runs surrounding the bad one should still persist")
+
+		gotIDs := make([]string, len(got))
+		for i, r := range got {
+			gotIDs[i] = r.RunID
+		}
+		for _, id := range validIDs {
+			assert.Contains(t, gotIDs, id)
+		}
+	})
+}
+
+func TestCQRSInsertSpansBatch(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+
+	t.Run("empty batch is a no-op", func(t *testing.T) {
+		require.NoError(t, cm.InsertSpans(ctx, nil))
+		require.NoError(t, cm.InsertSpans(ctx, []*cqrs.Span{}))
+	})
+
+	t.Run("inserts multiple spans in one call", func(t *testing.T) {
+		// Seed a trace run so GetTraceSpansByRun has something to look up.
+		runID := ulid.Make()
+		traceID := "trace-spans-" + runID.String()
+		require.NoError(t, cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     traceID,
+			RunID:       runID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{ulid.Make().String()},
+			Status:      1,
+		}))
+
+		baseTime := time.Now().UTC().Truncate(time.Millisecond)
+		spans := make([]*cqrs.Span, 3)
+		for i := range spans {
+			rid := runID
+			spans[i] = &cqrs.Span{
+				Timestamp:          baseTime.Add(time.Duration(i) * time.Millisecond),
+				TraceID:            traceID,
+				SpanID:             fmt.Sprintf("span-%d-%s", i, runID.String()),
+				SpanName:           fmt.Sprintf("span %d", i),
+				SpanKind:           "INTERNAL",
+				ServiceName:        "test",
+				ScopeName:          "test",
+				ScopeVersion:       "0.0.0",
+				StatusCode:         "OK",
+				Duration:           time.Millisecond,
+				ResourceAttributes: map[string]string{"key": "value"},
+				SpanAttributes:     map[string]string{"k": "v"},
+				RunID:              &rid,
+			}
+		}
+
+		require.NoError(t, cm.InsertSpans(ctx, spans))
+
+		got, err := cm.GetTraceSpansByRun(ctx, cqrs.TraceRunIdentifier{
+			TraceID: traceID,
+			RunID:   runID,
+		})
+		require.NoError(t, err)
+		assert.Len(t, got, 3)
+	})
+}
+
 func TestCQRSGetTraceRunsPagination(t *testing.T) {
 	// This test verifies that cursor-based pagination works correctly for the GetSpanRuns
 	ctx := context.Background()

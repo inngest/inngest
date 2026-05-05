@@ -24,7 +24,7 @@ const statusEventSchema = z.object({
 
 export const incidentSchema = statusEventSchema.extend({
   status: z.enum(['identified', 'investigating', 'monitoring']),
-  current_worst_impact: impactSchema as unknown as z.ZodTypeAny,
+  current_worst_impact: impactSchema,
 });
 
 export type IncidentEvent = z.infer<typeof incidentSchema>;

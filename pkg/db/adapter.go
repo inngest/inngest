@@ -31,7 +31,15 @@ type Adapter interface {
 	WithTx(ctx context.Context) (TxAdapter, error)
 
 	// Conn returns the underlying *sql.DB for raw queries (e.g. goqu dynamic SQL).
+	// Note: this is always the bare connection and ignores any transaction
+	// scope -- callers running raw SQL inside a tx should use ExecContext.
 	Conn() *sql.DB
+
+	// ExecContext runs a raw parameterised SQL statement against the adapter's
+	// current execution scope. The plain Adapter routes to its *sql.DB; a
+	// TxAdapter routes to its active *sql.Tx so dynamically-built SQL (goqu
+	// bulk inserts, etc.) participates in the transaction.
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 
 	// Close releases any resources held by the adapter.
 	Close() error

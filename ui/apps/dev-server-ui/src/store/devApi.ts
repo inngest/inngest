@@ -20,7 +20,7 @@ export interface EventPayload {
 const serverInfoSchema = z.object({
   version: z.string().optional(),
   isSingleNodeService: z.boolean().optional(),
-  startOpts: z.record(z.unknown()).optional(),
+  startOpts: z.record(z.string(), z.unknown()).optional(),
 });
 
 export interface ServerInfo extends z.output<typeof serverInfoSchema> {
@@ -94,7 +94,7 @@ export const devApi = createApi({
                 name: event.name,
                 pendingRuns: null,
                 raw: JSON.stringify(event),
-                createdAt: event.ts,
+                createdAt: event.ts != null ? new Date(event.ts).toISOString() : null,
                 status: null,
               },
             },

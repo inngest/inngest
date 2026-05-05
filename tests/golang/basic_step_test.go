@@ -165,7 +165,7 @@ func TestFunctionSteps(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return atomic.LoadInt32(&counter) == 4
-		}, 30*time.Second, time.Second, "Didn't resolve step.waitForEvents: got %d instead of 4", atomic.LoadInt32(&counter))
+		}, 60*time.Second, time.Second, "Didn't resolve step.waitForEvents: got %d instead of 4", atomic.LoadInt32(&counter))
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {

@@ -33,9 +33,13 @@ func New(conn *sql.DB) *Adapter {
 
 func (a *Adapter) Dialect() db.Dialect                { return db.DialectSQLite }
 func (a *Adapter) Q() db.Querier                      { return a.q }
-func (a *Adapter) Helpers() driverhelp.DialectHelpers  { return a.h }
-func (a *Adapter) Conn() *sql.DB                       { return a.conn }
-func (a *Adapter) Close() error                        { return a.conn.Close() }
+func (a *Adapter) Helpers() driverhelp.DialectHelpers { return a.h }
+func (a *Adapter) Conn() *sql.DB                      { return a.conn }
+func (a *Adapter) Close() error                       { return a.conn.Close() }
+
+func (a *Adapter) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return a.conn.ExecContext(ctx, query, args...)
+}
 
 func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	tx, err := a.conn.BeginTx(ctx, nil)
@@ -56,6 +60,13 @@ func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 type TxAdapter struct {
 	Adapter
 	tx *sql.Tx
+}
+
+// ExecContext overrides Adapter.ExecContext so dynamically-built SQL (goqu
+// bulk inserts, etc.) runs against the active transaction rather than the
+// underlying *sql.DB.
+func (t *TxAdapter) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return t.tx.ExecContext(ctx, query, args...)
 }
 
 func (t *TxAdapter) Commit(ctx context.Context) error {
