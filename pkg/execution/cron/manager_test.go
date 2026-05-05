@@ -90,7 +90,7 @@ func TestGenerateJitter(t *testing.T) {
 
 func TestOptions(t *testing.T) {
 	t.Run("WithJitterRange sets jitter correctly", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
+		opt := managerOpt{}
 		WithJitterRange(5*time.Millisecond, 15*time.Millisecond)(&opt)
 
 		assert.Equal(t, 5*time.Millisecond, opt.jitterMin)
@@ -98,7 +98,7 @@ func TestOptions(t *testing.T) {
 	})
 
 	t.Run("WithJitterRange ignores invalid range", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
+		opt := managerOpt{}
 		WithJitterRange(15*time.Millisecond, 5*time.Millisecond)(&opt)
 
 		assert.Equal(t, time.Duration(0), opt.jitterMin)
@@ -106,28 +106,28 @@ func TestOptions(t *testing.T) {
 	})
 
 	t.Run("WithHealthCheckInterval sets interval correctly", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
+		opt := managerOpt{}
 		WithHealthCheckInterval(5 * time.Minute)(&opt)
 
 		assert.Equal(t, 5*time.Minute, opt.healthCheckInterval)
 	})
 
 	t.Run("WithHealthCheckInterval ignores values < 1m", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
+		opt := managerOpt{}
 		WithHealthCheckInterval(10 * time.Second)(&opt)
 
 		assert.Equal(t, time.Duration(0), opt.healthCheckInterval)
 	})
 
 	t.Run("WithHealthCheckLeadTimeSeconds sets lead time correctly", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
+		opt := managerOpt{}
 		WithHealthCheckLeadTimeSeconds(20)(&opt)
 
 		assert.Equal(t, 20, opt.healthCheckLeadTimeSeconds)
 	})
 
 	t.Run("WithHealthCheckLeadTimeSeconds rejects negative values", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
+		opt := managerOpt{}
 		WithHealthCheckLeadTimeSeconds(-20)(&opt)
 
 		assert.Equal(t, 0, opt.healthCheckLeadTimeSeconds)
@@ -135,7 +135,7 @@ func TestOptions(t *testing.T) {
 
 	t.Run("validate options", func(t *testing.T) {
 		t.Run("valid configuration should not modify values", func(t *testing.T) {
-			opt := redisCronManagerOpt{
+			opt := managerOpt{
 				healthCheckLeadTimeSeconds: 19,
 				healthCheckInterval:        time.Minute,
 			}
@@ -146,7 +146,7 @@ func TestOptions(t *testing.T) {
 		})
 
 		t.Run("lead time equal to interval should reset to default", func(t *testing.T) {
-			opt := redisCronManagerOpt{
+			opt := managerOpt{
 				healthCheckLeadTimeSeconds: 60,
 				healthCheckInterval:        time.Minute,
 			}
@@ -157,7 +157,7 @@ func TestOptions(t *testing.T) {
 		})
 
 		t.Run("lead time greater than interval should reset to default", func(t *testing.T) {
-			opt := redisCronManagerOpt{
+			opt := managerOpt{
 				healthCheckLeadTimeSeconds: 120,
 				healthCheckInterval:        time.Minute,
 			}
@@ -168,7 +168,7 @@ func TestOptions(t *testing.T) {
 		})
 
 		t.Run("lead time one second less than interval should be valid", func(t *testing.T) {
-			opt := redisCronManagerOpt{
+			opt := managerOpt{
 				healthCheckLeadTimeSeconds: 59,
 				healthCheckInterval:        time.Minute,
 			}
@@ -179,7 +179,7 @@ func TestOptions(t *testing.T) {
 		})
 
 		t.Run("zero lead time should be valid", func(t *testing.T) {
-			opt := redisCronManagerOpt{
+			opt := managerOpt{
 				healthCheckLeadTimeSeconds: 0,
 				healthCheckInterval:        time.Minute,
 			}
@@ -230,7 +230,7 @@ func TestOptions(t *testing.T) {
 
 			for _, tc := range testCases {
 				t.Run(tc.name, func(t *testing.T) {
-					opt := redisCronManagerOpt{
+					opt := managerOpt{
 						healthCheckLeadTimeSeconds: tc.leadTimeSeconds,
 						healthCheckInterval:        tc.interval,
 					}
@@ -301,8 +301,8 @@ func TestNextHealthCheckTime(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("with default interval (1 minute) and default lead time (20 seconds)", func(t *testing.T) {
-		cm := NewRedisCronManager(shard, q, logger.StdlibLogger(ctx))
-		cmTyped := cm.(*redisCronManager)
+		cm := NewManager(shard, q, logger.StdlibLogger(ctx))
+		cmTyped := cm.(*manager)
 
 		testCases := []struct {
 			name           string
@@ -365,13 +365,13 @@ func TestNextHealthCheckTime(t *testing.T) {
 	})
 
 	t.Run("with 5 minute interval and 30 second lead time", func(t *testing.T) {
-		cm := NewRedisCronManager(
+		cm := NewManager(
 			shard, q,
 			logger.StdlibLogger(ctx),
 			WithHealthCheckInterval(5*time.Minute),
 			WithHealthCheckLeadTimeSeconds(30),
 		)
-		cmTyped := cm.(*redisCronManager)
+		cmTyped := cm.(*manager)
 
 		testCases := []struct {
 			name           string
@@ -428,13 +428,13 @@ func TestNextHealthCheckTime(t *testing.T) {
 	})
 
 	t.Run("with 1 hour interval and 5 minute lead time", func(t *testing.T) {
-		cm := NewRedisCronManager(
+		cm := NewManager(
 			shard, q,
 			logger.StdlibLogger(ctx),
 			WithHealthCheckInterval(1*time.Hour),
 			WithHealthCheckLeadTimeSeconds(300),
 		)
-		cmTyped := cm.(*redisCronManager)
+		cmTyped := cm.(*manager)
 
 		testCases := []struct {
 			name           string
@@ -477,8 +477,8 @@ func TestNextHealthCheckTime(t *testing.T) {
 	})
 
 	t.Run("consistency checks", func(t *testing.T) {
-		cm := NewRedisCronManager(shard, q, logger.StdlibLogger(ctx))
-		cmTyped := cm.(*redisCronManager)
+		cm := NewManager(shard, q, logger.StdlibLogger(ctx))
+		cmTyped := cm.(*manager)
 
 		t.Run("calling twice with same time should return same result", func(t *testing.T) {
 			inputTime := time.Date(2025, 10, 26, 14, 30, 45, 0, time.UTC)
@@ -544,8 +544,8 @@ func TestCronHealthCheckJobID(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	cm := NewRedisCronManager(shard, q, logger.StdlibLogger(ctx))
-	cmTyped := cm.(*redisCronManager)
+	cm := NewManager(shard, q, logger.StdlibLogger(ctx))
+	cmTyped := cm.(*manager)
 
 	t.Run("should generate consistent JobID for same time", func(t *testing.T) {
 		testTime := time.Date(2025, 10, 26, 14, 30, 41, 0, time.UTC)
@@ -634,7 +634,7 @@ func CronItemEquals(t *testing.T, expected, actual CronItem) {
 	assert.Equal(t, expected.Op, actual.Op)
 }
 
-func TestRedisCronManager(t *testing.T) {
+func TestManager(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
 
@@ -670,7 +670,7 @@ func TestRedisCronManager(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	cm := NewRedisCronManager(
+	cm := NewManager(
 		shard,
 		q,
 		logger.StdlibLogger(ctx),
