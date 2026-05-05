@@ -416,6 +416,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	}
 
 	var done atomic.Bool
+	goodRid := NewRunID()
 	evtName := "my-event"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -430,6 +431,11 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 			exp := "async.data.name == 'Alice'"
 			if input.Event.Data.Bad {
 				exp = "invalid"
+			} else {
+				// Capture the good run's ID directly — relying on the order of
+				// function.started events is unsafe under concurrency limits
+				// (a late-starting bad run can interleave with the good one).
+				goodRid.Send(input.InputCtx.RunID)
 			}
 
 			_, _ = step.WaitForEvent[any](
@@ -463,7 +469,8 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	_, err = inngestClient.SendMany(ctx, badEvents)
 	r.NoError(err)
 
-	// Wait until every bad run has started executing.
+	// Wait until every bad run has started executing so they are all in the
+	// aggregate-pauses path before we trigger the good run.
 	stream.WaitForFunctionStartedCount(len(badEvents), 60*time.Second)
 
 	// Trigger a function run with a valid expression that should match.
@@ -473,10 +480,8 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	})
 	r.NoError(err)
 
-	// Wait for the good run to start, then capture its runID (it's the
-	// (N+1)th function.started event).
-	started := stream.WaitForFunctionStartedCount(len(badEvents)+1, 30*time.Second)
-	goodRunID := started[len(badEvents)].RunID
+	// The good run captures its own runID inside the handler.
+	goodRunID := goodRid.Wait(t)
 
 	// Send the matching event and confirm the good run finishes.
 	_, err = inngestClient.Send(ctx, &event.Event{
