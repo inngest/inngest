@@ -225,6 +225,8 @@ func (g GeneratorOpcode) StepType() enums.StepType {
 		return enums.StepTypeSleep
 	case enums.OpcodeWaitForEvent:
 		return enums.StepTypeWaitForEvent
+	case enums.OpcodeWaitForSignal:
+		return enums.StepTypeWaitForSignal
 	case enums.OpcodeInvokeFunction:
 		return enums.StepTypeInvoke
 	case enums.OpcodeAIGateway:
