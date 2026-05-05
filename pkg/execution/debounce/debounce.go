@@ -181,8 +181,22 @@ type RunDebounceResult struct {
 	EventID string
 }
 
-// ManagerOpts configures a debounce Manager.
-type ManagerOpts struct {
+// NewDebouncer constructs a debounce manager backed by a single primary
+// shard. This is the steady-state configuration; for a migration from a
+// secondary (source) shard to a primary (destination), use
+// NewDebouncerWithMigration.
+func NewDebouncer(shards queue.ShardRegistry, primaryShardName string, q queue.Producer) (Debouncer, error) {
+	return NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           shards,
+		PrimaryShardName: primaryShardName,
+		Queue:            q,
+	})
+}
+
+// DebouncerOpts configures a debounce manager. Required fields are Shards,
+// PrimaryShardName and Queue. Set SecondaryShardName + ShouldMigrate to drive
+// a migration from the secondary (source) shard to the primary (destination).
+type DebouncerOpts struct {
 	// Shards is the registry used to resolve shards by name. Both
 	// PrimaryShardName and (optionally) SecondaryShardName must exist in
 	// it.
@@ -194,7 +208,7 @@ type ManagerOpts struct {
 	// migration. When empty, the manager runs without migration support.
 	SecondaryShardName string
 
-	// Queue is the queue manager used to enqueue/requeue timeout items.
+	// Queue is the queue producer used to enqueue/requeue timeout items.
 	// Its registry must know about every shard the manager may target.
 	Queue queue.Producer
 
@@ -207,13 +221,11 @@ type ManagerOpts struct {
 	Clock clockwork.Clock
 }
 
-// NewDebouncer constructs a debounce manager that resolves shards through a
-// ShardRegistry and runs all redis-side operations through queue.ShardOperations.
-//
-// Pass only PrimaryShardName for the steady-state, single-shard configuration.
-// Add SecondaryShardName + ShouldMigrate to drive a migration from the
-// secondary (source) shard to the primary (destination).
-func NewDebouncer(o ManagerOpts) (Debouncer, error) {
+// NewDebouncerWithMigration constructs a debounce manager that can drive a
+// migration from a secondary (source) shard to a primary (destination) shard,
+// gated by ShouldMigrate. For the steady-state, single-shard configuration,
+// use NewDebouncer.
+func NewDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
 	if o.Shards == nil {
 		return nil, fmt.Errorf("missing shard registry")
 	}
@@ -292,6 +304,21 @@ func (d debouncer) shard(shouldMigrate bool) (queue.QueueShard, error) {
 	return d.shards.ByName(d.secondaryShardName)
 }
 
+// shardForItem resolves the shard that holds di's debounce state. When di was
+// retrieved from the secondary cluster (isSecondary), we must operate on that
+// shard regardless of shouldMigrate, otherwise we'd write to a shard that
+// doesn't have the item. Errors if isSecondary is set without a configured
+// secondary shard.
+func (d debouncer) shardForItem(di DebounceItem, shouldMigrate bool) (queue.QueueShard, error) {
+	if di.isSecondary {
+		if !d.hasSecondary() {
+			return nil, fmt.Errorf("debounce retrieved from secondary cluster but no secondary shard is configured")
+		}
+		return d.shards.ByName(d.secondaryShardName)
+	}
+	return d.shard(shouldMigrate)
+}
+
 func (d debouncer) primaryShard() (queue.QueueShard, error) {
 	return d.shards.ByName(d.primaryShardName)
 }
@@ -308,15 +335,11 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 	// Determine the flag value once and pass down to prevent inconsistent values mid-deletion
 	shouldMigrate := d.shouldMigrate(ctx, accountID)
 
-	if di.isSecondary && !d.hasSecondary() {
-		return fmt.Errorf("debounce retrieved from secondary cluster but no secondary shard is configured")
-	}
-
 	// If the new primary is set up and the secondary is draining, for some time old debounces
 	// will still exist on the secondary. If a debounce item times out before being migrated,
 	// it will be marked with isSecondary in GetDebounceItem(). StartExecution() and DeleteDebounceItem()
 	// must then run on the secondary cluster.
-	queueShard, err := d.shard(shouldMigrate || di.isSecondary)
+	queueShard, err := d.shardForItem(di, shouldMigrate)
 	if err != nil {
 		return fmt.Errorf("could not resolve shard: %w", err)
 	}
@@ -406,16 +429,13 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	if err != nil {
 		return err
 	}
-	if di.isSecondary && !d.hasSecondary() {
-		return fmt.Errorf("debounce retrieved from secondary cluster but no secondary shard is configured")
-	}
 
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	// Determine the flag value once and pass down to prevent inconsistent values mid-execution
 	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 
-	queueShard, err := d.shard(shouldMigrate || di.isSecondary)
+	queueShard, err := d.shardForItem(di, shouldMigrate)
 	if err != nil {
 		return fmt.Errorf("could not resolve shard: %w", err)
 	}

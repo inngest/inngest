@@ -98,11 +98,7 @@ func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
 	)
 	require.NoError(t, err)
 
-	deb, err := debounce.NewDebouncer(debounce.ManagerOpts{
-		Shards:           shardRegistry,
-		PrimaryShardName: shard.Name(),
-		Queue:            q,
-	})
+	deb, err := debounce.NewDebouncer(shardRegistry, shard.Name(), q)
 	require.NoError(t, err)
 	return deb
 }

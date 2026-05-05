@@ -70,7 +70,7 @@ func TestDebounce(t *testing.T) {
 
 	fakeClock := clockwork.NewFakeClock()
 
-	deb, err := NewDebouncer(ManagerOpts{
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           shardRegistry,
 		PrimaryShardName: shard.Name(),
 		Queue:            q,
@@ -351,7 +351,7 @@ func TestJITDebounceMigration(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldDeb, err := NewDebouncer(ManagerOpts{
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           oldShardRegistry,
 		PrimaryShardName: defaultQueueShard.Name(),
 		Queue:            oldQueue,
@@ -360,7 +360,7 @@ func TestJITDebounceMigration(t *testing.T) {
 	require.NoError(t, err)
 	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewDebouncer(ManagerOpts{
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:             newShardRegistry,
 		PrimaryShardName:   newSystemShard.Name(),
 		SecondaryShardName: defaultQueueShard.Name(),
@@ -616,7 +616,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
-	oldDeb, err := NewDebouncer(ManagerOpts{
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           oldShardRegistry,
 		PrimaryShardName: defaultQueueShard.Name(),
 		Queue:            oldQueue,
@@ -625,7 +625,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	require.NoError(t, err)
 	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewDebouncer(ManagerOpts{
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:             newShardRegistry,
 		PrimaryShardName:   newSystemShard.Name(),
 		SecondaryShardName: defaultQueueShard.Name(),
@@ -866,7 +866,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldDeb, err := NewDebouncer(ManagerOpts{
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           oldShardRegistry,
 		PrimaryShardName: defaultQueueShard.Name(),
 		Queue:            oldQueue,
@@ -875,7 +875,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	require.NoError(t, err)
 	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewDebouncer(ManagerOpts{
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:             newShardRegistry,
 		PrimaryShardName:   newSystemShard.Name(),
 		SecondaryShardName: defaultQueueShard.Name(),
@@ -1079,7 +1079,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldDeb, err := NewDebouncer(ManagerOpts{
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           oldShardRegistry,
 		PrimaryShardName: defaultQueueShard.Name(),
 		Queue:            oldQueue,
@@ -1088,7 +1088,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	require.NoError(t, err)
 	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewDebouncer(ManagerOpts{
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:             newShardRegistry,
 		PrimaryShardName:   newSystemShard.Name(),
 		SecondaryShardName: defaultQueueShard.Name(),
@@ -1257,7 +1257,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
-	_, err = NewDebouncer(ManagerOpts{
+	_, err = NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           oldShardRegistry,
 		PrimaryShardName: defaultQueueShard.Name(),
 		Queue:            oldQueue,
@@ -1267,7 +1267,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 
 	// Initial state: Only one primary configured, feature flag off.
 	t.Run("before two clusters are configured for migration, use primary", func(t *testing.T) {
-		deb, err := NewDebouncer(ManagerOpts{
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
 			Shards:           newShardRegistry,
 			PrimaryShardName: newSystemShard.Name(),
 			Queue:            newQueue,
@@ -1285,7 +1285,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 
 	// Preparation for migration: Switch primary -> secondary and add new primary.
 	t.Run("when two clusters are configured, use secondary", func(t *testing.T) {
-		deb, err := NewDebouncer(ManagerOpts{
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
 			Shards:             newShardRegistry,
 			PrimaryShardName:   newSystemShard.Name(),
 			SecondaryShardName: defaultQueueShard.Name(),
@@ -1311,7 +1311,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	// Start migration: Enable feature flag. This test assumes the change propagation is immediate and is registered by
 	// all consumers at once.
 	t.Run("during migration, use primary", func(t *testing.T) {
-		deb, err := NewDebouncer(ManagerOpts{
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
 			Shards:             newShardRegistry,
 			PrimaryShardName:   newSystemShard.Name(),
 			SecondaryShardName: defaultQueueShard.Name(),
@@ -1333,7 +1333,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	// Once all debounces are moved from the old shard, we can remove the reference (by dropping the secondary).
 	// To prevent old deployments from using the old cluster again, we must keep the feature flag enabled during this time.
 	t.Run("after removing secondary once migration is completed, use primary", func(t *testing.T) {
-		deb, err := NewDebouncer(ManagerOpts{
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
 			Shards:           newShardRegistry,
 			PrimaryShardName: newSystemShard.Name(),
 			Queue:            newQueue,
@@ -1409,7 +1409,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldDeb, err := NewDebouncer(ManagerOpts{
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           oldShardRegistry,
 		PrimaryShardName: defaultQueueShard.Name(),
 		Queue:            oldQueue,
@@ -1418,7 +1418,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 	require.NoError(t, err)
 	oldRedisDebouncer := oldDeb.(debouncer)
 
-	newDeb, err := NewDebouncer(ManagerOpts{
+	newDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:             newShardRegistry,
 		PrimaryShardName:   newSystemShard.Name(),
 		SecondaryShardName: defaultQueueShard.Name(),
@@ -1615,7 +1615,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldDeb, err := NewDebouncer(ManagerOpts{
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           oldShardRegistry,
 		PrimaryShardName: defaultQueueShard.Name(),
 		Queue:            oldQueue,
@@ -1624,7 +1624,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 	require.NoError(t, err)
 	oldRedisDebouncer := oldDeb.(debouncer)
 
-	newDeb, err := NewDebouncer(ManagerOpts{
+	newDeb, err := NewDebouncerWithMigration(DebouncerOpts{
 		Shards:             newShardRegistry,
 		PrimaryShardName:   newSystemShard.Name(),
 		SecondaryShardName: defaultQueueShard.Name(),
@@ -1801,11 +1801,7 @@ func TestGetDebounceInfo(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer, err := NewDebouncer(ManagerOpts{
-		Shards:           shardRegistry,
-		PrimaryShardName: shard.Name(),
-		Queue:            q,
-	})
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -1996,11 +1992,7 @@ func TestDeleteDebounce(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer, err := NewDebouncer(ManagerOpts{
-		Shards:           shardRegistry,
-		PrimaryShardName: shard.Name(),
-		Queue:            q,
-	})
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -2092,11 +2084,7 @@ func TestRunDebounce(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer, err := NewDebouncer(ManagerOpts{
-		Shards:           shardRegistry,
-		PrimaryShardName: shard.Name(),
-		Queue:            q,
-	})
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -2190,11 +2178,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer, err := NewDebouncer(ManagerOpts{
-		Shards:           shardRegistry,
-		PrimaryShardName: shard.Name(),
-		Queue:            q,
-	})
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
 	require.NoError(t, err)
 
 	ctx := context.Background()

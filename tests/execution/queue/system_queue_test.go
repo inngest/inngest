@@ -98,7 +98,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 	t.Run("debounce timeouts should not be added to function queue", func(t *testing.T) {
 		r.FlushAll()
 
-		debouncer, err := debounce.NewDebouncer(debounce.ManagerOpts{
+		debouncer, err := debounce.NewDebouncerWithMigration(debounce.DebouncerOpts{
 			Shards:           shardRegistry,
 			PrimaryShardName: shard.Name(),
 			Queue:            q,

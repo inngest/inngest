@@ -403,11 +403,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
-	debouncer, err := debounce.NewDebouncer(debounce.ManagerOpts{
-		Shards:           shardRegistry,
-		PrimaryShardName: queueShard.Name(),
-		Queue:            rq,
-	})
+	debouncer, err := debounce.NewDebouncer(shardRegistry, queueShard.Name(), rq)
 	if err != nil {
 		return fmt.Errorf("could not create debounce manager: %w", err)
 	}
