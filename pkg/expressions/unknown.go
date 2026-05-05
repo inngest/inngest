@@ -53,10 +53,10 @@ func (r *runtimeUnknownCall) Eval(act interpreter.Activation) ref.Val {
 		fnVal = r.Function()
 	}
 
-	argTypes := &argColl{}
+	var argTypes argColl
 	args := r.Args()
 	for _, arg := range args {
-		argTypes.Add(arg.Eval(act))
+		argTypes.add(arg.Eval(act))
 	}
 
 	if argTypes.TypeLen() == 1 && !argTypes.Exists(types.ErrType) && !argTypes.Exists(types.UnknownType) {
@@ -98,10 +98,12 @@ func (r *runtimeUnknownCall) Eval(act interpreter.Activation) ref.Val {
 		//    variable.  This error contains "no such attribute", and this is a usual
 		//    part of runing macros.  XXX: Figure out why Eval() on macro variables fails:
 		//    this is actually _not_ an error.
-		for _, val := range argTypes.OfType(types.ErrType) {
-			if strings.HasPrefix(val.(error).Error(), "no such attribute") {
-				// This must be a macro call;  handle as usual
-				return r.InterpretableCall.Eval(act)
+		for i := 0; i < argTypes.n && i < 2; i++ {
+			if argTypes.a[i] != nil && argTypes.a[i].Type() == types.ErrType {
+				if strings.HasPrefix(argTypes.a[i].(error).Error(), "no such attribute") {
+					// This must be a macro call;  handle as usual
+					return r.InterpretableCall.Eval(act)
+				}
 			}
 		}
 		// This is an unknown type.  Dependent on the function being called return
@@ -131,7 +133,7 @@ func (r *runtimeUnknownCall) Eval(act interpreter.Activation) ref.Val {
 		//
 		// We must create a new zero type in place of the null argument,
 		// then fetch the overload from the standard dispatcher and run the function.
-		zeroArgs, err := argTypes.ZeroValArgs()
+		zeroArgs, err := argTypes.zeroValArgs()
 		if err != nil {
 			return r.InterpretableCall.Eval(act)
 		}
@@ -152,15 +154,15 @@ func (r *runtimeUnknownCall) Eval(act interpreter.Activation) ref.Val {
 //
 // This functionality adds custom logic for each overload to return a static ref.Val
 // which is used in place of unknown.
-func handleUnknownCall(i interpreter.InterpretableCall, args *argColl) (interpreter.Interpretable, error) {
+func handleUnknownCall(i interpreter.InterpretableCall, args argColl) (interpreter.Interpretable, error) {
 	switch i.Function() {
 	case operators.Add:
 		// Find the non-unknown type and return that
-		for _, arg := range args.arguments {
-			if types.IsUnknown(arg) {
+		for j := 0; j < args.n && j < 2; j++ {
+			if types.IsUnknown(args.a[j]) {
 				continue
 			}
-			return staticCall{result: arg, InterpretableCall: i}, nil
+			return staticCall{result: args.a[j], InterpretableCall: i}, nil
 		}
 		return staticCall{result: types.False, InterpretableCall: i}, nil
 	case operators.Equals:
@@ -182,14 +184,14 @@ func handleUnknownCall(i interpreter.InterpretableCall, args *argColl) (interpre
 
 	case operators.Less, operators.LessEquals:
 		// Unknown is less than anything.
-		if args.arguments[0].Type() == types.UnknownType || args.arguments[0].Type() == types.ErrType {
+		if args.a[0].Type() == types.UnknownType || args.a[0].Type() == types.ErrType {
 			return staticCall{result: types.True, InterpretableCall: i}, nil
 		}
 		return staticCall{result: types.False, InterpretableCall: i}, nil
 
 	case operators.Greater, operators.GreaterEquals:
-		// If the first arg is unkown, return false:  unknown is not greater.
-		if args.arguments[0].Type() == types.UnknownType || args.arguments[0].Type() == types.ErrType {
+		// If the first arg is unknown, return false:  unknown is not greater.
+		if args.a[0].Type() == types.UnknownType || args.a[0].Type() == types.ErrType {
 			return staticCall{result: types.False, InterpretableCall: i}, nil
 		}
 		return staticCall{result: types.True, InterpretableCall: i}, nil
@@ -205,9 +207,6 @@ func handleUnknownCall(i interpreter.InterpretableCall, args *argColl) (interpre
 		// Size on unknowns should always return zero to avoid type errors.
 		return staticCall{result: types.IntZero, InterpretableCall: i}, nil
 	default:
-
-		// By default, return false, for eaxmple: "_<_", "@in", "@not_strictly_false"
-		// return staticCall{result: types.False, InterpretableCall: call}, nil
 		return staticCall{result: types.False, InterpretableCall: i}, nil
 	}
 }
@@ -268,12 +267,14 @@ func (e *evalTruthyLogical) ID() int64 {
 }
 
 func (e *evalTruthyLogical) Eval(ctx interpreter.Activation) ref.Val {
-	// Evaluate all terms to check their types.
-	vals := make([]ref.Val, len(e.terms))
+	// CEL's || and && produce nested binary AST nodes by default; evalExhaustiveOr/And
+	// inherits that 2-element terms slice.  This breaks if the env ever enables
+	// cel.variadicLogicalOperatorASTs() which is not even exported can break this assumption.
+	var vals [2]ref.Val
 	allBool := true
-	for idx, term := range e.terms {
-		vals[idx] = term.Eval(ctx)
-		if vals[idx] == nil || vals[idx].Type() != types.BoolType {
+	for i, term := range e.terms {
+		vals[i] = term.Eval(ctx)
+		if vals[i] == nil || vals[i].Type() != types.BoolType {
 			allBool = false
 		}
 	}
@@ -286,18 +287,18 @@ func (e *evalTruthyLogical) Eval(ctx interpreter.Activation) ref.Val {
 	// Apply JS-like truthy coercion.
 	if e.isOr {
 		// Return the first truthy value, or the last value.
-		for _, val := range vals {
-			if isTruthy(val) {
-				return val
+		for i := 0; i < n; i++ {
+			if isTruthy(vals[i]) {
+				return vals[i]
 			}
 		}
 		return vals[len(vals)-1]
 	}
 
 	// AND: return the first falsy value, or the last value.
-	for _, val := range vals {
-		if !isTruthy(val) {
-			return val
+	for i := 0; i < n; i++ {
+		if !isTruthy(vals[i]) {
+			return vals[i]
 		}
 	}
 	return vals[len(vals)-1]
@@ -338,92 +339,68 @@ func (u staticCall) Eval(ctx interpreter.Activation) ref.Val {
 	return u.result
 }
 
-// argColl inspects all of the types available within a function call in
-// CEL, storing their type information.
+// argColl tracks the argument values and distinct types for a binary operator call.
+// CEL operators are always binary (2 args), so fixed-size arrays are used throughout
+// to avoid any heap allocation.
 type argColl struct {
-	// types represents a map of types to their values used within the
-	// function.
-	types map[ref.Type][]ref.Val
-
-	// arguments represents the function arguments, in order.
-	arguments []ref.Val
+	a      [2]ref.Val // arguments in order
+	n      int        // number of arguments added (0–2)
+	t0, t1 ref.Type  // distinct types seen; t0 is set first
+	nt     int        // number of distinct types (0–2)
 }
 
-// Add adds a new value to the type collection, storing its type in the map.
-func (t *argColl) Add(vals ...ref.Val) {
-	if t.types == nil {
-		t.types = map[ref.Type][]ref.Val{}
+func (t *argColl) add(val ref.Val) {
+	if t.n < 2 {
+		t.a[t.n] = val
 	}
-
-	for _, val := range vals {
-		// Store the arguments in order (left and right hand side of operators)
-		t.arguments = append(t.arguments, val)
-
-		if val == nil {
-			// XXX: We should probably handle this differently
-			continue
+	t.n++
+	if val == nil {
+		return
+	}
+	typ := val.Type()
+	switch t.nt {
+	case 0:
+		t.t0 = typ
+		t.nt = 1
+	case 1:
+		if t.t0 != typ {
+			t.t1 = typ
+			t.nt = 2
 		}
-
-		typ := val.Type()
-		coll, ok := t.types[typ]
-		if !ok {
-			t.types[typ] = []ref.Val{val}
-			return
-		}
-		t.types[typ] = append(coll, val)
 	}
 }
 
-func (t *argColl) TypeLen() int {
-	return len(t.types)
-}
-
-func (t *argColl) ArgLen() int {
-	return len(t.arguments)
-}
+func (t *argColl) TypeLen() int { return t.nt }
+func (t *argColl) ArgLen() int  { return t.n }
 
 func (t *argColl) Exists(typ ref.Type) bool {
-	_, ok := t.types[typ]
-	return ok
+	return (t.nt >= 1 && t.t0 == typ) || (t.nt >= 2 && t.t1 == typ)
 }
 
-// OfType returns all arguments of the given type.
-func (t *argColl) OfType(typ ref.Type) []ref.Val {
-	coll, ok := t.types[typ]
-	if !ok {
-		return nil
+// zeroValArgs returns the two args with any null replaced by the zero value of the
+// other type.  Returns an error if there isn't exactly one non-null type present.
+func (t *argColl) zeroValArgs() ([2]ref.Val, error) {
+	var nonNull ref.Type
+	nn := 0
+	if t.nt >= 1 && t.t0 != types.NullType {
+		nonNull = t.t0
+		nn++
 	}
-	return coll
-}
-
-// NonNull returns all non-null types as a slice.
-func (t *argColl) NonNull() []ref.Type {
-	coll := []ref.Type{}
-	for typ := range t.types {
-		if typ == types.NullType {
-			continue
-		}
-		coll = append(coll, typ)
+	if t.nt >= 2 && t.t1 != types.NullType {
+		nonNull = t.t1
+		nn++
 	}
-	return coll
-}
-
-// ZeroValArgs returns all args with null types replaced as zero values
-func (t *argColl) ZeroValArgs() ([]ref.Val, error) {
-	typ := t.NonNull()
-	if len(typ) != 1 {
-		return t.arguments, fmt.Errorf("not exactly one other non-null type present")
+	if nn != 1 {
+		return t.a, fmt.Errorf("not exactly one other non-null type present")
 	}
-
-	coll := make([]ref.Val, len(t.arguments))
-	for n, arg := range t.arguments {
-		coll[n] = arg
-		if arg.Type() == types.NullType {
-			coll[n] = zeroVal(typ[0])
+	result := t.a
+	zero := zeroVal(nonNull)
+	for i := 0; i < t.n && i < 2; i++ {
+		if t.a[i] != nil && t.a[i].Type() == types.NullType {
+			result[i] = zero
 		}
 	}
-
-	return coll, nil
+	return result, nil
 }
 
 // zeroVal returns a zero value for common cel datatypes.  This helps us
