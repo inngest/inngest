@@ -1355,11 +1355,23 @@ message GetFunctionTraceRequest {
   string run_id = 1;
   optional bool include_output = 2;
   optional uint32 max_depth = 3;
+  optional string cursor = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of root trace spans to return per page (min: 1, max: 250)"
+      default: "100"
+    }
+  ];
 }
 
 message GetFunctionTraceResponse {
   FunctionTrace data = 1;
   ResponseMetadata metadata = 2;
+  Page page = 3;
 }
 
 message GetFunctionTraceSpanRequest {
