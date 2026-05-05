@@ -184,6 +184,42 @@ func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, key st
 	return nil, nil
 }
 
+func (m *mockShardForIterator) DebounceCreate(ctx context.Context, fnID uuid.UUID, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) DebounceUpdate(ctx context.Context, fnID uuid.UUID, key string, debounceID ulid.ULID, item []byte, ttl time.Duration, jobID string, now time.Time, eventTimestamp int64) (int64, DebounceUpdateStatus, error) {
+	return 0, DebounceUpdateOK, nil
+}
+
+func (m *mockShardForIterator) DebounceStartExecution(ctx context.Context, fnID uuid.UUID, key string, newDebounceID, debounceID ulid.ULID) (DebounceStartStatus, error) {
+	return DebounceStartStarted, nil
+}
+
+func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, fnID uuid.UUID, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockShardForIterator) DebounceGetItem(ctx context.Context, debounceID ulid.ULID) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) DebounceDeleteItems(ctx context.Context, debounceIDs ...ulid.ULID) error {
+	return nil
+}
+
+func (m *mockShardForIterator) DebounceDeleteMigratingFlag(ctx context.Context, debounceID ulid.ULID) error {
+	return nil
+}
+
+func (m *mockShardForIterator) DebounceGetPointer(ctx context.Context, fnID uuid.UUID, key string) (string, error) {
+	return "", nil
+}
+
+func (m *mockShardForIterator) DebounceDeletePointer(ctx context.Context, fnID uuid.UUID, key string) error {
+	return nil
+}
+
 func (m *mockShardForIterator) ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error {
 	return nil
 }

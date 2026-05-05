@@ -157,7 +157,96 @@ type QueueProcessor interface {
 	) (ItemLeaseConstraintCheckResult, error)
 }
 
+// SingletonOperations is the per-shard surface for singleton lock state.
+// Construct singleton clients against a shard resolved through ShardRegistry.
+type SingletonOperations interface {
+	// SingletonGetRunID returns the run ID currently holding the singleton
+	// lock for key, or nil if no lock is held.
+	SingletonGetRunID(ctx context.Context, key string) (*ulid.ULID, error)
+	// SingletonReleaseRunID atomically gets and deletes the singleton lock
+	// for key, returning the released run ID or nil if no lock was held.
+	SingletonReleaseRunID(ctx context.Context, key string) (*ulid.ULID, error)
+}
+
+// DebounceUpdateStatus describes the outcome of DebounceUpdate.
+type DebounceUpdateStatus int
+
+const (
+	// DebounceUpdateOK indicates the debounce was updated; the returned TTL
+	// (in seconds) is the new lifetime to requeue against.
+	DebounceUpdateOK DebounceUpdateStatus = iota
+	// DebounceUpdateInProgress indicates the debounce has begun executing
+	// or is just about to; the caller should retry.
+	DebounceUpdateInProgress
+	// DebounceUpdateOutOfOrder indicates a newer event has already updated
+	// the debounce; the caller should drop the update.
+	DebounceUpdateOutOfOrder
+	// DebounceUpdateNotFound indicates the timeout queue item is missing;
+	// the caller should enqueue a fresh timeout job.
+	DebounceUpdateNotFound
+)
+
+// DebounceStartStatus describes the outcome of DebounceStartExecution.
+type DebounceStartStatus int
+
+const (
+	// DebounceStartStarted indicates execution started successfully.
+	DebounceStartStarted DebounceStartStatus = iota
+	// DebounceStartMigrating indicates a concurrent migration disabled
+	// execution on this shard; the caller must abort.
+	DebounceStartMigrating
+)
+
+// DebounceOperations is the per-shard surface for debounce state. Each
+// debounce lives on a single shard alongside its timeout queue item; route
+// to the right shard via ShardRegistry before invoking these.
+type DebounceOperations interface {
+	// DebounceCreate atomically creates a new debounce for fnID/key. If a
+	// debounce already exists, it returns the existing debounce ID and
+	// no error.
+	DebounceCreate(ctx context.Context, fnID uuid.UUID, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (existingID *ulid.ULID, err error)
+
+	// DebounceUpdate atomically updates the currently pending debounce.
+	// On status DebounceUpdateOK, ttlSeconds is the new TTL to requeue
+	// against. Other statuses describe special outcomes; ttlSeconds is
+	// undefined for those.
+	DebounceUpdate(ctx context.Context, fnID uuid.UUID, key string, debounceID ulid.ULID, item []byte, ttl time.Duration, jobID string, now time.Time, eventTimestamp int64) (ttlSeconds int64, status DebounceUpdateStatus, err error)
+
+	// DebounceStartExecution atomically begins execution of a debounce,
+	// rotating the pointer to newDebounceID.
+	DebounceStartExecution(ctx context.Context, fnID uuid.UUID, key string, newDebounceID, debounceID ulid.ULID) (DebounceStartStatus, error)
+
+	// DebouncePrepareMigration atomically replaces the debounce pointer
+	// with fakeDebounceID to disable execution on this shard, returning
+	// the existing debounce ID and timeout (millis) so the caller can
+	// re-create the debounce on another shard. Returns (nil, 0, nil)
+	// when no debounce exists.
+	DebouncePrepareMigration(ctx context.Context, fnID uuid.UUID, key string, fakeDebounceID ulid.ULID) (existingID *ulid.ULID, timeoutMillis int64, err error)
+
+	// DebounceGetItem retrieves the serialized debounce item from the
+	// hash. Returns ErrDebounceNotFound when absent.
+	DebounceGetItem(ctx context.Context, debounceID ulid.ULID) ([]byte, error)
+
+	// DebounceDeleteItems removes one or more debounce items from the
+	// hash. A no-op on an empty list.
+	DebounceDeleteItems(ctx context.Context, debounceIDs ...ulid.ULID) error
+
+	// DebounceDeleteMigratingFlag clears the in-progress migration flag
+	// for debounceID.
+	DebounceDeleteMigratingFlag(ctx context.Context, debounceID ulid.ULID) error
+
+	// DebounceGetPointer reads the current debounce ID for fnID/key.
+	// Returns ErrDebounceNotFound when no debounce is active.
+	DebounceGetPointer(ctx context.Context, fnID uuid.UUID, key string) (string, error)
+
+	// DebounceDeletePointer removes the pointer for fnID/key.
+	DebounceDeletePointer(ctx context.Context, fnID uuid.UUID, key string) error
+}
+
 type ShardOperations interface {
+	SingletonOperations
+	DebounceOperations
+
 	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	PeekRandom(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
@@ -187,13 +276,6 @@ type ShardOperations interface {
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 	ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error
-
-	// SingletonGetRunID returns the run ID currently holding the singleton
-	// lock for key, or nil if no lock is held.
-	SingletonGetRunID(ctx context.Context, key string) (*ulid.ULID, error)
-	// SingletonReleaseRunID atomically gets and deletes the singleton lock
-	// for key, returning the released run ID or nil if no lock was held.
-	SingletonReleaseRunID(ctx context.Context, key string) (*ulid.ULID, error)
 
 	AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
 

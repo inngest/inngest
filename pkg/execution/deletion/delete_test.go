@@ -75,8 +75,7 @@ func TestDeleteManager(t *testing.T) {
 	batchManager := batch.NewRedisBatchManager(batchClient, queueManager)
 
 	// Create debounce manager
-	debounceClient := unshardedClient.Debounce()
-	debouncer := debounce.NewRedisDebouncer(debounceClient, shard, queueManager)
+	debouncer := debounce.NewRedisDebouncer(shard, queueManager)
 
 	// Create DeleteManager with all dependencies
 	deleteManager, err := NewDeleteManager(

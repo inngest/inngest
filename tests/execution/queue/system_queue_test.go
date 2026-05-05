@@ -99,9 +99,8 @@ func TestSystemQueueConfigs(t *testing.T) {
 		r.FlushAll()
 
 		debouncer, err := debounce.NewRedisDebouncerWithMigration(debounce.DebouncerOpts{
-			PrimaryDebounceClient: redis_state.NewDebounceClient(rc, redis_state.QueueDefaultKey),
-			PrimaryQueue:          q,
-			PrimaryQueueShard:     shard,
+			PrimaryQueue:      q,
+			PrimaryQueueShard: shard,
 			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 				return false
 			},

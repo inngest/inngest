@@ -403,7 +403,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
+	debouncer := debounce.NewRedisDebouncer(queueShard, rq)
 	croner := cron.NewManager(queueShard, rq, l)
 
 	sn := singleton.New(ctx, shardRegistry)
