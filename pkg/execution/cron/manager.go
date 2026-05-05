@@ -17,13 +17,13 @@ import (
 
 const (
 	// lead time for scheduling "cron" items.
-	defaultJitterMin = 0 * time.Millisecond
-	defaultJitterMax = 20 * time.Millisecond
+	defaultJitterMin = 5 * time.Second
+	defaultJitterMax = 15 * time.Second
 
 	// interval and lead time for scheduling "cron-health-check" items
-	// default: 20 seconds before the top of a minute
-	defaultHealthCheckLeadTimeSeconds = 20
-	defaultHealthCheckInterval        = time.Minute
+	// default: 50 seconds before the top of a minute
+	defaultHealthCheckLeadTimeSeconds = 50
+	defaultHealthCheckInterval        = 5 * time.Minute
 )
 
 type ManagerOpt func(c *managerOpt)
