@@ -509,7 +509,13 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
 	}
 	if err != nil {
-		return err
+		// Fail open on transient load errors (e.g. Redis timeout). Rejecting
+		// here would surface as HTTP 400 and abort an otherwise-valid run.
+		logger.StdlibLogger(ctx).Warn("checkpoint: failed to load queue item for dispatch validation; skipping",
+			"error", err,
+			"run_id", input.RunID,
+		)
+		return nil
 	}
 	// Fail open for queue items that pre-date the rollout.
 	if item.GenerationID == 0 {
