@@ -196,6 +196,8 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			// Unset the queue ref, too
 			t.requestCtx.QueueItemRef = ""
 			er.Ctx.QueueItemRef = ""
+			t.requestCtx.GenerationID = 0
+			er.Ctx.GenerationID = 0
 
 			// For each error, remove the stack from our tests.
 			for _, v := range er.Steps {
