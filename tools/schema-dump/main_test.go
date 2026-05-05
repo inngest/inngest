@@ -47,6 +47,9 @@ func TestNormalizePostgresDump(t *testing.T) {
 -- PostgreSQL database dump
 --
 
+-- Dumped from database version 16.13
+-- Dumped by pg_dump version 16.13
+
 SET statement_timeout = 0;
 SET client_encoding = 'UTF8';
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -70,6 +73,8 @@ CREATE INDEX idx_apps_id ON public.apps (id);
 
 	for _, unwanted := range []string{
 		"\\unrestrict",
+		"Dumped from database version",
+		"Dumped by pg_dump version",
 	} {
 		if strings.Contains(got, unwanted) {
 			t.Fatalf("normalized dump should not contain %q:\n%s", unwanted, got)

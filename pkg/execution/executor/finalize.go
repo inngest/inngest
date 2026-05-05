@@ -300,12 +300,7 @@ func (e *executor) buildDeferEvents(
 func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.FinalizeOpts) {
 	l := logger.StdlibLogger(ctx)
 
-	// XXX: can we use e.assignedQueueShard here?
-	shard, err := e.shardFinder(
-		ctx,
-		opts.Metadata.ID.Tenant.AccountID,
-		nil,
-	)
+	shard, err := e.shards.Resolve(ctx, opts.Metadata.ID.Tenant.AccountID, nil)
 	if err != nil {
 		return
 	}

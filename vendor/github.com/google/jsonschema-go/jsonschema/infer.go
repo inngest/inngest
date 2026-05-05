@@ -10,11 +10,16 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"math"
 	"math/big"
+	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"time"
 )
+
+const debugEnv = "JSONSCHEMAGODEBUG"
 
 // ForOptions are options for the [For] and [ForType] functions.
 type ForOptions struct {
@@ -31,6 +36,7 @@ type ForOptions struct {
 	// ensure uniqueness).
 	// Types in this map override the default translations, as described
 	// in [For]'s documentation.
+	// PropertyOrder defined in these schemas will not be used in [For] or [ForType].
 	TypeSchemas map[reflect.Type]*Schema
 }
 
@@ -51,8 +57,9 @@ type ForOptions struct {
 //     schema for additionalProperties.
 //   - Structs have schema type "object", and disallow additionalProperties.
 //     Their properties are derived from exported struct fields, using the
-//     struct field JSON name. Fields that are marked "omitempty" are
+//     struct field JSON name. Fields that are marked "omitempty" or "omitzero" are
 //     considered optional; all other fields become required properties.
+//     For structs, the PropertyOrder will be set to the field order.
 //   - Some types in the standard library that implement json.Marshaler
 //     translate to schemas that match the values to which they marshal.
 //     For example, [time.Time] translates to the schema for strings.
@@ -89,6 +96,9 @@ func For[T any](opts *ForOptions) (*Schema, error) {
 
 // ForType is like [For], but takes a [reflect.Type]
 func ForType(t reflect.Type, opts *ForOptions) (*Schema, error) {
+	if opts == nil {
+		opts = &ForOptions{}
+	}
 	schemas := maps.Clone(initialSchemaMap)
 	// Add types from the options. They override the default ones.
 	maps.Copy(schemas, opts.TypeSchemas)
@@ -97,6 +107,11 @@ func ForType(t reflect.Type, opts *ForOptions) (*Schema, error) {
 		return nil, fmt.Errorf("ForType(%s): %w", t, err)
 	}
 	return s, nil
+}
+
+// Helper to create a *float64 pointer from a value
+func f64Ptr(f float64) *float64 {
+	return &f
 }
 
 func forType(t reflect.Type, seen map[reflect.Type]bool, ignore bool, schemas map[reflect.Type]*Schema) (*Schema, error) {
@@ -119,7 +134,16 @@ func forType(t reflect.Type, seen map[reflect.Type]bool, ignore bool, schemas ma
 	}
 
 	if s := schemas[t]; s != nil {
-		return s.CloneSchemas(), nil
+		cloned := s.CloneSchemas()
+		if os.Getenv(debugEnv) != "typeschemasnull=1" && allowNull {
+			if cloned.Type != "" {
+				cloned.Types = []string{"null", cloned.Type}
+				cloned.Type = ""
+			} else if !slices.Contains(cloned.Types, "null") {
+				cloned.Types = append([]string{"null"}, cloned.Types...)
+			}
+		}
+		return cloned, nil
 	}
 
 	var (
@@ -131,10 +155,42 @@ func forType(t reflect.Type, seen map[reflect.Type]bool, ignore bool, schemas ma
 	case reflect.Bool:
 		s.Type = "boolean"
 
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Uintptr:
+	case reflect.Int, reflect.Int64:
 		s.Type = "integer"
+
+	case reflect.Uint, reflect.Uint64, reflect.Uintptr:
+		s.Type = "integer"
+		s.Minimum = f64Ptr(0)
+
+	case reflect.Int8:
+		s.Type = "integer"
+		s.Minimum = f64Ptr(math.MinInt8)
+		s.Maximum = f64Ptr(math.MaxInt8)
+
+	case reflect.Uint8:
+		s.Type = "integer"
+		s.Minimum = f64Ptr(0)
+		s.Maximum = f64Ptr(math.MaxUint8)
+
+	case reflect.Int16:
+		s.Type = "integer"
+		s.Minimum = f64Ptr(math.MinInt16)
+		s.Maximum = f64Ptr(math.MaxInt16)
+
+	case reflect.Uint16:
+		s.Type = "integer"
+		s.Minimum = f64Ptr(0)
+		s.Maximum = f64Ptr(math.MaxUint16)
+
+	case reflect.Int32:
+		s.Type = "integer"
+		s.Minimum = f64Ptr(math.MinInt32)
+		s.Maximum = f64Ptr(math.MaxInt32)
+
+	case reflect.Uint32:
+		s.Type = "integer"
+		s.Minimum = f64Ptr(0)
+		s.Maximum = f64Ptr(math.MaxUint32)
 
 	case reflect.Float32, reflect.Float64:
 		s.Type = "number"
@@ -162,11 +218,19 @@ func forType(t reflect.Type, seen map[reflect.Type]bool, ignore bool, schemas ma
 		}
 
 	case reflect.Slice, reflect.Array:
-		s.Type = "array"
-		s.Items, err = forType(t.Elem(), seen, ignore, schemas)
+		if os.Getenv(debugEnv) != "typeschemasnull=1" && t.Kind() == reflect.Slice {
+			s.Types = []string{"null", "array"}
+		} else {
+			s.Type = "array"
+		}
+		itemsSchema, err := forType(t.Elem(), seen, ignore, schemas)
 		if err != nil {
 			return nil, fmt.Errorf("computing element schema: %v", err)
 		}
+		if itemsSchema == nil {
+			return nil, nil
+		}
+		s.Items = itemsSchema
 		if ignore && s.Items == nil {
 			// Ignore if the element type is invalid.
 			return nil, nil
@@ -183,17 +247,77 @@ func forType(t reflect.Type, seen map[reflect.Type]bool, ignore bool, schemas ma
 		s.Type = "object"
 		// no additional properties are allowed
 		s.AdditionalProperties = falseSchema()
+
+		// If skipPath is non-nil, it is path to an anonymous field whose
+		// schema has been replaced by a known schema.
+		var skipPath []int
 		for _, field := range reflect.VisibleFields(t) {
+			if s.Properties == nil {
+				s.Properties = make(map[string]*Schema)
+			}
 			if field.Anonymous {
+				override := schemas[field.Type]
+				if override != nil {
+					// Type must be object, and only properties can be set.
+					if override.Type != "object" {
+						return nil, fmt.Errorf(`custom schema for embedded struct must have type "object", got %q`,
+							override.Type)
+					}
+					// Check that all keywords relevant for objects are absent, except properties.
+					ov := reflect.ValueOf(override).Elem()
+					for _, sfi := range schemaFieldInfos {
+						if sfi.sf.Name == "Type" || sfi.sf.Name == "Properties" {
+							continue
+						}
+						fv := ov.FieldByIndex(sfi.sf.Index)
+						if !fv.IsZero() {
+							return nil, fmt.Errorf(`overrides for embedded fields can have only "Type" and "Properties"; this has %q`, sfi.sf.Name)
+						}
+					}
+
+					skipPath = field.Index
+					keys := make([]string, 0, len(override.Properties))
+					for k := range override.Properties {
+						keys = append(keys, k)
+					}
+					slices.Sort(keys)
+					for _, name := range keys {
+						if _, ok := s.Properties[name]; !ok {
+							s.Properties[name] = override.Properties[name].CloneSchemas()
+							s.PropertyOrder = append(s.PropertyOrder, name)
+						}
+					}
+				}
 				continue
+			}
+
+			// Check to see if this field has been promoted from a replaced anonymous
+			// type.
+			if skipPath != nil {
+				skip := false
+				if len(field.Index) >= len(skipPath) {
+					skip = true
+					for i, index := range skipPath {
+						if field.Index[i] != index {
+							// If we're no longer in a subfield.
+							skip = false
+							break
+						}
+					}
+				}
+				if skip {
+					continue
+				} else {
+					// Anonymous fields are followed immediately by their promoted fields.
+					// Once we encounter a field that *isn't* promoted, we can stop
+					// checking.
+					skipPath = nil
+				}
 			}
 
 			info := fieldJSONInfo(field)
 			if info.omit {
 				continue
-			}
-			if s.Properties == nil {
-				s.Properties = make(map[string]*Schema)
 			}
 			fs, err := forType(field.Type, seen, ignore, schemas)
 			if err != nil {
@@ -213,9 +337,33 @@ func forType(t reflect.Type, seen map[reflect.Type]bool, ignore bool, schemas ma
 				fs.Description = tag
 			}
 			s.Properties[info.name] = fs
+
+			s.PropertyOrder = append(s.PropertyOrder, info.name)
+
 			if !info.settings["omitempty"] && !info.settings["omitzero"] {
 				s.Required = append(s.Required, info.name)
 			}
+		}
+
+		// Remove PropertyOrder duplicates, keeping the last occurrence
+		if len(s.PropertyOrder) > 1 {
+			seen := make(map[string]bool)
+			// Create a slice to hold the cleaned order (capacity = current length)
+			cleaned := make([]string, 0, len(s.PropertyOrder))
+
+			// Iterate backwards
+			for i := len(s.PropertyOrder) - 1; i >= 0; i-- {
+				name := s.PropertyOrder[i]
+				if !seen[name] {
+					cleaned = append(cleaned, name)
+					seen[name] = true
+				}
+			}
+
+			// Since we collected them backwards, we need to reverse the result
+			// to restore the correct order.
+			slices.Reverse(cleaned)
+			s.PropertyOrder = cleaned
 		}
 
 	default:
@@ -239,7 +387,11 @@ func init() {
 	ss := &Schema{Type: "string"}
 	initialSchemaMap[reflect.TypeFor[time.Time]()] = ss
 	initialSchemaMap[reflect.TypeFor[slog.Level]()] = ss
-	initialSchemaMap[reflect.TypeFor[big.Int]()] = &Schema{Types: []string{"null", "string"}}
+	if os.Getenv(debugEnv) == "typeschemasnull=1" {
+		initialSchemaMap[reflect.TypeFor[big.Int]()] = &Schema{Types: []string{"null", "string"}}
+	} else {
+		initialSchemaMap[reflect.TypeFor[big.Int]()] = ss
+	}
 	initialSchemaMap[reflect.TypeFor[big.Rat]()] = ss
 	initialSchemaMap[reflect.TypeFor[big.Float]()] = ss
 }

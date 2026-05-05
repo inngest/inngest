@@ -94,9 +94,9 @@ func WithServiceLogger(l logger.Logger) func(s *svc) {
 	}
 }
 
-func WithServiceShardSelector(sl queue.ShardSelector) func(s *svc) {
+func WithServiceShardRegistry(shards queue.ShardRegistry) func(s *svc) {
 	return func(s *svc) {
-		s.findShard = sl
+		s.shards = shards
 	}
 }
 
@@ -123,9 +123,8 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	for _, o := range opts {
 		o(svc)
 	}
-	// don't proceed if shard selector is not set
-	if svc.findShard == nil {
-		panic("shard selector need to be provided for executor service")
+	if svc.shards == nil {
+		panic("shard registry must be provided for executor service")
 	}
 
 	return svc
@@ -141,16 +140,15 @@ type svc struct {
 	queue queue.Queue
 	// exec runs the specific actions.
 	exec          execution.Executor
-	debouncer     debounce.Debouncer
-	batcher       batch.BatchManager
-	croner        cron.CronManager
-	log           logger.Logger
-	shardSelector queue.ShardSelector
+	debouncer debounce.Debouncer
+	batcher   batch.BatchManager
+	croner    cron.CronManager
+	log       logger.Logger
 
 	wg sync.WaitGroup
 
-	opts      []ExecutorOpt
-	findShard queue.ShardSelector
+	opts   []ExecutorOpt
+	shards queue.ShardRegistry
 
 	publisher pubsub.Publisher
 
@@ -746,7 +744,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
@@ -847,7 +845,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		return fmt.Errorf("expected queue manager for cancellation")
 	}
 
-	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
@@ -1178,7 +1176,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 
 	// Retrieve current queue shard for sleep item. The account might have been migrated
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
-	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
+	shard, err := s.shards.Resolve(ctx, item.Identifier.AccountID, nil)
 	if err != nil {
 		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
 	}

@@ -15,7 +15,7 @@ plugins:
     out: docs/openapi/v2
     opt:
       - allow_delete_body=true
-      - json_names_for_fields=false
+      - json_names_for_fields=true
   - plugin: connect-go
     out: proto/gen
     opt: paths=source_relative

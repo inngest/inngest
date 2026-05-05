@@ -89,3 +89,21 @@ jobs:
           else
             npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public
           fi
+
+  linear-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # We block on goreleaser to not track any failed releases
+    needs: [check-release-type, goreleaser]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # required for commit history
+
+      - uses: linear/linear-release-action@v0
+        if: needs.check-release-type.outputs.prerelease == ''
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
+          version: ${{ github.ref_name }}
+          command: complete

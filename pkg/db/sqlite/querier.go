@@ -159,6 +159,17 @@ func (sq *sqliteQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*d
 	return functionFromSQLite(r), nil
 }
 
+func (sq *sqliteQuerier) GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*db.Function, error) {
+	r, err := sq.q.GetFunctionByAppNameAndSlug(ctx, sqlc.GetFunctionByAppNameAndSlugParams{
+		Name: appName,
+		Slug: slug,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return functionFromSQLite(r), nil
+}
+
 func (sq *sqliteQuerier) GetFunctions(ctx context.Context) ([]*db.Function, error) {
 	rows, err := sq.q.GetFunctions(ctx)
 	if err != nil {
@@ -167,8 +178,8 @@ func (sq *sqliteQuerier) GetFunctions(ctx context.Context) ([]*db.Function, erro
 	return convertSlice(rows, functionFromSQLite), nil
 }
 
-func (sq *sqliteQuerier) InsertFunction(ctx context.Context, arg db.InsertFunctionParams) (*db.Function, error) {
-	r, err := sq.q.InsertFunction(ctx, sqlc.InsertFunctionParams{
+func (sq *sqliteQuerier) UpsertFunction(ctx context.Context, arg db.UpsertFunctionParams) (*db.Function, error) {
+	r, err := sq.q.UpsertFunction(ctx, sqlc.UpsertFunctionParams{
 		ID: arg.ID, AppID: arg.AppID, Name: arg.Name,
 		Slug: arg.Slug, Config: arg.Config, CreatedAt: arg.CreatedAt,
 	})

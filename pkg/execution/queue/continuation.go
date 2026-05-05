@@ -120,7 +120,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name(),
+					"queue_shard": q.Shard().Name(),
 					"type":        "continuation",
 					"has_error":   err != nil,
 				},
@@ -156,6 +156,7 @@ func (q *queueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPa
 		q.removeShadowContinue(ctx, p, true)
 		return
 	}
+	shard := q.Shard()
 
 	q.shadowContinuesLock.Lock()
 	defer q.shadowContinuesLock.Unlock()
@@ -164,11 +165,11 @@ func (q *queueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPa
 	// beyond capacity.
 	if ctr == 1 {
 		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "max_capacity"}})
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name(), "op": "max_capacity"}})
 			return
 		}
 		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "cooldown"}})
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name(), "op": "cooldown"}})
 			return
 		}
 
@@ -182,7 +183,7 @@ func (q *queueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPa
 		// is higher.  This ensures that we always have the highest continuation
 		// count stored for queue processing.
 		q.shadowContinues[p.PartitionID] = ShadowContinuation{ShadowPart: p, Count: ctr}
-		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "added"}})
+		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name(), "op": "added"}})
 	}
 }
 
@@ -197,7 +198,7 @@ func (q *queueProcessor) removeShadowContinue(ctx context.Context, p *QueueShado
 	q.shadowContinuesLock.Lock()
 	defer q.shadowContinuesLock.Unlock()
 
-	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name(), "op": "removed"}})
+	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.Shard().Name(), "op": "removed"}})
 
 	delete(q.shadowContinues, p.PartitionID)
 
@@ -231,7 +232,7 @@ func (q *queueProcessor) scanShadowContinuations(ctx context.Context) error {
 
 			_, err := DurationWithTags(
 				ctx,
-				q.primaryQueueShard.Name(),
+				q.Shard().Name(),
 				"shadow_partition_process_duration",
 				q.Clock().Now(),
 				func(ctx context.Context) (any, error) {

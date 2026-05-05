@@ -368,16 +368,14 @@ func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
 	}
 }
 
-func WithAssignedQueueShard(shard queue.QueueShard) ExecutorOpt {
+// WithShardRegistry wires the executor up to the queue's shard registry.
+// Replaces the old WithAssignedQueueShard + WithShardSelector pair: the
+// registry exposes both the leased primary (Primary) and per-account
+// resolution (Resolve) so the executor doesn't need to track them
+// independently.
+func WithShardRegistry(shards queue.ShardRegistry) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).assignedQueueShard = shard
-		return nil
-	}
-}
-
-func WithShardSelector(selector queue.ShardSelector) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).shardFinder = selector
+		e.(*executor).shards = shards
 		return nil
 	}
 }
@@ -516,8 +514,7 @@ type executor struct {
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
 
-	assignedQueueShard queue.QueueShard
-	shardFinder        queue.ShardSelector
+	shards queue.ShardRegistry
 
 	traceReader    cqrs.TraceReader
 	tracerProvider tracing.TracerProvider
@@ -3150,7 +3147,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if q, ok := e.queue.(queue.QueueManager); ok {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
-			shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, nil)
+			shard, err := e.shards.Resolve(ctx, md.ID.Tenant.AccountID, nil)
 			if err != nil {
 				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
 			}
