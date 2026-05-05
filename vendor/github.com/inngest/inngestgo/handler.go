@@ -855,6 +855,9 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 			case result := <-results:
 				resp, ops, invokeErr = result.resp, result.ops, result.err
 				goto handleResponse
+			case <-r.Context().Done():
+				invokeErr = r.Context().Err()
+				goto handleResponse
 			case <-ticker.C:
 				_, _ = w.Write([]byte(" "))
 				if flusher, ok := w.(http.Flusher); ok {
