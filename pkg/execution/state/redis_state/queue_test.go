@@ -1729,14 +1729,12 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 
 		shardMap := mapFromShards(yoloShard, defaultShard)
 
+		registry, err := osqueue.NewShardRegistry(shardMap, osqueue.WithShardSelector(alwaysSelectShard(defaultShard)), osqueue.WithPrimary(defaultShard))
+		require.NoError(t, err)
 		q, err := osqueue.New(
 			context.Background(),
 			"test-queue",
-			defaultShard,
-			shardMap,
-			func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
-				return defaultShard, nil
-			},
+			registry,
 		)
 		require.NoError(t, err)
 
@@ -2141,28 +2139,24 @@ func TestMigrate(t *testing.T) {
 
 			shards := mapFromShards(shard1, shard2)
 
+			registry1, err := osqueue.NewShardRegistry(shards, osqueue.WithShardSelector(alwaysSelectShard(shard1)), osqueue.WithPrimary(shard1))
+			require.NoError(t, err)
 			q1, err := osqueue.New(
 				context.Background(),
 				"q1",
-				shard1,
-				shards,
-				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
-					return shard1, nil
-				},
+				registry1,
 				opts...,
 			)
 			require.NoError(t, err)
 
 			require.Equal(t, idempotencyTTL, q1.QueueOptions.IdempotencyTTL)
 
+			registry2, err := osqueue.NewShardRegistry(shards, osqueue.WithShardSelector(alwaysSelectShard(shard2)), osqueue.WithPrimary(shard2))
+			require.NoError(t, err)
 			q2, err := osqueue.New(
 				context.Background(),
 				"q2",
-				shard2,
-				shards,
-				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
-					return shard2, nil
-				},
+				registry2,
 				opts...,
 			)
 			require.NoError(t, err)

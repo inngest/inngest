@@ -23,7 +23,7 @@ type TestAPI struct {
 }
 
 type Options struct {
-	QueueShardSelector queue.ShardSelector
+	QueueShards        queue.ShardRegistry
 	Queue              queue.Queue
 	Executor           execution.Executor
 	StateManager       statev2.RunService
@@ -85,7 +85,7 @@ func (t *TestAPI) GetQueueSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shard, err := t.options.QueueShardSelector(ctx, parsedAccountId, nil)
+	shard, err := t.options.QueueShards.Resolve(ctx, parsedAccountId, nil)
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))

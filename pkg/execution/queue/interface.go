@@ -54,12 +54,7 @@ type PartitionLeaseOptions struct{}
 
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
 
-type ShardAssingmentManager interface {
-	SetPrimaryShard(ctx context.Context, queueShard QueueShard)
-}
-
 type QueueManager interface {
-	ShardAssingmentManager
 	JobQueueReader
 	Queue
 
@@ -192,6 +187,13 @@ type ShardOperations interface {
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 	ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error
+
+	// SingletonGetRunID returns the run ID currently holding the singleton
+	// lock for key, or nil if no lock is held.
+	SingletonGetRunID(ctx context.Context, key string) (*ulid.ULID, error)
+	// SingletonReleaseRunID atomically gets and deletes the singleton lock
+	// for key, returning the released run ID or nil if no lock was held.
+	SingletonReleaseRunID(ctx context.Context, key string) (*ulid.ULID, error)
 
 	AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
 

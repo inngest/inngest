@@ -180,7 +180,8 @@ function traceToBarData(
   trace: Trace,
   orgName?: string,
   rootStatus?: string,
-  runStartedAtMs?: number | null
+  runStartedAtMs?: number | null,
+  functionSlug?: string
 ): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
   // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
@@ -218,6 +219,7 @@ function traceToBarData(
         variantSelected: experimentMd.values.variant_selected,
         availableVariants: experimentMd.values.available_variants,
         variantWeights: experimentMd.values.variant_weights,
+        functionSlug,
       }
     : undefined;
 
@@ -228,7 +230,7 @@ function traceToBarData(
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
     children: trace.childrenSpans?.map((child) =>
-      traceToBarData(child, orgName, rootStatus, runStartedAtMs)
+      traceToBarData(child, orgName, rootStatus, runStartedAtMs, functionSlug)
     ),
     timingBreakdown,
     httpTimingBreakdown,
@@ -250,9 +252,10 @@ export function traceToTimelineData(
     runID: string;
     orgName?: string;
     leftWidth?: number;
+    functionSlug?: string;
   }
 ): TimelineData {
-  const { orgName, leftWidth = TIMELINE_CONSTANTS.DEFAULT_LEFT_WIDTH } = options;
+  const { orgName, leftWidth = TIMELINE_CONSTANTS.DEFAULT_LEFT_WIDTH, functionSlug } = options;
 
   // Calculate min/max time from the entire trace tree
   let minTime = new Date(trace.queuedAt);
@@ -276,7 +279,8 @@ export function traceToTimelineData(
     { ...trace, name: 'Run', isRoot: true },
     orgName,
     trace.status,
-    runStartedAtMs
+    runStartedAtMs,
+    functionSlug
   );
 
   // Give the Run bar a timingBreakdown matching the step-level inngest/execution split.

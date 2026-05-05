@@ -23,6 +23,7 @@ import (
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m,
 		goleak.IgnoreTopFunction("github.com/karlseguin/ccache/v2.(*Cache).worker"),
+		goleak.IgnoreTopFunction("github.com/redis/rueidis.(*call).LazyDo.func1"),
 	)
 }
 
