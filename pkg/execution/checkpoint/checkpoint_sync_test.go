@@ -923,21 +923,25 @@ func TestCheckpointSyncSteps_RunComplete(t *testing.T) {
 				}),
 			).Once()
 
+			// OnFnFinished is dispatched in a goroutine; signal via a channel
+			fnFinished := make(chan struct{}, 1)
 			mocks.metrics.On(
 				"OnFnFinished",
 				mock.Anything,
 				mock.AnythingOfType("checkpoint.MetricCardinality"),
 				enums.RunStatusCompleted,
-			).Once()
+			).Run(func(args mock.Arguments) {
+				fnFinished <- struct{}{}
+			}).Once()
 
 			err = testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 			require.NoError(err)
 
-			// Wait briefly for the goroutine that fires OnFnFinished — it's
-			// dispatched with `go` and otherwise races AssertExpectations.
-			require.Eventually(func() bool {
-				return mocks.metrics.AssertCalled(t, "OnFnFinished", mock.Anything, mock.Anything, enums.RunStatusCompleted)
-			}, time.Second, 10*time.Millisecond)
+			select {
+			case <-fnFinished:
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for OnFnFinished")
+			}
 
 			mocks.executor.AssertExpectations(t)
 			mocks.metrics.AssertExpectations(t)
