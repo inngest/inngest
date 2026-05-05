@@ -311,3 +311,53 @@ func TestNonLazyOpCount(t *testing.T) {
 		})
 	}
 }
+
+func TestOpcodeGroups_IDs_ExcludesLazyOps(t *testing.T) {
+	cases := []struct {
+		name  string
+		input []*state.GeneratorOpcode
+		want  []string
+	}{
+		{
+			name:  "all lazy yields no IDs",
+			input: []*state.GeneratorOpcode{{Op: enums.OpcodeDeferAdd, ID: "1"}, {Op: enums.OpcodeDeferCancel, ID: "2"}},
+			want:  []string{},
+		},
+		{
+			name:  "StepRun + DeferAdd drops the lazy ID",
+			input: []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun, ID: "step-1"}, {Op: enums.OpcodeDeferAdd, ID: "defer-1"}},
+			want:  []string{"step-1"},
+		},
+		{
+			name: "StepPlanned + DeferAdd + DeferCancel drops both lazy IDs",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeStepPlanned, ID: "plan-1"},
+				{Op: enums.OpcodeDeferAdd, ID: "defer-add-1"},
+				{Op: enums.OpcodeDeferCancel, ID: "defer-cancel-1"},
+			},
+			want: []string{"plan-1"},
+		},
+		{
+			name: "WaitForEvent (priority) + DeferAdd (other) drops the lazy ID",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeWaitForEvent, ID: "wait-1"},
+				{Op: enums.OpcodeDeferAdd, ID: "defer-1"},
+			},
+			want: []string{"wait-1"},
+		},
+		{
+			name: "no lazy ops: all IDs returned in priority-then-other order",
+			input: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeStepRun, ID: "step-1"},
+				{Op: enums.OpcodeWaitForEvent, ID: "wait-1"},
+			},
+			want: []string{"wait-1", "step-1"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := opGroups(tc.input).NonLazyIDs()
+			require.ElementsMatch(t, tc.want, got)
+		})
+	}
+}

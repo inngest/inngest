@@ -456,11 +456,6 @@ func TestDeferAdd(t *testing.T) {
 			r.NoError(err)
 			r.Len(defers, 1)
 			r.Equal(expected, defers[op.ID])
-
-			steps, err := infra.smv2.LoadSteps(ctx, runID)
-			r.NoError(err)
-			r.Equal(json.RawMessage("null"), steps[op.ID],
-				"DeferAdd should memoize the step with a null payload")
 		})
 	}
 }
@@ -785,4 +780,105 @@ func TestDeferCancel_BareOpEnqueuesDiscovery(t *testing.T) {
 	r.NoError(err)
 	r.Equal(enums.DeferStatusAborted, defers[deferStepID].ScheduleStatus,
 		"defer status should be Cancelled even on bare-op path")
+}
+
+// pendingCapturingState wraps a real RunService and captures every SavePending
+// call so tests can assert on what the executor handed off to the state layer.
+// All other methods pass through.
+type pendingCapturingState struct {
+	statev2.RunService
+	mu       sync.Mutex
+	captured [][]string
+}
+
+func (s *pendingCapturingState) SavePending(ctx context.Context, id statev2.ID, pending []string) error {
+	s.mu.Lock()
+	s.captured = append(s.captured, append([]string(nil), pending...))
+	s.mu.Unlock()
+	return s.RunService.SavePending(ctx, id, pending)
+}
+
+func (s *pendingCapturingState) calls() [][]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([][]string, len(s.captured))
+	for i, c := range s.captured {
+		out[i] = append([]string(nil), c...)
+	}
+	return out
+}
+
+func TestParallelPlanWithDeferAdd_PendingExcludesLazyOps(t *testing.T) {
+	// Ensure that lazy ops do not count toward the parallel plan. This is
+	// critical because lazy ops do not decrement the pending step count, so
+	// incrementing the pending step count results in a hanging run
+
+	r := require.New(t)
+	infra := newDeferTestInfra(t)
+	ctx := infra.ctx
+
+	const (
+		plannedStepID = "planned-step"
+		deferStepID   = "defer-add-step"
+	)
+
+	spy := &pendingCapturingState{RunService: infra.smv2}
+
+	driver := &mockDriverV1{
+		t: t,
+		response: &state.DriverResponse{
+			StatusCode: 206,
+			// ShouldCoalesceParallelism returns true for >= 2; required for
+			// the executor to invoke SavePending.
+			RequestVersion: 2,
+			Generator: []*state.GeneratorOpcode{
+				{Op: enums.OpcodeStepPlanned, ID: plannedStepID, Name: plannedStepID},
+				{
+					Op: enums.OpcodeDeferAdd,
+					ID: deferStepID,
+					Opts: map[string]any{
+						"fn_slug": "onDefer-score",
+						"input":   map[string]any{},
+					},
+				},
+			},
+		},
+	}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+		return infra.queueShard, nil
+	}
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(spy),
+		executor.WithPauseManager(infra.pauseMgr),
+		executor.WithQueue(infra.rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(infra.loader),
+		executor.WithAssignedQueueShard(infra.queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithDriverV1(driver),
+	)
+	r.NoError(err)
+
+	run := infra.scheduleRun(t, exec)
+
+	_, err = exec.Execute(ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID,
+	}, queue.Item{
+		WorkspaceID: infra.wsID,
+		Kind:        queue.KindStart,
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: plannedStepID}},
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: plannedStepID})
+	r.NoError(err)
+
+	calls := spy.calls()
+	r.NotEmpty(calls,
+		"this test must exercise the SavePending path; if it stops firing, the regression guard becomes vacuous and the test setup needs revisiting (check hasPlanOp + ShouldCoalesceParallelism conditions)")
+
+	for _, ids := range calls {
+		r.NotContains(ids, deferStepID,
+			"lazy op IDs (DeferAdd, DeferCancel) must not enter the pending set; got %v", ids)
+	}
 }

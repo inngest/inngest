@@ -87,11 +87,17 @@ func (g OpcodeGroups) All() []OpcodeGroup {
 	return []OpcodeGroup{g.PriorityGroup, g.OtherGroup}
 }
 
-// IDs returns a list of all step IDs from opcodes in all groups.
-func (g OpcodeGroups) IDs() []string {
+// NonLazyIDs returns the step IDs of "non-lazy" op. Distinguishing between lazy
+// and non-lazy ops is important because lazy ops do not have their own queue
+// items. This lack of queue items is critical for things like tracking pending
+// steps
+func (g OpcodeGroups) NonLazyIDs() []string {
 	ids := []string{}
 	for _, group := range g.All() {
 		for _, op := range group.Opcodes {
+			if enums.OpcodeIsLazy(op.Op) {
+				continue
+			}
 			ids = append(ids, op.ID)
 		}
 	}

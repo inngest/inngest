@@ -318,12 +318,12 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		case enums.OpcodeDeferAdd:
-			if err := c.saveDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+			if err := c.saveDeferFromOp(ctx, l, input.Metadata.ID, op); err != nil {
 				return err
 			}
 
 		case enums.OpcodeDeferCancel:
-			if err := c.cancelDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+			if err := c.cancelDeferFromOp(ctx, l, input.Metadata.ID, op); err != nil {
 				return err
 			}
 
@@ -467,12 +467,12 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
 
 		case enums.OpcodeDeferAdd:
-			if err := c.saveDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+			if err := c.saveDeferFromOp(ctx, l, md.ID, op); err != nil {
 				return err
 			}
 
 		case enums.OpcodeDeferCancel:
-			if err := c.cancelDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+			if err := c.cancelDeferFromOp(ctx, l, md.ID, op); err != nil {
 				return err
 			}
 
@@ -548,20 +548,9 @@ func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result ap
 	})
 }
 
-// cancelDeferFromOp memoizes the cancel step (with null data) and flips the
-// target Defer's ScheduleStatus to Cancelled. Mirrors the executor's
-// handleGeneratorDeferCancel without enqueueing a discovery step (the SDK is
-// still driving the run).
-func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
-	if !runComplete {
-		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
-			!errors.Is(err, state.ErrDuplicateResponse) &&
-			!errors.Is(err, state.ErrIdempotentResponse) {
-			l.Error("error saving checkpointed DeferCancel step state", "error", err)
-			return fmt.Errorf("failed to save DeferCancel step %s: %w", op.ID, err)
-		}
-	}
-
+// cancelDeferFromOp flips the target Defer's ScheduleStatus to Cancelled.
+// Similar to the executor's handleGeneratorDeferCancel.
+func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode) error {
 	opts, err := op.DeferCancelOpts()
 	if err != nil {
 		l.Error("error parsing DeferCancel opts in checkpoint", "error", err)
@@ -576,20 +565,7 @@ func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id
 	return nil
 }
 
-// saveDeferFromOp memoizes the step (with null data) and persists a Defer
-// record for an OpcodeDeferAdd observed during checkpointing. Mirrors the
-// executor's handleGeneratorDeferAdd, without enqueueing a discovery step
-// (the SDK is still driving the run).
-func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
-	if !runComplete {
-		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
-			!errors.Is(err, state.ErrDuplicateResponse) &&
-			!errors.Is(err, state.ErrIdempotentResponse) {
-			l.Error("error saving checkpointed DeferAdd step state", "error", err)
-			return fmt.Errorf("failed to save DeferAdd step %s: %w", op.ID, err)
-		}
-	}
-
+func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode) error {
 	opts, err := op.DeferAddOpts()
 	if err != nil {
 		l.Error("error parsing DeferAdd opts in checkpoint", "error", err)

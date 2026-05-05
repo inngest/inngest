@@ -661,7 +661,6 @@ func TestCheckpointSyncSteps_DeferAdd(t *testing.T) {
 
 	mocks, testData := setupSyncCheckpointTest(t, op)
 
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-defer", []byte("null")).Return(false, nil)
 	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
 		return d.FnSlug == "onDefer-score" &&
 			d.HashedID == "step-defer" &&
@@ -683,13 +682,12 @@ func TestCheckpointSyncSteps_DeferAdd(t *testing.T) {
 	mocks.executor.AssertExpectations(t)
 }
 
-// TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep asserts that when
-// the same batch also contains a RunComplete, SaveStep is elided (we're about
-// to delete state via Finalize anyway). SaveDefer still runs so Finalize's
-// LoadDefers can read the record before deletion. ForceStepPlan must NOT
-// trigger because [DeferAdd, RunComplete] has only one non-lazy op — DeferAdd
-// is a lazy op piggybacked onto RunComplete.
-func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
+// TestCheckpointSyncSteps_DeferAdd_BundledWithRunComplete asserts that
+// [DeferAdd, RunComplete] in a single batch persists the Defer (so
+// Finalize's LoadDefers can read it before state deletion) and invokes
+// Finalize. ForceStepPlan must NOT trigger because the batch has only one
+// non-lazy op — DeferAdd is lazy and piggybacks onto RunComplete.
+func TestCheckpointSyncSteps_DeferAdd_BundledWithRunComplete(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
@@ -711,8 +709,8 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 
 	mocks, testData := setupSyncCheckpointTest(t, ops...)
 
-	// No SaveStep for the defer (runComplete=true optimization).
-	// SaveDefer still runs so Finalize can read it.
+	// SaveDefer must run before Finalize (which deletes state) so the
+	// Defer record is readable by Finalize's LoadDefers call.
 	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
 		return d.HashedID == "step-defer" && d.FnSlug == "onDefer-score"
 	})).Return(nil)
@@ -731,7 +729,6 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteSkipsSaveStep(t *testing.T) {
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.NoError(err)
 
-	mocks.state.AssertNotCalled(t, "SaveStep", ctx, testData.metadata.ID, "step-defer", mock.Anything)
 	mocks.state.AssertNotCalled(t, "UpdateMetadata", mock.Anything, mock.Anything, mock.Anything)
 
 	mocks.state.AssertExpectations(t)
@@ -817,8 +814,6 @@ func TestCheckpointSyncSteps_DeferCancel(t *testing.T) {
 
 	mocks, testData := setupSyncCheckpointTest(t, op)
 
-	// The cancel step memoizes itself (cancel's own hash, not the target's).
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
 	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
 
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
@@ -847,11 +842,6 @@ func TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID(t *testing.T) {
 	}
 
 	mocks, testData := setupSyncCheckpointTest(t, op)
-
-	// SaveStep runs before validation in the current sync handler, so even
-	// the error path memoizes the cancel step. Pin that ordering: a regression
-	// that moved validation earlier would silently violate it.
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
 
 	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 	require.Error(err)

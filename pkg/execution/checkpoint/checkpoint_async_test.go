@@ -238,9 +238,10 @@ func TestAsyncStepWithMetadataCreatesMetadataSpans(t *testing.T) {
 // "cannot checkpoint opcode" for OpcodeRunComplete (see checkpoint.go).
 
 // TestCheckpointAsyncSteps_DeferAdd asserts that the async checkpoint path
-// handles OpcodeDeferAdd the same way the sync path does: memoize the step
-// with null data and persist a Defer record. No discovery step is enqueued;
-// the SDK is driving the run.
+// handles OpcodeDeferAdd the same way the sync path does: persist a Defer
+// record. No discovery step is enqueued; the SDK is driving the run.
+// SDK-side memoization is carried by the SDKRequest `Defers` map, not the
+// steps map, so no SaveStep is expected.
 func TestCheckpointAsyncSteps_DeferAdd(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
@@ -256,7 +257,6 @@ func TestCheckpointAsyncSteps_DeferAdd(t *testing.T) {
 
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-defer", []byte("null")).Return(false, nil)
 	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
 		return d.FnSlug == "onDefer-score" &&
 			d.HashedID == "step-defer" &&
@@ -273,8 +273,9 @@ func TestCheckpointAsyncSteps_DeferAdd(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
-// TestCheckpointAsyncSteps_DeferCancel asserts the async cancel path:
-// memoize the cancel step and flip the target defer to Cancelled.
+// TestCheckpointAsyncSteps_DeferCancel asserts the async cancel path: flip
+// the target defer to Cancelled. SDK-side memoization is carried by the
+// SDKRequest `Defers` map, not the steps map, so no SaveStep is expected.
 func TestCheckpointAsyncSteps_DeferCancel(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
@@ -289,7 +290,6 @@ func TestCheckpointAsyncSteps_DeferCancel(t *testing.T) {
 
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-cancel", []byte("null")).Return(false, nil)
 	mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
 	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
 

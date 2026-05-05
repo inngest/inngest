@@ -3245,7 +3245,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	// We only save pending steps if there's >= 1 step planned op.
 	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
-		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
+		if err := e.smv2.SavePending(ctx, i.md.ID, groups.NonLazyIDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
 	}
@@ -3512,11 +3512,6 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 }
 
 func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
-	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
-		return err
-	}
-
 	opts, err := gen.DeferAddOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
@@ -3544,6 +3539,10 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 		)
 		groupID := uuid.New().String()
 
+		// Assume no pending steps. This may not be correct, but we're
+		// optimizing for avoiding a hanging function run
+		hasPendingSteps := false
+
 		// Enqueue a discovery step so the run doesn't hang. This is necessary
 		// because lazy ops don't normally get a discovery step.
 		return e.maybeEnqueueDiscoveryStep(
@@ -3562,12 +3561,6 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 }
 
 func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// Memoize with null data so the SDK doesn't re-emit this opcode on resume.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte("null"))
-	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
-		return err
-	}
-
 	opts, err := gen.DeferCancelOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
@@ -3593,6 +3586,10 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 			"unreachable", true,
 		)
 		groupID := uuid.New().String()
+
+		// Assume no pending steps. This may not be correct, but we're
+		// optimizing for avoiding a hanging function run
+		hasPendingSteps := false
 
 		// Enqueue a discovery step so the run doesn't hang. This is necessary
 		// because lazy ops don't normally get a discovery step.
