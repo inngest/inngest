@@ -13,6 +13,23 @@ export type GetRunPayload = {
   preview?: boolean;
 };
 
+export type RunDeferEntry = {
+  id: string;
+  fnSlug: string;
+  status: 'SCHEDULED' | 'ABORTED';
+  input: unknown | null;
+  run: {
+    id: string;
+    status: string;
+  } | null;
+};
+
+export type RunDeferredFromEntry = {
+  parentRunID: string;
+  parentFnSlug: string;
+  parentRun: { id: string; status: string } | null;
+};
+
 export type GetRunData = {
   app: {
     externalID: string;
@@ -28,6 +45,8 @@ export type GetRunData = {
   hasAI: boolean;
   status: string;
   isDurableEndpoint?: boolean;
+  defers?: RunDeferEntry[];
+  deferredFrom?: RunDeferredFromEntry | null;
 };
 
 export type GetRunResult = {

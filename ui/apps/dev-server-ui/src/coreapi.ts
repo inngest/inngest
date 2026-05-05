@@ -420,6 +420,24 @@ export const GET_RUN = gql`
         }
       }
       hasAI
+      defers {
+        id
+        fnSlug
+        status
+        input
+        run {
+          id
+          status
+        }
+      }
+      deferredFrom {
+        parentRunID
+        parentFnSlug
+        parentRun {
+          id
+          status
+        }
+      }
     }
   }
 `;

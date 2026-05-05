@@ -9,6 +9,8 @@ import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { DeferredFromSection } from './DeferredFromSection';
+import { DefersSection } from './DefersSection';
 import { RunInfo as NewRunInfo, RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
@@ -243,6 +245,8 @@ export const RunDetailsV3 = ({
                 reset={runError ? () => refetchRun() : () => refetchResult()}
               />
             )}
+            <DeferredFromSection deferredFrom={runData?.deferredFrom} />
+            <DefersSection defers={runData?.defers} />
           </div>
           <Tabs
             tabs={[

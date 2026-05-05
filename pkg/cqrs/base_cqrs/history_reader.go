@@ -6,14 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/usage"
 	"github.com/oklog/ulid/v2"
 )
@@ -243,6 +248,303 @@ func (r *reader) CountActiveRuns(
 	opts history_reader.CountActiveRunsOpts,
 ) (int, error) {
 	return 0, errors.New("not implemented")
+}
+
+func (w wrapper) GetRunDefers(ctx context.Context, runID ulid.ULID) ([]cqrs.RunDefer, error) {
+	rows, err := w.q.GetFunctionRunHistory(ctx, runID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get run history: %w", err)
+	}
+
+	log := logger.StdlibLogger(ctx)
+
+	type entry struct {
+		userID    string
+		fnSlug    string
+		input     json.RawMessage
+		cancelled bool
+	}
+	order := []string{}
+	byHashed := map[string]*entry{}
+
+	for _, row := range rows {
+		if row == nil || !row.Result.Valid || row.Result.String == "" {
+			continue
+		}
+
+		var res history.Result
+		if err := json.Unmarshal([]byte(row.Result.String), &res); err != nil {
+			log.Warn("failed to unmarshal history result while extracting defers",
+				"run_id", runID.String(), "history_id", row.ID.String(), "error", err)
+			continue
+		}
+		if res.RawOutput == nil {
+			continue
+		}
+
+		opcodes, err := decodeOpcodes(res.RawOutput)
+		if err != nil {
+			log.Warn("failed to decode raw_output opcodes while extracting defers",
+				"run_id", runID.String(), "history_id", row.ID.String(), "error", err)
+			continue
+		}
+
+		for _, op := range opcodes {
+			switch op.Op {
+			case enums.OpcodeDeferAdd:
+				if op.ID == "" {
+					log.Warn("DeferAdd opcode missing hashed step ID; skipping",
+						"run_id", runID.String(), "history_id", row.ID.String())
+					continue
+				}
+				addOpts, err := op.DeferAddOpts()
+				if err != nil {
+					log.Warn("failed to parse DeferAdd opts; skipping",
+						"run_id", runID.String(), "hashed_id", op.ID, "error", err)
+					continue
+				}
+				userID := op.ID
+				if op.Userland != nil && op.Userland.ID != "" {
+					userID = op.Userland.ID
+				}
+				existing, ok := byHashed[op.ID]
+				if !ok {
+					existing = &entry{}
+					byHashed[op.ID] = existing
+					order = append(order, op.ID)
+				}
+				existing.userID = userID
+				existing.fnSlug = addOpts.FnSlug
+				if len(addOpts.Input) > 0 {
+					existing.input = addOpts.Input
+				}
+			case enums.OpcodeDeferCancel:
+				cancelOpts, err := op.DeferCancelOpts()
+				if err != nil {
+					log.Warn("failed to parse DeferCancel opts; skipping",
+						"run_id", runID.String(), "error", err)
+					continue
+				}
+				if existing, ok := byHashed[cancelOpts.TargetHashedID]; ok {
+					existing.cancelled = true
+				}
+			}
+		}
+	}
+
+	if len(order) == 0 {
+		return nil, nil
+	}
+
+	hashToEventID := make(map[string]ulid.ULID, len(order))
+	eventIDs := make([]string, 0, len(order))
+	for _, h := range order {
+		if byHashed[h].cancelled {
+			continue
+		}
+		evtID, err := event.DeferredScheduleEventID(runID, h)
+		if err != nil {
+			log.Warn("failed to compute deferred schedule event ID; skipping run lookup",
+				"run_id", runID.String(), "hashed_id", h, "error", err)
+			continue
+		}
+		hashToEventID[h] = evtID
+		eventIDs = append(eventIDs, evtID.String())
+	}
+
+	var runsByUserEventID map[string]*cqrs.FunctionRun
+	if len(eventIDs) > 0 {
+		runsByUserEventID, err = w.fetchRunsByUserEventIDs(ctx, eventIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch child runs for defers: %w", err)
+		}
+	}
+
+	out := make([]cqrs.RunDefer, 0, len(order))
+	for _, h := range order {
+		e := byHashed[h]
+		rd := cqrs.RunDefer{
+			ID:     e.userID,
+			FnSlug: e.fnSlug,
+			Input:  e.input,
+		}
+		if e.cancelled {
+			rd.Status = cqrs.RunDeferStatusAborted
+		} else {
+			rd.Status = cqrs.RunDeferStatusScheduled
+			if evtID, ok := hashToEventID[h]; ok {
+				rd.Run = runsByUserEventID[evtID.String()]
+			}
+		}
+		out = append(out, rd)
+	}
+
+	return out, nil
+}
+
+// fetchRunsByUserEventIDs resolves a slice of user-facing event_id strings to
+// the child function runs they triggered. Hand-rolled because the prepared
+// GetFunctionRunsFromEvents query matches function_runs.event_id, which stores
+// the events.internal_id ULID — not the user-facing events.event_id text the
+// deterministic deferred.schedule IDs use.
+func (w wrapper) fetchRunsByUserEventIDs(
+	ctx context.Context,
+	userEventIDs []string,
+) (map[string]*cqrs.FunctionRun, error) {
+	out := map[string]*cqrs.FunctionRun{}
+	if len(userEventIDs) == 0 {
+		return out, nil
+	}
+
+	placeholders := strings.Repeat(",?", len(userEventIDs))[1:]
+	args := make([]any, len(userEventIDs))
+	for i, id := range userEventIDs {
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+SELECT
+	e.event_id,
+	fr.run_id,
+	fr.run_started_at,
+	fr.function_id,
+	fr.function_version,
+	fr.event_id,
+	fr.batch_id,
+	fr.original_run_id,
+	fr.cron,
+	fr.workspace_id,
+	ff.run_id,
+	ff.status,
+	ff.output,
+	ff.completed_step_count,
+	ff.created_at
+FROM events AS e
+INNER JOIN function_runs AS fr ON fr.event_id = e.internal_id
+LEFT JOIN function_finishes AS ff ON ff.run_id = fr.run_id
+WHERE e.event_id IN (%s)
+`, placeholders)
+
+	rows, err := w.adapter.Conn().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query child runs by user event id: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userEventID string
+		var fr dbpkg.FunctionRun
+		var ff dbpkg.FunctionFinish
+		if err := rows.Scan(
+			&userEventID,
+			&fr.RunID,
+			&fr.RunStartedAt,
+			&fr.FunctionID,
+			&fr.FunctionVersion,
+			&fr.EventID,
+			&fr.BatchID,
+			&fr.OriginalRunID,
+			&fr.Cron,
+			&fr.WorkspaceID,
+			&ff.RunID,
+			&ff.Status,
+			&ff.Output,
+			&ff.CompletedStepCount,
+			&ff.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan child run row: %w", err)
+		}
+		out[userEventID] = toCQRSRun(fr, ff)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate child run rows: %w", err)
+	}
+	return out, nil
+}
+
+func (w wrapper) GetRunDeferredFrom(ctx context.Context, runID ulid.ULID) (*cqrs.RunDeferredFrom, error) {
+	log := logger.StdlibLogger(ctx)
+
+	// Join on events.internal_id — see fetchRunsByUserEventIDs for the why.
+	const query = `
+SELECT e.event_data
+FROM function_runs AS fr
+INNER JOIN events AS e ON fr.event_id = e.internal_id
+WHERE fr.run_id = ? AND e.event_name = ?
+LIMIT 1
+`
+
+	var eventData string
+	row := w.adapter.Conn().QueryRowContext(ctx, query, runID, consts.FnDeferScheduleName)
+	if err := row.Scan(&eventData); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("query deferred trigger event: %w", err)
+	}
+
+	var envelope struct {
+		Inngest *event.DeferredScheduleMetadata `json:"_inngest"`
+	}
+	if err := json.Unmarshal([]byte(eventData), &envelope); err != nil {
+		log.Warn("failed to unmarshal deferred schedule event data",
+			"run_id", runID.String(), "error", err)
+		return nil, nil
+	}
+	if envelope.Inngest == nil {
+		return nil, nil
+	}
+	meta := envelope.Inngest
+
+	parentRunID, err := ulid.Parse(meta.ParentRunID)
+	if err != nil {
+		log.Warn("invalid parent_run_id in deferred schedule metadata",
+			"run_id", runID.String(),
+			"parent_run_id", meta.ParentRunID,
+			"error", err)
+		return nil, nil
+	}
+
+	out := &cqrs.RunDeferredFrom{
+		ParentRunID:  parentRunID,
+		ParentFnSlug: meta.ParentFnSlug,
+	}
+
+	parent, err := w.GetFunctionRun(ctx, uuid.Nil, uuid.Nil, parentRunID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		log.Warn("failed to load parent run for deferred-from linkage",
+			"run_id", runID.String(),
+			"parent_run_id", parentRunID.String(),
+			"error", err)
+	} else if parent != nil {
+		out.ParentRun = parent
+	}
+
+	return out, nil
+}
+
+// decodeOpcodes coerces history.Result.RawOutput (any) into a typed opcode
+// slice. RawOutput's runtime shape depends on how Result was loaded — see
+// marshalJSONAsString for the same coercion used at write time.
+func decodeOpcodes(raw any) ([]state.GeneratorOpcode, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	str, err := marshalJSONAsString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("re-marshal raw_output: %w", err)
+	}
+	if str == "" {
+		return nil, nil
+	}
+	var ops []state.GeneratorOpcode
+	if err := json.Unmarshal([]byte(str), &ops); err != nil {
+		return nil, fmt.Errorf("raw_output is not a recognized opcode shape: %w", err)
+	}
+	return ops, nil
 }
 
 func sqlToRun(item *dbpkg.FunctionRun, finish *dbpkg.FunctionFinish) (*history_reader.Run, error) {

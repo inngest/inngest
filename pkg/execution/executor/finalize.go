@@ -231,8 +231,7 @@ func (e *executor) buildDeferEvents(
 		// Deterministic event ID so any duplicate-publish path dedupes on the
 		// runner side (runner.go uses event.ID as the schedule idempotency key).
 		// Time prefix is the parent run's start so the ULID stays well-formed.
-		seed := []byte(opts.Metadata.ID.RunID.String() + d.HashedID)
-		eventID, err := util.DeterministicULID(ulid.Time(opts.Metadata.ID.RunID.Time()), seed)
+		eventID, err := event.DeferredScheduleEventID(opts.Metadata.ID.RunID, d.HashedID)
 		if err != nil {
 			// Unreachable
 			logger.StdlibLogger(ctx).Error(

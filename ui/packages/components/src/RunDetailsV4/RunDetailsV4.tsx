@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { ErrorCard } from '../Error/ErrorCard';
+import { DeferredFromSection } from '../RunDetailsV3/DeferredFromSection';
+import { DefersSection } from '../RunDetailsV3/DefersSection';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
@@ -300,6 +302,8 @@ export const RunDetailsV4 = ({
                 reset={runError ? () => refetchRun() : () => refetchResult()}
               />
             )}
+            <DeferredFromSection deferredFrom={runData?.deferredFrom} />
+            <DefersSection defers={runData?.defers} />
           </div>
           <Tabs
             tabs={[

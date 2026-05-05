@@ -93,6 +93,10 @@ models:
         resolver: true
       trace:
         resolver: true
+      defers:
+        resolver: true
+      deferredFrom:
+        resolver: true
   ConnectV1WorkerConnection:
     fields:
       app:
