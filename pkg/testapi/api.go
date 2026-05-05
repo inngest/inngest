@@ -30,6 +30,7 @@ type Options struct {
 	ResetAll           func()
 	PauseFunction      func(id uuid.UUID)
 	UnpauseFunction    func(id uuid.UUID)
+	Hub                *Hub
 }
 
 func ShouldEnable() bool {
@@ -53,6 +54,8 @@ func New(o Options) http.Handler {
 	test.Get("/queue/function-queue-size", test.GetQueueSize)
 
 	test.Post("/reset", test.Reset)
+
+	test.Get("/events", test.streamEvents)
 
 	return test
 }

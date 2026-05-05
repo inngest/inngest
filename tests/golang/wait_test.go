@@ -405,6 +405,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 
 	ctx := context.Background()
 	r := require.New(t)
+	c := client.New(t)
 
 	appID := ulid.MustNew(ulid.Now(), nil).String()
 	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
@@ -414,8 +415,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 		Bad bool `json:"bad"`
 	}
 
-	var counter int32
-	var done bool
+	var done atomic.Bool
 	evtName := "my-event"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -427,8 +427,6 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 			ctx context.Context,
 			input inngestgo.Input[eventData],
 		) (any, error) {
-			atomic.AddInt32(&counter, 1)
-
 			exp := "async.data.name == 'Alice'"
 			if input.Event.Data.Bad {
 				exp = "invalid"
@@ -444,12 +442,14 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 				},
 			)
 
-			done = true
+			done.Store(true)
 			return nil, nil
 		},
 	)
 	r.NoError(err)
 	registerFuncs()
+
+	stream := c.SubscribeEvents(ctx, t)
 
 	// Trigger enough function runs to cause us to use the "aggregate pauses"
 	// code path.
@@ -462,10 +462,9 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	}
 	_, err = inngestClient.SendMany(ctx, badEvents)
 	r.NoError(err)
-	r.EventuallyWithT(func(ct *assert.CollectT) {
-		a := assert.New(ct)
-		a.EqualValues(len(badEvents), atomic.LoadInt32(&counter))
-	}, 20*time.Second, 100*time.Millisecond)
+
+	// Wait until every bad run has started executing.
+	stream.WaitForFunctionStartedCount(len(badEvents), 60*time.Second)
 
 	// Trigger a function run with a valid expression that should match.
 	_, err = inngestClient.Send(ctx, &event.Event{
@@ -473,27 +472,21 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 		Name: evtName,
 	})
 	r.NoError(err)
-	r.EventuallyWithT(func(ct *assert.CollectT) {
-		a := assert.New(ct)
-		a.EqualValues(len(badEvents)+1, atomic.LoadInt32(&counter))
-	}, 10*time.Second, 100*time.Millisecond)
 
-	// Arbitrary sleep to ensure all the waitForEvents are processed.
-	<-time.After(time.Second)
+	// Wait for the good run to start, then capture its runID (it's the
+	// (N+1)th function.started event).
+	started := stream.WaitForFunctionStartedCount(len(badEvents)+1, 30*time.Second)
+	goodRunID := started[len(badEvents)].RunID
 
-	// Send an event that should match the valid expression.
+	// Send the matching event and confirm the good run finishes.
 	_, err = inngestClient.Send(ctx, &event.Event{
 		Data: map[string]any{"name": "Alice"},
 		Name: "match-event",
 	})
 	r.NoError(err)
 
-	// Ensure we made it past the waitForEvent in the valid expression function
-	// run.
-	r.EventuallyWithT(func(ct *assert.CollectT) {
-		a := assert.New(ct)
-		a.True(done)
-	}, 5*time.Second, 100*time.Millisecond)
+	stream.WaitForFinished(goodRunID, 30*time.Second)
+	r.True(done.Load(), "function handler did not run past WaitForEvent")
 }
 
 func TestWaitForEvent_Timeout(t *testing.T) {

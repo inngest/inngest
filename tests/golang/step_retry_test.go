@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
@@ -54,12 +53,12 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 		registerFuncs()
 
+		stream := c.SubscribeEvents(ctx, t)
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
-		})
+		fin := stream.WaitForFinished(rid.Wait(t), 30*time.Second)
+		r.Equal("failed", fin.Status, "expected run to fail; got %s (err=%s)", fin.Status, fin.Error)
 
 		r.Equal(int32(1), stepExecutions.Load(), "step should execute exactly once (no retries)")
 
@@ -107,12 +106,12 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 		registerFuncs()
 
+		stream := c.SubscribeEvents(ctx, t)
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
-		})
+		fin := stream.WaitForFinished(rid.Wait(t), 30*time.Second)
+		r.Equal("failed", fin.Status, "expected run to fail; got %s (err=%s)", fin.Status, fin.Error)
 
 		r.Equal(int32(2), stepExecutions.Load(), "step should execute twice (initial + 1 retry)")
 
@@ -157,12 +156,12 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 		registerFuncs()
 
+		stream := c.SubscribeEvents(ctx, t)
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
-		})
+		fin := stream.WaitForFinished(rid.Wait(t), 30*time.Second)
+		r.Equal("failed", fin.Status, "expected run to fail; got %s (err=%s)", fin.Status, fin.Error)
 
 		r.Equal(int32(1), stepExecutions.Load(), "step should execute exactly once (NoRetryError prevents retries)")
 
@@ -200,12 +199,12 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 		registerFuncs()
 
+		stream := c.SubscribeEvents(ctx, t)
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
-		})
+		fin := stream.WaitForFinished(rid.Wait(t), 30*time.Second)
+		r.Equal("failed", fin.Status, "expected run to fail; got %s (err=%s)", fin.Status, fin.Error)
 
 		r.Equal(int32(1), functionExecutions.Load(), "function should execute exactly once (no retries)")
 	})
@@ -240,12 +239,12 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 		registerFuncs()
 
+		stream := c.SubscribeEvents(ctx, t)
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
-		})
+		fin := stream.WaitForFinished(rid.Wait(t), 30*time.Second)
+		r.Equal("failed", fin.Status, "expected run to fail; got %s (err=%s)", fin.Status, fin.Error)
 
 		r.Equal(int32(1), functionExecutions.Load(), "function should execute exactly once (NoRetryError prevents retries)")
 	})
@@ -290,12 +289,12 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 		registerFuncs()
 
+		stream := c.SubscribeEvents(ctx, t)
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, models.FunctionStatusCompleted.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
-		})
+		fin := stream.WaitForFinished(rid.Wait(t), 30*time.Second)
+		r.Equal("completed", fin.Status, "expected run to complete; got %s (err=%s)", fin.Status, fin.Error)
 
 		// The step executes once and fails, but the function continues and returns success
 		// The function may execute multiple times (once for the step, once to complete)
