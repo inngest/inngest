@@ -185,6 +185,10 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandIndex, &op.Userland.Index)
 	}
 
+	if stepType := op.StepType(); stepType != enums.StepTypeUnknown {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepType, &stepType)
+	}
+
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		{
