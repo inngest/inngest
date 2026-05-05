@@ -548,19 +548,13 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 	return &meta, nil
 }
 
-// deferMeta is the cjson-safe subset of statev2.Defer stored under the
-// `meta:<hashedID>` field. Input lives in `input:<hashedID>` and is never
-// decoded by Lua, sidestepping cjson's empty-object → array and >2^53 integer
-// precision bugs.
+// deferMeta is the cjson-safe subset of statev2.Defer stored as the value of
+// each field in the defers-meta hash. Input lives in a separate defers-input
+// hash and is never decoded by Lua, sidestepping cjson's empty-object → array
+// and >2^53 integer precision bugs.
 //
-// DO NOT add fields here without first verifying they are cjson-safe.
-// `lua/setDeferStatus.lua` round-trips this entire struct through
-// cjson.decode → mutate → cjson.encode on every cancel; cjson cannot
-// distinguish empty Lua tables from empty arrays (`{}` round-trips as
-// `[]`) and loses precision on integers above 2^53. Safe field types are
-// strings and small ints (status enums, bounded counts). Anything else —
-// nested objects, large ints, slices that could be empty, freeform
-// user data — must live in a separate hash field like Input does.
+// DO NOT add fields here without first verifying they are cjson-safe. Safe
+// field types are strings and small ints (status enums, bounded counts).
 type deferMeta struct {
 	FnSlug   string
 	HashedID string
@@ -572,45 +566,33 @@ type deferMeta struct {
 	ScheduleStatus int
 }
 
-func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]statev2.Defer, error) {
+// LoadDefersMeta returns each defer's metadata without loading Input. Use this
+// from any path that only needs FnSlug / HashedID / ScheduleStatus
+func (m shardedMgr) LoadDefersMeta(
+	ctx context.Context,
+	accountId uuid.UUID,
+	fnID uuid.UUID,
+	runID ulid.ULID,
+) (map[string]statev2.DeferMeta, error) {
+	ctx = redis_telemetry.WithScope(
+		redis_telemetry.WithOpName(ctx, "LoadDefersMeta"),
+		redis_telemetry.ScopeFnRunState,
+	)
+
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
-	// rmap will contain 2 keys for each defer. For example:
-	// {
-	// 	"input:hash-abc": "{\"user_id\":\"u_123\"}",
-	// 	"meta:hash-abc": "{\"FnSlug\":\"onDefer-score\",\"HashedID\":\"hash-abc\",\"ScheduleStatus\":1}",
-	// 	"input:hash-def": "{\"user_id\":\"u_456\"}",
-	// 	"meta:hash-def": "{\"FnSlug\":\"onDefer-score\",\"HashedID\":\"hash-def\",\"ScheduleStatus\":1}",
-	// }
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hgetall().Key(fnRunState.kg.Defers(ctx, isSharded, fnID, runID)).Build()
+		return client.B().Hgetall().Key(
+			fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID),
+		).Build()
 	}).AsStrMap()
 	if err != nil {
 		return nil, err
 	}
 
-	// Demux meta:<hashedID> and input:<hashedID> fields into a single Defer per
-	// hashedID. SaveDefer enforces consts.MaxDefersPerRun at write time, so any
-	// excess here is a bug or misuse of the hash. Log loudly and truncate. We
-	// pick the kept hashedIDs by sorted order so two LoadDefers calls against
-	// the same underlying state always return the same defers; selecting during
-	// random rmap iteration would silently fan out to different deferred runs.
-	rawMetas := make(map[string]string, len(rmap)/2)
-	inputs := make(map[string]string, len(rmap)/2)
-	for field, raw := range rmap {
-		switch {
-		case strings.HasPrefix(field, "meta:"):
-			hashedID := strings.TrimPrefix(field, "meta:")
-			rawMetas[hashedID] = raw
-		case strings.HasPrefix(field, "input:"):
-			hashedID := strings.TrimPrefix(field, "input:")
-			inputs[hashedID] = raw
-		}
-	}
-
-	hashedIDs := make([]string, 0, len(rawMetas))
-	for hashedID := range rawMetas {
+	hashedIDs := make([]string, 0, len(rmap))
+	for hashedID := range rmap {
 		hashedIDs = append(hashedIDs, hashedID)
 	}
 	if len(hashedIDs) > consts.MaxDefersPerRun {
@@ -641,16 +623,60 @@ func (m shardedMgr) LoadDefers(ctx context.Context, accountId uuid.UUID, fnID uu
 		hashedIDs = hashedIDs[:consts.MaxDefersPerRun]
 	}
 
-	defers := make(map[string]statev2.Defer, len(hashedIDs))
+	metas := make(map[string]statev2.DeferMeta, len(hashedIDs))
 	for _, hashedID := range hashedIDs {
 		var meta deferMeta
-		if err := json.Unmarshal([]byte(rawMetas[hashedID]), &meta); err != nil {
+		if err := json.Unmarshal([]byte(rmap[hashedID]), &meta); err != nil {
 			return nil, err
 		}
-		d := statev2.Defer{
+		metas[hashedID] = statev2.DeferMeta{
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
 			ScheduleStatus: enums.DeferStatus(meta.ScheduleStatus),
+		}
+	}
+	return metas, nil
+}
+
+// LoadDefers loads all defers for a given run, including their metadata and
+// input data. This is the full view of a defer, including input data.
+func (m shardedMgr) LoadDefers(
+	ctx context.Context,
+	accountId uuid.UUID,
+	fnID uuid.UUID,
+	runID ulid.ULID,
+) (map[string]statev2.Defer, error) {
+	ctx = redis_telemetry.WithScope(
+		redis_telemetry.WithOpName(ctx, "LoadDefers"),
+		redis_telemetry.ScopeFnRunState,
+	)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	metas, err := m.LoadDefersMeta(ctx, accountId, fnID, runID)
+	if err != nil {
+		return nil, err
+	}
+	if len(metas) == 0 {
+		return map[string]statev2.Defer{}, nil
+	}
+
+	inputs, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(
+			fnRunState.kg.DefersInput(ctx, isSharded, fnID, runID),
+		).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, err
+	}
+
+	defers := make(map[string]statev2.Defer, len(metas))
+	for hashedID, meta := range metas {
+		d := statev2.Defer{
+			FnSlug:         meta.FnSlug,
+			HashedID:       meta.HashedID,
+			ScheduleStatus: meta.ScheduleStatus,
 		}
 		if raw, ok := inputs[hashedID]; ok && len(raw) > 0 {
 			d.Input = json.RawMessage(raw)
@@ -915,7 +941,10 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	result, err := retriableScripts["saveDefer"].Exec(
 		redis_telemetry.WithScriptName(ctx, "saveDefer"),
 		r,
-		[]string{fnRunState.kg.Defers(ctx, isSharded, fnID, runID)},
+		[]string{
+			fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID),
+			fnRunState.kg.DefersInput(ctx, isSharded, fnID, runID),
+		},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -941,7 +970,7 @@ func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnI
 	result, err := retriableScripts["setDeferStatus"].Exec(
 		redis_telemetry.WithScriptName(ctx, "setDeferStatus"),
 		r,
-		[]string{fnRunState.kg.Defers(ctx, isSharded, fnID, runID)},
+		[]string{fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID)},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -1076,7 +1105,8 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
-		fnRunState.kg.Defers(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
 
 	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {

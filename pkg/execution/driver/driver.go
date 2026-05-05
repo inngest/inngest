@@ -119,7 +119,9 @@ func MarshalV1(
 		}
 	}
 
-	defers, err := sl.LoadDefers(ctx, md.ID)
+	// Load defers meta. We only need ScheduleStatus per defer here, so do not
+	// read the input data.
+	defers, err := sl.LoadDefersMeta(ctx, md.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error loading defers in driver marshaller: %w", err)
 	}

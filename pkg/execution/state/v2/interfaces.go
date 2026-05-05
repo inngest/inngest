@@ -116,6 +116,12 @@ type StateLoader interface {
 	// StreamState(ctx context.Context, id ID) (io.Reader, error)
 
 	LoadDefers(ctx context.Context, id ID) (map[string]Defer, error)
+
+	// LoadDefersMeta returns each defer's metadata without loading its Input.
+	// Prefer this over LoadDefers when only FnSlug / HashedID / ScheduleStatus
+	// are needed: defer inputs can be up to 4MB each and ride alongside every
+	// SDKRequest if loaded unnecessarily.
+	LoadDefersMeta(ctx context.Context, id ID) (map[string]DeferMeta, error)
 }
 
 //

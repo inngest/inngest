@@ -409,6 +409,15 @@ func (m *mockRunService) LoadDefers(ctx context.Context, id state.ID) (map[strin
 	return defers, args.Error(1)
 }
 
+func (m *mockRunService) LoadDefersMeta(ctx context.Context, id state.ID) (map[string]state.DeferMeta, error) {
+	args := m.Called(ctx, id)
+	var defers map[string]state.DeferMeta
+	if v := args.Get(0); v != nil {
+		defers = v.(map[string]state.DeferMeta)
+	}
+	return defers, args.Error(1)
+}
+
 func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
 	args := m.Called(ctx, id, hashedID, status)
 	return args.Error(0)

@@ -25,6 +25,17 @@ type State struct {
 	Steps map[string]json.RawMessage
 }
 
+// DeferMeta is the metadata-only view of a Defer. It carries all defer data
+// except for input.
+//
+// Field semantics match the Defer fields of the same name; keep these in
+// sync with Defer below.
+type DeferMeta struct {
+	FnSlug         string
+	HashedID       string
+	ScheduleStatus enums.DeferStatus
+}
+
 type Defer struct {
 	// Fully-qualified function slug (`{app-slug}-{fn-slug}`) of the
 	// `onDefer` Inngest function that will handle this deferred run.

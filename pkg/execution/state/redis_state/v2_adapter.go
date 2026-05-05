@@ -209,6 +209,10 @@ func (v v2) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer
 	return v.mgr.LoadDefers(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
+func (v v2) LoadDefersMeta(ctx context.Context, id state.ID) (map[string]state.DeferMeta, error) {
+	return v.mgr.LoadDefersMeta(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
 // LoadEvents returns all events for a run.
 func (v v2) LoadEvents(ctx context.Context, id state.ID) ([]json.RawMessage, error) {
 	return v.mgr.LoadEvents(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)

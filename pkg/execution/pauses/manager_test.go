@@ -420,3 +420,6 @@ func (m *mockRunService) SetDeferStatus(ctx context.Context, id statev2.ID, hash
 func (m *mockRunService) LoadDefers(ctx context.Context, id statev2.ID) (map[string]statev2.Defer, error) {
 	return nil, nil
 }
+func (m *mockRunService) LoadDefersMeta(ctx context.Context, id statev2.ID) (map[string]statev2.DeferMeta, error) {
+	return nil, nil
+}
