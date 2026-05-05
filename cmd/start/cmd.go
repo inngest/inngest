@@ -63,25 +63,25 @@ func Command() *cli.Command {
 				Category: "Persistence",
 				Name:     "postgres-max-idle-conns",
 				Usage:    "Sets the maximum number of idle database connections in the PostgreSQL connection pool.",
-				Value:    10,
+				Value:    devserver.DefaultPostgresMaxIdleConns,
 			},
 			&cli.IntFlag{
 				Category: "Persistence",
 				Name:     "postgres-max-open-conns",
 				Usage:    "Sets the maximum number of open database connections allowed in the PostgreSQL connection pool.",
-				Value:    100,
+				Value:    devserver.DefaultPostgresMaxOpenConns,
 			},
 			&cli.IntFlag{
 				Category: "Persistence",
 				Name:     "postgres-conn-max-idle-time",
 				Usage:    "Sets the maximum amount of time, in minutes, a PostgreSQL connection may be idle.",
-				Value:    5,
+				Value:    devserver.DefaultPostgresConnMaxIdleTime,
 			},
 			&cli.IntFlag{
 				Category: "Persistence",
 				Name:     "postgres-conn-max-lifetime",
 				Usage:    "Sets the maximum amount of time, in minutes, a PostgreSQL connection may be reused.",
-				Value:    30,
+				Value:    devserver.DefaultPostgresConnMaxLifetime,
 			},
 
 			// Advanced flags

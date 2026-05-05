@@ -90,6 +90,11 @@ const (
 	DefaultPollInterval = 5
 	DefaultQueueWorkers = 100
 
+	DefaultPostgresMaxIdleConns    = 10
+	DefaultPostgresMaxOpenConns    = 100
+	DefaultPostgresConnMaxIdleTime = 5
+	DefaultPostgresConnMaxLifetime = 30
+
 	DefaultConnectGatewayPort      = 8289
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
@@ -176,6 +181,26 @@ func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
 	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }
 
+func postgresPoolOptions(opts StartOpts) *base_cqrs.PostgresPoolOptions {
+	if opts.PostgresURI == "" {
+		return nil
+	}
+
+	if opts.PostgresMaxIdleConns == 0 &&
+		opts.PostgresMaxOpenConns == 0 &&
+		opts.PostgresConnMaxIdleTime == 0 &&
+		opts.PostgresConnMaxLifetime == 0 {
+		return nil
+	}
+
+	return &base_cqrs.PostgresPoolOptions{
+		MaxIdleConns:    opts.PostgresMaxIdleConns,
+		MaxOpenConns:    opts.PostgresMaxOpenConns,
+		ConnMaxIdleTime: opts.PostgresConnMaxIdleTime,
+		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
+	}
+}
+
 func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
@@ -183,9 +208,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	services := []service.Service{}
 
 	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{
-		Persist:     opts.Persist,
-		PostgresURI: opts.PostgresURI,
-		Directory:   opts.SQLiteDir,
+		Persist:      opts.Persist,
+		PostgresURI:  opts.PostgresURI,
+		PostgresPool: postgresPoolOptions(opts),
+		Directory:    opts.SQLiteDir,
 	})
 	if err != nil {
 		return err

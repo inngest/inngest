@@ -97,19 +97,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	// Validate PostgreSQL connection pool settings
-	postgresMaxIdleConns := cmd.Int("postgres-max-idle-conns")
-	postgresMaxOpenConns := cmd.Int("postgres-max-open-conns")
-	if postgresMaxOpenConns <= 1 {
-		fmt.Printf("Error: postgres-max-open-conns (%d) must be greater than 1\n", postgresMaxOpenConns)
-		os.Exit(1)
-	}
-	if postgresMaxIdleConns > postgresMaxOpenConns {
-		fmt.Printf("Error: postgres-max-idle-conns (%d) cannot be greater than postgres-max-open-conns (%d)\n",
-			postgresMaxIdleConns, postgresMaxOpenConns)
-		os.Exit(1)
-	}
-
 	conf.ServerKind = headers.ServerKindCloud
 
 	// Handle configuration options with simplified koanf-based approach
@@ -117,6 +104,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	redisURI := localconfig.GetValue(cmd, "redis-uri", "")
 	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
 	sdkURLs := localconfig.GetStringSlice(cmd, "sdk-url")
+
+	postgresPool := postgresConnectionPoolConfigFromCommand(cmd)
+	if err := validatePostgresConnectionPoolConfig(postgresURI, postgresPool); err != nil {
+		fmt.Printf("Error: %s\n", err)
+		os.Exit(1)
+	}
 
 	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
 	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
@@ -130,10 +123,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
 		Persist:                 true,
 		PollInterval:            localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
-		PostgresConnMaxIdleTime: cmd.Int("postgres-conn-max-idle-time"),
-		PostgresConnMaxLifetime: cmd.Int("postgres-conn-max-lifetime"),
-		PostgresMaxIdleConns:    postgresMaxIdleConns,
-		PostgresMaxOpenConns:    postgresMaxOpenConns,
+		PostgresConnMaxIdleTime: postgresPool.connMaxIdleTime,
+		PostgresConnMaxLifetime: postgresPool.connMaxLifetime,
+		PostgresMaxIdleConns:    postgresPool.maxIdleConns,
+		PostgresMaxOpenConns:    postgresPool.maxOpenConns,
 		PostgresURI:             postgresURI,
 		QueueWorkers:            localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers),
 		RedisURI:                redisURI,
