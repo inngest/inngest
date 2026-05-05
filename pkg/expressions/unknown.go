@@ -14,18 +14,11 @@ import (
 	"github.com/inngest/inngest/pkg/expressions/exprenv"
 )
 
-// unknownDecorator returns a decorator for inspecting and handling unknowns at runtime.  This
-// decorator is called before _any_ attribute or function is evaluated in CEL, allowing us to
-// intercept and return our own values.
-//
-// For example, natively in CEL `size(null)` returns a "no such overload" error.  We intercept
-// the evalutation of `size(null)` and return a new type (0) instead of the error.
-func unknownDecorator(act interpreter.PartialActivation) interpreter.InterpretableDecorator {
-	// Create a new dispatcher with all functions added
-	dispatcher := interpreter.NewDispatcher()
-	overloads := exprenv.CELOverloads()
-	_ = dispatcher.Add(overloads...)
-
+// unknownDecorator returns a data-independent decorator that wraps every InterpretableCall
+// in a runtimeUnknownCall.  The actual type-dispatch logic (unknown/null/coercion handling)
+// runs at eval time instead of plan time, which means the cel.Program can be built once and
+// cached for the lifetime of the expression rather than rebuilt on every evaluation.
+func unknownDecorator() interpreter.InterpretableDecorator {
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
 		// Handle logical OR/AND nodes.  CEL represents || and && as special
 		// evalOr/evalAnd (or evalExhaustiveOr/evalExhaustiveAnd) structs that
@@ -33,7 +26,7 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 		// commonly write "event.data.a || event.data.b" expecting JS-like truthy
 		// coercion.  We detect these nodes via reflection and wrap them to
 		// implement truthy coercion when operands are non-boolean.
-		if wrapped, ok := maybeWrapLogicalOp(i, act); ok {
+		if wrapped, ok := maybeWrapLogicalOp(i); ok {
 			return wrapped, nil
 		}
 
@@ -43,111 +36,115 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 			return i, nil
 		}
 
-		fnVal := call.OverloadID()
-		if fnVal == "" {
-			fnVal = call.Function()
-		}
-
-		argTypes := &argColl{}
-
-		args := call.Args()
-		for _, arg := range args {
-			// We want both attributes (variables) & consts to check for coercion.
-			argTypes.Add(arg.Eval(act))
-		}
-
-		if argTypes.TypeLen() == 1 && !argTypes.Exists(types.ErrType) && !argTypes.Exists(types.UnknownType) {
-			// A single type used within the function with no error and unknown is
-			// safe to call as usual.
-			return i, nil
-		}
-
-		// For each function that we wnat to be heterogeneous, check the types here.
-		//
-		// Only run this in the case in which we have known types;  unknowns are handled
-		// below.
-		if argTypes.TypeLen() == 2 && !argTypes.Exists(types.UnknownType) {
-			// Check if the original function is a success.
-			val := call.Eval(act)
-			if !types.IsError(val) && !types.IsUnknown(val) {
-				// Memoize this result and return it.
-				return staticCall{result: val, InterpretableCall: call}, nil
-			}
-
-			switch fnVal {
-			case operators.Add:
-				//
-				// This allows concatenation of distinct types, eg string + number.
-				//
-				str := types.String(fmt.Sprintf("%v%v", args[0].Eval(act).Value(), args[1].Eval(act).Value()))
-				return staticCall{result: str, InterpretableCall: call}, nil
-			}
-		}
-
-		if argTypes.Exists(types.ErrType) || argTypes.Exists(types.UnknownType) {
-			// We work with unknown and error types, handling both as non-existent
-			// types.
-			//
-			// Errors can appear when calling macros on unknowns (eg:
-			// event.data.nonexistent.subkey.contains("something")).
-			//
-			// This could be because:
-			//
-			// 1. we're calling a macro on an unknown value. This happens before we can intercept
-			// the InterpretableCall and will always happen.  That's fine, and this produces the
-			// error "no such key".  These are the errors we want to intercept.
-			//
-			// 2. we're inside a macro and we're using the __result__ or lambda
-			//    variable.  This error contains "no such attribute", and this is a usual
-			//    part of runing macros.  XXX: Figure out why Eval() on macro variables fails:
-			//    this is actually _not_ an error.
-			for _, val := range argTypes.OfType(types.ErrType) {
-				if strings.HasPrefix(val.(error).Error(), "no such attribute") {
-					// This must be a macro call;  handle as usual
-					return i, nil
-				}
-			}
-			// This is an unknown type.  Dependent on the function being called return
-			// a concrete true or false value by default.
-			return handleUnknownCall(call, argTypes)
-		}
-
-		// Here we have multiple types called together.  If these are coercible, we'll
-		// attempt to coerce them (eg. ints and floats).
-		//
-		// We can't create a custom null type, because Compare may run on String, Int, Double,
-		// etc:  we'd have to wrap every type and add null checking.  This is a maintenance
-		// en and could be bug-prone.
-		//
-		// Therefore, we have to evaluate this here within a decorator.
-		if argTypes.Exists(types.NullType) && argTypes.ArgLen() == 2 {
-			switch call.Function() {
-			case operators.Equals:
-				return staticCall{result: types.False, InterpretableCall: call}, nil
-			case operators.NotEquals:
-				return staticCall{result: types.True, InterpretableCall: call}, nil
-			}
-
-			// Other operators, such as >, <=, depend on the argument order to evaluate
-			// correctly.
-			//
-			// We must create a new zero type in place of the null argument,
-			// then fetch the overload from the standard dispatcher and run the function.
-			args, err := argTypes.ZeroValArgs()
-			if err != nil {
-				return i, nil
-			}
-
-			// Get the actual implementation which we've copied into overloads.go.
-			fn := exprenv.GetBindings(call.Function(), nil)
-			if fn == nil {
-				return i, nil
-			}
-			return staticCall{result: fn(args[0], args[1]), InterpretableCall: call}, nil
-		}
-
-		return i, nil
+		return &runtimeUnknownCall{InterpretableCall: call}, nil
 	}
+}
+
+// runtimeUnknownCall wraps an InterpretableCall and applies the same unknown/null/coercion
+// handling logic as the old plan-time unknownDecorator, but at eval time using the live
+// activation.  This is what allows cel.Program to be safely cached across evaluations.
+type runtimeUnknownCall struct {
+	interpreter.InterpretableCall
+}
+
+func (r *runtimeUnknownCall) Eval(act interpreter.Activation) ref.Val {
+	fnVal := r.OverloadID()
+	if fnVal == "" {
+		fnVal = r.Function()
+	}
+
+	argTypes := &argColl{}
+	args := r.Args()
+	for _, arg := range args {
+		argTypes.Add(arg.Eval(act))
+	}
+
+	if argTypes.TypeLen() == 1 && !argTypes.Exists(types.ErrType) && !argTypes.Exists(types.UnknownType) {
+		// A single type used within the function with no error and unknown is
+		// safe to call as usual.
+		return r.InterpretableCall.Eval(act)
+	}
+
+	// For each function that we want to be heterogeneous, check the types here.
+	//
+	// Only run this in the case in which we have known types;  unknowns are handled
+	// below.
+	if argTypes.TypeLen() == 2 && !argTypes.Exists(types.UnknownType) {
+		val := r.InterpretableCall.Eval(act)
+		if !types.IsError(val) && !types.IsUnknown(val) {
+			return val
+		}
+
+		if fnVal == operators.Add {
+			// This allows concatenation of distinct types, eg string + number.
+			return types.String(fmt.Sprintf("%v%v", args[0].Eval(act).Value(), args[1].Eval(act).Value()))
+		}
+	}
+
+	if argTypes.Exists(types.ErrType) || argTypes.Exists(types.UnknownType) {
+		// We work with unknown and error types, handling both as non-existent
+		// types.
+		//
+		// Errors can appear when calling macros on unknowns (eg:
+		// event.data.nonexistent.subkey.contains("something")).
+		//
+		// This could be because:
+		//
+		// 1. we're calling a macro on an unknown value. This happens before we can intercept
+		// the InterpretableCall and will always happen.  That's fine, and this produces the
+		// error "no such key".  These are the errors we want to intercept.
+		//
+		// 2. we're inside a macro and we're using the __result__ or lambda
+		//    variable.  This error contains "no such attribute", and this is a usual
+		//    part of runing macros.  XXX: Figure out why Eval() on macro variables fails:
+		//    this is actually _not_ an error.
+		for _, val := range argTypes.OfType(types.ErrType) {
+			if strings.HasPrefix(val.(error).Error(), "no such attribute") {
+				// This must be a macro call;  handle as usual
+				return r.InterpretableCall.Eval(act)
+			}
+		}
+		// This is an unknown type.  Dependent on the function being called return
+		// a concrete true or false value by default.
+		result, _ := handleUnknownCall(r.InterpretableCall, argTypes)
+		return result.Eval(act)
+	}
+
+	// Here we have multiple types called together.  If these are coercible, we'll
+	// attempt to coerce them (eg. ints and floats).
+	//
+	// We can't create a custom null type, because Compare may run on String, Int, Double,
+	// etc:  we'd have to wrap every type and add null checking.  This is a maintenance
+	// burden and could be bug-prone.
+	//
+	// Therefore, we have to evaluate this here within a decorator.
+	if argTypes.Exists(types.NullType) && argTypes.ArgLen() == 2 {
+		switch r.Function() {
+		case operators.Equals:
+			return types.False
+		case operators.NotEquals:
+			return types.True
+		}
+
+		// Other operators, such as >, <=, depend on the argument order to evaluate
+		// correctly.
+		//
+		// We must create a new zero type in place of the null argument,
+		// then fetch the overload from the standard dispatcher and run the function.
+		zeroArgs, err := argTypes.ZeroValArgs()
+		if err != nil {
+			return r.InterpretableCall.Eval(act)
+		}
+
+		// Get the actual implementation which we've copied into overloads.go.
+		fn := exprenv.GetBindings(r.Function(), nil)
+		if fn == nil {
+			return r.InterpretableCall.Eval(act)
+		}
+		return fn(zeroArgs[0], zeroArgs[1])
+	}
+
+	return r.InterpretableCall.Eval(act)
 }
 
 // By default, CEL tracks unknowns as a separate value.  This is fantastic, but when
@@ -219,7 +216,7 @@ func handleUnknownCall(i interpreter.InterpretableCall, args *argColl) (interpre
 // variants) via reflection and wraps them to implement JS-like truthy coercion
 // when operands are non-boolean.  Returns (wrapped, true) if the node was wrapped,
 // or (nil, false) if the node is not a logical operator.
-func maybeWrapLogicalOp(i interpreter.Interpretable, act interpreter.PartialActivation) (interpreter.Interpretable, bool) {
+func maybeWrapLogicalOp(i interpreter.Interpretable) (interpreter.Interpretable, bool) {
 	typeName := reflect.TypeOf(i).String()
 
 	var isOr bool

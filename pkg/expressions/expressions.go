@@ -137,6 +137,14 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 	// Use the lifting expression parser in order to compile our env,
 	// if it's not nil.
 	if exprCompiler != nil {
+		// Cache the full evaluator (including compiled program) so that repeated
+		// calls with the same expression string reuse the same cel.Program.
+		cacheKey := "lifted:" + expression
+		if cached := cache.Get(cacheKey); cached != nil {
+			cached.Extend(CacheExtendTime)
+			return cached.Value().(*expressionEvaluator), nil
+		}
+
 		ast, issues, vars := exprCompiler.Parse(expression)
 		if issues != nil {
 			return nil, NewCompileError(issues.Err())
@@ -158,6 +166,12 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		if err := eval.parseAttributes(ctx); err != nil {
 			return nil, err
 		}
+		prog, err := buildProgram(ast, e, true)
+		if err != nil {
+			return nil, err
+		}
+		eval.prog = prog
+		cache.Set(cacheKey, eval, CacheTTL)
 		return eval, nil
 	}
 
@@ -186,11 +200,14 @@ func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator
 		env:        e,
 		expression: expression,
 	}
-
 	if err := eval.parseAttributes(ctx); err != nil {
 		return nil, err
 	}
-
+	prog, err := buildProgram(ast, e, true)
+	if err != nil {
+		return nil, err
+	}
+	eval.prog = prog
 	cache.Set("eval:"+expression, eval, CacheTTL)
 	return eval, nil
 }
@@ -217,10 +234,6 @@ func (b booleanEvaluator) Evaluate(ctx context.Context, data *Data) (bool, error
 }
 
 type expressionEvaluator struct {
-	// TODO: Refactor unknownEval to remove the need tor attr.Eval(activation),
-	// and make dateRefs thread safe.  We can then place a cel.Program on the
-	// evaluator as it's thread safe.  Without these changes, Programs are bound
-	// to specific expression & data combinations.
 	ast *cel.Ast
 	env *cel.Env
 
@@ -231,15 +244,16 @@ type expressionEvaluator struct {
 	// parser.
 	liftedVars map[string]any
 
-	// attrs is allows us to determine which attributes are used within an expression.
-	// This is needed to create partial activations, and is also used to optimistically
-	// load only necessary attributes.
+	// attrs determines which attributes are referenced within the expression.
+	// Used to build PartialActivations and to optimistically load only necessary data.
 	attrs *UsedAttributes
+
+	// prog is the compiled, data-independent cel.Program built once and reused across
+	// all evaluations of this expression.  Safe for concurrent use.
+	prog *celProgram
 }
 
-// Evaluate compiles an expression string against a set of variables, returning whether the
-// expression evaluates to true, the next earliest time to re-test the evaluation (if dates are
-// compared), and any errors.
+// Evaluate evaluates the cached expression against the provided data.
 func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interface{}, error) {
 	if data == nil {
 		return false, nil
@@ -253,12 +267,12 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 		})
 	}
 
-	program, act, err := program(ctx, e.ast, e.env, data, true, e.attrs)
+	act, err := data.Partial(ctx, *e.attrs)
 	if err != nil {
 		return nil, err
 	}
 
-	return eval(program, act)
+	return eval(e.prog, act)
 }
 
 // UsedAttributes returns the attributes used within the expression.
