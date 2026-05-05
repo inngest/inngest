@@ -98,7 +98,13 @@ func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
 	)
 	require.NoError(t, err)
 
-	return debounce.NewRedisDebouncer(shard, q)
+	deb, err := debounce.NewDebouncer(debounce.ManagerOpts{
+		Shards:           shardRegistry,
+		PrimaryShardName: shard.Name(),
+		Queue:            q,
+	})
+	require.NoError(t, err)
+	return deb
 }
 
 // TestGetBatchInfoHandler tests the debug API handler for batch info.
