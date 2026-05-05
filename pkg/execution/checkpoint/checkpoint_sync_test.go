@@ -862,7 +862,7 @@ func TestCheckpointSyncSteps_RunComplete(t *testing.T) {
 			ctx := context.Background()
 			require := require.New(t)
 
-			body := json.RawMessage(`{"hello":"world"}`)
+			body := `{"hello":"world"}`
 			headers := map[string]string{"content-type": "application/json"}
 
 			wire, err := json.Marshal(apiresult.APIResult{
@@ -887,7 +887,7 @@ func TestCheckpointSyncSteps_RunComplete(t *testing.T) {
 			matchAPIResult := func(want apiresult.APIResult) func(apiresult.APIResult) bool {
 				return func(got apiresult.APIResult) bool {
 					return got.StatusCode == want.StatusCode &&
-						string(got.Body) == string(want.Body) &&
+						got.Body == want.Body &&
 						got.Headers["content-type"] == want.Headers["content-type"]
 				}
 			}
@@ -912,8 +912,8 @@ func TestCheckpointSyncSteps_RunComplete(t *testing.T) {
 					if resp.StatusCode != tc.statusCode {
 						return false
 					}
-					out, ok := resp.Output.([]byte)
-					if !ok || string(out) != string(body) {
+					out, ok := resp.Output.(string)
+					if !ok || out != body {
 						return false
 					}
 					if tc.wantErr == "" {

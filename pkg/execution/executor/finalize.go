@@ -508,7 +508,7 @@ func apiAttributes(res apiresult.APIResult) *meta.SerializableAttrs {
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &res.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(res.Body)))
 	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
-	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(res.Body)))
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap([]byte(res.Body))))
 
 	return rawAttrs
 }
