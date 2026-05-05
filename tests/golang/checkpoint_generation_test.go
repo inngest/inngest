@@ -68,8 +68,6 @@ func TestEXE1552DuplicateStepExecutionOnRequeue(t *testing.T) {
 		redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey),
 	)
 
-	// ItemsByRunID is on *queue but not on the public RedisQueueShard interface,
-	// so we type-assert via an inline interface.
 	finder, ok := shard.(interface {
 		ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.QueueItem, error)
 	})
@@ -109,19 +107,16 @@ func TestEXE1552DuplicateStepExecutionOnRequeue(t *testing.T) {
 	runID, err := ulid.Parse(rid.Wait(t))
 	require.NoError(t, err)
 
-	// Wait for the original SDK invocation to enter step1.
 	select {
 	case <-step1.entered:
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for original SDK to enter step1")
 	}
 
-	// Find the leased queue item and force a requeue, simulating the executor's
-	// behavior on HTTP timeout (pkg/execution/queue/process.go:404-432).
+	// Force a requeue, mimicking the executor's HTTP-timeout path.
 	leased := waitForLeasedItem(t, ctx, finder, runID)
 	require.NoError(t, shard.Requeue(ctx, *leased, time.Now()))
 
-	// Wait for the second SDK invocation triggered by the requeue.
 	select {
 	case <-step1.entered:
 	case <-time.After(15 * time.Second):
@@ -131,22 +126,19 @@ func TestEXE1552DuplicateStepExecutionOnRequeue(t *testing.T) {
 
 	step1.unblock()
 
-	// Wait for at least one step2 entry, then briefly for a possible second.
 	select {
 	case <-step2.entered:
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for any step2 entry")
 	}
+	// Brief grace window to catch a duplicate step2 entry if the fence didn't fire.
 	select {
 	case <-step2.entered:
 	case <-time.After(2 * time.Second):
 	}
 	step2.unblock()
 
-	// Load-bearing assertion: the in-flight step (step1) is unavoidably
-	// duplicated, but step2 must run only once. Two step2 executions means the
-	// original SDK process was not aborted before reaching it — which is what
-	// DispatchID validation will fix (its checkpoint POST will get 409).
+	// step1 is unavoidably duplicated; step2 must not be.
 	require.Equalf(t, int32(1), atomic.LoadInt32(&step2.count),
 		"step2 ran %d times; expected 1 (step1 ran %d)",
 		atomic.LoadInt32(&step2.count), atomic.LoadInt32(&step1.count))

@@ -809,11 +809,11 @@ func TestQueueSystemPartitions(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		leaseId, _, err := shard.Lease(ctx, item, time.Second, clock.Now())
+		leaseId, err := shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 
-		leaseId, _, err = shard.Lease(ctx, item2, time.Second, clock.Now())
+		leaseId, err = shard.Lease(ctx, item2, time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, leaseId)
 	})
@@ -943,7 +943,7 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
 			// Lease step A, and it should be removed.
-			_, _, err := shard.Lease(ctx, ia, 50*time.Millisecond, time.Now())
+			_, err := shard.Lease(ctx, ia, 50*time.Millisecond, time.Now())
 			require.NoError(t, err)
 
 			items, err = shard.Peek(ctx, &osqueue.QueuePartition{FunctionID: &workflowID}, d, osqueue.DefaultQueuePeekMax)
@@ -988,7 +988,7 @@ func TestQueuePeek(t *testing.T) {
 			ia.EnqueuedAt = items[0].EnqueuedAt
 			require.EqualValues(t, int64(1), items[0].ScavengeCount, "ScavengeCount should be 1 after first scavenge/requeue")
 			ia.ScavengeCount = 1
-			ia.DispatchID = items[0].DispatchID
+			ia.GenerationID = items[0].GenerationID
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 
@@ -1372,7 +1372,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, &idA, now)
 
 			// Simulate processing queue item, add to partition scavenger index
-			_, _, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now())
+			_, err = shard.Lease(ctx, qi, 10*time.Second, clock.Now())
 			require.NoError(t, err)
 			kg := shard.Client().kg
 			require.True(t, r.Exists(kg.PartitionScavengerIndex(idA.String())))
@@ -1452,7 +1452,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 
 			t.Run("It doesn't dequeue the partition with an in-progress job", func(t *testing.T) {
-				id, _, err := shard.Lease(ctx, item, 10*time.Second, clock.Now())
+				id, err := shard.Lease(ctx, item, 10*time.Second, clock.Now())
 				require.NoError(t, err)
 				require.NotNil(t, id)
 
@@ -1873,7 +1873,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.Equal(t, 1, len(partitions))
 
 			// Lease
-			lid, _, err := shard.Lease(ctx, item, time.Second*10, time.Now())
+			lid, err := shard.Lease(ctx, item, time.Second*10, time.Now())
 			require.NoError(t, err)
 			require.NotNil(t, lid)
 

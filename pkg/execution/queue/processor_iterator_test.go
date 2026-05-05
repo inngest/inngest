@@ -86,10 +86,9 @@ func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 	}, nil
 }
 
-func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, *ulid.ULID, error) {
+func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error) {
 	id := ulid.Make()
-	dispatchID := ulid.Make()
-	return &id, &dispatchID, nil
+	return &id, nil
 }
 
 func (m *mockShardForIterator) Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {

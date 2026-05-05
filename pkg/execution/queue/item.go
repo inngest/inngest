@@ -27,9 +27,9 @@ import (
 type jobIDValType struct{ int }
 
 var (
-	jobCtxVal      = jobIDValType{0}
-	shardCtxVal    = jobIDValType{1}
-	dispatchCtxVal = jobIDValType{2}
+	jobCtxVal          = jobIDValType{0}
+	shardCtxVal        = jobIDValType{1}
+	generationIDCtxVal = jobIDValType{2}
 )
 
 // WithJobID returns a context that stores the given job ID inside.
@@ -42,12 +42,11 @@ func WithShardID(ctx context.Context, shardID string) context.Context {
 	return context.WithValue(ctx, shardCtxVal, shardID)
 }
 
-// WithDispatchID returns a context that stores the dispatch ID minted on the
-// current lease. The driver echoes this to the SDK via MarshalV1, so the SDK
-// can include it on async checkpoint POSTs and the backend can detect a stale
-// dispatch when the queue item has been requeued.
-func WithDispatchID(ctx context.Context, dispatchID string) context.Context {
-	return context.WithValue(ctx, dispatchCtxVal, dispatchID)
+// WithGenerationID stores the queue item's monotonic dispatch generation. The
+// driver forwards this to the SDK so async checkpoint POSTs can be fenced
+// against requeues that supersede the original dispatch.
+func WithGenerationID(ctx context.Context, generationID int) context.Context {
+	return context.WithValue(ctx, generationIDCtxVal, generationID)
 }
 
 // JobIDFromContext returns the job ID given the current context, or an
@@ -62,11 +61,11 @@ func ShardIDFromContext(ctx context.Context) string {
 	return str
 }
 
-// DispatchIDFromContext returns the dispatch ID for the current lease, or an
-// empty string if not set.
-func DispatchIDFromContext(ctx context.Context) string {
-	str, _ := ctx.Value(dispatchCtxVal).(string)
-	return str
+// GenerationIDFromContext returns the dispatch generation for the current job,
+// or 0 if not set.
+func GenerationIDFromContext(ctx context.Context) int {
+	v, _ := ctx.Value(generationIDCtxVal).(int)
+	return v
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -104,11 +103,9 @@ type QueueItem struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
 	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
-	// DispatchID is a ULID minted on Lease and rotated on Requeue, identifying
-	// which dispatch attempt is canonical. Echoed by the SDK on async
-	// checkpoint POSTs and validated server-side so a stale SDK process whose
-	// dispatch was superseded by a requeue can be detected and aborted.
-	DispatchID *ulid.ULID `json:"dispatchID,omitempty"`
+	// GenerationID is a monotonic counter bumped by Requeue; mismatch fences
+	// a stale dispatch.
+	GenerationID int `json:"genID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
 	Data Item `json:"data"`

@@ -17,7 +17,6 @@ local queueID = ARGV[1]
 local partitionID = ARGV[2]
 local newLeaseID = ARGV[3]
 local currentTime = tonumber(ARGV[4]) -- in ms
-local newDispatchID = ARGV[5]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -47,10 +46,6 @@ item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
 -- Update the item's lease key.
 item.leaseID = newLeaseID
--- Mint a fresh dispatch ID for this lease attempt. ExtendLease leaves this
--- field untouched so a single dispatch (lease + extensions) shares one ID;
--- Requeue rotates it Go-side.
-item.dispatchID = newDispatchID
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress

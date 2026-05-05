@@ -244,12 +244,10 @@ func TestCheckpointAsyncSteps_StaleDispatchFailsBeforeSave(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	currentDispatchID := ulid.Make()
-	staleDispatchID := ulid.Make()
-	testData.asyncCheckpoint.DispatchID = staleDispatchID.String()
+	testData.asyncCheckpoint.GenerationID = 4
 	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
-		ID:         "job-123",
-		DispatchID: &currentDispatchID,
+		ID:           "job-123",
+		GenerationID: 7,
 	}, nil)
 
 	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
@@ -263,7 +261,7 @@ func TestCheckpointAsyncSteps_StaleDispatchFailsBeforeSave(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
-func TestCheckpointAsyncSteps_EmptyDispatchIDSkipsValidation(t *testing.T) {
+func TestCheckpointAsyncSteps_ZeroGenerationIDSkipsValidation(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
@@ -304,7 +302,7 @@ func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	testData.asyncCheckpoint.DispatchID = ulid.Make().String()
+	testData.asyncCheckpoint.GenerationID = 1
 	// Nil-from-HGET means the dispatch the SDK is serving no longer exists,
 	// which is exactly the stale case.
 	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(nil, queue.ErrQueueItemNotFound)
@@ -320,7 +318,7 @@ func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
-func TestCheckpointAsyncSteps_InvalidQueueRefWithDispatchIDFailsBeforeSave(t *testing.T) {
+func TestCheckpointAsyncSteps_InvalidQueueRefWithGenerationIDFailsBeforeSave(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
@@ -330,7 +328,7 @@ func TestCheckpointAsyncSteps_InvalidQueueRefWithDispatchIDFailsBeforeSave(t *te
 		Data: json.RawMessage(`{"result":"ok"}`),
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
-	testData.asyncCheckpoint.DispatchID = ulid.Make().String()
+	testData.asyncCheckpoint.GenerationID = 1
 	testData.asyncCheckpoint.QueueItemRef = "not-a-valid-queue-ref"
 
 	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)

@@ -44,8 +44,11 @@ type AsyncCheckpoint struct {
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
 	QueueItemRef string `json:"qi_id"`
-	// DispatchID identifies the leased SDK dispatch that produced this checkpoint.
-	DispatchID string `json:"dispatch_id"`
+	// GenerationID identifies the leased SDK dispatch that produced this
+	// checkpoint. The validator rejects writes whose value is behind the
+	// queue item's current GenerationID. Zero means the SDK did not echo a
+	// value, in which case validation fails open.
+	GenerationID int `json:"generation_id"`
 
 	// Plus auth data added from auth.  This is never exposed via JSON
 	// for security.

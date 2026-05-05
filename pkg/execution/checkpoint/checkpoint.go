@@ -483,7 +483,9 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 }
 
 func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) error {
-	if input.DispatchID == "" {
+	// Fail open when the SDK didn't echo a generation. Older SDKs predate the
+	// fence; rejecting them would break valid checkpoints.
+	if input.GenerationID == 0 {
 		return nil
 	}
 
@@ -494,10 +496,12 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 
 	loader, ok := c.Queue.(queueItemLoader)
 	if !ok {
-		// Fail-closed: an SDK echoing dispatch_id has opted in to fencing, so
-		// not being able to validate must abort the write rather than silently
-		// fall back to 400 (which the SDK would not treat as terminal).
-		return fmt.Errorf("%w: queue does not support dispatch validation", ErrStaleDispatch)
+		// Fail open if the queue can't load items (e.g. mock or alt backend);
+		// the alternative is rejecting every fenced POST forever.
+		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
+			"run_id", input.RunID,
+		)
+		return nil
 	}
 
 	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
@@ -507,8 +511,12 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	if err != nil {
 		return err
 	}
-	if item.DispatchID == nil || item.DispatchID.String() != input.DispatchID {
-		return fmt.Errorf("%w: dispatch ID mismatch", ErrStaleDispatch)
+	// Fail open for queue items that pre-date the rollout.
+	if item.GenerationID == 0 {
+		return nil
+	}
+	if input.GenerationID != item.GenerationID {
+		return fmt.Errorf("%w: generation %d does not match queue item generation %d", ErrStaleDispatch, input.GenerationID, item.GenerationID)
 	}
 
 	return nil

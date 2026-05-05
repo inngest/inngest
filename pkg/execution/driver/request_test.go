@@ -16,25 +16,25 @@ func TestStack(t *testing.T) {
 	assert.Equal(t, "{\"stack\":[],\"current\":0}", string(marshaled))
 }
 
-func TestSDKRequestContextDispatchID(t *testing.T) {
-	t.Run("present DispatchID is serialized as dispatch_id", func(t *testing.T) {
-		ctx := SDKRequestContext{DispatchID: "01ABC"}
+func TestSDKRequestContextGenerationID(t *testing.T) {
+	t.Run("present GenerationID is serialized as generation_id", func(t *testing.T) {
+		ctx := SDKRequestContext{GenerationID: 7}
 
 		b, err := json.Marshal(ctx)
 		require.NoError(t, err)
-		assert.Contains(t, string(b), `"dispatch_id":"01ABC"`)
+		assert.Contains(t, string(b), `"generation_id":7`)
 
 		var rt SDKRequestContext
 		require.NoError(t, json.Unmarshal(b, &rt))
-		assert.Equal(t, "01ABC", rt.DispatchID)
+		assert.Equal(t, 7, rt.GenerationID)
 	})
 
-	t.Run("empty DispatchID is omitted from the wire payload", func(t *testing.T) {
+	t.Run("zero GenerationID is omitted from the wire payload", func(t *testing.T) {
 		ctx := SDKRequestContext{}
 
 		b, err := json.Marshal(ctx)
 		require.NoError(t, err)
-		assert.NotContains(t, string(b), "dispatch_id",
+		assert.NotContains(t, string(b), "generation_id",
 			"omitempty must keep the field off the wire so old SDKs see no change")
 	})
 }

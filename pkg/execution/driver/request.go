@@ -51,11 +51,11 @@ type SDKRequestContext struct {
 	// async functions so that the API knows which queue item to reset.
 	QueueItemRef string `json:"qi_id"`
 
-	// DispatchID identifies the canonical dispatch attempt for the leased
-	// queue item. The SDK echoes this on every async checkpoint POST so the
-	// backend can reject writes from a stale dispatch whose lease was
-	// superseded by a Requeue.
-	DispatchID string `json:"dispatch_id,omitempty"`
+	// GenerationID identifies the canonical dispatch attempt for the leased
+	// queue item: a monotonic counter bumped by Requeue. The SDK echoes this
+	// on every async checkpoint POST so the backend can reject writes from a
+	// stale dispatch whose lease was superseded by a Requeue.
+	GenerationID int `json:"generation_id,omitempty"`
 
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.

@@ -175,7 +175,7 @@ func TestCheckpointAPI_Output(t *testing.T) {
 	})
 }
 
-func TestCheckpointAPI_CheckpointAsyncStepsPassesDispatchID(t *testing.T) {
+func TestCheckpointAPI_CheckpointAsyncStepsPassesGenerationID(t *testing.T) {
 	runID := ulid.Make()
 	fnID := uuid.New()
 	mockCheckpointer := &mockCheckpointer{}
@@ -190,14 +190,14 @@ func TestCheckpointAPI_CheckpointAsyncStepsPassesDispatchID(t *testing.T) {
 		"run_id":"`+runID.String()+`",
 		"fn_id":"`+fnID.String()+`",
 		"qi_id":"queue-ref",
-		"dispatch_id":"dispatch-123",
+		"generation_id":42,
 		"steps":[]
 	}`))
 	rec := httptest.NewRecorder()
 
 	api.CheckpointAsyncSteps(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "dispatch-123", mockCheckpointer.async.DispatchID)
+	require.Equal(t, 42, mockCheckpointer.async.GenerationID)
 	require.Equal(t, "queue-ref", mockCheckpointer.async.QueueItemRef)
 }
 
