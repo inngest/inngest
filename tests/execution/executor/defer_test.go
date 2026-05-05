@@ -141,17 +141,13 @@ func TestFinalizeContinuesOnLoadDefersError(t *testing.T) {
 
 	// Build executor with the failing wrapper. Can't use infra.newExecutor —
 	// it wires the unwrapped smv2.
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return infra.queueShard, nil
-	}
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(failingState),
 		executor.WithPauseManager(infra.pauseMgr),
 		executor.WithQueue(infra.rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(infra.loader),
-		executor.WithAssignedQueueShard(infra.queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(infra.shardRegistry),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 	)
 	r.NoError(err)
@@ -192,18 +188,19 @@ func TestFinalizeContinuesOnLoadDefersError(t *testing.T) {
 // checkpoint-vs-executor consistency tests so each test can spin up 3 runs
 // against the same backing store.
 type deferTestInfra struct {
-	ctx        context.Context
-	fn         inngest.Function
-	fnID       uuid.UUID
-	wsID       uuid.UUID
-	appID      uuid.UUID
-	aID        uuid.UUID
-	smv2       statev2.RunService
-	pauseMgr   pauses.Manager
-	loader     state.FunctionLoader
-	dbcqrs     cqrs.Manager
-	queueShard redis_state.RedisQueueShard
-	rq         queue.Queue
+	ctx           context.Context
+	fn            inngest.Function
+	fnID          uuid.UUID
+	wsID          uuid.UUID
+	appID         uuid.UUID
+	aID           uuid.UUID
+	smv2          statev2.RunService
+	pauseMgr      pauses.Manager
+	loader        state.FunctionLoader
+	dbcqrs        cqrs.Manager
+	queueShard    redis_state.RedisQueueShard
+	shardRegistry queue.ShardRegistryController
+	rq            queue.Queue
 }
 
 func newDeferTestInfra(t *testing.T) *deferTestInfra {
@@ -233,7 +230,7 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 
 	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{ID: appID, Name: "test-app"})
 	require.NoError(t, err)
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID: fnID, AppID: appID, Name: fn.Name, Slug: fn.Slug, Config: string(config),
 	})
 	require.NoError(t, err)
@@ -266,30 +263,27 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 
 	queueOpts := []queue.QueueOpt{queue.WithIdempotencyTTL(time.Hour)}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
 
-	rq, err := queue.New(
-		ctx, "test-queue", queueShard,
-		map[string]queue.QueueShard{queueShard.Name(): queueShard},
-		shardSelector, queueOpts...,
-	)
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
+
+	rq, err := queue.New(ctx, "test-queue", shardRegistry, queueOpts...)
 	require.NoError(t, err)
 
 	return &deferTestInfra{
-		ctx:        ctx,
-		fn:         fn,
-		fnID:       fnID,
-		wsID:       wsID,
-		appID:      appID,
-		aID:        aID,
-		smv2:       smv2,
-		pauseMgr:   pauseMgr,
-		loader:     loader,
-		dbcqrs:     dbcqrs,
-		queueShard: queueShard,
-		rq:         rq,
+		ctx:           ctx,
+		fn:            fn,
+		fnID:          fnID,
+		wsID:          wsID,
+		appID:         appID,
+		aID:           aID,
+		smv2:          smv2,
+		pauseMgr:      pauseMgr,
+		loader:        loader,
+		dbcqrs:        dbcqrs,
+		queueShard:    queueShard,
+		shardRegistry: shardRegistry,
+		rq:            rq,
 	}
 }
 
@@ -305,9 +299,6 @@ func (i *deferTestInfra) newExecutor(t *testing.T, driver *mockDriverV1) executi
 // discovery-enqueue tests that wrap the shared queue in enqueueCountingQueue.
 func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, driver *mockDriverV1) execution.Executor {
 	t.Helper()
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return i.queueShard, nil
-	}
 
 	opts := []executor.ExecutorOpt{
 		executor.WithStateManager(i.smv2),
@@ -315,8 +306,7 @@ func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, drive
 		executor.WithQueue(q),
 		executor.WithLogger(logger.StdlibLogger(i.ctx)),
 		executor.WithFunctionLoader(i.loader),
-		executor.WithAssignedQueueShard(i.queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(i.shardRegistry),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 	}
 	if driver != nil {
@@ -845,17 +835,13 @@ func TestParallelPlanWithDeferAdd_PendingExcludesLazyOps(t *testing.T) {
 		},
 	}
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return infra.queueShard, nil
-	}
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(spy),
 		executor.WithPauseManager(infra.pauseMgr),
 		executor.WithQueue(infra.rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(infra.loader),
-		executor.WithAssignedQueueShard(infra.queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(infra.shardRegistry),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithDriverV1(driver),
 	)
