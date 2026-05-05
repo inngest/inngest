@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/interpreter"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/expressions/exprenv"
 	"github.com/karlseguin/ccache/v2"
@@ -251,6 +252,11 @@ type expressionEvaluator struct {
 	// prog is the compiled, data-independent cel.Program built once and reused across
 	// all evaluations of this expression.  Safe for concurrent use.
 	prog *celProgram
+
+	// fullPaths and patterns are pre-computed from attrs once and reused on every
+	// Evaluate call.  fullPaths[i] and patterns[i] refer to the same attribute path.
+	fullPaths [][]string
+	patterns  []*interpreter.AttributePattern
 }
 
 // Evaluate evaluates the cached expression against the provided data.
@@ -267,7 +273,7 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 		})
 	}
 
-	act, err := data.Partial(ctx, *e.attrs)
+	act, err := data.partialWithPatterns(ctx, e.fullPaths, e.patterns)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +296,7 @@ func (e *expressionEvaluator) FilteredAttributes(ctx context.Context, d *Data) *
 	filtered := map[string]interface{}{}
 
 	current := filtered
-	stack := e.attrs.FullPaths()
+	stack := e.fullPaths
 	for len(stack) > 0 {
 		path := stack[0]
 		stack = stack[1:]
@@ -334,5 +340,6 @@ func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
 		return err
 	}
 	e.attrs = attrs
+	e.fullPaths, e.patterns = precomputePatterns(attrs)
 	return nil
 }
