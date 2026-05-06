@@ -141,7 +141,7 @@ func TestSaveDefer(t *testing.T) {
 		got := defers[original.HashedID]
 		require.Equal(t, enums.DeferStatusAborted, got.ScheduleStatus)
 		require.Equal(t, original.FnSlug, got.FnSlug)
-		require.Empty(t, got.Input, "Input released on cancel; retransmit must not re-attach it")
+		require.Empty(t, got.Input, "Input released on abort; retransmit must not re-attach it")
 	})
 
 	t.Run("rejects new hashed IDs once per-run count limit reached", func(t *testing.T) {

@@ -331,8 +331,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				return err
 			}
 
-		case enums.OpcodeDeferCancel:
-			if err := defers.CancelFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
+		case enums.OpcodeDeferAbort:
+			if err := defers.AbortFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
 				return err
 			}
 
@@ -480,8 +480,8 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				return err
 			}
 
-		case enums.OpcodeDeferCancel:
-			if err := defers.CancelFromOp(ctx, c.State, l, md.ID, op); err != nil {
+		case enums.OpcodeDeferAbort:
+			if err := defers.AbortFromOp(ctx, c.State, l, md.ID, op); err != nil {
 				return err
 			}
 

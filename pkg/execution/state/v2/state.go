@@ -53,7 +53,7 @@ type Defer struct {
 	// Aborted is terminal within a run: once a defer transitions to
 	// DeferStatusAborted, it stays there. The Lua-level SaveDefer silently
 	// no-ops any subsequent write for the same hashedID. There is no "unabort"
-	// path: same hashedID + cancel is final.
+	// path: same hashedID + abort is final.
 	ScheduleStatus enums.DeferStatus
 
 	// Data passed to the defer

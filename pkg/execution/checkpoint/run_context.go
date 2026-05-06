@@ -37,9 +37,9 @@ func (c *checkpointRunContext) DriverResponse() *state.DriverResponse {
 }
 
 func (c *checkpointRunContext) OnlyHasLazyOps() bool {
-	// Checkpoint dispatches DeferAdd/DeferCancel via its own paths
-	// (saveDeferFromOp / cancelDeferFromOp) before reaching the executor's lazy
-	// handlers, so this predicate is unreachable from a checkpoint runCtx.
+	// Checkpoint dispatches DeferAdd/DeferAbort via defers.SaveFromOp /
+	// defers.AbortFromOp before reaching the executor's lazy handlers, so
+	// this predicate is unreachable from a checkpoint runCtx.
 	return false
 }
 

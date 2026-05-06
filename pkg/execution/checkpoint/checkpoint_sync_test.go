@@ -738,7 +738,7 @@ func TestCheckpointSyncSteps_DeferAdd_BundledWithRunComplete(t *testing.T) {
 }
 
 // TestCheckpointSyncSteps_DeferAdd_RunCompleteFirstStillSavesDefer pins the
-// ordering invariant: DeferAdd/DeferCancel must drain before RunComplete even
+// ordering invariant: DeferAdd/DeferAbort must drain before RunComplete even
 // when the SDK delivers them in the opposite order. Without the priority
 // reorder, RunComplete's Finalize would delete state before SaveDefer ran,
 // silently dropping the deferred run.
@@ -797,16 +797,16 @@ func TestCheckpointSyncSteps_DeferAdd_RunCompleteFirstStillSavesDefer(t *testing
 	mocks.executor.AssertExpectations(t)
 }
 
-// TestCheckpointSyncSteps_DeferCancel asserts that a sync-checkpointed
-// OpcodeDeferCancel memoizes the cancel step and flips the target defer to
-// Cancelled via SetDeferStatus.
-func TestCheckpointSyncSteps_DeferCancel(t *testing.T) {
+// TestCheckpointSyncSteps_DeferAbort asserts that a sync-checkpointed
+// OpcodeDeferAbort memoizes the abort step and flips the target defer to
+// Aborted via SetDeferStatus.
+func TestCheckpointSyncSteps_DeferAbort(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
 	op := state.GeneratorOpcode{
-		ID: "step-cancel",
-		Op: enums.OpcodeDeferCancel,
+		ID: "step-abort",
+		Op: enums.OpcodeDeferAbort,
 		Opts: map[string]any{
 			"target_hashed_id": "step-defer",
 		},
@@ -828,16 +828,16 @@ func TestCheckpointSyncSteps_DeferCancel(t *testing.T) {
 	mocks.executor.AssertExpectations(t)
 }
 
-// TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID asserts that a
-// DeferCancel without target_hashed_id returns an error — the field is
+// TestCheckpointSyncSteps_DeferAbort_MissingTargetHashedID asserts that a
+// DeferAbort without target_hashed_id returns an error — the field is
 // required, not optional.
-func TestCheckpointSyncSteps_DeferCancel_MissingTargetHashedID(t *testing.T) {
+func TestCheckpointSyncSteps_DeferAbort_MissingTargetHashedID(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
 	op := state.GeneratorOpcode{
-		ID:   "step-cancel",
-		Op:   enums.OpcodeDeferCancel,
+		ID:   "step-abort",
+		Op:   enums.OpcodeDeferAbort,
 		Opts: map[string]any{},
 	}
 

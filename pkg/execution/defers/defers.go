@@ -83,24 +83,24 @@ func SaveFromOp(
 	return nil
 }
 
-// CancelFromOp flips the target defer's status to Aborted. Errors are
+// AbortFromOp flips the target defer's status to Aborted. Errors are
 // surfaced (no soft-fail).
-func CancelFromOp(
+func AbortFromOp(
 	ctx context.Context,
 	rs statev2.RunService,
 	log logger.Logger,
 	id statev2.ID,
 	op state.GeneratorOpcode,
 ) error {
-	opts, err := op.DeferCancelOpts()
+	opts, err := op.DeferAbortOpts()
 	if err != nil {
-		log.Error("error parsing DeferCancel opts", "error", err)
-		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
+		log.Error("error parsing DeferAbort opts", "error", err)
+		return fmt.Errorf("error parsing DeferAbort opts: %w", err)
 	}
 
 	if err := rs.SetDeferStatus(ctx, id, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
-		log.Error("error cancelling defer", "error", err)
-		return fmt.Errorf("error cancelling defer: %w", err)
+		log.Error("error aborting defer", "error", err)
+		return fmt.Errorf("error aborting defer: %w", err)
 	}
 
 	return nil

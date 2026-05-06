@@ -28,7 +28,7 @@ type SDKRequest struct {
 // SDKDeferEntry tells the SDK that a deferred run is already registered for the
 // given hashed ID, so it should not re-report `OpcodeDeferAdd` for it.
 type SDKDeferEntry struct {
-	// Abortable indicates the SDK may emit `OpcodeDeferCancel` for this
+	// Abortable indicates the SDK may emit `OpcodeDeferAbort` for this
 	// entry. It signifies that the deferred run hasn't queued yet, so it can be
 	// aborted.
 	//

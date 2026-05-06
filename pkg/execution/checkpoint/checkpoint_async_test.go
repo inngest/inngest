@@ -273,16 +273,16 @@ func TestCheckpointAsyncSteps_DeferAdd(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
-// TestCheckpointAsyncSteps_DeferCancel asserts the async cancel path: flip
-// the target defer to Cancelled. SDK-side memoization is carried by the
+// TestCheckpointAsyncSteps_DeferAbort asserts the async abort path: flip
+// the target defer to Aborted. SDK-side memoization is carried by the
 // SDKRequest `Defers` map, not the steps map, so no SaveStep is expected.
-func TestCheckpointAsyncSteps_DeferCancel(t *testing.T) {
+func TestCheckpointAsyncSteps_DeferAbort(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
 	op := state.GeneratorOpcode{
-		ID: "step-cancel",
-		Op: enums.OpcodeDeferCancel,
+		ID: "step-abort",
+		Op: enums.OpcodeDeferAbort,
 		Opts: map[string]any{
 			"target_hashed_id": "step-defer",
 		},

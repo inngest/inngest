@@ -163,7 +163,7 @@ type RunContext interface {
 	IncrementAttempt()
 
 	// OnlyHasLazyOps reports whether the opcode batch being processed contains
-	// only lazy ops (DeferAdd, DeferCancel), i.e. no host op to drive forward
+	// only lazy ops (DeferAdd, DeferAbort), i.e. no host op to drive forward
 	// progress. Lazy ops normally piggyback on a host (e.g. StepRun); the
 	// all-lazy case shouldn't happen, but lazy handlers fall back to enqueueing
 	// their own discovery step when it does. See enums.OpcodeIsLazy.

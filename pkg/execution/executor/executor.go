@@ -3386,8 +3386,8 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 			)
 		}
 		return nil
-	case enums.OpcodeDeferCancel:
-		err := e.handleGeneratorDeferCancel(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferAbort:
+		err := e.handleGeneratorDeferAbort(ctx, runCtx, gen, edge)
 		if err != nil {
 			// Log without returning the error. We may rethink this as the Defer
 			// feature matures.
@@ -3516,17 +3516,17 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAdd")
 }
 
-func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// If the SDK emits `[DeferAdd("X"), DeferCancel("X")]` in one response, the
-	// two ops race within the priority group's errgroup. If DeferCancel runs
+func (e *executor) handleGeneratorDeferAbort(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// If the SDK emits `[DeferAdd("X"), DeferAbort("X")]` in one response, the
+	// two ops race within the priority group's errgroup. If DeferAbort runs
 	// first it will error. We don't guard against this here (e.g. by writing a
 	// cancelled tombstone when the defer is absent) because emitting an
-	// DeferAdd and DeferCancel for the same hashed ID in a single response is
+	// DeferAdd and DeferAbort for the same hashed ID in a single response is
 	// an SDK bug, and the cost of handling it isn't worth the complexity.
-	if err := defers.CancelFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+	if err := defers.AbortFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
 		return err
 	}
-	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferCancel")
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAbort")
 }
 
 // enqueueLazyOpFallback ensures that a run doesn't hang due to an "only lazy

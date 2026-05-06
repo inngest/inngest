@@ -26,7 +26,7 @@ type OpcodeGroup struct {
 
 // OpcodeGroups groups opcodes by processing priority. The priority group runs
 // first so waitForEvent triggers are saved immediately (capturing expression
-// errors early) and lazy ops like DeferAdd/DeferCancel — which the SDK
+// errors early) and lazy ops like DeferAdd/DeferAbort — which the SDK
 // piggybacks onto other ops — drain before RunComplete can finalize and delete
 // state.
 type OpcodeGroups struct {

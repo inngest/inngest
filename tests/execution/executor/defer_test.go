@@ -273,7 +273,7 @@ func TestDeferFinalize(t *testing.T) {
 		}))
 		r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
 			FnSlug:         "onDefer-cleanup",
-			HashedID:       "hash-cancelled",
+			HashedID:       "hash-aborted",
 			ScheduleStatus: enums.DeferStatusAborted,
 			Input:          json.RawMessage(`{}`),
 		}))
@@ -309,7 +309,7 @@ func TestDeferFinalize(t *testing.T) {
 		}
 
 		r.Equal([]string{"onDefer-score"}, deferredFnSlugs,
-			"only the AfterRun defer should emit deferred.schedule; cancelled must not")
+			"only the AfterRun defer should emit deferred.schedule; aborted must not")
 		r.NotNil(activeData)
 
 		inn := activeData["_inngest"].(map[string]any)
@@ -721,7 +721,7 @@ func TestDeferAdd(t *testing.T) {
 
 		for _, ids := range calls {
 			r.NotContains(ids, deferStepID,
-				"lazy op IDs (DeferAdd, DeferCancel) must not enter the pending set; got %v", ids)
+				"lazy op IDs (DeferAdd, DeferAbort) must not enter the pending set; got %v", ids)
 		}
 	})
 
@@ -864,16 +864,16 @@ func TestDeferAdd(t *testing.T) {
 	})
 }
 
-func TestDeferCancel(t *testing.T) {
+func TestDeferAbort(t *testing.T) {
 	t.Run("consistent across executor and checkpoint paths", func(t *testing.T) {
-		// Originally added to catch a regression where DeferCancel worked
+		// Originally added to catch a regression where DeferAbort worked
 		// in non-checkpointing codepaths but not in checkpointing.
 		infra := newDeferTestInfra(t)
 		ctx := infra.ctx
 
 		const (
 			deferStepID  = "step-defer"
-			cancelStepID = "step-cancel"
+			abortStepID = "step-abort"
 		)
 		seed := statev2.Defer{
 			FnSlug:         "onDefer-score",
@@ -887,9 +887,9 @@ func TestDeferCancel(t *testing.T) {
 		expected.ScheduleStatus = enums.DeferStatusAborted
 		expected.Input = nil
 
-		cancelOp := state.GeneratorOpcode{
-			ID: cancelStepID,
-			Op: enums.OpcodeDeferCancel,
+		abortOp := state.GeneratorOpcode{
+			ID: abortStepID,
+			Op: enums.OpcodeDeferAbort,
 			Opts: map[string]any{
 				"target_hashed_id": deferStepID,
 			},
@@ -903,7 +903,7 @@ func TestDeferCancel(t *testing.T) {
 				name: "executor",
 				run: func(t *testing.T) statev2.ID {
 					driver := &mockDriverV1{
-						response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&cancelOp}},
+						response: &state.DriverResponse{StatusCode: 206, Generator: []*state.GeneratorOpcode{&abortOp}},
 						t:        t,
 					}
 					exec := infra.newExecutor(t, driver)
@@ -914,9 +914,9 @@ func TestDeferCancel(t *testing.T) {
 					}, queue.Item{
 						Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
 						Kind:        queue.KindStart,
-						Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
+						Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: abortStepID}},
 						WorkspaceID: infra.wsID,
-					}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
+					}, inngest.Edge{Incoming: "$trigger", Outgoing: abortStepID})
 					require.NoError(t, err)
 					return run.ID
 				},
@@ -935,7 +935,7 @@ func TestDeferCancel(t *testing.T) {
 						FnID:      infra.fnID,
 						Metadata:  run,
 						RunID:     run.ID.RunID,
-						Steps:     []state.GeneratorOpcode{cancelOp},
+						Steps:     []state.GeneratorOpcode{abortOp},
 					})
 					require.NoError(t, err)
 					return run.ID
@@ -953,7 +953,7 @@ func TestDeferCancel(t *testing.T) {
 						EnvID:     infra.wsID,
 						FnID:      infra.fnID,
 						RunID:     run.ID.RunID,
-						Steps:     []state.GeneratorOpcode{cancelOp},
+						Steps:     []state.GeneratorOpcode{abortOp},
 					})
 					require.NoError(t, err)
 					return run.ID
@@ -985,7 +985,7 @@ func TestDeferCancel(t *testing.T) {
 
 		const (
 			deferStepID  = "step-defer"
-			cancelStepID = "step-cancel"
+			abortStepID = "step-abort"
 		)
 
 		driver := &mockDriverV1{
@@ -994,8 +994,8 @@ func TestDeferCancel(t *testing.T) {
 				StatusCode: 206,
 				Generator: []*state.GeneratorOpcode{
 					{
-						Op: enums.OpcodeDeferCancel,
-						ID: cancelStepID,
+						Op: enums.OpcodeDeferAbort,
+						ID: abortStepID,
 						Opts: map[string]any{
 							"target_hashed_id": deferStepID,
 						},
@@ -1022,13 +1022,13 @@ func TestDeferCancel(t *testing.T) {
 			WorkspaceID: infra.wsID,
 			Kind:        queue.KindStart,
 			Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: run.ID.RunID, AccountID: infra.aID},
-			Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID}},
-		}, inngest.Edge{Incoming: "$trigger", Outgoing: cancelStepID})
+			Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: abortStepID}},
+		}, inngest.Edge{Incoming: "$trigger", Outgoing: abortStepID})
 		r.NoError(err)
 
 		enqueuesDuringExecute := countingQ.enqueues - countBeforeExecute
 		r.Equal(1, enqueuesDuringExecute,
-			"bare DeferCancel should enqueue exactly one discovery step; got %d enqueues", enqueuesDuringExecute)
+			"bare DeferAbort should enqueue exactly one discovery step; got %d enqueues", enqueuesDuringExecute)
 
 		defers, err := infra.smv2.LoadDefers(infra.ctx, run.ID)
 		r.NoError(err)

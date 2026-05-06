@@ -430,27 +430,27 @@ func (d *DeferAddOpts) UnmarshalAny(a any) error {
 	return nil
 }
 
-func (g GeneratorOpcode) DeferCancelOpts() (*DeferCancelOpts, error) {
-	opts := &DeferCancelOpts{}
+func (g GeneratorOpcode) DeferAbortOpts() (*DeferAbortOpts, error) {
+	opts := &DeferAbortOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
 		return nil, err
 	}
 	return opts, opts.Validate()
 }
 
-type DeferCancelOpts struct {
+type DeferAbortOpts struct {
 	TargetHashedID string `json:"target_hashed_id"`
 }
 
-func (d *DeferCancelOpts) Validate() error {
+func (d *DeferAbortOpts) Validate() error {
 	if d.TargetHashedID == "" {
 		return fmt.Errorf("TargetHashedID is required")
 	}
 	return nil
 }
 
-func (d *DeferCancelOpts) UnmarshalAny(a any) error {
-	opts := DeferCancelOpts{}
+func (d *DeferAbortOpts) UnmarshalAny(a any) error {
+	opts := DeferAbortOpts{}
 	var mappedByt []byte
 	switch typ := a.(type) {
 	case []byte:
