@@ -3237,8 +3237,17 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
-	// We only save pending steps if there's >= 1 step planned op.
-	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
+	// Save pending step IDs so that SaveStep can atomically track which
+	// parallel branches are still outstanding.  When the last branch
+	// completes, SaveStep returns hasPendingSteps=false and a single
+	// discovery step is enqueued.
+	//
+	// Previously this was gated on ShouldCoalesceParallelism (RequestVersion
+	// >= 2), which left the pending set empty for older SDKs.  With an empty
+	// pending set every step completion saw hasPendingSteps=false and
+	// enqueued its own discovery step, causing the final sequential step
+	// after a parallel group to execute more than once.
+	if hasPlanOp(resp.Generator) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
