@@ -72,9 +72,6 @@ func (r *ProcessResult) SetSemaphoreCapacity(ctx context.Context, sm constrainta
 // This is the single entry point for function registration logic shared between
 // devserver and cloud.
 func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts ProcessOpts) (*ProcessResult, error) {
-	if len(req.Functions) == 0 {
-		return nil, sdk.ErrNoFunctions
-	}
 
 	// Collect all errors for reporting.
 	var errs error
@@ -131,5 +128,8 @@ func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts Process
 		}
 	}
 
+	if len(req.Functions) == 0 {
+		return result, sdk.ErrNoFunctions
+	}
 	return result, nil
 }
