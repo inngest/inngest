@@ -1,8 +1,7 @@
 import { inngest } from "@/inngest/client";
 
 export const testSdkSteps = inngest.createFunction(
-  { id: "step-test" },
-  { event: "tests/step.test" },
+  { id: "step-test", triggers: [{ event: "tests/step.test" }] },
   async ({ event, step }) => {
 
     const data = await step.run("first step", async () => {

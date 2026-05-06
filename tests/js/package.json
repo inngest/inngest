@@ -18,10 +18,11 @@
     "@types/node": "18.13.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "inngest": "3.11.1-pr-411.4",
+    "inngest": "4.2.6",
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "zod": "^4.4.3"
   }
 }

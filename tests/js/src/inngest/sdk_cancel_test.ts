@@ -4,6 +4,7 @@ export const testCancel = inngest.createFunction(
   {
     id: "cancel-test",
     retries: 10,
+    triggers: [{ event: "tests/cancel.test" }],
     cancelOn: [
       {
         event: "cancel/please",
@@ -12,7 +13,6 @@ export const testCancel = inngest.createFunction(
       },
     ]
   },
-  { event: "tests/cancel.test" },
   async ({ event, step }) => {
     // Wait for 10 seconds.
     await step.sleep("sleep", "10s");

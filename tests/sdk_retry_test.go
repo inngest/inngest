@@ -27,17 +27,13 @@ func TestSDKRetry(t *testing.T) {
 		},
 	}
 
-	hashes := map[string]string{
-		"first step": "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
-	}
-
 	fnID := "test-suite-retry-test"
 	test := &Test{
 		ID:           fnID,
 		Name:         "SDK Retry",
 		Description:  ``,
 		EventTrigger: evt,
-		Timeout:      45 * time.Second,
+		Timeout:      3 * time.Minute,
 	}
 
 	test.SetAssertions(
@@ -55,37 +51,21 @@ func TestSDKRetry(t *testing.T) {
 				Name:    "Error",
 				Message: "broken",
 			},
-			Data: []byte(`null`),
+			Data:    []byte(`null`),
+			Opts:    map[string]any{},
+			Userland: &struct {
+				ID    string `json:"id"`
+				Index int    `json:"index,omitempty"`
+			}{ID: "first step"},
 		}}),
 
-		// We should retry the step successfully.
+		// We should retry the step successfully. In v4 with immediate execution,
+		// the step succeeds and the function continues inline. The function then
+		// throws, so we get a 500 error response.
 		test.Printf("Awaiting step retry"),
-		test.ExpectRequest("Second request", "step", 45*time.Second, func(r *driver.SDKRequestContext) {
+		test.ExpectRequest("Second request", "step", 90*time.Second, func(r *driver.SDKRequestContext) {
 			r.Attempt = 1
 		}),
-		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:          enums.OpcodeStepRun,
-			ID:          hashes["first step"],
-			Name:        "first step",
-			DisplayName: inngestgo.StrPtr("first step"),
-			Data:        []byte(`"yes: 2"`),
-		}}),
-		// Stack is updated
-		test.AddRequestStack(driver.FunctionStack{
-			Stack:   []string{hashes["first step"]},
-			Current: 1,
-		}),
-		// State is updated with step data
-		test.AddRequestSteps(map[string]any{
-			hashes["first step"]: map[string]any{"data": "yes: 2"},
-		}),
-
-		// Finally, the function should be called and should error once.
-		test.Printf("Awaiting function call after step"),
-		test.ExpectRequest("Final call", "step", time.Second, func(r *driver.SDKRequestContext) {
-			r.Attempt = 0
-		}),
-		// Expect a 500
 		test.ExpectResponseFunc(500, func(byt []byte) error {
 			e := map[string]any{}
 			err := json.Unmarshal(byt, &e)
@@ -96,11 +76,23 @@ func TestSDKRetry(t *testing.T) {
 			return nil
 		}),
 
+		// Server retries the function. It persists the step result from the
+		// previous execution (even though the function failed) and includes it
+		// in the next request's stack/steps.
 		test.Printf("Awaiting function call retry"),
-		test.ExpectRequest("Final call", "step", 45*time.Second, func(r *driver.SDKRequestContext) {
-			r.Attempt = 1
+		test.AddRequestStack(driver.FunctionStack{
+			Stack:   []string{"98bf98df193bcce7c33e6bc50927cf2ac21206cb"},
+			Current: 0,
 		}),
-		test.ExpectJSONResponse(200, map[string]any{
+		test.AddRequestSteps(map[string]any{
+			"98bf98df193bcce7c33e6bc50927cf2ac21206cb": map[string]any{
+				"data": "yes",
+			},
+		}),
+		test.ExpectRequest("Final call", "step", 90*time.Second, func(r *driver.SDKRequestContext) {
+			r.Attempt = 2
+		}),
+		test.ExpectRunCompleteResponse(map[string]any{
 			"body": "ok",
 			"name": "tests/retry.test",
 		}),

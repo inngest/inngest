@@ -53,71 +53,36 @@ func TestSDKSteps(t *testing.T) {
 
 		test.SendTrigger(),
 
-		// Expect to run the first step immediately, no plan included.  The SDK
-		// optimizes single steps to run immediately.
+		// In v4, the SDK does immediate execution of step.run("first step")
+		// inline and continues to the next blocking operation (sleep).
 		test.ExpectRequest("Initial request plan", "step", time.Second),
-		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:          enums.OpcodeStepRun,
-			ID:          hashes["first step"],
-			Name:        "first step",
-			DisplayName: inngestgo.StrPtr("first step"),
-			Data:        []byte(`"first step"`),
-		}}),
-		// Stack is updated
-		test.AddRequestStack(driver.FunctionStack{
-			Stack:   []string{hashes["first step"]},
-			Current: 1,
-		}),
-		// State is updated with step data
-		test.AddRequestSteps(map[string]any{
-			hashes["first step"]: map[string]any{"data": "first step"},
-		}),
-
-		// Execute the step again, get a wait
-		test.ExpectRequest("Wait step run", "step", time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:          enums.OpcodeSleep,
 			ID:          hashes["sleep"],
 			Data:        json.RawMessage("null"),
 			Name:        "2s",
 			DisplayName: inngestgo.StrPtr("for 2s"),
+			Opts:        map[string]any{},
+			Userland: &struct {
+				ID    string `json:"id"`
+				Index int    `json:"index,omitempty"`
+			}{ID: "for 2s"},
 		}}),
-		// Update stack and state
+		// The server tracks both the inline-executed first step and the sleep
 		test.AddRequestStack(driver.FunctionStack{
-			Stack:   []string{hashes["sleep"]},
+			Stack:   []string{hashes["first step"], hashes["sleep"]},
 			Current: 2,
 		}),
 		test.AddRequestSteps(map[string]any{
-			hashes["sleep"]: nil,
+			hashes["first step"]: map[string]any{"data": "first step"},
+			hashes["sleep"]:      nil,
 		}),
 
-		// After the wait we should re-invoke the request _again_
+		// After the sleep, the SDK re-executes the function. The first step
+		// runs inline again (immediate execution), sleep is memoized, then
+		// second step runs inline, and the function returns.
 		test.ExpectRequest("Post wait", "step", 3*time.Second),
-		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:          enums.OpcodeStepRun,
-			ID:          hashes["second step"],
-			DisplayName: inngestgo.StrPtr("second step"),
-			Name:        "second step",
-			Data:        json.RawMessage(`{"first":"first step","second":true}`),
-		}}),
-
-		// Update state with step data
-		test.AddRequestStack(driver.FunctionStack{
-			Stack:   []string{hashes["second step"]},
-			Current: 3,
-		}),
-		test.AddRequestSteps(map[string]any{
-			hashes["second step"]: map[string]any{
-				"data": map[string]any{
-					"first":  "first step",
-					"second": true,
-				},
-			},
-		}),
-
-		// Finally, the function should be called and should return a 200
-		test.ExpectRequest("Final call", "step", time.Second),
-		test.ExpectJSONResponse(200, map[string]any{
+		test.ExpectRunCompleteResponse(map[string]any{
 			"body": "ok",
 			"name": "tests/step.test",
 		}),

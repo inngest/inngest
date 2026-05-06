@@ -56,6 +56,11 @@ func TestSDKCancelNotReceived(t *testing.T) {
 				Name:        "10s",
 				DisplayName: inngestgo.StrPtr("sleep"),
 				Data:        json.RawMessage("null"),
+				Opts:        map[string]any{},
+				Userland: &struct {
+					ID    string `json:"id"`
+					Index int    `json:"index,omitempty"`
+				}{ID: "sleep"},
 			}}),
 
 			// Send an unrelated event.
@@ -78,30 +83,10 @@ func TestSDKCancelNotReceived(t *testing.T) {
 				hashes["Sleep 10s"]: nil,
 			}),
 
-			// Then, within 10 seconds, we should call the function back.  This should
-			// respond with a step.
+			// In v4, after sleep the SDK does immediate execution of step.run
+			// and returns the final result directly.
 			test.ExpectRequest("After sleep step", "step", 10*time.Second),
-			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:          enums.OpcodeStepRun,
-				ID:          hashes["After the sleep"],
-				Name:        "After the sleep",
-				DisplayName: inngestgo.StrPtr("After the sleep"),
-				Data:        []byte(`"This should be cancelled if a matching cancel event is received"`),
-			}}),
-
-			// Update stack and state.  We should now have the step
-			// in our stack.
-			test.AddRequestStack(driver.FunctionStack{
-				Stack:   []string{hashes["After the sleep"]},
-				Current: 2,
-			}),
-			test.AddRequestSteps(map[string]any{
-				// Data is wrapped.
-				hashes["After the sleep"]: map[string]any{"data": "This should be cancelled if a matching cancel event is received"},
-			}),
-
-			test.ExpectRequest("Final request as cancel didn't match", "step", 1*time.Second),
-			test.ExpectJSONResponse(200, map[string]any{"name": "tests/cancel.test", "body": "ok"}),
+			test.ExpectRunCompleteResponse(map[string]any{"name": "tests/cancel.test", "body": "ok"}),
 		)
 
 		run(t, test)
@@ -159,6 +144,11 @@ func TestSDKCancelReceived(t *testing.T) {
 				Name:        "10s",
 				DisplayName: inngestgo.StrPtr("sleep"),
 				Data:        json.RawMessage("null"),
+				Opts:        map[string]any{},
+				Userland: &struct {
+					ID    string `json:"id"`
+					Index int    `json:"index,omitempty"`
+				}{ID: "sleep"},
 			}}),
 
 			test.After(time.Second),

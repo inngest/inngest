@@ -72,6 +72,10 @@ func TestSDKWaitForEvent_WithEvent(t *testing.T) {
 					"if":      "async.data.resume == true && async.data.id == event.data.id",
 					"timeout": "10s",
 				},
+				Userland: &struct {
+					ID    string `json:"id"`
+					Index int    `json:"index,omitempty"`
+				}{ID: "test/resume"},
 			}}),
 
 			// Send an unrelated event.
@@ -96,10 +100,9 @@ func TestSDKWaitForEvent_WithEvent(t *testing.T) {
 				hashes["wait"]: resume.Map(),
 			}),
 
-			// Then, within 10 seconds, we should call the function back.  This should
-			// respond with a step.
+			// Then, within 10 seconds, we should call the function back.
 			test.ExpectRequest("After wait step", "step", 1*time.Second),
-			test.ExpectJSONResponse(200, map[string]any{"result": map[string]any{"id": "123", "resume": true}}),
+			test.ExpectRunCompleteResponse(map[string]any{"result": map[string]any{"id": "123", "resume": true}}),
 		)
 
 		run(t, test)
@@ -167,6 +170,10 @@ func TestSDKWaitForEvent_NoEvent(t *testing.T) {
 					"if":      "async.data.resume == true && async.data.id == event.data.id",
 					"timeout": "10s",
 				},
+				Userland: &struct {
+					ID    string `json:"id"`
+					Index int    `json:"index,omitempty"`
+				}{ID: "test/resume"},
 			}}),
 
 			test.After(11*time.Second),
@@ -185,7 +192,7 @@ func TestSDKWaitForEvent_NoEvent(t *testing.T) {
 			// Then, after the wait timeout expires, we should call the function back.
 			// Use a generous timeout to account for CI latency.
 			test.ExpectRequest("After wait step", "step", 10*time.Second),
-			test.ExpectJSONResponse(200, map[string]any{}),
+			test.ExpectRunCompleteResponse(map[string]any{}),
 		)
 
 		run(t, test)

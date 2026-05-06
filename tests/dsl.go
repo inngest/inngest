@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/util/interval"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -268,17 +269,22 @@ func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() 
 			err = json.Unmarshal(byt, &actual)
 			require.NoError(t.test, err)
 
-			// If this is of type OpcodeError, we ignore the Stack field for now.
+			// If this is of type OpcodeError or OpcodeStepFailed, we ignore the Stack field.
 			// The Stack field contains absolute paths, which means the content
 			// changes depending on the machine that runs the tests.
-			//
-			// NOTE: This obviously also changes the opcode ID, so we also
-			// recreate the ID after clearing the stack.
-			if len(actual) == 1 && actual[0].Op == enums.OpcodeStepError {
-				actual[0].Error.Stack = "[proxy-redact]"
+			if len(actual) == 1 && (actual[0].Op == enums.OpcodeStepError || actual[0].Op == enums.OpcodeStepFailed) {
+				if actual[0].Error != nil {
+					actual[0].Error.Stack = "[proxy-redact]"
+				}
 				if len(expected) == 1 && expected[0].Error != nil {
 					expected[0].Error.Stack = "[proxy-redact]"
 				}
+			}
+
+			// Zero out Timing fields as they contain runtime timestamps
+			// that vary between runs.
+			for i := range actual {
+				actual[i].Timing = interval.Interval{}
 			}
 
 			require.EqualValues(t.test, expected, actual)
@@ -286,6 +292,24 @@ func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() 
 			require.Fail(t.test, "Expected SDK generator response but timed out")
 		}
 	}
+}
+
+// ExpectRunCompleteResponse expects the SDK to return a 206 with a RunComplete opcode
+// containing the given data. This is the v4 SDK behavior for function completion.
+func (t *Test) ExpectRunCompleteResponse(expected any) func() {
+	return t.ExpectResponseFunc(206, func(byt []byte) error {
+		actual := []state.GeneratorOpcode{}
+		err := json.Unmarshal(byt, &actual)
+		require.NoError(t.test, err)
+		require.Len(t.test, actual, 1)
+		require.Equal(t.test, enums.OpcodeRunComplete, actual[0].Op)
+
+		var data any
+		err = json.Unmarshal(actual[0].Data, &data)
+		require.NoError(t.test, err)
+		require.EqualValues(t.test, expected, data)
+		return nil
+	})
 }
 
 // ExpectParallelStepRuns is used to assert that step.run is called with the given number of steps

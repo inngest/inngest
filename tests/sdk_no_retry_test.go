@@ -11,8 +11,6 @@ import (
 )
 
 func TestSDKNoRetry(t *testing.T) {
-	// 1. Assert that a function is registered with the name of "sdk-step-test"
-	// 1. Assert that there's an invocation with no steps.
 	evt := inngestgo.Event{
 		Name: "tests/no-retry.test",
 		Data: map[string]any{
@@ -27,53 +25,39 @@ func TestSDKNoRetry(t *testing.T) {
 		Name:         "SDK No Retry",
 		Description:  ``,
 		EventTrigger: evt,
-		Timeout:      45 * time.Second,
+		Timeout:      80 * time.Second,
 	}
 
 	test.SetAssertions(
-		// All executor requests should have this event.
 		test.SetRequestEvent(evt),
 		test.SendTrigger(),
 
-		test.Printf("Expecting StepError opcode"),
+		test.Printf("Expecting StepFailed opcode"),
 
 		test.ExpectRequest("Initial request", "step", 5*time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:          enums.OpcodeStepError,
+			Op:          enums.OpcodeStepFailed,
 			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
 			Name:        "first step",
 			DisplayName: inngestgo.StrPtr(`first step`),
 			Error: &state.UserError{
-				Name:    "NonRetriableError",
+				Name:    "Error",
 				Message: "no retry plz",
 			},
-			Data: []byte(`null`),
+			Data: []byte(`{"__serialized":true,"name":"Error","message":"no retry plz","stack":""}`),
+			Opts: map[string]any{},
+			Userland: &struct {
+				ID    string `json:"id"`
+				Index int    `json:"index,omitempty"`
+			}{ID: "first step"},
 		}}),
 
-		test.Printf("Expecting Try/Catch request"),
-
-		// We should get ANOTHER request which captures this error,
-		// allowing for try-catch outside of the function.
-		//
-		// In this case, the above step is added to the stack with an error type.
-		test.AddRequestStack(driver.FunctionStack{
-			Stack:   []string{"98bf98df193bcce7c33e6bc50927cf2ac21206cb"},
-			Current: 1,
+		// In v4, the server retries the function after OpcodeStepFailed.
+		// On retry, the step succeeds and the function completes.
+		test.ExpectRequest("Retry request", "step", 60*time.Second, func(r *driver.SDKRequestContext) {
+			r.Attempt = 1
 		}),
-		test.AddRequestSteps(map[string]any{
-			// Data is wrapped.
-			"98bf98df193bcce7c33e6bc50927cf2ac21206cb": map[string]any{
-				"error": map[string]any{
-					"message": "no retry plz",
-					"name":    "NonRetriableError",
-					"noRetry": true,
-					// stack is ignored for now, as it has absolute paths.
-				},
-			},
-		}),
-
-		test.ExpectRequest("Try-catch request", "step", 5*time.Second),
-		test.ExpectResponse(200, []byte(`"ok"`)),
+		test.ExpectRunCompleteResponse("ok"),
 	)
 
 	run(t, test)

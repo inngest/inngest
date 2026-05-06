@@ -1,8 +1,7 @@
 import { inngest } from "@/inngest/client";
 
 export const testParallelism = inngest.createFunction(
-  { id: "step-parallelism" },
-  { event: "tests/parallel.test" },
+  { id: "step-parallelism", triggers: [{ event: "tests/parallel.test" }] },
   async ({ step }) => {
 
     const [a, b, c] = await Promise.all([

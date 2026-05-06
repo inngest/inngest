@@ -61,6 +61,11 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 				DisplayName: inngestgo.StrPtr("sleep"),
 				Data:        json.RawMessage("null"),
 				Name:        "10s",
+				Opts:        map[string]any{},
+				Userland: &struct {
+					ID    string `json:"id"`
+					Index int    `json:"index,omitempty"`
+				}{ID: "sleep"},
 			}}),
 
 			test.After(time.Second),

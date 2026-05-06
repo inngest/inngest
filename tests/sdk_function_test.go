@@ -38,7 +38,7 @@ func TestSDKFunctions(t *testing.T) {
 		// Send trigger.
 		test.SendTrigger(),
 		test.ExpectRequest("Initial request", "step", time.Second),
-		test.ExpectJSONResponse(200, map[string]any{"name": "tests/function.test", "body": "ok"}),
+		test.ExpectRunCompleteResponse(map[string]any{"name": "tests/function.test", "body": "ok"}),
 	)
 
 	run(t, test)
