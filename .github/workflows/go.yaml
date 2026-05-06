@@ -70,9 +70,14 @@ jobs:
         with:
           go-version-file: ./go.mod
 
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.12.0
+
       - name: Test
         run: |
-          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1 -coverprofile=coverage.txt
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- \
+            $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") \
+            -race -count=1 -coverprofile=coverage.txt
         env:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
@@ -83,4 +88,12 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
           flags: unit,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
