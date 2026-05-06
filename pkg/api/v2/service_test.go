@@ -484,29 +484,6 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		require.Nil(t, resp.Data.RootSpan.Children[0].Output)
 	})
 
-	t.Run("applies max depth", func(t *testing.T) {
-		maxDepth := uint32(1)
-		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
-			RunId:    runID.String(),
-			MaxDepth: &maxDepth,
-		})
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.True(t, resp.Data.RootSpan.ChildrenTruncated)
-		require.Empty(t, resp.Data.RootSpan.Children)
-	})
-
-	t.Run("rejects oversized max depth", func(t *testing.T) {
-		maxDepth := uint32(11)
-		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
-			RunId:    runID.String(),
-			MaxDepth: &maxDepth,
-		})
-		require.Nil(t, resp)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "max_depth must be between 1 and 10")
-	})
-
 }
 
 func mustEncodeSpanIdentifier(t *testing.T, id cqrs.SpanIdentifier) string {

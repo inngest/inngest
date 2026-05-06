@@ -1329,7 +1329,6 @@ message TraceSpan {
   optional google.protobuf.Struct output = 11;
   repeated TraceSpanMetadata metadata = 12;
   repeated TraceSpan children = 13;
-  bool children_truncated = 14;
 }
 
 message FunctionTrace {
@@ -1340,7 +1339,6 @@ message FunctionTrace {
 message GetFunctionTraceRequest {
   string run_id = 1;
   optional bool include_output = 2;
-  optional uint32 max_depth = 3;
 }
 
 message GetFunctionTraceResponse {

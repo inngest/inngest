@@ -3,7 +3,6 @@ package apiv2
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -18,11 +17,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-)
-
-const (
-	defaultTraceMaxDepth uint32 = 5
-	maxTraceMaxDepth     uint32 = 10
 )
 
 func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
@@ -69,17 +63,12 @@ func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTr
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
 	}
 
-	maxDepth, err := traceMaxDepth(req.MaxDepth)
-	if err != nil {
-		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, err.Error())
-	}
-
 	rootSpan, err := s.traces.GetSpansByRunID(ctx, runID)
 	if err != nil {
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Trace not found")
 	}
 
-	trace, err := toFunctionTrace(ctx, s.traces, rootSpan, req.GetIncludeOutput(), maxDepth)
+	trace, err := toFunctionTrace(ctx, s.traces, rootSpan, req.GetIncludeOutput())
 	if err != nil {
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to build trace response")
 	}
@@ -187,23 +176,13 @@ func optionalString(value string) *string {
 	return &value
 }
 
-func traceMaxDepth(value *uint32) (uint32, error) {
-	if value == nil {
-		return defaultTraceMaxDepth, nil
-	}
-	if *value == 0 || *value > maxTraceMaxDepth {
-		return 0, fmt.Errorf("max_depth must be between 1 and %d", maxTraceMaxDepth)
-	}
-	return *value, nil
-}
-
-func toFunctionTrace(ctx context.Context, reader FunctionTraceReader, root *cqrs.OtelSpan, includeOutput bool, maxDepth uint32) (*apiv2.FunctionTrace, error) {
+func toFunctionTrace(ctx context.Context, reader FunctionTraceReader, root *cqrs.OtelSpan, includeOutput bool) (*apiv2.FunctionTrace, error) {
 	span, err := loader.ConvertRunSpan(ctx, root)
 	if err != nil {
 		return nil, err
 	}
 
-	rootSpan, err := toTraceSpan(ctx, reader, span, includeOutput, 1, maxDepth)
+	rootSpan, err := toTraceSpan(ctx, reader, span, includeOutput)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +193,7 @@ func toFunctionTrace(ctx context.Context, reader FunctionTraceReader, root *cqrs
 	}, nil
 }
 
-func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.RunTraceSpan, includeOutput bool, depth uint32, maxDepth uint32) (*apiv2.TraceSpan, error) {
+func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.RunTraceSpan, includeOutput bool) (*apiv2.TraceSpan, error) {
 	result := &apiv2.TraceSpan{
 		Id:         span.SpanID,
 		Name:       span.Name,
@@ -252,14 +231,9 @@ func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.R
 		result.Output = output.output
 	}
 
-	if maxDepth > 0 && depth >= maxDepth {
-		result.ChildrenTruncated = len(span.ChildrenSpans) > 0
-		return result, nil
-	}
-
 	children := make([]*apiv2.TraceSpan, 0, len(span.ChildrenSpans))
 	for _, child := range span.ChildrenSpans {
-		mapped, err := toTraceSpan(ctx, reader, child, includeOutput, depth+1, maxDepth)
+		mapped, err := toTraceSpan(ctx, reader, child, includeOutput)
 		if err != nil {
 			return nil, err
 		}
