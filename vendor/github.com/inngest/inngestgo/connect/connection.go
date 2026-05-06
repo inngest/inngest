@@ -305,21 +305,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 					continue
 				}
 			case connectproto.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK:
-				{
-					var payload connectproto.WorkerRequestExtendLeaseAckData
-					if err := proto.Unmarshal(msg.Payload, &payload); err != nil {
-						h.logger.Error("could not parse extend lease ack", "err", err)
-						continue
-					}
-
-					h.workerPool.inProgressLeasesLock.Lock()
-					if payload.NewLeaseId != nil {
-						h.workerPool.inProgressLeases[payload.RequestId] = *payload.NewLeaseId
-					} else {
-						// remove local request lease to stop extending
-						delete(h.workerPool.inProgressLeases, payload.RequestId)
-					}
-					h.workerPool.inProgressLeasesLock.Unlock()
+				if err := h.handleWorkerRequestExtendLeaseAck(&msg); err != nil {
+					h.logger.Error("could not handle extend lease ack", "err", err)
+					continue
 				}
 			default:
 				h.logger.Debug("got unknown gateway request", "err", err)
@@ -430,6 +418,28 @@ func (h *connectHandler) handleMessageReplyAck(msg *connectproto.ConnectMessage)
 	}
 
 	h.messageBuffer.acknowledge(payload.RequestId)
+
+	return nil
+}
+
+func (h *connectHandler) handleWorkerRequestExtendLeaseAck(msg *connectproto.ConnectMessage) error {
+	var payload connectproto.WorkerRequestExtendLeaseAckData
+	if err := proto.Unmarshal(msg.Payload, &payload); err != nil {
+		return fmt.Errorf("could not unmarshal extend lease ack data: %w", err)
+	}
+
+	h.workerPool.inProgressLeasesLock.Lock()
+	defer h.workerPool.inProgressLeasesLock.Unlock()
+
+	if payload.NewLeaseId != nil {
+		if _, ok := h.workerPool.inProgressLeases[payload.RequestId]; !ok {
+			return nil
+		}
+		h.workerPool.inProgressLeases[payload.RequestId] = *payload.NewLeaseId
+	} else {
+		// remove local request lease to stop extending
+		delete(h.workerPool.inProgressLeases, payload.RequestId)
+	}
 
 	return nil
 }
