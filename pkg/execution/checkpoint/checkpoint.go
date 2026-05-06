@@ -328,12 +328,28 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 
 		case enums.OpcodeDeferAdd:
 			if err := defers.SaveFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
-				return err
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer add in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", input.Metadata.ID.RunID.String(),
+				)
 			}
 
 		case enums.OpcodeDeferAbort:
 			if err := defers.AbortFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
-				return err
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer abort in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", input.Metadata.ID.RunID.String(),
+				)
 			}
 
 		default:
@@ -477,12 +493,28 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 
 		case enums.OpcodeDeferAdd:
 			if err := defers.SaveFromOp(ctx, c.State, l, md.ID, op); err != nil {
-				return err
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer add in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", md.ID.RunID.String(),
+				)
 			}
 
 		case enums.OpcodeDeferAbort:
 			if err := defers.AbortFromOp(ctx, c.State, l, md.ID, op); err != nil {
-				return err
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer abort in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", md.ID.RunID.String(),
+				)
 			}
 
 		default:
