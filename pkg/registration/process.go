@@ -81,6 +81,10 @@ func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts Process
 		Functions: make([]inngest.DeployedFunction, 0, len(req.Functions)),
 	}
 
+	if len(req.Functions) == 0 {
+		return result, sdk.ErrNoFunctions
+	}
+
 	for _, sdkFn := range req.Functions {
 		fn, err := sdkFn.Function()
 		if err != nil {
@@ -128,8 +132,5 @@ func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts Process
 		}
 	}
 
-	if len(req.Functions) == 0 {
-		return result, sdk.ErrNoFunctions
-	}
 	return result, nil
 }
