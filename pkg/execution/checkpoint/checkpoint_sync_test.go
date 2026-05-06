@@ -949,6 +949,33 @@ func TestCheckpointSyncSteps_RunComplete(t *testing.T) {
 	}
 }
 
+// On a duplicate save, the OnStepFinished metric must be suppressed —
+// otherwise the same step gets counted twice (once by whichever path
+// originally persisted it, once by this checkpoint).
+func TestCheckpointSyncSteps_DuplicateSaveSuppressesStepFinishedMetric(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result": "step 1 output"}`),
+		Name: "Step 1",
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, op)
+
+	expectedData := map[string]any{"data": json.RawMessage(op.Data)}
+	expectedOutputBytes, _ := json.Marshal(expectedData)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedOutputBytes).
+		Return(false, state.ErrDuplicateResponse)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	mocks.metrics.AssertNotCalled(t, "OnStepFinished")
+}
+
 //
 //
 // Testing utils.
