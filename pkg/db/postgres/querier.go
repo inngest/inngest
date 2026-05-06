@@ -158,6 +158,17 @@ func (pq *pgQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*db.Fu
 	return functionFromPG(r), nil
 }
 
+func (pq *pgQuerier) GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*db.Function, error) {
+	r, err := pq.q.GetFunctionByAppNameAndSlug(ctx, sqlc.GetFunctionByAppNameAndSlugParams{
+		Name: appName,
+		Slug: slug,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return functionFromPG(r), nil
+}
+
 func (pq *pgQuerier) GetFunctions(ctx context.Context) ([]*db.Function, error) {
 	rows, err := pq.q.GetFunctions(ctx)
 	if err != nil {
@@ -166,8 +177,8 @@ func (pq *pgQuerier) GetFunctions(ctx context.Context) ([]*db.Function, error) {
 	return convertSlice(rows, functionFromPG), nil
 }
 
-func (pq *pgQuerier) InsertFunction(ctx context.Context, arg db.InsertFunctionParams) (*db.Function, error) {
-	r, err := pq.q.InsertFunction(ctx, sqlc.InsertFunctionParams{
+func (pq *pgQuerier) UpsertFunction(ctx context.Context, arg db.UpsertFunctionParams) (*db.Function, error) {
+	r, err := pq.q.UpsertFunction(ctx, sqlc.UpsertFunctionParams{
 		ID: arg.ID, AppID: arg.AppID, Name: arg.Name,
 		Slug: arg.Slug, Config: arg.Config, CreatedAt: arg.CreatedAt,
 	})
@@ -387,7 +398,12 @@ func (pq *pgQuerier) GetFunctionRunsTimebound(ctx context.Context, arg db.GetFun
 }
 
 func (pq *pgQuerier) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*db.FunctionFinish, error) {
-	rows, err := pq.q.GetFunctionRunFinishesByRunIDs(ctx, runIds)
+	// Postgres sqlc expects [][]byte for this query.
+	byteIDs := make([][]byte, len(runIds))
+	for i, id := range runIds {
+		byteIDs[i] = id[:]
+	}
+	rows, err := pq.q.GetFunctionRunFinishesByRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}

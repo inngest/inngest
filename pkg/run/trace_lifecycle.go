@@ -820,6 +820,10 @@ func (l traceLifecycle) OnStepFinished(
 				span.SetStepRunType(typ)
 			}
 
+			if stepType := op.StepType(); stepType != enums.StepTypeUnknown {
+				span.SetStepType(stepType)
+			}
+
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
 				span.SetStatus(codes.Error, op.Error.Message)

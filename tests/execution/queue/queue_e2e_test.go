@@ -229,7 +229,9 @@ func TestQueueE2E(t *testing.T) {
 			queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
 			shard := redis_state.NewQueueShard("test", queueClient, options...)
 
-			q, err := queue.New(ctx, "test", shard, nil, nil, options...)
+			shardRegistry, err := queue.NewSingleShardRegistry(shard)
+			require.NoError(t, err)
+			q, err := queue.New(ctx, "test", shardRegistry, options...)
 			require.NoError(t, err)
 
 			sem := pool.New().

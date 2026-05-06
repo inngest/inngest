@@ -48,6 +48,19 @@ type FunctionReader interface {
 	GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID string, functionID string) (*Function, error)
 	// GetFunctionByInternalUUID returns a function given the internal ID.
 	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*Function, error)
+	// GetActiveFunctionByAppAndSlug returns an active (non-archived) function
+	// given its parent app's user-facing name and the function's slug.
+	//
+	// Keyed on app name (not internal UUID) because the dev server derives app
+	// UUIDs from different inputs across paths — placeholder rows hash the URL,
+	// post-sync rows hash the name — so a UUID-keyed lookup can miss the row
+	// the caller actually wants. The name is the one identifier that's stable
+	// across both paths.
+	//
+	// (app_id, slug) remains the natural identity at the storage layer (see the
+	// partial unique index `functions_app_id_slug_active_key`); this method is
+	// the caller-facing lookup that resolves to the right `app_id` via name.
+	GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
 }
 
 // DevFunctionManager is a development-only function manager
@@ -64,7 +77,7 @@ type DevFunctionManager interface {
 
 // FunctionCreator creates functions in the backing store.
 type FunctionCreator interface {
-	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
+	UpsertFunction(ctx context.Context, params UpsertFunctionParams) (*Function, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 }
 
@@ -82,7 +95,7 @@ type DevFunctionWriter interface {
 	DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error
 }
 
-type InsertFunctionParams struct {
+type UpsertFunctionParams struct {
 	ID        uuid.UUID
 	AccountID uuid.UUID
 	EnvID     uuid.UUID

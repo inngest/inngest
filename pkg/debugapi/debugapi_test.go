@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
@@ -64,17 +63,13 @@ func setupBatchManager(t *testing.T, rc rueidis.Client) batch.BatchManager {
 		}),
 	}
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient, opts...)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
 
 	q, err := queue.New(
 		context.Background(),
 		"batch-test",
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
+		shardRegistry,
 		opts...,
 	)
 	require.NoError(t, err)
@@ -93,17 +88,13 @@ func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
 		}),
 	}
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient, opts...)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
 
 	q, err := queue.New(
 		context.Background(),
 		"debounce-test",
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
+		shardRegistry,
 		opts...,
 	)
 	require.NoError(t, err)
@@ -172,14 +163,10 @@ func TestGetSingletonInfoHandler(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	queueClient := unshardedClient.Queue()
 
-	shardSelector := func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-		return redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient), nil
-	}
-	singletonStore := singleton.New(ctx, map[string]*redis_state.QueueClient{
-		consts.DefaultQueueShardName: queueClient,
-	}, shardSelector)
-
-	d := &debugAPI{singletonStore: singletonStore}
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	d := &debugAPI{shards: shardRegistry}
 
 	functionID := uuid.New()
 	singletonKey := functionID.String()
@@ -187,7 +174,7 @@ func TestGetSingletonInfoHandler(t *testing.T) {
 
 	// Set the singleton lock
 	redisKey := queueClient.KeyGenerator().SingletonKey(&queue.Singleton{Key: singletonKey})
-	err := rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
+	err = rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
 	require.NoError(t, err)
 
 	// Test handler correctly converts store response to protobuf
@@ -268,18 +255,6 @@ func TestGetBatchInfoNilManager(t *testing.T) {
 	require.Contains(t, err.Error(), "batch manager not configured")
 }
 
-func TestGetSingletonInfoNilStore(t *testing.T) {
-	d := &debugAPI{
-		singletonStore: nil,
-	}
-
-	_, err := d.GetSingletonInfo(context.Background(), &pb.SingletonInfoRequest{
-		FunctionId: uuid.New().String(),
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "singleton store not configured")
-}
-
 func TestGetDebounceInfoNilDebouncer(t *testing.T) {
 	d := &debugAPI{
 		debouncer: nil,
@@ -313,18 +288,14 @@ func TestGetSingletonInfoInvalidFunctionID(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	queueClient := unshardedClient.Queue()
 
-	shardSelector := func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-		return redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient), nil
-	}
-	singletonStore := singleton.New(context.Background(), map[string]*redis_state.QueueClient{
-		consts.DefaultQueueShardName: queueClient,
-	}, shardSelector)
-
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
 	d := &debugAPI{
-		singletonStore: singletonStore,
+		shards: shardRegistry,
 	}
 
-	_, err := d.GetSingletonInfo(context.Background(), &pb.SingletonInfoRequest{
+	_, err = d.GetSingletonInfo(context.Background(), &pb.SingletonInfoRequest{
 		FunctionId: "invalid-uuid",
 	})
 	require.Error(t, err)
@@ -472,14 +443,10 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	queueClient := unshardedClient.Queue()
 
-	shardSelector := func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-		return redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient), nil
-	}
-	singletonStore := singleton.New(ctx, map[string]*redis_state.QueueClient{
-		consts.DefaultQueueShardName: queueClient,
-	}, shardSelector)
-
-	d := &debugAPI{singletonStore: singletonStore}
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	d := &debugAPI{shards: shardRegistry}
 
 	functionID := uuid.New()
 	singletonKey := functionID.String()
@@ -487,7 +454,7 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 
 	// Set the singleton lock
 	redisKey := queueClient.KeyGenerator().SingletonKey(&queue.Singleton{Key: singletonKey})
-	err := rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
+	err = rc.Do(ctx, rc.B().Set().Key(redisKey).Value(runID.String()).Build()).Error()
 	require.NoError(t, err)
 
 	// Test handler correctly deletes the lock
@@ -531,18 +498,6 @@ func TestRunBatchNilManager(t *testing.T) {
 	require.Contains(t, err.Error(), "batch manager not configured")
 }
 
-func TestDeleteSingletonLockNilStore(t *testing.T) {
-	d := &debugAPI{
-		singletonStore: nil,
-	}
-
-	_, err := d.DeleteSingletonLock(context.Background(), &pb.DeleteSingletonLockRequest{
-		FunctionId: uuid.New().String(),
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "singleton store not configured")
-}
-
 func TestDeleteBatchInvalidFunctionID(t *testing.T) {
 	rc, _ := setupTestRedis(t)
 	batchManager := setupBatchManager(t, rc)
@@ -579,18 +534,14 @@ func TestDeleteSingletonLockInvalidFunctionID(t *testing.T) {
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	queueClient := unshardedClient.Queue()
 
-	shardSelector := func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-		return redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient), nil
-	}
-	singletonStore := singleton.New(context.Background(), map[string]*redis_state.QueueClient{
-		consts.DefaultQueueShardName: queueClient,
-	}, shardSelector)
-
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, queueClient)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
 	d := &debugAPI{
-		singletonStore: singletonStore,
+		shards: shardRegistry,
 	}
 
-	_, err := d.DeleteSingletonLock(context.Background(), &pb.DeleteSingletonLockRequest{
+	_, err = d.DeleteSingletonLock(context.Background(), &pb.DeleteSingletonLockRequest{
 		FunctionId: "invalid-uuid",
 	})
 	require.Error(t, err)

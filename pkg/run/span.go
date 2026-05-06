@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -572,6 +573,10 @@ func (s *Span) SetAIResponseMetadata(data any) {
 
 func (s *Span) SetStepRunType(t string) {
 	s.SetAttributes(attribute.String(consts.OtelSysStepRunType, t))
+}
+
+func (s *Span) SetStepType(t enums.StepType) {
+	s.SetAttributes(attribute.String(consts.OtelSysStepType, t.String()))
 }
 
 func (s *Span) setAttrData(data any, key string) {

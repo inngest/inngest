@@ -303,13 +303,13 @@ func TestNextScheduleCalculation(t *testing.T) {
 func TestCronSyncerInterface(t *testing.T) {
 	t.Run("CronManager implements CronSyncer", func(t *testing.T) {
 		// This test verifies that CronManager satisfies the CronSyncer interface
-		var _ CronSyncer = (*redisCronManager)(nil)
+		var _ CronSyncer = (*manager)(nil)
 
 		// Also verify through CronManager interface
-		var manager CronManager
+		var cm CronManager
 
 		// If this compiles, the interface embedding is working correctly
-		syncer := CronSyncer(manager)
+		syncer := CronSyncer(cm)
 		_ = syncer
 	})
 }
