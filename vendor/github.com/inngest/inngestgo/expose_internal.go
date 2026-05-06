@@ -56,9 +56,7 @@ type (
 	// 		event.data.account_id
 	//
 	// Concurrency is then limited for each unique account_id field in parent events.
-	ConfigStepConcurrency = fn.StepConcurrency
-	ConfigFnConcurrency   = fn.FnConcurrency
-	ConfigConcurrency     = fn.ConcurrencyLimits
+	ConfigStepConcurrency = fn.Concurrency
 
 	// ConfigCancel represents a cancellation signal for a function.  When specified, this
 	// will set up pauses which automatically cancel the function based off of matching

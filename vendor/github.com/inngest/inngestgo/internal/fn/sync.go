@@ -41,7 +41,9 @@ type SyncConfig struct {
 
 	// Concurrency allows limiting the concurrency of running functions, optionally constrained
 	// by an individual concurrency key.
-	Concurrency *ConcurrencyLimits `json:"concurrency,omitempty"`
+	//
+	// This may be an int OR a struct, for backwards compatibility.
+	Concurrency []Concurrency `json:"concurrency,omitempty"`
 
 	// Priority represents the priority information for this function.
 	Priority *Priority `json:"priority,omitempty"`
