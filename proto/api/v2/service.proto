@@ -1066,22 +1066,6 @@ service V2 {
     };
   }
 
-  rpc GetFunctionTraceSpan(GetFunctionTraceSpanRequest) returns (GetFunctionTraceSpanResponse) {
-    option (google.api.http) = {
-      get: "/runs/{run_id}/trace/spans/{span_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get function trace span"
-      description: "Fetches a trace subtree rooted at a single span"
-      security: {
-        security_requirement: {
-          key: "BearerAuth"
-          value: {}
-        }
-      }
-    };
-  }
-
   rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/invoke",
@@ -1355,34 +1339,10 @@ message GetFunctionTraceRequest {
   string run_id = 1;
   optional bool include_output = 2;
   optional uint32 max_depth = 3;
-  optional string cursor = 4 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Pagination cursor from previous response"
-    }
-  ];
-  optional int32 limit = 5 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Number of root trace spans to return per page (min: 1, max: 250)"
-      default: "100"
-    }
-  ];
 }
 
 message GetFunctionTraceResponse {
   FunctionTrace data = 1;
-  ResponseMetadata metadata = 2;
-  Page page = 3;
-}
-
-message GetFunctionTraceSpanRequest {
-  string run_id = 1;
-  string span_id = 2;
-  optional bool include_output = 3;
-  optional uint32 max_depth = 4;
-}
-
-message GetFunctionTraceSpanResponse {
-  TraceSpan data = 1;
   ResponseMetadata metadata = 2;
 }
 
