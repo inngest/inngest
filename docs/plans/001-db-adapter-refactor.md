@@ -1,4 +1,6 @@
 ---
+TITLE: DB Adapter Refactor
+AUTHOR: Darwin D. Wu
 STATUS: Done
 ---
 
