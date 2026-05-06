@@ -90,54 +90,6 @@ func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTr
 	}, nil
 }
 
-func (s *Service) GetFunctionTraceSpan(ctx context.Context, req *apiv2.GetFunctionTraceSpanRequest) (*apiv2.GetFunctionTraceSpanResponse, error) {
-	if req.RunId == "" {
-		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")
-	}
-	if req.SpanId == "" {
-		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Span ID is required")
-	}
-
-	if s.traces == nil {
-		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get function trace span is not yet implemented")
-	}
-
-	runID, err := ulid.Parse(req.RunId)
-	if err != nil {
-		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
-	}
-
-	maxDepth, err := traceMaxDepth(req.MaxDepth)
-	if err != nil {
-		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, err.Error())
-	}
-
-	rootSpan, err := s.traces.GetSpansByRunID(ctx, runID)
-	if err != nil {
-		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Trace not found")
-	}
-
-	span, err := loader.ConvertRunSpan(ctx, rootSpan)
-	if err != nil {
-		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to build trace response")
-	}
-
-	target := findTraceSpan(span, req.SpanId)
-	if target == nil {
-		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Trace span not found")
-	}
-
-	data, err := toTraceSpan(ctx, s.traces, target, req.GetIncludeOutput(), 1, maxDepth)
-	if err != nil {
-		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to build trace response")
-	}
-
-	return &apiv2.GetFunctionTraceSpanResponse{
-		Data:     data,
-		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
-	}, nil
-}
-
 func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOutput bool) *apiv2.FunctionRun {
 	queuedAt := timestamppb.New(ulid.Time(run.RunID.Time()))
 	startedAt := timestamppb.New(run.RunStartedAt)
@@ -300,7 +252,7 @@ func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.R
 		result.Output = output.output
 	}
 
-	if depth >= maxDepth {
+	if maxDepth > 0 && depth >= maxDepth {
 		result.ChildrenTruncated = len(span.ChildrenSpans) > 0
 		return result, nil
 	}
@@ -316,21 +268,6 @@ func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.R
 	result.Children = children
 
 	return result, nil
-}
-
-func findTraceSpan(root *models.RunTraceSpan, spanID string) *models.RunTraceSpan {
-	if root == nil {
-		return nil
-	}
-	if root.SpanID == spanID {
-		return root
-	}
-	for _, child := range root.ChildrenSpans {
-		if found := findTraceSpan(child, spanID); found != nil {
-			return found
-		}
-	}
-	return nil
 }
 
 func toTraceSpanStatus(status models.RunTraceSpanStatus) apiv2.TraceSpanStatus {

@@ -65,8 +65,6 @@ const (
 	V2SyncAppProcedure = "/api.v2.V2/SyncApp"
 	// V2GetFunctionTraceProcedure is the fully-qualified name of the V2's GetFunctionTrace RPC.
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
-	// V2GetFunctionTraceSpanProcedure is the fully-qualified name of the V2's GetFunctionTraceSpan RPC.
-	V2GetFunctionTraceSpanProcedure = "/api.v2.V2/GetFunctionTraceSpan"
 	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
 	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
 )
@@ -91,7 +89,6 @@ type V2Client interface {
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
-	GetFunctionTraceSpan(context.Context, *connect.Request[v2.GetFunctionTraceSpanRequest]) (*connect.Response[v2.GetFunctionTraceSpanResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 }
 
@@ -196,12 +193,6 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
 			connect.WithClientOptions(opts...),
 		),
-		getFunctionTraceSpan: connect.NewClient[v2.GetFunctionTraceSpanRequest, v2.GetFunctionTraceSpanResponse](
-			httpClient,
-			baseURL+V2GetFunctionTraceSpanProcedure,
-			connect.WithSchema(v2Methods.ByName("GetFunctionTraceSpan")),
-			connect.WithClientOptions(opts...),
-		),
 		invokeFunction: connect.NewClient[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse](
 			httpClient,
 			baseURL+V2InvokeFunctionProcedure,
@@ -228,7 +219,6 @@ type v2Client struct {
 	getFunctionRun          *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
 	syncApp                 *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace        *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
-	getFunctionTraceSpan    *connect.Client[v2.GetFunctionTraceSpanRequest, v2.GetFunctionTraceSpanResponse]
 	invokeFunction          *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
 }
 
@@ -307,11 +297,6 @@ func (c *v2Client) GetFunctionTrace(ctx context.Context, req *connect.Request[v2
 	return c.getFunctionTrace.CallUnary(ctx, req)
 }
 
-// GetFunctionTraceSpan calls api.v2.V2.GetFunctionTraceSpan.
-func (c *v2Client) GetFunctionTraceSpan(ctx context.Context, req *connect.Request[v2.GetFunctionTraceSpanRequest]) (*connect.Response[v2.GetFunctionTraceSpanResponse], error) {
-	return c.getFunctionTraceSpan.CallUnary(ctx, req)
-}
-
 // InvokeFunction calls api.v2.V2.InvokeFunction.
 func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
 	return c.invokeFunction.CallUnary(ctx, req)
@@ -337,7 +322,6 @@ type V2Handler interface {
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
-	GetFunctionTraceSpan(context.Context, *connect.Request[v2.GetFunctionTraceSpanRequest]) (*connect.Response[v2.GetFunctionTraceSpanResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 }
 
@@ -438,12 +422,6 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
 		connect.WithHandlerOptions(opts...),
 	)
-	v2GetFunctionTraceSpanHandler := connect.NewUnaryHandler(
-		V2GetFunctionTraceSpanProcedure,
-		svc.GetFunctionTraceSpan,
-		connect.WithSchema(v2Methods.ByName("GetFunctionTraceSpan")),
-		connect.WithHandlerOptions(opts...),
-	)
 	v2InvokeFunctionHandler := connect.NewUnaryHandler(
 		V2InvokeFunctionProcedure,
 		svc.InvokeFunction,
@@ -482,8 +460,6 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2SyncAppHandler.ServeHTTP(w, r)
 		case V2GetFunctionTraceProcedure:
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
-		case V2GetFunctionTraceSpanProcedure:
-			v2GetFunctionTraceSpanHandler.ServeHTTP(w, r)
 		case V2InvokeFunctionProcedure:
 			v2InvokeFunctionHandler.ServeHTTP(w, r)
 		default:
@@ -553,10 +529,6 @@ func (UnimplementedV2Handler) SyncApp(context.Context, *connect.Request[v2.SyncA
 
 func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionTrace is not implemented"))
-}
-
-func (UnimplementedV2Handler) GetFunctionTraceSpan(context.Context, *connect.Request[v2.GetFunctionTraceSpanRequest]) (*connect.Response[v2.GetFunctionTraceSpanResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionTraceSpan is not implemented"))
 }
 
 func (UnimplementedV2Handler) InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {

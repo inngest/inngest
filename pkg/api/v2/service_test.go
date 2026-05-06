@@ -507,20 +507,6 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		require.Contains(t, err.Error(), "max_depth must be between 1 and 10")
 	})
 
-	t.Run("returns span subtree", func(t *testing.T) {
-		maxDepth := uint32(1)
-		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{
-			RunId:    runID.String(),
-			SpanId:   "run-span",
-			MaxDepth: &maxDepth,
-		})
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Equal(t, "run-span", resp.Data.Id)
-		require.Equal(t, "Run", resp.Data.Name)
-		require.True(t, resp.Data.ChildrenTruncated)
-		require.Empty(t, resp.Data.Children)
-	})
 }
 
 func mustEncodeSpanIdentifier(t *testing.T, id cqrs.SpanIdentifier) string {
@@ -549,35 +535,5 @@ func TestService_GetFunctionTraceNotImplemented(t *testing.T) {
 		require.Nil(t, resp)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Run ID is required")
-	})
-}
-
-func TestService_GetFunctionTraceSpan(t *testing.T) {
-	service := NewService(ServiceOptions{})
-
-	t.Run("returns not implemented for valid request", func(t *testing.T) {
-		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{
-			RunId:  "01hp1zx8m3ng9vp6qn0xk7j4cy",
-			SpanId: "span-1",
-		})
-		require.Nil(t, resp)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "Get function trace span is not yet implemented")
-	})
-
-	t.Run("validates missing run ID", func(t *testing.T) {
-		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{})
-		require.Nil(t, resp)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "Run ID is required")
-	})
-
-	t.Run("validates missing span ID", func(t *testing.T) {
-		resp, err := service.GetFunctionTraceSpan(context.Background(), &apiv2.GetFunctionTraceSpanRequest{
-			RunId: "01hp1zx8m3ng9vp6qn0xk7j4cy",
-		})
-		require.Nil(t, resp)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "Span ID is required")
 	})
 }

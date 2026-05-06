@@ -300,20 +300,6 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.Contains(t, err.Error(), "not_implemented")
 	})
 
-	t.Run("get function trace span returns not implemented", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		resp, err := client.GetFunctionTraceSpan(ctx, &apiv2.GetFunctionTraceSpanRequest{
-			RunId:  "01hp1zx8m3ng9vp6qn0xk7j4cy",
-			SpanId: "span-1",
-		})
-
-		require.Error(t, err)
-		require.Nil(t, resp)
-		require.Contains(t, err.Error(), "not_implemented")
-	})
-
 }
 
 // Helper function to create string pointer for optional fields
