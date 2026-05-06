@@ -66,11 +66,14 @@ type RunService interface {
 	Duplicate(ctx context.Context, source State, destID ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error
 
 	SaveDefer(ctx context.Context, id ID, d Defer) error
-	// SetDeferStatus atomically updates only the ScheduleStatus field of an
-	// existing Defer. It returns an error if no defer exists with the given
-	// hashedID. Prefer this over reading a full Defer, mutating, and calling
-	// SaveDefer — that pattern races against concurrent SaveDefer writes.
+	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when
+	// no defer exists for hashedID. The Aborted transition also releases
+	// the Input from the aggregate budget; the meta entry stays.
 	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
+	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
+	// No-op if any defer already exists for hashedID. Returns
+	// ErrDeferLimitExceeded if no room.
+	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
@@ -118,9 +121,7 @@ type StateLoader interface {
 	LoadDefers(ctx context.Context, id ID) (map[string]Defer, error)
 
 	// LoadDefersMeta returns each defer's metadata without loading its Input.
-	// Prefer this over LoadDefers when only FnSlug / HashedID / ScheduleStatus
-	// are needed: defer inputs can be up to 4MB each and ride alongside every
-	// SDKRequest if loaded unnecessarily.
+	// Prefer this when only FnSlug/HashedID/ScheduleStatus are needed.
 	LoadDefersMeta(ctx context.Context, id ID) (map[string]DeferMeta, error)
 }
 
@@ -138,4 +139,8 @@ var (
 	ErrRunNotFound        = state.ErrRunNotFound
 	ErrIdempotentResponse = state.ErrIdempotentResponse
 	ErrDuplicateResponse  = state.ErrDuplicateResponse
+
+	// ErrDeferInputTooLarge re-exports the v1 error so v2 callers can match
+	// without importing v1.
+	ErrDeferInputTooLarge = state.ErrDeferInputTooLarge
 )

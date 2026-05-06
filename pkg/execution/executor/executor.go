@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/inngest/inngest/pkg/execution/defers"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -3509,98 +3510,59 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 }
 
 func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	opts, err := gen.DeferAddOpts()
-	if err != nil {
-		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
+	if err := defers.SaveFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+		return err
 	}
-
-	d := sv2.Defer{
-		FnSlug:         opts.FnSlug,
-		HashedID:       gen.ID,
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          opts.Input,
-	}
-
-	if err := e.smv2.SaveDefer(ctx, runCtx.Metadata().ID, d); err != nil {
-		return fmt.Errorf("error saving defer: %w", err)
-	}
-
-	if runCtx.OnlyHasLazyOps() {
-		// Unreachable. Only happens if the SDK sends a lazy op without
-		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
-		// "[StepRun, DeferAdd]").
-		e.log.Error(
-			"DeferAdd received without a host op; enqueuing discovery as fallback",
-			"step_id", sanitizeLogValue(gen.ID),
-			"unreachable", true,
-		)
-		groupID := uuid.New().String()
-
-		// Assume no pending steps. This may not be correct, but we're
-		// optimizing for avoiding a hanging function run
-		hasPendingSteps := false
-
-		// Enqueue a discovery step so the run doesn't hang. This is necessary
-		// because lazy ops don't normally get a discovery step.
-		return e.maybeEnqueueDiscoveryStep(
-			state.WithGroupID(ctx, groupID),
-			runCtx,
-			gen,
-			edge,
-			groupID,
-			hasPendingSteps,
-		)
-	}
-
-	// Common case: a host op in this batch will drive forward progress.
-	// We just recorded state and bow out.
-	return nil
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAdd")
 }
 
 func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	opts, err := gen.DeferCancelOpts()
-	if err != nil {
-		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
-	}
-
 	// If the SDK emits `[DeferAdd("X"), DeferCancel("X")]` in one response, the
 	// two ops race within the priority group's errgroup. If DeferCancel runs
 	// first it will error. We don't guard against this here (e.g. by writing a
 	// cancelled tombstone when the defer is absent) because emitting an
 	// DeferAdd and DeferCancel for the same hashed ID in a single response is
 	// an SDK bug, and the cost of handling it isn't worth the complexity.
-	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
-		return fmt.Errorf("error cancelling defer: %w", err)
+	if err := defers.CancelFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+		return err
+	}
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferCancel")
+}
+
+// enqueueLazyOpFallback ensures that a run doesn't hang due to an "only lazy
+// ops" scenario. This should never happen (e.g. caused by an SDK bug), but we
+// still need a defensive fallback.
+func (e *executor) enqueueLazyOpFallback(
+	ctx context.Context,
+	runCtx execution.RunContext,
+	gen state.GeneratorOpcode,
+	edge queue.PayloadEdge,
+	opName string,
+) error {
+	if !runCtx.OnlyHasLazyOps() {
+		// Common case: a host op in this batch drives forward progress.
+		return nil
 	}
 
-	if runCtx.OnlyHasLazyOps() {
-		// Unreachable. Only happens if the SDK sends a lazy op without
-		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
-		// "[StepRun, DeferAdd]").
-		e.log.Error(
-			"DeferCancel received without a host op; enqueuing discovery as fallback",
-			"step_id", sanitizeLogValue(gen.ID),
-			"unreachable", true,
-		)
-		groupID := uuid.New().String()
+	e.log.Error(
+		opName+" received without a host op; enqueuing discovery as fallback",
+		"step_id", sanitizeLogValue(gen.ID),
+		"unreachable", true,
+	)
+	groupID := uuid.New().String()
 
-		// Assume no pending steps. This may not be correct, but we're
-		// optimizing for avoiding a hanging function run
-		hasPendingSteps := false
+	// Assume no pending steps. This may not be correct, but we're
+	// optimizing for avoiding a hanging function run.
+	hasPendingSteps := false
 
-		// Enqueue a discovery step so the run doesn't hang. This is necessary
-		// because lazy ops don't normally get a discovery step.
-		return e.maybeEnqueueDiscoveryStep(
-			state.WithGroupID(ctx, groupID),
-			runCtx,
-			gen,
-			edge,
-			groupID,
-			hasPendingSteps,
-		)
-	}
-
-	return nil
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		hasPendingSteps,
+	)
 }
 
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step

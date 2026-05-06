@@ -77,6 +77,12 @@ const (
 	// MaxDeferInputSize is the maximum size of the Input payload on a single defer.
 	MaxDeferInputSize = 1024 * 1024 * 4 // 4MB
 
+	// MaxDeferInputAggregateSize is the maximum total size, in bytes, of all
+	// defer input payloads combined for a single function run. Must be a
+	// separate budget than DefaultMaxStateSizeLimit, so that defers can't fail
+	// the parent run.
+	MaxDeferInputAggregateSize = 1024 * 1024 * 4 // 4MB
+
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 

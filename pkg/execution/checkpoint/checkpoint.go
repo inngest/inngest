@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
+	"github.com/inngest/inngest/pkg/execution/defers"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -326,12 +327,12 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		case enums.OpcodeDeferAdd:
-			if err := c.saveDeferFromOp(ctx, l, input.Metadata.ID, op); err != nil {
+			if err := defers.SaveFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
 				return err
 			}
 
 		case enums.OpcodeDeferCancel:
-			if err := c.cancelDeferFromOp(ctx, l, input.Metadata.ID, op); err != nil {
+			if err := defers.CancelFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
 				return err
 			}
 
@@ -475,12 +476,12 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
 
 		case enums.OpcodeDeferAdd:
-			if err := c.saveDeferFromOp(ctx, l, md.ID, op); err != nil {
+			if err := defers.SaveFromOp(ctx, c.State, l, md.ID, op); err != nil {
 				return err
 			}
 
 		case enums.OpcodeDeferCancel:
-			if err := c.cancelDeferFromOp(ctx, l, md.ID, op); err != nil {
+			if err := defers.CancelFromOp(ctx, c.State, l, md.ID, op); err != nil {
 				return err
 			}
 
@@ -554,43 +555,6 @@ func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result ap
 		},
 		Optional: execution.FinalizeOptional{},
 	})
-}
-
-// cancelDeferFromOp flips the target Defer's ScheduleStatus to Cancelled.
-// Similar to the executor's handleGeneratorDeferCancel.
-func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode) error {
-	opts, err := op.DeferCancelOpts()
-	if err != nil {
-		l.Error("error parsing DeferCancel opts in checkpoint", "error", err)
-		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
-	}
-
-	if err := c.State.SetDeferStatus(ctx, id, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
-		l.Error("error cancelling defer in checkpoint", "error", err)
-		return fmt.Errorf("error cancelling defer: %w", err)
-	}
-
-	return nil
-}
-
-func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode) error {
-	opts, err := op.DeferAddOpts()
-	if err != nil {
-		l.Error("error parsing DeferAdd opts in checkpoint", "error", err)
-		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
-	}
-
-	if err := c.State.SaveDefer(ctx, id, state.Defer{
-		FnSlug:         opts.FnSlug,
-		HashedID:       op.ID,
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          opts.Input,
-	}); err != nil {
-		l.Error("error saving defer in checkpoint", "error", err)
-		return fmt.Errorf("error saving defer: %w", err)
-	}
-
-	return nil
 }
 
 func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

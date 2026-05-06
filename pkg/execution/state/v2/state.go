@@ -15,6 +15,10 @@ var (
 	// would exceed consts.MaxDefersPerRun for the run. Updates to an existing
 	// hashedID never trip this.
 	ErrDeferLimitExceeded = fmt.Errorf("defer limit per run exceeded")
+
+	// ErrDeferInputAggregateExceeded means the Input would push the run
+	// past MaxDeferInputAggregateSize. SaveDefer writes a Rejected sentinel.
+	ErrDeferInputAggregateExceeded = fmt.Errorf("defer input aggregate size exceeded")
 )
 
 type State struct {
@@ -25,11 +29,8 @@ type State struct {
 	Steps map[string]json.RawMessage
 }
 
-// DeferMeta is the metadata-only view of a Defer. It carries all defer data
-// except for input.
-//
-// Field semantics match the Defer fields of the same name; keep these in
-// sync with Defer below.
+// DeferMeta is the metadata-only view of a Defer (no Input). Keep fields
+// in sync with Defer below.
 type DeferMeta struct {
 	FnSlug         string
 	HashedID       string

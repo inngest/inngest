@@ -967,3 +967,19 @@ func IncrDefersFinalizedCounter(ctx context.Context, status string, opts Counter
 		Tags:        opts.Tags,
 	})
 }
+
+// IncrDefersRejectedCounter records a soft-rejected defer. Reason is one
+// of "per_defer_size", "aggregate_size", "per_run_count", "invalid_opts".
+func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_rejected_total",
+		Description: "Total number of defers soft-rejected at write time, tagged by reason",
+		Tags:        opts.Tags,
+	})
+}

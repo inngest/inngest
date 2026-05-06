@@ -75,185 +75,413 @@ func newDeferTestRunService(t *testing.T) (statev2.RunService, statev2.ID) {
 	return v2svc, id
 }
 
-// A retried SaveDefer must not undo an interleaved SetDeferStatus(Cancelled).
-func TestSaveDefer_DoesNotResurrectCancelled(t *testing.T) {
+func TestSaveDefer(t *testing.T) {
 	ctx := context.Background()
-	v2svc, id := newDeferTestRunService(t)
 
-	original := statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       "hash-step-1",
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          json.RawMessage(`{"user_id":"u_123"}`),
-	}
+	t.Run("new", func(t *testing.T) {
+		v2svc, id := newDeferTestRunService(t)
 
-	require.NoError(t, v2svc.SaveDefer(ctx, id, original))
-	require.NoError(t, v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusAborted))
-
-	// T3: SDK retransmits the original DeferAdd. Must not error, must not resurrect.
-	require.NoError(t, v2svc.SaveDefer(ctx, id, original))
-
-	defers, err := v2svc.LoadDefers(ctx, id)
-	require.NoError(t, err)
-	require.Len(t, defers, 1)
-
-	got := defers[original.HashedID]
-	require.Equal(t, enums.DeferStatusAborted, got.ScheduleStatus,
-		"cancelled defer must not be resurrected by a retried DeferAdd")
-	require.Equal(t, original.FnSlug, got.FnSlug, "FnSlug must be preserved across the no-op")
-	require.JSONEq(t, string(original.Input), string(got.Input),
-		"Input must be preserved across the no-op")
-}
-
-// Non-cancelled records get overwritten — the legitimate SDK retransmit path.
-func TestSaveDefer_OverwritesAfterRun(t *testing.T) {
-	ctx := context.Background()
-	v2svc, id := newDeferTestRunService(t)
-
-	first := statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       "hash-step-1",
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          json.RawMessage(`{"user_id":"u_old"}`),
-	}
-	require.NoError(t, v2svc.SaveDefer(ctx, id, first))
-
-	second := first
-	second.Input = json.RawMessage(`{"user_id":"u_new"}`)
-	require.NoError(t, v2svc.SaveDefer(ctx, id, second))
-
-	defers, err := v2svc.LoadDefers(ctx, id)
-	require.NoError(t, err)
-	require.JSONEq(t, `{"user_id":"u_new"}`, string(defers[first.HashedID].Input),
-		"non-cancelled defer should be overwritten by a subsequent SaveDefer")
-}
-
-// SetDeferStatus must reject hashedIDs with no existing defer; otherwise a
-// stray DeferCancel could silently no-op against a missing target.
-func TestSetDeferStatus_ErrorsOnMissing(t *testing.T) {
-	r := require.New(t)
-	ctx := context.Background()
-	v2svc, id := newDeferTestRunService(t)
-
-	err := v2svc.SetDeferStatus(ctx, id, "missing-hashed-id", enums.DeferStatusAborted)
-	r.Error(err, "expected SetDeferStatus to error when defer is missing")
-}
-
-// SetDeferStatus must update only ScheduleStatus; FnSlug, HashedID, and Input
-// all need to survive the status flip unchanged.
-func TestSetDeferStatus_PreservesFields(t *testing.T) {
-	r := require.New(t)
-	ctx := context.Background()
-	v2svc, id := newDeferTestRunService(t)
-
-	original := statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       "hash-step-1",
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          json.RawMessage(`{"user":{"id":"u_123"}}`),
-	}
-	r.NoError(v2svc.SaveDefer(ctx, id, original))
-	r.NoError(v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusAborted))
-
-	defers, err := v2svc.LoadDefers(ctx, id)
-	r.NoError(err)
-	r.Len(defers, 1)
-
-	expected := original
-	expected.ScheduleStatus = enums.DeferStatusAborted
-	r.Equal(expected, defers[original.HashedID])
-}
-
-// Ensure that updating the defer status doesn't corrupt the input
-func TestSetDeferStatus_InputRoundTripsByteForByte(t *testing.T) {
-	cases := []struct {
-		name  string
-		input string
-	}{
-		{"empty object", `{}`},
-		{"nested empty object", `{"user_id":"u_123","options":{}}`},
-		// 9007199254740993 is 2^53 + 1, the first integer that can't be
-		// represented exactly as a float64. cjson would round it down to 2^53.
-		{"integer above 2^53", `{"external_id":9007199254740993,"requested_at_ns":1735689600000000000}`},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			r := require.New(t)
-			ctx := context.Background()
-			v2svc, id := newDeferTestRunService(t)
-
-			d := statev2.Defer{
-				FnSlug:         "onDefer-score",
-				HashedID:       "hash-step-1",
-				ScheduleStatus: enums.DeferStatusAfterRun,
-				Input:          json.RawMessage(tc.input),
-			}
-			r.NoError(v2svc.SaveDefer(ctx, id, d))
-			r.NoError(v2svc.SetDeferStatus(ctx, id, d.HashedID, enums.DeferStatusAborted))
-
-			defers, err := v2svc.LoadDefers(ctx, id)
-			r.NoError(err)
-			r.Equal(tc.input, string(defers[d.HashedID].Input))
-		})
-	}
-}
-
-// SaveDefer must reject new hashedIDs once the per-run limit is reached, but
-// re-saves of an existing hashedID (legitimate SDK retransmits) must still go
-// through.
-func TestSaveDefer_LimitPerRun(t *testing.T) {
-	r := require.New(t)
-	ctx := context.Background()
-	v2svc, id := newDeferTestRunService(t)
-
-	for i := 0; i < consts.MaxDefersPerRun; i++ {
-		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+		d := statev2.Defer{
 			FnSlug:         "onDefer-score",
-			HashedID:       fmt.Sprintf("hash-step-%d", i),
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user_id":"u_123"}`),
+		}
+		require.NoError(t, v2svc.SaveDefer(ctx, id, d))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, d, defers[d.HashedID])
+	})
+
+	t.Run("idempotent", func(t *testing.T) {
+		v2svc, id := newDeferTestRunService(t)
+
+		first := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user_id":"u_old"}`),
+		}
+		require.NoError(t, v2svc.SaveDefer(ctx, id, first))
+
+		// SDK retransmit with a different payload (e.g. user-code
+		// non-determinism). Insert-only semantics: the original wins,
+		// retransmit is a silent no-op.
+		second := first
+		second.Input = json.RawMessage(`{"user_id":"u_new"}`)
+		require.NoError(t, v2svc.SaveDefer(ctx, id, second))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		require.NoError(t, err)
+		require.JSONEq(t, `{"user_id":"u_old"}`, string(defers[first.HashedID].Input))
+	})
+
+	t.Run("cannot reverse abort", func(t *testing.T) {
+		// Once a defer is aborted it stays aborted
+		v2svc, id := newDeferTestRunService(t)
+
+		original := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user_id":"u_123"}`),
+		}
+		require.NoError(t, v2svc.SaveDefer(ctx, id, original))
+		require.NoError(t, v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusAborted))
+
+		// SDK retransmits the original DeferAdd. Must not error, must stay
+		// aborted.
+		require.NoError(t, v2svc.SaveDefer(ctx, id, original))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		require.NoError(t, err)
+		require.Len(t, defers, 1)
+
+		got := defers[original.HashedID]
+		require.Equal(t, enums.DeferStatusAborted, got.ScheduleStatus)
+		require.Equal(t, original.FnSlug, got.FnSlug)
+		require.Empty(t, got.Input, "Input released on cancel; retransmit must not re-attach it")
+	})
+
+	t.Run("rejects new hashed IDs once per-run count limit reached", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		for i := 0; i < consts.MaxDefersPerRun; i++ {
+			r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+				FnSlug:         "onDefer-score",
+				HashedID:       fmt.Sprintf("hash-step-%d", i),
+				ScheduleStatus: enums.DeferStatusAfterRun,
+				Input:          json.RawMessage(`{}`),
+			}))
+		}
+
+		// Reject since it'd exceed the limit
+		err := v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-overflow",
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          json.RawMessage(`{}`),
+		})
+		r.ErrorIs(err, statev2.ErrDeferLimitExceeded)
+
+		// Idempotency for existing hashed ID
+		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-0",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"updated":true}`),
 		}))
-	}
 
-	// One past the limit: reject.
-	err := v2svc.SaveDefer(ctx, id, statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       "hash-step-overflow",
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          json.RawMessage(`{}`),
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Len(defers, consts.MaxDefersPerRun)
+		r.JSONEq(`{}`, string(defers["hash-step-0"].Input), "first writer wins")
+		_, ok := defers["hash-step-overflow"]
+		r.False(ok)
 	})
-	r.ErrorIs(err, statev2.ErrDeferLimitExceeded)
 
-	// Update of an existing hashedID must still succeed at the cap.
-	r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       "hash-step-0",
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          json.RawMessage(`{"updated":true}`),
-	}))
+	t.Run("aggregate cap writes rejected sentinel", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
 
-	defers, err := v2svc.LoadDefers(ctx, id)
-	r.NoError(err)
-	r.Len(defers, consts.MaxDefersPerRun)
-	r.JSONEq(`{"updated":true}`, string(defers["hash-step-0"].Input))
-	_, ok := defers["hash-step-overflow"]
-	r.False(ok, "rejected defer must not appear in LoadDefers")
+		// 3MB accepted, then a 2MB defer overflows the 4MB cap.
+		bigInput := make([]byte, 3*1024*1024)
+		for i := range bigInput {
+			bigInput[i] = 'x'
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-accepted",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`"` + string(bigInput) + `"`),
+		}))
+
+		// Reject since it'd exceed the aggregate cap
+		overflowInput := make([]byte, 2*1024*1024)
+		for i := range overflowInput {
+			overflowInput[i] = 'y'
+		}
+		err := v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-rejected",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`"` + string(overflowInput) + `"`),
+		})
+		r.ErrorIs(err, statev2.ErrDeferInputAggregateExceeded)
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Len(defers, 2)
+
+		rejected, ok := defers["hash-rejected"]
+		r.True(ok)
+		r.Equal(enums.DeferStatusRejected, rejected.ScheduleStatus)
+		r.Empty(rejected.Input)
+		r.Equal("onDefer-score", rejected.FnSlug)
+		r.Equal(enums.DeferStatusAfterRun, defers["hash-accepted"].ScheduleStatus)
+	})
+
+	t.Run("rejected is sticky across retransmits", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		// 5MB defer overflows on the first write.
+		overflow := make([]byte, 5*1024*1024)
+		for i := range overflow {
+			overflow[i] = 'z'
+		}
+		op := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-rejected",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`"` + string(overflow) + `"`),
+		}
+		r.ErrorIs(v2svc.SaveDefer(ctx, id, op), statev2.ErrDeferInputAggregateExceeded)
+
+		// Retransmit hits the terminal-sticky check and no-ops.
+		r.NoError(v2svc.SaveDefer(ctx, id, op))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Len(defers, 1)
+		r.Equal(enums.DeferStatusRejected, defers["hash-rejected"].ScheduleStatus)
+		r.Empty(defers["hash-rejected"].Input)
+	})
+
+	t.Run("retransmit does not bump aggregate counter", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		// 3MB once, then retransmit twice. Each retransmit is a no-op
+		// (insert-only) so the budget stays at the original 3MB+quotes.
+		big := make([]byte, 3*1024*1024)
+		for i := range big {
+			big[i] = 'a'
+		}
+		first := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-first",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`"` + string(big) + `"`),
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, first))
+		r.NoError(v2svc.SaveDefer(ctx, id, first))
+		r.NoError(v2svc.SaveDefer(ctx, id, first))
+
+		// Second defer fills the remaining budget. First Input on the wire
+		// is `"<3MB>"` = 3MB+2 bytes; remaining is 1MB-2 bytes total, minus
+		// 2 quote bytes for the second JSON wrapper = 1MB-4 inner. Would
+		// fail if any retransmit had bumped the counter.
+		small := make([]byte, 1024*1024-4)
+		for i := range small {
+			small[i] = 'b'
+		}
+		second := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-second",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`"` + string(small) + `"`),
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, second))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Len(defers, 2)
+		r.Equal(enums.DeferStatusAfterRun, defers["hash-first"].ScheduleStatus)
+		r.Equal(enums.DeferStatusAfterRun, defers["hash-second"].ScheduleStatus)
+	})
+
+	t.Run("does not affect run state_size", func(t *testing.T) {
+		// CRITICAL: Defer input cannot affect the run state size budget, since
+		// doing so would mean defers could fail the run.
+
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		mdBefore, err := v2svc.LoadMetadata(ctx, id)
+		r.NoError(err)
+
+		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user_id":"u_123"}`),
+		}))
+
+		mdAfter, err := v2svc.LoadMetadata(ctx, id)
+		r.NoError(err)
+		r.Equal(mdBefore.Metrics.StateSize, mdAfter.Metrics.StateSize,
+			"defer storage is on a separate budget from run state")
+	})
 }
 
-func TestSaveDefer_FirstWriteWhenMissing(t *testing.T) {
+func TestSetDeferStatus(t *testing.T) {
 	ctx := context.Background()
-	v2svc, id := newDeferTestRunService(t)
 
-	d := statev2.Defer{
-		FnSlug:         "onDefer-score",
-		HashedID:       "hash-step-1",
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          json.RawMessage(`{"user_id":"u_123"}`),
-	}
-	require.NoError(t, v2svc.SaveDefer(ctx, id, d))
+	t.Run("errors on missing hashedID", func(t *testing.T) {
+		v2svc, id := newDeferTestRunService(t)
+		err := v2svc.SetDeferStatus(ctx, id, "missing-hashed-id", enums.DeferStatusAborted)
+		require.Error(t, err)
+	})
 
-	defers, err := v2svc.LoadDefers(ctx, id)
-	require.NoError(t, err)
-	require.Equal(t, d, defers[d.HashedID])
+	t.Run("preserves meta fields across abort", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		original := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user":{"id":"u_123"}}`),
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, original))
+		r.NoError(v2svc.SetDeferStatus(ctx, id, original.HashedID, enums.DeferStatusAborted))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Len(defers, 1)
+
+		got := defers[original.HashedID]
+		r.Equal(original.FnSlug, got.FnSlug)
+		r.Equal(original.HashedID, got.HashedID)
+		r.Equal(enums.DeferStatusAborted, got.ScheduleStatus)
+		r.Empty(got.Input)
+	})
+
+	t.Run("meta survives cjson edge-case inputs", func(t *testing.T) {
+		cases := []struct {
+			name  string
+			input string
+		}{
+			{"empty object", `{}`},
+			{"nested empty object", `{"user_id":"u_123","options":{}}`},
+			// 2^53 + 1 — first integer that can't be represented exactly
+			// as a float64. cjson rounds it down to 2^53 if it ever decodes.
+			{"integer above 2^53", `{"external_id":9007199254740993,"requested_at_ns":1735689600000000000}`},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				r := require.New(t)
+				v2svc, id := newDeferTestRunService(t)
+
+				d := statev2.Defer{
+					FnSlug:         "onDefer-score",
+					HashedID:       "hash-step-1",
+					ScheduleStatus: enums.DeferStatusAfterRun,
+					Input:          json.RawMessage(tc.input),
+				}
+				r.NoError(v2svc.SaveDefer(ctx, id, d))
+				r.NoError(v2svc.SetDeferStatus(ctx, id, d.HashedID, enums.DeferStatusAborted))
+
+				defers, err := v2svc.LoadDefers(ctx, id)
+				r.NoError(err)
+				got := defers[d.HashedID]
+				r.Equal(d.FnSlug, got.FnSlug)
+				r.Equal(d.HashedID, got.HashedID)
+				r.Equal(enums.DeferStatusAborted, got.ScheduleStatus)
+				r.Empty(got.Input)
+			})
+		}
+	})
+
+	t.Run("abort releases input budget", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		big := make([]byte, 3*1024*1024)
+		for i := range big {
+			big[i] = 'q'
+		}
+		first := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-aborted",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`"` + string(big) + `"`),
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, first))
+
+		// Pre-abort: a 2MB second defer overflows the budget.
+		mid := make([]byte, 2*1024*1024)
+		for i := range mid {
+			mid[i] = 'r'
+		}
+		second := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-second",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`"` + string(mid) + `"`),
+		}
+		r.ErrorIs(v2svc.SaveDefer(ctx, id, second), statev2.ErrDeferInputAggregateExceeded)
+
+		// Abort the first defer; its 3MB are released.
+		r.NoError(v2svc.SetDeferStatus(ctx, id, first.HashedID, enums.DeferStatusAborted))
+
+		// Same 2MB defer now fits. Use a fresh hashedID since the previous
+		// attempt left a Rejected sentinel that blocks retransmits.
+		second.HashedID = "hash-second-retry"
+		r.NoError(v2svc.SaveDefer(ctx, id, second))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		got := defers["hash-aborted"]
+		r.Equal(enums.DeferStatusAborted, got.ScheduleStatus)
+		r.Empty(got.Input)
+	})
+}
+
+func TestSaveRejectedDefer(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("idempotent against existing entry", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		original := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user_id":"u_123"}`),
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, original))
+
+		// Late rejection signal must not downgrade the accepted defer.
+		r.NoError(v2svc.SaveRejectedDefer(ctx, id, original.FnSlug, original.HashedID))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Len(defers, 1)
+		r.Equal(enums.DeferStatusAfterRun, defers[original.HashedID].ScheduleStatus)
+		r.JSONEq(string(original.Input), string(defers[original.HashedID].Input))
+	})
+
+	t.Run("writes new sentinel and blocks retransmits", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		r.NoError(v2svc.SaveRejectedDefer(ctx, id, "onDefer-score", "hash-rejected"))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Len(defers, 1)
+		got := defers["hash-rejected"]
+		r.Equal(enums.DeferStatusRejected, got.ScheduleStatus)
+		r.Equal("onDefer-score", got.FnSlug)
+		r.Empty(got.Input)
+
+		// Subsequent SaveDefer hits the terminal-sticky check.
+		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-rejected",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"x":1}`),
+		}))
+
+		defers, err = v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Equal(enums.DeferStatusRejected, defers["hash-rejected"].ScheduleStatus)
+		r.Empty(defers["hash-rejected"].Input)
+	})
 }
