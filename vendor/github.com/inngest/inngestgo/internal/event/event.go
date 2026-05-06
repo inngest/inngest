@@ -74,7 +74,7 @@ func (ge GenericEvent[D]) Validate() error {
 
 func (ge GenericEvent[D]) Map() map[string]any {
 	var data any = ge.Data
-	if reflect.TypeOf(data).Kind() == reflect.Ptr && reflect.ValueOf(data).IsNil() {
+	if reflect.TypeOf(data).Kind() == reflect.Pointer && reflect.ValueOf(data).IsNil() {
 		data = make(map[string]any)
 	}
 
@@ -117,7 +117,7 @@ func ValidateEventDataType(v any) error {
 		return nil
 	}
 
-	if reflect.TypeOf(v).Kind() == reflect.Ptr {
+	if reflect.TypeOf(v).Kind() == reflect.Pointer {
 		if reflect.ValueOf(v).IsNil() {
 			return fmt.Errorf("event data must be a map or struct")
 		}
