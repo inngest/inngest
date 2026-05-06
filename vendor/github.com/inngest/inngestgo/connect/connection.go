@@ -226,24 +226,35 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	readerLifetimeContext, cancelReaderLifetimeContext := context.WithCancel(ctx)
 	defer cancelReaderLifetimeContext()
 
-	var lastGatewayHeartbeatReceived time.Time
+	heartbeatReceived := make(chan struct{}, 1)
 	go func() {
 		// Wait until initial heartbeat was sent out
-		<-time.After(preparedConn.heartbeatInterval)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(preparedConn.heartbeatInterval):
+		}
 
-		heartbeatReplyTicker := time.NewTicker(preparedConn.heartbeatInterval)
-		defer heartbeatReplyTicker.Stop()
+		heartbeatTimeout := 2 * preparedConn.heartbeatInterval
+		heartbeatReplyTimer := time.NewTimer(heartbeatTimeout)
+		defer heartbeatReplyTimer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-heartbeatReplyTicker.C:
-				gracePeriod := 2 * preparedConn.heartbeatInterval
-				if lastGatewayHeartbeatReceived.Before(time.Now().Add(-gracePeriod)) {
-					// No heartbeat received in time!
-					h.logger.Error("did not receive gateway heartbeat in time")
-					cancelReaderLifetimeContext()
+			case <-heartbeatReceived:
+				if !heartbeatReplyTimer.Stop() {
+					select {
+					case <-heartbeatReplyTimer.C:
+					default:
+					}
 				}
+				heartbeatReplyTimer.Reset(heartbeatTimeout)
+			case <-heartbeatReplyTimer.C:
+				// No heartbeat received in time!
+				h.logger.Error("did not receive gateway heartbeat in time")
+				cancelReaderLifetimeContext()
+				return
 			}
 		}
 	}()
@@ -273,12 +284,21 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				return errGatewayDraining
 			case connectproto.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
 				// Handle invoke in a non-blocking way to allow for other messages to be processed
+				msgCopy := connectproto.ConnectMessage{
+					Kind: msg.Kind,
+				}
+				if len(msg.Payload) > 0 {
+					msgCopy.Payload = append([]byte(nil), msg.Payload...)
+				}
 				h.workerPool.Add(workerPoolMsg{
-					msg:          &msg,
+					msg:          &msgCopy,
 					preparedConn: preparedConn,
 				})
 			case connectproto.GatewayMessageType_GATEWAY_HEARTBEAT:
-				lastGatewayHeartbeatReceived = time.Now()
+				select {
+				case heartbeatReceived <- struct{}{}:
+				default:
+				}
 			case connectproto.GatewayMessageType_WORKER_REPLY_ACK:
 				if err := h.handleMessageReplyAck(&msg); err != nil {
 					h.logger.Error("could not handle message reply ack", "err", err)
