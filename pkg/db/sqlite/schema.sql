@@ -213,3 +213,7 @@ CREATE TABLE IF NOT EXISTS "functions" (
 CREATE UNIQUE INDEX functions_app_id_slug_active_key
     ON functions (app_id, slug)
     WHERE archived_at IS NULL;
+CREATE INDEX idx_history_run_id_step_type
+    ON history (run_id, step_type, created_at)
+    WHERE step_type IS NOT NULL;
+CREATE INDEX idx_events_event_id ON events (event_id);

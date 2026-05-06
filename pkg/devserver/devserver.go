@@ -473,6 +473,20 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
+	lifecycleListeners := append([]execution.LifecycleListener{
+		history.NewLifecycleListener(
+			nil,
+			hd,
+			hmw,
+		),
+		Lifecycle{
+			Cqrs:       dbcqrs,
+			Pb:         pb,
+			EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
+		},
+		run.NewTraceLifecycleListener(nil),
+	}, metrics.NewLifecycleListeners()...)
+
 	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
@@ -492,21 +506,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}
 			return []byte(*opts.SigningKey), nil
 		}),
-		executor.WithLifecycleListeners(
-			append([]execution.LifecycleListener{
-				history.NewLifecycleListener(
-					nil,
-					hd,
-					hmw,
-				),
-				Lifecycle{
-					Cqrs:       dbcqrs,
-					Pb:         pb,
-					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
-				},
-				run.NewTraceLifecycleListener(nil),
-			}, metrics.NewLifecycleListeners()...)...,
-		),
+		executor.WithLifecycleListeners(lifecycleListeners...),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
 				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
@@ -659,6 +659,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				AllowStepMetadata: func(ctx context.Context, acctID uuid.UUID) bool {
 					return enableStepMetadata
 				},
+				Lifecycles: lifecycleListeners,
 			},
 
 			MetadataOpts: apiv1.MetadataOpts{

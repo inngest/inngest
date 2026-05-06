@@ -874,6 +874,82 @@ func (l lifecycle) OnSleep(
 	}
 }
 
+// OnDefer writes a history row for a DeferAdd or DeferCancel opcode. Both the
+// executor and checkpoint paths invoke it, so duplicate rows for
+// (run_id, op.ID) are possible; consumers must dedupe.
+func (l lifecycle) OnDefer(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	op state.GeneratorOpcode,
+) {
+	h, ok, err := BuildDeferHistory(md, item, op)
+	if err != nil {
+		l.log.Error("error building defer history",
+			"error", err,
+			"run_id", md.ID.RunID.String(),
+			"op", op.Op.String())
+		return
+	}
+	if !ok {
+		return
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onDefer", "error", err)
+		}
+	}
+}
+
+// BuildDeferHistory shapes the History row OnDefer writes for a DeferAdd or
+// DeferCancel opcode. ok=false means the opcode is neither (caller should
+// drop). Tests reuse this so a write-side shape change updates the read-side
+// test fixture in lockstep.
+func BuildDeferHistory(md sv2.Metadata, item queue.Item, op state.GeneratorOpcode) (History, bool, error) {
+	var stepType enums.HistoryStepType
+	switch op.Op {
+	case enums.OpcodeDeferAdd:
+		stepType = enums.HistoryStepTypeDeferAdd
+	case enums.OpcodeDeferCancel:
+		stepType = enums.HistoryStepTypeDeferCancel
+	default:
+		return History{}, false, nil
+	}
+
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		return History{}, false, fmt.Errorf("parse group ID %q: %w", item.GroupID, err)
+	}
+
+	rawOpcode, err := json.Marshal(op)
+	if err != nil {
+		return History{}, false, fmt.Errorf("marshal opcode: %w", err)
+	}
+
+	stepName := op.UserDefinedName()
+	return History{
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
+		RunID:           md.ID.RunID,
+		CreatedAt:       time.Now(),
+		GroupID:         groupID,
+		Type:            enums.HistoryTypeStepCompleted.String(),
+		Attempt:         int64(item.Attempt),
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventID(),
+		StepName:        &stepName,
+		StepID:          &op.ID,
+		StepType:        &stepType,
+		Result: &Result{
+			RawOutput: string(rawOpcode),
+		},
+		BatchID: md.Config.BatchID,
+	}, true, nil
+}
+
 func applyResponse(
 	h *History,
 	resp *state.DriverResponse,

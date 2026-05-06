@@ -313,10 +313,11 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 
 	// Create mock dependencies
 	mocks := &testMocks{
-		state:   &mockRunService{},
-		tracer:  &mockTracerProvider{},
-		queue:   &mockQueue{},
-		metrics: &mockMetricsProvider{},
+		state:    &mockRunService{},
+		tracer:   &mockTracerProvider{},
+		queue:    &mockQueue{},
+		metrics:  &mockMetricsProvider{},
+		executor: &mockExecutor{},
 	}
 
 	// Create test IDs
@@ -359,6 +360,7 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 		TracerProvider:  mocks.tracer,
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
+		Executor:        mocks.executor,
 	})
 
 	return mocks, &testData{
@@ -503,10 +505,11 @@ func (m *mockMetricsProvider) OnFnFinished(ctx context.Context, mc MetricCardina
 // Test helper types and functions
 
 type testMocks struct {
-	state   *mockRunService
-	tracer  *mockTracerProvider
-	queue   *mockQueue
-	metrics *mockMetricsProvider
+	state    *mockRunService
+	tracer   *mockTracerProvider
+	queue    *mockQueue
+	metrics  *mockMetricsProvider
+	executor *mockExecutor
 }
 
 type testData struct {

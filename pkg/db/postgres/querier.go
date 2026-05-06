@@ -436,6 +436,50 @@ func (pq *pgQuerier) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID)
 	return convertSlice(rows, historyFromPG), nil
 }
 
+func (pq *pgQuerier) GetRunDeferOpcodes(ctx context.Context, runID ulid.ULID, stepTypes []string) ([]*db.RunDeferOpcode, error) {
+	rows, err := pq.q.GetRunDeferOpcodes(ctx, sqlc.GetRunDeferOpcodesParams{
+		RunID:     runID,
+		StepTypes: stepTypes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.RunDeferOpcode, len(rows))
+	for i, r := range rows {
+		out[i] = &db.RunDeferOpcode{ID: r.ID, Result: r.Result}
+	}
+	return out, nil
+}
+
+func (pq *pgQuerier) GetRunsByUserEventIDs(ctx context.Context, eventIDs []string) ([]*db.RunWithUserEventID, error) {
+	rows, err := pq.q.GetRunsByUserEventIDs(ctx, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.RunWithUserEventID, len(rows))
+	for i, r := range rows {
+		out[i] = &db.RunWithUserEventID{
+			UserEventID: r.UserEventID,
+			FunctionRun: *functionRunFromPG(&r.FunctionRun),
+			FunctionFinish: db.FunctionFinish{
+				RunID:              r.FunctionRun.RunID,
+				Status:             sql.NullString{String: r.FinishStatus, Valid: r.FinishStatus != ""},
+				Output:             sql.NullString{String: r.FinishOutput, Valid: r.FinishOutput != ""},
+				CompletedStepCount: sql.NullInt64{Int64: int64(r.FinishCompletedStepCount), Valid: true},
+				CreatedAt:          sql.NullTime{Time: r.FinishCreatedAt, Valid: !r.FinishCreatedAt.IsZero()},
+			},
+		}
+	}
+	return out, nil
+}
+
+func (pq *pgQuerier) GetRunDeferredFromEvent(ctx context.Context, runID ulid.ULID, eventName string) (string, error) {
+	return pq.q.GetRunDeferredFromEvent(ctx, sqlc.GetRunDeferredFromEventParams{
+		RunID:     runID,
+		EventName: eventName,
+	})
+}
+
 func (pq *pgQuerier) GetHistoryItem(ctx context.Context, id ulid.ULID) (*db.History, error) {
 	r, err := pq.q.GetHistoryItem(ctx, id)
 	if err != nil {

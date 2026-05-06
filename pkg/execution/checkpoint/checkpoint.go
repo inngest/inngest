@@ -65,6 +65,11 @@ type Opts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// Lifecycles are the LifecycleListeners the checkpointer fans out to for
+	// hooks it observes directly (e.g. defer opcodes that don't route through
+	// Executor.HandleGenerator). Should be the same list passed to the
+	// Executor via WithLifecycleListeners.
+	Lifecycles []execution.LifecycleListener
 }
 
 func New(o Opts) Checkpointer {
@@ -326,12 +331,12 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		case enums.OpcodeDeferAdd:
-			if err := c.saveDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+			if err := c.saveDeferFromOp(ctx, l, *input.Metadata, runCtx.LifecycleItem(), op, complete); err != nil {
 				return err
 			}
 
 		case enums.OpcodeDeferCancel:
-			if err := c.cancelDeferFromOp(ctx, l, input.Metadata.ID, op, complete); err != nil {
+			if err := c.cancelDeferFromOp(ctx, l, *input.Metadata, runCtx.LifecycleItem(), op, complete); err != nil {
 				return err
 			}
 
@@ -475,12 +480,14 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
 
 		case enums.OpcodeDeferAdd:
-			if err := c.saveDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+			// Async checkpoints don't carry a queue.Item; the resulting
+			// defer history row will have a nil group_id and attempt=0.
+			if err := c.saveDeferFromOp(ctx, l, md, queue.Item{}, op, false); err != nil {
 				return err
 			}
 
 		case enums.OpcodeDeferCancel:
-			if err := c.cancelDeferFromOp(ctx, l, md.ID, op, false); err != nil {
+			if err := c.cancelDeferFromOp(ctx, l, md, queue.Item{}, op, false); err != nil {
 				return err
 			}
 
@@ -560,9 +567,9 @@ func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result ap
 // target Defer's ScheduleStatus to Cancelled. Mirrors the executor's
 // handleGeneratorDeferCancel without enqueueing a discovery step (the SDK is
 // still driving the run).
-func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
+func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, md state.Metadata, item queue.Item, op state.GeneratorOpcode, runComplete bool) error {
 	if !runComplete {
-		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
+		if _, err := c.State.SaveStep(ctx, md.ID, op.ID, []byte("null")); err != nil &&
 			!errors.Is(err, state.ErrDuplicateResponse) &&
 			!errors.Is(err, state.ErrIdempotentResponse) {
 			l.Error("error saving checkpointed DeferCancel step state", "error", err)
@@ -576,9 +583,13 @@ func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id
 		return fmt.Errorf("error parsing DeferCancel opts: %w", err)
 	}
 
-	if err := c.State.SetDeferStatus(ctx, id, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
+	if err := c.State.SetDeferStatus(ctx, md.ID, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
 		l.Error("error cancelling defer in checkpoint", "error", err)
 		return fmt.Errorf("error cancelling defer: %w", err)
+	}
+
+	for _, ll := range c.Lifecycles {
+		go ll.OnDefer(context.WithoutCancel(ctx), md, item, op)
 	}
 
 	return nil
@@ -588,9 +599,9 @@ func (c checkpointer) cancelDeferFromOp(ctx context.Context, l logger.Logger, id
 // record for an OpcodeDeferAdd observed during checkpointing. Mirrors the
 // executor's handleGeneratorDeferAdd, without enqueueing a discovery step
 // (the SDK is still driving the run).
-func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id state.ID, op state.GeneratorOpcode, runComplete bool) error {
+func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, md state.Metadata, item queue.Item, op state.GeneratorOpcode, runComplete bool) error {
 	if !runComplete {
-		if _, err := c.State.SaveStep(ctx, id, op.ID, []byte("null")); err != nil &&
+		if _, err := c.State.SaveStep(ctx, md.ID, op.ID, []byte("null")); err != nil &&
 			!errors.Is(err, state.ErrDuplicateResponse) &&
 			!errors.Is(err, state.ErrIdempotentResponse) {
 			l.Error("error saving checkpointed DeferAdd step state", "error", err)
@@ -604,7 +615,7 @@ func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id s
 		return fmt.Errorf("error parsing DeferAdd opts: %w", err)
 	}
 
-	if err := c.State.SaveDefer(ctx, id, state.Defer{
+	if err := c.State.SaveDefer(ctx, md.ID, state.Defer{
 		FnSlug:         opts.FnSlug,
 		HashedID:       op.ID,
 		ScheduleStatus: enums.DeferStatusAfterRun,
@@ -612,6 +623,10 @@ func (c checkpointer) saveDeferFromOp(ctx context.Context, l logger.Logger, id s
 	}); err != nil {
 		l.Error("error saving defer in checkpoint", "error", err)
 		return fmt.Errorf("error saving defer: %w", err)
+	}
+
+	for _, ll := range c.Lifecycles {
+		go ll.OnDefer(context.WithoutCancel(ctx), md, item, op)
 	}
 
 	return nil

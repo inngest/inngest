@@ -9,4 +9,6 @@ const (
 	HistoryStepTypeSend
 	HistoryStepTypeSleep
 	HistoryStepTypeWait
+	HistoryStepTypeDeferAdd
+	HistoryStepTypeDeferCancel
 )

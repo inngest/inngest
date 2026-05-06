@@ -370,13 +370,18 @@ type RunDefer struct {
 	FnSlug string         `json:"fnSlug"`
 	Status RunDeferStatus `json:"status"`
 	Input  *string        `json:"input,omitempty"`
-	Run    *FunctionRunV2 `json:"run,omitempty"`
+	Run    *RunRef        `json:"run,omitempty"`
 }
 
 type RunDeferredFrom struct {
-	ParentRunID  ulid.ULID      `json:"parentRunID"`
-	ParentFnSlug string         `json:"parentFnSlug"`
-	ParentRun    *FunctionRunV2 `json:"parentRun,omitempty"`
+	ParentRunID  ulid.ULID `json:"parentRunID"`
+	ParentFnSlug string    `json:"parentFnSlug"`
+	ParentRun    *RunRef   `json:"parentRun,omitempty"`
+}
+
+type RunRef struct {
+	ID     ulid.ULID         `json:"id"`
+	Status FunctionRunStatus `json:"status"`
 }
 
 type RunStep struct {

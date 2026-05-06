@@ -198,6 +198,16 @@ type LifecycleListener interface {
 		time.Time, // Sleeping until this time.
 	)
 
+	// OnDefer fires for each DeferAdd or DeferCancel opcode. Listeners must be
+	// idempotent w.r.t. (run_id, op.ID): both the executor and checkpoint
+	// paths invoke it.
+	OnDefer(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		statev1.GeneratorOpcode,
+	)
+
 	// Close closes the listener and flushes any pending writes.
 	//
 	// This is backend specific and may be a noop depending on the
@@ -384,6 +394,14 @@ func (NoopLifecyceListener) OnSleep(
 	queue.Item,
 	statev1.GeneratorOpcode,
 	time.Time,
+) {
+}
+
+func (NoopLifecyceListener) OnDefer(
+	context.Context,
+	statev2.Metadata,
+	queue.Item,
+	statev1.GeneratorOpcode,
 ) {
 }
 

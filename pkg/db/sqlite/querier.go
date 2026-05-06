@@ -359,6 +359,48 @@ func (sq *sqliteQuerier) GetFunctionRunHistory(ctx context.Context, runID ulid.U
 	return convertSlice(rows, historyFromSQLite), nil
 }
 
+func (sq *sqliteQuerier) GetRunDeferOpcodes(ctx context.Context, runID ulid.ULID, stepTypes []string) ([]*db.RunDeferOpcode, error) {
+	nullStepTypes := make([]sql.NullString, len(stepTypes))
+	for i, s := range stepTypes {
+		nullStepTypes[i] = sql.NullString{String: s, Valid: true}
+	}
+	rows, err := sq.q.GetRunDeferOpcodes(ctx, sqlc.GetRunDeferOpcodesParams{
+		RunID:     runID,
+		StepTypes: nullStepTypes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.RunDeferOpcode, len(rows))
+	for i, r := range rows {
+		out[i] = &db.RunDeferOpcode{ID: r.ID, Result: r.Result}
+	}
+	return out, nil
+}
+
+func (sq *sqliteQuerier) GetRunsByUserEventIDs(ctx context.Context, eventIDs []string) ([]*db.RunWithUserEventID, error) {
+	rows, err := sq.q.GetRunsByUserEventIDs(ctx, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.RunWithUserEventID, len(rows))
+	for i, r := range rows {
+		out[i] = &db.RunWithUserEventID{
+			UserEventID:    r.UserEventID,
+			FunctionRun:    *functionRunFromSQLite(&r.FunctionRun),
+			FunctionFinish: *functionFinishFromSQLite(&r.FunctionFinish),
+		}
+	}
+	return out, nil
+}
+
+func (sq *sqliteQuerier) GetRunDeferredFromEvent(ctx context.Context, runID ulid.ULID, eventName string) (string, error) {
+	return sq.q.GetRunDeferredFromEvent(ctx, sqlc.GetRunDeferredFromEventParams{
+		RunID:     runID,
+		EventName: eventName,
+	})
+}
+
 func (sq *sqliteQuerier) GetHistoryItem(ctx context.Context, id ulid.ULID) (*db.History, error) {
 	r, err := sq.q.GetHistoryItem(ctx, id)
 	if err != nil {

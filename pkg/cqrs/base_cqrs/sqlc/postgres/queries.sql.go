@@ -1178,6 +1178,65 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
+const getRunDeferOpcodes = `-- name: GetRunDeferOpcodes :many
+SELECT id, result FROM history
+WHERE run_id = $1 AND step_type = ANY($2::TEXT[])
+ORDER BY created_at ASC
+`
+
+type GetRunDeferOpcodesParams struct {
+	RunID     ulid.ULID
+	StepTypes []string
+}
+
+type GetRunDeferOpcodesRow struct {
+	ID     ulid.ULID
+	Result sql.NullString
+}
+
+func (q *Queries) GetRunDeferOpcodes(ctx context.Context, arg GetRunDeferOpcodesParams) ([]*GetRunDeferOpcodesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRunDeferOpcodes, arg.RunID, pq.Array(arg.StepTypes))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunDeferOpcodesRow
+	for rows.Next() {
+		var i GetRunDeferOpcodesRow
+		if err := rows.Scan(&i.ID, &i.Result); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRunDeferredFromEvent = `-- name: GetRunDeferredFromEvent :one
+SELECT e.event_data
+FROM function_runs AS fr
+INNER JOIN events AS e ON fr.event_id = e.internal_id
+WHERE fr.run_id = $1 AND e.event_name = $2
+LIMIT 1
+`
+
+type GetRunDeferredFromEventParams struct {
+	RunID     ulid.ULID
+	EventName string
+}
+
+func (q *Queries) GetRunDeferredFromEvent(ctx context.Context, arg GetRunDeferredFromEventParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, getRunDeferredFromEvent, arg.RunID, arg.EventName)
+	var event_data string
+	err := row.Scan(&event_data)
+	return event_data, err
+}
+
 const getRunSpanByRunID = `-- name: GetRunSpanByRunID :one
 SELECT
   run_id,
@@ -1230,6 +1289,67 @@ func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDPa
 		&i.SpanFragments,
 	)
 	return &i, err
+}
+
+const getRunsByUserEventIDs = `-- name: GetRunsByUserEventIDs :many
+SELECT
+    e.event_id AS user_event_id,
+    function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM events AS e
+INNER JOIN function_runs ON function_runs.event_id = e.internal_id
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE e.event_id = ANY($1::TEXT[])
+`
+
+type GetRunsByUserEventIDsRow struct {
+	UserEventID              string
+	FunctionRun              FunctionRun
+	FinishStatus             string
+	FinishOutput             string
+	FinishCompletedStepCount int32
+	FinishCreatedAt          time.Time
+}
+
+func (q *Queries) GetRunsByUserEventIDs(ctx context.Context, eventIds []string) ([]*GetRunsByUserEventIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRunsByUserEventIDs, pq.Array(eventIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunsByUserEventIDsRow
+	for rows.Next() {
+		var i GetRunsByUserEventIDsRow
+		if err := rows.Scan(
+			&i.UserEventID,
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FinishStatus,
+			&i.FinishOutput,
+			&i.FinishCompletedStepCount,
+			&i.FinishCreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getSpanBySpanID = `-- name: GetSpanBySpanID :one

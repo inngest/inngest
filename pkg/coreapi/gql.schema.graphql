@@ -517,7 +517,7 @@ type RunDefer {
   fnSlug: String!
   status: RunDeferStatus!
   input: Bytes
-  run: FunctionRunV2
+  run: RunRef
 }
 
 enum RunDeferStatus {
@@ -528,7 +528,16 @@ enum RunDeferStatus {
 type RunDeferredFrom {
   parentRunID: ULID!
   parentFnSlug: String!
-  parentRun: FunctionRunV2
+  parentRun: RunRef
+}
+
+# RunRef is a thin pointer to a function run carrying only the fields that the
+# defer projections need at render time. Consumers wanting the full run should
+# query it by id; this type intentionally exposes a small surface so the
+# generated resolvers don't lie about populated fields.
+type RunRef {
+  id: ULID!
+  status: FunctionRunStatus!
 }
 
 enum RunTraceSpanStatus {

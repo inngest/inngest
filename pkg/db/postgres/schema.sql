@@ -375,6 +375,12 @@ CREATE UNIQUE INDEX functions_app_id_slug_active_key ON public.functions USING b
 CREATE INDEX idx_events_internal_id ON public.events USING btree (internal_id);
 
 --
+-- Name: idx_events_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_events_event_id ON public.events USING btree (event_id);
+
+--
 -- Name: idx_events_internal_id_received_range; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -421,6 +427,14 @@ CREATE INDEX idx_history_id ON public.history USING btree (id);
 --
 
 CREATE INDEX idx_history_run_id_created ON public.history USING btree (run_id, created_at);
+
+
+--
+-- Name: idx_history_run_id_step_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_history_run_id_step_type ON public.history USING btree (run_id, step_type, created_at) WHERE (step_type IS NOT NULL);
+
 
 --
 -- Name: idx_spans_account_status_time; Type: INDEX; Schema: public; Owner: -

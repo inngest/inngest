@@ -3530,6 +3530,10 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 		return fmt.Errorf("error saving defer: %w", err)
 	}
 
+	for _, ll := range e.lifecycles {
+		go ll.OnDefer(context.WithoutCancel(ctx), *runCtx.Metadata(), runCtx.LifecycleItem(), gen)
+	}
+
 	if runCtx.OnlyHasLazyOps() {
 		// Unreachable. Only happens if the SDK sends a lazy op without
 		// piggybacking on a non-lazy op (e.g. "[DeferAdd]" instead of
@@ -3578,6 +3582,10 @@ func (e *executor) handleGeneratorDeferCancel(ctx context.Context, runCtx execut
 	// an SDK bug, and the cost of handling it isn't worth the complexity.
 	if err := e.smv2.SetDeferStatus(ctx, runCtx.Metadata().ID, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
 		return fmt.Errorf("error cancelling defer: %w", err)
+	}
+
+	for _, ll := range e.lifecycles {
+		go ll.OnDefer(context.WithoutCancel(ctx), *runCtx.Metadata(), runCtx.LifecycleItem(), gen)
 	}
 
 	if runCtx.OnlyHasLazyOps() {

@@ -615,6 +615,48 @@ func (q NormalizedQueries) GetFunctionRunHistory(ctx context.Context, runID ulid
 	return sqliteHistory, nil
 }
 
+func (q NormalizedQueries) GetRunDeferOpcodes(ctx context.Context, arg sqlc_sqlite.GetRunDeferOpcodesParams) ([]*sqlc_sqlite.GetRunDeferOpcodesRow, error) {
+	stepTypes := make([]string, 0, len(arg.StepTypes))
+	for _, s := range arg.StepTypes {
+		if s.Valid {
+			stepTypes = append(stepTypes, s.String)
+		}
+	}
+	rows, err := q.db.GetRunDeferOpcodes(ctx, GetRunDeferOpcodesParams{
+		RunID:     arg.RunID,
+		StepTypes: stepTypes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*sqlc_sqlite.GetRunDeferOpcodesRow, len(rows))
+	for i, r := range rows {
+		out[i] = &sqlc_sqlite.GetRunDeferOpcodesRow{ID: r.ID, Result: r.Result}
+	}
+	return out, nil
+}
+
+func (q NormalizedQueries) GetRunsByUserEventIDs(ctx context.Context, eventIDs []string) ([]*sqlc_sqlite.GetRunsByUserEventIDsRow, error) {
+	rows, err := q.db.GetRunsByUserEventIDs(ctx, eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetRunsByUserEventIDsRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
+}
+
+func (q NormalizedQueries) GetRunDeferredFromEvent(ctx context.Context, arg sqlc_sqlite.GetRunDeferredFromEventParams) (string, error) {
+	return q.db.GetRunDeferredFromEvent(ctx, GetRunDeferredFromEventParams{
+		RunID:     arg.RunID,
+		EventName: arg.EventName,
+	})
+}
+
 func (q NormalizedQueries) InsertTrace(ctx context.Context, span sqlc_sqlite.InsertTraceParams) error {
 	pgSpan := InsertTraceParams{
 		Timestamp:          span.Timestamp,

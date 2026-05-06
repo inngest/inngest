@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _HistoryStepTypeName = "RunSendSleepWait"
+const _HistoryStepTypeName = "RunSendSleepWaitDeferAddDeferCancel"
 
-var _HistoryStepTypeIndex = [...]uint8{0, 3, 7, 12, 16}
+var _HistoryStepTypeIndex = [...]uint8{0, 3, 7, 12, 16, 24, 35}
 
-const _HistoryStepTypeLowerName = "runsendsleepwait"
+const _HistoryStepTypeLowerName = "runsendsleepwaitdeferadddefercancel"
 
 func (i HistoryStepType) String() string {
 	if i < 0 || i >= HistoryStepType(len(_HistoryStepTypeIndex)-1) {
@@ -31,9 +31,11 @@ func _HistoryStepTypeNoOp() {
 	_ = x[HistoryStepTypeSend-(1)]
 	_ = x[HistoryStepTypeSleep-(2)]
 	_ = x[HistoryStepTypeWait-(3)]
+	_ = x[HistoryStepTypeDeferAdd-(4)]
+	_ = x[HistoryStepTypeDeferCancel-(5)]
 }
 
-var _HistoryStepTypeValues = []HistoryStepType{HistoryStepTypeRun, HistoryStepTypeSend, HistoryStepTypeSleep, HistoryStepTypeWait}
+var _HistoryStepTypeValues = []HistoryStepType{HistoryStepTypeRun, HistoryStepTypeSend, HistoryStepTypeSleep, HistoryStepTypeWait, HistoryStepTypeDeferAdd, HistoryStepTypeDeferCancel}
 
 var _HistoryStepTypeNameToValueMap = map[string]HistoryStepType{
 	_HistoryStepTypeName[0:3]:        HistoryStepTypeRun,
@@ -44,6 +46,10 @@ var _HistoryStepTypeNameToValueMap = map[string]HistoryStepType{
 	_HistoryStepTypeLowerName[7:12]:  HistoryStepTypeSleep,
 	_HistoryStepTypeName[12:16]:      HistoryStepTypeWait,
 	_HistoryStepTypeLowerName[12:16]: HistoryStepTypeWait,
+	_HistoryStepTypeName[16:24]:      HistoryStepTypeDeferAdd,
+	_HistoryStepTypeLowerName[16:24]: HistoryStepTypeDeferAdd,
+	_HistoryStepTypeName[24:35]:      HistoryStepTypeDeferCancel,
+	_HistoryStepTypeLowerName[24:35]: HistoryStepTypeDeferCancel,
 }
 
 var _HistoryStepTypeNames = []string{
@@ -51,6 +57,8 @@ var _HistoryStepTypeNames = []string{
 	_HistoryStepTypeName[3:7],
 	_HistoryStepTypeName[7:12],
 	_HistoryStepTypeName[12:16],
+	_HistoryStepTypeName[16:24],
+	_HistoryStepTypeName[24:35],
 }
 
 // HistoryStepTypeString retrieves an enum value from the enum constants string name.

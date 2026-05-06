@@ -64,6 +64,9 @@ type Querier interface {
 	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error)
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
 	HistoryCountRuns(ctx context.Context) (int64, error)
+	GetRunDeferOpcodes(ctx context.Context, runID ulid.ULID, stepTypes []string) ([]*RunDeferOpcode, error)
+	GetRunsByUserEventIDs(ctx context.Context, eventIDs []string) ([]*RunWithUserEventID, error)
+	GetRunDeferredFromEvent(ctx context.Context, runID ulid.ULID, eventName string) (string, error)
 
 	// Queue Snapshots
 	InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error

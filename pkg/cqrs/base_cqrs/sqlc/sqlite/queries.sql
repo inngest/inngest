@@ -142,6 +142,23 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_ru
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
 
+-- name: GetRunsByUserEventIDs :many
+SELECT
+    e.event_id AS user_event_id,
+    sqlc.embed(function_runs),
+    sqlc.embed(function_finishes)
+FROM events AS e
+INNER JOIN function_runs ON function_runs.event_id = e.internal_id
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE e.event_id IN (sqlc.slice('event_ids'));
+
+-- name: GetRunDeferredFromEvent :one
+SELECT e.event_data
+FROM function_runs AS fr
+INNER JOIN events AS e ON fr.event_id = e.internal_id
+WHERE fr.run_id = ? AND e.event_name = ?
+LIMIT 1;
+
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
 
@@ -206,6 +223,11 @@ SELECT * FROM history WHERE id = ?;
 
 -- name: GetFunctionRunHistory :many
 SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;
+
+-- name: GetRunDeferOpcodes :many
+SELECT id, result FROM history
+WHERE run_id = ? AND step_type IN (sqlc.slice('step_types'))
+ORDER BY created_at ASC;
 
 -- name: HistoryCountRuns :one
 SELECT COUNT(DISTINCT run_id) FROM history;

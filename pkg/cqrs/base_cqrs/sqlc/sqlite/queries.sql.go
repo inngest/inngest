@@ -1197,6 +1197,76 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 	return items, nil
 }
 
+const getRunDeferOpcodes = `-- name: GetRunDeferOpcodes :many
+SELECT id, result FROM history
+WHERE run_id = ? AND step_type IN (/*SLICE:step_types*/?)
+ORDER BY created_at ASC
+`
+
+type GetRunDeferOpcodesParams struct {
+	RunID     ulid.ULID
+	StepTypes []sql.NullString
+}
+
+type GetRunDeferOpcodesRow struct {
+	ID     ulid.ULID
+	Result sql.NullString
+}
+
+func (q *Queries) GetRunDeferOpcodes(ctx context.Context, arg GetRunDeferOpcodesParams) ([]*GetRunDeferOpcodesRow, error) {
+	query := getRunDeferOpcodes
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.RunID)
+	if len(arg.StepTypes) > 0 {
+		for _, v := range arg.StepTypes {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:step_types*/?", strings.Repeat(",?", len(arg.StepTypes))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:step_types*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunDeferOpcodesRow
+	for rows.Next() {
+		var i GetRunDeferOpcodesRow
+		if err := rows.Scan(&i.ID, &i.Result); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRunDeferredFromEvent = `-- name: GetRunDeferredFromEvent :one
+SELECT e.event_data
+FROM function_runs AS fr
+INNER JOIN events AS e ON fr.event_id = e.internal_id
+WHERE fr.run_id = ? AND e.event_name = ?
+LIMIT 1
+`
+
+type GetRunDeferredFromEventParams struct {
+	RunID     ulid.ULID
+	EventName string
+}
+
+func (q *Queries) GetRunDeferredFromEvent(ctx context.Context, arg GetRunDeferredFromEventParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, getRunDeferredFromEvent, arg.RunID, arg.EventName)
+	var event_data string
+	err := row.Scan(&event_data)
+	return event_data, err
+}
+
 const getRunSpanByRunID = `-- name: GetRunSpanByRunID :one
 SELECT
   run_id,
@@ -1249,6 +1319,73 @@ func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDPa
 		&i.SpanFragments,
 	)
 	return &i, err
+}
+
+const getRunsByUserEventIDs = `-- name: GetRunsByUserEventIDs :many
+SELECT
+    e.event_id AS user_event_id,
+    function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id,
+    function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at
+FROM events AS e
+INNER JOIN function_runs ON function_runs.event_id = e.internal_id
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE e.event_id IN (/*SLICE:event_ids*/?)
+`
+
+type GetRunsByUserEventIDsRow struct {
+	UserEventID    string
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+}
+
+func (q *Queries) GetRunsByUserEventIDs(ctx context.Context, eventIds []string) ([]*GetRunsByUserEventIDsRow, error) {
+	query := getRunsByUserEventIDs
+	var queryParams []interface{}
+	if len(eventIds) > 0 {
+		for _, v := range eventIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", strings.Repeat(",?", len(eventIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunsByUserEventIDsRow
+	for rows.Next() {
+		var i GetRunsByUserEventIDsRow
+		if err := rows.Scan(
+			&i.UserEventID,
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
+			&i.FunctionFinish.RunID,
+			&i.FunctionFinish.Status,
+			&i.FunctionFinish.Output,
+			&i.FunctionFinish.CompletedStepCount,
+			&i.FunctionFinish.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getSpanBySpanID = `-- name: GetSpanBySpanID :one

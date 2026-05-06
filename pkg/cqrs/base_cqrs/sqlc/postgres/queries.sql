@@ -162,6 +162,26 @@ FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[]));
 
+-- name: GetRunsByUserEventIDs :many
+SELECT
+    e.event_id AS user_event_id,
+    sqlc.embed(function_runs),
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at
+FROM events AS e
+INNER JOIN function_runs ON function_runs.event_id = e.internal_id
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE e.event_id = ANY(sqlc.slice('event_ids')::TEXT[]);
+
+-- name: GetRunDeferredFromEvent :one
+SELECT e.event_data
+FROM function_runs AS fr
+INNER JOIN events AS e ON fr.event_id = e.internal_id
+WHERE fr.run_id = $1 AND e.event_name = $2
+LIMIT 1;
+
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id = ANY($1::BYTEA[]);
 
@@ -222,6 +242,11 @@ SELECT * FROM history WHERE id = $1;
 
 -- name: GetFunctionRunHistory :many
 SELECT * FROM history WHERE run_id = $1 ORDER BY created_at ASC;
+
+-- name: GetRunDeferOpcodes :many
+SELECT id, result FROM history
+WHERE run_id = $1 AND step_type = ANY(sqlc.slice('step_types')::TEXT[])
+ORDER BY created_at ASC;
 
 -- name: HistoryCountRuns :one
 SELECT COUNT(DISTINCT run_id) FROM history;

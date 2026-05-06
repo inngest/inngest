@@ -454,6 +454,11 @@ type ComplexityRoot struct {
 		Timeout func(childComplexity int) int
 	}
 
+	RunRef struct {
+		ID     func(childComplexity int) int
+		Status func(childComplexity int) int
+	}
+
 	RunStep struct {
 		Name   func(childComplexity int) int
 		StepID func(childComplexity int) int
@@ -2708,6 +2713,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunHistoryWaitResult.Timeout(childComplexity), true
 
+	case "RunRef.id":
+		if e.complexity.RunRef.ID == nil {
+			break
+		}
+
+		return e.complexity.RunRef.ID(childComplexity), true
+
+	case "RunRef.status":
+		if e.complexity.RunRef.Status == nil {
+			break
+		}
+
+		return e.complexity.RunRef.Status(childComplexity), true
+
 	case "RunStep.name":
 		if e.complexity.RunStep.Name == nil {
 			break
@@ -4179,7 +4198,7 @@ type RunDefer {
   fnSlug: String!
   status: RunDeferStatus!
   input: Bytes
-  run: FunctionRunV2
+  run: RunRef
 }
 
 enum RunDeferStatus {
@@ -4190,7 +4209,16 @@ enum RunDeferStatus {
 type RunDeferredFrom {
   parentRunID: ULID!
   parentFnSlug: String!
-  parentRun: FunctionRunV2
+  parentRun: RunRef
+}
+
+# RunRef is a thin pointer to a function run carrying only the fields that the
+# defer projections need at render time. Consumers wanting the full run should
+# query it by id; this type intentionally exposes a small surface so the
+# generated resolvers don't lie about populated fields.
+type RunRef {
+  id: ULID!
+  status: FunctionRunStatus!
 }
 
 enum RunTraceSpanStatus {
@@ -16329,9 +16357,9 @@ func (ec *executionContext) _RunDefer_run(ctx context.Context, field graphql.Col
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*models.FunctionRunV2)
+	res := resTmp.(*models.RunRef)
 	fc.Result = res
-	return ec.marshalOFunctionRunV22ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunV2(ctx, field.Selections, res)
+	return ec.marshalORunRef2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunRef(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_RunDefer_run(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -16343,49 +16371,11 @@ func (ec *executionContext) fieldContext_RunDefer_run(ctx context.Context, field
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_FunctionRunV2_id(ctx, field)
-			case "appID":
-				return ec.fieldContext_FunctionRunV2_appID(ctx, field)
-			case "app":
-				return ec.fieldContext_FunctionRunV2_app(ctx, field)
-			case "functionID":
-				return ec.fieldContext_FunctionRunV2_functionID(ctx, field)
-			case "function":
-				return ec.fieldContext_FunctionRunV2_function(ctx, field)
-			case "traceID":
-				return ec.fieldContext_FunctionRunV2_traceID(ctx, field)
-			case "queuedAt":
-				return ec.fieldContext_FunctionRunV2_queuedAt(ctx, field)
-			case "startedAt":
-				return ec.fieldContext_FunctionRunV2_startedAt(ctx, field)
-			case "endedAt":
-				return ec.fieldContext_FunctionRunV2_endedAt(ctx, field)
+				return ec.fieldContext_RunRef_id(ctx, field)
 			case "status":
-				return ec.fieldContext_FunctionRunV2_status(ctx, field)
-			case "sourceID":
-				return ec.fieldContext_FunctionRunV2_sourceID(ctx, field)
-			case "triggerIDs":
-				return ec.fieldContext_FunctionRunV2_triggerIDs(ctx, field)
-			case "eventName":
-				return ec.fieldContext_FunctionRunV2_eventName(ctx, field)
-			case "isBatch":
-				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
-			case "batchCreatedAt":
-				return ec.fieldContext_FunctionRunV2_batchCreatedAt(ctx, field)
-			case "cronSchedule":
-				return ec.fieldContext_FunctionRunV2_cronSchedule(ctx, field)
-			case "output":
-				return ec.fieldContext_FunctionRunV2_output(ctx, field)
-			case "trace":
-				return ec.fieldContext_FunctionRunV2_trace(ctx, field)
-			case "hasAI":
-				return ec.fieldContext_FunctionRunV2_hasAI(ctx, field)
-			case "defers":
-				return ec.fieldContext_FunctionRunV2_defers(ctx, field)
-			case "deferredFrom":
-				return ec.fieldContext_FunctionRunV2_deferredFrom(ctx, field)
+				return ec.fieldContext_RunRef_status(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type RunRef", field.Name)
 		},
 	}
 	return fc, nil
@@ -16502,9 +16492,9 @@ func (ec *executionContext) _RunDeferredFrom_parentRun(ctx context.Context, fiel
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*models.FunctionRunV2)
+	res := resTmp.(*models.RunRef)
 	fc.Result = res
-	return ec.marshalOFunctionRunV22ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunV2(ctx, field.Selections, res)
+	return ec.marshalORunRef2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunRef(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_RunDeferredFrom_parentRun(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -16516,49 +16506,11 @@ func (ec *executionContext) fieldContext_RunDeferredFrom_parentRun(ctx context.C
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_FunctionRunV2_id(ctx, field)
-			case "appID":
-				return ec.fieldContext_FunctionRunV2_appID(ctx, field)
-			case "app":
-				return ec.fieldContext_FunctionRunV2_app(ctx, field)
-			case "functionID":
-				return ec.fieldContext_FunctionRunV2_functionID(ctx, field)
-			case "function":
-				return ec.fieldContext_FunctionRunV2_function(ctx, field)
-			case "traceID":
-				return ec.fieldContext_FunctionRunV2_traceID(ctx, field)
-			case "queuedAt":
-				return ec.fieldContext_FunctionRunV2_queuedAt(ctx, field)
-			case "startedAt":
-				return ec.fieldContext_FunctionRunV2_startedAt(ctx, field)
-			case "endedAt":
-				return ec.fieldContext_FunctionRunV2_endedAt(ctx, field)
+				return ec.fieldContext_RunRef_id(ctx, field)
 			case "status":
-				return ec.fieldContext_FunctionRunV2_status(ctx, field)
-			case "sourceID":
-				return ec.fieldContext_FunctionRunV2_sourceID(ctx, field)
-			case "triggerIDs":
-				return ec.fieldContext_FunctionRunV2_triggerIDs(ctx, field)
-			case "eventName":
-				return ec.fieldContext_FunctionRunV2_eventName(ctx, field)
-			case "isBatch":
-				return ec.fieldContext_FunctionRunV2_isBatch(ctx, field)
-			case "batchCreatedAt":
-				return ec.fieldContext_FunctionRunV2_batchCreatedAt(ctx, field)
-			case "cronSchedule":
-				return ec.fieldContext_FunctionRunV2_cronSchedule(ctx, field)
-			case "output":
-				return ec.fieldContext_FunctionRunV2_output(ctx, field)
-			case "trace":
-				return ec.fieldContext_FunctionRunV2_trace(ctx, field)
-			case "hasAI":
-				return ec.fieldContext_FunctionRunV2_hasAI(ctx, field)
-			case "defers":
-				return ec.fieldContext_FunctionRunV2_defers(ctx, field)
-			case "deferredFrom":
-				return ec.fieldContext_FunctionRunV2_deferredFrom(ctx, field)
+				return ec.fieldContext_RunRef_status(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type RunRef", field.Name)
 		},
 	}
 	return fc, nil
@@ -18272,6 +18224,94 @@ func (ec *executionContext) fieldContext_RunHistoryWaitResult_timeout(ctx contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunRef_id(ctx context.Context, field graphql.CollectedField, obj *models.RunRef) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunRef_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(ulid.ULID)
+	fc.Result = res
+	return ec.marshalNULID2githubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunRef_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunRef",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ULID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunRef_status(ctx context.Context, field graphql.CollectedField, obj *models.RunRef) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunRef_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.FunctionRunStatus)
+	fc.Result = res
+	return ec.marshalNFunctionRunStatus2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunRef_status(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunRef",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type FunctionRunStatus does not have child fields")
 		},
 	}
 	return fc, nil
@@ -28616,6 +28656,41 @@ func (ec *executionContext) _RunHistoryWaitResult(ctx context.Context, sel ast.S
 	return out
 }
 
+var runRefImplementors = []string{"RunRef"}
+
+func (ec *executionContext) _RunRef(ctx context.Context, sel ast.SelectionSet, obj *models.RunRef) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runRefImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunRef")
+		case "id":
+
+			out.Values[i] = ec._RunRef_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "status":
+
+			out.Values[i] = ec._RunRef_status(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var runStepImplementors = []string{"RunStep"}
 
 func (ec *executionContext) _RunStep(ctx context.Context, sel ast.SelectionSet, obj *models.RunStep) graphql.Marshaler {
@@ -32381,6 +32456,13 @@ func (ec *executionContext) marshalORunHistoryWaitResult2ᚖgithubᚗcomᚋinnge
 		return graphql.Null
 	}
 	return ec._RunHistoryWaitResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORunRef2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunRef(ctx context.Context, sel ast.SelectionSet, v *models.RunRef) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RunRef(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORunTraceSpan2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.RunTraceSpan) graphql.Marshaler {

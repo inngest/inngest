@@ -79,6 +79,9 @@ type CheckpointAPIOpts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// Lifecycles are the LifecycleListeners the checkpointer fans out to.
+	// Must match the list registered with the Executor.
+	Lifecycles []execution.LifecycleListener
 }
 
 // checkpointAPI is the base implementation.
@@ -108,6 +111,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
 		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
 		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
+		Lifecycles:        o.CheckpointOpts.Lifecycles,
 	})
 
 	api := checkpointAPI{

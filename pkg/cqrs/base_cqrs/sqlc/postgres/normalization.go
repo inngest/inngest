@@ -237,6 +237,31 @@ func (r *GetFunctionRunsFromEventsRow) ToSQLite() (*sqlc.GetFunctionRunsFromEven
 	}, nil
 }
 
+func (r *GetRunsByUserEventIDsRow) ToSQLite() (*sqlc.GetRunsByUserEventIDsRow, error) {
+	run, err := r.FunctionRun.ToSQLite()
+	if err != nil {
+		return nil, err
+	}
+
+	pgFinish := FunctionFinish{
+		RunID:              r.FunctionRun.RunID,
+		Status:             r.FinishStatus,
+		Output:             r.FinishOutput,
+		CompletedStepCount: r.FinishCompletedStepCount,
+		CreatedAt:          r.FinishCreatedAt,
+	}
+	finish, err := pgFinish.ToSQLite()
+	if err != nil {
+		return nil, err
+	}
+
+	return &sqlc.GetRunsByUserEventIDsRow{
+		UserEventID:    r.UserEventID,
+		FunctionRun:    *run,
+		FunctionFinish: *finish,
+	}, nil
+}
+
 func (r *GetFunctionRunRow) ToSQLite() (*sqlc.GetFunctionRunRow, error) {
 	run, err := r.FunctionRun.ToSQLite()
 	if err != nil {

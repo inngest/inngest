@@ -241,6 +241,23 @@ type FunctionRunRow struct {
 	FunctionFinish FunctionFinish
 }
 
+// RunWithUserEventID is a FunctionRunRow paired with the user-facing event_id
+// (text) that triggered it. Returned by lookups that resolve user-facing event
+// IDs to their child runs.
+type RunWithUserEventID struct {
+	UserEventID    string
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+}
+
+// RunDeferOpcode is the projection of history rows GetRunDeferOpcodes returns.
+// Only id and result are read; the result blob holds the marshaled opcode the
+// OnDefer lifecycle listener wrote.
+type RunDeferOpcode struct {
+	ID     ulid.ULID
+	Result sql.NullString
+}
+
 // SpanRow is the common shape returned by span queries that group by dynamic_span_id.
 type SpanRow struct {
 	RunID          string
