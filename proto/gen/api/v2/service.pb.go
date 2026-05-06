@@ -1074,23 +1074,22 @@ func (x *TraceSpanMetadata) GetUpdatedAt() *timestamppb.Timestamp {
 }
 
 type TraceSpan struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name              string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Status            TraceSpanStatus        `protobuf:"varint,3,opt,name=status,proto3,enum=api.v2.TraceSpanStatus" json:"status,omitempty"`
-	StepOp            *TraceStepOp           `protobuf:"varint,4,opt,name=step_op,json=stepOp,proto3,enum=api.v2.TraceStepOp,oneof" json:"step_op,omitempty"`
-	StepId            *string                `protobuf:"bytes,5,opt,name=step_id,json=stepId,proto3,oneof" json:"step_id,omitempty"`
-	DurationMs        *uint64                `protobuf:"varint,6,opt,name=duration_ms,json=durationMs,proto3,oneof" json:"duration_ms,omitempty"`
-	QueuedAt          *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
-	StartedAt         *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
-	EndedAt           *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
-	Input             *structpb.Struct       `protobuf:"bytes,10,opt,name=input,proto3,oneof" json:"input,omitempty"`
-	Output            *structpb.Struct       `protobuf:"bytes,11,opt,name=output,proto3,oneof" json:"output,omitempty"`
-	Metadata          []*TraceSpanMetadata   `protobuf:"bytes,12,rep,name=metadata,proto3" json:"metadata,omitempty"`
-	Children          []*TraceSpan           `protobuf:"bytes,13,rep,name=children,proto3" json:"children,omitempty"`
-	ChildrenTruncated bool                   `protobuf:"varint,14,opt,name=children_truncated,json=childrenTruncated,proto3" json:"children_truncated,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Status        TraceSpanStatus        `protobuf:"varint,3,opt,name=status,proto3,enum=api.v2.TraceSpanStatus" json:"status,omitempty"`
+	StepOp        *TraceStepOp           `protobuf:"varint,4,opt,name=step_op,json=stepOp,proto3,enum=api.v2.TraceStepOp,oneof" json:"step_op,omitempty"`
+	StepId        *string                `protobuf:"bytes,5,opt,name=step_id,json=stepId,proto3,oneof" json:"step_id,omitempty"`
+	DurationMs    *uint64                `protobuf:"varint,6,opt,name=duration_ms,json=durationMs,proto3,oneof" json:"duration_ms,omitempty"`
+	QueuedAt      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
+	Input         *structpb.Struct       `protobuf:"bytes,10,opt,name=input,proto3,oneof" json:"input,omitempty"`
+	Output        *structpb.Struct       `protobuf:"bytes,11,opt,name=output,proto3,oneof" json:"output,omitempty"`
+	Metadata      []*TraceSpanMetadata   `protobuf:"bytes,12,rep,name=metadata,proto3" json:"metadata,omitempty"`
+	Children      []*TraceSpan           `protobuf:"bytes,13,rep,name=children,proto3" json:"children,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TraceSpan) Reset() {
@@ -1214,13 +1213,6 @@ func (x *TraceSpan) GetChildren() []*TraceSpan {
 	return nil
 }
 
-func (x *TraceSpan) GetChildrenTruncated() bool {
-	if x != nil {
-		return x.ChildrenTruncated
-	}
-	return false
-}
-
 type FunctionTrace struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
@@ -1277,7 +1269,6 @@ type GetFunctionTraceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
-	MaxDepth      *uint32                `protobuf:"varint,3,opt,name=max_depth,json=maxDepth,proto3,oneof" json:"max_depth,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1324,13 +1315,6 @@ func (x *GetFunctionTraceRequest) GetIncludeOutput() bool {
 		return *x.IncludeOutput
 	}
 	return false
-}
-
-func (x *GetFunctionTraceRequest) GetMaxDepth() uint32 {
-	if x != nil && x.MaxDepth != nil {
-		return *x.MaxDepth
-	}
-	return 0
 }
 
 type GetFunctionTraceResponse struct {
@@ -3536,7 +3520,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe4\x05\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb5\x05\n" +
 	"\tTraceSpan\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12/\n" +
@@ -3553,8 +3537,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	" \x01(\v2\x17.google.protobuf.StructH\x05R\x05input\x88\x01\x01\x124\n" +
 	"\x06output\x18\v \x01(\v2\x17.google.protobuf.StructH\x06R\x06output\x88\x01\x01\x125\n" +
 	"\bmetadata\x18\f \x03(\v2\x19.api.v2.TraceSpanMetadataR\bmetadata\x12-\n" +
-	"\bchildren\x18\r \x03(\v2\x11.api.v2.TraceSpanR\bchildren\x12-\n" +
-	"\x12children_truncated\x18\x0e \x01(\bR\x11childrenTruncatedB\n" +
+	"\bchildren\x18\r \x03(\v2\x11.api.v2.TraceSpanR\bchildrenB\n" +
 	"\n" +
 	"\b_step_opB\n" +
 	"\n" +
@@ -3566,14 +3549,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\a_output\"V\n" +
 	"\rFunctionTrace\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12.\n" +
-	"\troot_span\x18\x02 \x01(\v2\x11.api.v2.TraceSpanR\brootSpan\"\x9f\x01\n" +
+	"\troot_span\x18\x02 \x01(\v2\x11.api.v2.TraceSpanR\brootSpan\"o\n" +
 	"\x17GetFunctionTraceRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12*\n" +
-	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12 \n" +
-	"\tmax_depth\x18\x03 \x01(\rH\x01R\bmaxDepth\x88\x01\x01B\x11\n" +
-	"\x0f_include_outputB\f\n" +
-	"\n" +
-	"_max_depth\"{\n" +
+	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01B\x11\n" +
+	"\x0f_include_output\"{\n" +
 	"\x18GetFunctionTraceResponse\x12)\n" +
 	"\x04data\x18\x01 \x01(\v2\x15.api.v2.FunctionTraceR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"N\n" +
