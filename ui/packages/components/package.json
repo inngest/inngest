@@ -60,7 +60,7 @@
   },
   "devDependencies": {
     "@eslint/compat": "2.0.5",
-    "@eslint/js": "9.39.4",
+    "@eslint/js": "10.0.1",
     "@inngest/tsconfig": "workspace:*",
     "@storybook/addon-a11y": "10.3.6",
     "@storybook/addon-docs": "10.3.6",
@@ -72,7 +72,7 @@
     "@types/json-schema": "7.0.15",
     "@types/react": "19.2.14",
     "@vitejs/plugin-react": "6.0.1",
-    "eslint": "9.39.4",
+    "eslint": "10.3.0",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "4.6.2",
     "globals": "17.6.0",

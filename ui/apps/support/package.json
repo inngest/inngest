@@ -49,7 +49,7 @@
     "@typescript-eslint/parser": "8.59.1",
     "@vitejs/plugin-react": "6.0.1",
     "autoprefixer": "10.5.0",
-    "eslint": "9.39.4",
+    "eslint": "10.3.0",
     "eslint-plugin-react-hooks": "5.2.0",
     "postcss": "8.5.13",
     "prettier": "3.8.3",
