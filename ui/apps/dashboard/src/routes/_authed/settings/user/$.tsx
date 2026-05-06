@@ -49,7 +49,7 @@ function UserSettingsPage() {
             elements: {
               navbar: 'hidden',
               scrollBox: 'bg-canvasBase shadow-none',
-              pageScrollBox: 'pt-0 px-2',
+              pageScrollBox: 'pt-6 px-2',
             },
           }}
         >

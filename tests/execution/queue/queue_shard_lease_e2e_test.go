@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/jonboulle/clockwork"
@@ -14,11 +15,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func alwaysSelect(s queue.QueueShard) func(context.Context, uuid.UUID, *string) (queue.QueueShard, error) {
+	return func(context.Context, uuid.UUID, *string) (queue.QueueShard, error) {
+		return s, nil
+	}
+}
+
 func TestNewQueueRequiresPrimaryShardOrShardGroup(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	_, err := queue.New(ctx, "test", nil, nil, nil)
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+	shard := redis_state.NewQueueShard("test-shard", queueClient)
+
+	// Registry has shards but no primary, and no ShardGroup is configured.
+	registry, err := queue.NewShardRegistry(
+		map[string]queue.QueueShard{"test-shard": shard},
+		queue.WithShardSelector(alwaysSelect(shard)),
+	)
+	require.NoError(t, err)
+
+	_, err = queue.New(ctx, "test", registry)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must pass either primary queue shard or a valid ShardGroup in runMode")
 }
@@ -38,7 +63,9 @@ func TestNewQueueCreationWithPrimaryShard(t *testing.T) {
 	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
 	shard := redis_state.NewQueueShard("test-shard", queueClient)
 
-	q, err := queue.New(ctx, "test", shard, nil, nil)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := queue.New(ctx, "test", shardRegistry)
 	require.NoError(t, err)
 
 	// Verify primaryQueueShard is set
@@ -66,12 +93,14 @@ func TestNewQueueWithNoValidShardsInGroup(t *testing.T) {
 		}),
 	)
 
-	queueShards := map[string]queue.QueueShard{
-		"shard-a": shard,
-	}
+	registry, err := queue.NewShardRegistry(
+		map[string]queue.QueueShard{"shard-a": shard},
+		queue.WithShardSelector(alwaysSelect(shard)),
+	)
+	require.NoError(t, err)
 
 	// Runtime expects group "B", but no shards belong to that group
-	_, err = queue.New(ctx, "test", nil, queueShards, nil,
+	_, err = queue.New(ctx, "test", registry,
 		queue.WithRunMode(queue.QueueRunMode{
 			ShardGroup: "B",
 		}),
@@ -113,15 +142,19 @@ func TestNewQueueWithShardAssignment(t *testing.T) {
 		queue.WithClock(clock),
 	)
 
-	queueShards := map[string]queue.QueueShard{
-		"shard-a": shardA,
-		"shard-b": shardB,
-	}
+	registry, err := queue.NewShardRegistry(
+		map[string]queue.QueueShard{
+			"shard-a": shardA,
+			"shard-b": shardB,
+		},
+		queue.WithShardSelector(alwaysSelect(shardA)),
+	)
+	require.NoError(t, err)
 
 	var mu sync.Mutex
 	var acquiredShardName string
 
-	q, err := queue.New(ctx, "test", nil, queueShards, nil,
+	q, err := queue.New(ctx, "test", registry,
 		queue.WithClock(clock),
 		queue.WithRunMode(queue.QueueRunMode{
 			ShardGroup: groupName,

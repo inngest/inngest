@@ -170,6 +170,24 @@ export const pathCreator = {
       functionSlug,
     )}/cancellations`;
   },
+  // The function slug is part of the URL so two functions sharing an
+  // experiment name don't collide.
+  functionExperiment({
+    envSlug,
+    functionSlug,
+    experimentName,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+    experimentName: string;
+  }) {
+    return `/env/${envSlug}/experiments/${encodeURIComponent(
+      functionSlug,
+    )}/${encodeURIComponent(experimentName)}`;
+  },
+  experiments({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/experiments`;
+  },
   insights({ envSlug, ref }: { envSlug: string; ref?: string }) {
     return `/env/${envSlug}/insights${ref ? `?ref=${ref}` : ''}`;
   },

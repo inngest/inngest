@@ -106,7 +106,7 @@ CREATE TABLE public.function_runs (
 --
 
 CREATE TABLE public.functions (
-    id character(36),
+    id character(36) NOT NULL,
     app_id character(36),
     name character varying NOT NULL,
     slug character varying NOT NULL,
@@ -314,6 +314,13 @@ ALTER TABLE ONLY public.event_batches
     ADD CONSTRAINT event_batches_pkey PRIMARY KEY (id);
 
 --
+-- Name: functions functions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.functions
+    ADD CONSTRAINT functions_pkey PRIMARY KEY (id);
+
+--
 -- Name: goose_db_version goose_db_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -354,6 +361,12 @@ ALTER TABLE ONLY public.trace_runs
 
 ALTER TABLE ONLY public.worker_connections
     ADD CONSTRAINT worker_connections_pkey PRIMARY KEY (id, app_name);
+
+--
+-- Name: functions_app_id_slug_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX functions_app_id_slug_active_key ON public.functions USING btree (app_id, slug) WHERE (archived_at IS NULL);
 
 --
 -- Name: idx_events_internal_id; Type: INDEX; Schema: public; Owner: -

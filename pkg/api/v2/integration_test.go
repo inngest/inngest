@@ -299,7 +299,6 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.Nil(t, resp)
 		require.Contains(t, err.Error(), "not_implemented")
 	})
-
 }
 
 // Helper function to create string pointer for optional fields

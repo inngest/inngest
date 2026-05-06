@@ -32,6 +32,12 @@ type Querier interface {
 	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
 	GetEventsIDbound(ctx context.Context, arg GetEventsIDboundParams) ([]*Event, error)
 	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*GetExecutionSpanByStepIDAndAttemptRow, error)
+	// Look up a function by the app's user-facing name, not its internal UUID.
+	// The dev server derives app UUIDs from different inputs at different sites
+	// (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+	// row even when the function exists. Joining on apps.name routes through the
+	// one identifier that's stable across both paths.
+	GetFunctionByAppNameAndSlug(ctx context.Context, arg GetFunctionByAppNameAndSlugParams) (*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunctionRunRow, error)
@@ -66,11 +72,6 @@ type Querier interface {
 	//
 	InsertEvent(ctx context.Context, arg InsertEventParams) error
 	InsertEventBatch(ctx context.Context, arg InsertEventBatchParams) error
-	//
-	// functions
-	//
-	// note - this is very basic right now.
-	InsertFunction(ctx context.Context, arg InsertFunctionParams) (*Function, error)
 	InsertFunctionFinish(ctx context.Context, arg InsertFunctionFinishParams) error
 	//
 	// function runs
@@ -96,6 +97,11 @@ type Querier interface {
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
+	//
+	// functions
+	//
+	// note - this is very basic right now.
+	UpsertFunction(ctx context.Context, arg UpsertFunctionParams) (*Function, error)
 }
 
 var _ Querier = (*Queries)(nil)

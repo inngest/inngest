@@ -27,7 +27,9 @@ import {
 } from '@remixicon/react';
 import { format } from 'date-fns';
 
+import { formatVariantWeight } from '../Experiments/format';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
@@ -463,6 +465,56 @@ function BarHoverCardContent({
 }
 
 /**
+ * Experiment badge shown beside a step that ran under an experiment. Renders
+ * the flask icon in the standard IconTile treatment (subtle bg + border, thin
+ * rounded) with a hover card, and links to the experiment page when a
+ * `pathCreator.experiment` is provided by the host app (cloud dashboard).
+ */
+function ExperimentBadge({ metadata }: { metadata?: TimelineBarProps['experimentMetadata'] }) {
+  const { pathCreator } = usePathCreator();
+  const href =
+    pathCreator.experiment && metadata?.experimentName && metadata?.functionSlug
+      ? pathCreator.experiment({
+          experimentName: metadata.experimentName,
+          functionSlug: metadata.functionSlug,
+        })
+      : null;
+
+  const badgeClass =
+    'bg-canvasSubtle border-subtle text-subtle hover:bg-canvasMuted inline-flex h-5 w-5 items-center justify-center rounded border transition-colors';
+
+  const badge = <RiFlaskLine className="h-3 w-3" />;
+
+  return (
+    <HoverCardRoot openDelay={200} closeDelay={0}>
+      <HoverCardTrigger asChild>
+        {href ? (
+          <a
+            href={href}
+            className={badgeClass}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {badge}
+          </a>
+        ) : (
+          <span
+            className={badgeClass}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {badge}
+          </span>
+        )}
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" className="border-muted max-w-none border">
+        <ExperimentHoverCardContent metadata={metadata} />
+      </HoverCardContent>
+    </HoverCardRoot>
+  );
+}
+
+/**
  * Hover card content for the experiment badge, showing experiment name and variant weights.
  * The selected variant is shown bold above the divider; other variants are shown lighter below.
  */
@@ -506,7 +558,7 @@ function ExperimentHoverCardContent({
             </span>
             {variantWeights && variantWeights[variantSelected] != null && (
               <span className="text-basis font-medium tabular-nums">
-                {variantWeights[variantSelected]}
+                {formatVariantWeight(variantWeights[variantSelected]!)}
               </span>
             )}
           </div>
@@ -519,7 +571,9 @@ function ExperimentHoverCardContent({
             >
               <span className="text-light ml-4">{variant}</span>
               {variantWeights && variantWeights[variant] != null && (
-                <span className="text-light tabular-nums">{variantWeights[variant]}</span>
+                <span className="text-light tabular-nums">
+                  {formatVariantWeight(variantWeights[variant]!)}
+                </span>
               )}
             </div>
           ))}
@@ -839,26 +893,7 @@ export function TimelineBar({
 
         {/* Experiment badge - centered between left panel and bars */}
         <span className="inline-flex w-7 shrink-0 items-center justify-center">
-          {hasExperiment && (
-            <HoverCardRoot openDelay={200} closeDelay={0}>
-              <HoverCardTrigger asChild>
-                <span
-                  className="hover:bg-canvasMuted inline-flex items-center justify-center rounded border p-0.5 transition-colors"
-                  style={{
-                    borderColor: 'rgb(var(--color-foreground-subtle))',
-                    color: 'rgb(var(--color-foreground-subtle))',
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  <RiFlaskLine className="h-3 w-3" />
-                </span>
-              </HoverCardTrigger>
-              <HoverCardContent side="top" align="start" className="border-muted max-w-none border">
-                <ExperimentHoverCardContent metadata={experimentMetadata} />
-              </HoverCardContent>
-            </HoverCardRoot>
-          )}
+          {hasExperiment && <ExperimentBadge metadata={experimentMetadata} />}
         </span>
 
         {/* Right panel - visual bar with optional hover card */}

@@ -273,11 +273,12 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		AccountID: *shadowPart.AccountID,
 		EnvID:     *shadowPart.EnvID,
 		// TODO: Make appID available to backlog
-		AppID:                appID,
-		IdempotencyKey:       operationIdempotencyKey,
-		FunctionID:           *shadowPart.FunctionID,
-		CurrentTime:          now,
-		RequestTime:          earliestEnqueuedAt(items),
+		AppID:          appID,
+		IdempotencyKey: operationIdempotencyKey,
+		FunctionID:     *shadowPart.FunctionID,
+		CurrentTime:    now,
+		// NOTE: We cannot skip caching for older queue items as this will massively increase load on the Constraint API, leading to latency spikes
+		// RequestTime:          earliestEnqueuedAt(items),
 		Duration:             QueueLeaseDuration,
 		Constraints:          constraintsToCheck,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
@@ -471,9 +472,10 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		LeaseRunIDs: map[string]ulid.ULID{
 			idempotencyKey: item.Data.Identifier.RunID,
 		},
-		FunctionID:      *shadowPart.FunctionID,
-		CurrentTime:     now,
-		RequestTime:     enqueuedAtTime(item),
+		FunctionID:  *shadowPart.FunctionID,
+		CurrentTime: now,
+		// NOTE: We cannot skip caching for older queue items as this will massively increase load on the Constraint API, leading to latency spikes
+		// RequestTime:     enqueuedAtTime(item),
 		Duration:        QueueLeaseDuration,
 		Constraints:     constraintItems,
 		Configuration:   config,
