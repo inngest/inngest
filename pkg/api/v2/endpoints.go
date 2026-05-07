@@ -334,7 +334,7 @@ func (s *Service) SyncApp(
 		return nil, s.base.NewError(
 			http.StatusInternalServerError,
 			apiv2base.ErrorInternalError,
-			err.Error(),
+			"internal error during sync",
 		)
 	}
 	if syscodeErr != nil {
