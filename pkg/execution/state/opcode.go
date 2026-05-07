@@ -20,6 +20,7 @@ import (
 var (
 	ErrStepInputTooLarge  = fmt.Errorf("step input size is greater than the limit")
 	ErrStepOutputTooLarge = fmt.Errorf("step output size is greater than the limit")
+	ErrDeferInputTooLarge = fmt.Errorf("defer input size is greater than the limit")
 )
 
 type GeneratorOpcode struct {
@@ -377,6 +378,95 @@ func (i InvokeFunctionOpts) Expires() (time.Time, error) {
 	}
 
 	return strtimeout.ParseTimeout(i.Timeout, time.Now)
+}
+
+func (g GeneratorOpcode) DeferAddOpts() (*DeferAddOpts, error) {
+	opts := &DeferAddOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, opts.Validate()
+}
+
+type DeferAddOpts struct {
+	FnSlug string          `json:"fn_slug"`
+	Input  json.RawMessage `json:"input,omitempty"`
+}
+
+func (d *DeferAddOpts) Validate() error {
+	if d.FnSlug == "" {
+		return fmt.Errorf("FnSlug is required")
+	}
+	if len(d.Input) == 0 {
+		return fmt.Errorf("Input is required")
+	}
+	if len(d.Input) > consts.MaxDeferInputSize {
+		// Mirrors the GeneratorOpcode.Validate() check on step inputs. Prevents
+		// a malicious or buggy SDK from storing arbitrarily large payloads in
+		// Redis (per defer × per run) and inflating them into the
+		// deferred.schedule event bus on Finalize.
+		return ErrDeferInputTooLarge
+	}
+	return nil
+}
+
+func (d *DeferAddOpts) UnmarshalAny(a any) error {
+	opts := DeferAddOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*d = opts
+	return nil
+}
+
+func (g GeneratorOpcode) DeferAbortOpts() (*DeferAbortOpts, error) {
+	opts := &DeferAbortOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, opts.Validate()
+}
+
+type DeferAbortOpts struct {
+	TargetHashedID string `json:"target_hashed_id"`
+}
+
+func (d *DeferAbortOpts) Validate() error {
+	if d.TargetHashedID == "" {
+		return fmt.Errorf("TargetHashedID is required")
+	}
+	return nil
+}
+
+func (d *DeferAbortOpts) UnmarshalAny(a any) error {
+	opts := DeferAbortOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*d = opts
+	return nil
 }
 
 type SleepOpts struct {
