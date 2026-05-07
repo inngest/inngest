@@ -2503,7 +2503,7 @@ const upsertApp = `-- name: UpsertApp :one
 INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
-    name = excluded.name,
+    name = CASE WHEN excluded.name = '' THEN apps.name ELSE excluded.name END,
     sdk_language = excluded.sdk_language,
     sdk_version = excluded.sdk_version,
     framework = excluded.framework,
@@ -2533,8 +2533,87 @@ type UpsertAppParams struct {
 	AppVersion  sql.NullString
 }
 
+// Placeholder-friendly upsert: keyed by id. The placeholder paths (-u
+// startup, autodiscovery, UI add-by-URL) intentionally upsert with name=”
+// to set/clear errors on a URL-derived id; they must not erase a real app's
+// name when re-pinging the same id, so the name update is conditional.
+// For the SDK /fn/register flow, use UpsertAppByName instead - it adopts an
+// existing active row keyed by name regardless of how its id was minted.
 func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error) {
 	row := q.db.QueryRowContext(ctx, upsertApp,
+		arg.ID,
+		arg.Name,
+		arg.SdkLanguage,
+		arg.SdkVersion,
+		arg.Framework,
+		arg.Metadata,
+		arg.Status,
+		arg.Error,
+		arg.Checksum,
+		arg.Url,
+		arg.Method,
+		arg.AppVersion,
+	)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+		&i.Url,
+		&i.Method,
+		&i.AppVersion,
+	)
+	return &i, err
+}
+
+const upsertAppByName = `-- name: UpsertAppByName :one
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (name) WHERE archived_at IS NULL AND name <> '' DO UPDATE SET
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    archived_at = NULL,
+    "method" = excluded.method,
+    app_version = excluded.app_version,
+    url = excluded.url
+RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version
+`
+
+type UpsertAppByNameParams struct {
+	ID          uuid.UUID
+	Name        string
+	SdkLanguage string
+	SdkVersion  string
+	Framework   sql.NullString
+	Metadata    string
+	Status      string
+	Error       sql.NullString
+	Checksum    string
+	Url         string
+	Method      string
+	AppVersion  sql.NullString
+}
+
+// For SDK /fn/register: the partial unique index apps_name_active_key on
+// (name) WHERE archived_at IS NULL AND name <> ” is the conflict target.
+// The existing row's id is preserved on conflict, so v1.13.x legacy rows
+// keyed by sha1(URL) are adopted in place when an SDK re-syncs under v1.15+
+// (which derives ids from name) - no Go-side lookup required.
+func (q *Queries) UpsertAppByName(ctx context.Context, arg UpsertAppByNameParams) (*App, error) {
+	row := q.db.QueryRowContext(ctx, upsertAppByName,
 		arg.ID,
 		arg.Name,
 		arg.SdkLanguage,

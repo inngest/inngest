@@ -213,3 +213,6 @@ CREATE TABLE IF NOT EXISTS "functions" (
 CREATE UNIQUE INDEX functions_app_id_slug_active_key
     ON functions (app_id, slug)
     WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX apps_name_active_key
+    ON apps (name)
+    WHERE archived_at IS NULL AND name <> '';

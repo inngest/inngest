@@ -599,6 +599,175 @@ func TestFunctionUniqueActiveAppSlug(t *testing.T) {
 	})
 }
 
+// TestAppUniqueActiveName verifies that an active app (archived_at IS NULL)
+// is unique per non-empty name. This is the schema-level guarantee that
+// register()'s UpsertAppByName relies on for adoption: with the partial
+// unique index in place, a re-sync from a customer upgrading across the
+// v1.15 seed flip (URL -> AppName) cannot insert a parallel row.
+//
+// Empty names are deliberately excluded so the placeholder paths (-u
+// startup, autodiscovery, UI add-by-URL) can keep multiple unreachable
+// rows for distinct URLs.
+func TestAppUniqueActiveName(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	first := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          first,
+		Name:        "uniq-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-uniq-app",
+		Url:         "https://example.com/inngest",
+	})
+	require.NoError(t, err)
+
+	t.Run("duplicate active name rejected", func(t *testing.T) {
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "uniq-app",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "checksum-uniq-app-2",
+			Url:         "https://example.com/inngest-2",
+		})
+		require.Error(t, err, "second active app with same name must fail")
+		assert.Contains(t, strings.ToLower(err.Error()), "unique")
+	})
+
+	t.Run("multiple empty names allowed", func(t *testing.T) {
+		// Distinct unreachable placeholders keyed by different URLs must
+		// coexist; the partial index excludes name=''.
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "",
+			SdkLanguage: "",
+			SdkVersion:  "",
+			Status:      "",
+			Checksum:    "",
+			Url:         "https://example.com/placeholder-a",
+		})
+		require.NoError(t, err)
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "",
+			SdkLanguage: "",
+			SdkVersion:  "",
+			Status:      "",
+			Checksum:    "",
+			Url:         "https://example.com/placeholder-b",
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("archived row releases the name", func(t *testing.T) {
+		require.NoError(t, q.DeleteApp(ctx, first))
+
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "uniq-app",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "checksum-uniq-app-replacement",
+			Url:         "https://example.com/inngest-replacement",
+		})
+		require.NoError(t, err, "after archiving the prior row, name must be reusable")
+	})
+}
+
+// TestUpsertAppByNameAdoptsLegacyURLKeyedRow exercises the partial-index
+// upsert path that fixes the v1.13 -> v1.19 orphaning bug. A pre-existing
+// row keyed by sha1(URL) (the pre-v1.15 deterministic id) must be adopted
+// in place when register() upserts by name with a fresh sha1(AppName) id;
+// the existing row's id stays, only the mutable fields are refreshed.
+func TestUpsertAppByNameAdoptsLegacyURLKeyedRow(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	// Pre-populate the legacy row (id derived from URL).
+	legacyID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          legacyID,
+		Name:        "adopt-me",
+		SdkLanguage: "go",
+		SdkVersion:  "0.0.1",
+		Status:      "ok",
+		Checksum:    "old-checksum",
+		Url:         "https://example.com/legacy",
+	})
+	require.NoError(t, err)
+
+	// Re-sync via UpsertAppByName with a fresh "candidate" id.
+	candidateID := uuid.New()
+	got, err := q.UpsertAppByName(ctx, db.UpsertAppParams{
+		ID:          candidateID,
+		Name:        "adopt-me",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "ok",
+		Checksum:    "new-checksum",
+		Url:         "https://example.com/legacy",
+	})
+	require.NoError(t, err)
+
+	// The returning id is the legacy one — the candidate is ignored on
+	// conflict. Mutable fields are refreshed.
+	require.Equal(t, legacyID, got.ID, "existing row's id must be preserved on name conflict")
+	require.Equal(t, "1.0.0", got.SdkVersion)
+	require.Equal(t, "new-checksum", got.Checksum)
+}
+
+// TestUpsertAppPreservesNameOnEmptyClobber covers the upstream defect that
+// turns the v1.13 row into a name="" placeholder before re-sync arrives:
+// service.go:315 (the -u startup loop) and the autodiscovery / UI add-by-URL
+// paths upsert with name="" to set/clear the unreachable error. The query
+// now skips the name assignment when excluded.name is empty so a real app's
+// name is never erased by re-pinging the same id.
+func TestUpsertAppPreservesNameOnEmptyClobber(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	id := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          id,
+		Name:        "real-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "real-checksum",
+		Url:         "https://example.com/real",
+	})
+	require.NoError(t, err)
+
+	// Mimic the placeholder upsert: empty name, error set.
+	_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:    id,
+		Name:  "",
+		Url:   "https://example.com/real",
+		Error: sql.NullString{Valid: true, String: "unreachable"},
+	})
+	require.NoError(t, err)
+
+	got, err := q.GetAppByID(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, "real-app", got.Name, "placeholder upsert must not blank a real name")
+	require.True(t, got.Error.Valid, "error should be set by the placeholder upsert")
+	require.Equal(t, "unreachable", got.Error.String)
+}
+
 // TestInsertFunctionIdempotentOnSameID covers the resync path: the sync loop
 // uses GetFunctionByInternalUUID to decide between UpsertFunction and
 // UpdateFunctionConfig, but UpsertFunction must still tolerate being called

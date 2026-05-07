@@ -95,6 +95,19 @@ func (pq *pgQuerier) UpsertApp(ctx context.Context, arg db.UpsertAppParams) (*db
 	return appFromPG(r), nil
 }
 
+func (pq *pgQuerier) UpsertAppByName(ctx context.Context, arg db.UpsertAppParams) (*db.App, error) {
+	r, err := pq.q.UpsertAppByName(ctx, sqlc.UpsertAppByNameParams{
+		ID: arg.ID, Name: arg.Name, SdkLanguage: arg.SdkLanguage,
+		SdkVersion: arg.SdkVersion, Framework: arg.Framework, Metadata: arg.Metadata,
+		Status: arg.Status, Error: arg.Error, Checksum: arg.Checksum,
+		Url: arg.Url, Method: arg.Method, AppVersion: arg.AppVersion,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return appFromPG(r), nil
+}
+
 func (pq *pgQuerier) UpdateAppError(ctx context.Context, arg db.UpdateAppErrorParams) (*db.App, error) {
 	r, err := pq.q.UpdateAppError(ctx, sqlc.UpdateAppErrorParams{Error: arg.Error, ID: arg.ID})
 	if err != nil {

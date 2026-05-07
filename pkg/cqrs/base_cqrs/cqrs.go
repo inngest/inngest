@@ -1030,6 +1030,38 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 	return domainToCQRS(app, domainApp), nil
 }
 
+// UpsertAppByName upserts on the partial unique index apps_name_active_key
+// (name) WHERE archived_at IS NULL AND name <> ''. The id provided in arg is
+// only used for fresh inserts; on conflict, the existing row's id is kept,
+// so SDK re-syncs adopt legacy URL-derived ids in place.
+func (w wrapper) UpsertAppByName(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
+	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
+
+	if arg.Method == "" {
+		arg.Method = enums.AppMethodServe.String()
+	}
+
+	app, err := w.q.UpsertAppByName(ctx, dbpkg.UpsertAppParams{
+		ID:          arg.ID,
+		Name:        arg.Name,
+		SdkLanguage: arg.SdkLanguage,
+		SdkVersion:  arg.SdkVersion,
+		Framework:   arg.Framework,
+		Metadata:    arg.Metadata,
+		Status:      arg.Status,
+		Error:       arg.Error,
+		Checksum:    arg.Checksum,
+		Url:         arg.Url,
+		Method:      arg.Method,
+		AppVersion:  sql.NullString{String: arg.AppVersion, Valid: arg.AppVersion != ""},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return domainToCQRS(app, domainApp), nil
+}
+
 func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
 	// Use the direct SQL UPDATE query instead of load-then-upsert
 	app, err := w.q.UpdateAppError(ctx, dbpkg.UpdateAppErrorParams{

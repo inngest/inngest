@@ -96,7 +96,19 @@ type Querier interface {
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+	// Placeholder-friendly upsert: keyed by id. The placeholder paths (-u
+	// startup, autodiscovery, UI add-by-URL) intentionally upsert with name=''
+	// to set/clear errors on a URL-derived id; they must not erase a real app's
+	// name when re-pinging the same id, so the name update is conditional.
+	// For the SDK /fn/register flow, use UpsertAppByName instead - it adopts an
+	// existing active row keyed by name regardless of how its id was minted.
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
+	// For SDK /fn/register: the partial unique index apps_name_active_key on
+	// (name) WHERE archived_at IS NULL AND name <> '' is the conflict target.
+	// The existing row's id is preserved on conflict, so v1.13.x legacy rows
+	// keyed by sha1(URL) are adopted in place when an SDK re-syncs under v1.15+
+	// (which derives ids from name) - no Go-side lookup required.
+	UpsertAppByName(ctx context.Context, arg UpsertAppByNameParams) (*App, error)
 	//
 	// functions
 	//

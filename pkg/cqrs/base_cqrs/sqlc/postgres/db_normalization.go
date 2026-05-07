@@ -250,6 +250,30 @@ func (q NormalizedQueries) UpsertApp(ctx context.Context, params sqlc_sqlite.Ups
 	return app.ToSQLite()
 }
 
+func (q NormalizedQueries) UpsertAppByName(ctx context.Context, params sqlc_sqlite.UpsertAppByNameParams) (*sqlc_sqlite.App, error) {
+	pgParams := UpsertAppByNameParams{
+		ID:          params.ID,
+		Name:        params.Name,
+		SdkLanguage: params.SdkLanguage,
+		SdkVersion:  params.SdkVersion,
+		Framework:   params.Framework,
+		Metadata:    params.Metadata,
+		Status:      params.Status,
+		Error:       params.Error,
+		Checksum:    params.Checksum,
+		Url:         params.Url,
+		Method:      params.Method,
+		AppVersion:  params.AppVersion,
+	}
+
+	app, err := q.db.UpsertAppByName(ctx, pgParams)
+	if err != nil {
+		return nil, err
+	}
+
+	return app.ToSQLite()
+}
+
 func (q NormalizedQueries) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*sqlc_sqlite.Function, error) {
 	functions, err := q.db.GetAppFunctions(ctx, appID)
 	if err != nil {

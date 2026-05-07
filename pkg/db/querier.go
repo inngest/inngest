@@ -24,6 +24,7 @@ type Querier interface {
 	GetAppByURL(ctx context.Context, url string) (*App, error)
 	GetApps(ctx context.Context) ([]*App, error)
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
+	UpsertAppByName(ctx context.Context, arg UpsertAppParams) (*App, error)
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 
