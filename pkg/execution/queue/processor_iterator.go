@@ -495,7 +495,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 	// Assign the lease ID and pass this to be handled by the available worker.
 	// There should always be capacity on this queue as we track capacity via
-	// a semaphore.
+	// a semaphore. GenerationID was loaded from the queue hash on Peek and is
+	// preserved across Lease (the Lua script does not touch it).
 	item.LeaseID = leaseID
 
 	// increase success counter.

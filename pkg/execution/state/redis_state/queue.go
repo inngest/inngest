@@ -159,6 +159,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		i.Data.JobID = &i.ID
 	}
 
+	// Start GenerationID at 1 so the very first dispatch carries a non-zero
+	// value to the SDK. The validator treats 0 as "no value sent"
+	if i.GenerationID == 0 {
+		i.GenerationID = 1
+	}
+
 	partitionTime := at
 	if at.Before(now) {
 		// We don't want to enqueue partitions (pointers to fns) before now.
