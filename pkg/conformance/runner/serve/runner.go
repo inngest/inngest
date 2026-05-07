@@ -791,6 +791,8 @@ func (h *caseHarness) expectRequest(timeout time.Duration, queryStepID string, m
 		expectedCtx.RunID = execReq.Ctx.RunID
 		expectedCtx.FunctionID = execReq.Ctx.FunctionID
 		expectedCtx.QueueItemRef = execReq.Ctx.QueueItemRef
+		copyRequestContextFieldIfPresent(&expectedCtx, execReq.Ctx, "RequestID")
+		copyRequestContextFieldIfPresent(&expectedCtx, execReq.Ctx, "JobID")
 		actualCtx := execReq.Ctx
 		actualCtx.MaxAttempts = 0
 		expectedCtx.MaxAttempts = 0
@@ -817,6 +819,18 @@ func (h *caseHarness) expectRequest(timeout time.Duration, queryStepID string, m
 	case <-time.After(timeout):
 		return fmt.Errorf("timed out after %s waiting for executor request", timeout)
 	}
+}
+
+func copyRequestContextFieldIfPresent(expected *driver.SDKRequestContext, actual driver.SDKRequestContext, name string) {
+	expectedValue := reflect.ValueOf(expected).Elem().FieldByName(name)
+	actualValue := reflect.ValueOf(actual).FieldByName(name)
+	if !expectedValue.IsValid() || !actualValue.IsValid() || !expectedValue.CanSet() {
+		return
+	}
+	if expectedValue.Type() != actualValue.Type() {
+		return
+	}
+	expectedValue.Set(actualValue)
 }
 
 func (h *caseHarness) expectJSONResponse(status int, expected any, timeout time.Duration) error {
