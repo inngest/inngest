@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -261,6 +262,116 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 	})
 }
 
+func TestCheckpointAsyncSteps_StaleDispatchFailsBeforeSave(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	testData.asyncCheckpoint.GenerationID = 4
+	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
+		ID:           "job-123",
+		GenerationID: 7,
+	}, nil)
+
+	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.Error(err)
+	require.True(errors.Is(err, ErrStaleDispatch))
+
+	mocks.state.AssertNotCalled(t, "SaveStep")
+	mocks.tracer.AssertNotCalled(t, "CreateSpan")
+	mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+	mocks.state.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
+func TestCheckpointAsyncSteps_ZeroGenerationIDSkipsValidation(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	expectedData, err := json.Marshal(map[string]any{
+		"data": json.RawMessage(`{"result":"ok"}`),
+	})
+	require.NoError(err)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
+func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	testData.asyncCheckpoint.GenerationID = 1
+	// Nil-from-HGET means the dispatch the SDK is serving no longer exists,
+	// which is exactly the stale case.
+	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(nil, queue.ErrQueueItemNotFound)
+
+	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.Error(err)
+	require.True(errors.Is(err, ErrStaleDispatch))
+
+	mocks.state.AssertNotCalled(t, "SaveStep")
+	mocks.tracer.AssertNotCalled(t, "CreateSpan")
+	mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+	mocks.state.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
+func TestCheckpointAsyncSteps_InvalidQueueRefWithGenerationIDFailsBeforeSave(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+	testData.asyncCheckpoint.GenerationID = 1
+	testData.asyncCheckpoint.QueueItemRef = "not-a-valid-queue-ref"
+
+	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.Error(err)
+	require.True(errors.Is(err, ErrStaleDispatch))
+
+	mocks.state.AssertNotCalled(t, "SaveStep")
+	mocks.tracer.AssertNotCalled(t, "CreateSpan")
+	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+	mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+	mocks.state.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
 //
 //
 // Testing utils.
@@ -450,6 +561,12 @@ type mockQueue struct {
 func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID, jobID string) error {
 	args := m.Called(ctx, shardID, jobID)
 	return args.Error(0)
+}
+
+func (m *mockQueue) LoadQueueItem(ctx context.Context, shardID, jobID string) (*queue.QueueItem, error) {
+	args := m.Called(ctx, shardID, jobID)
+	item, _ := args.Get(0).(*queue.QueueItem)
+	return item, args.Error(1)
 }
 
 func (m *mockQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {

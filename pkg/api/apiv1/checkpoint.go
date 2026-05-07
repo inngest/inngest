@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -361,18 +362,24 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		FnID:         input.FnID,
 		Steps:        input.Steps,
 		QueueItemRef: input.QueueItemRef,
+		GenerationID: input.GenerationID,
 		AccountID:    auth.AccountID(),
 		EnvID:        auth.WorkspaceID(),
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+		status := http.StatusBadRequest
+		if errors.Is(err, checkpoint.ErrStaleDispatch) {
+			status = http.StatusConflict
+		}
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Message: "Failed to checkpoint steps",
 			Data: map[string]any{
 				"run_id": input.RunID,
 			},
-			Status: 400,
+			Status: status,
 		})
+		return
 	}
 }
 

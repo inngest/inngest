@@ -222,7 +222,10 @@ type checkpointAsyncSteps struct {
 	FnID  uuid.UUID `json:"fn_id"`
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
-	QueueItemRef string                  `json:"qi_id"`
+	QueueItemRef string `json:"qi_id"`
+	// GenerationID identifies the leased SDK dispatch that produced this
+	// checkpoint. The API rejects mismatches as stale (HTTP 409).
+	GenerationID int                     `json:"generation_id"`
 	Steps        []state.GeneratorOpcode `json:"steps"`
 	// Timestamp is the unix-millisecond epoch when the request was created.
 	Timestamp int `json:"ts"`
