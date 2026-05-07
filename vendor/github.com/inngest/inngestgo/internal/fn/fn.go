@@ -118,6 +118,20 @@ func (t Trigger) Triggers() []Trigger {
 	return []Trigger{t}
 }
 
+// MarshalJSON serializes a Trigger, handling the case where either
+// EventTrigger or CronTrigger is nil (only one is set at a time).
+// This explicit method prevents Go from promoting a MarshalJSON defined
+// on *CronTrigger, which would panic when CronTrigger is nil.
+func (t Trigger) MarshalJSON() ([]byte, error) {
+	if t.CronTrigger != nil {
+		return json.Marshal(t.CronTrigger)
+	}
+	if t.EventTrigger != nil {
+		return json.Marshal(t.EventTrigger)
+	}
+	return []byte(`{}`), nil
+}
+
 // EventTrigger is a trigger which invokes the function each time a specific event is received.
 type EventTrigger struct {
 	// Event is the event name which triggers the function.
