@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngestgo/internal"
 	"github.com/inngest/inngestgo/internal/event"
 	"github.com/inngest/inngestgo/internal/fn"
+	"github.com/inngest/inngestgo/internal/logger"
 	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
@@ -248,12 +249,14 @@ func (h handlerOpts) isDev() bool {
 // newHandler returns a new Handler for serving Inngest functions.
 func newHandler(c Client, opts handlerOpts) *handler {
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
 
 	if opts.MaxBodySize == 0 {
 		opts.MaxBodySize = DefaultMaxBodySize
 	}
+
+	opts.Logger = opts.Logger.With("mode", "serve")
 
 	return &handler{
 		handlerOpts: opts,
@@ -292,7 +295,7 @@ func (h *handler) SetOptions(opts handlerOpts) *handler {
 		opts.MaxBodySize = DefaultMaxBodySize
 	}
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
 
 	return h
