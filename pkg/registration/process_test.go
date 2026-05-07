@@ -132,3 +132,18 @@ func TestProcessFunctions(t *testing.T) {
 		})
 	}
 }
+
+// TestProcessFunctionsEmptyReturnsNonNilResult is a regression test ensuring
+// that ProcessFunctions returns a non-nil *ProcessResult alongside
+// sdk.ErrNoFunctions when the request contains no functions. Callers rely on
+// the result being non-nil (e.g. to access Functions) even on this error path.
+func TestProcessFunctionsEmptyReturnsNonNilResult(t *testing.T) {
+	req := sdk.RegisterRequest{Functions: []sdk.SDKFunction{}}
+
+	result, err := ProcessFunctions(context.Background(), req, ProcessOpts{})
+
+	require.ErrorIs(t, err, sdk.ErrNoFunctions)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Functions)
+	require.Len(t, result.Functions, 0)
+}
