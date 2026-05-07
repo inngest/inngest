@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -230,35 +231,6 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 	})
 }
 
-type stubFunctionProvider struct {
-	fn inngest.DeployedFunction
-}
-
-func (s stubFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {
-	return s.fn, nil
-}
-
-type stubFunctionRunReader struct {
-	run *cqrs.FunctionRun
-}
-
-func (s stubFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*cqrs.FunctionRun, error) {
-	return s.run, nil
-}
-
-type stubFunctionTraceReader struct {
-	root   *cqrs.OtelSpan
-	output *cqrs.SpanOutput
-}
-
-func (s stubFunctionTraceReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
-	return s.root, nil
-}
-
-func (s stubFunctionTraceReader) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	return s.output, nil
-}
-
 func boolPtr(value bool) *bool {
 	return &value
 }
@@ -276,30 +248,37 @@ func TestService_GetFunctionRun(t *testing.T) {
 	output, err := json.Marshal(map[string]any{"ok": true})
 	require.NoError(t, err)
 
+	fn := inngest.DeployedFunction{
+		ID:      functionID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+		},
+	}
+	run := &cqrs.FunctionRun{
+		RunID:        runID,
+		RunStartedAt: startedAt,
+		FunctionID:   functionID,
+		EventID:      runID,
+		Status:       enums.RunStatusCompleted,
+		EndedAt:      &endedAt,
+		Output:       output,
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+	runs := &mockFunctionRunReader{}
+	runs.On("GetFunctionRun", mock.Anything, runID).Return(run, nil).Once()
+
 	service := NewService(ServiceOptions{
-		Functions: stubFunctionProvider{
-			fn: inngest.DeployedFunction{
-				ID:      functionID,
-				Slug:    "my-app-test-fn",
-				AppID:   appID,
-				AppName: "my-app",
-				Function: inngest.Function{
-					Name: "Test function",
-					Slug: "test-fn",
-				},
-			},
-		},
-		FunctionRuns: stubFunctionRunReader{
-			run: &cqrs.FunctionRun{
-				RunID:        runID,
-				RunStartedAt: startedAt,
-				FunctionID:   functionID,
-				EventID:      runID,
-				Status:       enums.RunStatusCompleted,
-				EndedAt:      &endedAt,
-				Output:       output,
-			},
-		},
+		Functions:    functions,
+		FunctionRuns: runs,
+	})
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+		runs.AssertExpectations(t)
 	})
 
 	t.Run("returns mapped run data", func(t *testing.T) {
@@ -359,78 +338,96 @@ func TestService_GetFunctionTrace(t *testing.T) {
 	stepOp := enums.OpcodeStepRun
 	statusCode := 200
 	responseHeaders := headers.Compact{"content-type": {"application/json"}}
-	outputID := mustEncodeSpanIdentifier(t, cqrs.SpanIdentifier{
+	outputIdentifier := cqrs.SpanIdentifier{
 		SpanID:      "span-output",
 		InputSpanID: strPtr("span-input"),
 		Preview:     boolPtr(true),
-	})
+	}
+	outputID := mustEncodeSpanIdentifier(t, outputIdentifier)
 
-	service := NewService(ServiceOptions{
-		FunctionTraces: stubFunctionTraceReader{
-			root: &cqrs.OtelSpan{
+	root := &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name:      meta.SpanNameRun,
+			SpanID:    "run-span",
+			TraceID:   "trace-123",
+			StartTime: queuedAt,
+			EndTime:   endedAt,
+		},
+		RunID: runID,
+		Attributes: &meta.ExtractedValues{
+			QueuedAt:      &queuedAt,
+			StartedAt:     &startedAt,
+			EndedAt:       &endedAt,
+			DynamicStatus: &stepStatus,
+		},
+		Children: []*cqrs.OtelSpan{
+			{
 				RawOtelSpan: cqrs.RawOtelSpan{
-					Name:      meta.SpanNameRun,
-					SpanID:    "run-span",
+					Name:      meta.SpanNameStep,
+					SpanID:    "step-span",
 					TraceID:   "trace-123",
-					StartTime: queuedAt,
+					StartTime: startedAt,
 					EndTime:   endedAt,
 				},
-				RunID: runID,
+				OutputID: &outputID,
 				Attributes: &meta.ExtractedValues{
-					QueuedAt:      &queuedAt,
-					StartedAt:     &startedAt,
-					EndedAt:       &endedAt,
-					DynamicStatus: &stepStatus,
+					QueuedAt:           &startedAt,
+					StartedAt:          &startedAt,
+					EndedAt:            &endedAt,
+					StepName:           &stepName,
+					StepID:             &stepID,
+					StepOp:             &stepOp,
+					DynamicStatus:      &stepStatus,
+					ResponseStatusCode: &statusCode,
+					ResponseHeaders:    &responseHeaders,
 				},
 				Children: []*cqrs.OtelSpan{
 					{
 						RawOtelSpan: cqrs.RawOtelSpan{
 							Name:      meta.SpanNameStep,
-							SpanID:    "step-span",
+							SpanID:    "nested-step-span",
 							TraceID:   "trace-123",
-							StartTime: startedAt,
-							EndTime:   endedAt,
+							StartTime: startedAt.Add(100 * time.Millisecond),
+							EndTime:   endedAt.Add(-100 * time.Millisecond),
 						},
-						OutputID: &outputID,
 						Attributes: &meta.ExtractedValues{
-							QueuedAt:           &startedAt,
-							StartedAt:          &startedAt,
-							EndedAt:            &endedAt,
-							StepName:           &stepName,
-							StepID:             &stepID,
-							StepOp:             &stepOp,
-							DynamicStatus:      &stepStatus,
-							ResponseStatusCode: &statusCode,
-							ResponseHeaders:    &responseHeaders,
-						},
-						Children: []*cqrs.OtelSpan{
-							{
-								RawOtelSpan: cqrs.RawOtelSpan{
-									Name:      meta.SpanNameStep,
-									SpanID:    "nested-step-span",
-									TraceID:   "trace-123",
-									StartTime: startedAt.Add(100 * time.Millisecond),
-									EndTime:   endedAt.Add(-100 * time.Millisecond),
-								},
-								Attributes: &meta.ExtractedValues{
-									QueuedAt:      &startedAt,
-									StartedAt:     &startedAt,
-									EndedAt:       &endedAt,
-									DynamicStatus: &stepStatus,
-								},
-							},
+							QueuedAt:      &startedAt,
+							StartedAt:     &startedAt,
+							EndedAt:       &endedAt,
+							DynamicStatus: &stepStatus,
 						},
 					},
 				},
 			},
-			output: &cqrs.SpanOutput{
+		},
+	}
+
+	newService := func(t *testing.T, includeOutput bool) *Service {
+		t.Helper()
+
+		reader := &mockFunctionTraceReader{}
+		reader.On("GetSpansByRunID", mock.Anything, runID).Return(root, nil).Once()
+		if includeOutput {
+			reader.On("GetSpanOutput", mock.Anything, outputIdentifier).Return(&cqrs.SpanOutput{
 				Input: []byte(`{"message":"hello"}`),
 				Data:  []byte(`{"ok":true}`),
-			},
-		},
+			}, nil).Once()
+		}
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		return NewService(ServiceOptions{
+			FunctionTraces: reader,
+		})
+	}
+	validationService := NewService(ServiceOptions{
+		FunctionTraces: &mockFunctionTraceReader{},
 	})
 
 	t.Run("returns a nested trace response", func(t *testing.T) {
+		service := newService(t, true)
+
 		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
 			RunId:         runID.String(),
 			IncludeOutput: boolPtr(true),
@@ -460,20 +457,22 @@ func TestService_GetFunctionTrace(t *testing.T) {
 	})
 
 	t.Run("validates missing run ID", func(t *testing.T) {
-		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{})
+		resp, err := validationService.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{})
 		require.Nil(t, resp)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Run ID is required")
 	})
 
 	t.Run("validates run ID format", func(t *testing.T) {
-		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{RunId: "not-a-ulid"})
+		resp, err := validationService.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{RunId: "not-a-ulid"})
 		require.Nil(t, resp)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Run ID must be a valid ULID")
 	})
 
 	t.Run("omits output when not requested", func(t *testing.T) {
+		service := newService(t, false)
+
 		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
 			RunId:         runID.String(),
 			IncludeOutput: boolPtr(false),

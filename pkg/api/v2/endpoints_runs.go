@@ -273,6 +273,8 @@ func toTraceStepOp(stepOp models.StepOp) apiv2.TraceStepOp {
 		return apiv2.TraceStepOp_TRACE_STEP_OP_INVOKE
 	case models.StepOpAiGateway:
 		return apiv2.TraceStepOp_TRACE_STEP_OP_AI_GATEWAY
+	case models.StepOpWaitForSignal:
+		return apiv2.TraceStepOp_TRACE_STEP_OP_WAIT_FOR_SIGNAL
 	default:
 		return apiv2.TraceStepOp_TRACE_STEP_OP_UNSPECIFIED
 	}
@@ -318,7 +320,12 @@ func traceDuration(span *models.RunTraceSpan) *uint64 {
 	}
 
 	if span.StartedAt != nil && span.EndedAt != nil {
-		value := uint64(span.EndedAt.Sub(*span.StartedAt) / time.Millisecond)
+		duration := span.EndedAt.Sub(*span.StartedAt) / time.Millisecond
+		if duration < 0 {
+			return nil
+		}
+
+		value := uint64(duration)
 		return &value
 	}
 

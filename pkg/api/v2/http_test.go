@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -103,30 +104,37 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 
+	fn := inngest.DeployedFunction{
+		ID:      functionID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+		},
+	}
+	functionRun := &cqrs.FunctionRun{
+		RunID:        runID,
+		RunStartedAt: startedAt,
+		FunctionID:   functionID,
+		EventID:      runID,
+		Status:       enums.RunStatusCompleted,
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+	runs := &mockFunctionRunReader{}
+	runs.On("GetFunctionRun", mock.Anything, runID).Return(functionRun, nil).Once()
+
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{
-		Functions: stubFunctionProvider{
-			fn: inngest.DeployedFunction{
-				ID:      functionID,
-				Slug:    "my-app-test-fn",
-				AppID:   appID,
-				AppName: "my-app",
-				Function: inngest.Function{
-					Name: "Test function",
-					Slug: "test-fn",
-				},
-			},
-		},
-		FunctionRuns: stubFunctionRunReader{
-			run: &cqrs.FunctionRun{
-				RunID:        runID,
-				RunStartedAt: startedAt,
-				FunctionID:   functionID,
-				EventID:      runID,
-				Status:       enums.RunStatusCompleted,
-			},
-		},
+		Functions:    functions,
+		FunctionRuns: runs,
 	}, HTTPHandlerOptions{})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+		runs.AssertExpectations(t)
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/runs/"+runID.String(), nil)
 	req.Header.Set("Accept", "*/*")
