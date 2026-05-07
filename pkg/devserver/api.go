@@ -207,13 +207,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ctx := r.Context()
 
-	// SDK-initiated sync is dev-only. `inngest start` uses the v2 SyncApp
-	// endpoint (server-initiated, in-band).
-	if a.devserver.Opts.Config.GetServerKind() == headers.ServerKindCloud {
-		_ = publicerr.WriteHTTP(w, publicerr.HTTPErr(http.StatusNotFound))
-		return
-	}
-
 	l := a.devserver.log
 	l.Debug("received register request")
 

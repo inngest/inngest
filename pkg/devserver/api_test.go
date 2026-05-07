@@ -807,23 +807,3 @@ func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
-func TestRegisterEndpoint_Returns404InCloudMode(t *testing.T) {
-	ds := newTestDevServer(t)
-	ds.Opts = StartOpts{
-		Config: config.Config{
-			ServerKind: headers.ServerKindCloud,
-		},
-	}
-
-	noAuthMiddleware := func(next http.Handler) http.Handler { return next }
-	api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
-
-	req := httptest.NewRequest("POST", "/fn/register", nil)
-	w := httptest.NewRecorder()
-	api.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusNotFound, w.Code)
-	var body map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	require.Equal(t, float64(http.StatusNotFound), body["status"])
-}
