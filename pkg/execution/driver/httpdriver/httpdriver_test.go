@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/stretchr/testify/require"
 )
@@ -61,6 +62,32 @@ func TestRedirect(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 200, res.StatusCode)
 	require.Equal(t, []byte("ok"), res.Body)
+}
+
+func TestRequestAndJobIDHeaders(t *testing.T) {
+	input := []byte(`{"event":{"name":"hi","data":{}}}`)
+	requestID := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+	jobID := "job-123"
+
+	var receivedHeaders http.Header
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header
+		w.Header().Set(headerSDK, "test-sdk")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	_, _, err := do(context.Background(), client, Request{
+		URL:       parseURL(ts.URL),
+		Input:     input,
+		RequestID: requestID,
+		JobID:     jobID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, requestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, jobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 }
 
 func TestRetryAfter(t *testing.T) {

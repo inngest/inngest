@@ -125,6 +125,8 @@ var Attrs = struct {
 	StepGatewayResponseOutputSizeBytes attr[*int]
 
 	// HTTP (serve) attributes
+	RequestID          attr[*string]
+	JobID              attr[*string]
 	RequestURL         attr[*string]
 	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
@@ -181,6 +183,8 @@ var Attrs = struct {
 	DurableEndpointModeChangedAt:       TimeAttr("run.durable_endpoint.mode_changed_at"),
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
+	RequestID:                          StringAttr("request.id"),
+	JobID:                              StringAttr("job.id"),
 	RequestURL:                         StringAttr("request.url"),
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),

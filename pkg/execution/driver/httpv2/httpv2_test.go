@@ -133,6 +133,8 @@ func TestSyncHeaders(t *testing.T) {
 
 	opts := driver.V2RequestOpts{
 		Fn:         fn,
+		RequestID:  "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		JobID:      "job-123",
 		SigningKey: []byte("test-signing-key"),
 		Metadata: sv2.Metadata{
 			ID: sv2.ID{
@@ -151,6 +153,8 @@ func TestSyncHeaders(t *testing.T) {
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "t=")
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "s=")
 	require.Equal(t, runID.String(), receivedHeaders.Get("X-Run-ID"))
+	require.Equal(t, opts.RequestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, opts.JobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 	// ForceStepPlan not set, so header should be absent
 	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
 }

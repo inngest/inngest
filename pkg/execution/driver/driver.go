@@ -56,6 +56,12 @@ type V2RequestOpts struct {
 	// async functions so that the API knows which queue item to reset.
 	QueueRef string
 
+	// RequestID is a unique ID generated for each outbound SDK request.
+	RequestID string
+
+	// JobID is the stable queue item ID for this SDK request.
+	JobID string
+
 	// StepID is an optional step ID that we're specifically executing.
 	//
 	// This happens in the case of StepPlanned ops, which request an explicit step ID
@@ -131,6 +137,8 @@ func MarshalV1(
 			StepID:       step.ID,
 			RunID:        md.ID.RunID,
 			QueueItemRef: queueItemRef,
+			RequestID:    RequestIDFromContext(ctx),
+			JobID:        JobIDFromContext(ctx),
 			Stack: &FunctionStack{
 				Stack:   md.Stack,
 				Current: stackIndex,
