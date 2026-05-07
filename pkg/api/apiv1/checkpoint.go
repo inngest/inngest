@@ -358,13 +358,14 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 	input.TrackLatency(ctx)
 
 	err = a.checkpointer.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
-		RunID:        input.RunID,
-		FnID:         input.FnID,
-		Steps:        input.Steps,
-		QueueItemRef: input.QueueItemRef,
-		GenerationID: input.GenerationID,
-		AccountID:    auth.AccountID(),
-		EnvID:        auth.WorkspaceID(),
+		RunID:         input.RunID,
+		FnID:          input.FnID,
+		Steps:         input.Steps,
+		QueueItemRef:  input.QueueItemRef,
+		GenerationID:  input.GenerationID,
+		StepStartedAt: input.StepStartedAt,
+		AccountID:     auth.AccountID(),
+		EnvID:         auth.WorkspaceID(),
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)

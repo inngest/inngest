@@ -50,6 +50,12 @@ type AsyncCheckpointer interface {
 
 var ErrStaleDispatch = errors.New("stale dispatch")
 
+// freshDispatchWindow is the maximum age a dispatch can have and still skip
+// the queue-item load in validateAsyncDispatch. Derived from the queue lease
+// duration (the earliest a Requeue can fire) minus a clock-skew budget for
+// drift between whichever box stamped the timestamp and the box validating.
+const freshDispatchWindow = queue.QueueLeaseDuration - 5*time.Second
+
 type queueItemLoader interface {
 	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
 }
@@ -561,6 +567,18 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	// fence; rejecting them would break valid checkpoints.
 	if input.GenerationID == 0 {
 		return nil
+	}
+
+	// Skip the queue-item load when the dispatch is younger than the minimum
+	// requeue window. A Requeue is the only path that bumps GenerationID, and
+	// it can't fire until the queue lease expires, so a fresh dispatch is
+	// provably uncontested. Negative elapsed (future-dated stamp from clock
+	// skew or a buggy SDK) falls through to the existing validation.
+	if input.StepStartedAt != 0 {
+		elapsed := time.Since(time.UnixMilli(input.StepStartedAt))
+		if elapsed >= 0 && elapsed < freshDispatchWindow {
+			return nil
+		}
 	}
 
 	ref := queueref.Decode(input.QueueItemRef)
