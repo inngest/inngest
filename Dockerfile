@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1 AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:e58f92c51f4cc98f2ef4780ba8708fe914f20e6175720a19c1c85ff029a6b9fc AS build
 RUN apk upgrade --no-cache && apk add --no-cache build-base
 WORKDIR /app
 COPY vendor vendor
