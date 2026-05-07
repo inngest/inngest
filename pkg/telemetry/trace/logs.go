@@ -12,6 +12,8 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 )
 
+// tldr:  export traces as logs to any OTLP capable endpoint.
+//
 // newSpansAsLogsProcessor builds an OTLP/HTTP logs LoggerProvider and returns a
 // SpanProcessor that converts every ended in-allowlist span into a LogRecord
 //
