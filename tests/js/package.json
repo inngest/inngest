@@ -24,7 +24,8 @@
   },
   "pnpm": {
     "overrides": {
-      "inngest@4>zod": "3.25.76"
+      "inngest@4>zod": "3.25.76",
+      "serialize-error-cjs": "0.1.3"
     }
   }
 }
