@@ -183,6 +183,13 @@ func TestSpansAsLogs_SeverityFromFunctionStatus(t *testing.T) {
 			if recs[0].Severity() != tc.want {
 				t.Fatalf("severity: got %v, want %v", recs[0].Severity(), tc.want)
 			}
+			body := unmarshalBody(t, recs[0])
+			if got := body["severity_text"]; got != tc.want.String() {
+				t.Fatalf("body severity_text: got %v, want %q", got, tc.want.String())
+			}
+			if got := body["severity_number"].(float64); int(got) != int(tc.want) {
+				t.Fatalf("body severity_number: got %v, want %d", got, tc.want)
+			}
 		})
 	}
 }

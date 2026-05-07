@@ -131,10 +131,21 @@ func (p *spansAsLogsProcessor) spanToRecord(span sdktrace.ReadOnlySpan, logType 
 
 	p.addSpanEvents(body, &attrs, span, logType)
 
-	rec.AddAttributes(attrs...)
+	severity := deriveSeverity(span)
+	rec.SetSeverity(severity)
+	rec.SetSeverityText(severity.String())
 
-	rec.SetSeverity(deriveSeverity(span))
-	rec.SetSeverityText(rec.Severity().String())
+	// Mirror severity into the body so operators can query it via
+	// `| json | severity_text="ERROR"` regardless of how the backend
+	// surfaces the LogRecord's top-level severity field.
+	body["severity_text"] = severity.String()
+	body["severity_number"] = int64(severity)
+	attrs = append(attrs,
+		otellog.KeyValue{Key: "severity_text", Value: otellog.StringValue(severity.String())},
+		otellog.KeyValue{Key: "severity_number", Value: otellog.Int64Value(int64(severity))},
+	)
+
+	rec.AddAttributes(attrs...)
 
 	if buf, err := json.Marshal(body); err == nil {
 		rec.SetBody(otellog.StringValue(string(buf)))

@@ -179,10 +179,11 @@ func (api *MetricsAPI) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set content type
-	w.Header().Set("Content-Type", string(expfmt.FmtText))
+	textFormat := expfmt.NewFormat(expfmt.TypeTextPlain)
+	w.Header().Set("Content-Type", string(textFormat))
 
 	// Encode metrics in Prometheus text format
-	encoder := expfmt.NewEncoder(w, expfmt.FmtText)
+	encoder := expfmt.NewEncoder(w, textFormat)
 	for _, mf := range metricFamilies {
 		if err := encoder.Encode(mf); err != nil {
 			http.Error(w, "Failed to encode metrics", http.StatusInternalServerError)

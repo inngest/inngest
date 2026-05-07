@@ -9,9 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 
 	"github.com/testcontainers/testcontainers-go/log"
 )
@@ -219,16 +218,21 @@ var defaultReadinessHook = func() ContainerLifecycleHooks {
 
 				// if a Wait Strategy has been specified, wait before returning
 				if dockerContainer.WaitingFor != nil {
+					strategy := dockerContainer.WaitingFor
+					strategyDesc := "unknown strategy"
+					if s, ok := strategy.(fmt.Stringer); ok {
+						strategyDesc = s.String()
+					}
 					dockerContainer.logger.Printf(
 						"⏳ Waiting for container id %s image: %s. Waiting for: %+v",
-						dockerContainer.ID[:12], dockerContainer.Image, dockerContainer.WaitingFor,
+						dockerContainer.ID[:12], dockerContainer.Image, strategyDesc,
 					)
-					if err := dockerContainer.WaitingFor.WaitUntilReady(ctx, c); err != nil {
+					if err := strategy.WaitUntilReady(ctx, dockerContainer); err != nil {
 						return fmt.Errorf("wait until ready: %w", err)
 					}
 				}
 
-				dockerContainer.isRunning = true
+				dockerContainer.isRunning.Store(true)
 
 				return nil
 			},
@@ -517,32 +521,29 @@ func (p *DockerProvider) preCreateContainerHook(ctx context.Context, req Contain
 
 	networkingConfig.EndpointsConfig = endpointSettings
 
+	// Expose ports automatically if the container request exposes zero ports and the container
+	// does not run in a container network. The NetworkMode check must be done after the pre-creation
+	// Modifiers are called, so the network mode is already set.
 	exposedPorts := req.ExposedPorts
-	// this check must be done after the pre-creation Modifiers are called, so the network mode is already set
 	if len(exposedPorts) == 0 && !hostConfig.NetworkMode.IsContainer() {
 		image, err := p.client.ImageInspect(ctx, dockerInput.Image)
 		if err != nil {
 			return err
 		}
-		for p := range image.Config.ExposedPorts {
-			exposedPorts = append(exposedPorts, string(p))
+
+		exposedPorts = exposedPorts[:0]
+		for port := range image.Config.ExposedPorts {
+			exposedPorts = append(exposedPorts, port)
 		}
 	}
 
-	exposedPortSet, exposedPortMap, err := nat.ParsePortSpecs(exposedPorts)
+	exposedPortSet, err := parseExposedPorts(exposedPorts)
 	if err != nil {
 		return err
 	}
 
 	dockerInput.ExposedPorts = exposedPortSet
-
-	// only exposing those ports automatically if the container request exposes zero ports and the container does not run in a container network
-	if len(exposedPorts) == 0 && !hostConfig.NetworkMode.IsContainer() {
-		hostConfig.PortBindings = exposedPortMap
-	} else {
-		hostConfig.PortBindings = mergePortBindings(hostConfig.PortBindings, exposedPortMap, req.ExposedPorts)
-	}
-
+	hostConfig.PortBindings = mergePortBindings(hostConfig.PortBindings, exposedPortSet)
 	return nil
 }
 
@@ -592,22 +593,59 @@ func combineContainerHooks(defaultHooks, userDefinedHooks []ContainerLifecycleHo
 	return hooks
 }
 
-func mergePortBindings(configPortMap, exposedPortMap nat.PortMap, exposedPorts []string) nat.PortMap {
-	if exposedPortMap == nil {
-		exposedPortMap = make(map[nat.Port][]nat.PortBinding)
-	}
+func parseExposedPorts(specs []string) (network.PortSet, error) {
+	exposed := make(network.PortSet, len(specs))
+	for _, s := range specs {
+		pr, err := network.ParsePortRange(s)
+		if err != nil {
+			return nil, fmt.Errorf("invalid exposed port %q: %w", s, err)
+		}
 
-	mappedPorts := make(map[string]struct{}, len(exposedPorts))
-	for _, p := range exposedPorts {
-		p = strings.Split(p, "/")[0]
-		mappedPorts[p] = struct{}{}
-	}
-
-	for k, v := range configPortMap {
-		if _, ok := mappedPorts[k.Port()]; ok {
-			exposedPortMap[k] = v
+		for p := range pr.All() {
+			exposed[p] = struct{}{}
 		}
 	}
+	return exposed, nil
+}
+
+// mergePortBindings returns a PortMap for the given exposedPortSet.
+//
+// For each port in exposedPortSet, a binding is ensured:
+//   - If configPortMap contains bindings for that port, those bindings are used.
+//   - Otherwise, a default binding with HostPort "0" (ephemeral allocation)
+//     is assigned.
+//
+// Bindings for ports not present in exposedPortSet are not preserved.
+// Any binding with an empty HostPort is normalized to "0".
+//
+// TODO(thaJeztah): this logic seems the reverse of the docker CLI, which
+// exposes ports if the user requests a port-mapping (i.e., if a port-mapping
+// is requested, but not exposed, we map the port *and* add an entry to
+// ExposedPorts). The logic here is the reverse; any port "mapped" in
+// HostConfig.PortBindings is dropped if is not exposed.
+func mergePortBindings(configPortMap network.PortMap, exposedPortSet network.PortSet) network.PortMap {
+	if len(exposedPortSet) == 0 {
+		return network.PortMap{}
+	}
+
+	exposedPortMap := make(network.PortMap, len(exposedPortSet))
+	for p := range exposedPortSet {
+		bindings := configPortMap[p]
+		if len(bindings) == 0 {
+			exposedPortMap[p] = []network.PortBinding{{HostPort: "0"}}
+			continue
+		}
+
+		// Fix: Ensure that ports with empty HostPort get "0" for automatic allocation
+		// This fixes the UDP port binding issue where ports were getting HostPort:0 instead of being allocated
+		for i := range bindings {
+			if bindings[i].HostPort == "" {
+				bindings[i].HostPort = "0" // Tell Docker to allocate a random port
+			}
+		}
+		exposedPortMap[p] = bindings
+	}
+
 	return exposedPortMap
 }
 
