@@ -63,7 +63,7 @@
     "eslint": "10.3.0",
     "eslint-plugin-react-hooks": "5.2.0",
     "nodemon": "3.1.14",
-    "postcss": "8.5.13",
+    "postcss": "8.5.14",
     "prettier": "3.8.3",
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",

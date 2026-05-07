@@ -88,7 +88,7 @@ importers:
         version: 16.4.0
       postcss-nesting:
         specifier: 14.0.0
-        version: 14.0.0(postcss@8.5.13)
+        version: 14.0.0(postcss@8.5.14)
       prettier:
         specifier: 3.8.3
         version: 3.8.3
@@ -299,7 +299,7 @@ importers:
         version: 6.0.1(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(yaml@2.8.4))
       autoprefixer:
         specifier: 10.5.0
-        version: 10.5.0(postcss@8.5.13)
+        version: 10.5.0(postcss@8.5.14)
       concurrently:
         specifier: 9.2.1
         version: 9.2.1
@@ -310,8 +310,8 @@ importers:
         specifier: 5.2.0
         version: 5.2.0(eslint@10.3.0(jiti@2.7.0))
       postcss:
-        specifier: 8.5.13
-        version: 8.5.13
+        specifier: 8.5.14
+        version: 8.5.14
       prettier:
         specifier: 3.8.3
         version: 3.8.3
@@ -435,7 +435,7 @@ importers:
         version: 6.0.1(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(yaml@2.8.4))
       autoprefixer:
         specifier: 10.5.0
-        version: 10.5.0(postcss@8.5.13)
+        version: 10.5.0(postcss@8.5.14)
       concurrently:
         specifier: 9.2.1
         version: 9.2.1
@@ -449,8 +449,8 @@ importers:
         specifier: '>=3.0.0'
         version: 3.1.14
       postcss:
-        specifier: 8.5.13
-        version: 8.5.13
+        specifier: 8.5.14
+        version: 8.5.14
       prettier:
         specifier: 3.8.3
         version: 3.8.3
@@ -580,7 +580,7 @@ importers:
         version: 6.0.1(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(yaml@2.8.4))
       autoprefixer:
         specifier: 10.5.0
-        version: 10.5.0(postcss@8.5.13)
+        version: 10.5.0(postcss@8.5.14)
       eslint:
         specifier: 10.3.0
         version: 10.3.0(jiti@2.7.0)
@@ -588,8 +588,8 @@ importers:
         specifier: 5.2.0
         version: 5.2.0(eslint@10.3.0(jiti@2.7.0))
       postcss:
-        specifier: 8.5.13
-        version: 8.5.13
+        specifier: 8.5.14
+        version: 8.5.14
       prettier:
         specifier: 3.8.3
         version: 3.8.3
@@ -793,8 +793,8 @@ importers:
         specifier: 29.1.1
         version: 29.1.1
       postcss:
-        specifier: 8.5.13
-        version: 8.5.13
+        specifier: 8.5.14
+        version: 8.5.14
       storybook:
         specifier: 10.3.6
         version: 10.3.6(@testing-library/dom@10.4.1)(prettier@3.8.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -9330,6 +9330,10 @@ packages:
     resolution: {integrity: sha512-qif0+jGGZoLWdHey3UFHHWP0H7Gbmsk8T5VEqyYFbWqPr1XqvLGBbk/sl8V5exGmcYJklJOhOQq1pV9IcsiFag==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postcss@8.5.14:
+    resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
+    engines: {node: ^10 || ^12 || >=14}
+
   postgres-array@2.0.0:
     resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
     engines: {node: '>=4'}
@@ -17312,13 +17316,13 @@ snapshots:
 
   auto-bind@5.0.1: {}
 
-  autoprefixer@10.5.0(postcss@8.5.13):
+  autoprefixer@10.5.0(postcss@8.5.14):
     dependencies:
       browserslist: 4.28.2
       caniuse-lite: 1.0.30001792
       fraction.js: 5.3.4
       picocolors: 1.1.1
-      postcss: 8.5.13
+      postcss: 8.5.14
       postcss-value-parser: 4.2.0
 
   available-typed-arrays@1.0.7:
@@ -21439,11 +21443,11 @@ snapshots:
       postcss: 8.5.13
       postcss-selector-parser: 6.1.2
 
-  postcss-nesting@14.0.0(postcss@8.5.13):
+  postcss-nesting@14.0.0(postcss@8.5.14):
     dependencies:
       '@csstools/selector-resolve-nested': 4.0.0(postcss-selector-parser@7.1.1)
       '@csstools/selector-specificity': 6.0.0(postcss-selector-parser@7.1.1)
-      postcss: 8.5.13
+      postcss: 8.5.14
       postcss-selector-parser: 7.1.1
 
   postcss-selector-parser@6.1.2:
@@ -21465,6 +21469,12 @@ snapshots:
       source-map-js: 1.2.1
 
   postcss@8.5.13:
+    dependencies:
+      nanoid: 3.3.12
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
+  postcss@8.5.14:
     dependencies:
       nanoid: 3.3.12
       picocolors: 1.1.1
