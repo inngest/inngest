@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/inngest/inngest/pkg/execution/defers"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -3203,6 +3205,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	nonLazy := nonLazyOpCount(resp.Generator)
+
 	{
 		// The following code helps with parallelism and the V2 -> V3 executor changes
 		var update *sv2.MutableConfig
@@ -3215,7 +3219,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 				StartedAt:      i.md.Config.StartedAt,
 			}
 		}
-		if len(resp.Generator) > 1 {
+		if nonLazy > 1 {
 			if !i.md.Config.ForceStepPlan {
 				// With parallelism, we currently instruct the SDK to disable immediate execution,
 				// enforcing that every step becomes pre-planned.
@@ -3262,7 +3266,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	// We only save pending steps if there's >= 1 step planned op.
 	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
-		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
+		if err := e.smv2.SavePending(ctx, i.md.ID, groups.NonLazyIDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
 	}
@@ -3274,8 +3278,12 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// When this happens, we ALWAYS need to create a trace for each step.
 	//
 	// We pass this down in context, unfortunately.
-	if len(resp.Generator) > 1 {
+	if nonLazy > 1 {
 		for _, op := range resp.Generator {
+			if op == nil {
+				// Just in case, because panics are bad
+				continue
+			}
 			if op.Op == enums.OpcodeStepRun {
 				ctx = setEmitCheckpointTraces(ctx)
 				break
@@ -3314,6 +3322,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					e.log.Error(
 						"panic in handleGenerator",
 						"error", r,
+						"stack", string(debug.Stack()),
 					)
 				}
 			}()
@@ -3387,6 +3396,32 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferAdd:
+		err := e.handleGeneratorDeferAdd(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer add",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
+	case enums.OpcodeDeferAbort:
+		err := e.handleGeneratorDeferAbort(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer cancel",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -3468,6 +3503,15 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	return nil
 }
 
+// sanitizeLogValue strips CR/LF from a user-supplied string before logging
+// to defuse log injection (CodeQL "log entries created from user input").
+// Used at the few sites that log SDK-controlled identifiers like step IDs.
+func sanitizeLogValue(v string) string {
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+	return v
+}
+
 // handleGeneratorDiscoveryRequest handles OpcodeDiscoveryRequest, which
 // indicates that the SDK is requesting new work to be scheduled, typically
 // after checkpointing or in an effort to recover from non-determinism.
@@ -3485,6 +3529,62 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 		edge,
 		groupID,
 		false,
+	)
+}
+
+func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	if err := defers.SaveFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+		return err
+	}
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAdd")
+}
+
+func (e *executor) handleGeneratorDeferAbort(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// If the SDK emits `[DeferAdd("X"), DeferAbort("X")]` in one response, the
+	// two ops race within the priority group's errgroup. If DeferAbort runs
+	// first it will error. We don't guard against this here (e.g. by writing a
+	// cancelled tombstone when the defer is absent) because emitting an
+	// DeferAdd and DeferAbort for the same hashed ID in a single response is
+	// an SDK bug, and the cost of handling it isn't worth the complexity.
+	if err := defers.AbortFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+		return err
+	}
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAbort")
+}
+
+// enqueueLazyOpFallback ensures that a run doesn't hang due to an "only lazy
+// ops" scenario. This should never happen (e.g. caused by an SDK bug), but we
+// still need a defensive fallback.
+func (e *executor) enqueueLazyOpFallback(
+	ctx context.Context,
+	runCtx execution.RunContext,
+	gen state.GeneratorOpcode,
+	edge queue.PayloadEdge,
+	opName string,
+) error {
+	if !runCtx.OnlyHasLazyOps() {
+		// Common case: a host op in this batch drives forward progress.
+		return nil
+	}
+
+	e.log.Error(
+		opName+" received without a host op; enqueuing discovery as fallback",
+		"step_id", sanitizeLogValue(gen.ID),
+		"unreachable", true,
+	)
+	groupID := uuid.New().String()
+
+	// Assume no pending steps. This may not be correct, but we're
+	// optimizing for avoiding a hanging function run.
+	hasPendingSteps := false
+
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		hasPendingSteps,
 	)
 }
 
