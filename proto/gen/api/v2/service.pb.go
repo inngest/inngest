@@ -3768,7 +3768,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xdaR\n" +
+	"\x04DENY\x10\x012\xf4R\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -4016,8 +4016,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}\x12\xcb\x01\n" +
-	"\x0eGetFunctionRun\x12\x1d.api.v2.GetFunctionRunRequest\x1a\x1e.api.v2.GetFunctionRunResponse\"z\x92Aa\x12\x10Get function run\x1a;Fetches the canonical run summary for a single function runb\x10\n" +
+	"/envs/{id}\x12\xd8\x01\n" +
+	"\x0eGetFunctionRun\x12\x1d.api.v2.GetFunctionRunRequest\x1a\x1e.api.v2.GetFunctionRunResponse\"\x86\x01\x92Am\n" +
+	"\x04Runs\n" +
+	"\x04Beta\x12\x10Get function run\x1a;Fetches the canonical run summary for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/runs/{run_id}\x12\xca\x06\n" +
@@ -4047,8 +4049,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xce\x01\n" +
-	"\x10GetFunctionTrace\x12\x1f.api.v2.GetFunctionTraceRequest\x1a .api.v2.GetFunctionTraceResponse\"w\x92AX\x12\x12Get function trace\x1a0Fetches the trace tree for a single function runb\x10\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xdb\x01\n" +
+	"\x10GetFunctionTrace\x12\x1f.api.v2.GetFunctionTraceRequest\x1a .api.v2.GetFunctionTraceResponse\"\x83\x01\x92Ad\n" +
+	"\x04Runs\n" +
+	"\x04Beta\x12\x12Get function trace\x1a0Fetches the trace tree for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x16\x12\x14/runs/{run_id}/trace\x12\xfc\v\n" +

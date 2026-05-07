@@ -944,6 +944,8 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get function run"
+      tags: "Runs"
+      tags: "Beta"
       description: "Fetches the canonical run summary for a single function run"
       security: {
         security_requirement: {
@@ -1056,6 +1058,8 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get function trace"
+      tags: "Runs"
+      tags: "Beta"
       description: "Fetches the trace tree for a single function run"
       security: {
         security_requirement: {
