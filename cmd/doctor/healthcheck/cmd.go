@@ -8,19 +8,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/connect"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	apiHealthPath     = "/health"
-	gatewayReadyPath  = "/ready"
-	defaultHost       = "127.0.0.1"
-	defaultAPIPort    = 8288
-	defaultGwPort     = 8289
-	defaultScheme     = "http"
-	defaultTimeout    = 5 * time.Second
-	verboseBodyLimit  = 200
+	defaultHost      = "127.0.0.1"
+	defaultScheme    = "http"
+	defaultTimeout   = 5 * time.Second
+	verboseBodyLimit = 200
 )
 
 func Command() *cli.Command {
@@ -32,17 +30,17 @@ func Command() *cli.Command {
 				Name:    "host",
 				Value:   defaultHost,
 				Sources: cli.EnvVars("INNGEST_HOST"),
-				Usage:   "Host to probe",
+				Usage:   "Inngest server host",
 			},
 			&cli.IntFlag{
-				Name:    "api-port",
-				Value:   defaultAPIPort,
+				Name:    "port",
+				Value:   api.DefaultAPIPort,
 				Sources: cli.EnvVars("INNGEST_PORT"),
-				Usage:   "Main API port",
+				Usage:   "Inngest server port",
 			},
 			&cli.IntFlag{
 				Name:    "connect-gateway-port",
-				Value:   defaultGwPort,
+				Value:   connect.DefaultGatewayPort,
 				Sources: cli.EnvVars("INNGEST_CONNECT_GATEWAY_PORT"),
 				Usage:   "Connect Gateway port",
 			},
@@ -85,13 +83,13 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	probes := []probe{
 		{
 			component: "api",
-			url:       fmt.Sprintf("%s://%s:%d%s", scheme, host, cmd.Int("api-port"), apiHealthPath),
+			url:       fmt.Sprintf("%s://%s:%d%s", scheme, host, cmd.Int("port"), api.HealthPath),
 		},
 	}
 	if !cmd.Bool("skip-connect-gateway") {
 		probes = append(probes, probe{
 			component: "connect-gateway",
-			url:       fmt.Sprintf("%s://%s:%d%s", scheme, host, cmd.Int("connect-gateway-port"), gatewayReadyPath),
+			url:       fmt.Sprintf("%s://%s:%d%s", scheme, host, cmd.Int("connect-gateway-port"), connect.ReadyPath),
 		})
 	}
 

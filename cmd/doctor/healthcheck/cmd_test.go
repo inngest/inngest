@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/connect"
 	"github.com/urfave/cli/v3"
 )
 
@@ -22,7 +24,7 @@ func init() {
 
 func TestRun(t *testing.T) {
 	apiOK := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != apiHealthPath {
+		if r.URL.Path != api.HealthPath {
 			http.NotFound(w, r)
 			return
 		}
@@ -31,7 +33,7 @@ func TestRun(t *testing.T) {
 	defer apiOK.Close()
 
 	gwOK := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != gatewayReadyPath {
+		if r.URL.Path != connect.ReadyPath {
 			http.NotFound(w, r)
 			return
 		}
@@ -51,12 +53,12 @@ func TestRun(t *testing.T) {
 	defer apiSlow.Close()
 
 	tests := []struct {
-		name           string
-		apiURL         string
-		gwURL          string
-		timeout        time.Duration
-		skipGw         bool
-		wantErr        bool
+		name    string
+		apiURL  string
+		gwURL   string
+		timeout time.Duration
+		skipGw  bool
+		wantErr bool
 	}{
 		{
 			name:    "both healthy",
@@ -112,7 +114,7 @@ func TestRun(t *testing.T) {
 			args := []string{
 				"healthcheck",
 				"--host=" + host,
-				"--api-port=" + strconv.Itoa(apiPort),
+				"--port=" + strconv.Itoa(apiPort),
 				"--connect-gateway-port=" + strconv.Itoa(gwPort),
 				"--timeout=" + tt.timeout.String(),
 			}
@@ -163,7 +165,7 @@ func TestRun_SchemeOverride(t *testing.T) {
 	err := cmd.Run(context.Background(), []string{
 		"healthcheck",
 		"--host=" + host,
-		"--api-port=" + strconv.Itoa(port),
+		"--port=" + strconv.Itoa(port),
 		"--connect-gateway-port=" + strconv.Itoa(port),
 		"--scheme=https",
 		"--timeout=2s",
