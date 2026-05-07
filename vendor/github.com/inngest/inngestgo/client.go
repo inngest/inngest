@@ -16,6 +16,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/inngest/inngestgo/internal/logger"
 	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/inngest/inngestgo/pkg/env"
@@ -138,7 +139,7 @@ func NewClient(opts ClientOpts) (Client, error) {
 	}
 
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
 
 	// Add the default log middleware as the first middleware.
