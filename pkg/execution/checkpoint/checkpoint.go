@@ -50,6 +50,12 @@ type AsyncCheckpointer interface {
 	CheckpointAsyncSteps(context.Context, AsyncCheckpoint) error
 }
 
+var ErrStaleDispatch = errors.New("stale dispatch")
+
+type queueItemLoader interface {
+	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
+}
+
 type Opts struct {
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
@@ -480,6 +486,10 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
+	if err := c.validateAsyncDispatch(ctx, input); err != nil {
+		return err
+	}
+
 	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
 
 	if enforceStepSizeLimits && md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
@@ -634,6 +644,52 @@ func stepOutputSize(ops []state.GeneratorOpcode) int {
 		}
 	}
 	return total
+}
+
+func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) error {
+	// Fail open when the SDK didn't echo a generation. Older SDKs predate the
+	// fence; rejecting them would break valid checkpoints.
+	if input.GenerationID == 0 {
+		return nil
+	}
+
+	ref := queueref.Decode(input.QueueItemRef)
+	if ref[0] == "" {
+		return fmt.Errorf("%w: missing queue item reference", ErrStaleDispatch)
+	}
+
+	loader, ok := c.Queue.(queueItemLoader)
+	if !ok {
+		// Fail open if the queue can't load items (e.g. mock or alt backend);
+		// the alternative is rejecting every fenced POST forever.
+		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
+			"run_id", input.RunID,
+		)
+		return nil
+	}
+
+	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
+	if errors.Is(err, queue.ErrQueueItemNotFound) {
+		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
+	}
+	if err != nil {
+		// Fail open on transient load errors (e.g. Redis timeout). Rejecting
+		// here would surface as HTTP 400 and abort an otherwise-valid run.
+		logger.StdlibLogger(ctx).Warn("checkpoint: failed to load queue item for dispatch validation; skipping",
+			"error", err,
+			"run_id", input.RunID,
+		)
+		return nil
+	}
+	// Fail open for queue items that pre-date the rollout.
+	if item.GenerationID == 0 {
+		return nil
+	}
+	if input.GenerationID != item.GenerationID {
+		return fmt.Errorf("%w: generation %d does not match queue item generation %d", ErrStaleDispatch, input.GenerationID, item.GenerationID)
+	}
+
+	return nil
 }
 
 func (c checkpointer) runContext(md state.Metadata, fn *inngest.Function) execution.RunContext {

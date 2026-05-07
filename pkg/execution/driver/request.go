@@ -99,6 +99,12 @@ type SDKRequestContext struct {
 	// JobID is the stable queue item ID for the current job.
 	JobID string `json:"job_id,omitempty"`
 
+	// GenerationID identifies the canonical dispatch attempt for the leased
+	// queue item: a monotonic counter bumped by Requeue. The SDK echoes this
+	// on every async checkpoint POST so the backend can reject writes from a
+	// stale dispatch whose lease was superseded by a Requeue.
+	GenerationID int `json:"generation_id,omitempty"`
+
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.
 	DisableImmediateExecution bool `json:"disable_immediate_execution"`

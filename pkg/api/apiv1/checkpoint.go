@@ -4,11 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"time"
 
-	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
@@ -376,12 +376,14 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		FnID:         input.FnID,
 		Steps:        input.Steps,
 		QueueItemRef: input.QueueItemRef,
+		GenerationID: input.GenerationID,
 		AccountID:    auth.AccountID(),
 		EnvID:        auth.WorkspaceID(),
 	})
 	if err != nil {
 		status := http.StatusBadRequest
-		if errors.Is(err, state.ErrStepOutputTooLarge) || errors.Is(err, state.ErrStateOverflowed) {
+		switch {
+		case errors.Is(err, state.ErrStepOutputTooLarge), errors.Is(err, state.ErrStateOverflowed):
 			logger.StdlibLogger(ctx).Error("async checkpoint rejected",
 				"run_id", input.RunID,
 				"fn_id", input.FnID,
@@ -389,7 +391,10 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 				"error", err,
 			)
 			status = http.StatusRequestEntityTooLarge
-		} else {
+		case errors.Is(err, checkpoint.ErrStaleDispatch):
+			logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+			status = http.StatusConflict
+		default:
 			logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
 		}
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
@@ -399,6 +404,7 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 			},
 			Status: status,
 		})
+		return
 	}
 }
 

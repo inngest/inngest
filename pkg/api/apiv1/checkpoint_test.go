@@ -3,14 +3,18 @@ package apiv1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -169,4 +173,79 @@ func TestCheckpointAPI_Output(t *testing.T) {
 
 		require.Equal(t, 401, rec.Code)
 	})
+}
+
+func TestCheckpointAPI_CheckpointAsyncStepsPassesGenerationID(t *testing.T) {
+	runID := ulid.Make()
+	fnID := uuid.New()
+	mockCheckpointer := &mockCheckpointer{}
+	api := checkpointAPI{
+		Opts: Opts{
+			AuthFinder: apiv1auth.NilAuthFinder,
+		},
+		checkpointer: mockCheckpointer,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{
+		"run_id":"`+runID.String()+`",
+		"fn_id":"`+fnID.String()+`",
+		"qi_id":"queue-ref",
+		"generation_id":42,
+		"steps":[]
+	}`))
+	rec := httptest.NewRecorder()
+
+	api.CheckpointAsyncSteps(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, 42, mockCheckpointer.async.GenerationID)
+	require.Equal(t, "queue-ref", mockCheckpointer.async.QueueItemRef)
+}
+
+func TestCheckpointAPI_CheckpointAsyncStepsMapsStaleDispatchToConflict(t *testing.T) {
+	runID := ulid.Make()
+	fnID := uuid.New()
+	api := checkpointAPI{
+		Opts: Opts{
+			AuthFinder: apiv1auth.NilAuthFinder,
+		},
+		checkpointer: &mockCheckpointer{err: checkpoint.ErrStaleDispatch},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{
+		"run_id":"`+runID.String()+`",
+		"fn_id":"`+fnID.String()+`",
+		"steps":[]
+	}`))
+	rec := httptest.NewRecorder()
+
+	api.CheckpointAsyncSteps(rec, req)
+	require.Equal(t, http.StatusConflict, rec.Code)
+}
+
+type mockCheckpointer struct {
+	async checkpoint.AsyncCheckpoint
+	err   error
+}
+
+func (m *mockCheckpointer) CheckpointAsyncSteps(ctx context.Context, input checkpoint.AsyncCheckpoint) error {
+	m.async = input
+	return m.err
+}
+
+func (m *mockCheckpointer) CheckpointSyncSteps(ctx context.Context, input checkpoint.SyncCheckpoint) error {
+	return errors.New("not implemented")
+}
+
+func (m *mockCheckpointer) Metrics() checkpoint.MetricsProvider {
+	return mockCheckpointMetrics{}
+}
+
+type mockCheckpointMetrics struct{}
+
+func (mockCheckpointMetrics) OnFnScheduled(ctx context.Context, m checkpoint.MetricCardinality) {}
+
+func (mockCheckpointMetrics) OnStepFinished(ctx context.Context, m checkpoint.MetricCardinality, status enums.StepStatus) {
+}
+
+func (mockCheckpointMetrics) OnFnFinished(ctx context.Context, m checkpoint.MetricCardinality, status enums.RunStatus) {
 }

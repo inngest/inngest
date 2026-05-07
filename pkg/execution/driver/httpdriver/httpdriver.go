@@ -69,7 +69,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 
 	jID := queueref.StringFromCtx(ctx)
 
-	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts(), jID)
+	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts(), jID, queue.GenerationIDFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
