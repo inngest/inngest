@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"sync/atomic"
+
+	"github.com/inngest/inngestgo/internal/logger"
 )
 
 type logContextKeyType struct{}
@@ -15,13 +17,13 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 	value := ctx.Value(logContextKey)
 	if value == nil {
 		// Unreachable if the middleware is used correctly.
-		return slog.Default()
+		return logger.Default()
 	}
 
 	l, ok := value.(*slog.Logger)
 	if !ok {
 		// Unreachable if the middleware is used correctly.
-		return slog.Default()
+		return logger.Default()
 	}
 
 	return l

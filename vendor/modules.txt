@@ -786,7 +786,7 @@ github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 ## explicit; go 1.23.2
 github.com/inngest/go-httpstat
-# github.com/inngest/inngestgo v0.15.2-0.20260506200124-23193cd96953
+# github.com/inngest/inngestgo v0.15.2-0.20260507002849-c26cf7119dbf
 ## explicit; go 1.25.9
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/connect
@@ -797,6 +797,7 @@ github.com/inngest/inngestgo/internal
 github.com/inngest/inngestgo/internal/checkpoint
 github.com/inngest/inngestgo/internal/event
 github.com/inngest/inngestgo/internal/fn
+github.com/inngest/inngestgo/internal/logger
 github.com/inngest/inngestgo/internal/middleware
 github.com/inngest/inngestgo/internal/opcode
 github.com/inngest/inngestgo/internal/sdkrequest
