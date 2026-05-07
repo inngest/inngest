@@ -65,6 +65,17 @@ const (
 	JSErrCodeConsumerEmptyFilter       ErrorCode = 10139
 	JSErrCodeConsumerExists            ErrorCode = 10148
 	JSErrCodeConsumerDoesNotExist      ErrorCode = 10149
+
+	JSErrCodeMirrorWithMsgSchedules   ErrorCode = 10186
+	JSErrCodeSourceWithMsgSchedules   ErrorCode = 10187
+	JSErrCodeMessageSchedulesDisabled ErrorCode = 10188
+	JSErrCodeSchedulePatternInvalid   ErrorCode = 10189
+	JSErrCodeScheduleTargetInvalid    ErrorCode = 10190
+	JSErrCodeScheduleTTLInvalid       ErrorCode = 10191
+	JSErrCodeScheduleRollupInvalid    ErrorCode = 10192
+	JSErrCodeScheduleSourceInvalid    ErrorCode = 10203
+
+	JSErrCodeConsumerInvalidReset ErrorCode = 10204
 )
 
 var (
@@ -132,6 +143,17 @@ var (
 	// with UpdateConsumer but a consumer with given name does not exist.
 	ErrConsumerDoesNotExist JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeConsumerDoesNotExist, Description: "consumer does not exist", Code: 400}}
 
+	// ErrConsumerResetResponseEmpty is returned when the response from the
+	// server to a consumer reset request is missing the ConsumerInfo
+	// payload. The reset may or may not have taken effect.
+	ErrConsumerResetResponseEmpty JetStreamError = &jsError{message: "consumer reset response is empty"}
+
+	// ErrConsumerInvalidReset is returned when ResetConsumerToSequence is
+	// called with a sequence that violates the consumer's DeliverPolicy
+	// constraints (e.g. seq below OptStartSeq, or non-zero seq with a
+	// DeliverPolicy other than all/by-start-sequence/by-start-time).
+	ErrConsumerInvalidReset JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeConsumerInvalidReset, Description: "invalid reset", Code: 400}}
+
 	// ErrMsgNotFound is returned when message with provided sequence number
 	// does not exist.
 	ErrMsgNotFound JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeMessageNotFound, Description: "message not found", Code: 404}}
@@ -157,6 +179,38 @@ var (
 
 	// ErrEmptyFilter is returned when a filter in FilterSubjects is empty.
 	ErrEmptyFilter JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeConsumerEmptyFilter, Description: "consumer filter in FilterSubjects cannot be empty", Code: 500}}
+
+	// ErrScheduleTargetInvalid is returned when publishing a scheduled
+	// message without a valid target subject.
+	ErrScheduleTargetInvalid JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeScheduleTargetInvalid, Description: "message schedules target is invalid", Code: 400}}
+
+	// ErrSchedulePatternInvalid is returned when the schedule expression
+	// is not a valid @at, @every, or cron pattern.
+	ErrSchedulePatternInvalid JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeSchedulePatternInvalid, Description: "message schedules pattern is invalid", Code: 400}}
+
+	// ErrMessageSchedulesDisabled is returned when publishing a scheduled
+	// message to a stream that does not have AllowMsgSchedules enabled.
+	ErrMessageSchedulesDisabled JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeMessageSchedulesDisabled, Description: "message schedules is disabled", Code: 400}}
+
+	// ErrScheduleSourceInvalid is returned when the schedule source
+	// subject is invalid.
+	ErrScheduleSourceInvalid JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeScheduleSourceInvalid, Description: "message schedules source is invalid", Code: 400}}
+
+	// ErrScheduleTTLInvalid is returned when the schedule TTL value
+	// is not a valid duration or "never".
+	ErrScheduleTTLInvalid JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeScheduleTTLInvalid, Description: "message schedules invalid per-message TTL", Code: 400}}
+
+	// ErrScheduleRollupInvalid is returned when a scheduled message
+	// has an invalid rollup configuration.
+	ErrScheduleRollupInvalid JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeScheduleRollupInvalid, Description: "message schedules invalid rollup", Code: 400}}
+
+	// ErrMirrorWithMsgSchedules is returned when attempting to enable
+	// message scheduling on a mirror stream.
+	ErrMirrorWithMsgSchedules JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeMirrorWithMsgSchedules, Description: "stream mirrors can not also schedule messages", Code: 400}}
+
+	// ErrSourceWithMsgSchedules is returned when attempting to enable
+	// message scheduling on a stream with sources.
+	ErrSourceWithMsgSchedules JetStreamError = &jsError{apiErr: &APIError{ErrorCode: JSErrCodeSourceWithMsgSchedules, Description: "stream source can not also schedule messages", Code: 400}}
 
 	// Client errors
 

@@ -7,8 +7,8 @@ A [Go](http://golang.org) client for the [NATS messaging system](https://nats.io
 [License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
 [ReportCard-Url]: https://goreportcard.com/report/github.com/nats-io/nats.go
 [ReportCard-Image]: https://goreportcard.com/badge/github.com/nats-io/nats.go
-[Build-Status-Url]: https://github.com/nats-io/nats.go/actions
-[Build-Status-Image]: https://github.com/nats-io/nats.go/actions/workflows/ci.yaml/badge.svg?branch=main
+[Build-Status-Url]: https://github.com/nats-io/nats.go/actions/workflows/ci.yaml?query=event%3Arelease
+[Build-Status-Image]: https://github.com/nats-io/nats.go/actions/workflows/ci.yaml/badge.svg?event=release
 [GoDoc-Url]: https://pkg.go.dev/github.com/nats-io/nats.go
 [GoDoc-Image]: https://img.shields.io/badge/GoDoc-reference-007d9c
 [Coverage-Url]: https://coveralls.io/r/nats-io/nats.go?branch=main
@@ -23,7 +23,7 @@ A [Go](http://golang.org) client for the [NATS messaging system](https://nats.io
 go get github.com/nats-io/nats.go@latest
 
 # To get a specific version:
-go get github.com/nats-io/nats.go@v1.51.0
+go get github.com/nats-io/nats.go@v1.52.0
 
 # Note that the latest major version for NATS Server is v2:
 go get github.com/nats-io/nats-server/v2@latest

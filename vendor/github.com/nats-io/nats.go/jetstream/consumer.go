@@ -496,6 +496,37 @@ func resumeConsumer(ctx context.Context, js *jetStream, stream, consumer string)
 	return pauseConsumer(ctx, js, stream, consumer, nil)
 }
 
+func resetConsumer(ctx context.Context, js *jetStream, stream, consumer string, seq uint64) (*ConsumerResetResponse, error) {
+	ctx, cancel := js.wrapContextWithoutDeadline(ctx)
+	if cancel != nil {
+		defer cancel()
+	}
+	if err := validateConsumerName(consumer); err != nil {
+		return nil, err
+	}
+	subject := fmt.Sprintf(apiConsumerResetT, stream, consumer)
+
+	req, err := json.Marshal(consumerResetRequest{Seq: seq})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp consumerResetApiResponse
+	if _, err := js.apiRequestJSON(ctx, subject, &resp, req); err != nil {
+		return nil, err
+	}
+	if resp.Error != nil {
+		if resp.Error.ErrorCode == JSErrCodeConsumerInvalidReset {
+			return nil, ErrConsumerInvalidReset
+		}
+		return nil, resp.Error
+	}
+	if resp.ConsumerInfo == nil {
+		return nil, ErrConsumerResetResponseEmpty
+	}
+	return &resp.ConsumerResetResponse, nil
+}
+
 func validateConsumerName(name string) error {
 	if name == "" {
 		return fmt.Errorf("%w: name is required", ErrInvalidConsumerName)
