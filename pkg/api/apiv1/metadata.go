@@ -156,8 +156,9 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	// limit within this request. This prevents unbounded metadata writes to
 	// old runs.
 	if stateMetadata == nil {
-		stateMetadata = &statev2.Metadata{}
+		stateMetadata = &statev2.Metadata{ID: stateID}
 	}
+	statev2.InitConfig(&stateMetadata.Config)
 
 	parentSpanRef := &meta.SpanReference{
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
