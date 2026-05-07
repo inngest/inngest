@@ -599,9 +599,6 @@ func (m *mockStateLoader) LoadStack(ctx context.Context, id sv2.ID) ([]string, e
 func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, error) {
 	return sv2.State{}, nil
 }
-func (m *mockStateLoader) LoadV1Metadata(ctx context.Context, id sv2.ID) (*sv1.Metadata, error) {
-	return nil, nil
-}
 func (m *mockStateLoader) LoadDefers(ctx context.Context, id sv2.ID) (map[string]sv2.Defer, error) {
 	return nil, nil
 }
