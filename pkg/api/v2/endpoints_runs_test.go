@@ -187,6 +187,27 @@ func TestToFunctionTrace(t *testing.T) {
 	require.Equal(t, meta.SpanNameRun, trace.RootSpan.Name)
 }
 
+func TestToFunctionTraceReturnsConvertError(t *testing.T) {
+	runID := ulid.MustParse("01jpq5jcxm8qhg2x61v61bh8p0")
+
+	trace, err := toFunctionTrace(context.Background(), &mockFunctionTraceReader{}, &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name:       "userland",
+			SpanID:     "run-span",
+			TraceID:    "trace-id",
+			Attributes: map[string]any{"bad": func() {}},
+		},
+		RunID: runID,
+		Attributes: &meta.ExtractedValues{
+			IsUserland:   boolPtr(true),
+			UserlandName: strPtr("userland"),
+		},
+	}, false)
+
+	require.Nil(t, trace)
+	require.ErrorContains(t, err, "error marshalling filtered attributes")
+}
+
 func TestToTraceSpan(t *testing.T) {
 	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 	endedAt := startedAt.Add(2 * time.Second)

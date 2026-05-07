@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -315,6 +316,49 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.Nil(t, resp)
 		require.Contains(t, err.Error(), "Run ID must be a valid ULID")
 	})
+
+	t.Run("returns not found when run is missing", func(t *testing.T) {
+		runs := &mockFunctionRunReader{}
+		runs.On("GetFunctionRun", mock.Anything, runID).Return(nil, errors.New("missing")).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    &mockFunctionProvider{},
+			FunctionRuns: runs,
+		})
+
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run not found")
+	})
+
+	t.Run("returns not found when function is missing", func(t *testing.T) {
+		runs := &mockFunctionRunReader{}
+		runs.On("GetFunctionRun", mock.Anything, runID).Return(run, nil).Once()
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, functionID.String()).Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    functions,
+			FunctionRuns: runs,
+		})
+
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Function not found")
+	})
 }
 
 func TestToTraceSpanStatus(t *testing.T) {
@@ -483,6 +527,74 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		require.Nil(t, resp.Data.RootSpan.Children[0].Output)
 	})
 
+	t.Run("returns not found when trace is missing", func(t *testing.T) {
+		reader := &mockFunctionTraceReader{}
+		reader.On("GetSpansByRunID", mock.Anything, runID).Return(nil, errors.New("missing")).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			FunctionTraces: reader,
+		})
+
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Trace not found")
+	})
+
+	t.Run("returns internal error when trace mapping fails", func(t *testing.T) {
+		badOutputID := "not-base64"
+		reader := &mockFunctionTraceReader{}
+		reader.On("GetSpansByRunID", mock.Anything, runID).Return(&cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{
+				Name:      meta.SpanNameRun,
+				SpanID:    "run-span",
+				TraceID:   "trace-123",
+				StartTime: queuedAt,
+				EndTime:   endedAt,
+			},
+			RunID: runID,
+			Attributes: &meta.ExtractedValues{
+				QueuedAt:      &queuedAt,
+				DynamicStatus: &stepStatus,
+			},
+			Children: []*cqrs.OtelSpan{
+				{
+					RawOtelSpan: cqrs.RawOtelSpan{
+						Name:      meta.SpanNameStep,
+						SpanID:    "step-span",
+						TraceID:   "trace-123",
+						StartTime: startedAt,
+						EndTime:   endedAt,
+					},
+					OutputID: &badOutputID,
+					Attributes: &meta.ExtractedValues{
+						QueuedAt:      &startedAt,
+						DynamicStatus: &stepStatus,
+					},
+				},
+			},
+		}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			FunctionTraces: reader,
+		})
+
+		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Unable to build trace response")
+	})
 }
 
 func mustEncodeSpanIdentifier(t *testing.T, id cqrs.SpanIdentifier) string {
