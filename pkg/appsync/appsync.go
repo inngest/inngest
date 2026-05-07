@@ -236,21 +236,21 @@ func Sync(ctx context.Context, opts Opts) (*Response, *syscode.Error, error) {
 		body,
 	)
 	if sigErr != nil || !valid {
-		msg := "invalid response signature"
-		if sigErr != nil {
-			msg = sigErr.Error()
-		}
+		// Don't reflect sigErr.Error(); it distinguishes expired/invalid/bad-ts
+		// to the API caller, which is a small probe oracle on key state.
 		return nil, &syscode.Error{
 			Code:    syscode.CodeSigVerificationFailed,
-			Message: msg,
+			Message: "invalid response signature",
 		}, nil
 	}
 
 	var out Response
 	if err := json.Unmarshal(body, &out); err != nil {
+		// json error strings can include byte offsets and raw token bytes from
+		// the body; keep them out of the public message.
 		return nil, &syscode.Error{
 			Code:    syscode.CodeMalformedResponse,
-			Message: err.Error(),
+			Message: "failed to parse SDK response",
 		}, nil
 	}
 
