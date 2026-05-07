@@ -151,7 +151,6 @@ func connectionLogAttrs(conn *state.Connection) []any {
 	attrs := []any{
 		"account_id", conn.AccountID.String(),
 		"env_id", conn.EnvID.String(),
-		"conn_id", conn.ConnectionId.String(),
 		"connection_id", conn.ConnectionId.String(),
 		"worker_ip", util.SanitizeLogField(conn.WorkerIP),
 	}
@@ -1446,7 +1445,6 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	log := c.log.With(
 		"account_id", authResp.AccountID,
 		"env_id", authResp.EnvID,
-		"conn_id", connectionId.String(),
 		"connection_id", connectionId.String(),
 		"instance_id", util.SanitizeLogField(initialMessageData.InstanceId),
 		"worker_ip", util.SanitizeLogField(c.remoteAddr))
