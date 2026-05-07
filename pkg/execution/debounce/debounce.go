@@ -181,10 +181,6 @@ type RunDebounceResult struct {
 	EventID string
 }
 
-// NewDebouncer constructs a debounce manager backed by a single primary
-// shard. This is the steady-state configuration; for a migration from a
-// secondary (source) shard to a primary (destination), use
-// NewDebouncerWithMigration.
 func NewDebouncer(shards queue.ShardRegistry, primaryShardName string, q queue.Producer) (Debouncer, error) {
 	return NewDebouncerWithMigration(DebouncerOpts{
 		Shards:           shards,
@@ -193,38 +189,22 @@ func NewDebouncer(shards queue.ShardRegistry, primaryShardName string, q queue.P
 	})
 }
 
-// DebouncerOpts configures a debounce manager. Required fields are Shards,
-// PrimaryShardName and Queue. Set SecondaryShardName + ShouldMigrate to drive
-// a migration from the secondary (source) shard to the primary (destination).
 type DebouncerOpts struct {
-	// Shards is the registry used to resolve shards by name. Both
-	// PrimaryShardName and (optionally) SecondaryShardName must exist in
-	// it.
 	Shards queue.ShardRegistry
-	// PrimaryShardName is the destination shard for new debounces and the
-	// shard timeout queue items are enqueued onto.
+	// Destination/Target: New system queue + colocated debounce state shard
 	PrimaryShardName string
-	// SecondaryShardName, when non-empty, is the source shard during a
-	// migration. When empty, the manager runs without migration support.
+	// Source/Old: Default queue cluster
 	SecondaryShardName string
 
 	// Queue is the queue producer used to enqueue/requeue timeout items.
 	// Its registry must know about every shard the manager may target.
 	Queue queue.Producer
 
-	// ShouldMigrate gates per-account migration. Required when
-	// SecondaryShardName is set; ignored otherwise.
 	ShouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 
-	// Clock is the clock used for time-based decisions. Defaults to a
-	// real clock.
 	Clock clockwork.Clock
 }
 
-// NewDebouncerWithMigration constructs a debounce manager that can drive a
-// migration from a secondary (source) shard to a primary (destination) shard,
-// gated by ShouldMigrate. For the steady-state, single-shard configuration,
-// use NewDebouncer.
 func NewDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
 	if o.Shards == nil {
 		return nil, fmt.Errorf("missing shard registry")
@@ -266,8 +246,10 @@ func NewDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
 type debouncer struct {
 	c clockwork.Clock
 
-	shards             queue.ShardRegistry
-	primaryShardName   string
+	shards queue.ShardRegistry
+	// New: system queue
+	primaryShardName string
+	// Old: default queue
 	secondaryShardName string
 
 	queue queue.Producer
