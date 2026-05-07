@@ -2,26 +2,22 @@ package apiv2
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
-	"github.com/inngest/inngest/pkg/appsync"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngestgo"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -31,15 +27,23 @@ import (
 
 const testSigningKey = "signkey-test-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
-// signResponse mirrors inngestgo's signWithoutJCS for response signing.
-func signResponse(t *testing.T, body []byte, key string) string {
+// realSDKHandler returns an httptest.Server backed by a real inngestgo
+// handler with in-band sync enabled. Drives Sync's success path through the
+// production response-signing code, so the test fails if either side's
+// signing logic drifts.
+func realSDKHandler(t *testing.T) *httptest.Server {
 	t.Helper()
-	keyBytes := regexp.MustCompile(`^signkey-\w+-`).ReplaceAll([]byte(key), nil)
-	ts := time.Now().Unix()
-	mac := hmac.New(sha256.New, keyBytes)
-	_, _ = mac.Write(body)
-	_, _ = fmt.Fprintf(mac, "%d", ts)
-	return fmt.Sprintf("t=%d&s=%s", ts, hex.EncodeToString(mac.Sum(nil)))
+	allow := true
+	dev := false
+	sk := testSigningKey
+	client, err := inngestgo.NewClient(inngestgo.ClientOpts{
+		AppID:           "my-app",
+		SigningKey:      &sk,
+		AllowInBandSync: &allow,
+		Dev:             &dev,
+	})
+	require.NoError(t, err)
+	return httptest.NewServer(client.Serve())
 }
 
 type fakeSigningKeyProvider struct {
@@ -69,38 +73,6 @@ func (r *recordingAppSyncer) ProcessSync(ctx context.Context, req sdk.RegisterRe
 	return r.reply, r.returnErr
 }
 
-// inBandHandler returns a fake SDK server. customize runs after defaults so
-// it can also override (including with empty values).
-func inBandHandler(t *testing.T, customize func(w http.ResponseWriter, body *[]byte)) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		body := sampleResponseBody(t)
-		w.Header().Set(headers.HeaderKeySignature, signResponse(t, body, testSigningKey))
-		w.Header().Set(headers.HeaderKeySDK, "go:0.7.0")
-		if customize != nil {
-			customize(w, &body)
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(body)
-	}))
-}
-
-func sampleResponseBody(t *testing.T) []byte {
-	t.Helper()
-	r := require.New(t)
-	resp := appsync.Response{
-		AppID:       "my-app",
-		SDKAuthor:   "inngest",
-		SDKLanguage: "go",
-		SDKVersion:  "0.7.0",
-		URL:         "http://placeholder/api/inngest",
-		Functions:   []sdk.SDKFunction{},
-	}
-	byt, err := json.Marshal(resp)
-	r.NoError(err)
-	return byt
-}
-
 // requireErrorWithCode asserts the gRPC status and the first embedded ErrorItem code.
 func requireErrorWithCode(t *testing.T, err error, wantStatus codes.Code, wantCode string) {
 	t.Helper()
@@ -119,7 +91,7 @@ func requireErrorWithCode(t *testing.T, err error, wantStatus codes.Code, wantCo
 func TestSyncApp(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		r := require.New(t)
-		srv := inBandHandler(t, nil)
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		syncID := uuid.New()
@@ -146,14 +118,21 @@ func TestSyncApp(t *testing.T) {
 		r.Nil(resp.Data.Error)
 		r.True(syncer.called)
 		r.Equal("my-app", syncer.gotReq.AppName)
-		r.Equal("go:0.7.0", syncer.gotReq.SDK)
+		r.Equal(inngestgo.SDKLanguage+":"+inngestgo.SDKVersion, syncer.gotReq.SDK)
 	})
 
-	t.Run("SDK returns bad signature returns 422", func(t *testing.T) {
+	// Stands in for the entire family of appsync.Sync syscode failures
+	// (unreachable, app_id mismatch, etc.). At this layer the assertion is
+	// the same: syscode propagates as the gRPC error code, status maps to
+	// 422, and ProcessSync is not invoked. Per-syscode behavior is covered
+	// in pkg/appsync.
+	t.Run("syncs that fail in appsync return 422 and skip ProcessSync", func(t *testing.T) {
 		r := require.New(t)
-		srv := inBandHandler(t, func(w http.ResponseWriter, _ *[]byte) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set(headers.HeaderKeySignature, fmt.Sprintf("t=%d&s=cafebabe", time.Now().Unix()))
-		})
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"app_id":"my-app"}`))
+		}))
 		defer srv.Close()
 
 		syncer := &recordingAppSyncer{}
@@ -172,53 +151,9 @@ func TestSyncApp(t *testing.T) {
 		r.False(syncer.called, "processor should not be invoked on protocol failure")
 	})
 
-	t.Run("unreachable returns 422", func(t *testing.T) {
-		// Closed server triggers a dial failure.
-		srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
-		url := srv.URL
-		srv.Close()
-
-		syncer := &recordingAppSyncer{}
-		service := NewService(ServiceOptions{
-			SigningKeysProvider:      fakeSigningKeyProvider{key: testSigningKey},
-			AppSyncer:                syncer,
-			ServerKind:               headers.ServerKindDev,
-			AppSyncAllowInsecureHTTP: true,
-		})
-
-		_, err := service.SyncApp(context.Background(), &apiv2.SyncAppRequest{
-			AppId: "my-app",
-			Url:   url,
-		})
-		requireErrorWithCode(t, err, codes.FailedPrecondition, syscode.CodeHTTPUnreachable)
-	})
-
-	t.Run("app_id mismatch fails sync", func(t *testing.T) {
-		r := require.New(t)
-		// SDK reports app_id "my-app" (sampleResponseBody default); caller asks
-		// to sync "other-app". Sync must fail before ProcessSync runs.
-		srv := inBandHandler(t, nil)
-		defer srv.Close()
-
-		syncer := &recordingAppSyncer{}
-		service := NewService(ServiceOptions{
-			SigningKeysProvider:      fakeSigningKeyProvider{key: testSigningKey},
-			AppSyncer:                syncer,
-			ServerKind:               headers.ServerKindDev,
-			AppSyncAllowInsecureHTTP: true,
-		})
-
-		_, err := service.SyncApp(context.Background(), &apiv2.SyncAppRequest{
-			AppId: "other-app",
-			Url:   srv.URL,
-		})
-		requireErrorWithCode(t, err, codes.FailedPrecondition, syscode.CodeAppIDMismatch)
-		r.False(syncer.called, "processor should not run on app_id mismatch")
-	})
-
 	t.Run("URL scheme rejection returns 400", func(t *testing.T) {
-		// Service has AllowInsecureHTTP=false, so http:// is rejected by
-		// appsync.checkScheme as CodeURLSchemeDenied. Should map to 400, not 422.
+		// CodeURLSchemeDenied is the one syscode that maps to 400 instead of
+		// 422; covers the special case in httpStatusForSyncSyscode.
 		service := NewService(ServiceOptions{
 			SigningKeysProvider: fakeSigningKeyProvider{key: testSigningKey},
 			AppSyncer:           &recordingAppSyncer{},
@@ -298,7 +233,7 @@ func TestSyncApp(t *testing.T) {
 
 	t.Run("processor unknown error sanitized to 500", func(t *testing.T) {
 		r := require.New(t)
-		srv := inBandHandler(t, nil)
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		syncer := &recordingAppSyncer{returnErr: errors.New("db down: connection refused at 10.0.0.5")}
@@ -324,7 +259,7 @@ func TestSyncApp(t *testing.T) {
 
 	t.Run("processor publicerr propagates status and message", func(t *testing.T) {
 		r := require.New(t)
-		srv := inBandHandler(t, nil)
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		syncer := &recordingAppSyncer{returnErr: publicerr.Error{
@@ -351,7 +286,7 @@ func TestSyncApp(t *testing.T) {
 	})
 
 	t.Run("processor publicerr without code falls back to app_sync_failed", func(t *testing.T) {
-		srv := inBandHandler(t, nil)
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		syncer := &recordingAppSyncer{returnErr: publicerr.Wrap(
@@ -372,7 +307,7 @@ func TestSyncApp(t *testing.T) {
 	})
 
 	t.Run("processor syscode error maps to 422", func(t *testing.T) {
-		srv := inBandHandler(t, nil)
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		syncer := &recordingAppSyncer{returnErr: &syscode.Error{
