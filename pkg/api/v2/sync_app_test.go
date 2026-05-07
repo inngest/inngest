@@ -392,4 +392,31 @@ func TestSyncApp(t *testing.T) {
 		})
 		requireErrorWithCode(t, err, codes.FailedPrecondition, "function_count_invalid")
 	})
+
+	t.Run("rate limited", func(t *testing.T) {
+		r := require.New(t)
+		syncer := &recordingAppSyncer{}
+		service := NewService(ServiceOptions{
+			SigningKeysProvider:      fakeSigningKeyProvider{key: testSigningKey},
+			AppSyncer:                syncer,
+			ServerKind:               headers.ServerKindDev,
+			AppSyncAllowInsecureHTTP: true,
+			RateLimitProvider:        stubRateLimitProvider{limited: true},
+		})
+
+		_, err := service.SyncApp(context.Background(), &apiv2.SyncAppRequest{
+			AppId: "my-app",
+			Url:   "http://example.com",
+		})
+		requireErrorWithCode(t, err, codes.ResourceExhausted, apiv2base.ErrorRateLimited)
+		r.False(syncer.called, "no outbound work when rate limited")
+	})
+}
+
+type stubRateLimitProvider struct {
+	limited bool
+}
+
+func (s stubRateLimitProvider) CheckRateLimit(context.Context, string) RateLimitResult {
+	return RateLimitResult{Limited: s.limited}
 }

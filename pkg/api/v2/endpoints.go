@@ -305,6 +305,17 @@ func (s *Service) SyncApp(
 			"app_id is required",
 		)
 	}
+
+	// Sync drives an outbound HTTP request to a caller-supplied URL; rate-limit
+	// before any work to bound SSRF / DoS amplification per signing key.
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_SyncApp_FullMethodName); result.Limited {
+		return nil, s.base.NewError(
+			http.StatusTooManyRequests,
+			apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no app was synced.",
+		)
+	}
+
 	if s.appSyncer == nil {
 		return nil, s.base.NewError(
 			http.StatusNotImplemented,
