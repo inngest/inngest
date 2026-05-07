@@ -5,23 +5,35 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDNSCache(t *testing.T) {
-	ctx := context.Background()
-	l := logger.StdlibLogger(ctx)
+	// Start a local HTTP server to avoid any external network dependency.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	// Extract the host IP and port from the test server address.
+	tsHost, tsPort, err := net.SplitHostPort(ts.Listener.Addr().String())
+	require.NoError(t, err)
 
 	ttl := 2 * time.Second
 
+	// Mock DNS: resolve any host to the test server's IP.
+	mockLookup := func(ctx context.Context, host string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP(tsHost)}}, nil
+	}
+
 	cachedResolver := New(
 		WithCacheTTL(ttl),
-		WithLogger(l),
+		WithLookupFunc(mockLookup),
 	)
 
 	c := http.Client{
@@ -30,8 +42,7 @@ func TestDNSCache(t *testing.T) {
 		},
 	}
 
-	// inngest and vercel use SNI
-	hosts := []string{"www.example.com", "www.inngest.com", "vercel.com"}
+	hosts := []string{"fake-host-1.test", "fake-host-2.test", "fake-host-3.test"}
 
 	for _, host := range hosts {
 		t.Run(host, func(t *testing.T) {
@@ -40,7 +51,7 @@ func TestDNSCache(t *testing.T) {
 			})
 
 			t.Run("request", func(t *testing.T) {
-				resp, err := c.Get(fmt.Sprintf("https://%s", host))
+				resp, err := c.Get(fmt.Sprintf("http://%s:%s", host, tsPort))
 				require.NoError(t, err)
 				require.EqualValues(t, 200, resp.StatusCode)
 			})
