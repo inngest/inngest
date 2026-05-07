@@ -23,8 +23,30 @@ import (
 
 const testSigningKey = "signkey-test-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
-// signResponse mirrors the SDK's signWithoutJCS.
-func signResponse(t *testing.T, body []byte, key string) string {
+// realSDKHandler returns an httptest.Server backed by a real inngestgo
+// handler with in-band sync enabled. The handler signs responses with the
+// production code path, so the success-path tests exercise actual signing
+// rather than a hand-rolled HMAC.
+func realSDKHandler(t *testing.T) *httptest.Server {
+	t.Helper()
+	allow := true
+	dev := false
+	sk := testSigningKey
+	client, err := inngestgo.NewClient(inngestgo.ClientOpts{
+		AppID:           "my-app",
+		SigningKey:      &sk,
+		AllowInBandSync: &allow,
+		Dev:             &dev,
+	})
+	require.NoError(t, err)
+	return httptest.NewServer(client.Serve())
+}
+
+// hmacSignResponse mirrors inngestgo's signWithoutJCS. Used only by tests
+// that intentionally produce a signature outside the production code path:
+// signing with a different key, or signing a deliberately malformed body
+// (where JCS would refuse). Other tests should drive realSDKHandler.
+func hmacSignResponse(t *testing.T, body []byte, key string) string {
 	t.Helper()
 	keyBytes := regexp.MustCompile(`^signkey-\w+-`).ReplaceAll([]byte(key), nil)
 	ts := time.Now().Unix()
@@ -32,50 +54,6 @@ func signResponse(t *testing.T, body []byte, key string) string {
 	_, _ = mac.Write(body)
 	_, _ = fmt.Fprintf(mac, "%d", ts)
 	return fmt.Sprintf("t=%d&s=%s", ts, hex.EncodeToString(mac.Sum(nil)))
-}
-
-func sampleResponseBody(t *testing.T) []byte {
-	t.Helper()
-	env := "production"
-	platform := "vercel"
-	resp := Response{
-		AppID:       "my-app",
-		Env:         &env,
-		Platform:    &platform,
-		SDKAuthor:   "inngest",
-		SDKLanguage: "go",
-		SDKVersion:  "0.7.0",
-		URL:         "https://example.com/api/inngest",
-		Functions:   []sdk.SDKFunction{},
-		Inspection: map[string]any{
-			"capabilities": map[string]any{
-				"in_band_sync": "v1",
-				"trust_probe":  "v1",
-				"connect":      "v1",
-			},
-		},
-	}
-	byt, err := json.Marshal(resp)
-	require.NoError(t, err, "marshal sample response")
-	return byt
-}
-
-// inBandHandler returns a fake SDK server. customize runs after defaults are
-// set, so it can also override (including with empty values).
-func inBandHandler(t *testing.T, customize func(w http.ResponseWriter, body *[]byte)) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPut, r.Method)
-		body := sampleResponseBody(t)
-		w.Header().Set(headers.HeaderKeySignature, signResponse(t, body, testSigningKey))
-		w.Header().Set(inngestgo.HeaderKeySyncKind, inngestgo.SyncKindInBand)
-		w.Header().Set(headers.HeaderKeySDK, "go:0.7.0")
-		if customize != nil {
-			customize(w, &body)
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(body)
-	}))
 }
 
 func assertSyscode(t *testing.T, syscodeErr *syscode.Error, err error, wantCode string) {
@@ -88,7 +66,7 @@ func assertSyscode(t *testing.T, syscodeErr *syscode.Error, err error, wantCode 
 func TestSync(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		r := require.New(t)
-		srv := inBandHandler(t, nil)
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		resp, syscodeErr, err := Sync(context.Background(), Opts{
@@ -102,11 +80,15 @@ func TestSync(t *testing.T) {
 		r.Nil(syscodeErr)
 		r.NotNil(resp)
 		r.Equal("my-app", resp.AppID)
-		r.Equal("go", resp.SDKLanguage)
-		r.Equal("0.7.0", resp.SDKVersion)
+		r.Equal(inngestgo.SDKLanguage, resp.SDKLanguage)
+		r.Equal(inngestgo.SDKVersion, resp.SDKVersion)
 	})
 
 	t.Run("sends required request headers", func(t *testing.T) {
+		// Capture the request headers/body the handler receives. We don't
+		// need a real signed response — Sync's request-side behavior is what
+		// we're verifying, so a minimal handler that doesn't return a body
+		// is enough; we ignore Sync's resulting error.
 		r := require.New(t)
 		var got struct {
 			serverKind string
@@ -119,24 +101,17 @@ func TestSync(t *testing.T) {
 			got.syncKind = req.Header.Get(inngestgo.HeaderKeySyncKind)
 			got.signature = req.Header.Get(headers.HeaderKeySignature)
 			got.body, _ = io.ReadAll(req.Body)
-
-			body := sampleResponseBody(t)
-			w.Header().Set(headers.HeaderKeySignature, signResponse(t, body, testSigningKey))
-			w.Header().Set(inngestgo.HeaderKeySyncKind, inngestgo.SyncKindInBand)
-			w.Header().Set(headers.HeaderKeySDK, "go:0.7.0")
-			_, _ = w.Write(body)
+			w.WriteHeader(http.StatusOK)
 		}))
 		defer srv.Close()
 
-		_, syscodeErr, err := Sync(context.Background(), Opts{
+		_, _, _ = Sync(context.Background(), Opts{
 			URL:               srv.URL,
 			SigningKey:        testSigningKey,
 			ExpectedAppID:     "my-app",
 			AllowInsecureHTTP: true,
 			HTTPClient:        srv.Client(),
 		})
-		r.NoError(err)
-		r.Nil(syscodeErr)
 
 		r.Equal(headers.ServerKindCloud, got.serverKind)
 		r.Equal(inngestgo.SyncKindInBand, got.syncKind)
@@ -152,14 +127,11 @@ func TestSync(t *testing.T) {
 		var got string
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			got = req.Header.Get(headers.HeaderKeyServerKind)
-			body := sampleResponseBody(t)
-			w.Header().Set(headers.HeaderKeySignature, signResponse(t, body, testSigningKey))
-			w.Header().Set(inngestgo.HeaderKeySyncKind, inngestgo.SyncKindInBand)
-			_, _ = w.Write(body)
+			w.WriteHeader(http.StatusOK)
 		}))
 		defer srv.Close()
 
-		_, syscodeErr, err := Sync(context.Background(), Opts{
+		_, _, _ = Sync(context.Background(), Opts{
 			URL:               srv.URL,
 			SigningKey:        testSigningKey,
 			ServerKind:        headers.ServerKindDev,
@@ -167,15 +139,14 @@ func TestSync(t *testing.T) {
 			AllowInsecureHTTP: true,
 			HTTPClient:        srv.Client(),
 		})
-		r.NoError(err)
-		r.Nil(syscodeErr)
 		r.Equal(headers.ServerKindDev, got)
 	})
 
 	t.Run("missing response signature", func(t *testing.T) {
-		srv := inBandHandler(t, func(w http.ResponseWriter, _ *[]byte) {
-			w.Header().Set(headers.HeaderKeySignature, "")
-		})
+		// Real handler would set the sig; strip it on the way out via a
+		// proxying handler that lets the request hit the SDK but rewrites
+		// the response.
+		srv := stripResponseSig(t, realSDKHandler(t))
 		defer srv.Close()
 
 		_, syscodeErr, err := Sync(context.Background(), Opts{
@@ -189,9 +160,7 @@ func TestSync(t *testing.T) {
 	})
 
 	t.Run("invalid response signature", func(t *testing.T) {
-		srv := inBandHandler(t, func(w http.ResponseWriter, _ *[]byte) {
-			w.Header().Set(headers.HeaderKeySignature, fmt.Sprintf("t=%d&s=cafebabe", time.Now().Unix()))
-		})
+		srv := overrideResponseSig(t, realSDKHandler(t), fmt.Sprintf("t=%d&s=cafebabe", time.Now().Unix()))
 		defer srv.Close()
 
 		_, syscodeErr, err := Sync(context.Background(), Opts{
@@ -205,10 +174,15 @@ func TestSync(t *testing.T) {
 	})
 
 	t.Run("response signature with different key", func(t *testing.T) {
+		// Hand-rolled HMAC: by definition we want a sig produced under a
+		// different key than the validator uses.
 		otherKey := "signkey-test-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		srv := inBandHandler(t, func(w http.ResponseWriter, body *[]byte) {
-			w.Header().Set(headers.HeaderKeySignature, signResponse(t, *body, otherKey))
-		})
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			body := []byte(`{"app_id":"my-app","sdk_language":"go","sdk_version":"0.0.0","url":"http://x/api/inngest","functions":[]}`)
+			w.Header().Set(headers.HeaderKeySignature, hmacSignResponse(t, body, otherKey))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(body)
+		}))
 		defer srv.Close()
 
 		_, syscodeErr, err := Sync(context.Background(), Opts{
@@ -265,9 +239,11 @@ func TestSync(t *testing.T) {
 	})
 
 	t.Run("malformed body", func(t *testing.T) {
+		// Hand-rolled HMAC: invalid JSON can't go through inngestgo.Sign
+		// because JCS canonicalization would refuse to parse it.
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			body := []byte(`{not valid json`)
-			w.Header().Set(headers.HeaderKeySignature, signResponse(t, body, testSigningKey))
+			w.Header().Set(headers.HeaderKeySignature, hmacSignResponse(t, body, testSigningKey))
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(body)
 		}))
@@ -285,7 +261,6 @@ func TestSync(t *testing.T) {
 
 	t.Run("body too large", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set(inngestgo.HeaderKeySyncKind, inngestgo.SyncKindInBand)
 			w.Header().Set(headers.HeaderKeySignature, "t=0&s=00")
 			w.WriteHeader(http.StatusOK)
 			// Size check runs before signature/parse, so content isn't validated.
@@ -380,7 +355,7 @@ func TestSync(t *testing.T) {
 
 	t.Run("succeeds against loopback (built-in client)", func(t *testing.T) {
 		r := require.New(t)
-		srv := inBandHandler(t, nil)
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		resp, syscodeErr, err := Sync(context.Background(), Opts{
@@ -414,8 +389,8 @@ func TestSync(t *testing.T) {
 
 	t.Run("ExpectedAppID mismatch", func(t *testing.T) {
 		r := require.New(t)
-		// sampleResponseBody reports AppID "my-app"; expect "other-app".
-		srv := inBandHandler(t, nil)
+		// Real SDK handler reports AppID "my-app"; expect "other-app".
+		srv := realSDKHandler(t)
 		defer srv.Close()
 
 		_, syscodeErr, err := Sync(context.Background(), Opts{
@@ -430,6 +405,74 @@ func TestSync(t *testing.T) {
 		r.Contains(syscodeErr.Message, "my-app")
 	})
 
+}
+
+// stripResponseSig wraps an httptest.Server in a proxy that forwards the
+// request to the inner server but removes the X-Inngest-Signature response
+// header before writing it to the caller.
+func stripResponseSig(t *testing.T, inner *httptest.Server) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyTo(t, inner, w, r, func(h http.Header) {
+			h.Del(headers.HeaderKeySignature)
+		})
+	}))
+}
+
+// overrideResponseSig wraps an httptest.Server in a proxy that forwards the
+// request to the inner server and replaces the X-Inngest-Signature response
+// header with the given value.
+func overrideResponseSig(t *testing.T, inner *httptest.Server, sig string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyTo(t, inner, w, r, func(h http.Header) {
+			h.Set(headers.HeaderKeySignature, sig)
+		})
+	}))
+}
+
+func proxyTo(t *testing.T, inner *httptest.Server, w http.ResponseWriter, r *http.Request, mutateHeaders func(http.Header)) {
+	t.Helper()
+	body, _ := io.ReadAll(r.Body)
+	req, err := http.NewRequest(r.Method, inner.URL+r.URL.Path, bytesReader(body))
+	require.NoError(t, err)
+	for k, vs := range r.Header {
+		for _, v := range vs {
+			req.Header.Add(k, v)
+		}
+	}
+	resp, err := inner.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	for k, vs := range resp.Header {
+		for _, v := range vs {
+			w.Header().Add(k, v)
+		}
+	}
+	mutateHeaders(w.Header())
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
+}
+
+func bytesReader(b []byte) io.Reader {
+	if len(b) == 0 {
+		return http.NoBody
+	}
+	return &readCloserBytes{b: b}
+}
+
+type readCloserBytes struct {
+	b []byte
+	i int
+}
+
+func (r *readCloserBytes) Read(p []byte) (int, error) {
+	if r.i >= len(r.b) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.b[r.i:])
+	r.i += n
+	return n, nil
 }
 
 func TestResponse(t *testing.T) {
@@ -485,7 +528,7 @@ func TestResponse(t *testing.T) {
 
 	t.Run("ToRegisterRequest normalizes URLs", func(t *testing.T) {
 		r := require.New(t)
-		// 127.0.0.1 → localhost, :80 stripped, step URLs same.
+		// 127.0.0.1 to localhost, :80 stripped, step URLs same.
 		resp := &Response{
 			AppID:       "app-1",
 			SDKLanguage: "go",

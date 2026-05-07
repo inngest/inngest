@@ -87,7 +87,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
-		AllowInsecureHTTP:  true, // `inngest dev` drives local SDKs over http://
+		// Dev Server always allows http://
+		AllowInsecureHTTP: true,
+
 		Autodiscover:       !noDiscovery,
 		Config:             *conf,
 		Poll:               !noPoll,
