@@ -8,7 +8,6 @@ import { pathCreator } from '@/utils/urls';
 import { useEnvironment } from '../Environments/environment-context';
 import type { EntityLookup } from './Dashboard';
 import { sum } from './utils';
-import type { FileRouteTypes } from '@tanstack/react-router';
 
 export type CompletedByFunctionType =
   FunctionStatusMetricsQuery['workspace']['completedByFunction'];
@@ -98,7 +97,7 @@ export const FailedRate = ({
                 `${pathCreator.function({
                   envSlug: env.slug,
                   functionSlug: r.slug,
-                })}/runs` as FileRouteTypes['to']
+                })}/runs`
               }
             >
               <div className="w-[136px] overflow-hidden text-ellipsis text-nowrap">

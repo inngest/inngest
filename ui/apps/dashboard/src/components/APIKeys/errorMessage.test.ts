@@ -6,7 +6,7 @@ import { apiKeyErrorMessage } from '@/components/APIKeys/errorMessage';
 describe('apiKeyErrorMessage', () => {
   it('returns the first GraphQL error message, stripping the urql prefix', () => {
     const err = new CombinedError({
-      graphQLErrors: [{ message: 'Name already in use' } as Error],
+      graphQLErrors: [{ message: 'Name already in use' }],
     });
     expect(apiKeyErrorMessage(err)).toBe('Name already in use');
   });
@@ -14,8 +14,8 @@ describe('apiKeyErrorMessage', () => {
   it('picks the first GraphQL error when multiple are returned', () => {
     const err = new CombinedError({
       graphQLErrors: [
-        { message: 'first' } as Error,
-        { message: 'second' } as Error,
+        { message: 'first' },
+        { message: 'second' },
       ],
     });
     expect(apiKeyErrorMessage(err)).toBe('first');
@@ -23,7 +23,7 @@ describe('apiKeyErrorMessage', () => {
 
   it('trims whitespace from the GraphQL message', () => {
     const err = new CombinedError({
-      graphQLErrors: [{ message: '  padded  ' } as Error],
+      graphQLErrors: [{ message: '  padded  ' }],
     });
     expect(apiKeyErrorMessage(err)).toBe('padded');
   });
@@ -39,7 +39,7 @@ describe('apiKeyErrorMessage', () => {
 
   it('prefers a GraphQL message over a network error when both are present', () => {
     const err = new CombinedError({
-      graphQLErrors: [{ message: 'forbidden' } as Error],
+      graphQLErrors: [{ message: 'forbidden' }],
       networkError: new Error('boom'),
     });
     expect(apiKeyErrorMessage(err)).toBe('forbidden');
@@ -47,7 +47,7 @@ describe('apiKeyErrorMessage', () => {
 
   it('returns the provided fallback when the GraphQL message is blank', () => {
     const err = new CombinedError({
-      graphQLErrors: [{ message: '   ' } as Error],
+      graphQLErrors: [{ message: '   ' }],
     });
     expect(apiKeyErrorMessage(err, 'Could not do the thing.')).toBe(
       'Could not do the thing.',

@@ -104,7 +104,7 @@ function createChartOption({
           },
         },
         lineStyle: {
-          type: 'solid' as any,
+          type: 'solid',
           color: resolveColor(lineColors[3][0], dark, lineColors[3][1]),
         },
         symbol: 'none',

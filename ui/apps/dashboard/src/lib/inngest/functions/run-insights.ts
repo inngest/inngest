@@ -215,10 +215,7 @@ export const runInsightsAgent = inngest.createFunction(
         title: sqlResult.title,
         reasoning: sqlResult.reasoning,
         summary,
-        selectedEvents: selectedEventsData.selectedEvents as unknown as Record<
-          string,
-          unknown
-        >,
+        selectedEvents: selectedEventsData.selectedEvents,
       },
       timestamp: Date.now(),
     });

@@ -85,7 +85,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="apiKeys"
             onClick={() =>
-              navigate({ to: '/settings/api-keys' as FileRouteTypes['to'] })
+              navigate({ to: '/settings/api-keys' })
             }
           >
             <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">

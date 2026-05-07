@@ -1,4 +1,4 @@
-import { z } from 'zod/v3';
+import { z } from 'zod';
 
 // This is a TypeScript implementation of the syscode package in Inngest OSS
 
@@ -58,7 +58,7 @@ const codedErrorSchema = z.object({
 export type CodedError = z.infer<typeof codedErrorSchema>;
 
 export const httpDataSchema = z.object({
-  headers: z.record(z.array(z.string())),
+  headers: z.record(z.string(), z.array(z.string())),
   statusCode: z.number(),
 });
 

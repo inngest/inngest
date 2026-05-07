@@ -3,7 +3,6 @@ import { Alert } from '@inngest/components/Alert';
 import { Header } from '@inngest/components/Header/Header';
 import { methodTypes } from '@inngest/components/types/app';
 import { createFileRoute, Outlet, useMatches } from '@tanstack/react-router';
-import type { CombinedError } from 'urql';
 
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
 import { ArchiveModal } from '@/components/Apps/ArchiveModal';
@@ -121,7 +120,7 @@ function AppLayout() {
       <div className="bg-canvasBase no-scrollbar mx-auto flex h-full w-full flex-col overflow-y-auto">
         <div className="bg-canvasBase h-full overflow-hidden">
           {res.error ? (
-            <Error error={res.error as CombinedError} externalID={externalID} />
+            <Error error={res.error} externalID={externalID} />
           ) : !res.data?.id && !res.isLoading ? (
             <NotFound externalID={externalID} />
           ) : (

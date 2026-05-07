@@ -1,3 +1,12 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+allowBuilds:
+  '@clerk/shared': false
+  '@parcel/watcher': true
+  '@sentry/cli': true
+  core-js-pure: false
+  esbuild: true
+  protobufjs: false
+  sharp: true
+  unrs-resolver: true

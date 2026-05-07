@@ -2,7 +2,7 @@ import { Connect } from '@/components/Integrations/Vercel/Connect';
 import { createVercelIntegration } from '@/queries/server/integrations/vercel';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { Link } from '@inngest/components/Link';
-import { createFileRoute, type FileRouteTypes } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 
 export type VercelCallbackProps = {
   // OAuth 2.0 authorization code issued by Vercel’s authorization server. This code is valid for
@@ -63,7 +63,7 @@ function VercelCallbackComponent() {
         <span className="font-semibold">(`/api/inngest`)</span>.
         <Link
           size="medium"
-          to={'/create-organization/set-up' as FileRouteTypes['to']}
+          to={'/create-organization/set-up'}
         >
           Learn more
         </Link>

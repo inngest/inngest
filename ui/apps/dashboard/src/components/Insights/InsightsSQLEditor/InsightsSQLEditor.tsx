@@ -1,7 +1,4 @@
-import {
-  SQLEditor,
-  type SQLEditorMarkerData,
-} from '@inngest/components/SQLEditor/SQLEditor';
+import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { hasUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
 import { useActiveTab } from '../InsightsTabManager/TabManagerContext';
@@ -157,7 +154,7 @@ export function InsightsSQLEditor() {
             value: diag.code,
           },
           message: diag.message, // TODO: pretty message by code
-        } as SQLEditorMarkerData;
+        };
       });
 
     monaco.editor.setModelMarkers(model, 'insights', decorations ?? []);

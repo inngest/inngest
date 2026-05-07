@@ -19,6 +19,21 @@ export type Environment = {
   lastDeployedAt: string | null | undefined;
 };
 
+type WorkspaceEnvironmentFields = Pick<
+  Workspace,
+  | 'id'
+  | 'name'
+  | 'slug'
+  | 'parentID'
+  | 'test'
+  | 'type'
+  | 'webhookSigningKey'
+  | 'createdAt'
+  | 'isArchived'
+  | 'isAutoArchiveEnabled'
+  | 'lastDeployedAt'
+>;
+
 export function getActiveEnvironment(
   environments: NonEmptyArray<Environment>,
   environmentSlug: string,
@@ -133,20 +148,7 @@ export function getTestEnvironments(
 }
 
 export function workspaceToEnvironment(
-  workspace: Pick<
-    Workspace,
-    | 'id'
-    | 'name'
-    | 'slug'
-    | 'parentID'
-    | 'test'
-    | 'type'
-    | 'webhookSigningKey'
-    | 'createdAt'
-    | 'isArchived'
-    | 'isAutoArchiveEnabled'
-    | 'lastDeployedAt'
-  >,
+  workspace: WorkspaceEnvironmentFields,
 ): Environment {
   const slug = getEnvironmentSlug({
     environmentID: workspace.id,
@@ -200,20 +202,7 @@ export function getEnvironmentSlug({
 // TEMP
 // Translate existing workspaces into any "environment" like shape during the transition
 export function workspacesToEnvironments(
-  workspaces: Pick<
-    Workspace,
-    | 'id'
-    | 'name'
-    | 'slug'
-    | 'parentID'
-    | 'test'
-    | 'type'
-    | 'webhookSigningKey'
-    | 'createdAt'
-    | 'isArchived'
-    | 'isAutoArchiveEnabled'
-    | 'lastDeployedAt'
-  >[],
+  workspaces: WorkspaceEnvironmentFields[],
 ): Environment[] {
   return workspaces.map(workspaceToEnvironment).sort((a, b) => {
     // Sort production environments first.

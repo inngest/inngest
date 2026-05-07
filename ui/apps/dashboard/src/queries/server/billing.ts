@@ -456,11 +456,7 @@ export const plans = createServerFn({
               billingPeriod: plan.billingPeriod as string,
             }
           : null,
-      ) as Array<
-        TransformPlanBillingPeriod<NonNullable<
-          GetPlansQuery['plans'][0]
-        > | null>
-      >;
+      );
     } catch (error) {
       console.error('Error fetching plans:', error);
       throw new Error('Failed to fetch plans');

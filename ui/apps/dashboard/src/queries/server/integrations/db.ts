@@ -133,7 +133,7 @@ export const deleteConn = createServerFn({ method: 'POST' })
     const environment = await getProductionEnvironment();
 
     return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(
-      deleteConnDocument as any,
+      deleteConnDocument,
       {
         envID: environment.id,
         id: data.id,

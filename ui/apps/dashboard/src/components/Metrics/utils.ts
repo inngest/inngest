@@ -20,14 +20,7 @@ import {
 } from '@/utils/tailwind';
 import type { EntityLookup, EntityType } from './Dashboard';
 
-// Type assertion for extended colors that aren't in DefaultColors
-const extendedColors = colors as typeof colors & {
-  accent: { subtle: string };
-  primary: { moderate: string };
-  secondary: { moderate: string };
-  tertiary: { moderate: string };
-  quaternary: { coolxIntense: string };
-};
+const extendedColors = colors;
 
 export type LineChartData = {
   xAxis: {

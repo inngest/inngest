@@ -10,7 +10,6 @@ import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiExternalLinkLine } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import type { FileRouteTypes } from '@tanstack/react-router';
 
 type Integration = {
   title: string;
@@ -50,7 +49,7 @@ const INTEGRATIONS: Integration[] = [
           kind="primary"
           appearance={enabled ? 'outlined' : 'solid'}
           size="medium"
-          to={url as FileRouteTypes['to']}
+          to={url}
           label={label}
           target={target}
         />

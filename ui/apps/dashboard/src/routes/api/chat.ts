@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
-import { z } from 'zod/v3';
+import { z } from 'zod';
 import { inngest } from '@/lib/inngest/client';
 
 //
@@ -9,7 +9,7 @@ const userMessageSchema = z.object({
   id: z.string().uuid('Valid message ID is required'),
   content: z.string().min(1, 'Message content is required'),
   role: z.literal('user'),
-  state: z.record(z.unknown()).optional(),
+  state: z.record(z.string(), z.unknown()).optional(),
   clientTimestamp: z.string().optional(),
   systemPrompt: z.string().optional(),
 });
@@ -51,7 +51,7 @@ export const Route = createFileRoute('/api/chat')({
             return new Response(
               JSON.stringify({
                 error:
-                  validationResult.error.errors[0]?.message ??
+                  validationResult.error.issues[0]?.message ??
                   'Invalid request',
               }),
               {
