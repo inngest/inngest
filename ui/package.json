@@ -18,13 +18,13 @@
   },
   "engines": {
     "node": "24.x",
-    "pnpm": "10.x"
+    "pnpm": "11.x"
   },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@11.0.4",
   "private": true,
   "pnpm": {
     "overrides": {
