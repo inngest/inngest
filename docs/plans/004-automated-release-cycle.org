@@ -472,8 +472,8 @@ treated as preview artifacts.
 
 - [ ] Run the release PR workflow manually on a test branch or fork.
 - [ ] Run the prerelease workflow against a test PR with =/prerelease beta --dry-run=.
-- [ ] Compare generated =CHANGELOG.md= against current output.
-- [ ] Compare assembled =RELEASE_NOTES.md= against expected PR context.
+- [X] Compare generated =CHANGELOG.md= against current output.
+- [X] Compare assembled =RELEASE_NOTES.md= against expected PR context.
 - [ ] Merge a low-risk release PR after review.
 - [X] Update =docs/RELEASING.md= from manual tagging to release PR merge flow.
 
