@@ -433,6 +433,36 @@ func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	require.Equal(t, connect.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String(), res.lifecycles.onDisconnected[0].closeReason)
 }
 
+func TestCloseConnectionOnWorkerMessageTooLarge(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	err := res.ws.Write(context.Background(), websocket.MessageBinary, make([]byte, consts.MaxSDKResponseBodySize+1))
+	require.NoError(t, err)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount:          1,
+		onSyncedCount:             1,
+		onReadyCount:              1,
+		onHeartbeatCount:          0,
+		onStartDrainingCount:      0,
+		onStartDisconnectingCount: 1,
+		onDisconnectedCount:       1,
+	})
+
+	res.lifecycles.lock.Lock()
+	defer res.lifecycles.lock.Unlock()
+
+	require.Len(t, res.lifecycles.onDisconnected, 1)
+	require.Equal(t, res.connID, res.lifecycles.onDisconnected[0].conn.ConnectionId)
+	require.Equal(t, connect.WorkerDisconnectReason_MESSAGE_TOO_LARGE.String(), res.lifecycles.onDisconnected[0].closeReason)
+}
+
 func TestWorkerHeartbeats(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 10,
