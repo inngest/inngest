@@ -1591,12 +1591,12 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		switch {
 		case err == nil:
 			if _, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data}); err != nil {
-				return fmt.Errorf("could not send response through grpc: %w", err)
+				l.Warn("could not fast-track response through grpc, executor will poll buffered response", "err", err)
 			}
 		case errors.Is(err, state.ErrExecutorNotFound):
 			l.Debug("executor not found in lease, reply was likely picked up by polling")
 		default:
-			return err
+			l.Warn("could not create grpc client for sdk reply, executor will poll buffered response", "err", err)
 		}
 	}
 
@@ -1613,7 +1613,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		Kind:    connectpb.GatewayMessageType_WORKER_REPLY_ACK,
 		Payload: replyAck,
 	}); err != nil {
-		return fmt.Errorf("could not send reply ack: %w", err)
+		l.Warn("could not send worker reply ack after response was buffered", "err", err)
 	}
 
 	return nil

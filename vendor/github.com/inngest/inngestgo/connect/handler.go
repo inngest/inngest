@@ -264,6 +264,10 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 
 				if !msg.reconnect {
 					h.setState(ConnectionStateClosed, "connection ended without reconnect", "err", msg.err)
+					err := msg.err
+					if err == nil {
+						err = fmt.Errorf("connection ended without reconnect")
+					}
 
 					if isInitialConnection {
 						isInitialConnection = false
@@ -280,8 +284,9 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 					if errors.Is(msg.err, ErrTooManyConnections) {
 						// If limits are exceed in initial connection, return immediately
 						if isInitialConnection {
+							err := fmt.Errorf("too many connections, please disconnect other workers or upgrade your billing plan for more concurrent connections")
 							isInitialConnection = false
-							initialConnectionDone <- fmt.Errorf("too many connections, please disconnect other workers or upgrade your billing plan for more concurrent connections")
+							initialConnectionDone <- err
 							return err
 						}
 					}

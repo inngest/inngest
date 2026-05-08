@@ -1,0 +1,652 @@
+#+TITLE: Connect Gateway Lifecycle Controller
+#+AUTHOR: Darwin D. Wu
+#+DATE: 2026-05-08
+#+STATUS: Draft
+#+STARTUP: showall
+
+* Overview
+
+Introduce a small lifecycle controller for Connect gateway websocket
+connections.
+
+This is the gateway-side companion to the SDK websocket generation lifecycle
+plan. It should not copy the SDK design 1:1: the gateway does not own worker
+reconnect, worker-pool execution, or SDK API flushing. The gateway does own
+connection registration, router forwarding, request ACK tracking, Redis
+connection status, drain behavior, and the decision to close a worker websocket
+with a Connect error.
+
+The immediate motivation is SYS-856. The SDK observed stale websocket writes
+after the gateway closed a connection with =connect_internal_error=. The
+gateway-side trigger was a class of post-delivery or post-persistence failures
+being treated as connection-fatal during =WORKER_REPLY= or =WORKER_REQUEST_ACK=
+handling.
+
+The goal is to make each gateway connection phase explicit, make write
+eligibility phase-driven, and define which failures should close a worker
+websocket versus only fail one delivery attempt.
+
+* Goals
+
+- Make =connectionHandler= lifecycle state explicit.
+- Correlate lifecycle side effects with state transitions.
+- Make websocket write eligibility clear for each phase.
+- Keep Redis connection status, in-memory routing, and websocket transport
+  lifecycle separate but coordinated.
+- Make request forwarding and ACK behavior testable without relying on closed
+  socket timing races.
+- Prevent post-persistence or already-accepted work from closing the worker
+  websocket unless that is an explicit protocol decision.
+- Keep implementation small and local to Connect gateway internals.
+
+* Non-Goals
+
+- Do not introduce a general-purpose FSM library.
+- Do not change the Connect wire protocol in this plan.
+- Do not model SDK reconnect or SDK worker-pool execution in gateway code.
+- Do not make the gateway responsible for SDK API response flushing.
+- Do not collapse Redis status and in-memory connection phase into one state.
+
+* Current State
+
+Gateway connection behavior currently spans several mechanisms:
+
+- =connectionHandler.draining= controls some forwarding and heartbeat behavior.
+- =stopForwarding= removes a connection from router forwarding after drain.
+- =wsConnections= maps connection IDs to active handlers for gRPC =Forward=.
+- =pendingAcks= tracks router forwards waiting for =WORKER_REQUEST_ACK=.
+- Redis connection status is updated through =updateConnStatus=.
+- websocket close behavior is scattered across drain, read-loop, handshake,
+  and deferred cleanup paths.
+- =handleIncomingWebSocketMessage= decides whether a protocol error closes the
+  websocket with =connect_internal_error=.
+
+Relevant code today:
+
+- =pkg/connect/gateway.go= =connectionHandler=
+- =pkg/connect/gateway.go= gateway drain path
+- =pkg/connect/gateway.go= =WORKER_REQUEST_ACK= handling
+- =pkg/connect/gateway.go= =WORKER_REPLY= / =handleSdkReply=
+- =pkg/connect/gateway.go= =receiveRouterMessagesFromGRPC=
+- =pkg/connect/rpc.go= =Forward=
+
+* Problem Statement
+
+The gateway lacks one local contract for these questions:
+
+- Is this connection allowed to receive a new router forward?
+- Is this connection allowed to write =GATEWAY_EXECUTOR_REQUEST=?
+- If a worker sends =WORKER_REQUEST_ACK=, when is the request considered
+  accepted by the gateway?
+- If executor gRPC =Ack= fails after the worker ACK is accepted, should the
+  worker websocket close?
+- If =WORKER_REPLY= was persisted, which later failures are non-fatal?
+- During gateway drain, when is a connection routable, draining, disconnected,
+  or transport-closed?
+- Which transition removes =wsConnections= and releases blocked =Forward=
+  calls?
+- Which transition clears =pendingAcks=?
+
+SYS-856 showed that unclear answers here can amplify a transient executor or
+transport failure into a full worker reconnect.
+
+* Design Direction
+
+Add an internal lifecycle helper around =connectionHandler=. Keep three
+concepts distinct:
+
+- Gateway connection phase: in-memory lifecycle of one websocket handler.
+- Redis connection status: router-visible state used for worker selection.
+- Request forward lifecycle: one executor request being delivered to a worker.
+
+Do not build one global FSM. The controller should be a small helper that
+validates transitions, runs transition side effects, and exposes write/forward
+eligibility checks.
+
+* Gateway Connection Lifecycle
+
+Recommended internal phases:
+
+- =New=
+- =Handshaking=
+- =Ready=
+- =Draining=
+- =Disconnecting=
+- =Closed=
+
+#+BEGIN_SRC mermaid
+stateDiagram-v2
+    [*] --> New
+    New --> Handshaking: websocket accepted
+    Handshaking --> Ready: worker authenticated, synced, ready
+    Handshaking --> Disconnecting: handshake failed or client closed
+
+    Ready --> Draining: gateway drain or WORKER_PAUSE
+    Ready --> Disconnecting: read loop ends, heartbeat miss, fatal protocol error
+
+    Draining --> Disconnecting: worker closed, drain timeout, gateway close
+    Disconnecting --> Closed: cleanup complete
+    Closed --> Closed: idempotent cleanup
+#+END_SRC
+
+Redis connection status is related but not identical to the in-memory phase.
+For example, during gateway-initiated drain the handler may enter =Draining=
+before Redis status is changed from =READY= to =DRAINING=, so the SDK has time
+to establish a replacement connection.
+
+** New
+
+The handler exists but the websocket protocol has not started.
+
+Allowed writes:
+
+- none.
+
+** Handshaking
+
+The gateway has accepted the websocket and is exchanging =GATEWAY_HELLO=,
+=WORKER_CONNECT=, sync, and =GATEWAY_CONNECTION_READY=.
+
+Allowed writes:
+
+- handshake messages only.
+
+** Ready
+
+The worker is registered, Redis status is =READY=, and =wsConnections= can route
+executor forwards to this handler.
+
+Allowed writes:
+
+- =GATEWAY_EXECUTOR_REQUEST=
+- =GATEWAY_HEARTBEAT=
+- =WORKER_REQUEST_EXTEND_LEASE_ACK=
+- =WORKER_REPLY_ACK=
+- =GATEWAY_CLOSING= when gateway drain begins
+
+** Draining
+
+The connection is being removed from new routing. This phase covers both
+worker-initiated pause and gateway-initiated drain.
+
+Expected behavior:
+
+- heartbeats must not move Redis status back to =READY=;
+- new router forwards should block until reroute is possible or fail quickly
+  with =Success=false=;
+- existing pending forwards should be resolved or timed out explicitly;
+- =WORKER_REPLY= should still be accepted and persisted;
+- post-persistence reply notification or reply ACK failures must not close the
+  worker websocket;
+- transition side effects should remove =wsConnections= and close
+  =stopForwarding= exactly once.
+
+Gateway-initiated drain has one extra step: send =GATEWAY_CLOSING= before the
+connection becomes fully unroutable, so the SDK can connect to a replacement
+gateway first.
+
+** Disconnecting
+
+The read loop is ending or a close has been requested, but cleanup may still be
+running.
+
+Expected behavior:
+
+- no new router forwards;
+- no status transition back to =READY=;
+- pending ACK waiters are released with failure;
+- late =WORKER_REPLY= can only be processed if the message was already read by
+  the run loop;
+- close reason is recorded once.
+
+** Closed
+
+The transport has been closed or best-effort closed, and gateway cleanup has
+run.
+
+Expected behavior:
+
+- no websocket writes;
+- no router forwards;
+- repeated close/cleanup is idempotent.
+
+* Request Forward Lifecycle
+
+Request forwarding is owned by the gateway and executor proxy, not the SDK.
+
+Recommended conceptual states:
+
+- =Queued=
+- =WritingToWorker=
+- =WaitingForWorkerAck=
+- =WorkerAckAccepted=
+- =ExecutorAckNotified=
+- =Failed=
+- =Done=
+
+#+BEGIN_SRC mermaid
+stateDiagram-v2
+    [*] --> Queued
+    Queued --> Failed: connection not Ready
+    Queued --> WritingToWorker: connection Ready
+
+    WritingToWorker --> Failed: websocket write failed
+    WritingToWorker --> WaitingForWorkerAck: websocket write succeeded
+
+    WaitingForWorkerAck --> Failed: timeout, disconnect, drain cleanup
+    WaitingForWorkerAck --> WorkerAckAccepted: WORKER_REQUEST_ACK received
+
+    WorkerAckAccepted --> ExecutorAckNotified: executor gRPC Ack succeeded
+    WorkerAckAccepted --> Failed: chosen policy requires executor Ack and it failed
+    WorkerAckAccepted --> Done: chosen policy accepts worker Ack as Forward success
+
+    ExecutorAckNotified --> Done
+    Failed --> Done
+#+END_SRC
+
+Policy:
+
+- before websocket write: require connection phase =Ready=;
+- if the websocket write fails, =Forward= returns =Success=false= and no worker
+  ACK is expected;
+- after websocket write succeeds, =Forward= waits for =WORKER_REQUEST_ACK=;
+- when =WORKER_REQUEST_ACK= arrives, close the local =pendingAcks= waiter only
+  after the desired executor ACK semantics are satisfied;
+- if executor gRPC =Ack= fails after the worker ACK is accepted, do not
+  automatically close the worker websocket unless the redelivery contract
+  requires it and tests encode that decision;
+- timeout releases =pendingAcks= and returns =Success=false=.
+
+The most important open policy decision is whether worker ACK acceptance or
+executor gRPC ACK success is the point at which =Forward= may report success.
+The current code unblocks =Forward= before executor gRPC =Ack= succeeds. If that
+is intentional, executor ACK failures should likely be downgraded from
+=connect_internal_error=. If it is not intentional, the ordering should be fixed
+and covered by tests.
+
+** Option A: worker ACK acceptance is enough
+
+#+BEGIN_SRC mermaid
+sequenceDiagram
+    participant E as Executor
+    participant G as Gateway
+    participant W as Worker
+
+    E->>G: Forward(request)
+    G->>W: GATEWAY_EXECUTOR_REQUEST
+    W->>G: WORKER_REQUEST_ACK
+    G-->>E: Forward success
+    G->>E: gRPC Ack(best effort)
+    alt gRPC Ack fails
+        G-->>G: log/report request-level failure
+        G-->>W: keep websocket open
+    end
+#+END_SRC
+
+** Option B: executor ACK is required
+
+#+BEGIN_SRC mermaid
+sequenceDiagram
+    participant E as Executor
+    participant G as Gateway
+    participant W as Worker
+
+    E->>G: Forward(request)
+    G->>W: GATEWAY_EXECUTOR_REQUEST
+    W->>G: WORKER_REQUEST_ACK
+    G->>E: gRPC Ack
+    alt gRPC Ack succeeds
+        G-->>E: Forward success
+    else gRPC Ack fails
+        G-->>E: Forward failure
+        G-->>W: keep websocket open unless protocol policy says otherwise
+    end
+#+END_SRC
+
+* Reply Lifecycle
+
+Gateway =WORKER_REPLY= handling already follows the desired durable-first
+shape:
+
+1. unmarshal =SDKResponse=;
+2. persist through =stateManager.SaveResponse=;
+3. best-effort executor gRPC =Reply= fast-path;
+4. best-effort =WORKER_REPLY_ACK= websocket write.
+
+Policy:
+
+- invalid payload remains protocol-fatal;
+- failed persistence remains fatal because the response is not durably captured;
+- after persistence succeeds, executor gRPC =Reply= failure is non-fatal;
+- after persistence succeeds, =WORKER_REPLY_ACK= write failure is non-fatal;
+- logs should make clear that the executor can poll the buffered response.
+
+#+BEGIN_SRC mermaid
+stateDiagram-v2
+    [*] --> Received
+    Received --> Fatal: invalid SDKResponse payload
+    Received --> Persisting: payload valid
+
+    Persisting --> Fatal: SaveResponse failed
+    Persisting --> Persisted: SaveResponse succeeded or already buffered
+
+    Persisted --> NotifyExecutor: try gRPC Reply fast path
+    NotifyExecutor --> AckWorker: gRPC Reply succeeded
+    NotifyExecutor --> AckWorker: gRPC Reply failed, executor can poll
+    NotifyExecutor --> AckWorker: executor lease not found, likely polling
+
+    AckWorker --> Done: WORKER_REPLY_ACK sent
+    AckWorker --> Done: ACK write failed after persistence
+    Fatal --> [*]: return SocketError
+    Done --> [*]: return nil
+#+END_SRC
+
+#+BEGIN_SRC mermaid
+sequenceDiagram
+    participant W as Worker
+    participant G as Gateway
+    participant S as State Buffer
+    participant E as Executor
+
+    W->>G: WORKER_REPLY
+    G->>S: SaveResponse
+    alt SaveResponse fails
+        G-->>W: close with connect_internal_error
+    else SaveResponse succeeds
+        G->>E: Reply fast path(best effort)
+        alt Reply fast path fails
+            G-->>G: warn, executor polls buffer
+        end
+        G->>W: WORKER_REPLY_ACK(best effort)
+        alt ACK write fails
+            G-->>G: warn, response already buffered
+        end
+        G-->>W: keep websocket open if still connected
+    end
+#+END_SRC
+
+* Transition Side Effects
+
+Transition methods should own side effects that are currently scattered.
+
+Recommended helper shape:
+
+#+BEGIN_SRC go
+type gatewayConnPhase int
+
+func (c *connectionHandler) phase() gatewayConnPhase
+func (c *connectionHandler) transition(to gatewayConnPhase, reason string, attrs ...any) error
+
+func (c *connectionHandler) markHandshaking(reason string, attrs ...any)
+func (c *connectionHandler) markReady(reason string, attrs ...any)
+func (c *connectionHandler) beginDrain(reason string, attrs ...any)
+func (c *connectionHandler) beginDisconnect(reason string, attrs ...any)
+func (c *connectionHandler) markClosed(reason string, attrs ...any)
+
+func (c *connectionHandler) canForward() bool
+func (c *connectionHandler) canWrite(kind connectpb.GatewayMessageType) bool
+#+END_SRC
+
+** On =Ready -> Draining=
+
+- record reason and log once;
+- set in-memory draining state;
+- prevent heartbeat/status paths from writing =READY=;
+- remove connection from =wsConnections=;
+- close =stopForwarding= exactly once;
+- update Redis status to =DRAINING= when appropriate;
+- notify lifecycle listeners once.
+
+** On =Ready -> Disconnecting= or =Draining -> Disconnecting=
+
+- record close reason;
+- prevent new router forwards;
+- release =pendingAcks= waiters with failure;
+- stop heartbeat/read-loop dependent work;
+- ensure Redis cleanup will run.
+
+** On =Disconnecting -> Closed=
+
+- delete Redis connection state;
+- notify disconnected lifecycles;
+- close websocket transport best-effort;
+- make repeated cleanup idempotent.
+
+* Phased Implementation Plan
+
+Each phase should be self-reviewable. Prefer test-only lock-in before behavior
+changes.
+
+** Phase 0: Baseline and current behavior lock-in
+
+Purpose: capture the behavior we rely on before moving lifecycle code.
+
+*** Implementation checklist
+
+- [ ] Keep the SYS-856 =handleSdkReply= regressions:
+  - [ ] persisted response plus gRPC =Reply= failure is non-fatal;
+  - [ ] persisted response plus =WORKER_REPLY_ACK= write failure is non-fatal.
+- [ ] Add coverage for =WORKER_REQUEST_ACK= ordering:
+  - [ ] worker ACK received for a known request;
+  - [ ] =pendingAcks= waiter behavior is explicit;
+  - [ ] executor gRPC =Ack= failure behavior is explicit.
+- [ ] Add coverage for drain and forwarding:
+  - [ ] gateway drain blocks or rejects new =Forward= calls;
+  - [ ] worker pause removes =wsConnections= and stops forwarding;
+  - [ ] heartbeat during drain cannot mark connection =READY=.
+- [ ] Document any behavior that is intentionally preserved even if awkward.
+
+*** Validation checklist
+
+- [ ] =go test ./pkg/connect -count=1=
+
+*** Exit criteria
+
+- [ ] Tests fail for the current ambiguous =WORKER_REQUEST_ACK= behavior if the
+  chosen policy is not implemented.
+- [ ] Drain and reply behavior can be refactored without relying on real socket
+  races.
+
+** Phase 1: Add gateway connection phases without behavior changes
+
+Purpose: make one gateway websocket handler's lifecycle observable.
+
+*** Implementation checklist
+
+- [ ] Add internal =gatewayConnPhase= values:
+  - [ ] =New=
+  - [ ] =Handshaking=
+  - [ ] =Ready=
+  - [ ] =Draining=
+  - [ ] =Disconnecting=
+  - [ ] =Closed=
+- [ ] Add concurrency-safe phase storage and transition logging.
+- [ ] Route existing state changes through phase helpers while preserving
+  current behavior.
+- [ ] Keep =draining= temporarily if needed, but derive it from phase where
+  possible.
+- [ ] Add phase to useful connection logs.
+
+*** Test checklist
+
+- [ ] handshake moves =New -> Handshaking -> Ready=;
+- [ ] worker pause moves =Ready -> Draining=;
+- [ ] gateway drain moves =Ready -> Draining=;
+- [ ] read-loop exit moves to =Disconnecting= and then =Closed=;
+- [ ] repeated close/cleanup is idempotent.
+
+*** Validation checklist
+
+- [ ] =go test ./pkg/connect -count=1=
+
+*** Exit criteria
+
+- [ ] Every established gateway connection has an observable phase.
+- [ ] No intentional behavior change is introduced in this phase.
+
+** Phase 2: Centralize write and forward eligibility
+
+Purpose: make routing and websocket writes consult connection phase.
+
+*** Implementation checklist
+
+- [ ] Add =canForward= and =canWrite= helpers.
+- [ ] Require =Ready= before accepting a new =Forward= into =messageChan=.
+- [ ] Require =Ready= before writing =GATEWAY_EXECUTOR_REQUEST=.
+- [ ] Allow =WORKER_REPLY_ACK= only for a message already read by the run loop,
+  and keep write failure non-fatal after persistence.
+- [ ] Allow heartbeat responses only when not draining/disconnecting.
+- [ ] Replace direct =draining.Load()= checks where a phase check is clearer.
+- [ ] Release =pendingAcks= explicitly when transitioning out of =Ready=.
+
+*** Test checklist
+
+- [ ] no new =Forward= succeeds outside =Ready=;
+- [ ] =GATEWAY_EXECUTOR_REQUEST= is not written outside =Ready=;
+- [ ] =pendingAcks= waiters are released when connection starts disconnecting;
+- [ ] heartbeat cannot revive a draining connection;
+- [ ] reply handling after persistence stays non-fatal.
+
+*** Validation checklist
+
+- [ ] =go test ./pkg/connect -count=1=
+
+*** Exit criteria
+
+- [ ] New router work cannot be sent to a draining or disconnecting websocket.
+- [ ] Pending ACK cleanup is lifecycle-driven, not only timeout-driven.
+
+** Phase 3: Decide and encode =WORKER_REQUEST_ACK= semantics
+
+Purpose: make the ACK delivery contract explicit.
+
+*** Policy options
+
+Option A: worker ACK acceptance is enough for local =Forward= success.
+
+- Close =pendingAcks= when =WORKER_REQUEST_ACK= arrives.
+- Executor gRPC =Ack= failure is logged/reported but does not close the worker
+  websocket.
+- This matches the current local unblock ordering but downgrades the fatal
+  close behavior.
+
+Option B: executor gRPC =Ack= success is required for =Forward= success.
+
+- Do not close =pendingAcks= until gRPC =Ack= succeeds.
+- If gRPC =Ack= fails, =Forward= returns =Success=false= and the worker
+  websocket stays open unless a protocol invariant was violated.
+- This changes current ordering and needs careful redelivery tests.
+
+*** Recommendation
+
+Start with tests that expose the current ordering. Prefer Option A only if the
+executor redelivery path tolerates a worker having already started processing
+the request. Prefer Option B if =Forward= success must mean executor ACK
+success.
+
+Either way, a transient =getOrCreateGRPCClient= or =Ack= failure should not
+automatically close the worker websocket after the worker ACK was parsed and
+accepted.
+
+*** Implementation checklist
+
+- [ ] Choose Option A or Option B.
+- [ ] Encode the chosen order in one helper.
+- [ ] Make unknown request ACKs non-fatal and clearly logged.
+- [ ] Make executor ACK failures return request-level failure or warning,
+  according to the chosen option.
+- [ ] Remove the direct =connect_internal_error= close for post-worker-ACK
+  executor notification failures unless tests prove it is required.
+
+*** Test checklist
+
+- [ ] gRPC client creation failure during =WORKER_REQUEST_ACK= does not close
+  the websocket unless chosen policy explicitly requires it;
+- [ ] gRPC =Ack= RPC failure behavior matches chosen policy;
+- [ ] =reply.Success=false= behavior matches chosen policy;
+- [ ] =Forward= result matches chosen policy.
+
+*** Validation checklist
+
+- [ ] =go test ./pkg/connect -run 'Test.*Ack|Test.*Forward|Test.*Drain' -count=1=
+- [ ] =go test ./pkg/connect -count=1=
+
+*** Exit criteria
+
+- [ ] =WORKER_REQUEST_ACK= can no longer unexpectedly close the worker
+  websocket for an executor notification failure after the worker ACK has been
+  accepted.
+
+** Phase 4: Model drain side effects explicitly
+
+Purpose: make gateway-initiated drain and worker-initiated pause converge on
+clear lifecycle side effects.
+
+*** Implementation checklist
+
+- [ ] Move gateway drain entry through =beginDrain=.
+- [ ] Move worker =WORKER_PAUSE= handling through =beginDrain=.
+- [ ] Preserve gateway drain's =GATEWAY_CLOSING= behavior before final
+  unroutable cleanup.
+- [ ] Ensure =wsConnections.Delete= and =stopForwarding= happen once.
+- [ ] Ensure lifecycle =OnStartDraining= fires once.
+- [ ] Ensure Redis =DRAINING= status cannot be overwritten by heartbeat.
+
+*** Test checklist
+
+- [ ] gateway drain sends =GATEWAY_CLOSING= when possible;
+- [ ] failed =GATEWAY_CLOSING= write still moves to =Draining=;
+- [ ] worker pause moves to =Draining= without returning =ErrDraining=;
+- [ ] blocked =Forward= calls release after drain transition;
+- [ ] repeated drain calls are idempotent.
+
+*** Validation checklist
+
+- [ ] =go test ./pkg/connect -count=1=
+
+*** Exit criteria
+
+- [ ] Drain behavior is controlled by transition helpers, not scattered channel
+  and atomic operations.
+
+** Phase 5: Cleanup and documentation
+
+Purpose: remove duplicate lifecycle mechanisms and document the final contract.
+
+*** Implementation checklist
+
+- [ ] Remove redundant direct =draining= checks once phase helpers cover them.
+- [ ] Remove redundant close calls if lifecycle close helpers make them
+  unnecessary.
+- [ ] Keep fallback close safeguards where still useful.
+- [ ] Update comments around =Forward=, =WORKER_REQUEST_ACK=, =WORKER_REPLY=,
+  and gateway drain.
+- [ ] Update this plan with decisions made during implementation.
+
+*** Test checklist
+
+- [ ] Full =pkg/connect= tests pass.
+- [ ] Add regressions for any lifecycle bugs found during phases 1-4.
+
+*** Validation checklist
+
+- [ ] =go test ./pkg/connect -count=1=
+
+*** Exit criteria
+
+- [ ] Gateway connection lifecycle rules are discoverable from code and this
+  plan.
+- [ ] State transitions own side effects.
+- [ ] Tests cover each phase boundary that affects forwarding, ACKs, replies,
+  drain, or close behavior.
+
+* Success Criteria
+
+- Every gateway websocket handler has an explicit phase.
+- New router work cannot be accepted outside the phase that allows forwarding.
+- =pendingAcks= are released on lifecycle exits, not only on timeouts.
+- Post-persistence reply failures do not close worker websockets.
+- =WORKER_REQUEST_ACK= executor notification failures follow an explicit,
+  tested request-level policy.
+- Gateway drain and worker pause share clear, idempotent side effects.
+- Tests no longer need real closed-socket races to prove lifecycle behavior.

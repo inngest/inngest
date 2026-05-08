@@ -33,6 +33,9 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -1252,6 +1255,62 @@ func sendWorkerPauseMessage(t *testing.T, ws *websocket.Conn) {
 	require.NoError(t, err)
 }
 
+func marshalSDKResponse(t *testing.T, res testingResources, requestID string) []byte {
+	t.Helper()
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	sdkResponse := &connect.SDKResponse{
+		RequestId:      requestID,
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		Status:         connect.SDKResponseStatus_DONE,
+		Body:           []byte("test response"),
+		SdkVersion:     "test-version",
+		RequestVersion: 1,
+		RunId:          runID.String(),
+	}
+
+	responseBytes, err := proto.Marshal(sdkResponse)
+	require.NoError(t, err)
+
+	return responseBytes
+}
+
+type replyFailingExecutor struct {
+	connect.UnimplementedConnectExecutorServer
+	port          int
+	replyReceived chan *connect.ReplyRequest
+}
+
+func startReplyFailingExecutor(t *testing.T) *replyFailingExecutor {
+	t.Helper()
+
+	executor := &replyFailingExecutor{
+		replyReceived: make(chan *connect.ReplyRequest, 1),
+	}
+	grpcServer := grpc.NewServer()
+	connect.RegisterConnectExecutorServer(grpcServer, executor)
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	executor.port = lis.Addr().(*net.TCPAddr).Port
+
+	go func() { _ = grpcServer.Serve(lis) }()
+	t.Cleanup(grpcServer.Stop)
+
+	return executor
+}
+
+func (s *replyFailingExecutor) Ping(_ context.Context, _ *connect.PingRequest) (*connect.PingResponse, error) {
+	return &connect.PingResponse{Message: "ok"}, nil
+}
+
+func (s *replyFailingExecutor) Reply(_ context.Context, req *connect.ReplyRequest) (*connect.ReplyResponse, error) {
+	s.replyReceived <- req
+	return nil, status.Error(codes.Unavailable, "transient reply failure")
+}
+
 func sendWorkerExtendLeaseMessage(t *testing.T, res testingResources, payload *connect.WorkerRequestExtendLeaseData) {
 	ctx := context.Background()
 
@@ -1323,6 +1382,81 @@ func TestHandleSdkReply(t *testing.T) {
 	require.NotNil(t, savedResponse)
 	require.Equal(t, requestID, savedResponse.RequestId)
 	require.Equal(t, connect.SDKResponseStatus_DONE, savedResponse.Status)
+}
+
+func TestHandleSdkReplyGRPCReplyFailureAfterSaveResponseIsNonFatal(t *testing.T) {
+	ctx := context.Background()
+	res := createTestingGateway(t, testingParameters{silent: true})
+	handshake(t, res)
+
+	executor := startReplyFailingExecutor(t)
+	res.svc.grpcConfig.Executor.Port = executor.port
+
+	requestID := "test-grpc-reply-failure"
+	_, err := res.svc.stateManager.LeaseRequest(ctx, res.envID, requestID, 5*time.Second, testExecutorIP)
+	require.NoError(t, err)
+
+	responseBytes := marshalSDKResponse(t, res, requestID)
+	err = wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY,
+		Payload: responseBytes,
+	})
+	require.NoError(t, err)
+
+	ackMsg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REPLY_ACK, ackMsg.Kind)
+
+	ackData := &connect.WorkerReplyAckData{}
+	err = proto.Unmarshal(ackMsg.Payload, ackData)
+	require.NoError(t, err)
+	require.Equal(t, requestID, ackData.RequestId)
+
+	select {
+	case req := <-executor.replyReceived:
+		require.Equal(t, requestID, req.Data.RequestId)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for grpc reply attempt")
+	}
+
+	savedResponse, err := res.stateManager.GetResponse(ctx, res.envID, requestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, savedResponse.RequestId)
+
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
+}
+
+func TestHandleSdkReplyAckWriteFailureAfterSaveResponseIsNonFatal(t *testing.T) {
+	ctx := context.Background()
+	res := createTestingGateway(t, testingParameters{silent: true})
+	handshake(t, res)
+
+	requestID := "test-reply-ack-write-failure"
+	responseBytes := marshalSDKResponse(t, res, requestID)
+
+	err := res.ws.CloseNow()
+	require.NoError(t, err)
+
+	ch := &connectionHandler{
+		svc: res.svc,
+		conn: &state.Connection{
+			EnvID: res.envID,
+			Data: &connect.WorkerConnectRequestData{
+				InstanceId: "test-worker",
+			},
+		},
+		ws:  res.ws,
+		log: res.svc.logger,
+	}
+
+	serr := ch.handleIncomingWebSocketMessage(&connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY,
+		Payload: responseBytes,
+	})
+	require.Nil(t, serr, "reply ack write failure after SaveResponse should not close with connect_internal_error")
+
+	savedResponse, err := res.stateManager.GetResponse(ctx, res.envID, requestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, savedResponse.RequestId)
 }
 
 // TestHandleIncomingWebSocketMessageInvalidPayloads tests error handling for invalid message payloads
