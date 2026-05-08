@@ -137,7 +137,7 @@ Add =.github/workflows/release-pr.yml=, based primarily on =lighthouse=:
 - Fetch tags and compute the latest stable SemVer tag.
 - Use =git-cliff --bumped-version= to compute the next stable version.
 - Generate =CHANGELOG.md= for the next tag.
-- Generate a release notes preview.
+- Generate a full release notes preview.
 - Create or force-update =release/next=.
 - Create or update one open PR from =release/next= into =main=.
 
@@ -167,13 +167,18 @@ None.
 
 ## Notes Preview
 <!-- release-note:preview-start -->
-Generated preview goes here.
+Full generated release preview goes here, including release notes, migration
+notes, and generated changelog entries.
 <!-- release-note:preview-end -->
 #+end_src
 
 When the workflow updates an existing release PR, it should preserve the manual
 blocks and replace only the generated preview. This allows maintainers to add
-release-level context without losing edits on the next scheduled refresh.
+release-level context without losing edits on the next scheduled refresh. The
+release PR body is the primary release review surface: it should include the
+full generated release preview, with release notes and migration notes first,
+followed by the generated changelog. The PR may also link to the =CHANGELOG.md=
+diff, but the diff should not be required to understand the release.
 
 ** Tag Creation
 
@@ -204,13 +209,19 @@ None.
 Rules:
 
 - The PR title still drives the generated changelog category.
+- Every PR must make an explicit release-note decision. Authors should leave
+  either real content or =None= in the release and migration note sections.
 - =Release notes= should explain the user-visible impact, not repeat the
   implementation summary.
 - =Migration notes= should include required operator/user action, compatibility
   risks, config changes, schema changes, deprecations, and behavior changes.
 - =None=, =N/A=, empty text, and untouched placeholders are ignored.
-- A later validation workflow can require non-empty release notes for =feat=,
-  breaking changes, or PRs labeled =release-note-required=.
+- Non-empty release notes are required for =feat:= PRs, breaking changes, and
+  PRs labeled =release-note-required=. Internal-only PRs may use =None=, subject
+  to reviewer judgment.
+- The first implementation will not add a separate release-owner reviewer gate
+  for migration notes. Migration-note review can be revisited later; see
+  =docs/DEFERRED.md=.
 
 ** Release Note Assembly
 
@@ -219,6 +230,9 @@ Add scripts under =scripts/release/=:
 - =collect-pr-notes=
   - Determine PRs included between the latest previous stable tag and the
     current release commit.
+  - Apply the same path exclusions used by =cliff.toml=. PRs that only touch
+    excluded paths should not contribute generated changelog entries, release
+    notes, or migration notes to the CLI/self-host release output.
   - Fetch PR titles, numbers, URLs, labels, authors, and bodies.
   - Parse exact markdown sections from PR bodies.
   - Emit structured JSON.
@@ -245,6 +259,10 @@ by PR. Omit this section when empty.
 
 Generated git-cliff changelog section.
 #+end_src
+
+The final release body should not include a contributor section in the first
+implementation. Keep the release page focused on release notes, migration notes,
+and changelog content; rely on GitHub metadata for contributor context.
 
 Implementation note: prefer a small Go command or well-tested shell scripts over
 large workflow-inline scripts. The parsing rules should have tests because PR
@@ -335,20 +353,6 @@ automation can be a follow-up once the stable path is proven.
 - [ ] Compare assembled =RELEASE_NOTES.md= against expected PR context.
 - [ ] Merge a low-risk release PR after review.
 - [ ] Update =docs/RELEASING.md= from manual tagging to release PR merge flow.
-
-* Open Questions
-
-- Should release notes be required for all =feat:= PRs, or should the first
-  iteration only collect optional notes?
-- Should migration notes trigger a required reviewer group or release-owner
-  review?
-- Should cloud-only paths excluded from =cliff.toml= also be excluded from
-  release-note collection, or should PR notes override path exclusion?
-- Should the release PR preview include every changelog entry, or only the
-  higher-signal release/migration sections plus a link to the =CHANGELOG.md=
-  diff?
-- Should the final release page include contributors, or leave that to GitHub's
-  generated metadata?
 
 * References
 
