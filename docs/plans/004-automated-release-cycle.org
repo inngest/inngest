@@ -1,0 +1,367 @@
+#+TITLE: Automated Release Cycle
+#+AUTHOR: Darwin D. Wu
+#+DATE: 2026-05-08
+#+STATUS: Draft
+#+STARTUP: showall
+
+* Overview
+
+Create a mostly automated release cycle for Inngest that prepares a long-lived
+=release/next= pull request, generates =CHANGELOG.md=, combines per-PR release
+context into final GitHub release notes, and then publishes through the existing
+tag-driven release pipeline.
+
+The intended workflow is:
+
+1. Each feature/fix PR captures its user-facing release context before merge.
+2. Automation keeps one =release/next= PR current with the next stable version.
+3. The release PR previews the generated changelog plus any release or migration
+   notes collected from included PRs.
+4. A maintainer can add release-level notes on the release PR.
+5. Merging the release PR creates the tag.
+6. The existing tag release workflow publishes binaries, Docker images, npm, and
+   Linear release completion, using the combined release notes as the GitHub
+   release body.
+
+This keeps the mental work close to the PR where the context is fresh, while
+leaving the release owner with a review-and-merge step instead of a forensic
+changelog-writing task.
+
+* Goals
+
+- Automatically prepare and update a =release/next= PR.
+- Keep Inngest's existing SemVer tag scheme for stable CLI releases.
+- Preserve the existing =.github/workflows/release.yml= publish path.
+- Generate =CHANGELOG.md= from Conventional Commit history with =git-cliff=.
+- Add a structured way for normal PRs to contribute release notes and migration
+  notes.
+- Combine release-level notes, per-PR notes, migration notes, and generated
+  changelog content into the GitHub release page.
+- Make the release PR body a useful preview of what will be published.
+- Keep pre-releases possible without forcing the full automated stable-release
+  path to solve them immediately.
+
+* Non-Goals
+
+- Do not replace GoReleaser.
+- Do not replace npm publishing.
+- Do not change the current =next= branch sync behavior unless a later deploy
+  workflow review requires it.
+- Do not adopt a package-fragment system like Changesets unless the PR-body note
+  approach proves too weak.
+- Do not require a human to manually write the final release page from scratch.
+
+* Current State
+
+Inngest already has useful release pieces:
+
+- =.github/workflows/release.yml= publishes on =v*= tags using GoReleaser, then
+  publishes the npm package, then completes the Linear release for stable tags.
+- =.github/workflows/next.yml= mirrors =main= to =next= on every =main= push.
+- =cliff.toml= already generates grouped changelog entries from Conventional
+  Commit-style history and excludes some cloud-only paths.
+- =CHANGELOG.md= exists, but the current stable release process is documented as
+  manual tag creation in =docs/RELEASING.md=.
+
+Local repo patterns:
+
+- =lighthouse= uses SemVer, =git-cliff=, =release/next=, an auto-created release
+  PR, an auto-tag workflow on merge, and GoReleaser release notes generated from
+  =git-cliff=.
+- =atlas= and =inngest-agents= use the same =release/next= release PR shape but
+  with date-indexed tags such as =v2026-05-08.01=; they also show a useful
+  pattern for exporting the exact =CHANGELOG.md= section into =RELEASE_NOTES.md=.
+- =inngest-agents= adds a small changelog validation script, which is a better
+  guardrail than open-coded =grep= checks in workflows.
+
+* Public Patterns Reviewed
+
+** Release Please
+
+Release Please is the closest off-the-shelf match for the release PR behavior:
+it parses Conventional Commits, maintains a release PR, updates changelogs, and
+creates releases when the release PR is merged. It supports Go repositories and
+manifest configuration, and it can split PR creation from GitHub release
+creation.
+
+Useful idea: maintained release PRs are a good UX.
+
+Concern for Inngest: the desired release page needs custom migration/release
+note aggregation from PR bodies and should preserve the existing GoReleaser/npm
+publish workflow. Release Please could be made to work, but it would either take
+over more of the release lifecycle or require custom glue anyway.
+
+** Changesets
+
+Changesets captures release intent per PR as committed markdown fragments, then
+opens and updates a version PR. This is strong for monorepos and JS packages.
+
+Useful idea: release context should be captured while the PR author still has
+the context.
+
+Concern for Inngest: requiring a changeset file for most Go/CLI changes adds a
+new authoring burden and does not align as naturally with the existing
+=git-cliff= changelog.
+
+** Release Drafter and GitHub Generated Notes
+
+Release Drafter and GitHub's native generated notes are good at summarizing
+merged PRs into a draft release or release body, often using labels and PR
+titles.
+
+Useful idea: PR metadata is a better release-note source than raw commits when
+the release audience needs context.
+
+Concern for Inngest: neither gives the exact =release/next= PR workflow by
+itself, and neither solves custom migration-note sections without conventions
+and glue.
+
+** git-cliff and GoReleaser
+
+git-cliff already matches the local repo pattern and current Inngest config.
+GoReleaser supports passing a custom release notes file with
+=--release-notes=FILE=, which lets Inngest own the final release body while
+keeping artifact publishing unchanged.
+
+Recommendation: keep =git-cliff= as the changelog engine and use custom scripts
+for PR-body note extraction and final note assembly.
+
+* Recommended Design
+
+** Release PR Lifecycle
+
+Add =.github/workflows/release-pr.yml=, based primarily on =lighthouse=:
+
+- Trigger on =main= pushes, scheduled refresh, and manual dispatch.
+- Ignore =CHANGELOG.md=-only pushes.
+- Fetch tags and compute the latest stable SemVer tag.
+- Use =git-cliff --bumped-version= to compute the next stable version.
+- Generate =CHANGELOG.md= for the next tag.
+- Generate a release notes preview.
+- Create or force-update =release/next=.
+- Create or update one open PR from =release/next= into =main=.
+
+The PR title should be:
+
+#+begin_src text
+chore(release): vX.Y.Z
+#+end_src
+
+The release PR body should contain machine-owned and human-owned sections:
+
+#+begin_src markdown
+<!-- auto-release-pr -->
+## Release
+
+This PR prepares `vX.Y.Z`.
+
+## Additional Release Notes
+<!-- release-note:manual-start -->
+None.
+<!-- release-note:manual-end -->
+
+## Additional Migration Notes
+<!-- migration-note:manual-start -->
+None.
+<!-- migration-note:manual-end -->
+
+## Notes Preview
+<!-- release-note:preview-start -->
+Generated preview goes here.
+<!-- release-note:preview-end -->
+#+end_src
+
+When the workflow updates an existing release PR, it should preserve the manual
+blocks and replace only the generated preview. This allows maintainers to add
+release-level context without losing edits on the next scheduled refresh.
+
+** Tag Creation
+
+Add =.github/workflows/release-tag.yml=, based on =lighthouse=:
+
+- Trigger on merged pull requests.
+- Only run for merged PRs whose head is =release/next= from the same repository.
+- Validate the title matches =chore(release): vX.Y.Z=.
+- Validate =CHANGELOG.md= contains the matching release section.
+- Create and push the tag if it does not already exist.
+
+The existing =.github/workflows/release.yml= will then run from the pushed tag.
+
+** PR Authoring Contract
+
+Update =.github/pull_request_template.md= with explicit release sections:
+
+#+begin_src markdown
+## Release notes
+<!-- User-facing release note. Use "None" if this does not need release notes. -->
+None.
+
+## Migration notes
+<!-- Upgrade, deployment, config, schema, or compatibility notes. Use "None" if none. -->
+None.
+#+end_src
+
+Rules:
+
+- The PR title still drives the generated changelog category.
+- =Release notes= should explain the user-visible impact, not repeat the
+  implementation summary.
+- =Migration notes= should include required operator/user action, compatibility
+  risks, config changes, schema changes, deprecations, and behavior changes.
+- =None=, =N/A=, empty text, and untouched placeholders are ignored.
+- A later validation workflow can require non-empty release notes for =feat=,
+  breaking changes, or PRs labeled =release-note-required=.
+
+** Release Note Assembly
+
+Add scripts under =scripts/release/=:
+
+- =collect-pr-notes=
+  - Determine PRs included between the latest previous stable tag and the
+    current release commit.
+  - Fetch PR titles, numbers, URLs, labels, authors, and bodies.
+  - Parse exact markdown sections from PR bodies.
+  - Emit structured JSON.
+
+- =build-release-notes=
+  - Read the merged release PR body and preserve manual release/migration notes.
+  - Read collected per-PR notes.
+  - Read the generated =git-cliff= section for the release.
+  - Write =RELEASE_NOTES.md=.
+
+Recommended final GitHub release body:
+
+#+begin_src markdown
+## Release Notes
+
+Manual release-level notes first, then per-PR release notes grouped by PR.
+
+## Migration Notes
+
+Manual release-level migration notes first, then per-PR migration notes grouped
+by PR. Omit this section when empty.
+
+## Changelog
+
+Generated git-cliff changelog section.
+#+end_src
+
+Implementation note: prefer a small Go command or well-tested shell scripts over
+large workflow-inline scripts. The parsing rules should have tests because PR
+body markdown is messy and this becomes release-critical.
+
+** Publishing Workflow Change
+
+Update =.github/workflows/release.yml= before the GoReleaser step:
+
+1. Checkout with full history and tags.
+2. Generate =RELEASE_NOTES.md= using =scripts/release/build-release-notes=.
+3. Run GoReleaser with:
+
+#+begin_src text
+release --clean --verbose --release-notes=RELEASE_NOTES.md
+#+end_src
+
+This keeps artifact publishing in GoReleaser and replaces only the release body
+generation.
+
+** Conventional Commit Guardrail
+
+Add or adapt the local =commits.yml= pattern:
+
+- Validate PR titles match the types configured in =cliff.toml=.
+- Keep the allowed type list close to =cliff.toml=.
+- Do not initially require every commit to be conventional; squash-merged PR
+  titles are enough for this workflow if branch protection enforces the PR title.
+
+* Versioning Policy
+
+Use SemVer for Inngest stable releases:
+
+- =fix:= -> patch
+- =feat:= -> minor
+- =!= or =BREAKING CHANGE:= -> major
+
+Pre-releases remain manual in the first implementation:
+
+- =vX.Y.Z-beta.N=
+- =vX.Y.Z-alpha.N=
+- =vX.Y.Z-rc.N=
+
+The automated =release/next= PR should target stable =vX.Y.Z= only. Pre-release
+automation can be a follow-up once the stable path is proven.
+
+* Implementation Phases
+
+** Phase 1: Release Metadata Contract
+
+- [ ] Update PR template with release and migration note sections.
+- [ ] Add PR title Conventional Commit validation.
+- [ ] Document author guidance in =docs/PULL_REQUEST_GUIDELINES.md=.
+
+** Phase 2: Note Extraction
+
+- [ ] Add =scripts/release/collect-pr-notes=.
+- [ ] Add parser tests for normal, empty, placeholder, multiline, and repeated
+      section cases.
+- [ ] Add =scripts/release/build-release-notes=.
+- [ ] Test output with representative real PR bodies.
+
+** Phase 3: Release PR Automation
+
+- [ ] Add =.github/workflows/release-pr.yml=.
+- [ ] Ensure it preserves manual blocks in existing release PR bodies.
+- [ ] Generate =CHANGELOG.md=.
+- [ ] Generate and publish the release notes preview in the release PR body.
+
+** Phase 4: Tag Gate
+
+- [ ] Add =.github/workflows/release-tag.yml=.
+- [ ] Validate release PR title and changelog section.
+- [ ] Create the tag on the merged release PR commit.
+- [ ] Ensure the workflow cannot tag arbitrary external PRs.
+
+** Phase 5: Publish Integration
+
+- [ ] Update =.github/workflows/release.yml= to generate =RELEASE_NOTES.md=.
+- [ ] Pass =--release-notes=RELEASE_NOTES.md= to GoReleaser.
+- [ ] Confirm npm publish still uses the tag version as before.
+- [ ] Confirm stable releases still complete Linear releases.
+
+** Phase 6: Dry Run and Rollout
+
+- [ ] Run the release PR workflow manually on a test branch or fork.
+- [ ] Compare generated =CHANGELOG.md= against current output.
+- [ ] Compare assembled =RELEASE_NOTES.md= against expected PR context.
+- [ ] Merge a low-risk release PR after review.
+- [ ] Update =docs/RELEASING.md= from manual tagging to release PR merge flow.
+
+* Open Questions
+
+- Should release notes be required for all =feat:= PRs, or should the first
+  iteration only collect optional notes?
+- Should migration notes trigger a required reviewer group or release-owner
+  review?
+- Should cloud-only paths excluded from =cliff.toml= also be excluded from
+  release-note collection, or should PR notes override path exclusion?
+- Should the release PR preview include every changelog entry, or only the
+  higher-signal release/migration sections plus a link to the =CHANGELOG.md=
+  diff?
+- Should the final release page include contributors, or leave that to GitHub's
+  generated metadata?
+
+* References
+
+- Local: =~/workspace/lighthouse/.github/workflows/release-pr.yml=
+- Local: =~/workspace/lighthouse/.github/workflows/release-tag.yml=
+- Local: =~/workspace/lighthouse/.github/workflows/release.yml=
+- Local: =~/workspace/atlas/.github/workflows/auto-release-pr.yml=
+- Local: =~/workspace/atlas/scripts/export-release-notes.sh=
+- Local: =~/workspace/inngest-agents/.github/workflows/auto-release-pr.yml=
+- Local: =~/workspace/inngest-agents/scripts/validate-release-changelog.sh=
+- Release Please: =https://github.com/googleapis/release-please-action=
+- Changesets Action: =https://github.com/changesets/action=
+- Release Drafter: =https://github.com/marketplace/actions/release-drafter=
+- GitHub generated release notes: =https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes=
+- git-cliff: =https://git-cliff.org/docs/=
+- GoReleaser release notes: =https://www.goreleaser.com/customization/release/=
