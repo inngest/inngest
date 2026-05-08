@@ -417,7 +417,7 @@ treated as preview artifacts.
 - [X] Add PR title Conventional Commit validation.
 - [X] Add =cloud:=, =internal:=, and =noop:= as accepted non-release PR title
       prefixes.
-- [ ] Document author guidance in =docs/PULL_REQUEST_GUIDELINES.md=.
+- [X] Document author guidance in =docs/PULL_REQUEST_GUIDELINES.md=.
 
 ** Phase 2: Note Extraction
 
