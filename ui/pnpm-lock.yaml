@@ -22,7 +22,7 @@ overrides:
   esbuild@<=0.24.2: '>=0.25.0'
   fast-loops@<1.1.4: '>=1.1.4'
   form-data@>=3.0.0 <3.0.4: '>=3.0.4'
-  h3-v2: npm:h3@2.0.1-rc.21
+  h3-v2: npm:h3@2.0.1-rc.22
   h3@>=2.0.0-beta.0 <2.0.1-rc.18: '>=2.0.1-rc.18 <3'
   image-size@>=1.1.0 <1.2.1: '>=1.2.1'
   jose: '>=5.0.0 <7.0.0'
@@ -7585,16 +7585,6 @@ packages:
 
   h3@1.15.11:
     resolution: {integrity: sha512-L3THSe2MPeBwgIZVSH5zLdBBU90TOxarvhK9d04IDY2AmVS8j2Jz2LIWtwsGOU3lu2I5jCN7FNvVfY2+XyF+mg==}
-
-  h3@2.0.1-rc.21:
-    resolution: {integrity: sha512-lDeqAgCQXWT7C+5Zs3ler2phZPeX5yTk9KqQuL8taSSngIhcPR0r83TZyYwTO/cLogm6a4+9slZcngrfdyZtrQ==}
-    engines: {node: '>=20.11.1'}
-    hasBin: true
-    peerDependencies:
-      crossws: ^0.4.1
-    peerDependenciesMeta:
-      crossws:
-        optional: true
 
   h3@2.0.1-rc.22:
     resolution: {integrity: sha512-Esv0DMIuPkCTSWCA0vO73vcTqwzH1wjSrAO1TXNu/K3up1sZHa9EKMapbmxCDYBeymC3fVTk4qxp7ogQWQ+KgA==}
@@ -16455,7 +16445,7 @@ snapshots:
       '@tanstack/start-client-core': 1.168.1
       '@tanstack/start-storage-context': 1.166.34
       fetchdts: 0.1.7
-      h3-v2: h3@2.0.1-rc.21(crossws@0.4.5(srvx@0.11.15))
+      h3-v2: h3@2.0.1-rc.22(crossws@0.4.5(srvx@0.11.15))
       seroval: 1.5.4
     transitivePeerDependencies:
       - crossws
@@ -19517,13 +19507,6 @@ snapshots:
       radix3: 1.1.2
       ufo: 1.6.4
       uncrypto: 0.1.3
-
-  h3@2.0.1-rc.21(crossws@0.4.5(srvx@0.11.15)):
-    dependencies:
-      rou3: 0.8.1
-      srvx: 0.11.15
-    optionalDependencies:
-      crossws: 0.4.5(srvx@0.11.15)
 
   h3@2.0.1-rc.22(crossws@0.4.5(srvx@0.11.15)):
     dependencies:
