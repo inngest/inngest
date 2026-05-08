@@ -37,12 +37,12 @@ func TestFnConcurrency(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency-test",
-			Concurrency: []inngestgo.ConfigStepConcurrency{
+			Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
 				{
 					Limit: 1,
 					Scope: enums.ConcurrencyScopeFn,
 				},
-			},
+			}},
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),
@@ -121,13 +121,13 @@ func TestFnConcurrency_Key(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency-key-test",
-			Concurrency: []inngestgo.ConfigStepConcurrency{
+			Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
 				{
 					Limit: 1,
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   inngestgo.StrPtr("event.data.customer_id"),
 				},
-			},
+			}},
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),

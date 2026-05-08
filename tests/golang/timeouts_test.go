@@ -36,7 +36,7 @@ func TestTimeoutStart(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:          "fn-concurrency",
-			Concurrency: []inngestgo.ConfigStepConcurrency{{Limit: 1}},
+			Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{{Limit: 1}}},
 			Timeouts: &inngestgo.ConfigTimeouts{
 				Start: &timeoutStart,
 			},

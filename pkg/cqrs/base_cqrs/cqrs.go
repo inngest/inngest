@@ -1826,53 +1826,47 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	ids := []string{}
-	if opts.SpanID != "" {
-		ids = append(ids, opts.SpanID)
-	}
-	if opts.InputSpanID != nil && *opts.InputSpanID != "" {
-		ids = append(ids, *opts.InputSpanID)
-	}
-
-	if len(ids) == 0 {
+	if opts.SpanID == "" && (opts.InputSpanID == nil || *opts.InputSpanID == "") {
 		return nil, fmt.Errorf("span ID or input span ID is required to retrieve output")
-	}
-
-	rows, err := w.q.GetSpanOutput(ctx, ids)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving span output: %w", err)
 	}
 
 	so := &cqrs.SpanOutput{}
 
-	for _, row := range rows {
-		if len(row.Input) > 0 {
-			so.Input = row.Input
+	// Fetch output data from the output span (SpanID).
+	if opts.SpanID != "" {
+		rows, err := w.q.GetSpanOutput(ctx, []string{opts.SpanID})
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving span output: %w", err)
 		}
 
-		if len(row.Output) > 0 {
-			var m map[string]any
+		for _, row := range rows {
+			if len(row.Input) > 0 {
+				so.Input = row.Input
+			}
+			if len(row.Output) > 0 {
+				so.Data, so.IsError = unwrapSpanOutput(ctx, row.Output, opts.SpanID)
+			}
+		}
+	}
 
-			so.Data = row.Output
-			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
-				// NOTE: By default, we wrap errors and data.  However, unforutnately
-				// step.waitForEvent is _not_ wrapped, so we check to see if there's
-				// both "data" and "name";  if so, we return the data wholesale.
-				if isWaitForEventOutput(m) {
-					return so, nil
-				}
+	// If a separate input span is specified, fetch data from it.
+	// This must be queried independently to avoid the input span's output
+	// data from overwriting the correct output fetched above.
+	if opts.InputSpanID != nil && *opts.InputSpanID != "" && *opts.InputSpanID != opts.SpanID {
+		inputRows, err := w.q.GetSpanOutput(ctx, []string{*opts.InputSpanID})
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving input span data: %w", err)
+		}
 
-				if errData, ok := m["error"]; ok {
-					so.IsError = true
-					so.Data, _ = json.Marshal(errData)
-				} else if successData, ok := m["data"]; ok {
-					so.Data, _ = json.Marshal(successData)
-				} else {
-					sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
-					sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
+		for _, row := range inputRows {
+			if len(row.Input) > 0 {
+				so.Input = row.Input
+			}
 
-					logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
-				}
+			// When SpanID is empty (no dedicated output span), fall back to
+			// reading output from the input span to preserve prior behavior.
+			if opts.SpanID == "" && len(row.Output) > 0 {
+				so.Data, so.IsError = unwrapSpanOutput(ctx, row.Output, *opts.InputSpanID)
 			}
 		}
 	}
@@ -3297,11 +3291,4 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 // needsEventJoin checks if CEL expression references event.* fields
 func needsEventJoin(cel string) bool {
 	return strings.Contains(cel, "event.")
-}
-
-func isWaitForEventOutput(o map[string]any) bool {
-	_, name := o["name"]
-	_, data := o["data"]
-	_, ts := o["ts"]
-	return name && data && ts
 }
