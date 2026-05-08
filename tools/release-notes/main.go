@@ -27,6 +27,8 @@ func command() *cli.Command {
 			collectCommand(),
 			buildCommand(),
 			prBodyCommand(),
+			prereleaseCommandCommand(),
+			prereleaseVersionCommand(),
 		},
 		CommandNotFound: func(ctx context.Context, cmd *cli.Command, name string) {
 			_, _ = fmt.Fprintf(cmd.ErrWriter, "unknown command %q\n", name)

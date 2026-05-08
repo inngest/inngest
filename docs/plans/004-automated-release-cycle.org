@@ -455,13 +455,13 @@ treated as preview artifacts.
 ** Phase 6: Pre-release Publishing
 
 - [ ] Add =.github/workflows/prerelease.yml= triggered by PR comments.
-- [ ] Parse commands like =/prerelease beta=, =/prerelease alpha vX.Y.Z-alpha.N=,
+- [X] Parse commands like =/prerelease beta=, =/prerelease alpha vX.Y.Z-alpha.N=,
       and =/prerelease rc --dry-run=.
 - [ ] Verify the commenter has maintainer permission.
 - [ ] Resolve and tag the PR head SHA rather than asking for a manual ref.
 - [ ] Initially reject forked PR heads for publishing because release credentials
       would be exposed to untrusted code.
-- [ ] Validate prerelease tags match =vX.Y.Z-(alpha|beta|rc).N=.
+- [X] Validate prerelease tags match =vX.Y.Z-(alpha|beta|rc).N=.
 - [ ] Support dry-run validation without creating a tag.
 - [ ] Confirm prerelease Docker images do not update =latest= tags.
 - [ ] Confirm npm publishes prereleases under the matching =alpha=, =beta=, or
