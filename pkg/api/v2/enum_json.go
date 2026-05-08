@@ -21,6 +21,10 @@ type responseEnumMarshaler struct {
 }
 
 func newResponseEnumMarshaler() runtime.Marshaler {
+	return NewResponseEnumMarshaler()
+}
+
+func NewResponseEnumMarshaler() runtime.Marshaler {
 	return responseEnumMarshaler{JSONPb: &runtime.JSONPb{}}
 }
 

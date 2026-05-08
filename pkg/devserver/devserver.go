@@ -698,6 +698,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Functions:           NewFunctionProvider(dbcqrs),
+		FunctionRuns:        NewFunctionRunReader(dbcqrs),
+		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
 	}
