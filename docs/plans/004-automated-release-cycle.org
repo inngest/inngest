@@ -431,12 +431,12 @@ treated as preview artifacts.
 
 ** Phase 3: Release PR Automation
 
-- [ ] Add =.github/workflows/release-pr.yml=.
+- [X] Add =.github/workflows/release-pr.yml=.
 - [X] Update =cliff.toml= to exclude =cloud:=, =internal:=, and =noop:= from
       generated changelogs.
 - [X] Ensure it preserves manual blocks in existing release PR bodies.
-- [ ] Generate =CHANGELOG.md=.
-- [ ] Generate and publish the release notes preview in the release PR body.
+- [X] Generate =CHANGELOG.md=.
+- [X] Generate and publish the release notes preview in the release PR body.
 
 ** Phase 4: Tag Gate
 
