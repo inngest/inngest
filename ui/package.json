@@ -24,6 +24,6 @@
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@11.0.5",
+  "packageManager": "pnpm@11.0.6",
   "private": true
 }
