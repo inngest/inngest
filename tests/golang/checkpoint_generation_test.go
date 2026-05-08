@@ -1,6 +1,11 @@
-// Asserts that requeuing an in-flight async dispatch aborts the prior SDK
-// process before it executes the next step, so an HTTP timeout no longer
-// produces duplicate step executions (EXE-1552).
+// EXE-1552: covers the late-arriving stale-dispatch case for the duplicate
+// step-execution bug — a Requeue that fires while a long-running step body
+// is still executing on the prior dispatch, then the old SDK posts its
+// checkpoint after the new dispatch is already in flight. The fence only
+// engages once the old dispatch's StepStartedAt is older than
+// freshDispatchWindow (see pkg/execution/checkpoint/checkpoint.go); faster
+// Requeue races are an accepted perf trade-off (hot path is one in-process
+// check on a 250k req/s endpoint).
 
 package golang
 
@@ -123,6 +128,14 @@ func TestEXE1552DuplicateStepExecutionOnRequeue(t *testing.T) {
 		t.Fatalf("only %d SDK invocation(s) entered step1 after requeue; executor did not re-dispatch",
 			atomic.LoadInt32(&step1.count))
 	}
+
+	// The validator's fast-path skips the queue-item load when
+	// time.Since(StepStartedAt) < freshDispatchWindow (10s — see
+	// pkg/execution/checkpoint/checkpoint.go:freshDispatchWindow). To exercise
+	// the entropy-comparison path that the fence relies on, wait past that
+	// window (plus a small clock-skew buffer) before unblocking the OLD SDK so
+	// its checkpoint POST is provably stale.
+	time.Sleep(11 * time.Second)
 
 	step1.unblock()
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -22,6 +23,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// The dispatch timestamp doesn't participate in fencing, so any current time
+// works in tests.
+func requestIDForGeneration(runID ulid.ULID, generationID int) string {
+	return driver.DispatchRequestID(time.Now(), runID, generationID).String()
+}
 
 func TestCheckpointAsyncSteps(t *testing.T) {
 	t.Run("three step runs", func(t *testing.T) {
@@ -273,7 +280,11 @@ func TestCheckpointAsyncSteps_StaleDispatchFailsBeforeSave(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	testData.asyncCheckpoint.GenerationID = 4
+	// The SDK echoes a RequestID seeded from generation 4 (the dispatch it
+	// was leased on), but the queue item has been Requeued and is now at
+	// generation 7. Recomputed entropy from (RunID, 7) won't match the
+	// echoed RequestID's entropy → stale.
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 4)
 	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
 		ID:           "job-123",
 		GenerationID: 7,
@@ -290,127 +301,69 @@ func TestCheckpointAsyncSteps_StaleDispatchFailsBeforeSave(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
-func TestCheckpointAsyncSteps_FreshStepStartedAtSkipsLoad(t *testing.T) {
-	ctx := context.Background()
-	require := require.New(t)
-
-	op := state.GeneratorOpcode{
-		ID:   "step-1",
-		Op:   enums.OpcodeStepRun,
-		Data: json.RawMessage(`{"result":"ok"}`),
+// TestCheckpointAsyncSteps_StepStartedAtGate covers the StepStartedAt
+// short-circuit: a dispatch younger than freshDispatchWindow skips the queue
+// load (Requeue can't have fired yet); anything else — stale or
+// clock-skewed-future — falls through to the RequestID validator.
+func TestCheckpointAsyncSteps_StepStartedAtGate(t *testing.T) {
+	cases := []struct {
+		name       string
+		ageOffset  time.Duration
+		expectLoad bool
+	}{
+		{"fresh dispatch skips load", -time.Second, false},
+		{"stale dispatch falls through to load", -time.Hour, true},
+		{"future-dated dispatch falls through to load", time.Hour, true},
 	}
-	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	// A fresh dispatch: GenerationID is set (so the gen-zero fail-open
-	// doesn't kick in), and StepStartedAt is recent. The validator must
-	// skip LoadQueueItem entirely. To prove the skip, we don't register a
-	// mock for it; an unexpected call would fail the test.
-	testData.asyncCheckpoint.GenerationID = 4
-	testData.asyncCheckpoint.StepStartedAt = time.Now().Add(-time.Second).UnixMilli()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			require := require.New(t)
 
-	expectedData, err := json.Marshal(map[string]any{
-		"data": json.RawMessage(`{"result":"ok"}`),
-	})
-	require.NoError(err)
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
-	mocks.tracer.
-		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
-		Return(&meta.SpanReference{}, nil)
-	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+			op := state.GeneratorOpcode{
+				ID:   "step-1",
+				Op:   enums.OpcodeStepRun,
+				Data: json.RawMessage(`{"result":"ok"}`),
+			}
+			mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
-	require.NoError(err)
+			testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 4)
+			testData.asyncCheckpoint.StepStartedAt = time.Now().Add(tc.ageOffset).UnixMilli()
 
-	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
-	mocks.state.AssertExpectations(t)
-	mocks.tracer.AssertExpectations(t)
-	mocks.queue.AssertExpectations(t)
+			if tc.expectLoad {
+				mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
+					ID:           "job-123",
+					GenerationID: 4,
+				}, nil)
+			}
+
+			expectedData, err := json.Marshal(map[string]any{
+				"data": json.RawMessage(`{"result":"ok"}`),
+			})
+			require.NoError(err)
+			mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+			mocks.tracer.
+				On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+				Return(&meta.SpanReference{}, nil)
+			mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+			err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+			require.NoError(err)
+
+			if tc.expectLoad {
+				mocks.queue.AssertCalled(t, "LoadQueueItem", ctx, "shard-1", "job-123")
+			} else {
+				mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+			}
+			mocks.state.AssertExpectations(t)
+			mocks.tracer.AssertExpectations(t)
+			mocks.queue.AssertExpectations(t)
+		})
+	}
 }
 
-func TestCheckpointAsyncSteps_StaleStepStartedAtFallsThroughToLoad(t *testing.T) {
-	ctx := context.Background()
-	require := require.New(t)
-
-	op := state.GeneratorOpcode{
-		ID:   "step-1",
-		Op:   enums.OpcodeStepRun,
-		Data: json.RawMessage(`{"result":"ok"}`),
-	}
-	mocks, testData := setupAsyncCheckpointTest(t, op)
-
-	// A dispatch older than the fresh-dispatch window must fall through to
-	// LoadQueueItem so the GenerationID validator runs. Match the queue
-	// item so the dispatch is accepted; we just want to assert the load
-	// happened.
-	testData.asyncCheckpoint.GenerationID = 4
-	testData.asyncCheckpoint.StepStartedAt = time.Now().Add(-time.Hour).UnixMilli()
-
-	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
-		ID:           "job-123",
-		GenerationID: 4,
-	}, nil)
-
-	expectedData, err := json.Marshal(map[string]any{
-		"data": json.RawMessage(`{"result":"ok"}`),
-	})
-	require.NoError(err)
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
-	mocks.tracer.
-		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
-		Return(&meta.SpanReference{}, nil)
-	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
-
-	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
-	require.NoError(err)
-
-	mocks.queue.AssertCalled(t, "LoadQueueItem", ctx, "shard-1", "job-123")
-	mocks.state.AssertExpectations(t)
-	mocks.tracer.AssertExpectations(t)
-	mocks.queue.AssertExpectations(t)
-}
-
-func TestCheckpointAsyncSteps_FutureStepStartedAtFallsThroughToLoad(t *testing.T) {
-	ctx := context.Background()
-	require := require.New(t)
-
-	op := state.GeneratorOpcode{
-		ID:   "step-1",
-		Op:   enums.OpcodeStepRun,
-		Data: json.RawMessage(`{"result":"ok"}`),
-	}
-	mocks, testData := setupAsyncCheckpointTest(t, op)
-
-	// A future-dated StepStartedAt (clock skew or buggy SDK) must not
-	// short-circuit forever. The negative-elapsed clamp falls through to
-	// the existing GenerationID validation.
-	testData.asyncCheckpoint.GenerationID = 4
-	testData.asyncCheckpoint.StepStartedAt = time.Now().Add(time.Hour).UnixMilli()
-
-	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
-		ID:           "job-123",
-		GenerationID: 4,
-	}, nil)
-
-	expectedData, err := json.Marshal(map[string]any{
-		"data": json.RawMessage(`{"result":"ok"}`),
-	})
-	require.NoError(err)
-	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
-	mocks.tracer.
-		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
-		Return(&meta.SpanReference{}, nil)
-	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
-
-	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
-	require.NoError(err)
-
-	mocks.queue.AssertCalled(t, "LoadQueueItem", ctx, "shard-1", "job-123")
-	mocks.state.AssertExpectations(t)
-	mocks.tracer.AssertExpectations(t)
-	mocks.queue.AssertExpectations(t)
-}
-
-func TestCheckpointAsyncSteps_ZeroGenerationIDSkipsValidation(t *testing.T) {
+func TestCheckpointAsyncSteps_EmptyRequestIDSkipsValidation(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
@@ -451,7 +404,7 @@ func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	testData.asyncCheckpoint.GenerationID = 1
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
 	// Nil-from-HGET means the dispatch the SDK is serving no longer exists,
 	// which is exactly the stale case.
 	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(nil, queue.ErrQueueItemNotFound)
@@ -467,7 +420,7 @@ func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
-func TestCheckpointAsyncSteps_InvalidQueueRefWithGenerationIDFailsBeforeSave(t *testing.T) {
+func TestCheckpointAsyncSteps_InvalidQueueRefWithRequestIDFailsBeforeSave(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
@@ -477,7 +430,7 @@ func TestCheckpointAsyncSteps_InvalidQueueRefWithGenerationIDFailsBeforeSave(t *
 		Data: json.RawMessage(`{"result":"ok"}`),
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
-	testData.asyncCheckpoint.GenerationID = 1
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
 	testData.asyncCheckpoint.QueueItemRef = "not-a-valid-queue-ref"
 
 	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)

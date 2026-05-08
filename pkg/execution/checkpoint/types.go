@@ -44,16 +44,18 @@ type AsyncCheckpoint struct {
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
 	QueueItemRef string `json:"qi_id"`
-	// GenerationID identifies the leased SDK dispatch that produced this
-	// checkpoint. The validator rejects writes whose value is behind the
-	// queue item's current GenerationID. Zero means the SDK did not echo a
-	// value, in which case validation fails open.
-	GenerationID int `json:"generation_id"`
+	// RequestID is the deterministic ULID the SDK received in its dispatch
+	// payload. The validator recomputes the seeded entropy from
+	// (RunID, queue item's current GenerationID) and rejects writes whose
+	// RequestID entropy doesn't match — i.e. whose dispatch was superseded
+	// by a Requeue. Empty means the SDK did not echo a value, in which case
+	// validation fails open.
+	RequestID string `json:"request_id"`
 	// StepStartedAt is the unix-millisecond epoch the SDK captured when it
 	// began executing the dispatch. The validator uses this to skip the
 	// queue-item load when the dispatch is younger than the minimum requeue
 	// window. Zero means the SDK didn't send it; validation falls through
-	// to the existing GenerationID check.
+	// to the existing RequestID check.
 	StepStartedAt int64 `json:"step_started_at"`
 
 	// Plus auth data added from auth.  This is never exposed via JSON

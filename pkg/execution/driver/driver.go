@@ -107,7 +107,6 @@ func MarshalV1(
 	attempt int,
 	maxAttempts int,
 	queueItemRef string,
-	generationID int,
 ) ([]byte, error) {
 	rawEvts, err := sl.LoadEvents(ctx, md.ID)
 	if err != nil {

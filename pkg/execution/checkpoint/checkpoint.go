@@ -1,6 +1,7 @@
 package checkpoint
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/defers"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -29,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
+	"github.com/oklog/ulid/v2"
 )
 
 type Checkpointer interface {
@@ -51,10 +54,11 @@ type AsyncCheckpointer interface {
 var ErrStaleDispatch = errors.New("stale dispatch")
 
 // freshDispatchWindow is the maximum age a dispatch can have and still skip
-// the queue-item load in validateAsyncDispatch. Derived from the queue lease
-// duration (the earliest a Requeue can fire) minus a clock-skew budget for
-// drift between whichever box stamped the timestamp and the box validating.
-const freshDispatchWindow = queue.QueueLeaseDuration - 5*time.Second
+// the queue-item load in validateAsyncDispatch. The bound is the lease-extension
+// cadence (QueueLeaseDuration/2) — the earliest path that can fire Requeue is a
+// failed extension, not lease expiry — minus a clock-skew budget for drift
+// between whichever box stamped the timestamp and the box validating.
+const freshDispatchWindow = queue.QueueLeaseDuration/2 - 5*time.Second
 
 type queueItemLoader interface {
 	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
@@ -563,9 +567,9 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 }
 
 func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) error {
-	// Fail open when the SDK didn't echo a generation. Older SDKs predate the
+	// Fail open when the SDK didn't echo a request id. Older SDKs predate the
 	// fence; rejecting them would break valid checkpoints.
-	if input.GenerationID == 0 {
+	if input.RequestID == "" {
 		return nil
 	}
 
@@ -579,6 +583,11 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		if elapsed >= 0 && elapsed < freshDispatchWindow {
 			return nil
 		}
+	}
+
+	parsed, err := ulid.Parse(input.RequestID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid request id %q: %v", ErrStaleDispatch, input.RequestID, err)
 	}
 
 	ref := queueref.Decode(input.QueueItemRef)
@@ -613,8 +622,11 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	if item.GenerationID == 0 {
 		return nil
 	}
-	if input.GenerationID != item.GenerationID {
-		return fmt.Errorf("%w: generation %d does not match queue item generation %d", ErrStaleDispatch, input.GenerationID, item.GenerationID)
+
+	// Compare only the entropy: the dispatch timestamp isn't recoverable
+	// from the SDK-echoed RequestID and isn't part of the fence.
+	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
+		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
 	}
 
 	return nil

@@ -175,9 +175,10 @@ func TestCheckpointAPI_Output(t *testing.T) {
 	})
 }
 
-func TestCheckpointAPI_CheckpointAsyncStepsPassesGenerationID(t *testing.T) {
+func TestCheckpointAPI_CheckpointAsyncStepsPassesRequestID(t *testing.T) {
 	runID := ulid.Make()
 	fnID := uuid.New()
+	requestID := ulid.Make().String()
 	mockCheckpointer := &mockCheckpointer{}
 	api := checkpointAPI{
 		Opts: Opts{
@@ -190,14 +191,14 @@ func TestCheckpointAPI_CheckpointAsyncStepsPassesGenerationID(t *testing.T) {
 		"run_id":"`+runID.String()+`",
 		"fn_id":"`+fnID.String()+`",
 		"qi_id":"queue-ref",
-		"generation_id":42,
+		"request_id":"`+requestID+`",
 		"steps":[]
 	}`))
 	rec := httptest.NewRecorder()
 
 	api.CheckpointAsyncSteps(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, 42, mockCheckpointer.async.GenerationID)
+	require.Equal(t, requestID, mockCheckpointer.async.RequestID)
 	require.Equal(t, "queue-ref", mockCheckpointer.async.QueueItemRef)
 }
 

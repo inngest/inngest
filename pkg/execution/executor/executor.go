@@ -1521,8 +1521,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
-	seed := fmt.Appendf(nil, "%s:%d", id.RunID, queue.GenerationIDFromContext(ctx))
-	requestID := util.MustDeterministicULID(e.now(), seed).String()
+	requestID := driver.DispatchRequestID(e.now(), id.RunID, queue.GenerationIDFromContext(ctx)).String()
 	jobID := queue.JobIDFromContext(ctx)
 	if item.JobID != nil {
 		jobID = *item.JobID

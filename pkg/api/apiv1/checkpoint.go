@@ -362,7 +362,7 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		FnID:          input.FnID,
 		Steps:         input.Steps,
 		QueueItemRef:  input.QueueItemRef,
-		GenerationID:  input.GenerationID,
+		RequestID:     input.RequestID,
 		StepStartedAt: input.StepStartedAt,
 		AccountID:     auth.AccountID(),
 		EnvID:         auth.WorkspaceID(),
