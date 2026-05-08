@@ -434,7 +434,7 @@ treated as preview artifacts.
 - [ ] Add =.github/workflows/release-pr.yml=.
 - [X] Update =cliff.toml= to exclude =cloud:=, =internal:=, and =noop:= from
       generated changelogs.
-- [ ] Ensure it preserves manual blocks in existing release PR bodies.
+- [X] Ensure it preserves manual blocks in existing release PR bodies.
 - [ ] Generate =CHANGELOG.md=.
 - [ ] Generate and publish the release notes preview in the release PR body.
 
