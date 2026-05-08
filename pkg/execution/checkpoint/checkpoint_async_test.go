@@ -503,6 +503,9 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 		TracerProvider:  mocks.tracer,
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
+		AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		},
 	})
 
 	return mocks, &testData{

@@ -431,6 +431,20 @@ func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, typ
 	})
 }
 
+func HistogramCheckpointAsyncDispatchValidationDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "checkpoint_async_dispatch_validation_duration",
+		Description: "Distribution of time spent validating async checkpoint dispatch staleness, tagged by result",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		// Fast-path skips are sub-ms; the slow path is dominated by a single
+		// Redis HGET (~1–10ms typical). DefaultBoundaries (10ms+) collapses
+		// both into one bucket. Top bucket of 1s catches anomalies.
+		Boundaries: []float64{1, 2, 5, 10, 25, 50, 100, 250, 500, 1000},
+	})
+}
+
 func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
 		PkgName:     opts.PkgName,

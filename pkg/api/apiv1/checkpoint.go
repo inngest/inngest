@@ -80,6 +80,8 @@ type CheckpointAPIOpts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// AllowAsyncDispatchValidation gates the dispatch validator per account.
+	AllowAsyncDispatchValidation checkpoint.AllowAsyncDispatchValidation
 }
 
 // checkpointAPI is the base implementation.
@@ -101,14 +103,15 @@ type checkpointAPI struct {
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	c := checkpoint.New(checkpoint.Opts{
-		State:             o.State,
-		FnReader:          o.FunctionReader,
-		Executor:          o.Executor,
-		TracerProvider:    o.TracerProvider,
-		Queue:             o.Queue,
-		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
-		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
-		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
+		State:                        o.State,
+		FnReader:                     o.FunctionReader,
+		Executor:                     o.Executor,
+		TracerProvider:               o.TracerProvider,
+		Queue:                        o.Queue,
+		MetricsProvider:              o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:                  o.CheckpointOpts.BackoffFunc,
+		AllowStepMetadata:            o.CheckpointOpts.AllowStepMetadata,
+		AllowAsyncDispatchValidation: o.CheckpointOpts.AllowAsyncDispatchValidation,
 	})
 
 	api := checkpointAPI{

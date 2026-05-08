@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -51,7 +52,21 @@ type AsyncCheckpointer interface {
 	CheckpointAsyncSteps(context.Context, AsyncCheckpoint) error
 }
 
+const pkgName = "checkpoint"
+
 var ErrStaleDispatch = errors.New("stale dispatch")
+
+// AllowAsyncDispatchValidation gates the async dispatch validator per account
+// so it can ramp through a staged rollout. Returns true to run the validator;
+// nil or false leaves it off.
+type AllowAsyncDispatchValidation func(ctx context.Context, acctID uuid.UUID) bool
+
+func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.UUID) bool {
+	if a == nil {
+		return false
+	}
+	return a(ctx, acctID)
+}
 
 // freshDispatchWindow is the maximum age a dispatch can have and still skip
 // the queue-item load in validateAsyncDispatch. The bound is the lease-extension
@@ -82,6 +97,8 @@ type Opts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// AllowAsyncDispatchValidation gates the dispatch validator per account.
+	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
 }
 
 func New(o Opts) Checkpointer {
@@ -460,8 +477,10 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
-	if err := c.validateAsyncDispatch(ctx, input); err != nil {
-		return err
+	if c.AllowAsyncDispatchValidation.Enabled(ctx, input.AccountID) {
+		if err := c.validateAsyncDispatch(ctx, input); err != nil {
+			return err
+		}
 	}
 
 	for _, op := range input.Steps {
@@ -566,7 +585,22 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 	return nil
 }
 
-func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) error {
+func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) (err error) {
+	start := time.Now()
+	result := "skipped"
+	defer func() {
+		if errors.Is(err, ErrStaleDispatch) {
+			result = "stale"
+		}
+		metrics.HistogramCheckpointAsyncDispatchValidationDuration(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"result": result},
+		})
+		metrics.IncrCheckpointAsyncDispatchValidationCounter(ctx, result, metrics.CounterOpt{
+			PkgName: pkgName,
+		})
+	}()
+
 	// Fail open when the SDK didn't echo a request id. Older SDKs predate the
 	// fence; rejecting them would break valid checkpoints.
 	if input.RequestID == "" {
@@ -622,6 +656,8 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	if item.GenerationID == 0 {
 		return nil
 	}
+
+	result = "passed"
 
 	// Compare only the entropy: the dispatch timestamp isn't recoverable
 	// from the SDK-echoed RequestID and isn't part of the fence.
