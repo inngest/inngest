@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +33,7 @@ func TestDurableEndpoint_SyncResponseRecorded(t *testing.T) {
 	require.Contains(t, resp.Header.Get("content-type"), "application/json")
 
 	// 2. Wait for the run to be recorded with COMPLETED status.
-	runID := waitForRecentRun(t, cli, ctx, start, "COMPLETED", 15*time.Second)
+	runID := waitForRecentRun(t, cli, ctx, "POST /api/durable/sync", start, "COMPLETED", 15*time.Second)
 
 	run := cli.Run(ctx, runID)
 	require.Equal(t, "COMPLETED", run.Status)
@@ -129,23 +130,49 @@ func mustRequest(t *testing.T, method, url string, body []byte) (*http.Response,
 }
 
 // waitForRecentRun polls the runs list for a run with the expected status
-// queued after `start`. We rely on time-window filtering because the JS
-// SDK doesn't surface the runID on the sync wire response.
-func waitForRecentRun(t *testing.T, cli *client.Client, ctx context.Context, start time.Time, status string, timeout time.Duration) string {
+// queued after `start`, scoped to the function with the given slug. We can't
+// use the runID from the JS SDK's sync wire response (it isn't surfaced), so
+// we filter by function ID + time window to avoid grabbing another test's run.
+func waitForRecentRun(t *testing.T, cli *client.Client, ctx context.Context, fnSlug string, start time.Time, status string, timeout time.Duration) string {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
+		fnID, ok := lookupFunctionID(ctx, cli, fnSlug)
+		if !ok {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
 		edges, _, _ := cli.FunctionRuns(ctx, client.FunctionRunOpt{
-			Items:  10,
-			Status: []string{status},
-			Start:  start,
-			End:    time.Now().Add(time.Minute),
+			Items:       10,
+			Status:      []string{status},
+			Start:       start,
+			End:         time.Now().Add(time.Minute),
+			FunctionIDs: []uuid.UUID{fnID},
 		})
 		if len(edges) > 0 {
 			return edges[0].Node.ID
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	require.FailNowf(t, "no run found", "no run with status %s appeared within %s", status, timeout)
+	require.FailNowf(t, "no run found", "no run with status %s for fn %q appeared within %s", status, fnSlug, timeout)
 	return ""
+}
+
+// lookupFunctionID resolves a function slug to its UUID via the GraphQL
+// functions list. Returns ok=false if the function isn't registered yet
+func lookupFunctionID(ctx context.Context, cli *client.Client, slug string) (id uuid.UUID, ok bool) {
+	fns, err := cli.Functions(ctx)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	for _, fn := range fns {
+		if fn.Name == slug {
+			id, err := uuid.Parse(fn.ID)
+			if err != nil {
+				return uuid.Nil, false
+			}
+			return id, true
+		}
+	}
+	return uuid.Nil, false
 }
