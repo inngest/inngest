@@ -120,7 +120,7 @@ func TestHandleGeneratorGroup_StepErrorHonorsRetryAt(t *testing.T) {
 // fmt.Errorf("error handling generator response: %w", serr). That wrap is
 // at executor.go:1966 in the path:
 //
-//   handleGeneratorGroup -> HandleGeneratorResponse -> HandleResponse
+//	handleGeneratorGroup -> HandleGeneratorResponse -> HandleResponse
 //
 // %w preserves Unwrap, so AsRetryAtError should still find it. If this
 // test fails while the previous one passes, the regression is somewhere

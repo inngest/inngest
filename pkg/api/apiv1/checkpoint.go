@@ -84,6 +84,8 @@ type CheckpointAPIOpts struct {
 	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
 	// The default is to always enforce the limits.
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
+	// AllowAsyncDispatchValidation gates the dispatch validator per account.
+	AllowAsyncDispatchValidation checkpoint.AllowAsyncDispatchValidation
 }
 
 // checkpointAPI is the base implementation.
@@ -105,15 +107,16 @@ type checkpointAPI struct {
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	c := checkpoint.New(checkpoint.Opts{
-		State:                 o.State,
-		FnReader:              o.FunctionReader,
-		Executor:              o.Executor,
-		TracerProvider:        o.TracerProvider,
-		Queue:                 o.Queue,
-		MetricsProvider:       o.CheckpointOpts.CheckpointMetrics,
-		BackoffFunc:           o.CheckpointOpts.BackoffFunc,
-		AllowStepMetadata:     o.CheckpointOpts.AllowStepMetadata,
-		EnforceStepSizeLimits: o.CheckpointOpts.EnforceStepSizeLimits,
+		State:                        o.State,
+		FnReader:                     o.FunctionReader,
+		Executor:                     o.Executor,
+		TracerProvider:               o.TracerProvider,
+		Queue:                        o.Queue,
+		MetricsProvider:              o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:                  o.CheckpointOpts.BackoffFunc,
+		AllowStepMetadata:            o.CheckpointOpts.AllowStepMetadata,
+		EnforceStepSizeLimits:        o.CheckpointOpts.EnforceStepSizeLimits,
+		AllowAsyncDispatchValidation: o.CheckpointOpts.AllowAsyncDispatchValidation,
 	})
 
 	api := checkpointAPI{

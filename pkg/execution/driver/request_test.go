@@ -15,4 +15,3 @@ func TestStack(t *testing.T) {
 
 	assert.Equal(t, "{\"stack\":[],\"current\":0}", string(marshaled))
 }
-

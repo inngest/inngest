@@ -4,24 +4,24 @@
 // checkpoint after the new dispatch is already in flight. The fence only
 // engages once the old dispatch's StepStartedAt is older than
 // freshDispatchWindow (see pkg/execution/checkpoint/checkpoint.go); faster
-// Requeue races are an accepted perf trade-off (hot path is one in-process
-// check on a 250k req/s endpoint).
+// Requeue races are an accepted perf trade-off.
+//
+// Requires the pre-running dev server (see Makefile `test-integration`) to be
+// started with `--redis-uri <addr>` AND `EXPERIMENTAL_ASYNC_DISPATCH_VALIDATION=true`,
+// and the same Redis to be reachable from this test process via the REDIS_URI
+// env var. Without REDIS_URI we fail loudly; without the validator gate the
+// step2 dedup assertion will fire.
 
 package golang
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"os"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/event"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -56,23 +56,24 @@ func (s *stepLatch) enter() {
 func (s *stepLatch) unblock() { close(s.release) }
 
 func TestEXE1552DuplicateStepExecutionOnRequeue(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
 
-	mr := miniredis.RunT(t)
-	startDevServer(t, ctx, "redis://"+mr.Addr())
-
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{mr.Addr()},
-		DisableCache: true,
-	})
+	redisURI := os.Getenv("REDIS_URI")
+	require.NotEmpty(t, redisURI,
+		"REDIS_URI must be set and point to the same redis the dev server is using "+
+			"(start dev with --redis-uri <addr> and export REDIS_URI=<same addr>)",
+	)
+	opt, err := rueidis.ParseURL(redisURI)
+	require.NoError(t, err, "REDIS_URI must be a valid redis URL")
+	opt.DisableCache = true
+	rc, err := rueidis.NewClient(opt)
 	require.NoError(t, err)
 	defer rc.Close()
+
 	shard := redis_state.NewQueueShard(
 		consts.DefaultQueueShardName,
 		redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey),
 	)
-
 	finder, ok := shard.(interface {
 		ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.QueueItem, error)
 	})
@@ -179,54 +180,4 @@ func waitForLeasedItem(
 	}
 	t.Fatal("did not find leased queue item for run within timeout")
 	return nil
-}
-
-func startDevServer(t *testing.T, ctx context.Context, redisURI string) {
-	t.Helper()
-	conf, err := config.Dev(ctx)
-	require.NoError(t, err)
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- devserver.New(ctx, devserver.StartOpts{
-			Config:             *conf,
-			QueueWorkers:       devserver.DefaultQueueWorkers,
-			Tick:               devserver.DefaultTickDuration,
-			PollInterval:       devserver.DefaultPollInterval,
-			ConnectGatewayPort: devserver.DefaultConnectGatewayPort,
-			ConnectGatewayHost: conf.CoreAPI.Addr,
-			NoUI:               true,
-			RedisURI:           redisURI,
-		})
-	}()
-	t.Cleanup(func() {
-		select {
-		case err := <-errCh:
-			if err != nil && ctx.Err() == nil {
-				t.Errorf("dev server exited with error: %v", err)
-			}
-		case <-time.After(2 * time.Second):
-		}
-	})
-
-	require.NoError(t, waitForDevPort(ctx, "127.0.0.1:8288", 15*time.Second))
-	time.Sleep(200 * time.Millisecond)
-	_ = os.Setenv("INNGEST_DEV", "http://127.0.0.1:8288")
-}
-
-func waitForDevPort(ctx context.Context, addr string, timeout time.Duration) error {
-	deadline, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	for {
-		select {
-		case <-deadline.Done():
-			return fmt.Errorf("timed out waiting for %s", addr)
-		default:
-			if conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond); err == nil {
-				_ = conn.Close()
-				return nil
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
-	}
 }
