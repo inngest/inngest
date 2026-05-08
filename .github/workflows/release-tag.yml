@@ -52,6 +52,13 @@ jobs:
 
       - name: Create and push tag
         if: steps.release.outputs.skip == 'false'
+        env:
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
         run: |
-          git tag "${{ steps.release.outputs.tag_name }}"
-          git push origin "${{ steps.release.outputs.tag_name }}"
+          if ! printf '%s\n' "${TAG_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Release tag output is invalid: ${TAG_NAME}"
+            exit 1
+          fi
+
+          git tag "${TAG_NAME}"
+          git push origin "${TAG_NAME}"
