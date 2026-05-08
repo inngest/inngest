@@ -16,9 +16,10 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 	if len(q.AllowQueues) > 0 {
 		return
 	}
+	shard := q.Shard()
 
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.SequentialLease())
+	leaseID, err := shard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.SequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
@@ -35,7 +36,7 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.Chan():
-			leaseID, err := q.primaryQueueShard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.SequentialLease())
+			leaseID, err := shard.ConfigLease(ctx, "sequential", ConfigLeaseDuration, q.SequentialLease())
 			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -56,7 +57,7 @@ func (q *queueProcessor) claimSequentialLease(ctx context.Context) {
 			if q.seqLeaseID == nil {
 				// Only track this if we're creating a new lease, not if we're renewing
 				// a lease.
-				metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+				metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 			}
 			q.seqLeaseID = leaseID
 			q.seqLeaseLock.Unlock()

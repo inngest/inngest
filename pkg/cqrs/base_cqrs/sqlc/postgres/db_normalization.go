@@ -286,6 +286,18 @@ func (q NormalizedQueries) GetFunctionBySlug(ctx context.Context, slug string) (
 	return function.ToSQLite()
 }
 
+func (q NormalizedQueries) GetFunctionByAppNameAndSlug(ctx context.Context, arg sqlc_sqlite.GetFunctionByAppNameAndSlugParams) (*sqlc_sqlite.Function, error) {
+	function, err := q.db.GetFunctionByAppNameAndSlug(ctx, GetFunctionByAppNameAndSlugParams{
+		Name: arg.Name,
+		Slug: arg.Slug,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return function.ToSQLite()
+}
+
 func (q NormalizedQueries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*sqlc_sqlite.Function, error) {
 	function, err := q.db.GetFunctionByID(ctx, id)
 	if err != nil {
@@ -323,8 +335,8 @@ func (q NormalizedQueries) GetAppFunctionsBySlug(ctx context.Context, slug strin
 	return sqliteFunctions, nil
 }
 
-func (q NormalizedQueries) InsertFunction(ctx context.Context, params sqlc_sqlite.InsertFunctionParams) (*sqlc_sqlite.Function, error) {
-	pgParams := InsertFunctionParams{
+func (q NormalizedQueries) UpsertFunction(ctx context.Context, params sqlc_sqlite.UpsertFunctionParams) (*sqlc_sqlite.Function, error) {
+	pgParams := UpsertFunctionParams{
 		ID:        params.ID,
 		AppID:     params.AppID,
 		Name:      params.Name,
@@ -333,7 +345,7 @@ func (q NormalizedQueries) InsertFunction(ctx context.Context, params sqlc_sqlit
 		CreatedAt: params.CreatedAt,
 	}
 
-	function, err := q.db.InsertFunction(ctx, pgParams)
+	function, err := q.db.UpsertFunction(ctx, pgParams)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +547,11 @@ func (q NormalizedQueries) GetFunctionRunsTimebound(ctx context.Context, params 
 }
 
 func (q NormalizedQueries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*sqlc_sqlite.FunctionFinish, error) {
-	finishes, err := q.db.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+	byteIDs := make([][]byte, len(runIDs))
+	for i, id := range runIDs {
+		byteIDs[i] = id[:]
+	}
+	finishes, err := q.db.GetFunctionRunFinishesByRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}

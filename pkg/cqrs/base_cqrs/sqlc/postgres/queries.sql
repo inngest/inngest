@@ -52,10 +52,17 @@ UPDATE apps SET error = $1 WHERE id = $2 RETURNING *;
 --
 
 
--- name: InsertFunction :one
+-- name: UpsertFunction :one
 INSERT INTO functions
     (id, app_id, name, slug, config, created_at) VALUES
-    ($1, $2, $3, $4, $5, $6) RETURNING *;
+    ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET
+    app_id = EXCLUDED.app_id,
+    name = EXCLUDED.name,
+    slug = EXCLUDED.slug,
+    config = EXCLUDED.config,
+    archived_at = NULL
+RETURNING *;
 
 -- name: GetFunctions :many
 SELECT functions.*
@@ -75,6 +82,19 @@ SELECT * FROM functions WHERE id = $1;
 
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = $1 AND archived_at IS NULL;
+
+-- name: GetFunctionByAppNameAndSlug :one
+-- Look up a function by the app's user-facing name, not its internal UUID.
+-- The dev server derives app UUIDs from different inputs at different sites
+-- (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+-- row even when the function exists. Joining on apps.name routes through the
+-- one identifier that's stable across both paths.
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = $1
+  AND functions.slug = $2
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = $1, archived_at = NULL WHERE id = $2 RETURNING *;
@@ -143,7 +163,7 @@ LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[]));
 
 -- name: GetFunctionRunFinishesByRunIDs :many
-SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
+SELECT * FROM function_finishes WHERE run_id = ANY($1::BYTEA[]);
 
 
 --

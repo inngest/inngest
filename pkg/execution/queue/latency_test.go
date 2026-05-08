@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 )
@@ -209,6 +208,8 @@ func TestEnqueueLatencyJob(t *testing.T) {
 		var enqueueCalled atomic.Int32
 
 		shard := &mockShardForIterator{name: "test"}
+		shardRegistry, err := NewSingleShardRegistry(shard)
+		require.NoError(t, err)
 		qp := &queueProcessor{
 			QueueOptions: NewQueueOptions(
 				WithLatencyPartition(LatencyPartitionOptions{
@@ -218,11 +219,7 @@ func TestEnqueueLatencyJob(t *testing.T) {
 				}),
 				WithClock(fakeClock),
 			),
-			primaryQueueShard: shard,
-			queueShardClients: map[string]QueueShard{"test": shard},
-			shardSelector: func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-				return shard, nil
-			},
+			shards: shardRegistry,
 		}
 
 		// Monkey-patch by wrapping: we can't easily mock Enqueue on queueProcessor
@@ -241,13 +238,10 @@ func TestEnqueueLatencyJob(t *testing.T) {
 			},
 		}
 
-		qp.primaryQueueShard = captureShard
-		qp.queueShardClients = map[string]QueueShard{"test": captureShard}
-		qp.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-			return captureShard, nil
-		}
+		qp.shards, err = NewSingleShardRegistry(captureShard)
+		require.NoError(t, err)
 
-		err := qp.enqueueLatencyJob(context.Background(), 1)
+		err = qp.enqueueLatencyJob(context.Background(), 1)
 		require.NoError(t, err)
 		require.Equal(t, int32(1), enqueueCalled.Load())
 

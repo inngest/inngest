@@ -129,16 +129,12 @@ func TestLuaCompatibility(t *testing.T) {
 				shard := setup(t)
 
 				// Initialize queue
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
 				q, err := queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					})
+					shardRegistry)
 				require.NoError(t, err)
 
 				// Test data setup
@@ -244,16 +240,12 @@ func TestLuaCompatibility(t *testing.T) {
 				keyHash := util.XXHash(throttleKey)
 
 				// Initialize queue
-				_, err := queue.New(
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
+				_, err = queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					},
+					shardRegistry,
 					opts...,
 				)
 				require.NoError(t, err)
@@ -318,16 +310,12 @@ func TestLuaCompatibility(t *testing.T) {
 
 				shard := setup(t, opts...)
 
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
 				q, err := queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					},
+					shardRegistry,
 					opts...,
 				)
 				require.NoError(t, err)

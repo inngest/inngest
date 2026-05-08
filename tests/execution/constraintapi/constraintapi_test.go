@@ -104,16 +104,12 @@ func TestConstraintEnforcement(t *testing.T) {
 			}
 			shard := redis_state.NewQueueShard("test", redis_state.NewQueueClient(rc, "q:v1"), queueOpts...)
 
+			shardRegistry, err := queue.NewSingleShardRegistry(shard)
+			require.NoError(t, err)
 			q, err := queue.New(
 				ctx,
 				"test-queue",
-				shard,
-				map[string]queue.QueueShard{
-					shard.Name(): shard,
-				},
-				func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-					return shard, nil
-				},
+				shardRegistry,
 				queueOpts...,
 			)
 			require.NoError(t, err)
@@ -139,7 +135,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			require.NoError(t, err)
 			exec, err := executor.NewExecutor(
 				executor.WithRateLimiter(rl),
-				executor.WithAssignedQueueShard(shard),
+				executor.WithShardRegistry(shardRegistry),
 				executor.WithQueue(q),
 				executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
 				executor.WithPauseManager(pauseMgr),

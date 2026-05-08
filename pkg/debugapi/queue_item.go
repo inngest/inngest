@@ -20,8 +20,8 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 		shardName = req.QueueShard
 	}
 
-	shard, ok := d.shards[shardName]
-	if !ok {
+	shard, err := d.shards.ByName(shardName)
+	if err != nil {
 		return nil, fmt.Errorf("could not find queue shard %q", shardName)
 	}
 

@@ -176,6 +176,14 @@ func (m *mockShardForIterator) ShardLease(ctx context.Context, key string, durat
 	return nil, nil
 }
 
+func (m *mockShardForIterator) SingletonGetRunID(ctx context.Context, key string) (*ulid.ULID, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, key string) (*ulid.ULID, error) {
+	return nil, nil
+}
+
 func (m *mockShardForIterator) ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error {
 	return nil
 }

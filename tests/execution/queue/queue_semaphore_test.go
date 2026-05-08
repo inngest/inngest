@@ -74,7 +74,9 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 
 	shard := redis_state.NewQueueShard("test", queueClient, options...)
 
-	q, err := queue.New(ctx, "test", shard, nil, nil, options...)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := queue.New(ctx, "test", shardRegistry, options...)
 	require.NoError(t, err)
 
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
@@ -611,7 +613,9 @@ func TestQueueSemaphore(t *testing.T) {
 
 			shard := redis_state.NewQueueShard("test", queueClient, options...)
 
-			q, err := queue.New(ctx, "test", shard, nil, nil, options...)
+			shardRegistry, err := queue.NewSingleShardRegistry(shard)
+			require.NoError(t, err)
+			q, err := queue.New(ctx, "test", shardRegistry, options...)
 			require.NoError(t, err)
 
 			require.NotNil(t, tc.run)

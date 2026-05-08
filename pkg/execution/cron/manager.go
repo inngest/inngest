@@ -26,9 +26,9 @@ const (
 	defaultHealthCheckInterval        = time.Minute
 )
 
-type RedisCronManagerOpt func(c *redisCronManagerOpt)
+type ManagerOpt func(c *managerOpt)
 
-type redisCronManagerOpt struct {
+type managerOpt struct {
 	// jitter range provides a min and max duration for the jitter to apply to schedules
 	// which will move the scheduling time a little earlier than the actual cron schedule.
 	//
@@ -40,21 +40,21 @@ type redisCronManagerOpt struct {
 	healthCheckInterval        time.Duration
 }
 
-func (opts *redisCronManagerOpt) validate() {
+func (opts *managerOpt) validate() {
 	if opts.healthCheckLeadTimeSeconds >= int(opts.healthCheckInterval.Seconds()) {
 		l := logger.StdlibLogger(context.Background())
 
 		opts.healthCheckLeadTimeSeconds = defaultHealthCheckLeadTimeSeconds
 
-		l.Warn("Invalid redisCronManagerOpt, health lead time cannot be >= health check interval", "leadTime_seconds", opts.healthCheckLeadTimeSeconds, "interval", opts.healthCheckInterval)
+		l.Warn("Invalid managerOpt, health lead time cannot be >= health check interval", "leadTime_seconds", opts.healthCheckLeadTimeSeconds, "interval", opts.healthCheckInterval)
 		l.Info("Resetting health check lead time", "leadTime", opts.healthCheckLeadTimeSeconds)
 	}
 }
 
-func WithJitterRange(min time.Duration, max time.Duration) RedisCronManagerOpt {
-	return func(c *redisCronManagerOpt) {
+func WithJitterRange(min time.Duration, max time.Duration) ManagerOpt {
+	return func(c *managerOpt) {
 		if min > max {
-			logger.StdlibLogger(context.Background()).Warn("rejecting invalid jitter range in redisCronManagerOpt", "min", min, "max", max)
+			logger.StdlibLogger(context.Background()).Warn("rejecting invalid jitter range in managerOpt", "min", min, "max", max)
 			return
 		}
 
@@ -63,33 +63,33 @@ func WithJitterRange(min time.Duration, max time.Duration) RedisCronManagerOpt {
 	}
 }
 
-func WithHealthCheckInterval(d time.Duration) RedisCronManagerOpt {
-	return func(c *redisCronManagerOpt) {
+func WithHealthCheckInterval(d time.Duration) ManagerOpt {
+	return func(c *managerOpt) {
 		if d < time.Minute {
-			logger.StdlibLogger(context.Background()).Warn("rejecting invalid health check interval in redisCronManagerOpt", "interval", d)
+			logger.StdlibLogger(context.Background()).Warn("rejecting invalid health check interval in managerOpt", "interval", d)
 			return
 		}
 		c.healthCheckInterval = d
 	}
 }
 
-func WithHealthCheckLeadTimeSeconds(leadTime int) RedisCronManagerOpt {
-	return func(c *redisCronManagerOpt) {
+func WithHealthCheckLeadTimeSeconds(leadTime int) ManagerOpt {
+	return func(c *managerOpt) {
 		if leadTime < 0 {
-			logger.StdlibLogger(context.Background()).Warn("rejecting invalid health check lead time in redisCronManagerOpt", "leadTime", leadTime)
+			logger.StdlibLogger(context.Background()).Warn("rejecting invalid health check lead time in managerOpt", "leadTime", leadTime)
 			return
 		}
 		c.healthCheckLeadTimeSeconds = leadTime
 	}
 }
 
-func NewRedisCronManager(
+func NewManager(
 	shard queue.QueueShard,
-	q queue.QueueManager,
+	q queue.Producer,
 	log logger.Logger,
-	opts ...RedisCronManagerOpt,
+	opts ...ManagerOpt,
 ) CronManager {
-	opt := redisCronManagerOpt{
+	opt := managerOpt{
 		jitterMin:                  defaultJitterMin,
 		jitterMax:                  defaultJitterMax,
 		healthCheckLeadTimeSeconds: defaultHealthCheckLeadTimeSeconds,
@@ -101,36 +101,34 @@ func NewRedisCronManager(
 
 	opt.validate()
 
-	manager := &redisCronManager{
+	return &manager{
 		shard: shard,
 		q:     q,
 		log:   log,
 		opt:   opt,
 	}
-
-	return manager
 }
 
-type redisCronManager struct {
+type manager struct {
 	shard queue.QueueShard
-	q     queue.QueueManager
+	q     queue.Producer
 
 	log logger.Logger
-	opt redisCronManagerOpt
+	opt managerOpt
 }
 
-func (c *redisCronManager) CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string {
+func (c *manager) CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string {
 	return fmt.Sprintf("{%s}:{%s}:{%s}:{%d}:cron:schedule", schedule, expr, fnID, fnVersion)
 }
 
-func (c *redisCronManager) CronHealthCheckJobID(at time.Time) string {
+func (c *manager) CronHealthCheckJobID(at time.Time) string {
 	return fmt.Sprintf("{%s}:cron:health-check", at)
 }
 
 // Sync enqueues a system job of kind "cron-sync" to the system queue.
-func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
+func (c *manager) Sync(ctx context.Context, ci CronItem) error {
 	kind := queue.KindCronSync
-	l := c.log.With("action", "redisCronManager.Sync", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
+	l := c.log.With("action", "cron.manager.Sync", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
 
 	switch ci.Op {
 	case enums.CronOpProcess, enums.CronHealthCheck:
@@ -171,7 +169,7 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}
 }
 
-func (c *redisCronManager) nextHealthCheckTime(now time.Time) time.Time {
+func (c *manager) nextHealthCheckTime(now time.Time) time.Time {
 	base := now.Truncate(c.opt.healthCheckInterval)
 	next := base.Add(c.opt.healthCheckInterval).Add(time.Duration(-1*c.opt.healthCheckLeadTimeSeconds) * time.Second)
 	if !next.After(now) {
@@ -182,7 +180,7 @@ func (c *redisCronManager) nextHealthCheckTime(now time.Time) time.Time {
 
 // Enqueues an adhoc cron-health-check system job
 // This is triggered only from our internal dashboard inngest function
-func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
+func (c *manager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
 	now := time.Now()
 
 	maxAttempts := consts.MaxRetries + 1
@@ -190,7 +188,7 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	jobID := fmt.Sprintf("adhoc-%s", c.CronHealthCheckJobID(now))
 
-	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "queue", kind, "ci", ci)
+	l := c.log.With("action", "cron.manager.EnqueueHealthCheck", "queue", kind, "ci", ci)
 
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -215,7 +213,7 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 }
 
 // enqueues a cronItem{op:healthcheck} of {kind:cron-health-check} into system queue.
-func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
+func (c *manager) EnqueueNextHealthCheck(ctx context.Context) error {
 	now := time.Now()
 	nextCheck := c.nextHealthCheckTime(now)
 
@@ -223,7 +221,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 	kind := queue.KindCronHealthCheck
 	jobID := c.CronHealthCheckJobID(nextCheck)
 
-	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "queue", kind, "now", now, "nextCheck", nextCheck)
+	l := c.log.With("action", "cron.manager.EnqueueNextHealthCheck", "queue", kind, "now", now, "nextCheck", nextCheck)
 
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -251,7 +249,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 }
 
 // HealthCheck checks if a "cron" queue item exists system queue for the next expected schedule time
-func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error) {
+func (c *manager) HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error) {
 	from := time.Now()
 
 	// Get the next schedule time based on the cron expression
@@ -264,7 +262,7 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, expr, functionID, fnVersion))
 
 	// check if the jobID exists in the system queue.
-	exists, err := c.q.ItemExists(ctx, c.shard, jobID)
+	exists, err := c.shard.ItemExists(ctx, jobID)
 	if err != nil {
 		return CronHealthCheckStatus{}, fmt.Errorf("failed to check if item exits for health check: %w", err)
 	}
@@ -274,9 +272,9 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 // ScheduleNext schedules the next "cron" job w.r.t the CronItem provided.
 // While CronItem.ID and CronItem.JobID encode the _actual_ timestamp of the next schedule, the CronItem is scheduled for a few milliseconds (jitterOpts) before the schedule to allow for some processing time to create the function run.
 // User-visible jitter is not applied here — it is computed in handleCron() from the live function config.
-func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
+func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
 	kind := queue.KindCron
-	l := c.log.With("action", "redisCronManager.ScheduleNext", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op)
+	l := c.log.With("action", "cron.manager.ScheduleNext", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op)
 
 	from := ci.ID.Timestamp()
 

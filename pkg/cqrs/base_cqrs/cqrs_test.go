@@ -706,7 +706,7 @@ func TestCQRSGetFunctionByInternalUUID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Insert the function
-		_, err = cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     envID,
@@ -769,7 +769,7 @@ func TestCQRSGetFunctionByInternalUUID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Insert the function to be archived
-		_, err = cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			AccountID: accountID,
 			EnvID:     envID,
 			AppID:     appID,
@@ -824,7 +824,7 @@ func TestCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	targetFn1ID := uuid.New()
 	targetFn2ID := uuid.New()
 
-	targetFunctions := []cqrs.InsertFunctionParams{
+	targetFunctions := []cqrs.UpsertFunctionParams{
 		{
 			ID:        targetFn1ID,
 			AccountID: uuid.New(),
@@ -851,7 +851,7 @@ func TestCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	otherFn1ID := uuid.New()
 	otherFn2ID := uuid.New()
 
-	otherFunctions := []cqrs.InsertFunctionParams{
+	otherFunctions := []cqrs.UpsertFunctionParams{
 		{
 			ID:        otherFn1ID,
 			AccountID: uuid.New(),
@@ -877,7 +877,7 @@ func TestCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	// Insert ALL functions (target + other)
 	allFunctions := append(targetFunctions, otherFunctions...)
 	for _, fn := range allFunctions {
-		_, err := cm.InsertFunction(ctx, fn)
+		_, err := cm.UpsertFunction(ctx, fn)
 		require.NoError(t, err)
 	}
 
@@ -949,7 +949,7 @@ func TestCQRSInsertFunction(t *testing.T) {
 		accountID := uuid.New()
 		envID := uuid.New()
 
-		params := cqrs.InsertFunctionParams{
+		params := cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     envID,
@@ -960,7 +960,7 @@ func TestCQRSInsertFunction(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 
-		fn, err := cm.InsertFunction(ctx, params)
+		fn, err := cm.UpsertFunction(ctx, params)
 		require.NoError(t, err)
 		require.NotNil(t, fn)
 
@@ -986,7 +986,7 @@ func TestCQRSInsertFunction(t *testing.T) {
 		accountID := uuid.New()
 		envID := uuid.New()
 
-		params := cqrs.InsertFunctionParams{
+		params := cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     envID,
@@ -997,7 +997,7 @@ func TestCQRSInsertFunction(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 
-		fn, err := cm.InsertFunction(ctx, params)
+		fn, err := cm.UpsertFunction(ctx, params)
 		require.NoError(t, err)
 		require.NotNil(t, fn)
 
@@ -1018,7 +1018,7 @@ func TestCQRSGetFunctions(t *testing.T) {
 	fnIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
 
 	for i, fnID := range fnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1086,7 +1086,7 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	// Create functions for TARGET app
 	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range targetFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     workspaceID,
@@ -1102,7 +1102,7 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	// Create functions for OTHER app (should NOT be returned)
 	otherFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range otherFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     workspaceID,
@@ -1182,7 +1182,7 @@ func TestCQRSDeleteFunctionsByAppID(t *testing.T) {
 	// Create functions for the TARGET app (to be deleted)
 	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range targetFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1198,7 +1198,7 @@ func TestCQRSDeleteFunctionsByAppID(t *testing.T) {
 	// Create functions for the PRESERVE app (should NOT be deleted)
 	preserveFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range preserveFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1271,7 +1271,7 @@ func TestCQRSDeleteFunctionsByIDs(t *testing.T) {
 	fnIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
 
 	for i, fnID := range fnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1326,7 +1326,7 @@ func TestCQRSUpdateFunctionConfig(t *testing.T) {
 	// Create test function
 	fnID := uuid.New()
 	originalConfig := `{"triggers": [{"event": "original.event"}], "concurrency": 1}`
-	_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:        fnID,
 		AccountID: uuid.New(),
 		EnvID:     uuid.New(),

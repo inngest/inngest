@@ -1,0 +1,79 @@
+name: API Docs deploy
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment target"
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production
+
+jobs:
+  deploy:
+    name: Build and deploy API docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # Provides Go, protoc, and protoc-gen-openapiv2 — all required by `make docs`.
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: nicknovitski/nix-develop@v1.2.1
+
+      # Set up Node 24 + pnpm for the api-docs build.
+      # Runs after nix-develop so node 24 takes precedence over nix's node 22.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10.18.2"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: docs/api-docs/pnpm-lock.yaml
+
+      - name: Generate OpenAPI docs
+        run: make docs
+
+      - name: Install dependencies
+        working-directory: docs/api-docs
+        run: pnpm install
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Build (preview)
+        if: inputs.environment == 'preview'
+        working-directory: docs/api-docs
+        run: vercel build
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build (production)
+        if: inputs.environment == 'production'
+        working-directory: docs/api-docs
+        run: vercel build --prod
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to preview
+        if: inputs.environment == 'preview'
+        working-directory: docs/api-docs
+        run: vercel deploy --prebuilt
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to production
+        if: inputs.environment == 'production'
+        working-directory: docs/api-docs
+        run: vercel deploy --prebuilt --prod
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
