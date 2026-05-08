@@ -38,8 +38,9 @@ changelog-writing task.
 - Combine release-level notes, per-PR notes, migration notes, and generated
   changelog content into the GitHub release page.
 - Make the release PR body a useful preview of what will be published.
-- Keep pre-releases possible without forcing the full automated stable-release
-  path to solve them immediately.
+- Allow alpha, beta, and release-candidate artifacts to be published directly
+  from PRs before the change is merged, so they can be shared with customers for
+  feedback.
 
 * Non-Goals
 
@@ -50,6 +51,7 @@ changelog-writing task.
 - Do not adopt a package-fragment system like Changesets unless the PR-body note
   approach proves too weak.
 - Do not require a human to manually write the final release page from scratch.
+- Do not route alpha or beta releases through the stable =release/next= PR.
 
 * Current State
 
@@ -283,6 +285,56 @@ release --clean --verbose --release-notes=RELEASE_NOTES.md
 This keeps artifact publishing in GoReleaser and replaces only the release body
 generation.
 
+** Pre-release Workflow
+
+Add a PR-driven pre-release workflow for publishing alpha, beta, and
+release-candidate artifacts from a pull request before it is merged. This is
+separate from the stable =release/next= flow and should not require a maintainer
+to manually type a branch name or SHA.
+
+Recommended workflow: =.github/workflows/prerelease.yml=.
+
+Trigger:
+
+- A maintainer comments on a PR with a command such as:
+
+  #+begin_src text
+  /prerelease beta
+  /prerelease alpha v1.18.0-alpha.1
+  /prerelease rc --dry-run
+  #+end_src
+
+Behavior:
+
+- Run from the default-branch workflow file using =issue_comment=.
+- Verify the comment belongs to an open PR.
+- Verify the commenter has maintainer permission.
+- Require the PR head repository to be the same repository, at least for the
+  first implementation. Publishing artifacts from forked PR code would run
+  untrusted code with release credentials.
+- Resolve the PR head SHA through the GitHub API and tag exactly that commit.
+- If a version is provided, validate that it matches
+  =vX.Y.Z-(alpha|beta|rc).N= and that the prerelease channel matches the command.
+- If a version is omitted, compute the next stable version using the same SemVer
+  rules as the stable release PR, then append =-${channel}.N= using the next
+  available numeric suffix for that channel.
+- On dry run, checkout the PR head SHA and validate the release build without
+  creating or pushing a tag.
+- On publish, create an immutable prerelease tag on the PR head SHA and push it.
+- Let the existing tag-triggered =.github/workflows/release.yml= publish the
+  artifacts.
+- Ensure prerelease tags do not update =latest= Docker tags and publish npm with
+  the matching dist-tag, which the current release workflow already does via the
+  prerelease suffix.
+- Skip Linear release completion for prerelease tags.
+- Comment back on the PR with the dry-run result or the published tag and
+  install/share instructions.
+
+This gives maintainers a controlled way to produce installable artifacts from a
+PR before the code lands on =main=. Those artifacts can then be shared with
+customers for feedback without implying the change is part of the next stable
+release.
+
 ** Conventional Commit Guardrail
 
 Add or adapt the local =commits.yml= pattern:
@@ -300,14 +352,15 @@ Use SemVer for Inngest stable releases:
 - =feat:= -> minor
 - =!= or =BREAKING CHANGE:= -> major
 
-Pre-releases remain manual in the first implementation:
+Pre-releases are dispatched from a PR by maintainer command:
 
 - =vX.Y.Z-beta.N=
 - =vX.Y.Z-alpha.N=
 - =vX.Y.Z-rc.N=
 
-The automated =release/next= PR should target stable =vX.Y.Z= only. Pre-release
-automation can be a follow-up once the stable path is proven.
+The automated =release/next= PR should target stable =vX.Y.Z= only. Alpha,
+beta, and release-candidate tags may point at PR head commits and should be
+treated as preview artifacts.
 
 * Implementation Phases
 
@@ -346,9 +399,26 @@ automation can be a follow-up once the stable path is proven.
 - [ ] Confirm npm publish still uses the tag version as before.
 - [ ] Confirm stable releases still complete Linear releases.
 
-** Phase 6: Dry Run and Rollout
+** Phase 6: Pre-release Publishing
+
+- [ ] Add =.github/workflows/prerelease.yml= triggered by PR comments.
+- [ ] Parse commands like =/prerelease beta=, =/prerelease alpha vX.Y.Z-alpha.N=,
+      and =/prerelease rc --dry-run=.
+- [ ] Verify the commenter has maintainer permission.
+- [ ] Resolve and tag the PR head SHA rather than asking for a manual ref.
+- [ ] Initially reject forked PR heads for publishing because release credentials
+      would be exposed to untrusted code.
+- [ ] Validate prerelease tags match =vX.Y.Z-(alpha|beta|rc).N=.
+- [ ] Support dry-run validation without creating a tag.
+- [ ] Confirm prerelease Docker images do not update =latest= tags.
+- [ ] Confirm npm publishes prereleases under the matching =alpha=, =beta=, or
+      =rc= dist-tag.
+- [ ] Confirm Linear release completion remains stable-release only.
+
+** Phase 7: Dry Run and Rollout
 
 - [ ] Run the release PR workflow manually on a test branch or fork.
+- [ ] Run the prerelease workflow against a test PR with =/prerelease beta --dry-run=.
 - [ ] Compare generated =CHANGELOG.md= against current output.
 - [ ] Compare assembled =RELEASE_NOTES.md= against expected PR context.
 - [ ] Merge a low-risk release PR after review.
