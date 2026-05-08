@@ -409,11 +409,11 @@ treated as preview artifacts.
 
 ** Phase 1: Release Metadata Contract
 
-- [ ] Simplify the PR template to =Description=, =Release note=, and
+- [X] Simplify the PR template to =Description=, =Release note=, and
       =Migration note=.
-- [ ] Remove the redundant type-of-change section once Conventional Commit title
+- [X] Remove the redundant type-of-change section once Conventional Commit title
       validation is in place.
-- [ ] Remove checklist items that are no longer useful release/process signals.
+- [X] Remove checklist items that are no longer useful release/process signals.
 - [ ] Add PR title Conventional Commit validation.
 - [ ] Add =cloud:=, =internal:=, and =noop:= as accepted non-release PR title
       prefixes.
