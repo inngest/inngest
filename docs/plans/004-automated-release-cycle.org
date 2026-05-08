@@ -196,34 +196,50 @@ The existing =.github/workflows/release.yml= will then run from the pushed tag.
 
 ** PR Authoring Contract
 
-Update =.github/pull_request_template.md= with explicit release sections:
+Simplify =.github/pull_request_template.md= around release automation. Keep
+=Description=, add dedicated =Release note= and =Migration note= sections, and
+remove the type-of-change and checklist sections once Conventional Commit title
+validation is in place.
+
+Recommended template shape:
 
 #+begin_src markdown
-## Release notes
+## Description
+
+<!-- What changed? Include screenshots if you modify the UI. -->
+
+## Release note
+
 <!-- User-facing release note. Use "None" if this does not need release notes. -->
 None.
 
-## Migration notes
+## Migration note
+
 <!-- Upgrade, deployment, config, schema, or compatibility notes. Use "None" if none. -->
 None.
 #+end_src
 
 Rules:
 
-- The PR title still drives the generated changelog category.
-- Every PR must make an explicit release-note decision. Authors should leave
-  either real content or =None= in the release and migration note sections.
-- =Release notes= should explain the user-visible impact, not repeat the
-  implementation summary.
-- =Migration notes= should include required operator/user action, compatibility
-  risks, config changes, schema changes, deprecations, and behavior changes.
-- =None=, =N/A=, empty text, and untouched placeholders are ignored.
-- Non-empty release notes are required for =feat:= PRs, breaking changes, and
-  PRs labeled =release-note-required=. Internal-only PRs may use =None=, subject
-  to reviewer judgment.
+- The PR title drives both the generated changelog category and release-note
+  eligibility through the Conventional Commit type.
+- =Description= should summarize what changed and provide implementation context
+  for reviewers.
+- =Release note= should explain the user-visible impact. Non-empty release notes
+  are required for =feat:=, =fix:=, =security:=, breaking changes, and PRs
+  labeled =release-note-required=.
+- =Migration note= should include required operator/user action, compatibility
+  guidance, config changes, schema changes, deprecations, or rollout/rollback
+  context.
+- Chores, docs-only PRs, and changes that only touch paths excluded by
+  =cliff.toml= do not contribute release or migration notes by default.
+- Empty text, untouched placeholders, =None=, and =N/A= are ignored.
 - The first implementation will not add a separate release-owner reviewer gate
   for migration notes. Migration-note review can be revisited later; see
   =docs/DEFERRED.md=.
+
+This keeps the normal PR path short while ensuring release and migration context
+is captured explicitly while the PR context is fresh.
 
 ** Release Note Assembly
 
@@ -236,7 +252,8 @@ Add scripts under =scripts/release/=:
     excluded paths should not contribute generated changelog entries, release
     notes, or migration notes to the CLI/self-host release output.
   - Fetch PR titles, numbers, URLs, labels, authors, and bodies.
-  - Parse exact markdown sections from PR bodies.
+  - Parse =Description=, =Release note=, and =Migration note= headings from PR
+    bodies.
   - Emit structured JSON.
 
 - =build-release-notes=
@@ -244,6 +261,7 @@ Add scripts under =scripts/release/=:
   - Read collected per-PR notes.
   - Read the generated =git-cliff= section for the release.
   - Write =RELEASE_NOTES.md=.
+  - Produce deterministic output for the same tag and repository state.
 
 Recommended final GitHub release body:
 
@@ -265,6 +283,22 @@ Generated git-cliff changelog section.
 The final release body should not include a contributor section in the first
 implementation. Keep the release page focused on release notes, migration notes,
 and changelog content; rely on GitHub metadata for contributor context.
+
+=RELEASE_NOTES.md= is a workflow artifact only and should not be committed. The
+persisted release records are =CHANGELOG.md= in the repository and the GitHub
+Release body generated from =RELEASE_NOTES.md=.
+
+Because =RELEASE_NOTES.md= is generated on demand, the builder must be
+deterministic:
+
+- Use the release tag and previous stable tag as explicit boundaries.
+- Sort included PRs by merge commit order or PR number, and keep that order
+  stable across preview and publish jobs.
+- Normalize empty values, placeholders, and whitespace consistently.
+- Use the same path exclusion rules in preview and publish jobs.
+- Fail if required inputs are missing instead of silently producing partial
+  notes.
+- Avoid timestamps or workflow-run-specific data in the generated body.
 
 Implementation note: prefer a small Go command or well-tested shell scripts over
 large workflow-inline scripts. The parsing rules should have tests because PR
@@ -343,6 +377,15 @@ Add or adapt the local =commits.yml= pattern:
 - Keep the allowed type list close to =cliff.toml=.
 - Do not initially require every commit to be conventional; squash-merged PR
   titles are enough for this workflow if branch protection enforces the PR title.
+- Add explicit non-release prefixes:
+  - =cloud:= for cloud-only changes that should not appear in CLI/self-host
+    changelogs.
+  - =internal:= for repository maintenance, refactors, tests, tooling, and other
+    implementation-only changes that should not appear in release notes.
+  - =noop:= for changes with no release impact, such as metadata-only updates or
+    intentionally empty commits.
+- Configure =cliff.toml= to exclude =cloud:=, =internal:=, and =noop:= from
+  generated changelogs and release-note eligibility.
 
 * Versioning Policy
 
@@ -366,8 +409,14 @@ treated as preview artifacts.
 
 ** Phase 1: Release Metadata Contract
 
-- [ ] Update PR template with release and migration note sections.
+- [ ] Simplify the PR template to =Description=, =Release note=, and
+      =Migration note=.
+- [ ] Remove the redundant type-of-change section once Conventional Commit title
+      validation is in place.
+- [ ] Remove checklist items that are no longer useful release/process signals.
 - [ ] Add PR title Conventional Commit validation.
+- [ ] Add =cloud:=, =internal:=, and =noop:= as accepted non-release PR title
+      prefixes.
 - [ ] Document author guidance in =docs/PULL_REQUEST_GUIDELINES.md=.
 
 ** Phase 2: Note Extraction
@@ -376,11 +425,15 @@ treated as preview artifacts.
 - [ ] Add parser tests for normal, empty, placeholder, multiline, and repeated
       section cases.
 - [ ] Add =scripts/release/build-release-notes=.
+- [ ] Ensure =build-release-notes= is deterministic for the same tag and repo
+      state.
 - [ ] Test output with representative real PR bodies.
 
 ** Phase 3: Release PR Automation
 
 - [ ] Add =.github/workflows/release-pr.yml=.
+- [ ] Update =cliff.toml= to exclude =cloud:=, =internal:=, and =noop:= from
+      generated changelogs.
 - [ ] Ensure it preserves manual blocks in existing release PR bodies.
 - [ ] Generate =CHANGELOG.md=.
 - [ ] Generate and publish the release notes preview in the release PR body.
