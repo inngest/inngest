@@ -3,14 +3,34 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
 type sdkRequestIDCtxKey struct{}
 
 type sdkJobIDCtxKey struct{}
+
+// DispatchRequestID returns the deterministic ULID the executor stamps on
+// outbound SDK requests for a given dispatch. Single source of truth for the
+// producer (executor) and the validator (checkpoint package): a drift in
+// either the seed format or the entropy derivation would silently break
+// fencing for in-flight runs.
+func DispatchRequestID(ts time.Time, runID ulid.ULID, generationID int) ulid.ULID {
+	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", runID, generationID))
+}
+
+// DispatchRequestIDEntropy returns the entropy portion of the dispatch
+// RequestID. The validator compares this against the entropy of the
+// SDK-echoed RequestID; the dispatch timestamp doesn't participate in
+// fencing.
+func DispatchRequestIDEntropy(runID ulid.ULID, generationID int) []byte {
+	return DispatchRequestID(time.Unix(0, 0), runID, generationID).Entropy()
+}
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
 // driver calls.
@@ -98,12 +118,6 @@ type SDKRequestContext struct {
 
 	// JobID is the stable queue item ID for the current job.
 	JobID string `json:"job_id,omitempty"`
-
-	// GenerationID identifies the canonical dispatch attempt for the leased
-	// queue item: a monotonic counter bumped by Requeue. The SDK echoes this
-	// on every async checkpoint POST so the backend can reject writes from a
-	// stale dispatch whose lease was superseded by a Requeue.
-	GenerationID int `json:"generation_id,omitempty"`
 
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.
