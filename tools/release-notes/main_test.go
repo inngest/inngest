@@ -56,6 +56,39 @@ Additional note.
 	}
 }
 
+func TestParsePRBodyCombinesRepeatedReleaseAndMigrationSections(t *testing.T) {
+	body := `## Release note
+
+First release note.
+
+## Migration note
+
+First migration note.
+
+## Release notes
+
+Second release note.
+
+## Migration notes
+
+Second migration note.
+`
+
+	sections := ParsePRBody(body)
+
+	releaseNote := NormalizeNote(sections["release note"])
+	wantReleaseNote := "First release note.\n\nSecond release note."
+	if releaseNote != wantReleaseNote {
+		t.Fatalf("release note = %q, want %q", releaseNote, wantReleaseNote)
+	}
+
+	migrationNote := NormalizeNote(sections["migration note"])
+	wantMigrationNote := "First migration note.\n\nSecond migration note."
+	if migrationNote != wantMigrationNote {
+		t.Fatalf("migration note = %q, want %q", migrationNote, wantMigrationNote)
+	}
+}
+
 func TestParsePRBodyKeepsNestedHeadingsInsideSection(t *testing.T) {
 	body := `## Release note
 
