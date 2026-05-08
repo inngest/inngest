@@ -9,7 +9,6 @@ import (
 )
 
 // DeterministicULID creates a deterministic ULID given the seed.
-// new SeededID.
 func DeterministicULID(ts time.Time, seed []byte) (ulid.ULID, error) {
 	// ULID requires 10 bytes of entropy. If seed is shorter, pad it with zeros.
 	// If seed is longer, use all of it as the entropy source.
