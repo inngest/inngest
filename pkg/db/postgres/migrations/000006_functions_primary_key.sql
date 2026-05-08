@@ -9,8 +9,14 @@ DELETE FROM functions a
 USING functions b
 WHERE a.id = b.id AND a.ctid < b.ctid;
 
-ALTER TABLE functions ADD PRIMARY KEY (id);
+-- The fork's 000005 migration may have already added this constraint.
+-- +goose StatementBegin
+DO $$ BEGIN
+  ALTER TABLE functions ADD PRIMARY KEY (id);
+EXCEPTION WHEN duplicate_object OR invalid_table_definition THEN NULL;
+END $$;
+-- +goose StatementEnd
 
 -- +goose Down
 
-ALTER TABLE functions DROP CONSTRAINT functions_pkey;
+ALTER TABLE functions DROP CONSTRAINT IF EXISTS functions_pkey;
