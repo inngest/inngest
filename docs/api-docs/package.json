@@ -19,7 +19,7 @@
     "@tanstack/react-start": "^1.158.1",
     "fumadocs-core": "^16.0.0",
     "fumadocs-mdx": "^14.0.0",
-    "fumadocs-openapi": "10.6.8",
+    "fumadocs-openapi": "10.8.1",
     "fumadocs-ui": "^16.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.2.4",
-    "@tanstack/eslint-config": "0.3.4",
+    "@tanstack/eslint-config": "0.4.0",
     "@types/mdx": "2.0.13",
     "@types/node": "24.12.2",
     "@types/react": "19.2.14",
@@ -35,7 +35,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "tailwindcss": "4.2.4",
     "tsx": "4.21.0",
-    "yaml": "2.8.3",
+    "yaml": "2.8.4",
     "typescript": "5.9.3",
     "vite": "7.3.2",
     "vite-tsconfig-paths": "6.1.1"
@@ -44,5 +44,5 @@
     "node": "24.x",
     "pnpm": "10.x"
   },
-  "packageManager": "pnpm@10.18.2"
+  "packageManager": "pnpm@10.33.3"
 }
