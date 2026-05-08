@@ -99,14 +99,18 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 					missing[name] = struct{}{}
 				}
 				if len(missing) != 0 {
-					missings := componentNames(missing)
-					return fmt.Errorf("operation %s %s must define exactly all path parameters (missing: %v)", method, path, missings)
+					return &PathParametersError{
+						Path:    path,
+						Method:  method,
+						Missing: componentNames(missing),
+						Origin:  pathItem.Origin,
+					}
 				}
 			}
 		}
 
 		if err := pathItem.Validate(ctx); err != nil {
-			return fmt.Errorf("invalid path %s: %v", path, err)
+			return fmt.Errorf("invalid path %s: %w", path, err)
 		}
 	}
 

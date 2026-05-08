@@ -3,7 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"maps"
 )
 
@@ -86,7 +85,7 @@ func (info *Info) Validate(ctx context.Context, opts ...ValidationOption) error 
 	ctx = WithValidationOptions(ctx, opts...)
 
 	if info.Summary != "" && !getValidationOptions(ctx).isOpenAPI31OrLater {
-		return errFieldFor31Plus("summary")
+		return newInfoSummaryFieldFor31Plus(info.Origin)
 	}
 
 	if contact := info.Contact; contact != nil {
@@ -102,11 +101,11 @@ func (info *Info) Validate(ctx context.Context, opts ...ValidationOption) error 
 	}
 
 	if info.Version == "" {
-		return errors.New("value of version must be a non-empty string")
+		return newInfoVersionRequired(info.Origin)
 	}
 
 	if info.Title == "" {
-		return errors.New("value of title must be a non-empty string")
+		return newInfoTitleRequired(info.Origin)
 	}
 
 	return validateExtensions(ctx, info.Extensions)

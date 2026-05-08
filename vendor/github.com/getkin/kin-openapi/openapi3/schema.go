@@ -1426,7 +1426,7 @@ func (schema *Schema) validate(ctx context.Context, stack []*Schema) ([]*Schema,
 			if _, ok := allowed[field]; ok {
 				return nil
 			}
-			return errFieldFor31Plus(field)
+			return errFieldFor31Plus(field, schema.Origin)
 		}
 		if schema.Const != nil {
 			if err := reject("const"); err != nil {
@@ -1891,13 +1891,13 @@ func (schema *Schema) validate(ctx context.Context, stack []*Schema) ([]*Schema,
 
 	if v := schema.Default; v != nil && !validationOpts.schemaDefaultsValidationDisabled {
 		if err := validateExampleValue(ctx, v, schema); err != nil {
-			return stack, fmt.Errorf("invalid default: %w", err)
+			return stack, newSchemaValueError("default", err, schema.Origin)
 		}
 	}
 
 	if x := schema.Example; x != nil && !validationOpts.examplesValidationDisabled {
 		if err := validateExampleValue(ctx, x, schema); err != nil {
-			return stack, fmt.Errorf("invalid example: %w", err)
+			return stack, newSchemaValueError("example", err, schema.Origin)
 		}
 	}
 

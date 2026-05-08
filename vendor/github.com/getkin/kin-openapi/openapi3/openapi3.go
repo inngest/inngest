@@ -53,8 +53,8 @@ func (doc *T) IsOpenAPI31OrLater() bool {
 	return slices.Contains([]string{"3.1", "3.2"}, doc.OpenAPIMajorMinor())
 }
 
-func errFieldFor31Plus(field string) error {
-	return fmt.Errorf("field %s is for OpenAPI >=3.1", field)
+func errFieldFor31Plus(field string, origin *Origin) error {
+	return newFieldFor31Plus(field, origin)
 }
 
 func errValueOfFieldFor31Plus(value any, field string) error {
@@ -269,14 +269,14 @@ func (doc *T) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
 
 	if doc.OpenAPI == "" {
-		return errors.New("value of openapi must be a non-empty string")
+		return newOpenAPIVersionRequired()
 	}
 
 	if doc.Webhooks != nil && !doc.IsOpenAPI31OrLater() {
-		return errFieldFor31Plus("webhooks")
+		return newWebhooksFieldFor31Plus()
 	}
 	if doc.JSONSchemaDialect != "" && !doc.IsOpenAPI31OrLater() {
-		return errFieldFor31Plus("jsonschemadialect")
+		return newJSONSchemaDialectFieldFor31Plus()
 	}
 
 	var wrap func(error) error

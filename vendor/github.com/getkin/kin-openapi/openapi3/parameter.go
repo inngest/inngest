@@ -391,7 +391,7 @@ func (parameter *Parameter) Validate(ctx context.Context, opts ...ValidationOpti
 		}
 		if example := parameter.Example; example != nil {
 			if err := validateExampleValue(ctx, example, schema.Value); err != nil {
-				return fmt.Errorf("invalid example: %w", err)
+				return newSchemaValueError("example", err, parameter.Origin)
 			}
 		} else if examples := parameter.Examples; examples != nil {
 			for _, k := range componentNames(examples) {

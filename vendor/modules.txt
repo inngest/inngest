@@ -670,7 +670,7 @@ github.com/felixge/httpsnoop
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
 github.com/fsnotify/fsnotify/internal
-# github.com/getkin/kin-openapi v0.137.0
+# github.com/getkin/kin-openapi v0.138.0
 ## explicit; go 1.25
 github.com/getkin/kin-openapi/openapi2
 github.com/getkin/kin-openapi/openapi2conv
