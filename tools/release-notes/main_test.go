@@ -56,6 +56,42 @@ Additional note.
 	}
 }
 
+func TestParsePRBodyKeepsNestedHeadingsInsideSection(t *testing.T) {
+	body := `## Release note
+
+Users can enable the new behavior.
+
+### Details
+
+- Works for serve functions.
+- Works for connect functions.
+
+## Migration note
+
+Set the new flag before rollout.
+`
+
+	sections := ParsePRBody(body)
+	got := NormalizeNote(sections["release note"])
+	want := "Users can enable the new behavior.\n\n### Details\n\n- Works for serve functions.\n- Works for connect functions."
+	if got != want {
+		t.Fatalf("release note = %q, want %q", got, want)
+	}
+	if got := NormalizeNote(sections["migration note"]); got != "Set the new flag before rollout." {
+		t.Fatalf("migration note = %q", got)
+	}
+}
+
+func TestNormalizeNotePlaceholders(t *testing.T) {
+	for _, input := range []string{"", "None", "None.", "N/A", "n/a.", " NA "} {
+		t.Run(input, func(t *testing.T) {
+			if got := NormalizeNote(input); got != "" {
+				t.Fatalf("NormalizeNote(%q) = %q, want empty", input, got)
+			}
+		})
+	}
+}
+
 func TestParseCliffExcludePaths(t *testing.T) {
 	config := `
 exclude_paths = [
@@ -111,12 +147,54 @@ func TestShouldExcludePR(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "scoped non release prefix",
+			pr: PullRequest{
+				Title: "cloud(dashboard): update card",
+				Files: []string{"pkg/execution/run.go"},
+			},
+			want: true,
+		},
+		{
+			name: "similar prefix is not excluded",
+			pr: PullRequest{
+				Title: "internalize: expose helper",
+				Files: []string{"pkg/execution/run.go"},
+			},
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ShouldExcludePR(tt.pr, excludes); got != tt.want {
 				t.Fatalf("ShouldExcludePR() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPathExcluded(t *testing.T) {
+	excludes := []string{"pkg/debugapi/", "cmd/debug", "ui/apps/dashboard/"}
+
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{path: "pkg/debugapi/api.go", want: true},
+		{path: "./pkg/debugapi/api.go", want: true},
+		{path: "pkg/debugapi_extra/api.go", want: false},
+		{path: "cmd/debug", want: true},
+		{path: "cmd/debug/main.go", want: true},
+		{path: "cmd/debugger/main.go", want: false},
+		{path: "ui/apps/dashboard", want: false},
+		{path: "ui/apps/dashboard/page.tsx", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := PathExcluded(tt.path, excludes); got != tt.want {
+				t.Fatalf("PathExcluded(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}
@@ -144,6 +222,54 @@ func TestExtractChangelogSection(t *testing.T) {
 	want := "### Features\n\n- Add thing"
 	if got != want {
 		t.Fatalf("section = %q, want %q", got, want)
+	}
+}
+
+func TestExtractChangelogSectionHeadingFormats(t *testing.T) {
+	tests := []struct {
+		name      string
+		changelog string
+	}{
+		{
+			name: "unprefixed bracket",
+			changelog: `## [1.2.3] - 2026-05-08
+
+- Entry
+`,
+		},
+		{
+			name: "prefixed plain",
+			changelog: `## v1.2.3
+
+- Entry
+`,
+		},
+		{
+			name: "unprefixed plain",
+			changelog: `## 1.2.3
+
+- Entry
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExtractChangelogSection(tt.changelog, "v1.2.3")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "- Entry" {
+				t.Fatalf("section = %q", got)
+			}
+		})
+	}
+}
+
+func TestExtractChangelogSectionMissing(t *testing.T) {
+	_, err := ExtractChangelogSection("## [v1.2.2]\n\n- Old", "v1.2.3")
+	if err == nil {
+		t.Fatal("expected missing changelog section error")
 	}
 }
 
@@ -209,6 +335,41 @@ Manual migration context.
 	}
 }
 
+func TestBuildReleaseNotesOmitsEmptySections(t *testing.T) {
+	got, err := BuildReleaseNotes(NotesFile{}, "### Bug Fixes\n\n- Fix thing", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, "## Release Notes") {
+		t.Fatalf("unexpected release notes section:\n%s", got)
+	}
+	if strings.Contains(got, "## Migration Notes") {
+		t.Fatalf("unexpected migration notes section:\n%s", got)
+	}
+	assertContains(t, got, "## Changelog")
+	assertContains(t, got, "### Bug Fixes")
+}
+
+func TestBuildReleaseNotesManualPlaceholdersAreIgnored(t *testing.T) {
+	releasePRBody := `## Additional Release Notes
+<!-- release-note:manual-start -->
+None.
+<!-- release-note:manual-end -->
+
+## Additional Migration Notes
+<!-- migration-note:manual-start -->
+N/A
+<!-- migration-note:manual-end -->`
+
+	got, err := BuildReleaseNotes(NotesFile{}, "### Bug Fixes\n\n- Fix thing", releasePRBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, "## Release Notes") || strings.Contains(got, "## Migration Notes") {
+		t.Fatalf("placeholder manual notes should not render:\n%s", got)
+	}
+}
+
 func TestCollectCommandFromInput(t *testing.T) {
 	dir := t.TempDir()
 	inputPath := filepath.Join(dir, "prs.json")
@@ -251,6 +412,50 @@ func TestCollectCommandFromInput(t *testing.T) {
 	if notes.PRs[0].MigrationNote != "" {
 		t.Fatalf("migration note = %q", notes.PRs[0].MigrationNote)
 	}
+}
+
+func TestBuildCommandWritesOutput(t *testing.T) {
+	dir := t.TempDir()
+	notesPath := filepath.Join(dir, "notes.json")
+	changelogPath := filepath.Join(dir, "CHANGELOG.md")
+	outputPath := filepath.Join(dir, "RELEASE_NOTES.md")
+
+	notes := NotesFile{PRs: []PullRequest{
+		{
+			Number:      2,
+			Title:       "fix: repair thing",
+			ReleaseNote: "Thing is repaired.",
+		},
+	}}
+	data, err := json.Marshal(notes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(notesPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(changelogPath, []byte("## [v1.2.3] - 2026-05-08\n\n### Bug Fixes\n\n- Repair thing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = run([]string{
+		"build",
+		"--notes", notesPath,
+		"--changelog", changelogPath,
+		"--tag", "v1.2.3",
+		"--output", outputPath,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(output)
+	assertContains(t, got, "Thing is repaired.")
+	assertContains(t, got, "### Bug Fixes")
 }
 
 func assertContains(t *testing.T, haystack, needle string) {
