@@ -6,7 +6,7 @@ settings:
 
 overrides:
   '@babel/runtime@<7.26.10': '>=7.26.10'
-  '@clerk/shared@<3.47.4': 4.9.0
+  '@clerk/shared@<3.47.4': 4.10.0
   '@sentry/browser@<7.119.1': '>=7.119.1'
   '@urql/core': 6.0.1
   brace-expansion@>=1.0.0 <=1.1.11: '>=1.1.12'
@@ -69,9 +69,9 @@ overrides:
   ws@>=6.0.0 <6.2.3: '>=6.2.3'
   ws@>=8.0.0 <8.17.1: '>=8.17.1'
   zod@>=3.0.0 <4.0.0: '>=3.25.76 <5.0.0'
-  '@tanstack/router-generator>zod': 3.24.3
-  '@tanstack/router-plugin>zod': 3.24.3
-  '@tanstack/start-plugin-core>zod': 3.24.3
+  '@tanstack/router-generator>zod': 3.25.76
+  '@tanstack/router-plugin>zod': 3.25.76
+  '@tanstack/start-plugin-core>zod': 3.25.76
 
 importers:
 
@@ -11417,9 +11417,6 @@ packages:
     peerDependencies:
       zod: '>=3.25.76 <5.0.0'
 
-  zod@3.24.3:
-    resolution: {integrity: sha512-HhY1oqzWCQWuUqvBFnsyrtZRhyPeR7SUGv+C4+MsisMuVfSPx8HpwWqH8tRahSlt6M3PiFAcoeFhZAqIXTxoSg==}
-
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
@@ -16296,7 +16293,7 @@ snapshots:
       jiti: 2.7.0
       magic-string: 0.30.21
       prettier: 3.8.3
-      zod: 3.24.3
+      zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
@@ -16314,7 +16311,7 @@ snapshots:
       '@tanstack/virtual-file-routes': 1.161.7
       chokidar: 3.6.0
       unplugin: 3.0.0
-      zod: 3.24.3
+      zod: 3.25.76
     optionalDependencies:
       '@rsbuild/core': 2.0.3
       '@tanstack/react-router': 1.169.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -16337,7 +16334,7 @@ snapshots:
       '@tanstack/virtual-file-routes': 1.161.7
       chokidar: 3.6.0
       unplugin: 3.0.0
-      zod: 3.24.3
+      zod: 3.25.76
     optionalDependencies:
       '@rsbuild/core': 2.0.3
       '@tanstack/react-router': 1.169.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -16398,7 +16395,7 @@ snapshots:
       ufo: 1.6.4
       vitefu: 1.1.3(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(yaml@2.8.4))
       xmlbuilder2: 4.0.3
-      zod: 3.24.3
+      zod: 3.25.76
     optionalDependencies:
       '@rsbuild/core': 2.0.3
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.46.2)(yaml@2.8.4)
@@ -16433,7 +16430,7 @@ snapshots:
       ufo: 1.6.4
       vitefu: 1.1.3(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(yaml@2.8.4))
       xmlbuilder2: 4.0.3
-      zod: 3.24.3
+      zod: 3.25.76
     optionalDependencies:
       '@rsbuild/core': 2.0.3
       vite: 8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(yaml@2.8.4)
@@ -23998,8 +23995,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.4.3):
     dependencies:
       zod: 4.4.3
-
-  zod@3.24.3: {}
 
   zod@3.25.76: {}
 
