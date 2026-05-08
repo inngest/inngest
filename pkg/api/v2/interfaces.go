@@ -3,10 +3,12 @@ package apiv2
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -29,4 +31,9 @@ type FunctionScheduler interface {
 
 type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
+}
+
+// AppSyncer persists an in-band sync result. Dev server and cloud differ.
+type AppSyncer interface {
+	ProcessSync(ctx context.Context, req sdk.RegisterRequest) (*sync.Reply, error)
 }

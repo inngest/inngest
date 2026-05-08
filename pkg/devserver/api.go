@@ -216,9 +216,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.devserver.handlerLock.Lock()
-	defer a.devserver.handlerLock.Unlock()
-
 	req, err := sdk.FromReadCloser(r.Body, sdk.FromReadCloserOpts{})
 	if err != nil {
 		l.Warn("Invalid request", "error", err)
@@ -226,7 +223,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, err := a.register(ctx, req)
+	reply, err := a.devserver.ProcessSync(ctx, req)
 	if err != nil {
 		l.Warn("error registering functions", "error", err)
 		_ = publicerr.WriteHTTP(w, err)
@@ -242,13 +239,16 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(resp)
 }
 
-func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Reply, error) {
+func (d *devserver) ProcessSync(ctx context.Context, r sdk.RegisterRequest) (*sync.Reply, error) {
+	d.handlerLock.Lock()
+	defer d.handlerLock.Unlock()
+
 	sum, err := r.Checksum()
 	if err != nil {
 		return nil, publicerr.Wrap(err, 400, "Invalid request")
 	}
 
-	l := a.devserver.log
+	l := d.log
 
 	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
 	syncID := uuid.New()
@@ -260,7 +260,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// We iterate all apps rather than using GetAppByURL because that query
 	// returns LIMIT 1 and may find the real (named) app instead of the
 	// placeholder when both share the same URL.
-	if allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID); err == nil {
+	if allApps, err := d.Data.GetAllApps(ctx, consts.DevServerEnvID); err == nil {
 		normalizedURL := util.NormalizeAppURL(r.URL, false)
 		for _, app := range allApps {
 			if app.Name == "" && util.NormalizeAppURL(app.Url, false) == normalizedURL {
@@ -271,7 +271,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				// This situation happens when a user enters an unreachable URL
 				// in the UI. It'll still create an app, but in a placeholder
 				// state.
-				if err := a.devserver.Data.DeleteApp(ctx, app.ID); err != nil {
+				if err := d.Data.DeleteApp(ctx, app.ID); err != nil {
 					l.Error("error deleting app", "error", err)
 				}
 			}
@@ -306,7 +306,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			Valid:  true,
 		}
 
-		if _, err := a.devserver.Data.UpsertApp(ctx, appParams); err != nil {
+		if _, err := d.Data.UpsertApp(ctx, appParams); err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error updating app error")
 		}
 
@@ -318,7 +318,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		}
 	}
 
-	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
+	if app, err := d.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
@@ -330,7 +330,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		}
 
 		// Clear app error.
-		_, err = a.devserver.Data.UpdateAppError(
+		_, err = d.Data.UpdateAppError(
 			ctx,
 			cqrs.UpdateAppErrorParams{
 				ID:    app.ID,
@@ -345,7 +345,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// setup a list of crons to be upserted into the queue for scheduling
 	var crons []cron.CronItem
 
-	tx, err := a.devserver.Data.WithTx(ctx)
+	tx, err := d.Data.WithTx(ctx)
 	if err != nil {
 		return nil, publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
@@ -366,7 +366,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 		// handle cron sync to system queue
 		for _, ci := range crons {
-			if err := a.devserver.CronSyncer.Sync(ctx, ci); err != nil {
+			if err := d.CronSyncer.Sync(ctx, ci); err != nil {
 				l.Error("error on triggering cron-sync", "functionID", ci.FunctionID, "cronExpr", ci.Expression, "functionVersion", ci.FunctionVersion, "error", err)
 			}
 		}
@@ -512,7 +512,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	}
 
 	// Set semaphore capacity for all fn-scoped concurrency limits after DB storage.
-	processed.SetSemaphoreCapacity(ctx, a.devserver.SemaphoreManager)
+	processed.SetSemaphoreCapacity(ctx, d.SemaphoreManager)
 
 	reply := &sync.Reply{
 		OK:       true,

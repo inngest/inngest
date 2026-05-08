@@ -121,6 +121,11 @@ type StartOpts struct {
 	// validate responses where applicable, modelling cloud behaviour.
 	SigningKey *string `json:"-"`
 
+	// AllowInsecureHTTP permits in-band sync against http:// SDK URLs.
+	// `inngest dev` always sets this true; `inngest start` exposes it via
+	// --allow-insecure-http.
+	AllowInsecureHTTP bool `json:"-"`
+
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
 	EventKeys []string `json:"-"`
@@ -693,13 +698,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	// Create the API v2 service handler
 	serviceOpts := apiv2.ServiceOptions{
-		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
-		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
-		Functions:           NewFunctionProvider(dbcqrs),
-		Executor:            exec,
-		EventPublisher:      runner,
+		SigningKeysProvider:      apiv2.NewSigningKeysProvider(opts.SigningKey),
+		EventKeysProvider:        apiv2.NewEventKeysProvider(opts.EventKeys),
+		Functions:                NewFunctionProvider(dbcqrs),
+		Executor:                 exec,
+		EventPublisher:           runner,
+		AppSyncer:                ds,
+		ServerKind:               opts.Config.GetServerKind(),
+		AppSyncAllowInsecureHTTP: opts.AllowInsecureHTTP,
 	}
 
 	apiv2Base := apiv2base.NewBase()

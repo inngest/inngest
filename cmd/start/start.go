@@ -123,6 +123,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
 
 	opts := devserver.StartOpts{
+		AllowInsecureHTTP:       localconfig.GetBoolValue(cmd, "allow-insecure-http", false),
 		Config:                  *conf,
 		ConnectGatewayHost:      conf.CoreAPI.Addr,
 		ConnectGatewayPort:      connectGatewayPort,

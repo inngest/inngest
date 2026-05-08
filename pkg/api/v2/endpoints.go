@@ -2,11 +2,16 @@ package apiv2
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/appsync"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/syscode"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -277,6 +282,183 @@ func (s *Service) PatchEnv(ctx context.Context, req *apiv2.PatchEnvRequest) (*ap
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
 }
 
-func (s *Service) SyncApp(ctx context.Context, req *apiv2.SyncAppRequest) (*apiv2.SyncAppResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "App sync not implemented in OSS")
+const syncStatusSuccess = "SUCCESS"
+
+// SyncApp performs an app sync against the SDK at the provided URL.
+func (s *Service) SyncApp(
+	ctx context.Context,
+	req *apiv2.SyncAppRequest,
+) (*apiv2.SyncAppResponse, error) {
+	ctx = logger.WithStdlib(ctx, logger.From(ctx).With("handler", "SyncApp"))
+
+	if req.Url == "" {
+		return nil, s.base.NewError(
+			http.StatusBadRequest,
+			apiv2base.ErrorMissingField,
+			"url is required",
+		)
+	}
+	if req.AppId == "" {
+		return nil, s.base.NewError(
+			http.StatusBadRequest,
+			apiv2base.ErrorMissingField,
+			"app_id is required",
+		)
+	}
+
+	// Sync drives an outbound HTTP request to a caller-supplied URL; rate-limit
+	// before any work to bound SSRF / DoS amplification per signing key.
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_SyncApp_FullMethodName); result.Limited {
+		return nil, s.base.NewError(
+			http.StatusTooManyRequests,
+			apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no app was synced.",
+		)
+	}
+
+	if s.appSyncer == nil {
+		return nil, s.base.NewError(
+			http.StatusNotImplemented,
+			apiv2base.ErrorNotImplemented,
+			"App sync not implemented",
+		)
+	}
+
+	signingKey, err := s.firstSigningKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	syncResp, syscodeErr, err := appsync.Sync(ctx, appsync.Opts{
+		AllowInsecureHTTP: s.appSyncAllowInsecure,
+		ExpectedAppID:     req.AppId,
+		ServerKind:        s.serverKind,
+		SigningKey:        signingKey,
+		URL:               req.Url,
+	})
+	if err != nil {
+		logger.From(ctx).Error(
+			"system error during sync",
+			"error", err,
+			"url", req.Url,
+		)
+		return nil, s.base.NewError(
+			http.StatusInternalServerError,
+			apiv2base.ErrorInternalError,
+			"internal error during sync",
+		)
+	}
+	if syscodeErr != nil {
+		logger.From(ctx).Warn(
+			"sync failed",
+			"code", syscodeErr.Code,
+			"message", syscodeErr.Message,
+			"url", req.Url,
+		)
+		return nil, s.base.NewError(
+			httpStatusForSyncSyscode(syscodeErr.Code),
+			syscodeErr.Code,
+			syscodeErr.Message,
+		)
+	}
+
+	reply, err := s.appSyncer.ProcessSync(ctx, *syncResp.ToRegisterRequest())
+	if err != nil {
+		logger.From(ctx).Error("error processing sync", "error", err)
+		return nil, s.processSyncErr(err)
+	}
+
+	syncID := ""
+	if reply != nil && reply.SyncID != nil {
+		syncID = reply.SyncID.String()
+	}
+
+	return &apiv2.SyncAppResponse{
+		Data: &apiv2.SyncAppData{
+			AppId:  req.AppId,
+			Id:     syncID,
+			Status: syncStatusSuccess,
+		},
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt: timestamppb.Now(),
+		},
+	}, nil
+}
+
+// firstSigningKey returns the configured key, or a generic 501 if anything
+// is misconfigured. All failure modes log a reason but never surface it, so
+// the response can't be used to probe key configuration.
+func (s *Service) firstSigningKey(ctx context.Context) (string, error) {
+	notImpl := s.base.NewError(
+		http.StatusNotImplemented,
+		apiv2base.ErrorNotImplemented,
+		"App sync not implemented",
+	)
+
+	if s.signingKeys == nil {
+		logger.From(ctx).Error("no signing keys provider")
+		return "", notImpl
+	}
+	keys, err := s.signingKeys.GetSigningKeys(ctx)
+	if err != nil {
+		logger.From(ctx).Error("failed to load signing keys", "error", err)
+		return "", notImpl
+	}
+	if len(keys) == 0 || keys[0].Key == "" {
+		logger.From(ctx).Error("no signing key")
+		return "", notImpl
+	}
+	if len(keys) > 1 {
+		logger.From(ctx).Warn("multiple signing keys")
+	}
+	return keys[0].Key, nil
+}
+
+// processSyncErr maps an AppSyncer error to a v2 response. Known types
+// (publicerr.Error, *syscode.Error) propagate status/code/message; others
+// collapse to 500 with no internal detail. Caller logs the raw err.
+func (s *Service) processSyncErr(err error) error {
+	var perr publicerr.Error
+	if errors.As(err, &perr) {
+		code := perr.Code
+		if code == "" {
+			code = apiv2base.ErrorAppSyncFailed
+		}
+		msg := perr.Message
+		if msg == "" {
+			msg = http.StatusText(perr.Status)
+		}
+		status := perr.Status
+		if status == 0 {
+			status = http.StatusInternalServerError
+		}
+		return s.base.NewError(status, code, msg)
+	}
+
+	var syserr *syscode.Error
+	if errors.As(err, &syserr) {
+		return s.base.NewError(
+			http.StatusUnprocessableEntity,
+			syserr.Code,
+			syserr.Message,
+		)
+	}
+
+	return s.base.NewError(
+		http.StatusInternalServerError,
+		apiv2base.ErrorInternalError,
+		"failed to process sync",
+	)
+}
+
+// httpStatusForSyncSyscode maps an appsync.Sync syscode to an HTTP status.
+// Caller-input violations are 400; everything else is a 422 (the SDK side of
+// the protocol exchange failed).
+func httpStatusForSyncSyscode(code string) int {
+	switch code {
+	case syscode.CodeURLSchemeDenied:
+		return http.StatusBadRequest
+	default:
+		return http.StatusUnprocessableEntity
+	}
 }

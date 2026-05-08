@@ -87,6 +87,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
+		// Dev Server always allows http://
+		AllowInsecureHTTP: true,
+
 		Autodiscover:       !noDiscovery,
 		Config:             *conf,
 		Poll:               !noPoll,
