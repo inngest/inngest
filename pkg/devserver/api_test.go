@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
@@ -39,6 +41,39 @@ func (c *capturingCronSyncer) Sync(_ context.Context, ci cronpkg.CronItem) error
 
 func (c *capturingCronSyncer) Items() []cronpkg.CronItem {
 	return c.items
+}
+
+type semaphoreSetCall struct {
+	accountID      uuid.UUID
+	name           string
+	idempotencyKey string
+	capacity       int64
+}
+
+type capturingSemaphoreManager struct {
+	setCalls []semaphoreSetCall
+}
+
+func (c *capturingSemaphoreManager) SetCapacity(_ context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error {
+	c.setCalls = append(c.setCalls, semaphoreSetCall{
+		accountID:      accountID,
+		name:           name,
+		idempotencyKey: idempotencyKey,
+		capacity:       capacity,
+	})
+	return nil
+}
+
+func (c *capturingSemaphoreManager) AdjustCapacity(context.Context, uuid.UUID, string, string, int64) error {
+	return nil
+}
+
+func (c *capturingSemaphoreManager) GetCapacity(context.Context, uuid.UUID, string, string) (int64, int64, error) {
+	return 0, 0, nil
+}
+
+func (c *capturingSemaphoreManager) ReleaseSemaphore(context.Context, uuid.UUID, string, string, string, int64) error {
+	return nil
 }
 
 func TestRegister_FunctionVersionIncrement(t *testing.T) {
@@ -730,6 +765,68 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, apps, 1, "two URLs with the same app name should result in one app")
 		require.Equal(t, "my-app", apps[0].Name)
+	})
+
+	t.Run("URL rotation keeps fn concurrency semaphore keyed by persisted function ID", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		sm := &capturingSemaphoreManager{}
+		ds.SemaphoreManager = sm
+		api := &devapi{
+			devserver: ds,
+		}
+
+		fn := sdkFunction
+		fn.Concurrency = &inngest.ConcurrencyLimits{
+			Fn: []inngest.FnConcurrency{
+				{
+					Limit: 3,
+				},
+			},
+		}
+
+		req1 := sdk.RegisterRequest{
+			URL:       "http://localhost:3000/api/inngest",
+			AppName:   "my-app",
+			V:         "1",
+			Functions: []sdk.SDKFunction{fn},
+		}
+		_, err := api.register(ctx, req1)
+		require.NoError(t, err)
+
+		funcs, err := ds.Data.GetFunctionsByAppInternalID(ctx, inngest.DeterministicAppUUID("my-app"))
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		persistedID := funcs[0].ID
+		require.Len(t, sm.setCalls, 1)
+		require.Equal(t, constraintapi.SemaphoreIDFn(persistedID), sm.setCalls[0].name)
+		require.Equal(t, int64(3), sm.setCalls[0].capacity)
+
+		rotatedFn := fn
+		rotatedFn.Steps = map[string]sdk.SDKStep{
+			"step-1": {
+				ID:   "step-1",
+				Name: "test step",
+				Runtime: map[string]any{
+					"url": "http://localhost:3001/api/inngest",
+				},
+			},
+		}
+		req2 := sdk.RegisterRequest{
+			URL:       "http://localhost:3001/api/inngest",
+			AppName:   "my-app",
+			V:         "1",
+			Functions: []sdk.SDKFunction{rotatedFn},
+		}
+		_, err = api.register(ctx, req2)
+		require.NoError(t, err)
+
+		funcs, err = ds.Data.GetFunctionsByAppInternalID(ctx, inngest.DeterministicAppUUID("my-app"))
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		require.Equal(t, persistedID, funcs[0].ID)
+		require.Len(t, sm.setCalls, 2)
+		require.Equal(t, constraintapi.SemaphoreIDFn(persistedID), sm.setCalls[1].name)
+		require.Equal(t, int64(3), sm.setCalls[1].capacity)
 	})
 }
 

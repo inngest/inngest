@@ -22,6 +22,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func migrationShardMap(defaultShard, newSystemShard queue.QueueShard) map[string]queue.QueueShard {
+	return map[string]queue.QueueShard{
+		consts.DefaultQueueShardName: defaultShard,
+		newSystemShard.Name():        newSystemShard,
+	}
+}
+
+// migrationShardSelector routes system queue items (queueName != nil) to the
+// new system shard and everything else to the default shard.
+func migrationShardSelector(defaultShard, newSystemShard queue.QueueShard) func(ctx context.Context, accountID uuid.UUID, queueName *string) (queue.QueueShard, error) {
+	return func(ctx context.Context, accountID uuid.UUID, queueName *string) (queue.QueueShard, error) {
+		if queueName != nil {
+			return newSystemShard, nil
+		}
+		return defaultShard, nil
+	}
+}
+
 // TestDebounce ensures the debounce feature works in general.
 func TestDebounce(t *testing.T) {
 	unshardedCluster := miniredis.RunT(t)
@@ -43,19 +61,10 @@ func TestDebounce(t *testing.T) {
 
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
 
-	q, err := queue.New(
-		context.Background(),
-		"debounce-test",
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
 
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
-		opts...,
-	)
+	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 	kg := shard.Client().KeyGenerator()
 
@@ -318,38 +327,20 @@ func TestJITDebounceMigration(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.New(
-		context.Background(),
-		"old-queue",
-		defaultQueueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return defaultQueueShard, nil
-		},
-		opts...,
-	)
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
 	require.NoError(t, err)
 
-	newQueue, err := queue.New(
-		context.Background(),
-		"new-queue",
-		newSystemShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-			newSystemShard.Name():        newSystemShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			// Enqueue new system queue items to new system queue shard
-			if queueName != nil {
-				return newSystemShard, nil
-			}
-
-			return defaultQueueShard, nil
-		},
-		opts...,
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
 	)
+
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
@@ -600,38 +591,20 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.New(
-		context.Background(),
-		"old-queue",
-		defaultQueueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return defaultQueueShard, nil
-		},
-		opts...,
-	)
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
 	require.NoError(t, err)
 
-	newQueue, err := queue.New(
-		context.Background(),
-		"new-queue",
-		newSystemShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-			newSystemShard.Name():        newSystemShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			// Enqueue new system queue items to new system queue shard
-			if queueName != nil {
-				return newSystemShard, nil
-			}
-
-			return defaultQueueShard, nil
-		},
-		opts...,
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
 	)
+
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
@@ -865,38 +838,20 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.New(
-		context.Background(),
-		"old-queue",
-		defaultQueueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return defaultQueueShard, nil
-		},
-		opts...,
-	)
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
 	require.NoError(t, err)
 
-	newQueue, err := queue.New(
-		context.Background(),
-		"new-queue",
-		newSystemShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-			newSystemShard.Name():        newSystemShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			// Enqueue new system queue items to new system queue shard
-			if queueName != nil {
-				return newSystemShard, nil
-			}
-
-			return defaultQueueShard, nil
-		},
-		opts...,
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
 	)
+
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
@@ -1094,38 +1049,20 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.New(
-		context.Background(),
-		"old-queue",
-		defaultQueueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return defaultQueueShard, nil
-		},
-		opts...,
-	)
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
 	require.NoError(t, err)
 
-	newQueue, err := queue.New(
-		context.Background(),
-		"new-queue",
-		newSystemShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-			newSystemShard.Name():        newSystemShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			// Enqueue new system queue items to new system queue shard
-			if queueName != nil {
-				return newSystemShard, nil
-			}
-
-			return defaultQueueShard, nil
-		},
-		opts...,
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
 	)
+
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
@@ -1292,38 +1229,20 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.New(
-		context.Background(),
-		"old-queue",
-		defaultQueueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return defaultQueueShard, nil
-		},
-		opts...,
-	)
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
 	require.NoError(t, err)
 
-	newQueue, err := queue.New(
-		context.Background(),
-		"new-queue",
-		newSystemShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-			newSystemShard.Name():        newSystemShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			// Enqueue new system queue items to new system queue shard
-			if queueName != nil {
-				return newSystemShard, nil
-			}
-
-			return defaultQueueShard, nil
-		},
-		opts...,
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
 	)
+
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
@@ -1465,38 +1384,20 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.New(
-		context.Background(),
-		"old-queue",
-		defaultQueueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return defaultQueueShard, nil
-		},
-		opts...,
-	)
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
 	require.NoError(t, err)
 
-	newQueue, err := queue.New(
-		context.Background(),
-		"new-queue",
-		newSystemShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-			newSystemShard.Name():        newSystemShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			// Enqueue new system queue items to new system queue shard
-			if queueName != nil {
-				return newSystemShard, nil
-			}
-
-			return defaultQueueShard, nil
-		},
-		opts...,
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
 	)
+
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
@@ -1686,38 +1587,20 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
 	//  once all services running `Schedule` (new-runs, executor) are rolled out?
-	oldQueue, err := queue.New(
-		context.Background(),
-		"old-queue",
-		defaultQueueShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return defaultQueueShard, nil
-		},
-		opts...,
-	)
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
 	require.NoError(t, err)
 
-	newQueue, err := queue.New(
-		context.Background(),
-		"new-queue",
-		newSystemShard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: defaultQueueShard,
-			newSystemShard.Name():        newSystemShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			// Enqueue new system queue items to new system queue shard
-			if queueName != nil {
-				return newSystemShard, nil
-			}
-
-			return defaultQueueShard, nil
-		},
-		opts...,
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
 	)
+
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
@@ -1900,18 +1783,10 @@ func TestGetDebounceInfo(t *testing.T) {
 
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
 
-	q, err := queue.New(
-		context.Background(),
-		"debounce-test",
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
-		opts...,
-	)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
 	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
@@ -2099,18 +1974,10 @@ func TestDeleteDebounce(t *testing.T) {
 
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
 
-	q, err := queue.New(
-		context.Background(),
-		"debounce-test",
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
-		opts...,
-	)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
 	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
@@ -2199,18 +2066,10 @@ func TestRunDebounce(t *testing.T) {
 
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
 
-	q, err := queue.New(
-		context.Background(),
-		"debounce-test",
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
-		opts...,
-	)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
 	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
@@ -2300,18 +2159,10 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
 
-	q, err := queue.New(
-		context.Background(),
-		"debounce-test",
-		shard,
-		map[string]queue.QueueShard{
-			consts.DefaultQueueShardName: shard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return shard, nil
-		},
-		opts...,
-	)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
 	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)

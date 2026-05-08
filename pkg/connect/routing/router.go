@@ -310,15 +310,12 @@ func sortByGroupCreatedAt(candidates []connWithGroup) {
 }
 
 func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connectpb.ConnMetadata, error) {
-	// First, sort candidate connections by CreatedAt timestamp (newest first)
+	// Sort by group CreatedAt (oldest first) so getVersionTimeDistribution can
+	// read the oldest/newest versions from the ends. All candidates remain
+	// eligible; the weighted sampler distributes uniformly among connections
+	// within a group while biasing selection toward newer groups.
 	sortByGroupCreatedAt(candidates)
 
-	// Clamp candidates
-	if len(candidates) > 5 {
-		candidates = candidates[:5]
-	}
-
-	// Get range of versions
 	versionTimeDistribution := getVersionTimeDistribution(candidates)
 
 	weights := make([]float64, len(candidates))

@@ -79,6 +79,26 @@ func (r *runInstance) MaxAttempts() *int {
 	return &max
 }
 
+func (r *runInstance) OnlyHasLazyOps() bool {
+	if r.resp == nil {
+		return false
+	}
+	// "Only has lazy ops" requires at least one lazy op present and zero
+	// non-lazy ops. An empty generator (or a slice of nils) returns false —
+	// that's a different shape from "every op in the batch is lazy."
+	hasLazy := false
+	for _, op := range r.resp.Generator {
+		if op == nil {
+			continue
+		}
+		if !enums.OpcodeIsLazy(op.Op) {
+			return false
+		}
+		hasLazy = true
+	}
+	return hasLazy
+}
+
 func (r *runInstance) ShouldRetry() bool {
 	if r.resp.NoRetry {
 		return false

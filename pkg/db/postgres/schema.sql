@@ -2,9 +2,6 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.13
--- Dumped by pg_dump version 16.13
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -364,6 +361,12 @@ ALTER TABLE ONLY public.trace_runs
 
 ALTER TABLE ONLY public.worker_connections
     ADD CONSTRAINT worker_connections_pkey PRIMARY KEY (id, app_name);
+
+--
+-- Name: functions_app_id_slug_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX functions_app_id_slug_active_key ON public.functions USING btree (app_id, slug) WHERE (archived_at IS NULL);
 
 --
 -- Name: idx_events_internal_id; Type: INDEX; Schema: public; Owner: -

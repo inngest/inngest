@@ -65,6 +65,7 @@ const (
 	OtelSysStepAIResponse      = "sys.step.ai.res" // ai response metadata
 	OtelSysStepRunType         = "sys.step.run.type"
 	OtelSysStepPlan            = "sys.step.plan" // indicate this is a planning step
+	OtelSysStepType            = "sys.step.type" // SDK-side step type
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 

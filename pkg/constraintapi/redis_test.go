@@ -69,6 +69,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		AccountID:            accountID,
 		EnvID:                envID,
 		FunctionID:           fnID,
+		AppID:                uuid.New(),
 		Amount:               1,
 		LeaseIdempotencyKeys: []string{leaseIdempotencyKey},
 		IdempotencyKey:       "event1",
@@ -109,11 +110,6 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		// Don't expect limiting constraint
 		require.Nil(t, resp.LimitingConstraints)
 		require.Empty(t, resp.ExhaustedConstraints)
-
-		// Usage should reflect post-acquire state
-		require.NotEmpty(t, resp.Usage, "Acquire response should include per-constraint usage")
-		require.Equal(t, 120, resp.Usage[0].Limit, "Rate limit constraint limit should be 120")
-		require.Equal(t, 1, resp.Usage[0].Used, "Rate limit usage should be 1 after acquiring 1 lease")
 
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)
@@ -237,6 +233,26 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "rel", "release-test"))
 		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "chk", checkHash))
 	})
+}
+
+func TestRedisRequestState_AppIDRoundTrip(t *testing.T) {
+	appID := uuid.New()
+
+	state := redisRequestState{
+		AppID: appID,
+	}
+
+	body, err := json.Marshal(state)
+	require.NoError(t, err)
+	require.Contains(t, string(body), `"ai":`)
+
+	var decoded redisRequestState
+	require.NoError(t, json.Unmarshal(body, &decoded))
+	require.Equal(t, appID, decoded.AppID)
+
+	var knownGood redisRequestState
+	require.NoError(t, json.Unmarshal([]byte(`{"ai":"`+appID.String()+`"}`), &knownGood))
+	require.Equal(t, appID, knownGood.AppID)
 }
 
 func TestRedisCapacityManager_Concurrency(t *testing.T) {

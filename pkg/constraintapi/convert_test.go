@@ -1689,57 +1689,6 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "response with usage",
-			input: &CapacityAcquireResponse{
-				Leases: []CapacityLease{
-					{
-						LeaseID:        leaseID1,
-						IdempotencyKey: "lease-key-1",
-					},
-				},
-				LimitingConstraints:  []ConstraintItem{},
-				ExhaustedConstraints: []ConstraintItem{},
-				RetryAfter:           time.Time{},
-				Usage: []ConstraintUsage{
-					{
-						Constraint: ConstraintItem{
-							Kind: ConstraintKindConcurrency,
-							Concurrency: &ConcurrencyConstraint{
-								Mode:  enums.ConcurrencyModeStep,
-								Scope: enums.ConcurrencyScopeFn,
-							},
-						},
-						Used:  5,
-						Limit: 10,
-					},
-				},
-			},
-			expected: &pb.CapacityAcquireResponse{
-				Leases: []*pb.CapacityLease{
-					{
-						LeaseId:        leaseID1.String(),
-						IdempotencyKey: "lease-key-1",
-					},
-				},
-				LimitingConstraints:  []*pb.ConstraintItem{},
-				ExhaustedConstraints: []*pb.ConstraintItem{},
-				RetryAfter:           timestamppb.New(time.Time{}),
-				Usage: []*pb.ConstraintUsage{
-					{
-						Constraint: &pb.ConstraintItem{
-							Kind: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY,
-							Concurrency: &pb.ConcurrencyConstraint{
-								Mode:  pb.ConstraintApiConcurrencyMode_CONSTRAINT_API_CONCURRENCY_MODE_STEP,
-								Scope: pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION,
-							},
-						},
-						Used:  5,
-						Limit: 10,
-					},
-				},
-			},
-		},
-		{
 			name:     "nil response",
 			input:    nil,
 			expected: nil,

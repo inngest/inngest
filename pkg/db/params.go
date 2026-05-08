@@ -36,8 +36,10 @@ type UpdateAppURLParams struct {
 	ID  uuid.UUID
 }
 
-// InsertFunctionParams are the parameters for inserting a function definition.
-type InsertFunctionParams struct {
+// UpsertFunctionParams are the parameters for inserting or refreshing a
+// function definition. On id conflict, the row's app_id, name, slug, config
+// are overwritten and archived_at is cleared.
+type UpsertFunctionParams struct {
 	ID        uuid.UUID
 	AppID     uuid.UUID
 	Name      string

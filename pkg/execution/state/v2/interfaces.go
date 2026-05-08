@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -63,6 +64,16 @@ type RunService interface {
 	// Step inputs must be loaded separately from the source backend since State.Steps
 	// only contains step outputs.
 	Duplicate(ctx context.Context, source State, destID ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error
+
+	SaveDefer(ctx context.Context, id ID, d Defer) error
+	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when
+	// no defer exists for hashedID. The Aborted transition also releases
+	// the Input from the aggregate budget; the meta entry stays.
+	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
+	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
+	// No-op if any defer already exists for hashedID. Returns
+	// ErrDeferLimitExceeded if no room.
+	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
@@ -106,6 +117,12 @@ type StateLoader interface {
 
 	// StreamState returns all state without loading in-memory
 	// StreamState(ctx context.Context, id ID) (io.Reader, error)
+
+	LoadDefers(ctx context.Context, id ID) (map[string]Defer, error)
+
+	// LoadDefersMeta returns each defer's metadata without loading its Input.
+	// Prefer this when only FnSlug/HashedID/ScheduleStatus are needed.
+	LoadDefersMeta(ctx context.Context, id ID) (map[string]DeferMeta, error)
 }
 
 //
@@ -122,4 +139,8 @@ var (
 	ErrRunNotFound        = state.ErrRunNotFound
 	ErrIdempotentResponse = state.ErrIdempotentResponse
 	ErrDuplicateResponse  = state.ErrDuplicateResponse
+
+	// ErrDeferInputTooLarge re-exports the v1 error so v2 callers can match
+	// without importing v1.
+	ErrDeferInputTooLarge = state.ErrDeferInputTooLarge
 )

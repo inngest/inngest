@@ -97,18 +97,12 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 
 	shard1 := redis_state.NewQueueShard(consts.DefaultQueueShardName, redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), opts...)
 
-	shards := map[string]osqueue.QueueShard{
-		consts.DefaultQueueShardName: shard1,
-	}
-
+	shardRegistry, err := osqueue.NewSingleShardRegistry(shard1)
+	require.NoError(t, err)
 	q, err := osqueue.New(
 		ctx,
 		"test-queue",
-		shard1,
-		shards,
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
-			return shard1, nil
-		},
+		shardRegistry,
 		opts...,
 	)
 	require.NoError(t, err)

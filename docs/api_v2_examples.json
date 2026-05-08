@@ -11,7 +11,7 @@
         },
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         }
       },
       "401": "Authentication failed",
@@ -25,6 +25,65 @@
             "message": "Something went wrong"
           }
         ]
+      }
+    }
+  },
+  "/apps/{appId}/functions/{functionId}/invoke": {
+    "post": {
+      "201": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 201"
+      },
+      "202": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 202"
+      },
+      "400": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 403"
+      },
+      "404": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 404"
+      },
+      "409": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 409"
+      },
+      "422": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 422"
+      },
+      "429": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 429"
+      },
+      "500": {
+        "// TODO": "Add example data for post /apps/{appId}/functions/{functionId}/invoke 500"
+      }
+    }
+  },
+  "/apps/{appId}/syncs": {
+    "post": {
+      "200": {
+        "// TODO": "Add example data for post /apps/{appId}/syncs 200"
+      },
+      "400": {
+        "// TODO": "Add example data for post /apps/{appId}/syncs 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /apps/{appId}/syncs 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /apps/{appId}/syncs 403"
+      },
+      "404": {
+        "// TODO": "Add example data for post /apps/{appId}/syncs 404"
+      },
+      "422": {
+        "// TODO": "Add example data for post /apps/{appId}/syncs 422"
+      },
+      "500": {
+        "// TODO": "Add example data for post /apps/{appId}/syncs 500"
       }
     }
   },
@@ -114,7 +173,7 @@
         ],
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         },
         "page": {
           "hasMore": false,
@@ -155,7 +214,7 @@
         },
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         }
       },
       "400": {
@@ -211,7 +270,7 @@
         },
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         }
       },
       "401": "Authentication failed",
@@ -246,7 +305,7 @@
         ],
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         },
         "page": {
           "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
@@ -293,7 +352,7 @@
         ],
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         },
         "page": {
           "cursor": null,
@@ -347,7 +406,7 @@
         ],
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         },
         "page": {
           "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
@@ -395,7 +454,7 @@
         },
         "metadata": {
           "cachedUntil": null,
-          "fetched_at": "2024-01-20T14:22:33Z"
+          "fetchedAt": "2024-01-20T14:22:33Z"
         }
       },
       "400": {

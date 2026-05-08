@@ -93,8 +93,8 @@ const MetadataAttrRow = ({
                 {byteValueKeys.has(key) && typeof value === 'number'
                   ? formatBytes(value)
                   : typeof value === 'object' && value !== null
-                    ? JSON.stringify(value, null, 2)
-                    : String(value) || '--'}
+                  ? JSON.stringify(value, null, 2)
+                  : String(value) || '--'}
               </div>
             </div>
           );

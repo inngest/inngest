@@ -39,12 +39,14 @@ func LatencyAverage() float64 {
 func New(
 	ctx context.Context,
 	name string,
-	primaryQueueShard QueueShard,
-	queueShardClients map[string]QueueShard,
-	shardSelector ShardSelector,
+	shards QueueShardRegistry,
 	options ...QueueOpt,
 ) (*queueProcessor, error) {
 	o := NewQueueOptions(options...)
+
+	if shards == nil {
+		return nil, fmt.Errorf("shard registry must not be nil")
+	}
 
 	qp := &queueProcessor{
 		name: name,
@@ -66,9 +68,7 @@ func New(
 		partitionSem: util.NewTrackingSemaphore(int(o.numPartitionWorkers)),
 		quit:         make(chan error, o.numWorkers),
 
-		primaryQueueShard: primaryQueueShard,
-		queueShardClients: queueShardClients,
-		shardSelector:     shardSelector,
+		shards: shards,
 
 		peekSizeCache: ccache.New(ccache.Configure[int64]().MaxSize(50_000)),
 
@@ -79,12 +79,13 @@ func New(
 		shadowContinueCooldown: map[string]time.Time{},
 	}
 
-	if primaryQueueShard != nil {
-		qp.SetPrimaryShard(ctx, primaryQueueShard)
-	} else if o.runMode.ShardGroup == "" {
-		return nil, fmt.Errorf("must pass either primary queue shard or a valid ShardGroup in runMode")
-	} else if len(qp.shardsByGroupName(o.runMode.ShardGroup)) == 0 {
-		return nil, fmt.Errorf("No shards found for configured shard group: %s", o.runMode.ShardGroup)
+	if shards.Primary() == nil {
+		if o.runMode.ShardGroup == "" {
+			return nil, fmt.Errorf("must pass either primary queue shard or a valid ShardGroup in runMode")
+		}
+		if len(shards.ByGroup(o.runMode.ShardGroup)) == 0 {
+			return nil, fmt.Errorf("No shards found for configured shard group: %s", o.runMode.ShardGroup)
+		}
 	}
 
 	return qp, nil
@@ -96,8 +97,9 @@ type queueProcessor struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 
-	queueShardClients map[string]QueueShard
-	shardSelector     ShardSelector
+	// shards owns the {shards map, selector, primary} trio. Topology can be
+	// mutated at runtime via shards.SetPrimary.
+	shards QueueShardRegistry
 
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
@@ -127,8 +129,7 @@ type queueProcessor struct {
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
 
-	primaryQueueShard QueueShard
-	// shardLeaseID stores the lease ID for the primaryQueueShard this queue is processing from.
+	// shardLeaseID stores the lease ID for the primary shard this queue is processing from.
 	// all runners attempt to claim this lease on start up.
 	shardLeaseID *ulid.ULID
 	// shardLeaseLock ensures that there are no data races writing to
@@ -184,25 +185,10 @@ func (q *queueProcessor) Clock() clockwork.Clock {
 	return q.QueueOptions.Clock
 }
 
+// Shard returns the leased primary shard. Callers in hot paths should
+// cache the result locally to avoid repeated registry reads.
 func (q *queueProcessor) Shard() QueueShard {
-	return q.primaryQueueShard
-}
-
-// Implements SetPrimaryShard() in ShardAssingmentManager interface
-func (q *queueProcessor) SetPrimaryShard(ctx context.Context, queueShard QueueShard) {
-	q.primaryQueueShard = queueShard
-
-	if q.queueShardClients == nil {
-		q.queueShardClients = map[string]QueueShard{
-			queueShard.Name(): queueShard,
-		}
-	}
-
-	if q.shardSelector == nil {
-		q.shardSelector = func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error) {
-			return queueShard, nil
-		}
-	}
+	return q.shards.Primary()
 }
 
 func (q *queueProcessor) Semaphore() util.TrackingSemaphore {
@@ -262,27 +248,9 @@ func (q *queueProcessor) ItemsByRunID(ctx context.Context, shard QueueShard, run
 	return shard.ItemsByRunID(ctx, runID)
 }
 
-func (q *queueProcessor) shardByName(name string) (QueueShard, error) {
-	shard, ok := q.queueShardClients[name]
-	if !ok {
-		return nil, ErrQueueShardNotFound
-	}
-	return shard, nil
-}
-
-func (q *queueProcessor) shardsByGroupName(groupName string) []QueueShard {
-	var shards []QueueShard
-	for _, shard := range q.queueShardClients {
-		if shard.ShardAssignmentConfig().ShardGroup == groupName {
-			shards = append(shards, shard)
-		}
-	}
-	return shards
-}
-
 // LoadQueueItem implements QueueManager.
 func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error) {
-	shard, err := q.shardByName(shardName)
+	shard, err := q.shards.ByName(shardName)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +262,7 @@ func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, it
 func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
 	var totalCount int64
 
-	err := q.AllShards(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
 		backlogSize, err := shard.PartitionBacklogSize(ctx, partitionID)
 		if err != nil {
 			return fmt.Errorf("could not load partition backlog size: %w", err)
@@ -317,7 +285,7 @@ func (q *queueProcessor) PartitionByID(ctx context.Context, shard QueueShard, pa
 
 // RemoveQueueItem implements QueueManager.
 func (q *queueProcessor) RemoveQueueItem(ctx context.Context, shardName string, partitionID string, itemID string) error {
-	shard, err := q.shardByName(shardName)
+	shard, err := q.shards.ByName(shardName)
 	if err != nil {
 		return err
 	}
@@ -340,32 +308,11 @@ func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueS
 	return shard.TotalSystemQueueDepth(ctx)
 }
 
-func (q *queueProcessor) AllShards(ctx context.Context, fn func(context.Context, QueueShard) error) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	l := logger.StdlibLogger(ctx)
-
-	eg, ctx := errgroup.WithContext(ctx)
-
-	for shardName, qs := range q.queueShardClients {
-		eg.Go(func() error {
-			l := l.With("shard_name", shardName)
-			err := fn(logger.WithStdlib(ctx, l), qs)
-			if err != nil {
-				return fmt.Errorf("map operation on shard %q failed: %w", shardName, err)
-			}
-			return nil
-		})
-	}
-
-	return eg.Wait()
-}
-
 // OutstandingJobCount implements Queue.
 func (q *queueProcessor) OutstandingJobCount(ctx context.Context, envID uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (int, error) {
 	var totalCount int64
 
-	err := q.AllShards(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
 		outstanding, err := shard.OutstandingJobCount(ctx, envID, fnID, runID)
 		if err != nil {
 			return fmt.Errorf("could not load outstanding job count: %w", err)
@@ -381,7 +328,7 @@ func (q *queueProcessor) OutstandingJobCount(ctx context.Context, envID uuid.UUI
 
 // RunJobs implements Queue.
 func (q *queueProcessor) RunJobs(ctx context.Context, shardName string, workspaceID uuid.UUID, workflowID uuid.UUID, runID ulid.ULID, limit int64, offset int64) ([]JobResponse, error) {
-	shard, err := q.shardByName(shardName)
+	shard, err := q.shards.ByName(shardName)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +340,7 @@ func (q *queueProcessor) RunJobs(ctx context.Context, shardName string, workspac
 func (q *queueProcessor) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
 	var totalCount int64
 
-	err := q.AllShards(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
 		running, err := shard.RunningCount(ctx, workflowID)
 		if err != nil {
 			return fmt.Errorf("could not load running count: %w", err)
@@ -411,7 +358,7 @@ func (q *queueProcessor) RunningCount(ctx context.Context, workflowID uuid.UUID)
 func (q *queueProcessor) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
 	var totalCount int64
 
-	err := q.AllShards(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
 		running, err := shard.StatusCount(ctx, workflowID, status)
 		if err != nil {
 			return fmt.Errorf("could not load status count: %w", err)
@@ -427,7 +374,7 @@ func (q *queueProcessor) StatusCount(ctx context.Context, workflowID uuid.UUID, 
 
 // ResetAttemptsByJobID implements Queue.
 func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shardName string, jobID string) error {
-	shard, err := q.shardByName(shardName)
+	shard, err := q.shards.ByName(shardName)
 	if err != nil {
 		return err
 	}
@@ -436,13 +383,15 @@ func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shardName str
 }
 
 func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
-	// claimShardLease will block until a shard lease is obtained to process the primaryQueueShard.
+	// claimShardLease will block until a shard lease is obtained to process the primary shard.
 	l := logger.StdlibLogger(ctx)
 	if len(q.runMode.ShardGroup) != 0 {
 		l.Info("Executor started in ShardGroup mode, attempting to claim a shard lease", "shard_group", q.runMode.ShardGroup)
-		q.claimShardLease(ctx)
+		if err := q.claimShardLease(ctx); err != nil {
+			return err
+		}
 	} else {
-		l.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.primaryQueueShard.Name())
+		l.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.Shard().Name())
 	}
 
 	if q.runMode.Sequential {
@@ -482,8 +431,8 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 
 // SetFunctionMigrate implements Queue.
 func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error {
-	shard, ok := q.queueShardClients[sourceShard]
-	if !ok {
+	shard, err := q.shards.ByName(sourceShard)
+	if err != nil {
 		return fmt.Errorf("could not find shard %q", sourceShard)
 	}
 
@@ -492,7 +441,7 @@ func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard str
 
 // UnpauseFunction implements Queue.
 func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, acctID uuid.UUID, envID, fnID uuid.UUID) error {
-	shard, err := q.shardByName(shardName)
+	shard, err := q.shards.ByName(shardName)
 	if err != nil {
 		return err
 	}

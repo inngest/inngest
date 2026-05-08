@@ -186,6 +186,10 @@ func normalizePostgresDump(raw string) string {
 			continue
 		case strings.HasPrefix(trimmed, "\\unrestrict "):
 			continue
+		case strings.HasPrefix(trimmed, "-- Dumped from database version "):
+			continue
+		case strings.HasPrefix(trimmed, "-- Dumped by pg_dump version "):
+			continue
 		}
 
 		if blankPending && len(filtered) > 0 {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/inngest/inngest/cmd/conformance"
 	"github.com/inngest/inngest/cmd/debug"
 	"github.com/urfave/cli/v3"
 )
@@ -11,6 +12,7 @@ func alpha() *cli.Command {
 		Hidden: true,
 		Usage:  "experimental CLI commands",
 		Commands: []*cli.Command{
+			conformance.Command(),
 			debug.Command(),
 		},
 	}

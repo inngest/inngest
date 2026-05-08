@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -29,19 +28,18 @@ func NewDebugAPI(o Opts) service.Service {
 	}
 
 	return &debugAPI{
-		rpc:            grpc.NewServer(),
-		port:           port,
-		log:            o.Log,
-		db:             o.DB,
-		queue:          o.Queue,
-		state:          o.State,
-		croner:         o.Cron,
-		findShard:      o.ShardSelector,
-		pm:             o.PauseManager,
-		cm:             o.CapacityManager,
-		batchManager:   o.BatchManager,
-		singletonStore: o.SingletonStore,
-		debouncer:      o.Debouncer,
+		rpc:          grpc.NewServer(),
+		port:         port,
+		log:          o.Log,
+		db:           o.DB,
+		queue:        o.Queue,
+		state:        o.State,
+		croner:       o.Cron,
+		shards:       o.ShardRegistry,
+		pm:           o.PauseManager,
+		cm:           o.CapacityManager,
+		batchManager: o.BatchManager,
+		debouncer:    o.Debouncer,
 	}
 }
 
@@ -54,12 +52,11 @@ type Opts struct {
 	PauseManager    pauses.Manager
 	CapacityManager constraintapi.CapacityManager
 
-	ShardSelector queue.ShardSelector
+	ShardRegistry queue.ShardRegistry
 
-	// Dependencies for batching, singleton, and debounce insights
-	BatchManager   batch.BatchManager
-	SingletonStore singleton.Singleton
-	Debouncer      debounce.Debouncer
+	// Dependencies for batching and debounce insights
+	BatchManager batch.BatchManager
+	Debouncer    debounce.Debouncer
 
 	Port int
 }
@@ -68,11 +65,9 @@ type debugAPI struct {
 	pb.DebugServer
 	port int
 
-	rpc       *grpc.Server
-	log       logger.Logger
-	findShard queue.ShardSelector
-
-	shards map[string]queue.QueueShard
+	rpc    *grpc.Server
+	log    logger.Logger
+	shards queue.ShardRegistry
 
 	db     cqrs.Manager
 	queue  queue.QueueManager
@@ -81,10 +76,9 @@ type debugAPI struct {
 	pm     pauses.Manager
 	cm     constraintapi.CapacityManager
 
-	// Dependencies for batching, singleton, and debounce insights
-	batchManager   batch.BatchManager
-	singletonStore singleton.Singleton
-	debouncer      debounce.Debouncer
+	// Dependencies for batching and debounce insights
+	batchManager batch.BatchManager
+	debouncer    debounce.Debouncer
 }
 
 func (d *debugAPI) Name() string {

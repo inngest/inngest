@@ -60,6 +60,7 @@ import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_auth
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
 import { Route as AuthedEnvEnvSlugInsightsIndexRouteImport } from './routes/_authed/env/$envSlug/insights/index'
 import { Route as AuthedEnvEnvSlugFunctionsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/index'
+import { Route as AuthedEnvEnvSlugExperimentsIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/index'
 import { Route as AuthedEnvEnvSlugEventsIndexRouteImport } from './routes/_authed/env/$envSlug/events/index'
 import { Route as AuthedEnvEnvSlugEventTypesIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/index'
 import { Route as AuthedEnvEnvSlugDebuggerIndexRouteImport } from './routes/_authed/env/$envSlug/debugger/index'
@@ -96,6 +97,7 @@ import { Route as AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport } from '
 import { Route as AuthedEnvEnvSlugFunctionsSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/runs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/cancellations/index'
+import { Route as AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/index'
 import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/$eventTypeName/events/index'
 import { Route as AuthedEnvEnvSlugAppsExternalIDSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/apps/$externalID/syncs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/$replayID/index'
@@ -380,6 +382,12 @@ const AuthedEnvEnvSlugFunctionsIndexRoute =
     path: '/functions/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugExperimentsIndexRoute =
+  AuthedEnvEnvSlugExperimentsIndexRouteImport.update({
+    id: '/experiments/',
+    path: '/experiments/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugEventsIndexRoute =
   AuthedEnvEnvSlugEventsIndexRouteImport.update({
     id: '/events/',
@@ -596,6 +604,12 @@ const AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute =
     path: '/cancellations/',
     getParentRoute: () => AuthedEnvEnvSlugFunctionsSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute =
+  AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport.update({
+    id: '/experiments/$functionSlug/$experimentName/',
+    path: '/experiments/$functionSlug/$experimentName/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute =
   AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRouteImport.update({
     id: '/events/',
@@ -666,6 +680,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -699,6 +714,7 @@ export interface FileRoutesByFullPath {
   '/settings/integrations/vercel/connect/': typeof AuthedSettingsIntegrationsVercelConnectIndexRoute
   '/env/$envSlug/apps/$externalID/syncs/': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/env/$envSlug/event-types/$eventTypeName/events/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
+  '/env/$envSlug/experiments/$functionSlug/$experimentName/': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
   '/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -745,6 +761,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/debugger': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -778,6 +795,7 @@ export interface FileRoutesByTo {
   '/settings/integrations/vercel/connect': typeof AuthedSettingsIntegrationsVercelConnectIndexRoute
   '/env/$envSlug/apps/$externalID/syncs': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/env/$envSlug/event-types/$eventTypeName/events': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
+  '/env/$envSlug/experiments/$functionSlug/$experimentName': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
   '/env/$envSlug/functions/$slug/cancellations': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -838,6 +856,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/_authed/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/_authed/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/_authed/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/_authed/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/_authed/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -871,6 +890,7 @@ export interface FileRoutesById {
   '/_authed/settings/integrations/vercel/connect/': typeof AuthedSettingsIntegrationsVercelConnectIndexRoute
   '/_authed/env/$envSlug/apps/$externalID/syncs/': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/_authed/env/$envSlug/event-types/$eventTypeName/events/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
+  '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
   '/_authed/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/_authed/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/_authed/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -931,6 +951,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger/'
     | '/env/$envSlug/event-types/'
     | '/env/$envSlug/events/'
+    | '/env/$envSlug/experiments/'
     | '/env/$envSlug/functions/'
     | '/env/$envSlug/insights/'
     | '/env/$envSlug/manage/'
@@ -964,6 +985,7 @@ export interface FileRouteTypes {
     | '/settings/integrations/vercel/connect/'
     | '/env/$envSlug/apps/$externalID/syncs/'
     | '/env/$envSlug/event-types/$eventTypeName/events/'
+    | '/env/$envSlug/experiments/$functionSlug/$experimentName/'
     | '/env/$envSlug/functions/$slug/cancellations/'
     | '/env/$envSlug/functions/$slug/replays/'
     | '/env/$envSlug/functions/$slug/runs/'
@@ -1010,6 +1032,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger'
     | '/env/$envSlug/event-types'
     | '/env/$envSlug/events'
+    | '/env/$envSlug/experiments'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/insights'
     | '/env/$envSlug/manage'
@@ -1043,6 +1066,7 @@ export interface FileRouteTypes {
     | '/settings/integrations/vercel/connect'
     | '/env/$envSlug/apps/$externalID/syncs'
     | '/env/$envSlug/event-types/$eventTypeName/events'
+    | '/env/$envSlug/experiments/$functionSlug/$experimentName'
     | '/env/$envSlug/functions/$slug/cancellations'
     | '/env/$envSlug/functions/$slug/replays'
     | '/env/$envSlug/functions/$slug/runs'
@@ -1102,6 +1126,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/debugger/'
     | '/_authed/env/$envSlug/event-types/'
     | '/_authed/env/$envSlug/events/'
+    | '/_authed/env/$envSlug/experiments/'
     | '/_authed/env/$envSlug/functions/'
     | '/_authed/env/$envSlug/insights/'
     | '/_authed/env/$envSlug/manage/'
@@ -1135,6 +1160,7 @@ export interface FileRouteTypes {
     | '/_authed/settings/integrations/vercel/connect/'
     | '/_authed/env/$envSlug/apps/$externalID/syncs/'
     | '/_authed/env/$envSlug/event-types/$eventTypeName/events/'
+    | '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/'
     | '/_authed/env/$envSlug/functions/$slug/cancellations/'
     | '/_authed/env/$envSlug/functions/$slug/replays/'
     | '/_authed/env/$envSlug/functions/$slug/runs/'
@@ -1523,6 +1549,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
+    '/_authed/env/$envSlug/experiments/': {
+      id: '/_authed/env/$envSlug/experiments/'
+      path: '/experiments'
+      fullPath: '/env/$envSlug/experiments/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugExperimentsIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
     '/_authed/env/$envSlug/events/': {
       id: '/_authed/env/$envSlug/events/'
       path: '/events'
@@ -1774,6 +1807,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/env/$envSlug/functions/$slug/cancellations/'
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugFunctionsSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/': {
+      id: '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/'
+      path: '/experiments/$functionSlug/$experimentName'
+      fullPath: '/env/$envSlug/experiments/$functionSlug/$experimentName/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/event-types/$eventTypeName/events/': {
       id: '/_authed/env/$envSlug/event-types/$eventTypeName/events/'
@@ -2110,6 +2150,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugDebuggerIndexRoute: typeof AuthedEnvEnvSlugDebuggerIndexRoute
   AuthedEnvEnvSlugEventTypesIndexRoute: typeof AuthedEnvEnvSlugEventTypesIndexRoute
   AuthedEnvEnvSlugEventsIndexRoute: typeof AuthedEnvEnvSlugEventsIndexRoute
+  AuthedEnvEnvSlugExperimentsIndexRoute: typeof AuthedEnvEnvSlugExperimentsIndexRoute
   AuthedEnvEnvSlugFunctionsIndexRoute: typeof AuthedEnvEnvSlugFunctionsIndexRoute
   AuthedEnvEnvSlugInsightsIndexRoute: typeof AuthedEnvEnvSlugInsightsIndexRoute
   AuthedEnvEnvSlugMetricsIndexRoute: typeof AuthedEnvEnvSlugMetricsIndexRoute
@@ -2117,6 +2158,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute: typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   AuthedEnvEnvSlugEventsEventIDIndexRoute: typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
   AuthedEnvEnvSlugRunsRunIDIndexRoute: typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute: typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
 }
 
 const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
@@ -2134,6 +2176,7 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugDebuggerIndexRoute: AuthedEnvEnvSlugDebuggerIndexRoute,
   AuthedEnvEnvSlugEventTypesIndexRoute: AuthedEnvEnvSlugEventTypesIndexRoute,
   AuthedEnvEnvSlugEventsIndexRoute: AuthedEnvEnvSlugEventsIndexRoute,
+  AuthedEnvEnvSlugExperimentsIndexRoute: AuthedEnvEnvSlugExperimentsIndexRoute,
   AuthedEnvEnvSlugFunctionsIndexRoute: AuthedEnvEnvSlugFunctionsIndexRoute,
   AuthedEnvEnvSlugInsightsIndexRoute: AuthedEnvEnvSlugInsightsIndexRoute,
   AuthedEnvEnvSlugMetricsIndexRoute: AuthedEnvEnvSlugMetricsIndexRoute,
@@ -2143,6 +2186,8 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugEventsEventIDIndexRoute:
     AuthedEnvEnvSlugEventsEventIDIndexRoute,
   AuthedEnvEnvSlugRunsRunIDIndexRoute: AuthedEnvEnvSlugRunsRunIDIndexRoute,
+  AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute:
+    AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute,
 }
 
 const AuthedEnvEnvSlugRouteRouteWithChildren =

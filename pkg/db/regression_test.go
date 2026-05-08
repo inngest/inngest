@@ -330,6 +330,7 @@ func TestFunctionRunWithoutFinish(t *testing.T) {
 
 	ctx := context.Background()
 	q := adapter.Q()
+
 	runID := ulid.Make()
 	eventID := ulid.Make()
 	now := time.Now().UTC()
@@ -373,6 +374,353 @@ func TestFunctionRunWithoutFinish(t *testing.T) {
 	assert.Equal(t, runID, tb[0].FunctionRun.RunID)
 	assert.False(t, tb[0].FunctionFinish.Status.Valid)
 	assert.False(t, tb[0].FunctionFinish.Output.Valid)
+}
+
+// TestGetFunctionRunFinishesByRunIDsMultiple reproduces a sqlc slice-generation
+// bug on Postgres: the generated query at pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql.go
+// contains a literal "WHERE run_id IN ($1)" placeholder instead of the
+// "/*SLICE:run_ids*/?" marker, so the runtime parameter expansion is a no-op
+// and pgx rejects multi-ID calls with "mismatched param and argument count".
+// See GitHub issue #3551 — a sibling query (DeleteFunctionsByIDs) was previously
+// fixed via sqlc regeneration but this call site was missed.
+func TestGetFunctionRunFinishesByRunIDsMultiple(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	runIDs := []ulid.ULID{ulid.Make(), ulid.Make(), ulid.Make()}
+	for i, runID := range runIDs {
+		require.NoError(t, q.InsertFunctionFinish(ctx, db.InsertFunctionFinishParams{
+			RunID:              runID,
+			Status:             sql.NullString{String: "completed", Valid: true},
+			Output:             sql.NullString{String: fmt.Sprintf(`{"i":%d}`, i), Valid: true},
+			CompletedStepCount: sql.NullInt64{Int64: 1, Valid: true},
+			CreatedAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		}))
+	}
+
+	t.Run("single run id", func(t *testing.T) {
+		finishes, err := q.GetFunctionRunFinishesByRunIDs(ctx, []ulid.ULID{runIDs[0]})
+		require.NoError(t, err)
+		assert.Len(t, finishes, 1)
+	})
+
+	t.Run("multiple run ids", func(t *testing.T) {
+		finishes, err := q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+		require.NoError(t, err, "multi-id query must not fail on the sqlc slice expansion")
+		assert.Len(t, finishes, len(runIDs))
+	})
+}
+
+// TestDeleteFunctionsByIDsHandlesDuplicateRows exercises the cross-product of
+// GitHub issues #3551 and #3556:
+//
+//   - #3556 left the functions table without a PRIMARY KEY on id, so duplicate
+//     rows can accumulate during repeated syncs on self-hosted deployments.
+//   - #3551 broke DeleteFunctionsByIDs whenever its input slice had more than
+//     one element — which is exactly what the sync loop in pkg/devserver/api.go
+//     produces when GetFunctionsByAppInternalID returns duplicate rows for the
+//     same id. PR #3614 fixed DeleteFunctionsByIDs on main by switching to
+//     ANY(@ids::text[]). This test guards that fix against regression and
+//     verifies the end-to-end archive semantics when duplicates exist.
+//
+// If a future migration adds PRIMARY KEY (id) to functions (#3556 fix), the
+// duplicate-row scenario becomes structurally unreachable; the test skips
+// itself in that case rather than failing.
+func TestDeleteFunctionsByIDsHandlesDuplicateRows(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	conn := adapter.Conn()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "dup-fn-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-dup",
+		Url:         "https://example.com/inngest",
+	})
+	require.NoError(t, err)
+
+	fnID := uuid.New()
+
+	// Seed two functions with the same id via raw SQL. This bypasses any
+	// future uniqueness constraints — legacy self-hosted deployments can
+	// already have duplicates from before #3556 is fixed.
+	var insertSQL string
+	switch adapter.Dialect() {
+	case db.DialectPostgres:
+		insertSQL = `INSERT INTO functions (id, app_id, name, slug, config) VALUES ($1, $2, $3, $4, $5)`
+	default:
+		insertSQL = `INSERT INTO functions (id, app_id, name, slug, config) VALUES (?, ?, ?, ?, ?)`
+	}
+
+	_, err = conn.ExecContext(ctx, insertSQL,
+		fnID.String(), appID.String(), "dup-a", "dup-slug", `{}`)
+	require.NoError(t, err, "first insert of the function must succeed")
+
+	_, err = conn.ExecContext(ctx, insertSQL,
+		fnID.String(), appID.String(), "dup-b", "dup-slug", `{}`)
+	if err != nil {
+		t.Skipf("functions table now enforces uniqueness on id; duplicate-row scenario is no longer reachable: %v", err)
+	}
+
+	// Sanity: two active rows exist for the same id.
+	active, err := q.GetAppFunctions(ctx, appID)
+	require.NoError(t, err)
+	dupCount := 0
+	for _, fn := range active {
+		if fn.ID == fnID {
+			dupCount++
+		}
+	}
+	require.Equal(t, 2, dupCount, "expected two duplicate rows to be seeded")
+
+	// Simulates the sync delete path in devserver/api.go. When rows duplicate,
+	// the deletes slice ends up with the same id listed multiple times —
+	// exactly the input that broke DeleteFunctionsByIDs pre-PR #3614.
+	require.NoError(t, q.DeleteFunctionsByIDs(ctx, []uuid.UUID{fnID, fnID}),
+		"delete must succeed when the slice contains duplicate ids matching multiple rows")
+
+	// All duplicates are archived.
+	active, err = q.GetAppFunctions(ctx, appID)
+	require.NoError(t, err)
+	for _, fn := range active {
+		assert.NotEqual(t, fnID, fn.ID, "found unarchived duplicate after delete")
+	}
+}
+
+// TestFunctionUniqueActiveAppSlug verifies that an active function (archived_at
+// IS NULL) is unique per (app_id, slug). This guards against the same class of
+// duplicate-row corruption that #3556 surfaced: without the partial unique
+// index, two distinct function rows can claim the same slug within an app, and
+// downstream lookups (GetAppFunctionsBySlug, sync deletes) silently misbehave.
+//
+// Once the row is archived the constraint releases — re-syncing the same slug
+// after a soft-delete must succeed.
+func TestFunctionUniqueActiveAppSlug(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "unique-slug-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-unique-slug",
+		Url:         "https://example.com/inngest",
+	})
+	require.NoError(t, err)
+
+	first := uuid.New()
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        first,
+		AppID:     appID,
+		Name:      "fn-a",
+		Slug:      "fn-shared-slug",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	t.Run("duplicate active slug rejected", func(t *testing.T) {
+		_, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     appID,
+			Name:      "fn-b",
+			Slug:      "fn-shared-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.Error(t, err, "second active function with same (app_id, slug) must fail")
+		assert.Contains(t, strings.ToLower(err.Error()), "unique")
+	})
+
+	t.Run("different slug same app allowed", func(t *testing.T) {
+		_, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     appID,
+			Name:      "fn-c",
+			Slug:      "fn-distinct-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("same slug different app allowed", func(t *testing.T) {
+		otherAppID := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          otherAppID,
+			Name:        "unique-slug-app-2",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "checksum-other-app",
+			Url:         "https://example.com/inngest-2",
+		})
+		require.NoError(t, err)
+
+		_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     otherAppID,
+			Name:      "fn-d",
+			Slug:      "fn-shared-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("archived row releases the slug", func(t *testing.T) {
+		require.NoError(t, q.DeleteFunctionsByIDs(ctx, []uuid.UUID{first}))
+
+		_, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     appID,
+			Name:      "fn-replacement",
+			Slug:      "fn-shared-slug",
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err, "after archiving the prior row, slug must be reusable")
+	})
+}
+
+// TestInsertFunctionIdempotentOnSameID covers the resync path: the sync loop
+// uses GetFunctionByInternalUUID to decide between UpsertFunction and
+// UpdateFunctionConfig, but UpsertFunction must still tolerate being called
+// twice with the same id without surfacing a primary-key violation. With
+// PRIMARY KEY (id) now enforced (#3556), the old "INSERT and ignore duplicate"
+// behavior would break resyncs; ON CONFLICT (id) DO UPDATE keeps the row
+// reachable and refreshes its config + clears archived_at.
+func TestInsertFunctionIdempotentOnSameID(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "idempotent-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-idempotent",
+		Url:         "https://example.com/idempotent",
+	})
+	require.NoError(t, err)
+
+	fnID := uuid.New()
+	createdAt := time.Now().UTC()
+
+	first, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        fnID,
+		AppID:     appID,
+		Name:      "fn-original",
+		Slug:      "fn-original-slug",
+		Config:    `{"v":1}`,
+		CreatedAt: createdAt,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "fn-original", first.Name)
+
+	// Soft-delete via the same code path the sync loop uses.
+	require.NoError(t, q.DeleteFunctionsByIDs(ctx, []uuid.UUID{fnID}))
+
+	// Resync: same id, refreshed config. Must not fail on the primary key.
+	second, err := q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        fnID,
+		AppID:     appID,
+		Name:      "fn-refreshed",
+		Slug:      "fn-original-slug",
+		Config:    `{"v":2}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err, "UpsertFunction must be idempotent on id to support resyncs")
+	assert.Equal(t, "fn-refreshed", second.Name)
+	assert.JSONEq(t, `{"v":2}`, second.Config)
+	assert.False(t, second.ArchivedAt.Valid, "resync must clear archived_at")
+	assert.WithinDuration(t, createdAt, second.CreatedAt, time.Second,
+		"resync must preserve original created_at — it is not in the DO UPDATE SET clause")
+}
+
+// TestUpsertFunctionRejectsSlugRenameIntoExistingSlug guards the most likely
+// real-world failure mode introduced by the partial unique index: a resync
+// renames an existing function's slug to one already claimed by another
+// active function in the same app. Pre-index this produced silent corruption
+// (two active rows with the same slug). With the index, the ON CONFLICT (id)
+// path fires for the renamed row, attempts to UPDATE its slug, and must hit
+// the partial unique violation instead of silently succeeding.
+func TestUpsertFunctionRejectsSlugRenameIntoExistingSlug(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "rename-conflict-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-rename-conflict",
+		Url:         "https://example.com/rename-conflict",
+	})
+	require.NoError(t, err)
+
+	// Two active functions: A claims "slug-a", B claims "slug-b".
+	idA := uuid.New()
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        idA,
+		AppID:     appID,
+		Name:      "fn-a",
+		Slug:      "slug-a",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	idB := uuid.New()
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        idB,
+		AppID:     appID,
+		Name:      "fn-b",
+		Slug:      "slug-b",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	// Resync B with the slug A already owns. ON CONFLICT (id) fires, the
+	// UPDATE attempts slug = "slug-a", and the partial unique index must
+	// reject it rather than silently producing two active "slug-a" rows.
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        idB,
+		AppID:     appID,
+		Name:      "fn-b-renamed",
+		Slug:      "slug-a",
+		Config:    `{}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.Error(t, err, "renaming B's slug into A's must fail the partial unique index")
+	assert.Contains(t, strings.ToLower(err.Error()), "unique")
 }
 
 func TestEventBatchRoundTrip(t *testing.T) {
@@ -779,6 +1127,7 @@ func sqlitePrimaryKeyDuplicateCases() []struct {
 	}{
 		{name: "apps.id", tableName: "apps", values: specs["apps"]},
 		{name: "event_batches.id", tableName: "event_batches", values: specs["event_batches"]},
+		{name: "functions.id", tableName: "functions", values: specs["functions"]},
 		{name: "trace_runs.run_id", tableName: "trace_runs", values: specs["trace_runs"]},
 		{name: "queue_snapshot_chunks.snapshot_id_chunk_id", tableName: "queue_snapshot_chunks", values: specs["queue_snapshot_chunks"]},
 		{name: "worker_connections.id_app_name", tableName: "worker_connections", values: specs["worker_connections"]},

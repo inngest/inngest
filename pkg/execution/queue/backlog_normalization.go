@@ -96,7 +96,7 @@ func (q *queueProcessor) backlogNormalizationScan(ctx context.Context) error {
 // iterateNormalizationPartition scans and iterate through the global normalization partition to process backlogs needing to be normalized
 func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, until time.Time, bc chan normalizeWorkerChanMsg) error {
 	// introduce weight probability to blend account/global scanning
-	peekedAccounts, err := q.primaryQueueShard.PeekGlobalNormalizeAccounts(ctx, until, NormalizeAccountPeekMax)
+	peekedAccounts, err := q.Shard().PeekGlobalNormalizeAccounts(ctx, until, NormalizeAccountPeekMax)
 	if err != nil {
 		return fmt.Errorf("could not peek global normalize accounts: %w", err)
 	}
@@ -128,17 +128,18 @@ func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, unti
 }
 
 func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context, accountID *uuid.UUID, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg) error {
+	shard := q.Shard()
 	// Find partitions in account or globally with backlogs to normalize
 	sequential := false
-	shadowPartitions, err := q.primaryQueueShard.PeekShadowPartitions(ctx, accountID, sequential, peekLimit, until)
+	shadowPartitions, err := shard.PeekShadowPartitions(ctx, accountID, sequential, peekLimit, until)
 	if err != nil {
 		return fmt.Errorf("could not peek shadow partitions to normalize: %w", err)
 	}
 
 	// For each partition, attempt to normalize backlogs
 	for _, partition := range shadowPartitions {
-		backlogs, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_peek", until, func(ctx context.Context) ([]*QueueBacklog, error) {
-			return q.primaryQueueShard.ShadowPartitionPeekNormalizeBacklogs(ctx, partition, NormalizePartitionPeekMax)
+		backlogs, err := Duration(ctx, shard.Name(), "normalize_peek", until, func(ctx context.Context) ([]*QueueBacklog, error) {
+			return shard.ShadowPartitionPeekNormalizeBacklogs(ctx, partition, NormalizePartitionPeekMax)
 		})
 		if err != nil {
 			return err
@@ -148,8 +149,8 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 
 		for _, bl := range backlogs {
 			// lease the backlog
-			_, err := Duration(ctx, q.primaryQueueShard.Name(), "normalize_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
-				err := q.primaryQueueShard.LeaseBacklogForNormalization(ctx, bl)
+			_, err := Duration(ctx, shard.Name(), "normalize_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
+				err := shard.LeaseBacklogForNormalization(ctx, bl)
 				return nil, err
 			})
 			if err != nil {
@@ -163,7 +164,7 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 			metrics.IncrBacklogNormalizationScannedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name(),
+					"queue_shard": shard.Name(),
 					// "partition_id": partition.PartitionID,
 				},
 			})
@@ -186,12 +187,13 @@ func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context
 func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error {
 	ctx, cancelNormalization := context.WithCancel(ctx)
 	defer cancelNormalization()
+	shard := q.Shard()
 
 	_, file, line, _ := runtime.Caller(1)
 	caller := fmt.Sprintf("%s:%d", file, line)
 
-	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
-	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
+	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 
 	l := logger.StdlibLogger(ctx).With(
 		"backlog", backlog,
@@ -210,7 +212,7 @@ func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBac
 			case <-extendLeaseCtx.Done():
 				return
 			case <-time.Tick(BacklogNormalizeLeaseDuration / 2):
-				if err := q.primaryQueueShard.ExtendBacklogNormalizationLease(ctx, q.Clock().Now(), backlog); err != nil {
+				if err := shard.ExtendBacklogNormalizationLease(ctx, q.Clock().Now(), backlog); err != nil {
 					switch err {
 					// can't extend since it's already expired
 					case ErrBacklogNormalizationLeaseExpired:
@@ -234,7 +236,7 @@ func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBac
 			return nil
 		}
 
-		res, err := q.primaryQueueShard.BacklogNormalizePeek(ctx, backlog, NormalizeBacklogPeekMax)
+		res, err := shard.BacklogNormalizePeek(ctx, backlog, NormalizeBacklogPeekMax)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return nil
@@ -263,7 +265,7 @@ func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBac
 							"app_id":      item.Data.Identifier.AppID.String(),
 							"fn_id":       item.FunctionID.String(),
 							"backlog_id":  backlog.BacklogID,
-							"queue_shard": q.primaryQueueShard.Name(),
+							"queue_shard": shard.Name(),
 						}),
 					)
 				}
@@ -282,7 +284,7 @@ func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBac
 		metrics.IncrBacklogNormalizedItemCounter(ctx, processed, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard": q.primaryQueueShard.Name(),
+				"queue_shard": shard.Name(),
 				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
@@ -293,7 +295,7 @@ func (q *queueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBac
 	metrics.IncrBacklogNormalizedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name(),
+			"queue_shard": shard.Name(),
 			// "partition_id": backlog.ShadowPartitionID,
 		},
 	})
@@ -310,6 +312,7 @@ func (q *queueProcessor) NormalizeItem(
 	sourceBacklog *QueueBacklog,
 	item QueueItem,
 ) (QueueItem, error) {
+	shard := q.Shard()
 	// We must modify the queue item to ensure q.ItemBacklog and q.ItemShadowPartition
 	// return the new values properly. Otherwise, we'd enqueue to the same backlog, not
 	// the desired new backlog.
@@ -324,7 +327,7 @@ func (q *queueProcessor) NormalizeItem(
 
 	cleanupItem := func() {
 		// If event for item cannot be found, remove it from the backlog
-		err := q.primaryQueueShard.Dequeue(ctx, item)
+		err := shard.Dequeue(ctx, item)
 		if err != nil {
 			log.Warn("could not dequeue queue item with missing event", "err", err)
 		}
@@ -366,7 +369,7 @@ func (q *queueProcessor) NormalizeItem(
 
 	log.Debug("retrieved refreshed backlog")
 
-	if _, err := q.primaryQueueShard.EnqueueItem(ctx, item, time.UnixMilli(item.AtMS), EnqueueOpts{
+	if _, err := shard.EnqueueItem(ctx, item, time.UnixMilli(item.AtMS), EnqueueOpts{
 		PassthroughJobId:       true,
 		NormalizeFromBacklogID: sourceBacklog.BacklogID,
 	}); err != nil {

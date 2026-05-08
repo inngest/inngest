@@ -30,7 +30,7 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 
 			err := q.ProcessItem(processCtx, i, f)
 			q.Semaphore().Release(1)
-			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name()}})
+			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.Shard().Name()}})
 			cancel()
 			if err == nil {
 				continue
@@ -64,7 +64,7 @@ func (q *queueProcessor) shadowWorker(ctx context.Context, qspc chan ShadowParti
 		case msg := <-qspc:
 			_, err := DurationWithTags(
 				ctx,
-				q.primaryQueueShard.Name(),
+				q.Shard().Name(),
 				"shadow_partition_process_duration",
 				q.Clock().Now(),
 				func(ctx context.Context) (any, error) {

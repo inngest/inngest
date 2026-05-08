@@ -20,6 +20,7 @@ import (
 var (
 	ErrStepInputTooLarge  = fmt.Errorf("step input size is greater than the limit")
 	ErrStepOutputTooLarge = fmt.Errorf("step output size is greater than the limit")
+	ErrDeferInputTooLarge = fmt.Errorf("defer input size is greater than the limit")
 )
 
 type GeneratorOpcode struct {
@@ -195,6 +196,47 @@ func (g GeneratorOpcode) RunType() string {
 	return opts.Type
 }
 
+// Returns the SDK-side step type of the opcode for use in Insights.
+// This does not map 1-1 to Opcode. For example, many different SDK operations map to OpcodeStepRun.
+func (g GeneratorOpcode) StepType() enums.StepType {
+	switch g.RunType() {
+	case "step.sendEvent":
+		return enums.StepTypeSendEvent
+	case "step.sendSignal":
+		return enums.StepTypeSendSignal
+	case "step.ai.wrap":
+		return enums.StepTypeAiWrap
+	case "step.ai.infer":
+		return enums.StepTypeAiInfer
+	case "step.fetch":
+		return enums.StepTypeFetch
+	case "step.realtime.publish":
+		return enums.StepTypeRealtimePublish
+	case "group.experiment":
+		return enums.StepTypeGroupExperiment
+	}
+
+	switch g.Op {
+	case enums.OpcodeStepRun, enums.OpcodeStepError, enums.OpcodeStepFailed:
+		// Other explicit types are caught above via the RunType, but
+		// if the RunType is not set, we can default to StepTypeRun for backwards
+		// compatibility with older SDK versions that do not set the type.
+		return enums.StepTypeRun
+	case enums.OpcodeSleep:
+		return enums.StepTypeSleep
+	case enums.OpcodeWaitForEvent:
+		return enums.StepTypeWaitForEvent
+	case enums.OpcodeWaitForSignal:
+		return enums.StepTypeWaitForSignal
+	case enums.OpcodeInvokeFunction:
+		return enums.StepTypeInvoke
+	case enums.OpcodeAIGateway:
+		return enums.StepTypeAiInfer
+	default:
+		return enums.StepTypeUnknown
+	}
+}
+
 func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 	opts := &RunOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
@@ -336,6 +378,95 @@ func (i InvokeFunctionOpts) Expires() (time.Time, error) {
 	}
 
 	return strtimeout.ParseTimeout(i.Timeout, time.Now)
+}
+
+func (g GeneratorOpcode) DeferAddOpts() (*DeferAddOpts, error) {
+	opts := &DeferAddOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, opts.Validate()
+}
+
+type DeferAddOpts struct {
+	FnSlug string          `json:"fn_slug"`
+	Input  json.RawMessage `json:"input,omitempty"`
+}
+
+func (d *DeferAddOpts) Validate() error {
+	if d.FnSlug == "" {
+		return fmt.Errorf("FnSlug is required")
+	}
+	if len(d.Input) == 0 {
+		return fmt.Errorf("Input is required")
+	}
+	if len(d.Input) > consts.MaxDeferInputSize {
+		// Mirrors the GeneratorOpcode.Validate() check on step inputs. Prevents
+		// a malicious or buggy SDK from storing arbitrarily large payloads in
+		// Redis (per defer × per run) and inflating them into the
+		// deferred.schedule event bus on Finalize.
+		return ErrDeferInputTooLarge
+	}
+	return nil
+}
+
+func (d *DeferAddOpts) UnmarshalAny(a any) error {
+	opts := DeferAddOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*d = opts
+	return nil
+}
+
+func (g GeneratorOpcode) DeferAbortOpts() (*DeferAbortOpts, error) {
+	opts := &DeferAbortOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, opts.Validate()
+}
+
+type DeferAbortOpts struct {
+	TargetHashedID string `json:"target_hashed_id"`
+}
+
+func (d *DeferAbortOpts) Validate() error {
+	if d.TargetHashedID == "" {
+		return fmt.Errorf("TargetHashedID is required")
+	}
+	return nil
+}
+
+func (d *DeferAbortOpts) UnmarshalAny(a any) error {
+	opts := DeferAbortOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*d = opts
+	return nil
 }
 
 type SleepOpts struct {

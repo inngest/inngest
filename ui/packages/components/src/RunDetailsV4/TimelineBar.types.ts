@@ -224,6 +224,7 @@ export interface TimelineBarProps {
     variantSelected: string;
     availableVariants?: string[];
     variantWeights?: Record<string, number>;
+    functionSlug?: string;
   };
 }
 
@@ -309,6 +310,7 @@ export interface TimelineBarData {
     variantSelected: string;
     availableVariants?: string[];
     variantWeights?: Record<string, number>;
+    functionSlug?: string;
   };
 }
 

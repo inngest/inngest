@@ -476,30 +476,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		return
 	}
 
-	// We may have already added this function, so check if it exists prior to inserting and updating.
-	// XXX: It would be good to add an upsert method to the function CQRS layer.
-	fn, err := a.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
-	if err == nil && fn != nil {
-		if string(fn.Config) == config {
-			return // no need to update
-		}
-		_, err = a.FunctionCreator.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
-			Config:    config,
-			ID:        fnID,
-			AccountID: auth.AccountID(),
-			EnvID:     auth.WorkspaceID(),
-			AppID:     app.ID,
-		})
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("failed to update fn config",
-				"error", err,
-				"app_id", input.AppID(auth.WorkspaceID()),
-			)
-		}
-		return
-	}
-
-	_, err = a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = a.FunctionCreator.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:        fnID,
 		AccountID: auth.AccountID(),
 		EnvID:     auth.WorkspaceID(),
@@ -510,7 +487,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		CreatedAt: time.UnixMilli(input.Event.Timestamp),
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("failed to insert function",
+		logger.StdlibLogger(ctx).Error("failed to upsert function",
 			"error", err,
 			"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
 			"app_id", app.ID,

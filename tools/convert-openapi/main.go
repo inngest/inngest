@@ -64,6 +64,9 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		// Remove default responses from v2 doc before conversion
 		removeDefaultResponses(&v2Doc)
 
+		// Remove internal schema-only paths used only to force schema generation
+		removeInternalPaths(&v2Doc)
+
 		// Convert to OpenAPI v3
 		v3Doc, err := openapi2conv.ToV3(&v2Doc)
 		if err != nil {
@@ -142,6 +145,20 @@ func removeDefaultResponses(doc *openapi2.T) {
 
 		// Update the path item back to the map
 		doc.Paths[path] = pathItem
+	}
+}
+
+// removeInternalPaths removes paths prefixed with /_internal/ — these are only
+// present to force protoc-gen-openapiv2 to emit schema definitions and should
+// never appear in the public API docs.
+func removeInternalPaths(doc *openapi2.T) {
+	if doc.Paths == nil {
+		return
+	}
+	for path := range doc.Paths {
+		if strings.HasPrefix(path, "/_internal/") {
+			delete(doc.Paths, path)
+		}
 	}
 }
 

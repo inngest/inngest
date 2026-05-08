@@ -347,10 +347,7 @@ export const NewCodeBlock = ({
           ) : loading ? (
             <Skeleton className="h-24 w-full" />
           ) : enableTreeView && mode === 'raw' ? (
-            <div
-              className="flex min-h-0 flex-1 flex-col"
-              onMouseLeave={() => setHoveredPath(null)}
-            >
+            <div className="flex min-h-0 flex-1 flex-col" onMouseLeave={() => setHoveredPath(null)}>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <JSONTree
                   hideRoot={true}
@@ -358,22 +355,16 @@ export const NewCodeBlock = ({
                   shouldExpandNodeInitially={() => true}
                   theme={jsonTreeTheme(dark)}
                   labelRenderer={(keyPath) => (
-                    <span
-                      onMouseEnter={() => setHoveredPath(buildJsonPath(keyPath))}
-                    >
+                    <span onMouseEnter={() => setHoveredPath(buildJsonPath(keyPath))}>
                       <span className="font-mono text-[13px]">{keyPath[0]}</span>
-                      <span className="text-codeDelimiterBracketJson font-mono text-[13px]">
-                        :
-                      </span>
+                      <span className="text-codeDelimiterBracketJson font-mono text-[13px]">:</span>
                     </span>
                   )}
-                  valueRenderer={(raw: any) => (
-                    <span className="font-mono text-[13px]">{raw}</span>
-                  )}
+                  valueRenderer={(raw: any) => <span className="font-mono text-[13px]">{raw}</span>}
                   getItemString={() => null}
                 />
               </div>
-              <div className="bg-canvasSubtle text-muted border-subtle flex min-h-8 shrink-0 items-center justify-between border-t px-3 py-1">
+              <div className="bg-canvasSubtle text-muted border-subtle min-h-8 flex shrink-0 items-center justify-between border-t px-3 py-1">
                 <code className="truncate font-mono text-xs">
                   {hoveredPath || (
                     <span className="text-muted flex items-center gap-1">
@@ -440,7 +431,7 @@ export const NewCodeBlock = ({
                 />
               </div>
               {language === 'json' && (
-                <div className="bg-canvasSubtle text-muted border-subtle flex min-h-8 shrink-0 items-center justify-between border-t px-3 py-1">
+                <div className="bg-canvasSubtle text-muted border-subtle min-h-8 flex shrink-0 items-center justify-between border-t px-3 py-1">
                   <code className="truncate font-mono text-xs">
                     {cursorPath || (
                       <span className="text-muted flex items-center gap-1">
