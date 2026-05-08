@@ -91,7 +91,7 @@
   "devDependencies": {
     "@graphql-codegen/cli": "7.0.0",
     "@graphql-codegen/client-preset": "6.0.0",
-    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/container-queries": "0.1.1",
     "@types/mustache": "4.2.6",
     "@types/node": "24.12.2",
     "@types/react": "19.2.14",
