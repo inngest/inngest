@@ -421,13 +421,13 @@ treated as preview artifacts.
 
 ** Phase 2: Note Extraction
 
-- [ ] Add =scripts/release/collect-pr-notes=.
-- [ ] Add parser tests for normal, empty, placeholder, multiline, and repeated
+- [X] Add =scripts/release/collect-pr-notes=.
+- [X] Add parser tests for normal, empty, placeholder, multiline, and repeated
       section cases.
-- [ ] Add =scripts/release/build-release-notes=.
-- [ ] Ensure =build-release-notes= is deterministic for the same tag and repo
+- [X] Add =scripts/release/build-release-notes=.
+- [X] Ensure =build-release-notes= is deterministic for the same tag and repo
       state.
-- [ ] Test output with representative real PR bodies.
+- [X] Test output with representative PR bodies.
 
 ** Phase 3: Release PR Automation
 
