@@ -1,0 +1,57 @@
+name: Auto-tag Release Commits
+
+on:
+  pull_request_target:
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tag-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  tag-release:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'release/next' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout merged release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Determine release tag
+        id: release
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          git fetch --tags origin
+
+          if ! printf '%s\n' "${PR_TITLE}" | grep -Eq '^chore\(release\): v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Release PR title is not a valid stable release title: ${PR_TITLE}"
+            exit 1
+          fi
+
+          tag_name="$(printf '%s\n' "${PR_TITLE}" | sed -E 's/^chore\(release\): (v[0-9]+\.[0-9]+\.[0-9]+)$/\1/')"
+
+          if ! grep -Eq "^## \[${tag_name}\]|^## \[${tag_name#v}\]|^## ${tag_name}$|^## ${tag_name#v}$" CHANGELOG.md; then
+            echo "Merged release commit does not contain changelog entry for ${tag_name}"
+            exit 1
+          fi
+
+          if git rev-parse "${tag_name}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        if: steps.release.outputs.skip == 'false'
+        run: |
+          git tag "${{ steps.release.outputs.tag_name }}"
+          git push origin "${{ steps.release.outputs.tag_name }}"

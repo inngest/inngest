@@ -440,10 +440,10 @@ treated as preview artifacts.
 
 ** Phase 4: Tag Gate
 
-- [ ] Add =.github/workflows/release-tag.yml=.
-- [ ] Validate release PR title and changelog section.
-- [ ] Create the tag on the merged release PR commit.
-- [ ] Ensure the workflow cannot tag arbitrary external PRs.
+- [X] Add =.github/workflows/release-tag.yml=.
+- [X] Validate release PR title and changelog section.
+- [X] Create the tag on the merged release PR commit.
+- [X] Ensure the workflow cannot tag arbitrary external PRs.
 
 ** Phase 5: Publish Integration
 
