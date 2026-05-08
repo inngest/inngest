@@ -938,6 +938,24 @@ service V2 {
     };
   }
 
+  rpc GetFunctionRun(GetFunctionRunRequest) returns (GetFunctionRunResponse) {
+    option (google.api.http) = {
+      get: "/runs/{run_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get function run"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Fetches the canonical run summary for a single function run"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc SyncApp(SyncAppRequest) returns (SyncAppResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/syncs",
@@ -1029,6 +1047,24 @@ service V2 {
               ref: "#/definitions/v2ErrorResponse"
             }
           }
+        }
+      }
+    };
+  }
+
+  rpc GetFunctionTrace(GetFunctionTraceRequest) returns (GetFunctionTraceResponse) {
+    option (google.api.http) = {
+      get: "/runs/{run_id}/trace"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get function trace"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Fetches the trace tree for a single function run"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
         }
       }
     };
@@ -1172,6 +1208,7 @@ service V2 {
       }
     };
   }
+
 }
 
 message HealthRequest {
@@ -1203,6 +1240,114 @@ message ErrorResponse {
 message ResponseMetadata {
   google.protobuf.Timestamp fetched_at = 1;
   google.protobuf.Timestamp cached_until = 2;
+}
+
+enum FunctionRunStatus {
+  FUNCTION_RUN_STATUS_UNSPECIFIED = 0;
+  FUNCTION_RUN_STATUS_QUEUED = 1;
+  FUNCTION_RUN_STATUS_RUNNING = 2;
+  FUNCTION_RUN_STATUS_COMPLETED = 3;
+  FUNCTION_RUN_STATUS_FAILED = 4;
+  FUNCTION_RUN_STATUS_CANCELLED = 5;
+}
+
+enum TraceSpanStatus {
+  TRACE_SPAN_STATUS_UNKNOWN = 0;
+  TRACE_SPAN_STATUS_RUNNING = 1;
+  TRACE_SPAN_STATUS_COMPLETED = 2;
+  TRACE_SPAN_STATUS_FAILED = 3;
+  TRACE_SPAN_STATUS_WAITING = 4;
+  TRACE_SPAN_STATUS_CANCELLED = 5;
+  TRACE_SPAN_STATUS_SKIPPED = 6;
+}
+
+enum TraceStepOp {
+  TRACE_STEP_OP_UNSPECIFIED = 0;
+  TRACE_STEP_OP_RUN = 1;
+  TRACE_STEP_OP_SLEEP = 2;
+  TRACE_STEP_OP_WAIT_FOR_EVENT = 3;
+  TRACE_STEP_OP_INVOKE = 4;
+  TRACE_STEP_OP_SEND_EVENT = 5;
+  TRACE_STEP_OP_AI_GATEWAY = 6;
+  TRACE_STEP_OP_WAIT_FOR_SIGNAL = 7;
+}
+
+message FunctionRef {
+  string id = 1;
+  string name = 2;
+}
+
+message AppRef {
+  string id = 1;
+}
+
+message RunTrigger {
+  repeated string event_ids = 1;
+  optional string event_name = 2;
+  bool is_batch = 3;
+  optional string batch_id = 4;
+  optional string cron_schedule = 5;
+}
+
+message FunctionRun {
+  string id = 1;
+  FunctionRef function = 2;
+  AppRef app = 3;
+  FunctionRunStatus status = 4;
+  google.protobuf.Timestamp queued_at = 5;
+  optional google.protobuf.Timestamp started_at = 6;
+  optional google.protobuf.Timestamp ended_at = 7;
+  optional uint64 duration_ms = 8;
+  RunTrigger trigger = 9;
+  optional google.protobuf.Struct output = 10;
+}
+
+message GetFunctionRunRequest {
+  string run_id = 1;
+  optional bool include_output = 2;
+}
+
+message GetFunctionRunResponse {
+  FunctionRun data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message TraceSpanMetadata {
+  string scope = 1;
+  string kind = 2;
+  map<string, string> values = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message TraceSpan {
+  string id = 1;
+  string name = 2;
+  TraceSpanStatus status = 3;
+  optional TraceStepOp step_op = 4;
+  optional string step_id = 5;
+  optional uint64 duration_ms = 6;
+  google.protobuf.Timestamp queued_at = 7;
+  optional google.protobuf.Timestamp started_at = 8;
+  optional google.protobuf.Timestamp ended_at = 9;
+  optional google.protobuf.Struct input = 10;
+  optional google.protobuf.Struct output = 11;
+  repeated TraceSpanMetadata metadata = 12;
+  repeated TraceSpan children = 13;
+}
+
+message FunctionTrace {
+  string run_id = 1;
+  TraceSpan root_span = 2;
+}
+
+message GetFunctionTraceRequest {
+  string run_id = 1;
+  optional bool include_output = 2;
+}
+
+message GetFunctionTraceResponse {
+  FunctionTrace data = 1;
+  ResponseMetadata metadata = 2;
 }
 
 message CreateAccountRequest {
@@ -1489,7 +1634,6 @@ message InvokeFunctionRequest {
     }
   ];
 }
-
 
 message InvokeFunctionResponse {
   InvokeFunctionData data = 1;

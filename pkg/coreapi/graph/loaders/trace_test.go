@@ -165,6 +165,29 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 	})
 }
 
+func TestConvertRunSpan(t *testing.T) {
+	status := enums.StepStatusCompleted
+	queuedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+
+	result, err := ConvertRunSpan(context.Background(), &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name:      meta.SpanNameRun,
+			SpanID:    "run-span",
+			TraceID:   "trace-id",
+			StartTime: queuedAt,
+			EndTime:   queuedAt.Add(time.Second),
+		},
+		Attributes: &meta.ExtractedValues{
+			DynamicStatus: &status,
+			QueuedAt:      &queuedAt,
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "run-span", result.SpanID)
+	require.Equal(t, models.RunTraceSpanStatusCompleted, result.Status)
+}
+
 func TestConvertRunSpanToGQL_DroppedDiscoveryExecutionDoesNotCreateSleepAttempts(t *testing.T) {
 	tr := &traceReader{}
 	ctx := context.Background()

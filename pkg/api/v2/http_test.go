@@ -10,7 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -89,6 +95,59 @@ func TestHTTPGateway_Health(t *testing.T) {
 
 		require.Equal(t, http.StatusNotImplemented, rec.Code)
 	})
+}
+
+func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+
+	fn := inngest.DeployedFunction{
+		ID:      functionID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+		},
+	}
+	functionRun := &cqrs.FunctionRun{
+		RunID:        runID,
+		RunStartedAt: startedAt,
+		FunctionID:   functionID,
+		EventID:      runID,
+		Status:       enums.RunStatusCompleted,
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+	runs := &mockFunctionRunReader{}
+	runs.On("GetFunctionRun", mock.Anything, runID).Return(functionRun, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{
+		Functions:    functions,
+		FunctionRuns: runs,
+	}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+		runs.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/runs/"+runID.String(), nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	run := body["data"].(map[string]any)
+	require.Equal(t, "COMPLETED", run["status"])
 }
 
 func TestHTTPGateway_Middleware(t *testing.T) {
