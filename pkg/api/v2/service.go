@@ -22,6 +22,8 @@ type Service struct {
 	signingKeys    SigningKeysProvider
 	eventKeys      EventKeysProvider
 	functions      FunctionProvider
+	runs           FunctionRunReader
+	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
 	rateLimiter    RateLimitProvider
@@ -33,6 +35,8 @@ type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
 	Functions           FunctionProvider
+	FunctionRuns        FunctionRunReader
+	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
 	RateLimitProvider   RateLimitProvider
@@ -47,6 +51,8 @@ func NewService(opts ServiceOptions) *Service {
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
 		functions:      opts.Functions,
+		runs:           opts.FunctionRuns,
+		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
 		rateLimiter:    rateLimiter,
@@ -99,6 +105,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 
 	// Create grpc-gateway mux for HTTP REST endpoints with custom error handler
 	gwmux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, newResponseEnumMarshaler()),
 		runtime.WithErrorHandler(base.CustomErrorHandler()),
 		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
 			// forward standard headers
