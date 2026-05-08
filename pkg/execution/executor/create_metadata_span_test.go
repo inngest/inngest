@@ -37,6 +37,7 @@ func (m *mockRunContext) AttemptCount() int                                     
 func (m *mockRunContext) MaxAttempts() *int                                                    { return nil }
 func (m *mockRunContext) ShouldRetry() bool                                                    { return false }
 func (m *mockRunContext) IncrementAttempt()                                                    {}
+func (m *mockRunContext) OnlyHasLazyOps() bool                                                 { return false }
 func (m *mockRunContext) PriorityFactor() *int64                                               { return nil }
 func (m *mockRunContext) ConcurrencyKeys() []state.CustomConcurrency                           { return nil }
 func (m *mockRunContext) ParallelMode() enums.ParallelMode                                     { return 0 }

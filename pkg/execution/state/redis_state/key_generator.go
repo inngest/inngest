@@ -38,6 +38,13 @@ type RunStateKeyGenerator interface {
 	// run.
 	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
 
+	// DefersMeta returns the key used to store each defer's metadata. This does
+	// not include the defer input data, which is stored in DefersInput
+	DefersMeta(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
+
+	// DefersInput returns the key used to store each defer's arbitrary input
+	// data. This does not include defer metadata, which is stored in DefersMeta
+	DefersInput(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 }
 
 type runStateKeyGenerator struct {
@@ -72,6 +79,14 @@ func (s runStateKeyGenerator) Events(ctx context.Context, isSharded bool, fnID u
 
 func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
+}
+
+func (s runStateKeyGenerator) DefersMeta(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:defers-meta:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
+}
+
+func (s runStateKeyGenerator) DefersInput(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:defers-input:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {
