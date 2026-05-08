@@ -1,7 +1,7 @@
 #+TITLE: Automated Release Cycle
 #+AUTHOR: Darwin D. Wu
 #+DATE: 2026-05-08
-#+STATUS: Draft
+#+STATUS: Active
 #+STARTUP: showall
 
 * Overview
