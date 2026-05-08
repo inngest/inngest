@@ -447,10 +447,10 @@ treated as preview artifacts.
 
 ** Phase 5: Publish Integration
 
-- [ ] Update =.github/workflows/release.yml= to generate =RELEASE_NOTES.md=.
-- [ ] Pass =--release-notes=RELEASE_NOTES.md= to GoReleaser.
-- [ ] Confirm npm publish still uses the tag version as before.
-- [ ] Confirm stable releases still complete Linear releases.
+- [X] Update =.github/workflows/release.yml= to generate =RELEASE_NOTES.md=.
+- [X] Pass =--release-notes=RELEASE_NOTES.md= to GoReleaser.
+- [X] Confirm npm publish still uses the tag version as before.
+- [X] Confirm stable releases still complete Linear releases.
 
 ** Phase 6: Pre-release Publishing
 
