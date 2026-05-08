@@ -432,7 +432,7 @@ treated as preview artifacts.
 ** Phase 3: Release PR Automation
 
 - [ ] Add =.github/workflows/release-pr.yml=.
-- [ ] Update =cliff.toml= to exclude =cloud:=, =internal:=, and =noop:= from
+- [X] Update =cliff.toml= to exclude =cloud:=, =internal:=, and =noop:= from
       generated changelogs.
 - [ ] Ensure it preserves manual blocks in existing release PR bodies.
 - [ ] Generate =CHANGELOG.md=.
