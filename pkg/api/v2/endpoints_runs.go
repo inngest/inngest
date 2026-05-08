@@ -256,8 +256,10 @@ func toTraceSpanStatus(status models.RunTraceSpanStatus) apiv2.TraceSpanStatus {
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_SKIPPED
 	case models.RunTraceSpanStatusWaiting, models.RunTraceSpanStatusQueued:
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_WAITING
-	default:
+	case models.RunTraceSpanStatusRunning:
 		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_RUNNING
+	default:
+		return apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_UNKNOWN
 	}
 }
 
