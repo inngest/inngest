@@ -634,3 +634,24 @@ func HistogramConstraintAPISemaphoreDuration(ctx context.Context, dur time.Durat
 		Boundaries:  ConstraintAPIDurationBoundaries,
 	})
 }
+
+func HistogramDefersLoadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_load_duration",
+		Description: "Distribution of LoadDefers latency in run finalize, including retries",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramDefersPerRun(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_per_run",
+		Description: "Distribution of the number of defers loaded per finalized run",
+		Tags:        opts.Tags,
+		Boundaries:  []float64{1, 2, 5, 10, 15, 20},
+	})
+}

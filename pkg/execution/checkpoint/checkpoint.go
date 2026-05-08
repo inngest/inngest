@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
+	"github.com/inngest/inngest/pkg/execution/defers"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -129,10 +130,14 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		return s.Op == enums.OpcodeRunComplete
 	})
 
-	// When we have >1 steps (parallel mode), we need to set ForceStepPlan to disable
-	// immediate execution in the SDK. This ensures that parallel steps are properly
-	// planned rather than executed immediately.
-	if len(input.Steps) > 1 && !input.Metadata.Config.ForceStepPlan {
+	// >1 non-lazy steps means parallel mode — see enums.OpcodeIsLazy.
+	nonLazyCount := 0
+	for _, s := range input.Steps {
+		if !enums.OpcodeIsLazy(s.Op) {
+			nonLazyCount++
+		}
+	}
+	if nonLazyCount > 1 && !input.Metadata.Config.ForceStepPlan {
 		if err := c.State.UpdateMetadata(ctx, input.Metadata.ID, state.MutableConfig{
 			ForceStepPlan:  true,
 			RequestVersion: input.Metadata.Config.RequestVersion,
@@ -150,7 +155,24 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	// at some point in the future.
 	onChangeToAsync := sync.OnceFunc(func() { c.updateSpanAsync(ctx, input) })
 
+	// Drain priority opcodes before the rest.
+	//
+	// NOTE: This assumes that ops are processed sequentially. If they aren't,
+	// then priority order would only decrease the chance of a race, but not
+	// eliminate it.
+	ordered := make([]state.GeneratorOpcode, 0, len(input.Steps))
 	for _, op := range input.Steps {
+		if enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+	for _, op := range input.Steps {
+		if !enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+
+	for _, op := range ordered {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, input.Metadata.ID)
 
@@ -304,6 +326,32 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error finalizing sync run", "error", err)
 			}
 
+		case enums.OpcodeDeferAdd:
+			if err := defers.SaveFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer add in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", input.Metadata.ID.RunID.String(),
+				)
+			}
+
+		case enums.OpcodeDeferAbort:
+			if err := defers.AbortFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer abort in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", input.Metadata.ID.RunID.String(),
+				)
+			}
+
 		default:
 			// This is an async opcode (sleep, waitForEvent, invoke, etc.) that causes
 			// the run to transition from sync to async mode. Track this on the run span
@@ -442,6 +490,32 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
+
+		case enums.OpcodeDeferAdd:
+			if err := defers.SaveFromOp(ctx, c.State, l, md.ID, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer add in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", md.ID.RunID.String(),
+				)
+			}
+
+		case enums.OpcodeDeferAbort:
+			if err := defers.AbortFromOp(ctx, c.State, l, md.ID, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer abort in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", md.ID.RunID.String(),
+				)
+			}
 
 		default:
 			// Return an error
