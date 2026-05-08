@@ -302,11 +302,7 @@ func (e *executor) buildDeferEvents(
 func (e *executor) finalizeRemoveActiveRun(ctx context.Context, opts execution.FinalizeOpts) {
 	l := logger.StdlibLogger(ctx)
 
-	shard, err := e.shardFinder(
-		ctx,
-		opts.Metadata.ID.Tenant.AccountID,
-		nil,
-	)
+	shard, err := e.shards.Resolve(ctx, opts.Metadata.ID.Tenant.AccountID, nil)
 	if err != nil {
 		l.Warn("failed to find queue shard for active run cleanup",
 			"error", err,
