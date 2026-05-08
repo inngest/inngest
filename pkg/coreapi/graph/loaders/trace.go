@@ -399,9 +399,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				continue
 			}
 
-			if !cs.MarkedAsDropped {
-				showSpan = true
+			if cs.MarkedAsDropped {
+				continue
 			}
+
+			showSpan = true
 
 			// Transfer any accumulated metadata from preceding omitted
 			// step discovery spans to this visible step sibling. Each
