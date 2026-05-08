@@ -15,8 +15,6 @@ import {
   RiPlayCircleLine,
 } from '@remixicon/react';
 
-import { useBooleanFlag } from '../FeatureFlags/hooks';
-
 export type FunctionActions = {
   showCancel: () => void;
   showInvoke: () => void;
@@ -34,8 +32,6 @@ export const ActionsMenu = ({
   archived,
   paused,
 }: FunctionActions) => {
-  const { value: cancelEnabled } = useBooleanFlag('bulk-cancellation-ui');
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -90,12 +86,10 @@ export const ActionsMenu = ({
             Replay
           </DropdownMenuItem>
         </OptionalTooltip>
-        {cancelEnabled && (
-          <DropdownMenuItem onSelect={showCancel} className="text-error">
-            <RiCloseCircleLine className="h-4 w-4" />
-            Bulk Cancel
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem onSelect={showCancel} className="text-error">
+          <RiCloseCircleLine className="h-4 w-4" />
+          Bulk Cancel
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

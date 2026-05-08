@@ -9,7 +9,6 @@ import { useFunction } from '@/queries/functions';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
@@ -34,8 +33,6 @@ function FunctionComponent() {
   const [{ data, error, fetching }] = useFunction({ functionSlug });
   const [, invokeFunction] = useMutation(InvokeFunctionOnboardingDocument);
   const env = useEnvironment();
-
-  const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -151,17 +148,12 @@ function FunctionComponent() {
               slug,
             )}/replays`,
           },
-          ...(isBulkCancellationEnabled.isReady &&
-          isBulkCancellationEnabled.value
-            ? [
-                {
-                  children: 'Cancellations',
-                  href: `/env/${envSlug}/functions/${encodeURIComponent(
-                    slug,
-                  )}/cancellations`,
-                },
-              ]
-            : []),
+          {
+            children: 'Cancellations',
+            href: `/env/${envSlug}/functions/${encodeURIComponent(
+              slug,
+            )}/cancellations`,
+          },
         ]}
       />
       <Outlet />
