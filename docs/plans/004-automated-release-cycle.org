@@ -475,7 +475,7 @@ treated as preview artifacts.
 - [ ] Compare generated =CHANGELOG.md= against current output.
 - [ ] Compare assembled =RELEASE_NOTES.md= against expected PR context.
 - [ ] Merge a low-risk release PR after review.
-- [ ] Update =docs/RELEASING.md= from manual tagging to release PR merge flow.
+- [X] Update =docs/RELEASING.md= from manual tagging to release PR merge flow.
 
 * References
 
