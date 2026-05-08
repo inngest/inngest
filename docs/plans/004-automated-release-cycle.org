@@ -414,8 +414,8 @@ treated as preview artifacts.
 - [X] Remove the redundant type-of-change section once Conventional Commit title
       validation is in place.
 - [X] Remove checklist items that are no longer useful release/process signals.
-- [ ] Add PR title Conventional Commit validation.
-- [ ] Add =cloud:=, =internal:=, and =noop:= as accepted non-release PR title
+- [X] Add PR title Conventional Commit validation.
+- [X] Add =cloud:=, =internal:=, and =noop:= as accepted non-release PR title
       prefixes.
 - [ ] Document author guidance in =docs/PULL_REQUEST_GUIDELINES.md=.
 
