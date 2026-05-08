@@ -1521,17 +1521,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
+	requestID := ulid.MustNew(ulid.Timestamp(e.now()), rand.Reader).String()
+	jobID := queue.JobIDFromContext(ctx)
+	if item.JobID != nil {
+		jobID = *item.JobID
+	}
+	ctx = driver.WithRequestIDs(ctx, requestID, jobID)
+
 	l := e.log.With(
 		"account_id", item.Identifier.AccountID,
 		"env_id", item.WorkspaceID,
 		"app_id", item.Identifier.AppID,
 		"fn_id", item.Identifier.WorkflowID,
 		"run_id", id.RunID,
+		"request_id", requestID,
+		"job_id", jobID,
 	)
 	ctx = logger.WithStdlib(ctx, l)
 
 	conditionalSpan.SetAttributes(attribute.String("run_id", id.RunID.String()))
 	conditionalSpan.SetAttributes(attribute.String("event_id", id.EventID.String()))
+	conditionalSpan.SetAttributes(attribute.String("request_id", requestID))
+	conditionalSpan.SetAttributes(attribute.String("job_id", jobID))
 
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
@@ -1758,6 +1769,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		item:       item,
 		edge:       edge,
 		stackIndex: stackIndex,
+		requestID:  requestID,
+		jobID:      jobID,
 		httpClient: e.httpClient,
 		parentSpan: parentRef,
 		c:          e.clock,
@@ -1765,6 +1778,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	// This span will be updated with output as soon as execution finishes.
+	execAttrs := tracing.FunctionAttrs(&instance.f)
+	meta.AddAttr(execAttrs, meta.Attrs.RequestID, &instance.requestID)
+	meta.AddAttr(execAttrs, meta.Attrs.JobID, &instance.jobID)
+
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,
 		meta.SpanNameExecution,
@@ -1773,7 +1790,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Parent:     parentRef,
 			Metadata:   &md,
 			QueueItem:  &item,
-			Attributes: tracing.FunctionAttrs(&instance.f),
+			Attributes: execAttrs,
 			StartTime:  e.now(),
 		},
 	)
@@ -1799,12 +1816,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
+		responseAttrs := tracing.DriverResponseAttrs(resp, nil)
+		meta.AddAttr(responseAttrs, meta.Attrs.RequestID, &instance.requestID)
+		meta.AddAttr(responseAttrs, meta.Attrs.JobID, &instance.jobID)
+
 		updateOpts := &tracing.UpdateSpanOptions{
 			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
 			Metadata:   &md,
 			QueueItem:  &item,
 			TargetSpan: instance.execSpan,
-			Attributes: tracing.DriverResponseAttrs(resp, nil),
+			Attributes: responseAttrs,
 		}
 
 		// For most executions, we now set the status of the execution span.
@@ -2247,6 +2268,8 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		Index:      run.stackIndex,
 		StepID:     &stepID,
 		QueueRef:   queueref.StringFromCtx(ctx),
+		RequestID:  run.requestID,
+		JobID:      run.jobID,
 		URL:        url,
 	})
 

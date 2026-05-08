@@ -96,6 +96,8 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		AccountID:      s.ID.Tenant.AccountID,
 		WorkflowID:     s.ID.FunctionID,
 		RunID:          s.ID.RunID,
+		RequestID:      driver.RequestIDFromContext(ctx),
+		JobID:          driver.JobIDFromContext(ctx),
 		SigningKey:     e.localSigningKey,
 		URL:            *uri,
 		Input:          input,
@@ -118,6 +120,10 @@ type Request struct {
 	WorkflowID uuid.UUID
 	// RunID is used for logging purposes, and is not used in the request
 	RunID ulid.ULID
+	// RequestID is the unique per-outbound SDK request ID.
+	RequestID string
+	// JobID is the stable queue item ID for this SDK request.
+	JobID string
 
 	// Signature, if set, is the signature to use for the request.  If unset,
 	// the SigningKey below will be used to sign the input.
@@ -323,6 +329,12 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 
 	// Always add the run ID
 	req.Header.Add("X-Run-ID", r.RunID.String())
+	if r.RequestID != "" {
+		req.Header.Add(headerspkg.HeaderKeyRequestID, r.RequestID)
+	}
+	if r.JobID != "" {
+		req.Header.Add(headerspkg.HeaderKeyJobID, r.JobID)
+	}
 
 	if r.RequestVersion != nil {
 		req.Header.Add(headerspkg.HeaderKeyRequestVersion, fmt.Sprintf("%d", *r.RequestVersion))

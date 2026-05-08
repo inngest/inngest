@@ -25,6 +25,8 @@ type runInstance struct {
 	resp       *state.DriverResponse
 	httpClient exechttp.RequestExecutor
 	stackIndex int
+	requestID  string
+	jobID      string
 
 	// If specified, this is the span reference that represents this execution:
 	// the current request outgoing to the user's SDK.
