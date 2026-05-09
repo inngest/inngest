@@ -47,8 +47,8 @@
   },
   "devDependencies": {
     "@graphql-codegen/cli": "7.0.0",
-    "@graphql-codegen/typescript": "6.0.0",
-    "@graphql-codegen/typescript-operations": "6.0.0",
+    "@graphql-codegen/typescript": "6.0.1",
+    "@graphql-codegen/typescript-operations": "6.0.1",
     "@graphql-codegen/typescript-rtk-query": "4.0.1",
     "@inngest/components": "workspace:*",
     "@tanstack/eslint-config": "0.4.0",
