@@ -124,7 +124,7 @@ importers:
         version: 0.4.0(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(express@5.2.1)(h3@2.0.1-rc.22(crossws@0.4.5(srvx@0.11.15)))(hono@4.12.18)(next@16.2.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(uuid@14.0.0)(zod@4.4.3)
       '@launchdarkly/node-server-sdk':
         specifier: ^9.0.3
-        version: 9.10.13
+        version: 9.10.14
       '@radix-ui/react-select':
         specifier: ^2.0.0
         version: 2.2.6(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -2522,14 +2522,14 @@ packages:
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
 
-  '@launchdarkly/js-sdk-common@2.24.3':
-    resolution: {integrity: sha512-KQaaHJcFOKvdiLIcS9f70tYLyENOmBvKI9sEKiMc43BwTwDW3AS0jyoKyCw3jCQL/sYv1+oX3VLk1urbdphGPg==}
+  '@launchdarkly/js-sdk-common@2.24.4':
+    resolution: {integrity: sha512-ikD6MElNa3WPUxXdUIDSBvbig21gfjemEus1Vh0HGcgLThxGglq+EGb0coyc8199+3aqu8c9kpuXEdMBZhOowA==}
 
-  '@launchdarkly/js-server-sdk-common@2.18.6':
-    resolution: {integrity: sha512-oc4ZJa7cuBuWN62PFR3Kcok+qVcm5XX4/5YEvcvg6cvqSRdte/8JYZ6AVAnJ9YFfYWoedpUSmFe9VXTBG/mWQw==}
+  '@launchdarkly/js-server-sdk-common@2.18.7':
+    resolution: {integrity: sha512-v1vttu8tALIvpm1+Bal2HKtuvpdBBOTVJfAidlqS4PgSO9qyIzMa5R9fTkRFFXUpQh/iLRqPMI2TINubdfd5kg==}
 
-  '@launchdarkly/node-server-sdk@9.10.13':
-    resolution: {integrity: sha512-trN7DWtYO7BccQsMariHuIIw+QT1deqaj6jWECoT+FBlEW/Ws/oHQLX+HV2dMqKGASeofd66u+UxMTU5apGY4A==}
+  '@launchdarkly/node-server-sdk@9.10.14':
+    resolution: {integrity: sha512-mpgBT0mRBO/2dup7VrKaydyowv7pu3xRqyN7QMsXnOVF5yvC2N2HOBJ7HwBYaNtII32vEa9uQJbX8v2mBfVMaw==}
 
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
@@ -13451,16 +13451,16 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
-  '@launchdarkly/js-sdk-common@2.24.3': {}
+  '@launchdarkly/js-sdk-common@2.24.4': {}
 
-  '@launchdarkly/js-server-sdk-common@2.18.6':
+  '@launchdarkly/js-server-sdk-common@2.18.7':
     dependencies:
-      '@launchdarkly/js-sdk-common': 2.24.3
+      '@launchdarkly/js-sdk-common': 2.24.4
       semver: 7.5.4
 
-  '@launchdarkly/node-server-sdk@9.10.13':
+  '@launchdarkly/node-server-sdk@9.10.14':
     dependencies:
-      '@launchdarkly/js-server-sdk-common': 2.18.6
+      '@launchdarkly/js-server-sdk-common': 2.18.7
       https-proxy-agent: 7.0.6
       launchdarkly-eventsource: 2.2.0
     transitivePeerDependencies:
