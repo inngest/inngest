@@ -14,7 +14,7 @@ allowBuilds:
 
 overrides:
   "@babel/runtime@<7.26.10": ">=7.26.10"
-  "@clerk/shared@<3.47.4": "4.10.0"
+  "@clerk/shared@<3.47.4": "4.10.1"
   "@sentry/browser@<7.119.1": ">=7.119.1"
   "@urql/core": "6.0.1"
   "brace-expansion@>=1.0.0 <=1.1.11": ">=1.1.12"
