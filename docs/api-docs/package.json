@@ -44,5 +44,5 @@
     "node": "24.x",
     "pnpm": "11.x"
   },
-  "packageManager": "pnpm@11.0.7"
+  "packageManager": "pnpm@11.0.8"
 }
