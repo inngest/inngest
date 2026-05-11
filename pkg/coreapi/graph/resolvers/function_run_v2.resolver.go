@@ -25,6 +25,59 @@ func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.Functio
 	return models.MakeFunction(fun)
 }
 
+func (r *functionRunV2Resolver) Defers(ctx context.Context, fn *models.FunctionRunV2) ([]*models.RunDefer, error) {
+	defersPtr, err := loader.LoadOneWithString[[]cqrs.RunDefer](ctx, loader.FromCtx(ctx).RunDefersLoader, fn.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving run defers: %w", err)
+	}
+	var defers []cqrs.RunDefer
+	if defersPtr != nil {
+		defers = *defersPtr
+	}
+
+	out := make([]*models.RunDefer, 0, len(defers))
+	for _, d := range defers {
+		var input *string
+		if len(d.Input) > 0 {
+			s := string(d.Input)
+			input = &s
+		}
+		runV2, err := models.MakeFunctionRunV2(d.Run)
+		if err != nil {
+			return nil, fmt.Errorf("error converting defer child run: %w", err)
+		}
+		out = append(out, &models.RunDefer{
+			ID:     d.ID,
+			FnSlug: d.FnSlug,
+			Status: models.RunDeferStatus(d.Status),
+			Input:  input,
+			Run:    runV2,
+		})
+	}
+	return out, nil
+}
+
+func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.FunctionRunV2) (*models.RunDeferredFrom, error) {
+	df, err := loader.LoadOneWithString[cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
+	}
+	if df == nil {
+		return nil, nil
+	}
+
+	parentV2, err := models.MakeFunctionRunV2(df.ParentRun)
+	if err != nil {
+		return nil, fmt.Errorf("error converting deferred-from parent run: %w", err)
+	}
+
+	return &models.RunDeferredFrom{
+		ParentRunID:  df.ParentRunID,
+		ParentFnSlug: df.ParentFnSlug,
+		ParentRun:    parentV2,
+	}, nil
+}
+
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {
 	targetLoader := loader.FromCtx(ctx).LegacyRunTraceLoader
 	if preview != nil && *preview {

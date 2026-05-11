@@ -307,6 +307,8 @@ type FunctionRunV2 struct {
 	Output         *string           `json:"output,omitempty"`
 	Trace          *RunTraceSpan     `json:"trace,omitempty"`
 	HasAi          bool              `json:"hasAI"`
+	Defers         []*RunDefer       `json:"defers"`
+	DeferredFrom   *RunDeferredFrom  `json:"deferredFrom,omitempty"`
 }
 
 type FunctionRunV2Edge struct {
@@ -361,6 +363,20 @@ type RerunFromStepInput struct {
 type RetryConfiguration struct {
 	Value     int   `json:"value"`
 	IsDefault *bool `json:"isDefault,omitempty"`
+}
+
+type RunDefer struct {
+	ID     string         `json:"id"`
+	FnSlug string         `json:"fnSlug"`
+	Status RunDeferStatus `json:"status"`
+	Input  *string        `json:"input,omitempty"`
+	Run    *FunctionRunV2 `json:"run,omitempty"`
+}
+
+type RunDeferredFrom struct {
+	ParentRunID  ulid.ULID      `json:"parentRunID"`
+	ParentFnSlug string         `json:"parentFnSlug"`
+	ParentRun    *FunctionRunV2 `json:"parentRun,omitempty"`
 }
 
 type RunStep struct {
@@ -958,6 +974,47 @@ func (e *FunctionTriggerTypes) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunDeferStatus string
+
+const (
+	RunDeferStatusScheduled RunDeferStatus = "SCHEDULED"
+	RunDeferStatusAborted   RunDeferStatus = "ABORTED"
+)
+
+var AllRunDeferStatus = []RunDeferStatus{
+	RunDeferStatusScheduled,
+	RunDeferStatusAborted,
+}
+
+func (e RunDeferStatus) IsValid() bool {
+	switch e {
+	case RunDeferStatusScheduled, RunDeferStatusAborted:
+		return true
+	}
+	return false
+}
+
+func (e RunDeferStatus) String() string {
+	return string(e)
+}
+
+func (e *RunDeferStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunDeferStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunDeferStatus", str)
+	}
+	return nil
+}
+
+func (e RunDeferStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
