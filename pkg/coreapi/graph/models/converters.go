@@ -3,10 +3,12 @@ package models
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/oklog/ulid/v2"
 )
 
 func MakeFunction(f *cqrs.Function) (*Function, error) {
@@ -85,6 +87,77 @@ func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
 		r.Output = &str
 	}
 	return r
+}
+
+// MakeFunctionRunV2 mirrors the inline construction in
+// pkg/coreapi/graph/resolvers/runs_v2.go's Run/Runs resolvers; keep them in
+// sync until those callsites are folded in.
+func MakeFunctionRunV2(run *cqrs.TraceRun) (*FunctionRunV2, error) {
+	if run == nil {
+		return nil, nil
+	}
+	runID, err := ulid.Parse(run.RunID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing runID: %w", err)
+	}
+	status, err := ToFunctionRunStatus(run.Status)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing status: %w", err)
+	}
+
+	var (
+		startedAt *time.Time
+		endedAt   *time.Time
+		sourceID  *string
+		output    *string
+		batchTS   *time.Time
+	)
+
+	triggerIDs := []ulid.ULID{}
+	for _, evtID := range run.TriggerIDs {
+		if id, err := ulid.Parse(evtID); err == nil {
+			triggerIDs = append(triggerIDs, id)
+		}
+	}
+
+	if len(run.Output) > 0 {
+		o := string(run.Output)
+		output = &o
+	}
+	if run.BatchID != nil {
+		ts := ulid.Time(run.BatchID.Time())
+		batchTS = &ts
+	}
+	if run.StartedAt.UnixMilli() > 0 {
+		startedAt = &run.StartedAt
+	}
+	if run.SourceID != "" {
+		sourceID = &run.SourceID
+	}
+	switch status {
+	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled:
+		if run.EndedAt.UnixMilli() > 0 {
+			endedAt = &run.EndedAt
+		}
+	}
+
+	return &FunctionRunV2{
+		ID:             runID,
+		AppID:          run.AppID,
+		FunctionID:     run.FunctionID,
+		TraceID:        run.TraceID,
+		QueuedAt:       run.QueuedAt,
+		StartedAt:      startedAt,
+		EndedAt:        endedAt,
+		Status:         status,
+		SourceID:       sourceID,
+		TriggerIDs:     triggerIDs,
+		IsBatch:        run.IsBatch,
+		BatchCreatedAt: batchTS,
+		CronSchedule:   run.CronSchedule,
+		Output:         output,
+		HasAi:          run.HasAI,
+	}, nil
 }
 
 func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {

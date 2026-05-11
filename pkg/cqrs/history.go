@@ -20,4 +20,14 @@ type HistoryReader interface {
 	// GetFunctionRunHistory must return history for the given function run,
 	// ordered from oldest to newest.
 	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*history.History, error)
+
+	// GetRunDefers returns the defers for a parent run, in the order their
+	// DeferAdd opcodes first appeared. A DeferAdd later aborted by a matching
+	// DeferAbort folds into a single entry with status ABORTED; otherwise the
+	// entry is SCHEDULED. Orphan DeferAbort opcodes are ignored.
+	GetRunDefers(ctx context.Context, runID ulid.ULID) ([]RunDefer, error)
+
+	// GetRunDeferredFrom returns the parent-run linkage for a deferred run, or
+	// nil if the run was not triggered by an inngest/deferred.schedule event.
+	GetRunDeferredFrom(ctx context.Context, runID ulid.ULID) (*RunDeferredFrom, error)
 }

@@ -497,6 +497,8 @@ type FunctionRunV2 {
 
   trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
+  defers: [RunDefer!]!
+  deferredFrom: RunDeferredFrom
 }
 
 type RunsV2Connection {
@@ -508,6 +510,25 @@ type RunsV2Connection {
 type FunctionRunV2Edge {
   node: FunctionRunV2!
   cursor: String!
+}
+
+type RunDefer {
+  id: String!
+  fnSlug: String!
+  status: RunDeferStatus!
+  input: Bytes
+  run: FunctionRunV2
+}
+
+enum RunDeferStatus {
+  SCHEDULED
+  ABORTED
+}
+
+type RunDeferredFrom {
+  parentRunID: ULID!
+  parentFnSlug: String!
+  parentRun: FunctionRunV2
 }
 
 enum RunTraceSpanStatus {

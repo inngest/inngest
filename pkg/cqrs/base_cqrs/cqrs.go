@@ -1624,6 +1624,16 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	return nil, err
 }
 
+// GetRunDefers is a placeholder pending the defer history-reader implementation.
+func (w wrapper) GetRunDefers(ctx context.Context, runID ulid.ULID) ([]cqrs.RunDefer, error) {
+	return nil, nil
+}
+
+// GetRunDeferredFrom is a placeholder pending the defer history-reader implementation.
+func (w wrapper) GetRunDeferredFrom(ctx context.Context, runID ulid.ULID) (*cqrs.RunDeferredFrom, error) {
+	return nil, nil
+}
+
 func toCQRSRun(run dbpkg.FunctionRun, finish dbpkg.FunctionFinish) *cqrs.FunctionRun {
 	copied := cqrs.FunctionRun{
 		RunID:           run.RunID,
