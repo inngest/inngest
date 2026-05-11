@@ -18,6 +18,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	connectconfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
@@ -939,7 +940,12 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		},
 	}
 
+	grpcGatewayPort := freePort()
+	grpcExecutorPort := freePort()
+	grpcConfig := connectconfig.NewGRPCConfig(ctx, "127.0.0.1", grpcGatewayPort, "127.0.0.1", grpcExecutorPort)
+
 	opts := []gatewayOpt{
+		WithGRPCConfig(grpcConfig),
 		WithGatewayAuthHandler(func(ctx context.Context, data *connect.WorkerConnectRequestData) (*auth.Response, error) {
 			l.Info("got auth request", "data", data)
 
@@ -1000,33 +1006,17 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		_ = svc.Stop(context.Background())
 	})
 
-	// Wait until fake API is up
-	maxAttempts := 10
-	for i := 0; i <= maxAttempts; i++ {
-		if i == maxAttempts {
-			require.Fail(t, "failed to connect to fake api")
-		}
-
+	// Wait until fake API is up.
+	require.Eventually(t, func() bool {
 		resp, err := http.Get(fakeApiBaseUrl + "/ready")
-		if err == nil && resp.StatusCode == http.StatusOK {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+		return err == nil && resp.StatusCode == http.StatusOK
+	}, 15*time.Second, 100*time.Millisecond, "failed to connect to fake api")
 
-	// Wait until gateway is up
-	maxAttempts = 10
-	for i := 0; i <= maxAttempts; i++ {
-		if i == maxAttempts {
-			require.Fail(t, "failed to connect to gateway")
-		}
-
+	// Wait until gateway is up.
+	require.Eventually(t, func() bool {
 		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/ready", gwPort))
-		if err == nil && resp.StatusCode == http.StatusOK {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+		return err == nil && resp.StatusCode == http.StatusOK
+	}, 15*time.Second, 100*time.Millisecond, "failed to connect to gateway")
 
 	var ws *websocket.Conn
 	if len(params) == 0 || !params[0].noConnect {

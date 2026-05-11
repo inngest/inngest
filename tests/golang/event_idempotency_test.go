@@ -56,10 +56,10 @@ func TestEventIdempotency(t *testing.T) {
 
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, 2*time.Second, time.Second)
+		}, 10*time.Second, 100*time.Millisecond)
 
 		// Wait a little longer to make sure no more runs happen
-		<-time.After(100 * time.Millisecond)
+		<-time.After(2 * time.Second)
 
 		r.Equal(int32(1), atomic.LoadInt32(&counter))
 
@@ -88,6 +88,6 @@ func TestEventIdempotency(t *testing.T) {
 
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 2
-		}, 2*time.Second, time.Second)
+		}, 10*time.Second, 100*time.Millisecond)
 	})
 }

@@ -186,6 +186,13 @@ func (q *queueProcessor) ProcessItem(
 						// Don't extend lease when the ctx is done.
 						return
 					}
+					// Don't extend if the capacity lease was explicitly released early.
+					// Release() cancels extendCapacityLeaseCtx; if we already entered this
+					// select branch before that cancellation was observed, bail out silently
+					// rather than attempting to extend a lease that no longer exists.
+					if extendCapacityLeaseCtx.Err() != nil {
+						return
+					}
 
 					currentCapacityLease := capacityLeaseID.get()
 					if currentCapacityLease == nil {
@@ -211,6 +218,11 @@ func (q *queueProcessor) ProcessItem(
 						LeaseIssuedAt: capacityLeaseID.issuedAt(),
 					})
 					if err != nil {
+						// If the lease was explicitly released while this extend call was in
+						// flight, the error is expected — don't abort processing.
+						if extendCapacityLeaseCtx.Err() != nil {
+							return
+						}
 						l.ReportError(
 							err,
 							"error extending capacity lease",
@@ -229,6 +241,10 @@ func (q *queueProcessor) ProcessItem(
 					}
 
 					if res.LeaseID == nil {
+						// If the lease was explicitly released, a nil response is expected.
+						if extendCapacityLeaseCtx.Err() != nil {
+							return
+						}
 						// Lease could not be extended
 						l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi, "partition", p)
 						errCh <- AlwaysRetryError(fmt.Errorf("failed to extend capacity lease, no new lease ID received"))

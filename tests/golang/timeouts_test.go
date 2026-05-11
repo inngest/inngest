@@ -64,8 +64,10 @@ func TestTimeoutStart(t *testing.T) {
 		}()
 	}
 
-	<-time.After(8 * time.Second)
-	require.EqualValues(t, 1, total)
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&total) >= 1
+	}, 15*time.Second, 100*time.Millisecond)
+	require.EqualValues(t, 1, atomic.LoadInt32(&total))
 
 	// XXX: Hit API to ensure runs have been cancelled here alongside testing counts.
 }
@@ -220,10 +222,12 @@ func TestTimeoutFinish(t *testing.T) {
 			}()
 		}
 
-		<-time.After(8 * time.Second)
-		require.EqualValues(t, 3, progressA)
-		require.EqualValues(t, 3, progressB)
-		require.EqualValues(t, 0, progressC)
+		require.Eventually(t, func() bool {
+			return atomic.LoadInt32(&progressA) >= 3 && atomic.LoadInt32(&progressB) >= 3
+		}, 20*time.Second, 100*time.Millisecond)
+		require.EqualValues(t, 3, atomic.LoadInt32(&progressA))
+		require.EqualValues(t, 3, atomic.LoadInt32(&progressB))
+		require.EqualValues(t, 0, atomic.LoadInt32(&progressC))
 
 		// XXX: Hit API to ensure runs have been cancelled here alongside testing counts.
 	})

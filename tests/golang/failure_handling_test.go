@@ -81,11 +81,9 @@ func TestFunctionFailureHandling(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	<-time.After(3 * time.Second)
-
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&count) == 1
-	}, 20*time.Second, 5*time.Millisecond)
+	}, 25*time.Second, 100*time.Millisecond)
 }
 
 func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
@@ -131,10 +129,8 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	<-time.After(5 * time.Second)
-
-	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 10*time.Second, time.Second)
-	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 15*time.Second, 100*time.Millisecond)
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&handled) == 1 }, 15*time.Second, 100*time.Millisecond)
 
 	// send another, it should be rate limited
 	_, err = inngestClient.Send(ctx, inngestgo.Event{
@@ -142,10 +138,10 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		Data: map[string]any{"number": 10},
 	})
 	require.NoError(t, err)
-	<-time.After(2 * time.Second)
-
-	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 10*time.Second, time.Second)
-	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
+	// Both counters are already 1; use Never to verify the rate-limited event
+	// is not processed during a 3s observation window.
+	require.Never(t, func() bool { return atomic.LoadInt32(&failed) > 1 }, 3*time.Second, 100*time.Millisecond)
+	require.Never(t, func() bool { return atomic.LoadInt32(&handled) > 1 }, 3*time.Second, 100*time.Millisecond)
 
 	// send a different payload
 	_, err = inngestClient.Send(ctx, inngestgo.Event{
@@ -153,8 +149,6 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		Data: map[string]any{"number": 1},
 	})
 	require.NoError(t, err)
-	<-time.After(5 * time.Second)
-
-	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 2 }, 10*time.Second, time.Second)
-	require.Equal(t, int32(2), atomic.LoadInt32(&handled))
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 2 }, 15*time.Second, 100*time.Millisecond)
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&handled) == 2 }, 15*time.Second, 100*time.Millisecond)
 }

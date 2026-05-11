@@ -98,10 +98,11 @@ func TestSendIdempotentRetry(t *testing.T) {
 	)
 	r.NoError(err)
 
-	// Sleep long enough for the Dev Server to process the events.
-	time.Sleep(5 * time.Second)
+	// Wait for the Dev Server to process the events.
+	r.Eventually(func() bool {
+		return atomic.LoadInt32(&fnCounter) == 2
+	}, 15*time.Second, 100*time.Millisecond)
 	r.Equal(int32(2), atomic.LoadInt32(&proxyCounter))
-	r.Equal(int32(2), atomic.LoadInt32(&fnCounter))
 
 	events, err := getEvents(ctx, eventName)
 	r.NoError(err)

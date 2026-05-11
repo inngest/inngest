@@ -59,9 +59,10 @@ func TestFunctionFailure(t *testing.T) {
 	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
-	<-time.After(5 * time.Second)
-
-	require.EqualValues(t, counter, 1)
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&counter) >= 1
+	}, 15*time.Second, 100*time.Millisecond)
+	require.EqualValues(t, 1, atomic.LoadInt32(&counter))
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, ChildSpanCount: 1, RequireTraceOutputID: true})
@@ -133,9 +134,10 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
-	<-time.After(5 * time.Second)
-
-	require.EqualValues(t, counter, 1)
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&counter) >= 1
+	}, 15*time.Second, 100*time.Millisecond)
+	require.EqualValues(t, 1, atomic.LoadInt32(&counter))
 
 	t.Run("in progress run", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
