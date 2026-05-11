@@ -1,6 +1,7 @@
 package healthcheck
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"net/http"
@@ -162,6 +163,11 @@ func TestRun_SchemeOverride(t *testing.T) {
 
 	host, port := splitURL(t, srv.URL)
 	cmd := Command()
+	// Capture per-probe error context; cmd.Run returns cli.Exit("", 1)
+	// regardless of failure mode, so the returned err alone can't tell us
+	// whether the scheme flag was honored.
+	var stderr bytes.Buffer
+	cmd.ErrWriter = &stderr
 	err := cmd.Run(context.Background(), []string{
 		"healthcheck",
 		"--host=" + host,
@@ -170,14 +176,15 @@ func TestRun_SchemeOverride(t *testing.T) {
 		"--scheme=https",
 		"--timeout=2s",
 	})
-	// httptest's TLS uses a self-signed cert, so the probe will fail TLS verification.
-	// We're only validating that the scheme flag is honored (request goes out as HTTPS,
-	// not HTTP, which would otherwise return 400).
 	if err == nil {
-		t.Fatal("expected TLS verification error, got nil")
+		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "") { // err is non-nil; cli.Exit("", 1) has empty msg
-		t.Fatalf("unexpected error shape: %v", err)
+	// httptest's TLS uses a self-signed cert. If scheme=https was honored,
+	// the probe fails TLS verification on the client side; if it was ignored
+	// and the request went out as HTTP to the TLS port, we'd see a 400 or
+	// "malformed HTTP response" instead.
+	if got := stderr.String(); !strings.Contains(got, "tls") {
+		t.Fatalf("expected TLS verification error in probe output, got:\n%s", got)
 	}
 }
 

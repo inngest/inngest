@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api"
@@ -107,9 +106,10 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	_ = eg.Wait()
 
 	var failed int
+	errOut := cmd.Root().ErrWriter
 	for _, err := range errs {
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+			fmt.Fprintln(errOut, err.Error())
 			failed++
 		}
 	}
