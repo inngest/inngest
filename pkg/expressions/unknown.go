@@ -285,6 +285,7 @@ func (e *evalTruthyLogical) Eval(ctx interpreter.Activation) ref.Val {
 	}
 
 	// Apply JS-like truthy coercion.
+	n := len(e.terms)
 	if e.isOr {
 		// Return the first truthy value, or the last value.
 		for i := 0; i < n; i++ {
@@ -292,7 +293,7 @@ func (e *evalTruthyLogical) Eval(ctx interpreter.Activation) ref.Val {
 				return vals[i]
 			}
 		}
-		return vals[len(vals)-1]
+		return vals[n-1]
 	}
 
 	// AND: return the first falsy value, or the last value.
@@ -301,7 +302,7 @@ func (e *evalTruthyLogical) Eval(ctx interpreter.Activation) ref.Val {
 			return vals[i]
 		}
 	}
-	return vals[len(vals)-1]
+	return vals[n-1]
 }
 
 // isTruthy returns whether a CEL value is "truthy" using JS-like semantics.
