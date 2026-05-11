@@ -40,6 +40,9 @@ type BaseCQRSOptions struct {
 	// PostgresURI declares the postgres connection to connect to a postgres database
 	PostgresURI string
 
+	// PostgresPool configures the Postgres database/sql connection pool.
+	PostgresPool *PostgresPoolOptions
+
 	// The path at which the SQLite database should be stored.
 	Directory string
 }
@@ -108,10 +111,21 @@ func New(ctx context.Context, opts BaseCQRSOptions) (*sql.DB, error) {
 		}
 		l = l.With("db", "sqlite", "mode", "memory")
 	}
-	l.Info("initialized database")
-
 	if err != nil {
 		return nil, err
+	}
+
+	l.Info("initialized database")
+
+	if opts.PostgresURI != "" && opts.PostgresPool != nil {
+		applyPostgresPoolOptions(db, *opts.PostgresPool)
+		l.Info(
+			"configured postgres database pool",
+			"max_idle_conns", opts.PostgresPool.MaxIdleConns,
+			"max_open_conns", opts.PostgresPool.MaxOpenConns,
+			"conn_max_idle_time_minutes", opts.PostgresPool.ConnMaxIdleTime,
+			"conn_max_lifetime_minutes", opts.PostgresPool.ConnMaxLifetime,
+		)
 	}
 
 	if err := db.Ping(); err != nil {

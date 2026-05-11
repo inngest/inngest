@@ -1,37 +1,16 @@
 package start
 
 import (
-	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	localconfig "github.com/inngest/inngest/cmd/internal/config"
+	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
-
-// validatePostgreSQLConnectionPool extracts the validation logic from the action function
-// to make it testable in isolation
-func validatePostgreSQLConnectionPool(maxIdleConns, maxOpenConns int) error {
-	if maxOpenConns <= 1 {
-		return &PostgreSQLValidationError{
-			message: fmt.Sprintf("postgres-max-open-conns (%d) must be greater than 1", maxOpenConns),
-		}
-	}
-	if maxIdleConns > maxOpenConns {
-		return &PostgreSQLValidationError{
-			message: fmt.Sprintf("postgres-max-idle-conns (%d) cannot be greater than postgres-max-open-conns (%d)",
-				maxIdleConns, maxOpenConns),
-		}
-	}
-	return nil
-}
-
-// PostgreSQLValidationError represents a PostgreSQL connection pool validation error
-type PostgreSQLValidationError struct {
-	message string
-}
-
-func (e *PostgreSQLValidationError) Error() string {
-	return e.message
-}
 
 func TestValidatePostgreSQLConnectionPool(t *testing.T) {
 	tests := []struct {
@@ -108,4 +87,43 @@ func TestValidatePostgreSQLConnectionPool(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPostgresConnectionPoolConfigFromCommandUsesEnvBackedConfig(t *testing.T) {
+	configFile := filepath.Join(t.TempDir(), "inngest.yml")
+	require.NoError(t, os.WriteFile(configFile, []byte("{}\n"), 0644))
+
+	t.Setenv("INNGEST_CONFIG", configFile)
+	t.Setenv("INNGEST_POSTGRES_MAX_IDLE_CONNS", "17")
+	t.Setenv("INNGEST_POSTGRES_MAX_OPEN_CONNS", "171")
+	t.Setenv("INNGEST_POSTGRES_CONN_MAX_IDLE_TIME", "11")
+	t.Setenv("INNGEST_POSTGRES_CONN_MAX_LIFETIME", "61")
+
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "config"},
+			&cli.IntFlag{Name: "postgres-max-idle-conns", Value: devserver.DefaultPostgresMaxIdleConns},
+			&cli.IntFlag{Name: "postgres-max-open-conns", Value: devserver.DefaultPostgresMaxOpenConns},
+			&cli.IntFlag{Name: "postgres-conn-max-idle-time", Value: devserver.DefaultPostgresConnMaxIdleTime},
+			&cli.IntFlag{Name: "postgres-conn-max-lifetime", Value: devserver.DefaultPostgresConnMaxLifetime},
+		},
+	}
+
+	err := localconfig.InitStartConfig(t.Context(), cmd)
+	require.NoError(t, err)
+
+	pool := postgresConnectionPoolConfigFromCommand(cmd)
+	assert.Equal(t, 17, pool.maxIdleConns)
+	assert.Equal(t, 171, pool.maxOpenConns)
+	assert.Equal(t, 11, pool.connMaxIdleTime)
+	assert.Equal(t, 61, pool.connMaxLifetime)
+}
+
+func TestValidatePostgresConnectionPoolConfigSkipsSQLite(t *testing.T) {
+	err := validatePostgresConnectionPoolConfig("", postgresConnectionPoolConfig{
+		maxIdleConns: 10,
+		maxOpenConns: 1,
+	})
+
+	require.NoError(t, err)
 }
