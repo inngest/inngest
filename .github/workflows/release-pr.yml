@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   create-release-pr:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04-4
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -119,6 +119,8 @@ jobs:
 
       - name: Collect PR release notes
         if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           scripts/release/collect-pr-notes \
             --range "${{ steps.changes.outputs.release_range }}" \
