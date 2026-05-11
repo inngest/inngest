@@ -3,6 +3,7 @@ name: PR Conventional Commit Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  merge_group:
 
 jobs:
   validate-pr-title:

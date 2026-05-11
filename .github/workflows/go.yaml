@@ -8,6 +8,7 @@ on:
   pull_request:
     paths-ignore:
       - "ui/**"
+  merge_group:
 
 permissions:
   contents: read
