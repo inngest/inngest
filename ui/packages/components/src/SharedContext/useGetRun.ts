@@ -13,6 +13,29 @@ export type GetRunPayload = {
   preview?: boolean;
 };
 
+export type RunDeferSummary = {
+  id: string;
+  fnSlug: string;
+  status: string;
+  run: {
+    id: string;
+    status: string;
+    queuedAt: string;
+    function: { name: string; slug: string };
+  } | null;
+};
+
+export type RunDeferredFromSummary = {
+  parentRunID: string;
+  parentFnSlug: string;
+  parentRun: {
+    id: string;
+    status: string;
+    function: { name: string; slug: string };
+    defers: RunDeferSummary[];
+  } | null;
+};
+
 export type GetRunData = {
   app: {
     externalID: string;
@@ -28,6 +51,8 @@ export type GetRunData = {
   hasAI: boolean;
   status: string;
   isDurableEndpoint?: boolean;
+  defers?: RunDeferSummary[];
+  deferredFrom?: RunDeferredFromSummary | null;
 };
 
 export type GetRunResult = {

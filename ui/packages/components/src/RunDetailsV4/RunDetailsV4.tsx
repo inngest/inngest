@@ -363,6 +363,8 @@ export const RunDetailsV4 = ({
               result={resultData}
               trace={runData?.trace}
               isDurableEndpoint={runData?.isDurableEndpoint}
+              defers={runData?.defers}
+              deferredFrom={runData?.deferredFrom}
             />
           )}
         </div>
