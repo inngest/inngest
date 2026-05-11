@@ -119,6 +119,8 @@ jobs:
 
       - name: Collect PR release notes
         if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           scripts/release/collect-pr-notes \
             --range "${{ steps.changes.outputs.release_range }}" \
