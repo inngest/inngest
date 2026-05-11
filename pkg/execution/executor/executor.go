@@ -1459,6 +1459,10 @@ func (e *executor) schedule(
 		}
 	}
 
+	// If this run was triggered by an invoke, write the invoked run's ID back
+	// onto the invoking function's invoke span so the in-progress trace shows it.
+	e.updateInvokeSpanWithInvokedRunID(ctx, l, req.Events, metadata.ID.RunID)
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -1499,6 +1503,49 @@ func (e *executor) schedule(
 	}
 
 	return &metadata.ID.RunID, &metadata, nil
+}
+
+func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logger.Logger, events []event.TrackedEvent, invokedRunID ulid.ULID) {
+	// We should only have one Invoke event at most, but this technically handles a batch of invoke events
+	if len(events) == 0 || events[0].GetEvent().Name != consts.FnInvokeName {
+		return
+	}
+	for _, trackedEvent := range events {
+		invocationEvtID := trackedEvent.GetInternalID()
+		raw, ok := trackedEvent.GetEvent().Data[consts.InngestEventDataPrefix]
+		if !ok {
+			l.Debug("invocation event missing inngest metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		invocationMeta := event.InngestMetadata{}
+		if err := invocationMeta.Decode(raw); err != nil {
+			l.Debug("failed to decode invocation metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID, "error", err)
+			continue
+		}
+		if invocationMeta.InvokeSpanRef == nil {
+			l.Debug("invocation event missing invoke span ref; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		sourceRunID := invocationMeta.RunID()
+		if sourceRunID == nil {
+			l.Debug("invocation event has unparseable correlation id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "correlation_id", invocationMeta.InvokeCorrelationId)
+			continue
+		}
+		sourceAccountID := trackedEvent.GetAccountID()
+		sourceEnvID := trackedEvent.GetWorkspaceID()
+		if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.Schedule.invokeRunID"},
+			TargetSpan: invocationMeta.InvokeSpanRef,
+			Attributes: meta.NewAttrSet(
+				meta.Attr(meta.Attrs.StepInvokeRunID, &invokedRunID),
+				meta.Attr(meta.Attrs.RunID, sourceRunID),
+				meta.Attr(meta.Attrs.AccountID, &sourceAccountID),
+				meta.Attr(meta.Attrs.EnvID, &sourceEnvID),
+			),
+		}); err != nil {
+			l.Debug("error updating invoke span with invoked runID", "error", err)
+		}
+	}
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
@@ -4940,6 +4987,13 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	if span != nil {
 		_ = span.Send()
+	}
+
+	// Attach the v2 invoke span ref to the invocation event so the invoked
+	// function's Schedule can call UpdateSpan to write its runID onto this
+	// invoke span while the invoke is still in progress.
+	if span != nil && span.Ref != nil {
+		evt.Event.SetInvokeSpanRef(span.Ref)
 	}
 
 	// Send the event.
