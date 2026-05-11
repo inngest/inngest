@@ -12,6 +12,7 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -106,7 +107,13 @@ export const RunInfo = ({
       {expanded && (
         <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4">
           <ElementWrapper label="Run ID">
-            <IDElement>{runID}</IDElement>
+            {standalone ? (
+              <IDElement>{runID}</IDElement>
+            ) : (
+              <Link href={pathCreator.runPopout({ runID })} className="font-mono">
+                {runID}
+              </Link>
+            )}
           </ElementWrapper>
 
           <OptimisticElementWrapper
