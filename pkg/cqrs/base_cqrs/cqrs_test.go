@@ -1789,6 +1789,32 @@ func TestSpanWithAttributesAndOutput(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
+// TestSpanAttributesRoundTrip exercises the read path for stored span
+// attributes. Postgres' jsonb embeds as a nested object inside json_build_object
+// while sqlite's JSON returns a quoted string, so this regression-tests that the
+// reader handles both shapes — when broken, the entire attribute map is silently
+// empty under postgres and every downstream consumer (StepOp, RunID, etc.) sees
+// zero values.
+func TestSpanAttributesRoundTrip(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runULID := ulid.MustNew(ulid.Now(), rand.Reader)
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runULID.String(),
+		DynamicSpanID: "dyn-attrs",
+		Name:          "executor.run",
+		Attributes:    []byte(`{"sdk.language":"go","sdk.version":"0.1.0","_inngest.run.id":"` + runULID.String() + `"}`),
+	})
+
+	result, err := cm.GetSpansByRunID(t.Context(), runULID)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "go", result.RawOtelSpan.Attributes["sdk.language"])
+	assert.Equal(t, "0.1.0", result.RawOtelSpan.Attributes["sdk.version"])
+}
+
 // TestSpanOutputReadBack verifies that span output stored as []byte can be
 // read back via GetSpanOutput without corruption. This is a regression test
 // for double-encoding where json.Marshal(stringValue) would wrap the JSON
