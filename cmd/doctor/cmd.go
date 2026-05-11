@@ -26,7 +26,7 @@ func runAllChecks(ctx context.Context, cmd *cli.Command) error {
 	var failed []string
 	for _, sub := range cmd.Commands {
 		fmt.Printf("• %s ... ", sub.Name)
-		if err := sub.Action(ctx, sub); err != nil {
+		if err := runSubCheck(ctx, sub); err != nil {
 			fmt.Println("FAIL")
 			if msg := err.Error(); msg != "" {
 				fmt.Fprintf(os.Stderr, "  %s\n", msg)
@@ -40,4 +40,27 @@ func runAllChecks(ctx context.Context, cmd *cli.Command) error {
 		return cli.Exit(fmt.Sprintf("%d check(s) failed: %s", len(failed), strings.Join(failed, ", ")), 1)
 	}
 	return nil
+}
+
+// runSubCheck invokes a subcommand's Action with its flag values populated
+// from defaults and Sources (env vars, files). We can't go through sub.Run:
+// it routes ExitCoder errors (cli.Exit) through OsExiter = os.Exit, which
+// would kill the loop on the first failing check. Call Action directly, but
+// drive the same Pre/PostParse phases sub.Run would, so env-var Sources
+// resolve.
+func runSubCheck(ctx context.Context, sub *cli.Command) error {
+	if sub.Action == nil {
+		return nil
+	}
+	for _, f := range sub.Flags {
+		if err := f.PreParse(); err != nil {
+			return err
+		}
+	}
+	for _, f := range sub.Flags {
+		if err := f.PostParse(); err != nil {
+			return err
+		}
+	}
+	return sub.Action(ctx, sub)
 }
