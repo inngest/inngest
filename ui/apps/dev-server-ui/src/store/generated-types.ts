@@ -408,15 +408,19 @@ export type FunctionRunV2 = {
   appID: Scalars['UUID'];
   batchCreatedAt: Maybe<Scalars['Time']>;
   cronSchedule: Maybe<Scalars['String']>;
+  deferredFrom: Maybe<RunDeferredFrom>;
+  defers: Array<RunDefer>;
   endedAt: Maybe<Scalars['Time']>;
   eventName: Maybe<Scalars['String']>;
   function: Function;
   functionID: Scalars['UUID'];
   hasAI: Scalars['Boolean'];
   id: Scalars['ULID'];
+  invokedFrom: Maybe<RunInvokedFrom>;
   isBatch: Scalars['Boolean'];
   output: Maybe<Scalars['Bytes']>;
   queuedAt: Scalars['Time'];
+  runType: RunType;
   sourceID: Maybe<Scalars['String']>;
   startedAt: Maybe<Scalars['Time']>;
   status: FunctionRunStatus;
@@ -689,6 +693,26 @@ export type RetryConfiguration = {
   value: Scalars['Int'];
 };
 
+export type RunDefer = {
+  __typename?: 'RunDefer';
+  fnSlug: Scalars['String'];
+  id: Scalars['String'];
+  run: Maybe<FunctionRunV2>;
+  status: RunDeferStatus;
+  userDeferID: Scalars['String'];
+};
+
+export enum RunDeferStatus {
+  Aborted = 'ABORTED',
+  Scheduled = 'SCHEDULED',
+}
+
+export type RunDeferredFrom = {
+  __typename?: 'RunDeferredFrom';
+  parentRun: Maybe<FunctionRunV2>;
+  parentRunID: Scalars['ULID'];
+};
+
 export type RunHistoryCancel = {
   __typename?: 'RunHistoryCancel';
   eventID: Maybe<Scalars['ULID']>;
@@ -758,6 +782,13 @@ export type RunHistoryWaitResult = {
   __typename?: 'RunHistoryWaitResult';
   eventID: Maybe<Scalars['ULID']>;
   timeout: Scalars['Boolean'];
+};
+
+export type RunInvokedFrom = {
+  __typename?: 'RunInvokedFrom';
+  parentRun: Maybe<FunctionRunV2>;
+  parentRunID: Scalars['ULID'];
+  stepName: Maybe<Scalars['String']>;
 };
 
 export type RunStep = {
@@ -841,11 +872,17 @@ export type RunTraceTrigger = {
   timestamp: Scalars['Time'];
 };
 
+export enum RunType {
+  Defer = 'DEFER',
+  Primary = 'PRIMARY',
+}
+
 export type RunsFilterV2 = {
   appIDs?: InputMaybe<Array<Scalars['UUID']>>;
   from: Scalars['Time'];
   functionIDs?: InputMaybe<Array<Scalars['UUID']>>;
   query?: InputMaybe<Scalars['String']>;
+  runType?: InputMaybe<RunType>;
   status?: InputMaybe<Array<FunctionRunStatus>>;
   timeField?: InputMaybe<RunsV2OrderByField>;
   until?: InputMaybe<Scalars['Time']>;
@@ -1019,6 +1056,20 @@ export type WaitForSignalStepInfo = {
 export type Workspace = {
   __typename?: 'Workspace';
   id: Scalars['ID'];
+};
+
+export type RunDeferSummaryFieldsFragment = {
+  __typename?: 'RunDefer';
+  id: string;
+  userDeferID: string;
+  fnSlug: string;
+  status: RunDeferStatus;
+  run: {
+    __typename?: 'FunctionRunV2';
+    id: any;
+    status: FunctionRunStatus;
+    function: { __typename?: 'Function'; name: string; slug: string };
+  } | null;
 };
 
 export type GetEventQueryVariables = Exact<{
@@ -1289,6 +1340,7 @@ export type GetRunsQueryVariables = Exact<{
   functionRunCursor?: InputMaybe<Scalars['String']>;
   celQuery?: InputMaybe<Scalars['String']>;
   preview?: InputMaybe<Scalars['Boolean']>;
+  runType?: InputMaybe<RunType>;
 }>;
 
 export type GetRunsQuery = {
@@ -1308,8 +1360,16 @@ export type GetRunsQuery = {
         startedAt: any | null;
         status: FunctionRunStatus;
         hasAI: boolean;
+        runType: RunType;
         app: { __typename?: 'App'; externalID: string; name: string };
         function: { __typename?: 'Function'; name: string; slug: string };
+        deferredFrom: {
+          __typename?: 'RunDeferredFrom';
+          parentRun: {
+            __typename?: 'FunctionRunV2';
+            function: { __typename?: 'Function'; name: string; slug: string };
+          } | null;
+        } | null;
       };
     }>;
     pageInfo: {
@@ -1327,6 +1387,7 @@ export type CountRunsQueryVariables = Exact<{
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   preview?: InputMaybe<Scalars['Boolean']>;
+  runType?: InputMaybe<RunType>;
 }>;
 
 export type CountRunsQuery = {
@@ -1753,6 +1814,53 @@ export type GetRunQuery = {
         __typename?: 'RunTraceSpanResponseInfo';
         statusCode: number;
         headers: any;
+      } | null;
+    } | null;
+    defers: Array<{
+      __typename?: 'RunDefer';
+      id: string;
+      userDeferID: string;
+      fnSlug: string;
+      status: RunDeferStatus;
+      run: {
+        __typename?: 'FunctionRunV2';
+        id: any;
+        status: FunctionRunStatus;
+        function: { __typename?: 'Function'; name: string; slug: string };
+      } | null;
+    }>;
+    deferredFrom: {
+      __typename?: 'RunDeferredFrom';
+      parentRunID: any;
+      parentRun: {
+        __typename?: 'FunctionRunV2';
+        id: any;
+        status: FunctionRunStatus;
+        function: { __typename?: 'Function'; name: string; slug: string };
+        defers: Array<{
+          __typename?: 'RunDefer';
+          id: string;
+          userDeferID: string;
+          fnSlug: string;
+          status: RunDeferStatus;
+          run: {
+            __typename?: 'FunctionRunV2';
+            id: any;
+            status: FunctionRunStatus;
+            function: { __typename?: 'Function'; name: string; slug: string };
+          } | null;
+        }>;
+      } | null;
+    } | null;
+    invokedFrom: {
+      __typename?: 'RunInvokedFrom';
+      parentRunID: any;
+      stepName: string | null;
+      parentRun: {
+        __typename?: 'FunctionRunV2';
+        id: any;
+        status: FunctionRunStatus;
+        function: { __typename?: 'Function'; name: string; slug: string };
       } | null;
     } | null;
   } | null;

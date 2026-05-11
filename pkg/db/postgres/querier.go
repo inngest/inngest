@@ -522,6 +522,28 @@ func (pq *pgQuerier) GetSpansByRunID(ctx context.Context, runID string) ([]*db.S
 	return out, nil
 }
 
+func (pq *pgQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []string, name string) ([]*db.SpanRow, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := pq.q.GetSpansByRunIDsAndName(ctx, sqlc.GetSpansByRunIDsAndNameParams{
+		RunIds: runIDs,
+		Name:   name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.SpanRow, len(rows))
+	for i, r := range rows {
+		out[i] = &db.SpanRow{
+			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
+			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
+			SpanFragments: r.SpanFragments,
+		}
+	}
+	return out, nil
+}
+
 func (pq *pgQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*db.SpanRow, error) {
 	// Postgres sqlc expects string for this query.
 	rows, err := pq.q.GetSpansByDebugRunID(ctx, debugRunID.String)
@@ -671,6 +693,21 @@ func (pq *pgQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.Trac
 		return nil, err
 	}
 	return traceRunFromPG(r), nil
+}
+
+func (pq *pgQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	strIDs := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		strIDs[i] = id.String()
+	}
+	rows, err := pq.q.GetTraceRunsByRunIDs(ctx, strIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, traceRunFromPG), nil
 }
 
 func (pq *pgQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {

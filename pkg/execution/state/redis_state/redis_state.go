@@ -556,8 +556,9 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 // DO NOT add fields here without first verifying they are cjson-safe. Safe
 // field types are strings and small ints (status enums, bounded counts).
 type deferMeta struct {
-	FnSlug   string
-	HashedID string
+	FnSlug     string
+	HashedID   string
+	UserlandID string
 
 	// Must stay int, not enums.DeferStatus: the enum's MarshalJSON renders
 	// as a string, but saveDefer.lua/setDeferStatus.lua compare and rewrite
@@ -632,6 +633,7 @@ func (m shardedMgr) LoadDefersMeta(
 		metas[hashedID] = statev2.DeferMeta{
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
+			UserlandID:     meta.UserlandID,
 			ScheduleStatus: enums.DeferStatus(meta.ScheduleStatus),
 		}
 	}
@@ -676,6 +678,7 @@ func (m shardedMgr) LoadDefers(
 		d := statev2.Defer{
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
+			UserlandID:     meta.UserlandID,
 			ScheduleStatus: meta.ScheduleStatus,
 		}
 		if raw, ok := inputs[hashedID]; ok && len(raw) > 0 {
@@ -921,6 +924,7 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	metaJSON, err := json.Marshal(deferMeta{
 		FnSlug:         d.FnSlug,
 		HashedID:       d.HashedID,
+		UserlandID:     d.UserlandID,
 		ScheduleStatus: int(d.ScheduleStatus),
 	})
 	if err != nil {

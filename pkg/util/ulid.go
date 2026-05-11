@@ -25,3 +25,21 @@ func DeterministicULID(ts time.Time, seed []byte) (ulid.ULID, error) {
 		bytes.NewReader(data[:]),
 	)
 }
+
+// DeterministicChildRunID derives the run ID of a deferred child run from
+// its parent run ID and the defer's hashed ID. It is the "r"-tagged sibling
+// of two other deterministic IDs that share the same (parent_run_id,
+// hashed_id) input pair, all built in executor.buildDeferEvents:
+//
+//   - schedule event ID (untagged)
+//   - executor.defer span ID ("s" tag)
+//   - child run ID ("r" tag, this function)
+//
+// The tag is what differentiates these three ULIDs; do not change it
+// without updating all three sites in lockstep.
+func DeterministicChildRunID(parent ulid.ULID, hashedID string) ulid.ULID {
+	// err is unreachable: ulid.New only fails when its entropy reader errors,
+	// and bytes.Reader over a fixed SHA-256 sum cannot.
+	id, _ := DeterministicULID(ulid.Time(parent.Time()), []byte(parent.String()+hashedID+"r"))
+	return id
+}

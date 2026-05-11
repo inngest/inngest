@@ -1,5 +1,22 @@
 import { gql } from 'graphql-request';
 
+export const RUN_DEFER_SUMMARY_FRAGMENT = gql`
+  fragment RunDeferSummaryFields on RunDefer {
+    id
+    userDeferID
+    fnSlug
+    status
+    run {
+      id
+      status
+      function {
+        name
+        slug
+      }
+    }
+  }
+`;
+
 export const EVENT = gql`
   query GetEvent($id: ID!) {
     event(query: { eventId: $id }) {
@@ -262,6 +279,7 @@ export const GET_RUNS = gql`
     $functionRunCursor: String = null
     $celQuery: String = null
     $preview: Boolean = false
+    $runType: RunType = null
   ) {
     runs(
       filter: {
@@ -270,6 +288,7 @@ export const GET_RUNS = gql`
         status: $status
         timeField: $timeField
         query: $celQuery
+        runType: $runType
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
@@ -294,6 +313,15 @@ export const GET_RUNS = gql`
           startedAt
           status
           hasAI
+          runType
+          deferredFrom {
+            parentRun {
+              function {
+                name
+                slug
+              }
+            }
+          }
         }
       }
       pageInfo {
@@ -312,9 +340,15 @@ export const COUNT_RUNS = gql`
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $preview: Boolean = false
+    $runType: RunType = null
   ) {
     runs(
-      filter: { from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        from: $startTime
+        status: $status
+        timeField: $timeField
+        runType: $runType
+      }
       orderBy: [{ field: $timeField, direction: DESC }]
       preview: $preview
     ) {
@@ -420,6 +454,35 @@ export const GET_RUN = gql`
         }
       }
       hasAI
+      defers {
+        ...RunDeferSummaryFields
+      }
+      deferredFrom {
+        parentRunID
+        parentRun {
+          id
+          status
+          function {
+            name
+            slug
+          }
+          defers {
+            ...RunDeferSummaryFields
+          }
+        }
+      }
+      invokedFrom {
+        parentRunID
+        parentRun {
+          id
+          status
+          function {
+            name
+            slug
+          }
+        }
+        stepName
+      }
     }
   }
 `;

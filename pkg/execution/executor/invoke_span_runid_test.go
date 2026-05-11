@@ -16,16 +16,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// recordingTracerProvider captures UpdateSpan calls so tests can inspect them.
+// recordingTracerProvider captures CreateSpan and UpdateSpan calls so tests
+// can inspect them.
 type recordingTracerProvider struct {
 	tracing.TracerProvider
 	updateCalls []*tracing.UpdateSpanOptions
 	updateErr   error
+
+	createCalls []recordedCreateCall
+}
+
+// recordedCreateCall captures the name + options handed to CreateSpan so
+// tests can assert against the emit shape (seed, attributes, parent ref).
+type recordedCreateCall struct {
+	Name string
+	Opts *tracing.CreateSpanOptions
 }
 
 func (r *recordingTracerProvider) UpdateSpan(_ context.Context, opts *tracing.UpdateSpanOptions) error {
 	r.updateCalls = append(r.updateCalls, opts)
 	return r.updateErr
+}
+
+func (r *recordingTracerProvider) CreateSpan(_ context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
+	r.createCalls = append(r.createCalls, recordedCreateCall{Name: name, Opts: opts})
+	// Return a non-nil ref so callers don't trip on the result.
+	return newSpanRef(), nil
 }
 
 func newRecordingTracerProvider() *recordingTracerProvider {

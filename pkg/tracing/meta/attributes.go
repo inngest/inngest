@@ -40,6 +40,13 @@ var Attrs = struct {
 	IsDurableEndpointRun         attr[*bool]
 	DurableEndpointModeChangedAt attr[*time.Time]
 
+	// Defer attributes
+	DeferFnSlug      attr[*string]
+	DeferHashedID    attr[*string]
+	DeferParentRunID attr[*ulid.ULID]
+	DeferStatus      attr[*enums.DeferStatus]
+	DeferUserID      attr[*string]
+
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
 	DynamicStatus attr[*enums.StepStatus]
@@ -167,6 +174,11 @@ var Attrs = struct {
 	BatchID:                            ULIDAttr("batch.id"),
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
+	DeferFnSlug:                        StringAttr("defer.fn_slug"),
+	DeferHashedID:                      StringAttr("defer.hashed_id"),
+	DeferParentRunID:                   ULIDAttr("defer.parent_run_id"),
+	DeferStatus:                        TextAttr[enums.DeferStatus]("defer.status"),
+	DeferUserID:                        StringAttr("defer.user_id"),
 	DropSpan:                           BoolAttr("executor.drop"),
 	DynamicTraceID:                     StringAttr("dynamic.trace.id"),
 	DynamicSpanID:                      StringAttr("dynamic.span.id"),

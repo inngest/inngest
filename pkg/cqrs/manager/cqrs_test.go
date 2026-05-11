@@ -1866,6 +1866,7 @@ type testSpanFields struct {
 	AppID          string    // default: "app"
 	FunctionID     string    // default: "fn"
 	EnvID          string    // default: "env"
+	TraceID        string    // default: new ULID (set explicitly when two fragments must share a trace_id and dynamic_span_id, e.g. an EXTEND pair)
 	Attributes     []byte    // JSON attributes (optional)
 	Output         []byte    // JSON output (optional)
 }
@@ -1876,7 +1877,10 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 	t.Helper()
 
 	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := spanFields.TraceID
+	if traceID == "" {
+		traceID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
 
 	// Apply defaults
 	if spanFields.Name == "" {

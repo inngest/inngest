@@ -12,7 +12,7 @@ KEYS[1] - defers meta hash key
 KEYS[2] - defers input hash key
 KEYS[3] - run metadata hash key
 ARGV[1] - hashedID
-ARGV[2] - meta JSON ({FnSlug, HashedID, ScheduleStatus} only)
+ARGV[2] - meta JSON ({FnSlug, HashedID, UserlandID, ScheduleStatus} only)
 ARGV[3] - raw Input bytes (HSET verbatim, never decoded by Lua)
 ARGV[4] - integer max defers per run
 ARGV[5] - integer max defer input aggregate size (bytes)

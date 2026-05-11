@@ -74,6 +74,7 @@ type Querier interface {
 	// Spans (new tracing)
 	InsertSpan(ctx context.Context, arg InsertSpanParams) error
 	GetSpansByRunID(ctx context.Context, runID string) ([]*SpanRow, error)
+	GetSpansByRunIDsAndName(ctx context.Context, runIDs []string, name string) ([]*SpanRow, error)
 	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*SpanRow, error)
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*SpanRow, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*SpanRow, error)
@@ -87,6 +88,7 @@ type Querier interface {
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
 	InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
+	GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)

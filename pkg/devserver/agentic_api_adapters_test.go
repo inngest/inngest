@@ -190,6 +190,10 @@ func (f *fakeTraceReader) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdent
 	return nil, nil
 }
 
+func (f *fakeTraceReader) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
+	return nil, nil
+}
+
 func (f *fakeTraceReader) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
 	return nil, nil
 }
@@ -205,6 +209,10 @@ func (f *fakeTraceReader) GetSpanStack(ctx context.Context, id cqrs.SpanIdentifi
 func (f *fakeTraceReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	f.runID = runID
 	return f.root, nil
+}
+
+func (f *fakeTraceReader) GetSpansByRunIDsAndName(ctx context.Context, runIDs []ulid.ULID, name string) (map[ulid.ULID][]*cqrs.OtelSpan, error) {
+	return nil, nil
 }
 
 func (f *fakeTraceReader) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {

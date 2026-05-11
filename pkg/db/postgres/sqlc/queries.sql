@@ -267,6 +267,9 @@ ON CONFLICT (run_id) DO UPDATE SET
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = sqlc.arg('run_id')::CHAR(26);
 
+-- name: GetTraceRunsByRunIDs :many
+SELECT * FROM trace_runs WHERE run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::CHAR(26)[]));
+
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND run_id = sqlc.arg('run_id')::CHAR(26) ORDER BY timestamp_unix_ms DESC, duration DESC;
 
@@ -430,6 +433,28 @@ FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))
 GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
+
+-- name: GetSpansByRunIDsAndName :many
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::TEXT[]))
+  AND name = sqlc.arg('name')
+GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
+ORDER BY run_id, start_time;
 
 -- name: GetSpansByDebugRunID :many
 SELECT

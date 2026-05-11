@@ -222,6 +222,10 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
+		if d.ScheduleStatus == enums.DeferStatusAfterRun || d.ScheduleStatus == enums.DeferStatusAborted {
+			e.emitDeferSpan(ctx, opts.Metadata, now, d)
+		}
+
 		// TODO: what about an immediate execution mode?
 		if d.ScheduleStatus != enums.DeferStatusAfterRun {
 			metrics.IncrDefersFinalizedCounter(ctx, d.ScheduleStatus.String(), metrics.CounterOpt{PkgName: pkgName})
@@ -231,6 +235,7 @@ func (e *executor) buildDeferEvents(
 		// Deterministic event ID so any duplicate-publish path dedupes on the
 		// runner side (runner.go uses event.ID as the schedule idempotency key).
 		// Time prefix is the parent run's start so the ULID stays well-formed.
+		// Untagged seed; see util.DeterministicChildRunID for the three-tag convention.
 		seed := []byte(opts.Metadata.ID.RunID.String() + d.HashedID)
 		eventID, err := util.DeterministicULID(ulid.Time(opts.Metadata.ID.RunID.Time()), seed)
 		if err != nil {
@@ -263,16 +268,13 @@ func (e *executor) buildDeferEvents(
 			}
 		}
 
-		// Local variable name avoids shadowing the imported `meta` package
-		// (see top of file). A future addition that uses meta.NewAttrSet
-		// or similar inside this loop would otherwise fail to compile in
-		// a non-obvious way.
-		deferredMeta := event.DeferredScheduleMetadata{
-			FnSlug:       d.FnSlug,
-			ParentFnSlug: fnSlug,
-			ParentRunID:  opts.Metadata.ID.RunID.String(),
+		evtMeta := event.DeferredScheduleMetadata{
+			FnSlug:        d.FnSlug,
+			ParentFnSlug:  fnSlug,
+			ParentRunID:   opts.Metadata.ID.RunID.String(),
+			HashedDeferID: d.HashedID,
 		}
-		if err := deferredMeta.Validate(); err != nil {
+		if err := evtMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(
 				"invalid deferred event metadata",
 				"error", err,
@@ -281,7 +283,7 @@ func (e *executor) buildDeferEvents(
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
 		}
-		data[consts.InngestEventDataPrefix] = deferredMeta
+		data[consts.InngestEventDataPrefix] = evtMeta
 
 		events = append(events, event.Event{
 			ID:        eventID.String(),
@@ -293,6 +295,36 @@ func (e *executor) buildDeferEvents(
 	}
 
 	return events, nil
+}
+
+// emitDeferSpan writes the executor.defer span for a single defer. The span is
+// the storage: resolvers reconstruct parent->child linkage from it rather than
+// reading a side-channel row. The "s"-tag seed is sibling to the untagged
+// event-ID seed in buildDeferEvents and the "r"-tag child run ID seed in
+// util.DeterministicChildRunID — see that helper for the three-tag convention.
+func (e *executor) emitDeferSpan(ctx context.Context, md sv2.Metadata, now time.Time, d sv2.Defer) {
+	_, err := e.tracerProvider.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
+		Debug:     &tracing.SpanDebugData{Location: "executor.buildDeferEvents"},
+		Metadata:  &md,
+		Parent:    tracing.RunSpanRefFromMetadata(&md),
+		StartTime: now,
+		EndTime:   now,
+		Seed:      []byte(md.ID.RunID.String() + d.HashedID + "s"),
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DeferHashedID, &d.HashedID),
+			meta.Attr(meta.Attrs.DeferUserID, &d.UserlandID),
+			meta.Attr(meta.Attrs.DeferFnSlug, &d.FnSlug),
+			meta.Attr(meta.Attrs.DeferStatus, &d.ScheduleStatus),
+		),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error(
+			"error emitting executor.defer span",
+			"error", err,
+			"run_id", md.ID.RunID,
+			"hashed_id", d.HashedID,
+		)
+	}
 }
 
 // finalizeRemoveJobs removes any other jobs for a finalized run, as the function is

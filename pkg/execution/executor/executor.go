@@ -811,15 +811,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	var runID *ulid.ULID
 
-	if req.RunID == nil {
-		id := ulid.MustNew(ulid.Now(), rand.Reader)
-		runID = &id
-	} else {
-		runID = req.RunID
-	}
-
-	key := idempotencyKey(req, *runID)
-
 	if len(req.Events) == 0 {
 		return nil, nil, fmt.Errorf("no events provided in schedule request")
 	}
@@ -831,9 +822,26 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"fn_id", req.Function.ID,
 		"fn_v", req.Function.FunctionVersion,
 		"evt_id", req.Events[0].GetInternalID(),
-		"run_id", runID,
 		"schedule_req", req,
 	)
+
+	deferredMeta, deferredParentRunID, isDeferredChild := deferredScheduleFromEvents(l, req.Events)
+
+	if req.RunID == nil {
+		if isDeferredChild {
+			id := util.DeterministicChildRunID(deferredParentRunID, deferredMeta.HashedDeferID)
+			runID = &id
+		} else {
+			id := ulid.MustNew(ulid.Now(), rand.Reader)
+			runID = &id
+		}
+	} else {
+		runID = req.RunID
+	}
+
+	key := idempotencyKey(req, *runID)
+
+	l = l.With("run_id", runID)
 
 	span.SetAttributes(attribute.String("event_id", req.Events[0].GetInternalID().String()))
 	span.SetAttributes(attribute.String("run_id", runID.String()))
@@ -865,7 +873,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					md  *sv2.Metadata
 					err error
 				)
-				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks)
+				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks, deferredMeta, deferredParentRunID, isDeferredChild)
 				return md, err
 			}, util.WithBoundaries(2*time.Second))
 		})
@@ -894,6 +902,13 @@ func (e *executor) schedule(
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
+	// deferredMeta / deferredParentRunID / isDeferredChild are the result of
+	// deferredScheduleFromEvents(req.Events) computed once in Schedule and
+	// threaded through so the run-span attribute stamping below uses the same
+	// values that drove the deterministic run-ID derivation.
+	deferredMeta *event.DeferredScheduleMetadata,
+	deferredParentRunID ulid.ULID,
+	isDeferredChild bool,
 ) (*ulid.ULID, *sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
@@ -1360,6 +1375,16 @@ func (e *executor) schedule(
 		}
 	}
 
+	// If this run was triggered by a deferred.schedule event, stamp the
+	// parent linkage onto the child's run span. This is the child-side half
+	// of the parent->child join; the parent side lives on the parent's
+	// executor.defer span (see finalize.buildDeferEvents).
+	if isDeferredChild {
+		hashedID := deferredMeta.HashedDeferID
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentRunID, &deferredParentRunID)
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferHashedID, &hashedID)
+	}
+
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -1562,6 +1587,54 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 			l.Debug("error updating invoke span with invoked runID", "error", err)
 		}
 	}
+}
+
+// deferredScheduleFromEvents finds a single inngest/deferred.schedule event
+// in the batch and returns its parsed, validated metadata along with the
+// parsed parent run ID. Returns (nil, zero, false) when there is no
+// deferred-schedule event, when the metadata fails to decode or validate,
+// or when more than one such event is present (which shouldn't happen — we
+// bail rather than guess).
+//
+// The caller threads the result through Schedule -> schedule so the
+// deterministic child run ID derivation and the run-span attribute
+// attachment use the same values. The derived child run ID is
+// util.DeterministicChildRunID(parentRunID, meta.HashedDeferID) — the
+// "r"-tagged sibling of the schedule event's ID seed and the parent's
+// executor.defer span ID seed.
+func deferredScheduleFromEvents(l logger.Logger, events []event.TrackedEvent) (*event.DeferredScheduleMetadata, ulid.ULID, bool) {
+	var found *event.DeferredScheduleMetadata
+	var parentRunID ulid.ULID
+	for _, te := range events {
+		evt := te.GetEvent()
+		if evt.Name != consts.FnDeferScheduleName {
+			continue
+		}
+		if found != nil {
+			l.Warn("multiple deferred.schedule events in batch; bailing rather than guess", "event_id", evt.ID)
+			return nil, ulid.ULID{}, false
+		}
+		m, err := evt.DeferredScheduleMetadata()
+		if err != nil {
+			l.Warn("malformed deferred schedule metadata", "error", err, "event_id", evt.ID)
+			return nil, ulid.ULID{}, false
+		}
+		if err := m.Validate(); err != nil {
+			l.Warn("invalid deferred schedule metadata", "error", err, "event_id", evt.ID)
+			return nil, ulid.ULID{}, false
+		}
+		pid, err := ulid.Parse(m.ParentRunID)
+		if err != nil {
+			l.Warn("invalid parent run id on deferred schedule event", "error", err, "parent_run_id", m.ParentRunID, "event_id", evt.ID)
+			return nil, ulid.ULID{}, false
+		}
+		found = m
+		parentRunID = pid
+	}
+	if found == nil {
+		return nil, ulid.ULID{}, false
+	}
+	return found, parentRunID, true
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {

@@ -11,7 +11,9 @@ import {
   FunctionRunTimeField,
   isFunctionRunStatus,
   isFunctionTimeField,
+  isRunType,
   type FunctionRunStatus,
+  type RunType,
 } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
@@ -34,6 +36,7 @@ import {
 import type { Features } from '../types/features';
 import RunsStatusFilter from './RunsStatusFilter';
 import RunsTable from './RunsTable';
+import RunsTypeFilter from './RunsTypeFilter';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
 
@@ -130,6 +133,8 @@ export function RunsPage({
     isFunctionTimeField
   );
 
+  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
+
   const [search, setSearch, removeSearch] = useSearchParam('search');
 
   const [lastDays] = useSearchParam('last');
@@ -192,6 +197,14 @@ export function RunsPage({
       setTimeField(value);
     },
     [scrollToTop, setTimeField]
+  );
+
+  const onRunTypeFilterChange = useCallback(
+    (value: RunType | undefined) => {
+      scrollToTop();
+      batchUpdate({ filterRunType: value ?? null });
+    },
+    [batchUpdate, scrollToTop]
   );
 
   const onDaysChange = useCallback(
@@ -358,6 +371,10 @@ export function RunsPage({
                 entities={functions}
               />
             )}
+            <RunsTypeFilter
+              selectedRunType={filterRunType}
+              onRunTypeChange={onRunTypeFilterChange}
+            />
           </div>
           <div className="flex items-center gap-2">
             <TotalCount totalCount={totalCount} />

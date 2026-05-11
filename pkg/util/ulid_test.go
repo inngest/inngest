@@ -85,3 +85,25 @@ func TestDeterministicULID(t *testing.T) {
 		require.Equal(t, a, b)
 	})
 }
+
+func TestDeterministicChildRunID(t *testing.T) {
+	ts := time.UnixMilli(1_700_000_000_000) // 2023-11-14
+	parent, err := DeterministicULID(ts, []byte("parent-seed"))
+	require.NoError(t, err)
+	const hashedID = "abc123-hashed-defer-id"
+
+	t.Run("output preserves the parent's timestamp", func(t *testing.T) {
+		id := DeterministicChildRunID(parent, hashedID)
+		require.Equal(t, parent.Time(), id.Time(),
+			"child run ID must share the parent run's time prefix")
+	})
+
+	t.Run("seed construction is pinned to a golden value", func(t *testing.T) {
+		// Pinned output guards the (parent.String() + hashedID + "r") seed
+		// recipe. Any change to the tag, order, or component will flip this.
+		fixedParent := ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB")
+		require.Equal(t,
+			"01HKQJZ5R7WCQA18WZG4RGCB0X",
+			DeterministicChildRunID(fixedParent, "fixed-hashed-id").String())
+	})
+}

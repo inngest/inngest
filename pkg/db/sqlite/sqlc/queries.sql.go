@@ -1547,6 +1547,90 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpan
 	return items, nil
 }
 
+const getSpansByRunIDsAndName = `-- name: GetSpansByRunIDsAndName :many
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE name = ?1
+  AND run_id IN (/*SLICE:run_ids*/?)
+GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
+ORDER BY run_id, start_time
+`
+
+type GetSpansByRunIDsAndNameParams struct {
+	Name   string
+	RunIds []string
+}
+
+type GetSpansByRunIDsAndNameRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+// NOTE: `name` is intentionally listed before the slice in the WHERE clause so
+// sqlc binds it to ?1. If the slice came first, sqlc would still emit `name = ?N`
+// with a fixed N, but the runtime SLICE expansion shifts the slice's `?` slots
+// and the named index would point at a slice element instead.
+func (q *Queries) GetSpansByRunIDsAndName(ctx context.Context, arg GetSpansByRunIDsAndNameParams) ([]*GetSpansByRunIDsAndNameRow, error) {
+	query := getSpansByRunIDsAndName
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Name)
+	if len(arg.RunIds) > 0 {
+		for _, v := range arg.RunIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(arg.RunIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByRunIDsAndNameRow
+	for rows.Next() {
+		var i GetSpansByRunIDsAndNameRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.TraceID,
+			&i.DynamicSpanID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStepSpanByStepID = `-- name: GetStepSpanByStepID :one
 SELECT
   run_id,
@@ -1664,6 +1748,61 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, 
 		&i.HasAi,
 	)
 	return &i, err
+}
+
+const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id IN (/*SLICE:run_ids*/?)
+`
+
+func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*TraceRun, error) {
+	query := getTraceRunsByRunIDs
+	var queryParams []interface{}
+	if len(runIds) > 0 {
+		for _, v := range runIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(runIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TraceRun
+	for rows.Next() {
+		var i TraceRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.FunctionID,
+			&i.TraceID,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Status,
+			&i.SourceID,
+			&i.TriggerIds,
+			&i.Output,
+			&i.IsDebounce,
+			&i.BatchID,
+			&i.CronSchedule,
+			&i.HasAi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
