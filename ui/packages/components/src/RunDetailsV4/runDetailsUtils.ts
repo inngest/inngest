@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { Trace } from './types';
+import { isStepInfoInvoke, type Trace } from './types';
 
 export const FINAL_SPAN_DISPLAY = 'Finalization';
 export const FINAL_SPAN_NAME = 'function success';
@@ -57,6 +57,31 @@ export function traceWalk(trace: Trace, fn: (trace: Trace) => void) {
   };
 
   return walkChildren(trace);
+}
+
+export type InvokedRun = {
+  spanID: string;
+  invokerName: string;
+  functionID: string;
+  runID: string;
+  status: string;
+};
+
+export function collectInvokedRuns(trace: Trace | undefined): InvokedRun[] {
+  if (!trace) return [];
+  const out: InvokedRun[] = [];
+  traceWalk(trace, (t) => {
+    if (isStepInfoInvoke(t.stepInfo) && t.stepInfo.runID) {
+      out.push({
+        spanID: t.spanID,
+        invokerName: t.name,
+        functionID: t.stepInfo.functionID,
+        runID: t.stepInfo.runID,
+        status: t.status,
+      });
+    }
+  });
+  return out;
 }
 
 export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {
