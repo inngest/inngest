@@ -26,14 +26,14 @@
     "shiki": "^4.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "4.2.4",
+    "@tailwindcss/vite": "4.3.0",
     "@tanstack/eslint-config": "0.4.0",
     "@types/mdx": "2.0.13",
     "@types/node": "24.12.3",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
-    "tailwindcss": "4.2.4",
+    "tailwindcss": "4.3.0",
     "tsx": "4.21.0",
     "yaml": "2.8.4",
     "typescript": "5.9.3",
