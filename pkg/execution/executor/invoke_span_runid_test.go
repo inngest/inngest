@@ -44,6 +44,12 @@ func newSpanRef() *meta.SpanReference {
 func invocationEvent(t *testing.T, accountID, envID uuid.UUID, sourceRunID ulid.ULID, md event.InngestMetadata) event.InternalEvent {
 	t.Helper()
 	md.InvokeCorrelationId = sourceRunID.String() + ".step-1"
+	if md.SourceFnID == "" {
+		md.SourceFnID = uuid.NewString()
+	}
+	if md.SourceAppID == "" {
+		md.SourceAppID = uuid.NewString()
+	}
 	id := ulid.MustNew(ulid.Now(), nil)
 	return event.InternalEvent{
 		ID:          id,

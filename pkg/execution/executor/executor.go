@@ -1531,6 +1531,16 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 			l.Debug("invocation event has unparseable correlation id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "correlation_id", invocationMeta.InvokeCorrelationId)
 			continue
 		}
+		sourceFnID, err := uuid.Parse(invocationMeta.SourceFnID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source fn id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_fn_id", invocationMeta.SourceFnID, "error", err)
+			continue
+		}
+		sourceAppID, err := uuid.Parse(invocationMeta.SourceAppID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source app id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_app_id", invocationMeta.SourceAppID, "error", err)
+			continue
+		}
 		sourceAccountID := trackedEvent.GetAccountID()
 		sourceEnvID := trackedEvent.GetWorkspaceID()
 		if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
@@ -1541,6 +1551,8 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 				meta.Attr(meta.Attrs.RunID, sourceRunID),
 				meta.Attr(meta.Attrs.AccountID, &sourceAccountID),
 				meta.Attr(meta.Attrs.EnvID, &sourceEnvID),
+				meta.Attr(meta.Attrs.FunctionID, &sourceFnID),
+				meta.Attr(meta.Attrs.AppID, &sourceAppID),
 			),
 		}); err != nil {
 			l.Debug("error updating invoke span with invoked runID", "error", err)
