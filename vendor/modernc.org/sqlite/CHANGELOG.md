@@ -1,5 +1,8 @@
 # Changelog
 
+ - 2026-05-10 v1.50.1:
+     - Upgrade to [SQLite 3.53.1](https://sqlite.org/releaselog/3_53_1.html).
+
  - 2026-04-24 v1.50.0:
      - Upgrade to sqlite-vec [v0.1.9](https://github.com/asg017/sqlite-vec/releases/tag/v0.1.9).
      - Introduce `ColumnInfo`, enabling dynamic query builders and ORMs to retrieve underlying SQLite C-API metadata (`OriginName`, `TableName`, `DatabaseName`, and `DeclType`).
