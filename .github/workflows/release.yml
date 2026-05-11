@@ -47,11 +47,46 @@ jobs:
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
+      - name: Collect PR release notes
+        if: needs.check-release-type.outputs.prerelease == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous_tag="$(git tag --list 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${GITHUB_REF_NAME}$" | head -n1 || true)"
+
+          if [ -n "${previous_tag}" ]; then
+            release_range="${previous_tag}..${GITHUB_REF_NAME}"
+          else
+            release_range="${GITHUB_REF_NAME}"
+          fi
+
+          scripts/release/collect-pr-notes \
+            --range "${release_range}" \
+            --repo "${{ github.repository }}" \
+            --output /tmp/release-pr-notes.json
+      - name: Build release notes
+        if: needs.check-release-type.outputs.prerelease == ''
+        run: |
+          scripts/release/build-release-notes \
+            --notes /tmp/release-pr-notes.json \
+            --changelog CHANGELOG.md \
+            --tag "${GITHUB_REF_NAME}" \
+            --output /tmp/RELEASE_NOTES.md
+      - name: Build prerelease notes
+        if: needs.check-release-type.outputs.prerelease != ''
+        run: |
+          {
+            echo "## Prerelease"
+            echo
+            echo "This prerelease was built from \`${GITHUB_REF_NAME}\`."
+            echo
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
+          } > /tmp/RELEASE_NOTES.md
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
           version: "~> 2"
-          args: release --clean --verbose
+          args: release --clean --verbose --release-notes=/tmp/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   npm:
