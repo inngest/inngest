@@ -90,7 +90,7 @@ const (
 	DefaultPollInterval = 5
 	DefaultQueueWorkers = 100
 
-	DefaultConnectGatewayPort      = 8289
+	DefaultConnectGatewayPort      = connect.DefaultGatewayPort
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
 

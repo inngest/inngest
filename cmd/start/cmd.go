@@ -1,6 +1,7 @@
 package start
 
 import (
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/urfave/cli/v3"
 )
@@ -8,7 +9,7 @@ import (
 func Command() *cli.Command {
 	cmd := &cli.Command{
 		Name:        "start",
-		Usage:       "[Beta] Run Inngest as a single-node service.",
+		Usage:       "Run the Inngest server with external persistence.",
 		UsageText:   "inngest start [options]",
 		Description: "Example: inngest start",
 		Action:      action,
@@ -23,10 +24,10 @@ func Command() *cli.Command {
 				Name:  "host",
 				Usage: "Inngest server hostname",
 			},
-			&cli.StringFlag{
+			&cli.IntFlag{
 				Name:    "port",
 				Aliases: []string{"p"},
-				Value:   "8288",
+				Value:   api.DefaultAPIPort,
 				Usage:   "Inngest server port",
 			},
 			&cli.StringSliceFlag{
