@@ -420,7 +420,7 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set(k, v)
 			}
 			w.WriteHeader(res.Data.StatusCode)
-			_, _ = w.Write(res.Data.Body)
+			_, _ = w.Write([]byte(res.Data.Body))
 			return
 		}
 

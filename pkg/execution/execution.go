@@ -117,6 +117,10 @@ type Executor interface {
 
 	Finalize(ctx context.Context, opts FinalizeOpts) error
 
+	// RunFunctionFinishedLifecycle fans OnFunctionFinished out to every
+	// registered LifecycleListener.
+	RunFunctionFinishedLifecycle(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage, resp state.DriverResponse)
+
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
