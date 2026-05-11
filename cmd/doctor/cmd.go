@@ -25,6 +25,13 @@ func Command() *cli.Command {
 func runAllChecks(ctx context.Context, cmd *cli.Command) error {
 	var failed []string
 	for _, sub := range cmd.Commands {
+		// cli auto-injects a "help" subcommand into cmd.Commands during
+		// setupDefaults; it's not a health check, and invoking its Action
+		// (helpCommandAction) against an unparsed command panics in
+		// cmd.Args().First().
+		if sub.Name == "help" {
+			continue
+		}
 		fmt.Printf("• %s ... ", sub.Name)
 		if err := runSubCheck(ctx, sub); err != nil {
 			fmt.Println("FAIL")
