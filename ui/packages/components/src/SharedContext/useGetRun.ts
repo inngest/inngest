@@ -15,12 +15,12 @@ export type GetRunPayload = {
 
 export type RunDeferSummary = {
   id: string;
+  userDeferID: string;
   fnSlug: string;
   status: string;
   run: {
     id: string;
     status: string;
-    queuedAt: string;
     function: { name: string; slug: string };
   } | null;
 };

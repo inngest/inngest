@@ -448,6 +448,53 @@ func (pq *pgQuerier) HistoryCountRuns(ctx context.Context) (int64, error) {
 	return pq.q.HistoryCountRuns(ctx)
 }
 
+// --- Run defers ---
+
+func (pq *pgQuerier) InsertRunDefer(ctx context.Context, arg db.InsertRunDeferParams) error {
+	return pq.q.InsertRunDefer(ctx, sqlc.InsertRunDeferParams{
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+		UserDeferID: arg.UserDeferID,
+		FnSlug:      arg.FnSlug,
+		Status:      arg.Status,
+	})
+}
+
+func (pq *pgQuerier) UpdateRunDeferChildRunID(ctx context.Context, arg db.UpdateRunDeferChildRunIDParams) error {
+	return pq.q.UpdateRunDeferChildRunID(ctx, sqlc.UpdateRunDeferChildRunIDParams{
+		ChildRunID:  arg.ChildRunID,
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+	})
+}
+
+func (pq *pgQuerier) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*db.RunDeferRow, error) {
+	rows, err := pq.q.GetRunDefersByParentRun(ctx, parentRunID)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, runDeferFromPG), nil
+}
+
+func (pq *pgQuerier) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*db.RunDeferRow, error) {
+	r, err := pq.q.GetRunDeferredFromByChildRun(ctx, childRunID)
+	if err != nil {
+		return nil, err
+	}
+	return runDeferFromPG(r), nil
+}
+
+func runDeferFromPG(r *sqlc.RunDefer) *db.RunDeferRow {
+	return &db.RunDeferRow{
+		ParentRunID: r.ParentRunID,
+		DeferID:     r.DeferID,
+		UserDeferID: r.UserDeferID,
+		FnSlug:      r.FnSlug,
+		Status:      r.Status,
+		ChildRunID:  r.ChildRunID,
+	}
+}
+
 // --- Queue Snapshots ---
 
 func (pq *pgQuerier) InsertQueueSnapshotChunk(ctx context.Context, arg db.InsertQueueSnapshotChunkParams) error {

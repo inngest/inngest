@@ -371,6 +371,53 @@ func (sq *sqliteQuerier) HistoryCountRuns(ctx context.Context) (int64, error) {
 	return sq.q.HistoryCountRuns(ctx)
 }
 
+// --- Run defers ---
+
+func (sq *sqliteQuerier) InsertRunDefer(ctx context.Context, arg db.InsertRunDeferParams) error {
+	return sq.q.InsertRunDefer(ctx, sqlc.InsertRunDeferParams{
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+		UserDeferID: arg.UserDeferID,
+		FnSlug:      arg.FnSlug,
+		Status:      arg.Status,
+	})
+}
+
+func (sq *sqliteQuerier) UpdateRunDeferChildRunID(ctx context.Context, arg db.UpdateRunDeferChildRunIDParams) error {
+	return sq.q.UpdateRunDeferChildRunID(ctx, sqlc.UpdateRunDeferChildRunIDParams{
+		ChildRunID:  arg.ChildRunID,
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+	})
+}
+
+func (sq *sqliteQuerier) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*db.RunDeferRow, error) {
+	rows, err := sq.q.GetRunDefersByParentRun(ctx, parentRunID)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, runDeferFromSQLite), nil
+}
+
+func (sq *sqliteQuerier) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*db.RunDeferRow, error) {
+	r, err := sq.q.GetRunDeferredFromByChildRun(ctx, childRunID)
+	if err != nil {
+		return nil, err
+	}
+	return runDeferFromSQLite(r), nil
+}
+
+func runDeferFromSQLite(r *sqlc.RunDefer) *db.RunDeferRow {
+	return &db.RunDeferRow{
+		ParentRunID: r.ParentRunID,
+		DeferID:     r.DeferID,
+		UserDeferID: r.UserDeferID,
+		FnSlug:      r.FnSlug,
+		Status:      r.Status,
+		ChildRunID:  r.ChildRunID,
+	}
+}
+
 // --- Queue Snapshots ---
 
 func (sq *sqliteQuerier) InsertQueueSnapshotChunk(ctx context.Context, arg db.InsertQueueSnapshotChunkParams) error {

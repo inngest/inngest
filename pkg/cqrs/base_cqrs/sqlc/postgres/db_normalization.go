@@ -871,6 +871,58 @@ func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) 
 	return sqliteRows, nil
 }
 
+func (q NormalizedQueries) InsertRunDefer(ctx context.Context, arg sqlc_sqlite.InsertRunDeferParams) error {
+	return q.db.InsertRunDefer(ctx, InsertRunDeferParams{
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+		UserDeferID: arg.UserDeferID,
+		FnSlug:      arg.FnSlug,
+		Status:      arg.Status,
+	})
+}
+
+func (q NormalizedQueries) UpdateRunDeferChildRunID(ctx context.Context, arg sqlc_sqlite.UpdateRunDeferChildRunIDParams) error {
+	return q.db.UpdateRunDeferChildRunID(ctx, UpdateRunDeferChildRunIDParams{
+		ChildRunID:  arg.ChildRunID,
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+	})
+}
+
+func (q NormalizedQueries) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*sqlc_sqlite.RunDefer, error) {
+	rows, err := q.db.GetRunDefersByParentRun(ctx, parentRunID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*sqlc_sqlite.RunDefer, len(rows))
+	for i, r := range rows {
+		out[i] = &sqlc_sqlite.RunDefer{
+			ParentRunID: r.ParentRunID,
+			DeferID:     r.DeferID,
+			UserDeferID: r.UserDeferID,
+			FnSlug:      r.FnSlug,
+			Status:      r.Status,
+			ChildRunID:  r.ChildRunID,
+		}
+	}
+	return out, nil
+}
+
+func (q NormalizedQueries) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*sqlc_sqlite.RunDefer, error) {
+	r, err := q.db.GetRunDeferredFromByChildRun(ctx, childRunID)
+	if err != nil {
+		return nil, err
+	}
+	return &sqlc_sqlite.RunDefer{
+		ParentRunID: r.ParentRunID,
+		DeferID:     r.DeferID,
+		UserDeferID: r.UserDeferID,
+		FnSlug:      r.FnSlug,
+		Status:      r.Status,
+		ChildRunID:  r.ChildRunID,
+	}, nil
+}
+
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
 	pgArg := InsertSpanParams{
 		AccountID:      arg.AccountID,

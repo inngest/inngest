@@ -37,21 +37,16 @@ func (r *functionRunV2Resolver) Defers(ctx context.Context, fn *models.FunctionR
 
 	out := make([]*models.RunDefer, 0, len(defers))
 	for _, d := range defers {
-		var input *string
-		if len(d.Input) > 0 {
-			s := string(d.Input)
-			input = &s
-		}
 		runV2, err := models.MakeFunctionRunV2(d.Run)
 		if err != nil {
 			return nil, fmt.Errorf("error converting defer child run: %w", err)
 		}
 		out = append(out, &models.RunDefer{
-			ID:     d.ID,
-			FnSlug: d.FnSlug,
-			Status: models.RunDeferStatus(d.Status),
-			Input:  input,
-			Run:    runV2,
+			ID:          d.ID,
+			UserDeferID: d.UserDeferID,
+			FnSlug:      d.FnSlug,
+			Status:      models.RunDeferStatus(d.Status),
+			Run:         runV2,
 		})
 	}
 	return out, nil

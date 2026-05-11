@@ -378,11 +378,11 @@ type ComplexityRoot struct {
 	}
 
 	RunDefer struct {
-		FnSlug func(childComplexity int) int
-		ID     func(childComplexity int) int
-		Input  func(childComplexity int) int
-		Run    func(childComplexity int) int
-		Status func(childComplexity int) int
+		FnSlug      func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Run         func(childComplexity int) int
+		Status      func(childComplexity int) int
+		UserDeferID func(childComplexity int) int
 	}
 
 	RunDeferredFrom struct {
@@ -2393,13 +2393,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunDefer.ID(childComplexity), true
 
-	case "RunDefer.input":
-		if e.complexity.RunDefer.Input == nil {
-			break
-		}
-
-		return e.complexity.RunDefer.Input(childComplexity), true
-
 	case "RunDefer.run":
 		if e.complexity.RunDefer.Run == nil {
 			break
@@ -2413,6 +2406,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunDefer.Status(childComplexity), true
+
+	case "RunDefer.userDeferID":
+		if e.complexity.RunDefer.UserDeferID == nil {
+			break
+		}
+
+		return e.complexity.RunDefer.UserDeferID(childComplexity), true
 
 	case "RunDeferredFrom.parentFnSlug":
 		if e.complexity.RunDeferredFrom.ParentFnSlug == nil {
@@ -4176,9 +4176,9 @@ type FunctionRunV2Edge {
 
 type RunDefer {
   id: String!
+  userDeferID: String!
   fnSlug: String!
   status: RunDeferStatus!
-  input: Bytes
   run: FunctionRunV2
 }
 
@@ -12737,12 +12737,12 @@ func (ec *executionContext) fieldContext_FunctionRunV2_defers(ctx context.Contex
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_RunDefer_id(ctx, field)
+			case "userDeferID":
+				return ec.fieldContext_RunDefer_userDeferID(ctx, field)
 			case "fnSlug":
 				return ec.fieldContext_RunDefer_fnSlug(ctx, field)
 			case "status":
 				return ec.fieldContext_RunDefer_status(ctx, field)
-			case "input":
-				return ec.fieldContext_RunDefer_input(ctx, field)
 			case "run":
 				return ec.fieldContext_RunDefer_run(ctx, field)
 			}
@@ -16177,6 +16177,50 @@ func (ec *executionContext) fieldContext_RunDefer_id(ctx context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _RunDefer_userDeferID(ctx context.Context, field graphql.CollectedField, obj *models.RunDefer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDefer_userDeferID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserDeferID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunDefer_userDeferID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunDefer",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunDefer_fnSlug(ctx context.Context, field graphql.CollectedField, obj *models.RunDefer) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunDefer_fnSlug(ctx, field)
 	if err != nil {
@@ -16260,47 +16304,6 @@ func (ec *executionContext) fieldContext_RunDefer_status(ctx context.Context, fi
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type RunDeferStatus does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RunDefer_input(ctx context.Context, field graphql.CollectedField, obj *models.RunDefer) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RunDefer_input(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Input, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RunDefer_input(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RunDefer",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Bytes does not have child fields")
 		},
 	}
 	return fc, nil
@@ -28166,6 +28169,13 @@ func (ec *executionContext) _RunDefer(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "userDeferID":
+
+			out.Values[i] = ec._RunDefer_userDeferID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "fnSlug":
 
 			out.Values[i] = ec._RunDefer_fnSlug(ctx, field, obj)
@@ -28180,10 +28190,6 @@ func (ec *executionContext) _RunDefer(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "input":
-
-			out.Values[i] = ec._RunDefer_input(ctx, field, obj)
-
 		case "run":
 
 			out.Values[i] = ec._RunDefer_run(ctx, field, obj)

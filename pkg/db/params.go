@@ -145,6 +145,23 @@ type InsertHistoryParams struct {
 	Result               sql.NullString
 }
 
+// InsertRunDeferParams are the parameters for upserting a run_defers row.
+type InsertRunDeferParams struct {
+	ParentRunID ulid.ULID
+	DeferID     string
+	UserDeferID string
+	FnSlug      string
+	Status      string
+}
+
+// UpdateRunDeferChildRunIDParams are the parameters for setting a defer's
+// child run ID after its scheduled child has been created.
+type UpdateRunDeferChildRunIDParams struct {
+	ChildRunID  ulid.ULID
+	ParentRunID ulid.ULID
+	DeferID     string
+}
+
 // InsertQueueSnapshotChunkParams are the parameters for inserting a queue snapshot chunk.
 type InsertQueueSnapshotChunkParams struct {
 	SnapshotID string

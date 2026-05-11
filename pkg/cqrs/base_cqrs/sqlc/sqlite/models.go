@@ -133,6 +133,15 @@ type QueueSnapshotChunk struct {
 	Data       []byte
 }
 
+type RunDefer struct {
+	ParentRunID ulid.ULID
+	DeferID     string
+	UserDeferID string
+	FnSlug      string
+	Status      string
+	ChildRunID  ulid.ULID
+}
+
 type Span struct {
 	SpanID         string
 	TraceID        string

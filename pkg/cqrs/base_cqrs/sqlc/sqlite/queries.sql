@@ -620,3 +620,34 @@ WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
+
+
+--
+-- Run defers
+--
+
+-- name: InsertRunDefer :exec
+INSERT INTO run_defers
+    (parent_run_id, defer_id, user_defer_id, fn_slug, status) VALUES
+    (?, ?, ?, ?, ?)
+ON CONFLICT(parent_run_id, defer_id) DO UPDATE SET
+    user_defer_id = excluded.user_defer_id,
+    fn_slug = excluded.fn_slug,
+    status = excluded.status;
+
+-- name: UpdateRunDeferChildRunID :exec
+UPDATE run_defers
+SET child_run_id = ?
+WHERE parent_run_id = ? AND defer_id = ?;
+
+-- name: GetRunDefersByParentRun :many
+SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
+FROM run_defers
+WHERE parent_run_id = ?
+ORDER BY defer_id ASC;
+
+-- name: GetRunDeferredFromByChildRun :one
+SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
+FROM run_defers
+WHERE child_run_id = ?
+LIMIT 1;

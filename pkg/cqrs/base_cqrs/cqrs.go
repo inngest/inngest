@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -1624,14 +1625,76 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	return nil, err
 }
 
-// GetRunDefers is a placeholder pending the defer history-reader implementation.
-func (w wrapper) GetRunDefers(ctx context.Context, runID ulid.ULID) ([]cqrs.RunDefer, error) {
-	return nil, nil
+func (w wrapper) InsertRunDefer(ctx context.Context, parentRunID ulid.ULID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
+	return w.q.InsertRunDefer(ctx, dbpkg.InsertRunDeferParams{
+		ParentRunID: parentRunID,
+		DeferID:     deferID,
+		UserDeferID: userDeferID,
+		FnSlug:      fnSlug,
+		Status:      string(status),
+	})
 }
 
-// GetRunDeferredFrom is a placeholder pending the defer history-reader implementation.
+func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error {
+	return w.q.UpdateRunDeferChildRunID(ctx, dbpkg.UpdateRunDeferChildRunIDParams{
+		ChildRunID:  childRunID,
+		ParentRunID: parentRunID,
+		DeferID:     deferID,
+	})
+}
+
+// GetRunDefers returns defers attached to a parent run, paired with the
+// child TraceRun if one has been created. Aborted defers and not-yet-scheduled
+// defers leave Run nil.
+func (w wrapper) GetRunDefers(ctx context.Context, runID ulid.ULID) ([]cqrs.RunDefer, error) {
+	rows, err := w.q.GetRunDefersByParentRun(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]cqrs.RunDefer, 0, len(rows))
+	for _, r := range rows {
+		entry := cqrs.RunDefer{
+			ID:          r.DeferID,
+			UserDeferID: r.UserDeferID,
+			FnSlug:      r.FnSlug,
+			Status:      cqrs.RunDeferStatus(r.Status),
+		}
+		if !r.ChildRunID.IsZero() {
+			tr, terr := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: r.ChildRunID})
+			switch {
+			case terr == nil:
+				entry.Run = tr
+			case !errors.Is(terr, sql.ErrNoRows):
+				logger.StdlibLogger(ctx).Error("error loading child trace run for defer", "error", terr, "child_run_id", r.ChildRunID)
+			}
+		}
+		out = append(out, entry)
+	}
+	return out, nil
+}
+
+// GetRunDeferredFrom returns the parent linkage for a deferred child run,
+// or nil if there is no row.
 func (w wrapper) GetRunDeferredFrom(ctx context.Context, runID ulid.ULID) (*cqrs.RunDeferredFrom, error) {
-	return nil, nil
+	row, err := w.q.GetRunDeferredFromByChildRun(ctx, runID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	out := &cqrs.RunDeferredFrom{
+		ParentRunID:  row.ParentRunID,
+		ParentFnSlug: row.FnSlug,
+	}
+	tr, terr := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: row.ParentRunID})
+	switch {
+	case terr == nil:
+		out.ParentRun = tr
+	case !errors.Is(terr, sql.ErrNoRows):
+		logger.StdlibLogger(ctx).Error("error loading parent trace run for deferred-from linkage", "error", terr, "parent_run_id", row.ParentRunID)
+	}
+	return out, nil
 }
 
 func toCQRSRun(run dbpkg.FunctionRun, finish dbpkg.FunctionFinish) *cqrs.FunctionRun {

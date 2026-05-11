@@ -533,6 +533,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithBatcher(batcher),
 		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
+		executor.WithDeferStore(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),

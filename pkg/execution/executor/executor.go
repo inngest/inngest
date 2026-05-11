@@ -388,6 +388,15 @@ func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
 	}
 }
 
+// WithDeferStore plumbs the run-defer linkage writer into the executor.
+// Optional — when unset, defer linkage is not persisted.
+func WithDeferStore(s cqrs.DeferStore) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).deferStore = s
+		return nil
+	}
+}
+
 func WithTracerProvider(t tracing.TracerProvider) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).tracerProvider = t
@@ -518,6 +527,7 @@ type executor struct {
 	shards queue.ShardRegistry
 
 	traceReader    cqrs.TraceReader
+	deferStore     cqrs.DeferStore
 	tracerProvider tracing.TracerProvider
 
 	allowStepMetadata AllowStepMetadata
@@ -1276,6 +1286,8 @@ func (e *executor) schedule(
 		// Override existing identifier in case we changed the run ID due to idempotency
 		stv1ID = sv2.V1FromMetadata(st.Metadata)
 
+		e.backfillDeferChildRunID(ctx, req, stv1ID.RunID, l)
+
 		// NOTE: if the runID mismatches, it means there's already a state available
 		// and we need to override the one we already have to make sure we're using
 		// the correct metedata values
@@ -1560,6 +1572,41 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 			),
 		}); err != nil {
 			l.Debug("error updating invoke span with invoked runID", "error", err)
+		}
+	}
+}
+
+// backfillDeferChildRunID links a freshly-scheduled child run back to its
+// originating defer row so the parent's GraphQL `defers` field can resolve
+// the child. No-op when this run was not triggered by a deferred.schedule
+// event or when no defer store is configured.
+func (e *executor) backfillDeferChildRunID(ctx context.Context, req execution.ScheduleRequest, childRunID ulid.ULID, l logger.Logger) {
+	if e.deferStore == nil {
+		return
+	}
+	for _, te := range req.Events {
+		evt := te.GetEvent()
+		if evt.Name != consts.FnDeferScheduleName {
+			continue
+		}
+		deferredMeta, err := evt.DeferredScheduleMetadata()
+		if err != nil {
+			l.Error("error decoding deferred schedule metadata", "error", err, "child_run_id", childRunID)
+			continue
+		}
+		parentRunID, err := ulid.Parse(deferredMeta.ParentRunID)
+		if err != nil {
+			l.Error("invalid parent run id on deferred schedule event", "error", err, "parent_run_id", deferredMeta.ParentRunID)
+			continue
+		}
+		if err := e.deferStore.UpdateRunDeferChildRunID(ctx, parentRunID, deferredMeta.DeferID, childRunID); err != nil {
+			l.Error(
+				"error updating run defer child run id",
+				"error", err,
+				"parent_run_id", parentRunID,
+				"defer_id", deferredMeta.DeferID,
+				"child_run_id", childRunID,
+			)
 		}
 	}
 }

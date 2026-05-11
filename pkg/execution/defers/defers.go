@@ -51,9 +51,14 @@ func SaveFromOp(
 	}
 
 	if !rejected {
+		var userlandID string
+		if op.Userland != nil {
+			userlandID = op.Userland.ID
+		}
 		saveErr := rs.SaveDefer(ctx, id, statev2.Defer{
 			FnSlug:         opts.FnSlug,
 			HashedID:       op.ID,
+			UserlandID:     userlandID,
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          opts.Input,
 		})

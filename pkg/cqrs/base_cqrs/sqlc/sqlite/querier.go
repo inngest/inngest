@@ -54,6 +54,8 @@ type Querier interface {
 	// Queue snapshots
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
+	GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*RunDefer, error)
+	GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*RunDefer, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)
 	GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error)
@@ -82,6 +84,10 @@ type Querier interface {
 	//
 	InsertHistory(ctx context.Context, arg InsertHistoryParams) error
 	InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error
+	//
+	// Run defers
+	//
+	InsertRunDefer(ctx context.Context, arg InsertRunDeferParams) error
 	// New
 	InsertSpan(ctx context.Context, arg InsertSpanParams) error
 	//
@@ -96,6 +102,7 @@ type Querier interface {
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+	UpdateRunDeferChildRunID(ctx context.Context, arg UpdateRunDeferChildRunIDParams) error
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
 	//
 	// functions
