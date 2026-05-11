@@ -422,12 +422,12 @@ export const GET_RUN = gql`
       hasAI
       defers {
         id
+        userDeferID
         fnSlug
         status
         run {
           id
           status
-          queuedAt
           function {
             name
             slug
@@ -446,12 +446,12 @@ export const GET_RUN = gql`
           }
           defers {
             id
+            userDeferID
             fnSlug
             status
             run {
               id
               status
-              queuedAt
               function {
                 name
                 slug

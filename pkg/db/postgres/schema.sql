@@ -267,6 +267,19 @@ CREATE TABLE public.traces (
 );
 
 --
+-- Name: run_defers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.run_defers (
+    parent_run_id bytea NOT NULL,
+    defer_id character varying NOT NULL,
+    user_defer_id character varying DEFAULT ''::character varying NOT NULL,
+    fn_slug character varying NOT NULL,
+    status character varying NOT NULL,
+    child_run_id bytea
+);
+
+--
 -- Name: worker_connections; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -349,6 +362,13 @@ ALTER TABLE ONLY public.spans
     ADD CONSTRAINT spans_pkey PRIMARY KEY (trace_id, span_id);
 
 --
+-- Name: run_defers run_defers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.run_defers
+    ADD CONSTRAINT run_defers_pkey PRIMARY KEY (parent_run_id, defer_id);
+
+--
 -- Name: trace_runs trace_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -367,6 +387,12 @@ ALTER TABLE ONLY public.worker_connections
 --
 
 CREATE UNIQUE INDEX functions_app_id_slug_active_key ON public.functions USING btree (app_id, slug) WHERE (archived_at IS NULL);
+
+--
+-- Name: idx_run_defers_child; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_run_defers_child ON public.run_defers USING btree (child_run_id);
 
 --
 -- Name: idx_events_internal_id; Type: INDEX; Schema: public; Owner: -

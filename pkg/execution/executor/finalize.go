@@ -11,6 +11,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -222,6 +223,29 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
+		// The GraphQL `defers` field surfaces both SCHEDULED and ABORTED rows;
+		// Rejected and any future enum value are out of contract and skipped
+		// rather than persisted as an unknown string.
+		if e.deferStore != nil {
+			var deferRowStatus cqrs.RunDeferStatus
+			switch d.ScheduleStatus {
+			case enums.DeferStatusAfterRun:
+				deferRowStatus = cqrs.RunDeferStatusScheduled
+			case enums.DeferStatusAborted:
+				deferRowStatus = cqrs.RunDeferStatusAborted
+			}
+			if deferRowStatus != "" {
+				if err := e.deferStore.InsertRunDefer(ctx, opts.Metadata.ID.RunID, d.HashedID, d.UserlandID, d.FnSlug, deferRowStatus); err != nil {
+					logger.StdlibLogger(ctx).Error(
+						"error persisting run defer",
+						"error", err,
+						"run_id", opts.Metadata.ID.RunID,
+						"defer_id", d.HashedID,
+					)
+				}
+			}
+		}
+
 		// TODO: what about an immediate execution mode?
 		if d.ScheduleStatus != enums.DeferStatusAfterRun {
 			metrics.IncrDefersFinalizedCounter(ctx, d.ScheduleStatus.String(), metrics.CounterOpt{PkgName: pkgName})
@@ -271,6 +295,7 @@ func (e *executor) buildDeferEvents(
 			FnSlug:       d.FnSlug,
 			ParentFnSlug: fnSlug,
 			ParentRunID:  opts.Metadata.ID.RunID.String(),
+			DeferID:      d.HashedID,
 		}
 		if err := deferredMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(

@@ -514,9 +514,9 @@ type FunctionRunV2Edge {
 
 type RunDefer {
   id: String!
+  userDeferID: String!
   fnSlug: String!
   status: RunDeferStatus!
-  input: Bytes
   run: FunctionRunV2
 }
 

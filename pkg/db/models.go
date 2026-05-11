@@ -241,6 +241,17 @@ type FunctionRunRow struct {
 	FunctionFinish FunctionFinish
 }
 
+// RunDeferRow is a row from run_defers. ChildRunID is the zero ULID when the
+// row's child run has not yet been scheduled or the defer was aborted.
+type RunDeferRow struct {
+	ParentRunID ulid.ULID
+	DeferID     string
+	UserDeferID string
+	FnSlug      string
+	Status      string
+	ChildRunID  ulid.ULID
+}
+
 // SpanRow is the common shape returned by span queries that group by dynamic_span_id.
 type SpanRow struct {
 	RunID          string

@@ -213,3 +213,13 @@ CREATE TABLE IF NOT EXISTS "functions" (
 CREATE UNIQUE INDEX functions_app_id_slug_active_key
     ON functions (app_id, slug)
     WHERE archived_at IS NULL;
+CREATE TABLE run_defers (
+    parent_run_id BLOB NOT NULL,
+    defer_id VARCHAR NOT NULL,
+    user_defer_id VARCHAR NOT NULL DEFAULT '',
+    fn_slug VARCHAR NOT NULL,
+    status VARCHAR NOT NULL,
+    child_run_id BLOB,
+    PRIMARY KEY (parent_run_id, defer_id)
+);
+CREATE INDEX idx_run_defers_child ON run_defers(child_run_id);

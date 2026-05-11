@@ -1537,6 +1537,7 @@ type Defer struct {
 	HashedId       string                 `protobuf:"bytes,2,opt,name=hashed_id,json=hashedId,proto3" json:"hashed_id,omitempty"`
 	ScheduleStatus DeferStatus            `protobuf:"varint,3,opt,name=schedule_status,json=scheduleStatus,proto3,enum=state.v2.DeferStatus" json:"schedule_status,omitempty"`
 	Input          []byte                 `protobuf:"bytes,4,opt,name=input,proto3" json:"input,omitempty"`
+	UserlandId     string                 `protobuf:"bytes,5,opt,name=userland_id,json=userlandId,proto3" json:"userland_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1599,11 +1600,19 @@ func (x *Defer) GetInput() []byte {
 	return nil
 }
 
+func (x *Defer) GetUserlandId() string {
+	if x != nil {
+		return x.UserlandId
+	}
+	return ""
+}
+
 type DeferMeta struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FnSlug         string                 `protobuf:"bytes,1,opt,name=fn_slug,json=fnSlug,proto3" json:"fn_slug,omitempty"`
 	HashedId       string                 `protobuf:"bytes,2,opt,name=hashed_id,json=hashedId,proto3" json:"hashed_id,omitempty"`
 	ScheduleStatus DeferStatus            `protobuf:"varint,3,opt,name=schedule_status,json=scheduleStatus,proto3,enum=state.v2.DeferStatus" json:"schedule_status,omitempty"`
+	UserlandId     string                 `protobuf:"bytes,4,opt,name=userland_id,json=userlandId,proto3" json:"userland_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1657,6 +1666,13 @@ func (x *DeferMeta) GetScheduleStatus() DeferStatus {
 		return x.ScheduleStatus
 	}
 	return DeferStatus_DEFER_STATUS_UNKNOWN
+}
+
+func (x *DeferMeta) GetUserlandId() string {
+	if x != nil {
+		return x.UserlandId
+	}
+	return ""
 }
 
 type SaveDeferRequest struct {
@@ -2556,16 +2572,20 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\n" +
 	"StepsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\x93\x01\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xb4\x01\n" +
 	"\x05Defer\x12\x17\n" +
 	"\afn_slug\x18\x01 \x01(\tR\x06fnSlug\x12\x1b\n" +
 	"\thashed_id\x18\x02 \x01(\tR\bhashedId\x12>\n" +
 	"\x0fschedule_status\x18\x03 \x01(\x0e2\x15.state.v2.DeferStatusR\x0escheduleStatus\x12\x14\n" +
-	"\x05input\x18\x04 \x01(\fR\x05input\"\x81\x01\n" +
+	"\x05input\x18\x04 \x01(\fR\x05input\x12\x1f\n" +
+	"\vuserland_id\x18\x05 \x01(\tR\n" +
+	"userlandId\"\xa2\x01\n" +
 	"\tDeferMeta\x12\x17\n" +
 	"\afn_slug\x18\x01 \x01(\tR\x06fnSlug\x12\x1b\n" +
 	"\thashed_id\x18\x02 \x01(\tR\bhashedId\x12>\n" +
-	"\x0fschedule_status\x18\x03 \x01(\x0e2\x15.state.v2.DeferStatusR\x0escheduleStatus\"W\n" +
+	"\x0fschedule_status\x18\x03 \x01(\x0e2\x15.state.v2.DeferStatusR\x0escheduleStatus\x12\x1f\n" +
+	"\vuserland_id\x18\x04 \x01(\tR\n" +
+	"userlandId\"W\n" +
 	"\x10SaveDeferRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12%\n" +
 	"\x05defer\x18\x02 \x01(\v2\x0f.state.v2.DeferR\x05defer\"\x13\n" +

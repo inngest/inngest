@@ -34,6 +34,7 @@ type State struct {
 type DeferMeta struct {
 	FnSlug         string
 	HashedID       string
+	UserlandID     string
 	ScheduleStatus enums.DeferStatus
 }
 
@@ -44,6 +45,12 @@ type Defer struct {
 
 	// Hashed defer ID
 	HashedID string
+
+	// UserlandID is the SDK-caller-supplied defer id (the first argument to
+	// `defer("foo", ...)`). HashedID is `sha1(UserlandID)`; this field
+	// preserves the original string so the dev-server UI can show the id the
+	// user typed instead of the hash.
+	UserlandID string
 
 	// Status for scheduling the deferred run:
 	// - Already scheduled?

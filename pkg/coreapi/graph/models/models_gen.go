@@ -366,11 +366,11 @@ type RetryConfiguration struct {
 }
 
 type RunDefer struct {
-	ID     string         `json:"id"`
-	FnSlug string         `json:"fnSlug"`
-	Status RunDeferStatus `json:"status"`
-	Input  *string        `json:"input,omitempty"`
-	Run    *FunctionRunV2 `json:"run,omitempty"`
+	ID          string         `json:"id"`
+	UserDeferID string         `json:"userDeferID"`
+	FnSlug      string         `json:"fnSlug"`
+	Status      RunDeferStatus `json:"status"`
+	Run         *FunctionRunV2 `json:"run,omitempty"`
 }
 
 type RunDeferredFrom struct {

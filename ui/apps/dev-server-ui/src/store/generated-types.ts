@@ -408,6 +408,8 @@ export type FunctionRunV2 = {
   appID: Scalars['UUID'];
   batchCreatedAt: Maybe<Scalars['Time']>;
   cronSchedule: Maybe<Scalars['String']>;
+  deferredFrom: Maybe<RunDeferredFrom>;
+  defers: Array<RunDefer>;
   endedAt: Maybe<Scalars['Time']>;
   eventName: Maybe<Scalars['String']>;
   function: Function;
@@ -687,6 +689,27 @@ export type RetryConfiguration = {
   __typename?: 'RetryConfiguration';
   isDefault: Maybe<Scalars['Boolean']>;
   value: Scalars['Int'];
+};
+
+export type RunDefer = {
+  __typename?: 'RunDefer';
+  fnSlug: Scalars['String'];
+  id: Scalars['String'];
+  run: Maybe<FunctionRunV2>;
+  status: RunDeferStatus;
+  userDeferID: Scalars['String'];
+};
+
+export enum RunDeferStatus {
+  Aborted = 'ABORTED',
+  Scheduled = 'SCHEDULED',
+}
+
+export type RunDeferredFrom = {
+  __typename?: 'RunDeferredFrom';
+  parentFnSlug: Scalars['String'];
+  parentRun: Maybe<FunctionRunV2>;
+  parentRunID: Scalars['ULID'];
 };
 
 export type RunHistoryCancel = {
@@ -1753,6 +1776,43 @@ export type GetRunQuery = {
         __typename?: 'RunTraceSpanResponseInfo';
         statusCode: number;
         headers: any;
+      } | null;
+    } | null;
+    defers: Array<{
+      __typename?: 'RunDefer';
+      id: string;
+      userDeferID: string;
+      fnSlug: string;
+      status: RunDeferStatus;
+      run: {
+        __typename?: 'FunctionRunV2';
+        id: any;
+        status: FunctionRunStatus;
+        function: { __typename?: 'Function'; name: string; slug: string };
+      } | null;
+    }>;
+    deferredFrom: {
+      __typename?: 'RunDeferredFrom';
+      parentRunID: any;
+      parentFnSlug: string;
+      parentRun: {
+        __typename?: 'FunctionRunV2';
+        id: any;
+        status: FunctionRunStatus;
+        function: { __typename?: 'Function'; name: string; slug: string };
+        defers: Array<{
+          __typename?: 'RunDefer';
+          id: string;
+          userDeferID: string;
+          fnSlug: string;
+          status: RunDeferStatus;
+          run: {
+            __typename?: 'FunctionRunV2';
+            id: any;
+            status: FunctionRunStatus;
+            function: { __typename?: 'Function'; name: string; slug: string };
+          } | null;
+        }>;
       } | null;
     } | null;
   } | null;

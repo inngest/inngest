@@ -65,6 +65,12 @@ type Querier interface {
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
 	HistoryCountRuns(ctx context.Context) (int64, error)
 
+	// Run defers
+	InsertRunDefer(ctx context.Context, arg InsertRunDeferParams) error
+	UpdateRunDeferChildRunID(ctx context.Context, arg UpdateRunDeferChildRunIDParams) error
+	GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*RunDeferRow, error)
+	GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*RunDeferRow, error)
+
 	// Queue Snapshots
 	InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error
 	DeleteOldQueueSnapshots(ctx context.Context, limit int64) (int64, error)

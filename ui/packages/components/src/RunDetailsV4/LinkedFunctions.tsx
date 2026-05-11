@@ -3,7 +3,8 @@ import { useMemo } from 'react';
 import { Link } from '../Link';
 import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRun';
 import { usePathCreator } from '../SharedContext/usePathCreator';
-import { IDCell, StatusCell, TimeCell } from '../Table/Cell';
+import { IDCell, StatusCell } from '../Table/Cell';
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
 import type { InvokedRun } from './runDetailsUtils';
 
@@ -71,7 +72,7 @@ const ParentFunctionSection = ({ deferredFrom }: { deferredFrom: RunDeferredFrom
       <SectionHeader title="Parent function" />
       <ColumnHeader
         columns={[
-          { label: 'Current Status', flex: 'w-36 shrink-0' },
+          { label: 'Status', flex: 'w-36 shrink-0' },
           { label: 'Run ID', flex: 'flex-1 min-w-0' },
           { label: 'Function', flex: 'flex-1 min-w-0' },
         ]}
@@ -102,7 +103,7 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
       <ColumnHeader
         columns={[
           { label: 'Status', flex: 'w-32 shrink-0' },
-          { label: 'Called at', flex: 'w-40 shrink-0' },
+          { label: 'Defer ID', flex: 'w-40 shrink-0' },
           { label: 'Run ID', flex: 'flex-1 min-w-0' },
           { label: 'Function', flex: 'flex-1 min-w-0' },
         ]}
@@ -115,8 +116,10 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
             <RowCell className="w-32 shrink-0">
               <StatusCell status={deferStatus(d)} />
             </RowCell>
-            <RowCell className="text-muted w-40 shrink-0">
-              {d.run?.queuedAt ? <TimeCell date={d.run.queuedAt} /> : '-'}
+            <RowCell className="w-40 shrink-0 truncate">
+              <OptionalTooltip tooltip={d.userDeferID}>
+                <IDCell>{d.userDeferID}</IDCell>
+              </OptionalTooltip>
             </RowCell>
             <RowCell className="flex-1 truncate">
               {d.run ? (

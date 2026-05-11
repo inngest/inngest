@@ -11,6 +11,7 @@ func TestDeferredScheduleMetadataValidate(t *testing.T) {
 		FnSlug:       "score",
 		ParentFnSlug: "app-parent-fn",
 		ParentRunID:  "01ABCDEF",
+		DeferID:      "deadbeef",
 	}
 
 	t.Run("valid", func(t *testing.T) {
@@ -25,5 +26,6 @@ func TestDeferredScheduleMetadataValidate(t *testing.T) {
 		require.Contains(t, err.Error(), "fn_slug")
 		require.Contains(t, err.Error(), "parent_fn_slug")
 		require.Contains(t, err.Error(), "parent_run_id")
+		require.Contains(t, err.Error(), "defer_id")
 	})
 }
