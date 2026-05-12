@@ -136,7 +136,7 @@ func NewLoaders(params LoaderParams) *Loaders {
 	loaders := &Loaders{}
 	tr := &traceReader{loaders: loaders, reader: params.DB}
 	er := &eventReader{loaders: loaders, reader: params.DB}
-	dr := &deferReader{loaders: loaders, reader: params.DB}
+	dr := &deferReader{reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.LegacyRunTraceLoader = dataloader.NewBatchedLoader(tr.GetLegacyRunTrace)

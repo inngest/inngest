@@ -720,6 +720,21 @@ func (pq *pgQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.Trac
 	return traceRunFromPG(r), nil
 }
 
+func (pq *pgQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	strIDs := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		strIDs[i] = id.String()
+	}
+	rows, err := pq.q.GetTraceRunsByRunIDs(ctx, strIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, traceRunFromPG), nil
+}
+
 func (pq *pgQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {
 	// Postgres sqlc expects interface{} for this query.
 	rows, err := pq.q.GetTraceRunsByTriggerId(ctx, eventID)

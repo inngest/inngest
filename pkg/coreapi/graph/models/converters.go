@@ -89,9 +89,6 @@ func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
 	return r
 }
 
-// MakeFunctionRunV2 mirrors the inline construction in
-// pkg/coreapi/graph/resolvers/runs_v2.go's Run/Runs resolvers; keep them in
-// sync until those callsites are folded in.
 func MakeFunctionRunV2(run *cqrs.TraceRun) (*FunctionRunV2, error) {
 	if run == nil {
 		return nil, nil

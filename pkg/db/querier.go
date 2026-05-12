@@ -93,6 +93,7 @@ type Querier interface {
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
 	InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
+	GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)

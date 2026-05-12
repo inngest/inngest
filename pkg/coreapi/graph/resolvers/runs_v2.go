@@ -39,14 +39,6 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 	edges := []*models.FunctionRunV2Edge{}
 	total := len(runs)
 	for i, r := range runs {
-		var (
-			started   *time.Time
-			ended     *time.Time
-			sourceID  *string
-			output    *string
-			batchTime *time.Time
-		)
-
 		c := r.Cursor
 		if i == 0 {
 			scursor = &c // start cursor
@@ -55,70 +47,26 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 			ecursor = &c // end cursor
 		}
 
-		if r.StartedAt.UnixMilli() > 0 {
-			started = &r.StartedAt
-		}
-		if r.EndedAt.UnixMilli() > 0 {
-			ended = &r.EndedAt
-		}
-		if len(r.SourceID) > 0 {
-			sourceID = &r.SourceID
-		}
-		if len(r.Output) > 0 {
-			s := string(r.Output)
-			output = &s
-		}
-
 		// If this run ID is the same as the starting cursor, do not include it.
 		if scursor != nil && r.RunID == *scursor {
 			continue
 		}
 
-		runID := ulid.MustParse(r.RunID)
-		status, err := models.ToFunctionRunStatus(r.Status)
+		node, err := models.MakeFunctionRunV2(r)
 		if err != nil {
 			continue
 		}
 
-		if r.BatchID != nil {
-			ts := ulid.Time(r.BatchID.Time())
-			batchTime = &ts
-		}
-
-		node := &models.FunctionRunV2{
-			ID:             runID,
-			AppID:          r.AppID,
-			FunctionID:     r.FunctionID,
-			TraceID:        r.TraceID,
-			QueuedAt:       r.QueuedAt,
-			StartedAt:      started,
-			EndedAt:        ended,
-			SourceID:       sourceID,
-			Status:         status,
-			Output:         output,
-			IsBatch:        r.IsBatch,
-			BatchCreatedAt: batchTime,
-			CronSchedule:   r.CronSchedule,
-			HasAi:          r.HasAI,
-		}
-
-		triggerIDS := []ulid.ULID{}
-		for _, tid := range r.TriggerIDs {
-			if id, err := ulid.Parse(tid); err == nil {
-				triggerIDS = append(triggerIDS, id)
-
-				// track evtID only if it's not batch nor cron
-				if !r.IsBatch && r.CronSchedule == nil {
-					if _, ok := evtRunMap[id]; !ok {
-						evtRunMap[id] = []*models.FunctionRunV2{}
-					}
-					evtRunMap[id] = append(evtRunMap[id], node)
-					evtIDs = append(evtIDs, id)
+		// track evtID only if it's not batch nor cron
+		if !r.IsBatch && r.CronSchedule == nil {
+			for _, id := range node.TriggerIDs {
+				if _, ok := evtRunMap[id]; !ok {
+					evtRunMap[id] = []*models.FunctionRunV2{}
 				}
+				evtRunMap[id] = append(evtRunMap[id], node)
+				evtIDs = append(evtIDs, id)
 			}
 		}
-
-		node.TriggerIDs = triggerIDS
 
 		edges = append(edges, &models.FunctionRunV2Edge{
 			Node:   node,
@@ -173,69 +121,7 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}
 
-	var (
-		startedAt *time.Time
-		endedAt   *time.Time
-		sourceID  *string
-		output    *string
-		batchTS   *time.Time
-	)
-
-	triggerIDs := []ulid.ULID{}
-	for _, evtID := range run.TriggerIDs {
-		if id, err := ulid.Parse(evtID); err == nil {
-			triggerIDs = append(triggerIDs, id)
-		}
-	}
-
-	if len(run.Output) > 0 {
-		o := string(run.Output)
-		output = &o
-	}
-
-	if run.BatchID != nil {
-		ts := ulid.Time(run.BatchID.Time())
-		batchTS = &ts
-	}
-
-	status, err := models.ToFunctionRunStatus(run.Status)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing status: %w", err)
-	}
-
-	if run.StartedAt.UnixMilli() > 0 {
-		startedAt = &run.StartedAt
-	}
-	if run.SourceID != "" {
-		sourceID = &run.SourceID
-	}
-
-	switch status {
-	case models.FunctionRunStatusCompleted, models.FunctionRunStatusFailed, models.FunctionRunStatusCancelled:
-		if run.EndedAt.UnixMilli() > 0 {
-			endedAt = &run.EndedAt
-		}
-	}
-
-	res := models.FunctionRunV2{
-		ID:             runid,
-		AppID:          run.AppID,
-		FunctionID:     run.FunctionID,
-		TraceID:        run.TraceID,
-		QueuedAt:       run.QueuedAt,
-		StartedAt:      startedAt,
-		EndedAt:        endedAt,
-		Status:         status,
-		SourceID:       sourceID,
-		TriggerIDs:     triggerIDs,
-		IsBatch:        run.IsBatch,
-		BatchCreatedAt: batchTS,
-		CronSchedule:   run.CronSchedule,
-		Output:         output,
-		HasAi:          run.HasAI,
-	}
-
-	return &res, nil
+	return models.MakeFunctionRunV2(run)
 }
 
 func (qr *queryResolver) RunTrace(ctx context.Context, runID string) (*models.RunTraceSpan, error) {
