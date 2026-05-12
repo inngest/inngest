@@ -230,6 +230,8 @@ func (g GeneratorOpcode) StepType() enums.StepType {
 		return enums.StepTypeWaitForSignal
 	case enums.OpcodeInvokeFunction:
 		return enums.StepTypeInvoke
+	case enums.OpcodeGateway:
+		return enums.StepTypeFetch
 	case enums.OpcodeAIGateway:
 		return enums.StepTypeAiInfer
 	default:
