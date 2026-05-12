@@ -6,9 +6,6 @@ on:
   pull_request:
     paths-ignore:
       - "ui/**"
-  # Release PRs are updated by GITHUB_TOKEN, which does not fan out normal
-  # pull_request workflows. release-pr.yml dispatches this explicitly.
-  workflow_dispatch:
   schedule:
     - cron: "0 0 * * 0"
 
