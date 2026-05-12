@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
 
 import { TimeElement } from '../DetailsCard/Element';
-import type { SpanMetadata } from './types';
+
+type ScoreMetadata = {
+  updatedAt: string;
+  values: Record<string, unknown>;
+};
 
 type ScoreRow = {
   name: string;
@@ -9,7 +13,7 @@ type ScoreRow = {
   value: number;
 };
 
-function scoreRows(metadata: SpanMetadata[]): ScoreRow[] {
+function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   return metadata
     .flatMap((md) =>
       Object.entries(md.values)
@@ -26,7 +30,7 @@ function scoreRows(metadata: SpanMetadata[]): ScoreRow[] {
     .sort((a, b) => a.name.localeCompare(b.name) || a.updatedAt.localeCompare(b.updatedAt));
 }
 
-export const ScoresAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
+export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
   const rows = useMemo(() => scoreRows(metadata), [metadata]);
 
   if (rows.length === 0) {

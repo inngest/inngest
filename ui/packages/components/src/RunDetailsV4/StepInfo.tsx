@@ -14,6 +14,7 @@ import {
 } from '../DetailsCard/Element';
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
+import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
 import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -25,7 +26,6 @@ import { toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
-import { ScoresAttrs } from './ScoresAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
