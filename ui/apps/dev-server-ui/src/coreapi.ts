@@ -262,6 +262,7 @@ export const GET_RUNS = gql`
     $functionRunCursor: String = null
     $celQuery: String = null
     $preview: Boolean = false
+    $runType: RunType = null
   ) {
     runs(
       filter: {
@@ -270,6 +271,7 @@ export const GET_RUNS = gql`
         status: $status
         timeField: $timeField
         query: $celQuery
+        runType: $runType
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
@@ -294,6 +296,15 @@ export const GET_RUNS = gql`
           startedAt
           status
           hasAI
+          runType
+          deferredFrom {
+            parentRun {
+              function {
+                name
+                slug
+              }
+            }
+          }
         }
       }
       pageInfo {
@@ -312,9 +323,15 @@ export const COUNT_RUNS = gql`
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $preview: Boolean = false
+    $runType: RunType = null
   ) {
     runs(
-      filter: { from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        from: $startTime
+        status: $status
+        timeField: $timeField
+        runType: $runType
+      }
       orderBy: [{ field: $timeField, direction: DESC }]
       preview: $preview
     ) {

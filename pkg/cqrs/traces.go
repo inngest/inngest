@@ -485,6 +485,17 @@ func GetRunOptFromContext(ctx context.Context) GetRunOpt {
 	return opt
 }
 
+// RunTypeFilter narrows the run list to primary runs, deferred (child) runs,
+// or both. The zero value (RunTypeFilterAny) preserves the legacy "show
+// everything" behavior.
+type RunTypeFilter int
+
+const (
+	RunTypeFilterAny RunTypeFilter = iota
+	RunTypeFilterPrimary
+	RunTypeFilterDefer
+)
+
 type GetTraceRunFilter struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
@@ -495,6 +506,7 @@ type GetTraceRunFilter struct {
 	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
+	RunType     RunTypeFilter
 }
 
 type GetTraceRunOrder struct {

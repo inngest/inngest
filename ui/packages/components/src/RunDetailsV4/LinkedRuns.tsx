@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Link } from '../Link';
 import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRun';
 import { usePathCreator } from '../SharedContext/usePathCreator';
-import { IDCell, StatusCell } from '../Table/Cell';
+import { IDCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
 import type { InvokedRun } from './runDetailsUtils';
@@ -21,14 +21,19 @@ export const LinkedRuns = ({ runID, defers, deferredFrom, invoked }: Props) => {
     [deferredFrom, runID]
   );
 
+  if (deferredFrom) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <ParentRunSection deferredFrom={deferredFrom} />
+        <DefersSection title="Parallel defers" defers={parallelDefers} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto">
-      {deferredFrom && <ParentRunSection deferredFrom={deferredFrom} />}
-      {parallelDefers.length > 0 && (
-        <DefersSection title="Parallel defers" defers={parallelDefers} />
-      )}
-      {defers && defers.length > 0 && <DefersSection title="Deferred runs" defers={defers} />}
-      {invoked.length > 0 && <InvokedSection invoked={invoked} />}
+      <InvokedSection invoked={invoked} />
+      <DefersSection title="Deferred runs" defers={defers ?? []} />
     </div>
   );
 };
@@ -87,7 +92,7 @@ const ParentRunSection = ({ deferredFrom }: { deferredFrom: RunDeferredFromSumma
         <RowCell className="flex-1 truncate">
           {parent ? (
             <Link href={pathCreator.function({ functionSlug: parent.function.slug })}>
-              {parent.function.name}
+              <PillCell type="FUNCTION">{parent.function.slug}</PillCell>
             </Link>
           ) : (
             <span className="text-muted">-</span>
@@ -113,7 +118,6 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
         ]}
       />
       {defers.map((d) => {
-        const fnName = d.run?.function.name ?? d.fnSlug;
         const fnSlug = d.run?.function.slug ?? d.fnSlug;
         return (
           <div key={d.id} className="flex flex-row items-center gap-4 px-4 py-2">
@@ -135,7 +139,9 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
               )}
             </RowCell>
             <RowCell className="flex-1 truncate">
-              <Link href={pathCreator.function({ functionSlug: fnSlug })}>{fnName}</Link>
+              <Link href={pathCreator.function({ functionSlug: fnSlug })}>
+                <PillCell type="FUNCTION">{fnSlug}</PillCell>
+              </Link>
             </RowCell>
           </div>
         );
@@ -153,7 +159,7 @@ const InvokedSection = ({ invoked }: { invoked: InvokedRun[] }) => {
       <ColumnHeader
         columns={[
           { label: 'Status', flex: 'w-32 shrink-0' },
-          { label: 'Invoker', flex: 'flex-1 min-w-0' },
+          { label: 'Invoke ID', flex: 'flex-1 min-w-0' },
           { label: 'Run ID', flex: 'flex-1 min-w-0' },
           { label: 'Function', flex: 'flex-1 min-w-0' },
         ]}
@@ -163,14 +169,18 @@ const InvokedSection = ({ invoked }: { invoked: InvokedRun[] }) => {
           <RowCell className="w-32 shrink-0">
             <StatusCell status={i.status} />
           </RowCell>
-          <RowCell className="flex-1 truncate">{i.invokerName}</RowCell>
+          <RowCell className="flex-1 truncate">
+            <IDCell>{i.spanID}</IDCell>
+          </RowCell>
           <RowCell className="flex-1 truncate">
             <Link href={pathCreator.runPopout({ runID: i.runID })}>
               <IDCell>{i.runID}</IDCell>
             </Link>
           </RowCell>
           <RowCell className="flex-1 truncate">
-            <Link href={pathCreator.function({ functionSlug: i.functionID })}>{i.functionID}</Link>
+            <Link href={pathCreator.function({ functionSlug: i.functionID })}>
+              <PillCell type="FUNCTION">{i.functionID}</PillCell>
+            </Link>
           </RowCell>
         </div>
       ))}

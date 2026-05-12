@@ -309,6 +309,7 @@ type FunctionRunV2 struct {
 	HasAi          bool              `json:"hasAI"`
 	Defers         []*RunDefer       `json:"defers"`
 	DeferredFrom   *RunDeferredFrom  `json:"deferredFrom,omitempty"`
+	RunType        RunType           `json:"runType"`
 }
 
 type FunctionRunV2Edge struct {
@@ -418,6 +419,7 @@ type RunsFilterV2 struct {
 	Status      []FunctionRunStatus `json:"status,omitempty"`
 	FunctionIDs []uuid.UUID         `json:"functionIDs,omitempty"`
 	AppIDs      []uuid.UUID         `json:"appIDs,omitempty"`
+	RunType     *RunType            `json:"runType,omitempty"`
 	Query       *string             `json:"query,omitempty"`
 }
 
@@ -1065,6 +1067,47 @@ func (e *RunTraceSpanStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e RunTraceSpanStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunType string
+
+const (
+	RunTypePrimary RunType = "PRIMARY"
+	RunTypeDefer   RunType = "DEFER"
+)
+
+var AllRunType = []RunType{
+	RunTypePrimary,
+	RunTypeDefer,
+}
+
+func (e RunType) IsValid() bool {
+	switch e {
+	case RunTypePrimary, RunTypeDefer:
+		return true
+	}
+	return false
+}
+
+func (e RunType) String() string {
+	return string(e)
+}
+
+func (e *RunType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunType", str)
+	}
+	return nil
+}
+
+func (e RunType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
