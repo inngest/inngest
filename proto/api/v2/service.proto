@@ -35,6 +35,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Webhooks"     description: "Create and manage inbound webhooks" }
   tags: { name: "Apps"         description: "Sync and manage" }
   tags: { name: "Functions"    description: "Invoke and manage functions" }
+  tags: { name: "Runs"         description: "Inspect function runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
 };
 
