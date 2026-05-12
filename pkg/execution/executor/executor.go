@@ -3717,9 +3717,11 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	// A duplicate or idempotent save means the step was already persisted
-	// (typically via the checkpoint path). Keep the original output and
-	// continue so the run still advances.
+	// The step output was already persisted, typically by an earlier
+	// attempt that timed out or errored after succeeding. Clear the error so the
+	// discovery step still enqueues; otherwise the run stalls.
+	// XXX: hasPendingSteps can be stale on duplicate; worst case is
+	// redundant SDK invocations per in-flight parallel siblng.
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 		e.log.Warn("step output already persisted; keeping existing output", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
 		err = nil
