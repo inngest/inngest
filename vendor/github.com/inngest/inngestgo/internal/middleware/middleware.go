@@ -17,6 +17,10 @@ type CallContext struct {
 	RunID string
 	// Attempt is the 0-indexed attempt for this request.
 	Attempt int
+	// RequestID is the unique ID for this outbound SDK request.
+	RequestID string
+	// JobID is the stable queue item ID for this SDK request.
+	JobID string
 }
 
 // Middleware is the middleware interface that each implementation must fulfil.

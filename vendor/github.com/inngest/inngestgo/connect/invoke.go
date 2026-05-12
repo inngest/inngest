@@ -86,6 +86,13 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	if body.AppName == "" {
 		return nil, fmt.Errorf("missing app name in executor request")
 	}
+	logAttrs := []any{
+		"request_id", body.RequestId,
+		"run_id", body.RunId,
+		"app_id", body.AppId,
+		"function_slug", body.FunctionSlug,
+	}
+	l := h.logger.With(logAttrs...)
 
 	invoker, ok := h.invokers[body.AppName]
 	if !ok {
@@ -97,8 +104,13 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	var request sdkrequest.Request
 	if err := json.Unmarshal(body.RequestPayload, &request); err != nil {
 		// TODO Should we send this back to the gateway? Previously this was a status code 400 public error with "malformed input"
-		h.logger.Error("error decoding sdk request", "error", err)
+		l.Error("error decoding sdk request", "error", err)
 		return nil, fmt.Errorf("invalid SDK request payload: %w", err)
+	}
+	request.CallCtx.RequestID = body.RequestId
+	request.CallCtx.JobID = body.JobId
+	if request.CallCtx.JobID != "" {
+		l = l.With("job_id", request.CallCtx.JobID)
 	}
 
 	ackPayload, err := proto.Marshal(&connectproto.WorkerRequestAckData{
@@ -113,7 +125,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		RunId:          body.RunId,
 	})
 	if err != nil {
-		h.logger.Error("error marshaling request ack", "error", err)
+		l.Error("error marshaling request ack", "error", err)
 		return nil, publicerr.Error{
 			Message: "malformed input",
 			Status:  400,
@@ -129,7 +141,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		Kind:    connectproto.GatewayMessageType_WORKER_REQUEST_ACK,
 		Payload: ackPayload,
 	}); err != nil {
-		h.logger.Error("error sending request ack", "error", err)
+		l.Error("error sending request ack", "error", err)
 		return nil, publicerr.Error{
 			Message: "failed to ack worker request",
 			Status:  400,
@@ -203,7 +215,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				LeaseId:        currentLeaseID,
 			})
 			if err != nil {
-				h.logger.Error("error marshaling extend payload", "error", err)
+				l.Error("error marshaling extend payload", "error", err)
 				continue
 			}
 
@@ -211,7 +223,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				Kind:    connectproto.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
 				Payload: extendPayload,
 			}); err != nil {
-				h.logger.Error("error sending extend request", "error", err)
+				l.Error("error sending extend request", "error", err)
 			}
 		}
 	}()
@@ -253,7 +265,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	}
 
 	if err != nil {
-		h.logger.Error("error calling function", "error", err)
+		l.Error("error calling function", "error", err)
 		return &connectproto.SDKResponse{
 			RequestId:      body.RequestId,
 			AccountId:      body.AccountId,

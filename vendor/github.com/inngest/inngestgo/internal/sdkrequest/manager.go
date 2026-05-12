@@ -326,6 +326,8 @@ func (r *requestCtxManager) CallContext() middleware.CallContext {
 		Env:          r.request.CallCtx.Env,
 		RunID:        r.request.CallCtx.RunID,
 		Attempt:      r.request.CallCtx.Attempt,
+		RequestID:    r.request.CallCtx.RequestID,
+		JobID:        r.request.CallCtx.JobID,
 	}
 }
 

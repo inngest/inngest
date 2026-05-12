@@ -789,6 +789,8 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		h.Logger.Error("error decoding function request", "error", err)
 		return fmt.Errorf("%w: %s", errBadRequest, err)
 	}
+	request.CallCtx.RequestID = r.Header.Get(HeaderKeyRequestID)
+	request.CallCtx.JobID = r.Header.Get(HeaderKeyJobID)
 
 	if request.UseAPI {
 		// TODO: implement this
@@ -813,7 +815,14 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("%w: %s", errFunctionMissing, fnID)
 	}
 
-	l := h.Logger.With("fn", fnID, "call_ctx", request.CallCtx)
+	logAttrs := []any{"fn", fnID, "call_ctx", request.CallCtx}
+	if request.CallCtx.RequestID != "" {
+		logAttrs = append(logAttrs, "request_id", request.CallCtx.RequestID)
+	}
+	if request.CallCtx.JobID != "" {
+		logAttrs = append(logAttrs, "job_id", request.CallCtx.JobID)
+	}
+	l := h.Logger.With(logAttrs...)
 	l.Debug("calling function")
 
 	var stepID *string
@@ -1273,6 +1282,8 @@ func invoke(
 		RunID:      input.CallCtx.RunID,
 		StepID:     input.CallCtx.StepID,
 		Attempt:    input.CallCtx.Attempt,
+		RequestID:  input.CallCtx.RequestID,
+		JobID:      input.CallCtx.JobID,
 	}
 	inputVal.FieldByName("InputCtx").Set(reflect.ValueOf(callCtx))
 
