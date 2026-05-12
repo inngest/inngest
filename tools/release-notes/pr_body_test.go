@@ -31,7 +31,8 @@ Old preview.
 
 	got, err := RenderReleasePRBody(ReleasePRBodyInput{
 		Tag:          "v1.2.3",
-		CompareURL:   "https://github.com/inngest/inngest/compare/v1.2.2...main",
+		CompareURL:   "https://github.com/inngest/inngest/compare/v1.2.2...abc1234",
+		CompareLabel: "v1.2.2...abc1234",
 		Base:         "main",
 		Head:         "release/next",
 		LatestTag:    "v1.2.2",
@@ -43,7 +44,7 @@ Old preview.
 	}
 
 	assertContains(t, got, "This PR prepares `v1.2.3`.")
-	assertContains(t, got, "- Code difference since last tag: [v1.2.2...main](https://github.com/inngest/inngest/compare/v1.2.2...main)")
+	assertContains(t, got, "- Code difference since last tag: [v1.2.2...abc1234](https://github.com/inngest/inngest/compare/v1.2.2...abc1234)")
 	assertContains(t, got, "- Previous tag: `v1.2.2`")
 	assertContains(t, got, "Keep this release context.")
 	assertContains(t, got, "Keep this migration context.")
@@ -87,7 +88,8 @@ Manual context.
 	err := run([]string{
 		"pr-body",
 		"--tag", "v1.2.3",
-		"--compare-url", "https://github.com/inngest/inngest/compare/v1.2.2...main",
+		"--compare-url", "https://github.com/inngest/inngest/compare/v1.2.2...abc1234",
+		"--compare-label", "v1.2.2...abc1234",
 		"--preview", previewPath,
 		"--existing-body", existingPath,
 		"--output", outputPath,

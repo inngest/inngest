@@ -51,21 +51,26 @@ jobs:
         id: changes
         run: |
           latest_tag="$(git tag --list 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+          head_sha="$(git rev-parse HEAD)"
+          head_short_sha="$(git rev-parse --short HEAD)"
 
           if [ -n "${latest_tag}" ]; then
             ahead="$(git rev-list --count "${latest_tag}"..HEAD)"
             release_range="${latest_tag}..HEAD"
-            compare_url="${{ github.server_url }}/${{ github.repository }}/compare/${latest_tag}...${{ github.event.repository.default_branch }}"
+            compare_url="${{ github.server_url }}/${{ github.repository }}/compare/${latest_tag}...${head_sha}"
+            compare_label="${latest_tag}...${head_short_sha}"
           else
             ahead="$(git rev-list --count HEAD)"
             release_range="HEAD"
             compare_url=""
+            compare_label=""
           fi
 
           echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
           echo "ahead=${ahead}" >> "$GITHUB_OUTPUT"
           echo "release_range=${release_range}" >> "$GITHUB_OUTPUT"
           echo "compare_url=${compare_url}" >> "$GITHUB_OUTPUT"
+          echo "compare_label=${compare_label}" >> "$GITHUB_OUTPUT"
 
           if [ "${ahead}" -eq 0 ]; then
             echo "No unreleased commits found"
@@ -168,6 +173,7 @@ jobs:
           scripts/release/render-release-pr-body \
             --tag "${{ steps.normalized-version.outputs.tag }}" \
             --compare-url "${{ steps.changes.outputs.compare_url }}" \
+            --compare-label "${{ steps.changes.outputs.compare_label }}" \
             --latest-tag "${{ steps.changes.outputs.latest_tag }}" \
             --base "${{ github.event.repository.default_branch }}" \
             --head "release/next" \
