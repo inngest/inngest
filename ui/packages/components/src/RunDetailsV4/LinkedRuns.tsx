@@ -15,7 +15,7 @@ type Props = {
   invoked: InvokedRun[];
 };
 
-export const LinkedFunctions = ({ runID, defers, deferredFrom, invoked }: Props) => {
+export const LinkedRuns = ({ runID, defers, deferredFrom, invoked }: Props) => {
   const parallelDefers = useMemo(
     () => (deferredFrom?.parentRun?.defers ?? []).filter((d) => d.run?.id !== runID),
     [deferredFrom, runID]
@@ -23,11 +23,11 @@ export const LinkedFunctions = ({ runID, defers, deferredFrom, invoked }: Props)
 
   return (
     <div className="h-full overflow-y-auto">
-      {deferredFrom && <ParentFunctionSection deferredFrom={deferredFrom} />}
+      {deferredFrom && <ParentRunSection deferredFrom={deferredFrom} />}
       {parallelDefers.length > 0 && (
         <DefersSection title="Parallel defers" defers={parallelDefers} />
       )}
-      {defers && defers.length > 0 && <DefersSection title="Deferred functions" defers={defers} />}
+      {defers && defers.length > 0 && <DefersSection title="Deferred runs" defers={defers} />}
       {invoked.length > 0 && <InvokedSection invoked={invoked} />}
     </div>
   );
@@ -61,13 +61,13 @@ const sectionBorder = 'border-muted mb-2 border-b pb-2';
 
 const deferStatus = (defer: RunDeferSummary): string => defer.run?.status ?? defer.status;
 
-const ParentFunctionSection = ({ deferredFrom }: { deferredFrom: RunDeferredFromSummary }) => {
+const ParentRunSection = ({ deferredFrom }: { deferredFrom: RunDeferredFromSummary }) => {
   const { pathCreator } = usePathCreator();
   const parent = deferredFrom.parentRun;
 
   return (
     <div className={sectionBorder}>
-      <SectionHeader title="Parent function" />
+      <SectionHeader title="Parent run" />
       <ColumnHeader
         columns={[
           { label: 'Status', flex: 'w-36 shrink-0' },
@@ -149,7 +149,7 @@ const InvokedSection = ({ invoked }: { invoked: InvokedRun[] }) => {
 
   return (
     <div className={sectionBorder}>
-      <SectionHeader title="Invoked functions" />
+      <SectionHeader title="Invoked runs" />
       <ColumnHeader
         columns={[
           { label: 'Status', flex: 'w-32 shrink-0' },

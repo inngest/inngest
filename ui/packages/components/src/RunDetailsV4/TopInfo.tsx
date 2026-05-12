@@ -24,7 +24,7 @@ import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
-import { LinkedFunctions } from './LinkedFunctions';
+import { LinkedRuns } from './LinkedRuns';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
 import { collectInvokedRuns } from './runDetailsUtils';
@@ -140,7 +140,7 @@ export const TopInfo = ({
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   const invokedRuns = collectInvokedRuns(trace);
-  const hasLinkedFunctions =
+  const hasLinkedRuns =
     Boolean(deferredFrom) || (defers?.length ?? 0) > 0 || invokedRuns.length > 0;
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
@@ -347,13 +347,13 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(hasLinkedFunctions
+            ...(hasLinkedRuns
               ? [
                   {
-                    label: 'Linked functions',
+                    label: 'Linked runs',
                     id: 'linked',
                     node: (
-                      <LinkedFunctions
+                      <LinkedRuns
                         runID={runID}
                         defers={defers}
                         deferredFrom={deferredFrom}
