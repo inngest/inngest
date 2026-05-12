@@ -937,6 +937,47 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 			"fresh install must mint the name-derived id, not adopt anything")
 		require.Equal(t, req.AppName, apps[0].Name)
 	})
+
+	t.Run("archived app row is revived on resync, function UUID survives", func(t *testing.T) {
+		// Customer archives an app via the UI (or any path that flips
+		// archived_at), then re-syncs from the SDK under the same name.
+		// UpsertAppByName must revive the archived row in place: same id,
+		// archived_at cleared, function uuid unchanged.
+		ds := newTestDevServer(t)
+		api := &devapi{devserver: ds}
+
+		// First sync to create the app + a function. The deterministic
+		// candidate id IS the row's id since this is a fresh install.
+		_, err := api.register(ctx, req)
+		require.NoError(t, err)
+
+		appID := inngest.DeterministicAppUUID(req.AppName)
+		funcs, err := ds.Data.GetFunctionsByAppInternalID(ctx, appID)
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		originalFnID := funcs[0].ID
+
+		// Archive the app (simulating the UI archive action).
+		require.NoError(t, ds.Data.DeleteApp(ctx, appID))
+		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Empty(t, apps, "archived row must drop out of the active listing")
+
+		// Resync with the same payload. The archived row should revive.
+		_, err = api.register(ctx, req)
+		require.NoError(t, err, "resync after archive must not collide on PK")
+
+		apps, err = ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Len(t, apps, 1, "revival must reuse the row, not create a parallel one")
+		require.Equal(t, appID, apps[0].ID, "revived row keeps its original id")
+		require.Equal(t, req.AppName, apps[0].Name)
+
+		funcs, err = ds.Data.GetFunctionsByAppInternalID(ctx, appID)
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		require.Equal(t, originalFnID, funcs[0].ID, "function uuid must survive archive + revive")
+	})
 }
 
 func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {

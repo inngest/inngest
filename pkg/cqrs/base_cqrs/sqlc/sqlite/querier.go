@@ -103,11 +103,14 @@ type Querier interface {
 	// For the SDK /fn/register flow, use UpsertAppByName instead - it adopts an
 	// existing active row keyed by name regardless of how its id was minted.
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
-	// For SDK /fn/register: the partial unique index apps_name_active_key on
-	// (name) WHERE archived_at IS NULL AND name <> '' is the conflict target.
-	// The existing row's id is preserved on conflict, so v1.13.x legacy rows
-	// keyed by sha1(URL) are adopted in place when an SDK re-syncs under v1.15+
-	// (which derives ids from name) - no Go-side lookup required.
+	// For SDK /fn/register: the partial unique index apps_name_unique_key on
+	// (name) WHERE name <> '' is the conflict target. The predicate omits
+	// archived_at so a conflicting archived row is found by the arbiter; the
+	// DO UPDATE clears archived_at, so an SDK re-sync under the same name
+	// revives a previously-archived app in place. The existing row's id is
+	// preserved on conflict, so v1.13.x legacy rows keyed by sha1(URL) are
+	// adopted by name when an SDK re-syncs under v1.15+ (which derives ids
+	// from name) - no Go-side lookup required.
 	UpsertAppByName(ctx context.Context, arg UpsertAppByNameParams) (*App, error)
 	//
 	// functions

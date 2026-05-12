@@ -363,10 +363,10 @@ ALTER TABLE ONLY public.worker_connections
     ADD CONSTRAINT worker_connections_pkey PRIMARY KEY (id, app_name);
 
 --
--- Name: apps_name_active_key; Type: INDEX; Schema: public; Owner: -
+-- Name: apps_name_unique_key; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX apps_name_active_key ON public.apps USING btree (name) WHERE ((archived_at IS NULL) AND ((name)::text <> ''::text));
+CREATE UNIQUE INDEX apps_name_unique_key ON public.apps USING btree (name) WHERE ((name)::text <> ''::text);
 
 --
 -- Name: functions_app_id_slug_active_key; Type: INDEX; Schema: public; Owner: -
