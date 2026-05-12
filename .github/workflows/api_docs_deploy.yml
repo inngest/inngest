@@ -33,7 +33,7 @@ jobs:
       # Runs after nix-develop so node 24 takes precedence over nix's node 22.
       - uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6
         with:
-          version: "11.0.8"
+          version: "11.0.9"
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: "24"
