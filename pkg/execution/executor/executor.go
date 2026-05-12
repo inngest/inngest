@@ -1594,6 +1594,10 @@ func (e *executor) backfillDeferChildRunID(ctx context.Context, req execution.Sc
 			l.Error("error decoding deferred schedule metadata", "error", err, "child_run_id", childRunID)
 			continue
 		}
+		if err := deferredMeta.Validate(); err != nil {
+			l.Error("invalid deferred schedule metadata", "error", err, "child_run_id", childRunID)
+			continue
+		}
 		parentRunID, err := ulid.Parse(deferredMeta.ParentRunID)
 		if err != nil {
 			l.Error("invalid parent run id on deferred schedule event", "error", err, "parent_run_id", deferredMeta.ParentRunID)
