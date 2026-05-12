@@ -548,6 +548,18 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
 }
 
+func (e *executor) RunFunctionFinishedLifecycle(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	evts []json.RawMessage,
+	resp state.DriverResponse,
+) {
+	for _, l := range e.lifecycles {
+		go l.OnFunctionFinished(context.WithoutCancel(ctx), md, item, evts, resp)
+	}
+}
+
 func (e *executor) CloseLifecycleListeners(ctx context.Context) {
 	var eg errgroup.Group
 
@@ -1447,6 +1459,10 @@ func (e *executor) schedule(
 		}
 	}
 
+	// If this run was triggered by an invoke, write the invoked run's ID back
+	// onto the invoking function's invoke span so the in-progress trace shows it.
+	e.updateInvokeSpanWithInvokedRunID(ctx, l, req.Events, metadata.ID.RunID)
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -1489,6 +1505,61 @@ func (e *executor) schedule(
 	return &metadata.ID.RunID, &metadata, nil
 }
 
+func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logger.Logger, events []event.TrackedEvent, invokedRunID ulid.ULID) {
+	// We should only have one Invoke event at most, but this technically handles a batch of invoke events
+	if len(events) == 0 || events[0].GetEvent().Name != consts.FnInvokeName {
+		return
+	}
+	for _, trackedEvent := range events {
+		invocationEvtID := trackedEvent.GetInternalID()
+		raw, ok := trackedEvent.GetEvent().Data[consts.InngestEventDataPrefix]
+		if !ok {
+			l.Debug("invocation event missing inngest metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		invocationMeta := event.InngestMetadata{}
+		if err := invocationMeta.Decode(raw); err != nil {
+			l.Debug("failed to decode invocation metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID, "error", err)
+			continue
+		}
+		if invocationMeta.InvokeSpanRef == nil {
+			l.Debug("invocation event missing invoke span ref; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		sourceRunID := invocationMeta.RunID()
+		if sourceRunID == nil {
+			l.Debug("invocation event has unparseable correlation id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "correlation_id", invocationMeta.InvokeCorrelationId)
+			continue
+		}
+		sourceFnID, err := uuid.Parse(invocationMeta.SourceFnID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source fn id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_fn_id", invocationMeta.SourceFnID, "error", err)
+			continue
+		}
+		sourceAppID, err := uuid.Parse(invocationMeta.SourceAppID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source app id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_app_id", invocationMeta.SourceAppID, "error", err)
+			continue
+		}
+		sourceAccountID := trackedEvent.GetAccountID()
+		sourceEnvID := trackedEvent.GetWorkspaceID()
+		if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.Schedule.invokeRunID"},
+			TargetSpan: invocationMeta.InvokeSpanRef,
+			Attributes: meta.NewAttrSet(
+				meta.Attr(meta.Attrs.StepInvokeRunID, &invokedRunID),
+				meta.Attr(meta.Attrs.RunID, sourceRunID),
+				meta.Attr(meta.Attrs.AccountID, &sourceAccountID),
+				meta.Attr(meta.Attrs.EnvID, &sourceEnvID),
+				meta.Attr(meta.Attrs.FunctionID, &sourceFnID),
+				meta.Attr(meta.Attrs.AppID, &sourceAppID),
+			),
+		}); err != nil {
+			l.Debug("error updating invoke span with invoked runID", "error", err)
+		}
+	}
+}
+
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
 	for _, e := range e.lifecycles {
 		service.Go(
@@ -1521,17 +1592,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
+	requestID := ulid.MustNew(ulid.Timestamp(e.now()), rand.Reader).String()
+	jobID := queue.JobIDFromContext(ctx)
+	if item.JobID != nil {
+		jobID = *item.JobID
+	}
+	ctx = driver.WithRequestIDs(ctx, requestID, jobID)
+
 	l := e.log.With(
 		"account_id", item.Identifier.AccountID,
 		"env_id", item.WorkspaceID,
 		"app_id", item.Identifier.AppID,
 		"fn_id", item.Identifier.WorkflowID,
 		"run_id", id.RunID,
+		"request_id", requestID,
+		"job_id", jobID,
 	)
 	ctx = logger.WithStdlib(ctx, l)
 
 	conditionalSpan.SetAttributes(attribute.String("run_id", id.RunID.String()))
 	conditionalSpan.SetAttributes(attribute.String("event_id", id.EventID.String()))
+	conditionalSpan.SetAttributes(attribute.String("request_id", requestID))
+	conditionalSpan.SetAttributes(attribute.String("job_id", jobID))
 
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
@@ -1758,6 +1840,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		item:       item,
 		edge:       edge,
 		stackIndex: stackIndex,
+		requestID:  requestID,
+		jobID:      jobID,
 		httpClient: e.httpClient,
 		parentSpan: parentRef,
 		c:          e.clock,
@@ -1765,6 +1849,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	// This span will be updated with output as soon as execution finishes.
+	execAttrs := tracing.FunctionAttrs(&instance.f)
+	meta.AddAttr(execAttrs, meta.Attrs.RequestID, &instance.requestID)
+	meta.AddAttr(execAttrs, meta.Attrs.JobID, &instance.jobID)
+
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,
 		meta.SpanNameExecution,
@@ -1773,7 +1861,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Parent:     parentRef,
 			Metadata:   &md,
 			QueueItem:  &item,
-			Attributes: tracing.FunctionAttrs(&instance.f),
+			Attributes: execAttrs,
 			StartTime:  e.now(),
 		},
 	)
@@ -1799,12 +1887,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
+		responseAttrs := tracing.DriverResponseAttrs(resp, nil)
+		meta.AddAttr(responseAttrs, meta.Attrs.RequestID, &instance.requestID)
+		meta.AddAttr(responseAttrs, meta.Attrs.JobID, &instance.jobID)
+
 		updateOpts := &tracing.UpdateSpanOptions{
 			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
 			Metadata:   &md,
 			QueueItem:  &item,
 			TargetSpan: instance.execSpan,
-			Attributes: tracing.DriverResponseAttrs(resp, nil),
+			Attributes: responseAttrs,
 		}
 
 		// For most executions, we now set the status of the execution span.
@@ -2247,6 +2339,8 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		Index:      run.stackIndex,
 		StepID:     &stepID,
 		QueueRef:   queueref.StringFromCtx(ctx),
+		RequestID:  run.requestID,
+		JobID:      run.jobID,
 		URL:        url,
 	})
 
@@ -4905,6 +4999,13 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	if span != nil {
 		_ = span.Send()
+	}
+
+	// Attach the v2 invoke span ref to the invocation event so the invoked
+	// function's Schedule can call UpdateSpan to write its runID onto this
+	// invoke span while the invoke is still in progress.
+	if span != nil && span.Ref != nil {
+		evt.Event.SetInvokeSpanRef(span.Ref)
 	}
 
 	// Send the event.

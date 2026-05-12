@@ -23,6 +23,12 @@ const (
 
 	HeaderKeySignature = "X-Inngest-Signature"
 
+	// HeaderKeyRequestID is the per-outbound SDK request identifier.
+	HeaderKeyRequestID = "x-request-id"
+
+	// HeaderKeyJobID is the stable queue item identifier for the current job.
+	HeaderKeyJobID = "x-inngest-job-id"
+
 	// HeaderRequestVersion represents the request version header.
 	// XXX: This is exctracted from httpdriver and needs documenting.
 	HeaderKeyRequestVersion = "x-inngest-req-version"

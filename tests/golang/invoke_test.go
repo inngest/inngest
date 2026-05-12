@@ -438,3 +438,100 @@ func TestInvokeRateLimit(t *testing.T) {
 	secondRunID := secondRID.Wait(t)
 	c.WaitForRunStatus(ctx, t, "FAILED", secondRunID)
 }
+
+func TestInvokeInProgressRunID(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
+
+	appID := "InvokeInProgressRunID-" + ulid.MustNew(ulid.Now(), nil).String()
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
+
+	mainRID := NewRunID()
+	invokedRID := NewRunID()
+
+	// Invoked function: capture its runID, then sleep long enough that we can
+	// observe the invoking function mid-flight.
+	invokedFnName := "invoked-fn"
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:      invokedFnName,
+			Retries: inngestgo.IntPtr(0),
+		},
+		inngestgo.EventTrigger("none", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			invokedRID.Send(input.InputCtx.RunID)
+			step.Sleep(ctx, "hold", 20*time.Second)
+			return "invoked!", nil
+		},
+	)
+	r.NoError(err)
+
+	evtName := "invoke-in-progress"
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:      "main-fn",
+			Retries: inngestgo.IntPtr(0),
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			mainRID.Send(input.InputCtx.RunID)
+			_, err := step.Invoke[any](
+				ctx,
+				"invoke",
+				step.InvokeOpts{FunctionId: appID + "-" + invokedFnName},
+			)
+			return nil, err
+		},
+	)
+	r.NoError(err)
+	registerFuncs()
+
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+
+	// Both runs must have started before we query mid-flight.
+	mainRunID := mainRID.Wait(t)
+	invokedRunID := invokedRID.Wait(t)
+
+	// Poll the v2 trace until the invoke step span has the invoked runID.
+	var observedRunID string
+	invokeOp := models.StepOpInvoke.String()
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		run, err := c.RunTraces(ctx, mainRunID, true)
+		require.NoError(ct, err)
+		require.NotNil(ct, run)
+		require.NotNil(ct, run.Trace)
+		require.Equal(ct, models.FunctionStatusRunning.String(), run.Status,
+			"main fn finished before we could observe the in-progress invoke")
+
+		var invokeStepInfo any
+		var invokeStatus string
+		found := false
+		for i := range run.Trace.ChildSpans {
+			s := &run.Trace.ChildSpans[i]
+			if s.StepOp == invokeOp {
+				invokeStepInfo = s.StepInfo
+				invokeStatus = s.Status
+				found = true
+				break
+			}
+		}
+		require.True(ct, found, "invoke step span not yet present in trace")
+		require.Equal(ct, models.RunTraceSpanStatusRunning.String(), invokeStatus,
+			"invoke span must still be running")
+
+		var stepInfo models.InvokeStepInfo
+		byt, err := json.Marshal(invokeStepInfo)
+		require.NoError(ct, err)
+		require.NoError(ct, json.Unmarshal(byt, &stepInfo))
+		require.NotNil(ct, stepInfo.RunID, "InvokeStepInfo.RunID must be populated while invoke is in-progress")
+		observedRunID = stepInfo.RunID.String()
+	}, 15*time.Second, 500*time.Millisecond)
+
+	r.Equal(invokedRunID, observedRunID,
+		"InvokeStepInfo.RunID must match the invoked function's runID")
+}

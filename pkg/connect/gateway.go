@@ -60,6 +60,14 @@ func isConnectionClosedErr(err error) bool {
 	return errors.As(err, &closeErr)
 }
 
+func isWebSocketReadLimitErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(err.Error(), "read limited at")
+}
+
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *connecterrors.SocketError) {
 	// reason must be limited to 125 bytes and should not be dynamic,
 	// so we restrict it to the known syscodes to prevent unintentional overflows
@@ -615,8 +623,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					// Unfortunately, the websocket library does not expose a proper error when the size limit is reached,
 					// so we have to check the error message instead. This should rarely happen.
-					if strings.HasPrefix(err.Error(), "read limited at") {
+					if isWebSocketReadLimitErr(err) {
 						setCloseReason(connectpb.WorkerDisconnectReason_MESSAGE_TOO_LARGE.String())
+						ch.log.Warn("worker WebSocket message exceeded read limit", "max_bytes", consts.MaxSDKResponseBodySize, "err", err)
 						return nil
 					}
 
@@ -1582,12 +1591,12 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		switch {
 		case err == nil:
 			if _, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data}); err != nil {
-				return fmt.Errorf("could not send response through grpc: %w", err)
+				l.Warn("could not fast-track response through grpc, executor will poll buffered response", "err", err)
 			}
 		case errors.Is(err, state.ErrExecutorNotFound):
 			l.Debug("executor not found in lease, reply was likely picked up by polling")
 		default:
-			return err
+			l.Warn("could not create grpc client for sdk reply, executor will poll buffered response", "err", err)
 		}
 	}
 
@@ -1604,7 +1613,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		Kind:    connectpb.GatewayMessageType_WORKER_REPLY_ACK,
 		Payload: replyAck,
 	}); err != nil {
-		return fmt.Errorf("could not send reply ack: %w", err)
+		l.Warn("could not send worker reply ack after response was buffered", "err", err)
 	}
 
 	return nil

@@ -31,6 +31,14 @@ import (
 const (
 	GatewayInstrumentInterval = 20 * time.Second
 	GatewayGCInterval         = 30 * time.Minute
+
+	// DefaultGatewayPort is the default HTTP port the connect gateway binds to.
+	DefaultGatewayPort = 8289
+
+	// ReadyPath is the URL path of the gateway's readiness endpoint. Exported
+	// so callers (notably cmd/doctor/healthcheck) can probe the same path the
+	// gateway registers without the two drifting apart.
+	ReadyPath = "/ready"
 )
 
 // WorkerStatusIntervalFunc returns the status reporting interval for a given
@@ -282,11 +290,11 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		r.Mount("/v0", v0Router)
 
 		// Readiness must be served to traffic port for load balancer health checks
-		r.Get("/ready", readinessHandler)
+		r.Get(ReadyPath, readinessHandler)
 	})
 
 	gateway.maintenanceApi = newMaintenanceApi(gateway)
-	gateway.maintenanceApi.Get("/ready", readinessHandler)
+	gateway.maintenanceApi.Get(ReadyPath, readinessHandler)
 
 	// Optionally mount maintenance API on the gateway public routes
 	if os.Getenv("INTERNAL_CONNECT_MAINTENANCE") == "1" {

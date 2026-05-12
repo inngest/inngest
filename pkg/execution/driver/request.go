@@ -1,11 +1,36 @@
 package driver
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 )
+
+type sdkRequestIDCtxKey struct{}
+
+type sdkJobIDCtxKey struct{}
+
+// WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
+// driver calls.
+func WithRequestIDs(ctx context.Context, requestID, jobID string) context.Context {
+	ctx = context.WithValue(ctx, sdkRequestIDCtxKey{}, requestID)
+	ctx = context.WithValue(ctx, sdkJobIDCtxKey{}, jobID)
+	return ctx
+}
+
+// RequestIDFromContext returns the per-outbound SDK request ID.
+func RequestIDFromContext(ctx context.Context) string {
+	id, _ := ctx.Value(sdkRequestIDCtxKey{}).(string)
+	return id
+}
+
+// JobIDFromContext returns the stable queue item ID for this SDK request.
+func JobIDFromContext(ctx context.Context) string {
+	id, _ := ctx.Value(sdkJobIDCtxKey{}).(string)
+	return id
+}
 
 type SDKRequest struct {
 	Event   map[string]any   `json:"event"`
@@ -67,6 +92,12 @@ type SDKRequestContext struct {
 	// QueueItemID is the ID of the queue item and shard, used when checkpointing
 	// async functions so that the API knows which queue item to reset.
 	QueueItemRef string `json:"qi_id"`
+
+	// RequestID is a unique ID generated for each outbound SDK request.
+	RequestID string `json:"request_id,omitempty"`
+
+	// JobID is the stable queue item ID for the current job.
+	JobID string `json:"job_id,omitempty"`
 
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.

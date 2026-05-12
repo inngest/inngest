@@ -14,6 +14,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"sync/atomic"
 	"time"
 )
 
@@ -111,6 +112,8 @@ type connection struct {
 
 	heartbeatInterval   time.Duration
 	extendLeaseInterval time.Duration
+
+	retired atomic.Bool
 }
 
 func (c *connection) logAttrs() []any {
@@ -119,6 +122,14 @@ func (c *connection) logAttrs() []any {
 		"gateway_group", c.gatewayGroupName,
 		"gateway_endpoint", c.gatewayEndpoint,
 	}
+}
+
+func (c *connection) retire() {
+	c.retired.Store(true)
+}
+
+func (c *connection) isRetired() bool {
+	return c.retired.Load()
 }
 
 func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData, excludeGateways []string) (*connection, error) {
@@ -361,12 +372,14 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			}
 
 			// Send a proper close frame
+			preparedConn.retire()
 			_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 
 			return errGatewayDraining
 		}
 
 		l.Debug("read loop ended with error", "err", err)
+		preparedConn.retire()
 
 		// In case the gateway intentionally closed the connection, we'll receive a close error
 		cerr := websocket.CloseError{}
@@ -412,6 +425,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	h.workerPool.Wait()
 
 	// Attempt to shut down connection if not already done
+	preparedConn.retire()
 	_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 
 	// Attempt to flush leftover messages before closing
@@ -429,7 +443,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 func (h *connectHandler) handleMessageReplyAck(msg *connectproto.ConnectMessage) error {
 	var payload connectproto.WorkerReplyAckData
-	if err := proto.Unmarshal(msg.Payload, msg); err != nil {
+	if err := proto.Unmarshal(msg.Payload, &payload); err != nil {
 		return fmt.Errorf("could not unmarshal reply ack data: %w", err)
 	}
 

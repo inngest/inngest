@@ -95,6 +95,8 @@ message GatewayExecutorRequestData {
 	string run_id = 12;
 
 	string lease_id = 13;
+
+	string job_id = 14;
 }
 
 message WorkerRequestAckData {

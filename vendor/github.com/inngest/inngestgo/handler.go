@@ -289,14 +289,15 @@ func (h *handler) GetFunctions() []ServableFunction {
 }
 
 func (h *handler) SetOptions(opts handlerOpts) *handler {
-	h.handlerOpts = opts
-
 	if opts.MaxBodySize == 0 {
 		opts.MaxBodySize = DefaultMaxBodySize
 	}
 	if opts.Logger == nil {
 		opts.Logger = logger.Default()
 	}
+
+	opts.Logger = opts.Logger.With("mode", "serve")
+	h.handlerOpts = opts
 
 	return h
 }

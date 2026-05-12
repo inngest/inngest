@@ -72,8 +72,8 @@ func TestRunTraceEnded(t *testing.T) {
 	}
 }
 
-func boolPtr(b bool) *bool     { return &b }
-func strPtr(s string) *string  { return &s }
+func boolPtr(b bool) *bool    { return &b }
+func strPtr(s string) *string { return &s }
 
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 	tr := &traceReader{}
@@ -163,6 +163,131 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 		require.Len(t, result.ChildrenSpans[0].ChildrenSpans, 1, "should preserve children")
 		assert.Equal(t, "child-span", result.ChildrenSpans[0].ChildrenSpans[0].Name)
 	})
+}
+
+func TestConvertRunSpan(t *testing.T) {
+	status := enums.StepStatusCompleted
+	queuedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+
+	result, err := ConvertRunSpan(context.Background(), &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name:      meta.SpanNameRun,
+			SpanID:    "run-span",
+			TraceID:   "trace-id",
+			StartTime: queuedAt,
+			EndTime:   queuedAt.Add(time.Second),
+		},
+		Attributes: &meta.ExtractedValues{
+			DynamicStatus: &status,
+			QueuedAt:      &queuedAt,
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "run-span", result.SpanID)
+	require.Equal(t, models.RunTraceSpanStatusCompleted, result.Status)
+}
+
+func TestConvertRunSpanToGQL_DroppedDiscoveryExecutionDoesNotCreateSleepAttempts(t *testing.T) {
+	tr := &traceReader{}
+	ctx := context.Background()
+
+	status := enums.StepStatusCompleted
+	stepOp := enums.OpcodeSleep
+	sleepDuration := time.Second
+	queuedAt := time.Date(2026, 5, 8, 15, 34, 39, 0, time.UTC)
+	endedAt := queuedAt.Add(sleepDuration)
+	stepID := "b101b7cef051778f3c4378e92fad02d5f90a527d"
+	stepName := "wait-a-moment"
+
+	result, err := tr.convertRunSpanToGQL(ctx, &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name:      meta.SpanNameRun,
+			SpanID:    "run",
+			TraceID:   "trace",
+			StartTime: queuedAt,
+			EndTime:   endedAt,
+		},
+		Attributes: &meta.ExtractedValues{
+			DynamicStatus: &status,
+			QueuedAt:      &queuedAt,
+			StartedAt:     &queuedAt,
+			EndedAt:       &endedAt,
+		},
+		Children: []*cqrs.OtelSpan{
+			{
+				RawOtelSpan: cqrs.RawOtelSpan{
+					Name:      meta.SpanNameStepDiscovery,
+					SpanID:    "discovery",
+					TraceID:   "trace",
+					StartTime: queuedAt,
+					EndTime:   endedAt,
+				},
+				Attributes: &meta.ExtractedValues{
+					QueuedAt:  &queuedAt,
+					StartedAt: &queuedAt,
+					EndedAt:   &endedAt,
+				},
+				Children: []*cqrs.OtelSpan{
+					{
+						RawOtelSpan: cqrs.RawOtelSpan{
+							Name:      meta.SpanNameExecution,
+							SpanID:    "discovery-execution",
+							TraceID:   "trace",
+							StartTime: queuedAt,
+							EndTime:   queuedAt,
+						},
+						Attributes: &meta.ExtractedValues{
+							DynamicStatus:     &status,
+							StepOp:            &stepOp,
+							StepID:            &stepID,
+							StepName:          &stepName,
+							StepSleepDuration: &sleepDuration,
+							QueuedAt:          &queuedAt,
+							StartedAt:         &queuedAt,
+							EndedAt:           &queuedAt,
+						},
+						MarkedAsDropped: true,
+					},
+					{
+						RawOtelSpan: cqrs.RawOtelSpan{
+							Name:      meta.SpanNameStep,
+							SpanID:    "sleep",
+							TraceID:   "trace",
+							StartTime: queuedAt,
+							EndTime:   endedAt,
+						},
+						Attributes: &meta.ExtractedValues{
+							DynamicStatus:     &status,
+							StepOp:            &stepOp,
+							StepID:            &stepID,
+							StepName:          &stepName,
+							StepSleepDuration: &sleepDuration,
+							QueuedAt:          &queuedAt,
+							StartedAt:         &queuedAt,
+							EndedAt:           &endedAt,
+						},
+					},
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.ChildrenSpans, 1)
+
+	sleep := result.ChildrenSpans[0]
+	assert.Equal(t, stepName, sleep.Name)
+	assert.Equal(t, models.RunTraceSpanStatusCompleted, sleep.Status)
+	assert.Empty(t, sleep.ChildrenSpans)
+	require.NotNil(t, sleep.StepOp)
+	assert.Equal(t, models.StepOpSleep, *sleep.StepOp)
+	require.NotNil(t, sleep.StepID)
+	assert.Equal(t, stepID, *sleep.StepID)
+
+	info, ok := sleep.StepInfo.(*models.SleepStepInfo)
+	require.True(t, ok)
+	assert.Equal(t, endedAt, info.SleepUntil)
 }
 
 func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
