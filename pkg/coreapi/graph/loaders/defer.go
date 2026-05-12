@@ -2,7 +2,6 @@ package loader
 
 import (
 	"context"
-	"sync"
 
 	"github.com/graph-gophers/dataloader"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -13,49 +12,58 @@ type deferReader struct {
 	reader cqrs.HistoryReader
 }
 
-// loadByRunID provides request-scoped memoization and per-key concurrency,
-// not batched SQL: the underlying CQRS reads are per-run.
-func (dr *deferReader) loadByRunID(
-	ctx context.Context,
-	keys dataloader.Keys,
-	fetch func(context.Context, ulid.ULID) (any, error),
-) []*dataloader.Result {
-	results := make([]*dataloader.Result, len(keys))
-	var wg sync.WaitGroup
-
-	for i, key := range keys {
-		results[i] = &dataloader.Result{}
-
-		wg.Add(1)
-		go func(ctx context.Context, res *dataloader.Result, key dataloader.Key) {
-			defer wg.Done()
-
-			runID, err := ulid.Parse(key.String())
-			if err != nil {
-				res.Error = err
-				return
-			}
-			data, err := fetch(ctx, runID)
-			if err != nil {
-				res.Error = err
-				return
-			}
-			res.Data = data
-		}(ctx, results[i], key)
+func parseRunIDKeys(keys dataloader.Keys) []ulid.ULID {
+	runIDs := make([]ulid.ULID, 0, len(keys))
+	for _, key := range keys.Keys() {
+		runID, err := ulid.Parse(key)
+		if err != nil {
+			continue
+		}
+		runIDs = append(runIDs, runID)
 	}
-
-	wg.Wait()
-	return results
+	return runIDs
 }
 
 func (dr *deferReader) GetRunDefers(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
-	return dr.loadByRunID(ctx, keys, func(ctx context.Context, runID ulid.ULID) (any, error) {
-		return dr.reader.GetRunDefers(ctx, runID)
-	})
+	results := make([]*dataloader.Result, len(keys))
+
+	defersByRun, err := dr.reader.GetRunDefers(ctx, parseRunIDKeys(keys))
+	if err != nil {
+		for i := range results {
+			results[i] = &dataloader.Result{Error: err}
+		}
+		return results
+	}
+
+	for i, key := range keys.Keys() {
+		runID, err := ulid.Parse(key)
+		if err != nil {
+			results[i] = &dataloader.Result{Error: err}
+			continue
+		}
+		results[i] = &dataloader.Result{Data: defersByRun[runID]}
+	}
+	return results
 }
 
 func (dr *deferReader) GetRunDeferredFrom(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
-	return dr.loadByRunID(ctx, keys, func(ctx context.Context, runID ulid.ULID) (any, error) {
-		return dr.reader.GetRunDeferredFrom(ctx, runID)
-	})
+	results := make([]*dataloader.Result, len(keys))
+
+	linksByChild, err := dr.reader.GetRunDeferredFrom(ctx, parseRunIDKeys(keys))
+	if err != nil {
+		for i := range results {
+			results[i] = &dataloader.Result{Error: err}
+		}
+		return results
+	}
+
+	for i, key := range keys.Keys() {
+		runID, err := ulid.Parse(key)
+		if err != nil {
+			results[i] = &dataloader.Result{Error: err}
+			continue
+		}
+		results[i] = &dataloader.Result{Data: linksByChild[runID]}
+	}
+	return results
 }

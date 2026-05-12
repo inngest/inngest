@@ -68,8 +68,8 @@ type Querier interface {
 	// Run defers
 	InsertRunDefer(ctx context.Context, arg InsertRunDeferParams) error
 	UpdateRunDeferChildRunID(ctx context.Context, arg UpdateRunDeferChildRunIDParams) error
-	GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*RunDeferRow, error)
-	GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*RunDeferRow, error)
+	GetRunDefersByParentRunIDs(ctx context.Context, parentRunIDs []ulid.ULID) ([]*RunDeferRow, error)
+	GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*RunDeferRow, error)
 
 	// Queue Snapshots
 	InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error

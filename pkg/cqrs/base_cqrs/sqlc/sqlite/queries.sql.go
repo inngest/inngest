@@ -1197,36 +1197,71 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 	return items, nil
 }
 
-const getRunDeferredFromByChildRun = `-- name: GetRunDeferredFromByChildRun :one
+const getRunDeferredFromByChildRunIDs = `-- name: GetRunDeferredFromByChildRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE child_run_id = ?
-LIMIT 1
+WHERE child_run_id IN (/*SLICE:child_run_ids*/?)
 `
 
-func (q *Queries) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*RunDefer, error) {
-	row := q.db.QueryRowContext(ctx, getRunDeferredFromByChildRun, childRunID)
-	var i RunDefer
-	err := row.Scan(
-		&i.ParentRunID,
-		&i.DeferID,
-		&i.UserDeferID,
-		&i.FnSlug,
-		&i.Status,
-		&i.ChildRunID,
-	)
-	return &i, err
+func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []ulid.ULID) ([]*RunDefer, error) {
+	query := getRunDeferredFromByChildRunIDs
+	var queryParams []interface{}
+	if len(childRunIds) > 0 {
+		for _, v := range childRunIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:child_run_ids*/?", strings.Repeat(",?", len(childRunIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:child_run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*RunDefer
+	for rows.Next() {
+		var i RunDefer
+		if err := rows.Scan(
+			&i.ParentRunID,
+			&i.DeferID,
+			&i.UserDeferID,
+			&i.FnSlug,
+			&i.Status,
+			&i.ChildRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-const getRunDefersByParentRun = `-- name: GetRunDefersByParentRun :many
+const getRunDefersByParentRunIDs = `-- name: GetRunDefersByParentRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE parent_run_id = ?
+WHERE parent_run_id IN (/*SLICE:parent_run_ids*/?)
 ORDER BY defer_id ASC
 `
 
-func (q *Queries) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*RunDefer, error) {
-	rows, err := q.db.QueryContext(ctx, getRunDefersByParentRun, parentRunID)
+func (q *Queries) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIds []ulid.ULID) ([]*RunDefer, error) {
+	query := getRunDefersByParentRunIDs
+	var queryParams []interface{}
+	if len(parentRunIds) > 0 {
+		for _, v := range parentRunIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:parent_run_ids*/?", strings.Repeat(",?", len(parentRunIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:parent_run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -1728,14 +1763,14 @@ const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id IN (/*SLICE:run_ids*/?)
 `
 
-func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*TraceRun, error) {
+func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*TraceRun, error) {
 	query := getTraceRunsByRunIDs
 	var queryParams []interface{}
-	if len(runIDs) > 0 {
-		for _, v := range runIDs {
+	if len(runIds) > 0 {
+		for _, v := range runIds {
 			queryParams = append(queryParams, v)
 		}
-		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(runIDs))[1:], 1)
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(runIds))[1:], 1)
 	} else {
 		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
 	}

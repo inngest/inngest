@@ -468,20 +468,34 @@ func (pq *pgQuerier) UpdateRunDeferChildRunID(ctx context.Context, arg db.Update
 	})
 }
 
-func (pq *pgQuerier) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*db.RunDeferRow, error) {
-	rows, err := pq.q.GetRunDefersByParentRun(ctx, parentRunID)
+func (pq *pgQuerier) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIDs []ulid.ULID) ([]*db.RunDeferRow, error) {
+	if len(parentRunIDs) == 0 {
+		return nil, nil
+	}
+	strIDs := make([]string, len(parentRunIDs))
+	for i, id := range parentRunIDs {
+		strIDs[i] = id.String()
+	}
+	rows, err := pq.q.GetRunDefersByParentRunIDs(ctx, strIDs)
 	if err != nil {
 		return nil, err
 	}
 	return convertSlice(rows, runDeferFromPG), nil
 }
 
-func (pq *pgQuerier) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*db.RunDeferRow, error) {
-	r, err := pq.q.GetRunDeferredFromByChildRun(ctx, childRunID)
+func (pq *pgQuerier) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*db.RunDeferRow, error) {
+	if len(childRunIDs) == 0 {
+		return nil, nil
+	}
+	strIDs := make([]string, len(childRunIDs))
+	for i, id := range childRunIDs {
+		strIDs[i] = id.String()
+	}
+	rows, err := pq.q.GetRunDeferredFromByChildRunIDs(ctx, strIDs)
 	if err != nil {
 		return nil, err
 	}
-	return runDeferFromPG(r), nil
+	return convertSlice(rows, runDeferFromPG), nil
 }
 
 func runDeferFromPG(r *sqlc.RunDefer) *db.RunDeferRow {

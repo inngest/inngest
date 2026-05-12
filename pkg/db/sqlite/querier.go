@@ -391,20 +391,20 @@ func (sq *sqliteQuerier) UpdateRunDeferChildRunID(ctx context.Context, arg db.Up
 	})
 }
 
-func (sq *sqliteQuerier) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*db.RunDeferRow, error) {
-	rows, err := sq.q.GetRunDefersByParentRun(ctx, parentRunID)
+func (sq *sqliteQuerier) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIDs []ulid.ULID) ([]*db.RunDeferRow, error) {
+	rows, err := sq.q.GetRunDefersByParentRunIDs(ctx, parentRunIDs)
 	if err != nil {
 		return nil, err
 	}
 	return convertSlice(rows, runDeferFromSQLite), nil
 }
 
-func (sq *sqliteQuerier) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*db.RunDeferRow, error) {
-	r, err := sq.q.GetRunDeferredFromByChildRun(ctx, childRunID)
+func (sq *sqliteQuerier) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*db.RunDeferRow, error) {
+	rows, err := sq.q.GetRunDeferredFromByChildRunIDs(ctx, childRunIDs)
 	if err != nil {
 		return nil, err
 	}
-	return runDeferFromSQLite(r), nil
+	return convertSlice(rows, runDeferFromSQLite), nil
 }
 
 func runDeferFromSQLite(r *sqlc.RunDefer) *db.RunDeferRow {

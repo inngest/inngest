@@ -663,14 +663,13 @@ UPDATE run_defers
 SET child_run_id = $1
 WHERE parent_run_id = $2 AND defer_id = $3;
 
--- name: GetRunDefersByParentRun :many
+-- name: GetRunDefersByParentRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE parent_run_id = $1
+WHERE parent_run_id IN (SELECT UNNEST(sqlc.slice('parent_run_ids')::CHAR(26)[]))
 ORDER BY defer_id ASC;
 
--- name: GetRunDeferredFromByChildRun :one
+-- name: GetRunDeferredFromByChildRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE child_run_id = $1
-LIMIT 1;
+WHERE child_run_id IN (SELECT UNNEST(sqlc.slice('child_run_ids')::CHAR(26)[]));
