@@ -23,6 +23,7 @@ export type Trace = {
 export type SpanMetadataKind =
   | `inngest.http`
   | `inngest.ai`
+  | `inngest.score`
   | `inngest.warnings`
   | SpanMetadataKindUserland;
 
@@ -33,6 +34,7 @@ export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trac
 export type SpanMetadata =
   | SpanMetadataInngestAI
   | SpanMetadataInngestHTTP
+  | SpanMetadataInngestScore
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
   | SpanMetadataUnknown;
@@ -71,6 +73,13 @@ export type SpanMetadataInngestWarnings = {
   kind: 'inngest.warnings';
   updatedAt: string;
   values: Record<string, string>;
+};
+
+export type SpanMetadataInngestScore = {
+  scope: SpanMetadataScope;
+  kind: 'inngest.score';
+  updatedAt: string;
+  values: Record<string, number>;
 };
 
 export type SpanMetadataUserland = {

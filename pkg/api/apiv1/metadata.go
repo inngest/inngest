@@ -81,13 +81,6 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, md := range data.Metadata {
-		if err := md.Validate(); err != nil {
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid metadata"))
-			return
-		}
-	}
-
 	err = a.AddRunMetadata(ctx, auth, runID, &data)
 	switch {
 	case errors.Is(err, metadata.ErrMetadataSpanTooLarge):
@@ -175,7 +168,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	for _, md := range req.Metadata {
-		if err := md.Validate(); err != nil {
+		if err := md.ValidateAllowedForScope(scope); err != nil {
 			return publicerr.Wrap(err, 400, "Invalid metadata")
 		}
 

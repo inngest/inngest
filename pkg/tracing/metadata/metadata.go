@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
+	"regexp"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/enums"
@@ -15,7 +17,12 @@ import (
 var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
+	ErrScoreNameInvalid        = errors.New("score name is invalid")
+	ErrScoreScopeInvalid       = errors.New("score metadata must target step scope")
+	ErrScoreValueInvalid       = errors.New("score value must be a finite number")
 )
+
+var scoreNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,63}$`)
 
 type Opcode = enums.MetadataOpcode
 
@@ -140,6 +147,56 @@ func (m Update) Serialize() (Values, error) {
 func (m Update) Validate() error {
 	if err := m.RawUpdate.Kind.Validate(); err != nil {
 		return fmt.Errorf("invalid kind: %w", err)
+	}
+
+	return nil
+}
+
+func (m Update) ValidateAllowed() error {
+	if err := m.Validate(); err != nil {
+		return err
+	}
+
+	if err := m.Kind().ValidateAllowed(); err != nil {
+		return err
+	}
+
+	if m.Kind() == "inngest.score" {
+		return validateScoreValues(m.RawUpdate.Values)
+	}
+
+	return nil
+}
+
+func (m Update) ValidateAllowedForScope(scope Scope) error {
+	if err := m.ValidateAllowed(); err != nil {
+		return err
+	}
+
+	if m.Kind() == "inngest.score" && scope != enums.MetadataScopeStep {
+		return fmt.Errorf("invalid score scope %q: %w", scope, ErrScoreScopeInvalid)
+	}
+
+	return nil
+}
+
+func (m ScopedUpdate) ValidateAllowed() error {
+	return m.Update.ValidateAllowedForScope(m.Scope)
+}
+
+func validateScoreValues(values Values) error {
+	for name, raw := range values {
+		if !scoreNameRegex.MatchString(name) {
+			return fmt.Errorf("invalid score name %q: %w", name, ErrScoreNameInvalid)
+		}
+
+		var value float64
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
+		}
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
+		}
 	}
 
 	return nil

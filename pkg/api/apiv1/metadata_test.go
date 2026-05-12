@@ -27,6 +27,10 @@ func (r metadataFallbackTraceReader) GetRunSpanByRunID(context.Context, ulid.ULI
 	return r.span, nil
 }
 
+func (r metadataFallbackTraceReader) GetLatestExecutionSpanByStepID(context.Context, ulid.ULID, string, uuid.UUID, uuid.UUID) (*cqrs.OtelSpan, error) {
+	return r.span, nil
+}
+
 type metadataFallbackTracerProvider struct {
 	t      *testing.T
 	wantID statev2.ID
@@ -95,4 +99,133 @@ func TestAddRunMetadataFallbackInitializesStateMetadata(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
+}
+
+func TestAddRunMetadataAllowsScoreMetadata(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := ulid.Make()
+	functionID := uuid.New()
+	appID := uuid.New()
+	stepID := "score-step"
+	wantID := statev2.ID{
+		RunID:      runID,
+		FunctionID: functionID,
+		Tenant: statev2.Tenant{
+			AppID:     appID,
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
+	}
+
+	tp := &metadataFallbackTracerProvider{t: t, wantID: wantID}
+	r := router{API: &API{opts: Opts{
+		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{
+				TraceID: "00000000000000000000000000000001",
+				SpanID:  "0000000000000001",
+			},
+			RunID:      runID,
+			FunctionID: functionID,
+			AppID:      appID,
+		}},
+		TracerProvider: tp,
+	}}}
+
+	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+		Target: RunMetadataTarget{StepID: &stepID},
+		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+			Kind:   "inngest.score",
+			Op:     enums.MetadataOpcodeMerge,
+			Values: metadata.Values{"accuracy": json.RawMessage(`1`)},
+		}}},
+	})
+	require.NoError(t, err)
+	require.True(t, tp.called)
+}
+
+func TestAddRunMetadataRejectsInvalidScoreMetadata(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := ulid.Make()
+	r := router{API: &API{opts: Opts{
+		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{
+				TraceID: "00000000000000000000000000000001",
+				SpanID:  "0000000000000001",
+			},
+			RunID:      runID,
+			FunctionID: uuid.New(),
+			AppID:      uuid.New(),
+		}},
+	}}}
+
+	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+			Kind:   "inngest.score",
+			Op:     enums.MetadataOpcodeMerge,
+			Values: metadata.Values{"score": json.RawMessage(`{"value":1}`)},
+		}}},
+	})
+	require.ErrorIs(t, err, metadata.ErrScoreValueInvalid)
+}
+
+func TestAddRunMetadataRejectsRunScopedScoreMetadata(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := ulid.Make()
+	r := router{API: &API{opts: Opts{
+		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{
+				TraceID: "00000000000000000000000000000001",
+				SpanID:  "0000000000000001",
+			},
+			RunID:      runID,
+			FunctionID: uuid.New(),
+			AppID:      uuid.New(),
+		}},
+	}}}
+
+	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+			Kind:   "inngest.score",
+			Op:     enums.MetadataOpcodeMerge,
+			Values: metadata.Values{"accuracy": json.RawMessage(`1`)},
+		}}},
+	})
+	require.ErrorIs(t, err, metadata.ErrScoreScopeInvalid)
+}
+
+func TestAddRunMetadataRejectsDisallowedInngestKind(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := ulid.Make()
+	r := router{API: &API{opts: Opts{
+		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{
+				TraceID: "00000000000000000000000000000001",
+				SpanID:  "0000000000000001",
+			},
+			RunID:      runID,
+			FunctionID: uuid.New(),
+			AppID:      uuid.New(),
+		}},
+	}}}
+
+	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+			Kind:   "inngest.internal",
+			Op:     enums.MetadataOpcodeMerge,
+			Values: metadata.Values{"score": json.RawMessage(`1`)},
+		}}},
+	})
+	require.ErrorIs(t, err, metadata.ErrKindNotAllowed)
 }
