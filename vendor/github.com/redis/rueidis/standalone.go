@@ -28,7 +28,7 @@ func newStandaloneClient(opt *ClientOption, connFn connFn, retryer retryHandler)
 		opt:            opt,
 		retryer:        retryer,
 	}
-	s.primary.Store(newSingleClientWithConn(p, cmds.NewBuilder(cmds.NoSlot), !opt.DisableRetry, opt.DisableCache, retryer, false))
+	s.primary.Store(newSingleClientWithConn(p, cmds.NewBuilder(cmds.NoSlot), !opt.DisableRetry, opt.DisableCache, retryer, opt.ConnLifetime > 0))
 
 	for i := range s.replicas {
 		replicaConn := connFn(opt.Standalone.ReplicaAddress[i], opt)
@@ -39,7 +39,7 @@ func newStandaloneClient(opt *ClientOption, connFn connFn, retryer retryHandler)
 			}
 			return nil, err
 		}
-		s.replicas[i] = newSingleClientWithConn(replicaConn, cmds.NewBuilder(cmds.NoSlot), !opt.DisableRetry, opt.DisableCache, retryer, false)
+		s.replicas[i] = newSingleClientWithConn(replicaConn, cmds.NewBuilder(cmds.NoSlot), !opt.DisableRetry, opt.DisableCache, retryer, opt.ConnLifetime > 0)
 	}
 	if s.opt.EnableReplicaAZInfo && (s.opt.ReadNodeSelector != nil || len(s.replicas) > 1) {
 		s.nodes = make([]NodeInfo, len(s.replicas)+1)
@@ -103,7 +103,7 @@ func (s *standalone) redirectToPrimary(addr string) error {
 	}
 
 	// Create a new primary client with the redirect connection
-	newPrimary := newSingleClientWithConn(redirectConn, cmds.NewBuilder(cmds.NoSlot), !s.opt.DisableRetry, s.opt.DisableCache, s.retryer, false)
+	newPrimary := newSingleClientWithConn(redirectConn, cmds.NewBuilder(cmds.NoSlot), !s.opt.DisableRetry, s.opt.DisableCache, s.retryer, s.opt.ConnLifetime > 0)
 
 	// Atomically swap the primary and close the old one
 	oldPrimary := s.primary.Swap(newPrimary)

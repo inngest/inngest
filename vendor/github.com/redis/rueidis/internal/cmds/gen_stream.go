@@ -1335,6 +1335,124 @@ func (c XlenKey) Build() Completed {
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
+type Xnack Incomplete
+
+func (b Builder) Xnack() (c Xnack) {
+	c = Xnack{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "XNACK")
+	return c
+}
+
+func (c Xnack) Key(key string) XnackKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (XnackKey)(c)
+}
+
+type XnackCount Incomplete
+
+func (c XnackCount) Force() XnackForce {
+	c.cs.s = append(c.cs.s, "FORCE")
+	return (XnackForce)(c)
+}
+
+func (c XnackCount) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XnackForce Incomplete
+
+func (c XnackForce) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XnackGroup Incomplete
+
+func (c XnackGroup) Silent() XnackModeSilent {
+	c.cs.s = append(c.cs.s, "SILENT")
+	return (XnackModeSilent)(c)
+}
+
+func (c XnackGroup) Fail() XnackModeFail {
+	c.cs.s = append(c.cs.s, "FAIL")
+	return (XnackModeFail)(c)
+}
+
+func (c XnackGroup) Fatal() XnackModeFatal {
+	c.cs.s = append(c.cs.s, "FATAL")
+	return (XnackModeFatal)(c)
+}
+
+type XnackIdsId Incomplete
+
+func (c XnackIdsId) Id(id ...string) XnackIdsId {
+	c.cs.s = append(c.cs.s, id...)
+	return c
+}
+
+func (c XnackIdsId) Count(count int64) XnackCount {
+	c.cs.s = append(c.cs.s, "RETRYCOUNT", strconv.FormatInt(count, 10))
+	return (XnackCount)(c)
+}
+
+func (c XnackIdsId) Force() XnackForce {
+	c.cs.s = append(c.cs.s, "FORCE")
+	return (XnackForce)(c)
+}
+
+func (c XnackIdsId) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XnackIdsIds Incomplete
+
+func (c XnackIdsIds) Numids(numids int64) XnackIdsNumids {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(numids, 10))
+	return (XnackIdsNumids)(c)
+}
+
+type XnackIdsNumids Incomplete
+
+func (c XnackIdsNumids) Id(id ...string) XnackIdsId {
+	c.cs.s = append(c.cs.s, id...)
+	return (XnackIdsId)(c)
+}
+
+type XnackKey Incomplete
+
+func (c XnackKey) Group(group string) XnackGroup {
+	c.cs.s = append(c.cs.s, group)
+	return (XnackGroup)(c)
+}
+
+type XnackModeFail Incomplete
+
+func (c XnackModeFail) Ids() XnackIdsIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XnackIdsIds)(c)
+}
+
+type XnackModeFatal Incomplete
+
+func (c XnackModeFatal) Ids() XnackIdsIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XnackIdsIds)(c)
+}
+
+type XnackModeSilent Incomplete
+
+func (c XnackModeSilent) Ids() XnackIdsIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XnackIdsIds)(c)
+}
+
 type Xpending Incomplete
 
 func (b Builder) Xpending() (c Xpending) {

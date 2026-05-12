@@ -1002,6 +1002,11 @@ func (c JsonSet) Key(key string) JsonSetKey {
 
 type JsonSetConditionNx Incomplete
 
+func (c JsonSetConditionNx) Fpha() JsonSetFphaFpha {
+	c.cs.s = append(c.cs.s, "FPHA")
+	return (JsonSetFphaFpha)(c)
+}
+
 func (c JsonSetConditionNx) Build() Completed {
 	c.cs.Build()
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
@@ -1009,7 +1014,62 @@ func (c JsonSetConditionNx) Build() Completed {
 
 type JsonSetConditionXx Incomplete
 
+func (c JsonSetConditionXx) Fpha() JsonSetFphaFpha {
+	c.cs.s = append(c.cs.s, "FPHA")
+	return (JsonSetFphaFpha)(c)
+}
+
 func (c JsonSetConditionXx) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type JsonSetFphaFpha Incomplete
+
+func (c JsonSetFphaFpha) Fp16() JsonSetFphaFphaTypeFp16 {
+	c.cs.s = append(c.cs.s, "FP16")
+	return (JsonSetFphaFphaTypeFp16)(c)
+}
+
+func (c JsonSetFphaFpha) Bf16() JsonSetFphaFphaTypeBf16 {
+	c.cs.s = append(c.cs.s, "BF16")
+	return (JsonSetFphaFphaTypeBf16)(c)
+}
+
+func (c JsonSetFphaFpha) Fp32() JsonSetFphaFphaTypeFp32 {
+	c.cs.s = append(c.cs.s, "FP32")
+	return (JsonSetFphaFphaTypeFp32)(c)
+}
+
+func (c JsonSetFphaFpha) Fp64() JsonSetFphaFphaTypeFp64 {
+	c.cs.s = append(c.cs.s, "FP64")
+	return (JsonSetFphaFphaTypeFp64)(c)
+}
+
+type JsonSetFphaFphaTypeBf16 Incomplete
+
+func (c JsonSetFphaFphaTypeBf16) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type JsonSetFphaFphaTypeFp16 Incomplete
+
+func (c JsonSetFphaFphaTypeFp16) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type JsonSetFphaFphaTypeFp32 Incomplete
+
+func (c JsonSetFphaFphaTypeFp32) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type JsonSetFphaFphaTypeFp64 Incomplete
+
+func (c JsonSetFphaFphaTypeFp64) Build() Completed {
 	c.cs.Build()
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
@@ -1038,6 +1098,11 @@ func (c JsonSetValue) Nx() JsonSetConditionNx {
 func (c JsonSetValue) Xx() JsonSetConditionXx {
 	c.cs.s = append(c.cs.s, "XX")
 	return (JsonSetConditionXx)(c)
+}
+
+func (c JsonSetValue) Fpha() JsonSetFphaFpha {
+	c.cs.s = append(c.cs.s, "FPHA")
+	return (JsonSetFphaFpha)(c)
 }
 
 func (c JsonSetValue) Build() Completed {

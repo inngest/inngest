@@ -19,11 +19,10 @@ func MGetCache(client Client, ctx context.Context, ttl time.Duration, keys []str
 		return MGet(client, ctx, keys)
 	}
 	cmds := mgetcachecmdsp.Get(len(keys), len(keys))
-	defer mgetcachecmdsp.Put(cmds)
 	for i := range cmds.s {
 		cmds.s[i] = CT(client.B().Get().Key(keys[i]).Cache(), ttl)
 	}
-	return doMultiCache(client, ctx, cmds.s, keys)
+	return doMultiCache(client, ctx, cmds, keys)
 }
 
 func isCacheDisabled(client Client) bool {
@@ -114,11 +113,10 @@ func JsonMGetCache(client Client, ctx context.Context, ttl time.Duration, keys [
 		return make(map[string]RedisMessage), nil
 	}
 	cmds := mgetcachecmdsp.Get(len(keys), len(keys))
-	defer mgetcachecmdsp.Put(cmds)
 	for i := range cmds.s {
 		cmds.s[i] = CT(client.B().JsonGet().Key(keys[i]).Path(path).Cache(), ttl)
 	}
-	return doMultiCache(client, ctx, cmds.s, keys)
+	return doMultiCache(client, ctx, cmds, keys)
 }
 
 // JsonMGet is a helper that consults redis directly with multiple keys by grouping keys within the same slot into JSON.MGETs or multiple JSON.GETs
@@ -219,9 +217,9 @@ func clientMDel(client Client, ctx context.Context, keys []string) map[string]er
 	return ret
 }
 
-func doMultiCache(cc Client, ctx context.Context, cmds []CacheableTTL, keys []string) (ret map[string]RedisMessage, err error) {
+func doMultiCache(cc Client, ctx context.Context, buf *mgetcachecmds, keys []string) (ret map[string]RedisMessage, err error) {
 	ret = make(map[string]RedisMessage, len(keys))
-	resps := cc.DoMultiCache(ctx, cmds...)
+	resps := cc.DoMultiCache(ctx, buf.s...)
 	defer resultsp.Put(&redisresults{s: resps})
 	for i, resp := range resps {
 		if err := resp.NonRedisError(); err != nil {
@@ -229,6 +227,7 @@ func doMultiCache(cc Client, ctx context.Context, cmds []CacheableTTL, keys []st
 		}
 		ret[keys[i]] = resp.val
 	}
+	mgetcachecmdsp.Put(buf)
 	return ret, nil
 }
 

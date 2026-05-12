@@ -262,6 +262,8 @@ github.com/AzureAD/microsoft-authentication-library-for-go/apps/public
 # github.com/DataDog/zstd v1.5.7
 ## explicit; go 1.14
 github.com/DataDog/zstd
+# github.com/Masterminds/semver/v3 v3.5.0
+## explicit; go 1.21
 # github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
 ## explicit
 github.com/MauriceGit/skiplist
@@ -1230,8 +1232,8 @@ github.com/protocolbuffers/txtpbfmt/quote
 github.com/protocolbuffers/txtpbfmt/sort
 github.com/protocolbuffers/txtpbfmt/unquote
 github.com/protocolbuffers/txtpbfmt/wrap
-# github.com/redis/rueidis v1.0.74
-## explicit; go 1.24.9
+# github.com/redis/rueidis v1.0.75
+## explicit; go 1.25.0
 github.com/redis/rueidis
 github.com/redis/rueidis/internal/cmds
 github.com/redis/rueidis/internal/util
