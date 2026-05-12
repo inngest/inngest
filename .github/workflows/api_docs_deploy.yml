@@ -31,7 +31,7 @@ jobs:
 
       # Set up Node 24 + pnpm for the api-docs build.
       # Runs after nix-develop so node 24 takes precedence over nix's node 22.
-      - uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
         with:
           version: "11.0.9"
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
