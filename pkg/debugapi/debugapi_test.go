@@ -79,7 +79,6 @@ func setupBatchManager(t *testing.T, rc rueidis.Client) batch.BatchManager {
 
 func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	debounceClient := unshardedClient.Debounce()
 	queueClient := unshardedClient.Queue()
 
 	opts := []queue.QueueOpt{
@@ -99,7 +98,9 @@ func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
 	)
 	require.NoError(t, err)
 
-	return debounce.NewRedisDebouncer(debounceClient, shard, q)
+	deb, err := debounce.NewDebouncer(shardRegistry, shard.Name(), q)
+	require.NoError(t, err)
+	return deb
 }
 
 // TestGetBatchInfoHandler tests the debug API handler for batch info.
