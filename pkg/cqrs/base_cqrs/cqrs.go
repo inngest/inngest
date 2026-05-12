@@ -1634,6 +1634,23 @@ func (w wrapper) InsertRunDefer(ctx context.Context, parentRunID ulid.ULID, defe
 	})
 }
 
+func (w wrapper) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInsert) error {
+	if len(defers) == 0 {
+		return nil
+	}
+	params := make([]dbpkg.InsertRunDeferParams, len(defers))
+	for i, d := range defers {
+		params[i] = dbpkg.InsertRunDeferParams{
+			ParentRunID: d.ParentRunID,
+			DeferID:     d.DeferID,
+			UserDeferID: d.UserDeferID,
+			FnSlug:      d.FnSlug,
+			Status:      string(d.Status),
+		}
+	}
+	return w.q.InsertRunDefers(ctx, params)
+}
+
 func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error {
 	return w.q.UpdateRunDeferChildRunID(ctx, dbpkg.UpdateRunDeferChildRunIDParams{
 		ChildRunID:  childRunID,

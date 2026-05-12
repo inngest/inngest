@@ -211,6 +211,7 @@ func (e *executor) buildDeferEvents(
 
 	now := e.now()
 	var events []event.Event
+	var deferInserts []cqrs.RunDeferInsert
 
 	for _, d := range defers {
 		if err := d.Validate(); err != nil {
@@ -235,14 +236,13 @@ func (e *executor) buildDeferEvents(
 				deferRowStatus = cqrs.RunDeferStatusAborted
 			}
 			if deferRowStatus != "" {
-				if err := e.deferStore.InsertRunDefer(ctx, opts.Metadata.ID.RunID, d.HashedID, d.UserlandID, d.FnSlug, deferRowStatus); err != nil {
-					logger.StdlibLogger(ctx).Error(
-						"error persisting run defer",
-						"error", err,
-						"run_id", opts.Metadata.ID.RunID,
-						"defer_id", d.HashedID,
-					)
-				}
+				deferInserts = append(deferInserts, cqrs.RunDeferInsert{
+					ParentRunID: opts.Metadata.ID.RunID,
+					DeferID:     d.HashedID,
+					UserDeferID: d.UserlandID,
+					FnSlug:      d.FnSlug,
+					Status:      deferRowStatus,
+				})
 			}
 		}
 
@@ -315,6 +315,17 @@ func (e *executor) buildDeferEvents(
 			Data:      data,
 		})
 		metrics.IncrDefersFinalizedCounter(ctx, "after_run", metrics.CounterOpt{PkgName: pkgName})
+	}
+
+	if e.deferStore != nil && len(deferInserts) > 0 {
+		if err := e.deferStore.InsertRunDefers(ctx, deferInserts); err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error persisting run defers",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+				"count", len(deferInserts),
+			)
+		}
 	}
 
 	return events, nil

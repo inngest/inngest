@@ -666,10 +666,10 @@ WHERE parent_run_id = $2 AND defer_id = $3;
 -- name: GetRunDefersByParentRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE parent_run_id IN (SELECT UNNEST(sqlc.slice('parent_run_ids')::CHAR(26)[]))
+WHERE parent_run_id IN (SELECT UNNEST(sqlc.slice('parent_run_ids')::BYTEA[]))
 ORDER BY defer_id ASC;
 
 -- name: GetRunDeferredFromByChildRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE child_run_id IN (SELECT UNNEST(sqlc.slice('child_run_ids')::CHAR(26)[]));
+WHERE child_run_id IN (SELECT UNNEST(sqlc.slice('child_run_ids')::BYTEA[]));

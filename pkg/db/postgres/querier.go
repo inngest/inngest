@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -460,6 +461,26 @@ func (pq *pgQuerier) InsertRunDefer(ctx context.Context, arg db.InsertRunDeferPa
 	})
 }
 
+func (pq *pgQuerier) InsertRunDefers(ctx context.Context, defers []db.InsertRunDeferParams) error {
+	if len(defers) == 0 {
+		return nil
+	}
+	var sb strings.Builder
+	sb.WriteString(`INSERT INTO run_defers (parent_run_id, defer_id, user_defer_id, fn_slug, status) VALUES `)
+	args := make([]any, 0, len(defers)*5)
+	for i, d := range defers {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		base := i * 5
+		fmt.Fprintf(&sb, "($%d,$%d,$%d,$%d,$%d)", base+1, base+2, base+3, base+4, base+5)
+		args = append(args, d.ParentRunID[:], d.DeferID, d.UserDeferID, d.FnSlug, d.Status)
+	}
+	sb.WriteString(` ON CONFLICT (parent_run_id, defer_id) DO UPDATE SET user_defer_id = EXCLUDED.user_defer_id, fn_slug = EXCLUDED.fn_slug, status = EXCLUDED.status`)
+	_, err := pq.db.ExecContext(ctx, sb.String(), args...)
+	return err
+}
+
 func (pq *pgQuerier) UpdateRunDeferChildRunID(ctx context.Context, arg db.UpdateRunDeferChildRunIDParams) error {
 	return pq.q.UpdateRunDeferChildRunID(ctx, sqlc.UpdateRunDeferChildRunIDParams{
 		ChildRunID:  arg.ChildRunID,
@@ -472,11 +493,11 @@ func (pq *pgQuerier) GetRunDefersByParentRunIDs(ctx context.Context, parentRunID
 	if len(parentRunIDs) == 0 {
 		return nil, nil
 	}
-	strIDs := make([]string, len(parentRunIDs))
+	byteIDs := make([][]byte, len(parentRunIDs))
 	for i, id := range parentRunIDs {
-		strIDs[i] = id.String()
+		byteIDs[i] = id[:]
 	}
-	rows, err := pq.q.GetRunDefersByParentRunIDs(ctx, strIDs)
+	rows, err := pq.q.GetRunDefersByParentRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -487,11 +508,11 @@ func (pq *pgQuerier) GetRunDeferredFromByChildRunIDs(ctx context.Context, childR
 	if len(childRunIDs) == 0 {
 		return nil, nil
 	}
-	strIDs := make([]string, len(childRunIDs))
+	byteIDs := make([][]byte, len(childRunIDs))
 	for i, id := range childRunIDs {
-		strIDs[i] = id.String()
+		byteIDs[i] = id[:]
 	}
-	rows, err := pq.q.GetRunDeferredFromByChildRunIDs(ctx, strIDs)
+	rows, err := pq.q.GetRunDeferredFromByChildRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}

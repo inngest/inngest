@@ -1181,10 +1181,10 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 const getRunDeferredFromByChildRunIDs = `-- name: GetRunDeferredFromByChildRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE child_run_id IN (SELECT UNNEST($1::CHAR(26)[]))
+WHERE child_run_id IN (SELECT UNNEST($1::BYTEA[]))
 `
 
-func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []string) ([]*RunDefer, error) {
+func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds [][]byte) ([]*RunDefer, error) {
 	rows, err := q.db.QueryContext(ctx, getRunDeferredFromByChildRunIDs, pq.Array(childRunIds))
 	if err != nil {
 		return nil, err
@@ -1217,11 +1217,11 @@ func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunI
 const getRunDefersByParentRunIDs = `-- name: GetRunDefersByParentRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE parent_run_id IN (SELECT UNNEST($1::CHAR(26)[]))
+WHERE parent_run_id IN (SELECT UNNEST($1::BYTEA[]))
 ORDER BY defer_id ASC
 `
 
-func (q *Queries) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIds []string) ([]*RunDefer, error) {
+func (q *Queries) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIds [][]byte) ([]*RunDefer, error) {
 	rows, err := q.db.QueryContext(ctx, getRunDefersByParentRunIDs, pq.Array(parentRunIds))
 	if err != nil {
 		return nil, err

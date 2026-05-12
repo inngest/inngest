@@ -139,7 +139,7 @@ export const TopInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
-  const invokedRuns = useMemo(() => collectInvokedRuns(trace), [trace]);
+  const invokedRuns = collectInvokedRuns(trace);
   const hasLinkedFunctions =
     Boolean(deferredFrom) || (defers?.length ?? 0) > 0 || invokedRuns.length > 0;
 
