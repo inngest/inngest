@@ -14,6 +14,8 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util/errs"
+	"google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 )
 
 // DriverV2 represents a driver that makes requests to SDKs to re-enter and execute
@@ -129,7 +131,14 @@ func MarshalV1(
 	// read the input data.
 	defers, err := sl.LoadDefersMeta(ctx, md.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error loading defers in driver marshaller: %w", err)
+		// Older state-service deployments may not yet expose LoadDefersMeta.
+		// Treat that as an empty set rather than failing the whole request, so
+		// a rolling upgrade doesn't break in-flight executions.
+		if st, ok := grpcStatus.FromError(err); ok && st.Code() == codes.Unimplemented {
+			defers = map[string]sv2.DeferMeta{}
+		} else {
+			return nil, fmt.Errorf("error loading defers in driver marshaller: %w", err)
+		}
 	}
 
 	deferEntries := make(map[string]SDKDeferEntry, len(defers))
