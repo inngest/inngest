@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - release/next
     paths-ignore:
       - "ui/**"
   pull_request:
