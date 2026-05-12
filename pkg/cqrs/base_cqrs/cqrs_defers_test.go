@@ -53,6 +53,35 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 		assert.Nil(t, found.Run)
 	})
 
+	t.Run("batch insert round-trips all rows", func(t *testing.T) {
+		parent := ulid.Make()
+		batch := []cqrs.RunDeferInsert{
+			{ParentRunID: parent, DeferID: "hash-batch-1", UserDeferID: "u1", FnSlug: "fn-1", Status: cqrs.RunDeferStatusScheduled},
+			{ParentRunID: parent, DeferID: "hash-batch-2", UserDeferID: "u2", FnSlug: "fn-2", Status: cqrs.RunDeferStatusAborted},
+			{ParentRunID: parent, DeferID: "hash-batch-3", UserDeferID: "u3", FnSlug: "fn-3", Status: cqrs.RunDeferStatusScheduled},
+		}
+		require.NoError(t, cm.InsertRunDefers(ctx, batch))
+
+		got, err := getDefersForRun(ctx, cm, parent)
+		require.NoError(t, err)
+		require.Len(t, got, 3)
+		byID := map[string]cqrs.RunDefer{}
+		for _, d := range got {
+			byID[d.ID] = d
+		}
+		for _, in := range batch {
+			d, ok := byID[in.DeferID]
+			require.True(t, ok, "missing %s", in.DeferID)
+			assert.Equal(t, in.UserDeferID, d.UserDeferID)
+			assert.Equal(t, in.FnSlug, d.FnSlug)
+			assert.Equal(t, in.Status, d.Status)
+		}
+	})
+
+	t.Run("batch insert with empty slice is a no-op", func(t *testing.T) {
+		require.NoError(t, cm.InsertRunDefers(ctx, nil))
+	})
+
 	t.Run("upsert on (parent, defer) replaces status/slug", func(t *testing.T) {
 		parent := ulid.Make()
 		deferID := "hash-upsert"

@@ -916,11 +916,11 @@ func (q NormalizedQueries) GetRunDefersByParentRunIDs(ctx context.Context, paren
 	if len(parentRunIDs) == 0 {
 		return nil, nil
 	}
-	strIDs := make([]string, len(parentRunIDs))
+	byteIDs := make([][]byte, len(parentRunIDs))
 	for i, id := range parentRunIDs {
-		strIDs[i] = id.String()
+		byteIDs[i] = id[:]
 	}
-	rows, err := q.db.GetRunDefersByParentRunIDs(ctx, strIDs)
+	rows, err := q.db.GetRunDefersByParentRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -942,11 +942,11 @@ func (q NormalizedQueries) GetRunDeferredFromByChildRunIDs(ctx context.Context, 
 	if len(childRunIDs) == 0 {
 		return nil, nil
 	}
-	strIDs := make([]string, len(childRunIDs))
+	byteIDs := make([][]byte, len(childRunIDs))
 	for i, id := range childRunIDs {
-		strIDs[i] = id.String()
+		byteIDs[i] = id[:]
 	}
-	rows, err := q.db.GetRunDeferredFromByChildRunIDs(ctx, strIDs)
+	rows, err := q.db.GetRunDeferredFromByChildRunIDs(ctx, byteIDs)
 	if err != nil {
 		return nil, err
 	}

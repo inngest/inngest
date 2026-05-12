@@ -14,7 +14,16 @@ import (
 // UI can show the id the SDK caller typed.
 type DeferStore interface {
 	InsertRunDefer(ctx context.Context, parentRunID ulid.ULID, deferID, userDeferID, fnSlug string, status RunDeferStatus) error
+	InsertRunDefers(ctx context.Context, defers []RunDeferInsert) error
 	UpdateRunDeferChildRunID(ctx context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error
+}
+
+type RunDeferInsert struct {
+	ParentRunID ulid.ULID
+	DeferID     string
+	UserDeferID string
+	FnSlug      string
+	Status      RunDeferStatus
 }
 
 type RunDeferStatus string

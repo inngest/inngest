@@ -67,6 +67,7 @@ type Querier interface {
 
 	// Run defers
 	InsertRunDefer(ctx context.Context, arg InsertRunDeferParams) error
+	InsertRunDefers(ctx context.Context, defers []InsertRunDeferParams) error
 	UpdateRunDeferChildRunID(ctx context.Context, arg UpdateRunDeferChildRunIDParams) error
 	GetRunDefersByParentRunIDs(ctx context.Context, parentRunIDs []ulid.ULID) ([]*RunDeferRow, error)
 	GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*RunDeferRow, error)

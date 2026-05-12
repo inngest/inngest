@@ -53,6 +53,15 @@ func (f *fakeDeferStore) InsertRunDefer(_ context.Context, parentRunID ulid.ULID
 	return f.insertErr
 }
 
+func (f *fakeDeferStore) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInsert) error {
+	for _, d := range defers {
+		if err := f.InsertRunDefer(ctx, d.ParentRunID, d.DeferID, d.UserDeferID, d.FnSlug, d.Status); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (f *fakeDeferStore) UpdateRunDeferChildRunID(_ context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error {
 	f.updates = append(f.updates, deferUpdateCall{
 		ParentRunID: parentRunID,

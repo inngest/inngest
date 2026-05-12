@@ -83,6 +83,16 @@ type InngestMetadata struct {
 }
 
 func (m *InngestMetadata) Decode(data any) error {
+	switch v := data.(type) {
+	case InngestMetadata:
+		*m = v
+		return nil
+	case *InngestMetadata:
+		if v != nil {
+			*m = *v
+		}
+		return nil
+	}
 	byt, err := json.Marshal(data)
 	if err != nil {
 		return err

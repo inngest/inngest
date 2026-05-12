@@ -1282,7 +1282,9 @@ func (e *executor) schedule(
 		// Override existing identifier in case we changed the run ID due to idempotency
 		stv1ID = sv2.V1FromMetadata(st.Metadata)
 
-		e.backfillDeferChildRunID(ctx, req, stv1ID.RunID, l)
+		if err == nil {
+			e.backfillDeferChildRunID(ctx, req, stv1ID.RunID, l)
+		}
 
 		// NOTE: if the runID mismatches, it means there's already a state available
 		// and we need to override the one we already have to make sure we're using
