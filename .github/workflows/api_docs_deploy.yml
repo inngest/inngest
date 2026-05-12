@@ -61,27 +61,27 @@ jobs:
       - name: Build (preview)
         if: inputs.environment == 'preview'
         working-directory: docs/api-docs
-        run: vercel build --token="$VERCEL_TOKEN"
+        run: vercel build
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Build (production)
         if: inputs.environment == 'production'
         working-directory: docs/api-docs
-        run: vercel build --prod --token="$VERCEL_TOKEN"
+        run: vercel build --prod
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to preview
         if: inputs.environment == 'preview'
         working-directory: docs/api-docs
-        run: vercel deploy --prebuilt --token="$VERCEL_TOKEN"
+        run: vercel deploy --prebuilt
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to production
         if: inputs.environment == 'production'
         working-directory: docs/api-docs
-        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: vercel deploy --prebuilt --prod
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
