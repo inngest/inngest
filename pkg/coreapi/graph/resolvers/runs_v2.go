@@ -391,6 +391,16 @@ func toRunsQueryOpt(
 		items = num
 	}
 
+	runType := cqrs.RunTypeFilterAny
+	if filter.RunType != nil {
+		switch *filter.RunType {
+		case models.RunTypePrimary:
+			runType = cqrs.RunTypeFilterPrimary
+		case models.RunTypeDefer:
+			runType = cqrs.RunTypeFilterDefer
+		}
+	}
+
 	return cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			AppID:      filter.AppIDs,
@@ -400,6 +410,7 @@ func toRunsQueryOpt(
 			Until:      until,
 			Status:     statuses,
 			CEL:        cel,
+			RunType:    runType,
 		},
 		Order:   orderBy,
 		Cursor:  cursor,

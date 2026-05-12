@@ -23,6 +23,7 @@ import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import {
   isFunctionRunStatus,
+  isRunType,
   FunctionRunTimeField,
   isFunctionTimeField,
 } from '@inngest/components/types/functionRun';
@@ -70,6 +71,7 @@ function RunsComponent() {
     'timeField',
     isFunctionTimeField,
   );
+  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
@@ -98,6 +100,7 @@ function RunsComponent() {
         timeField,
         celQuery: search,
         preview,
+        runType: filterRunType ?? null,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -125,6 +128,7 @@ function RunsComponent() {
       timeField,
       search,
       preview,
+      filterRunType,
     ],
   );
 
@@ -140,6 +144,7 @@ function RunsComponent() {
           timeField,
           search,
           preview,
+          filterRunType,
         },
       ],
       queryFn,
@@ -166,10 +171,18 @@ function RunsComponent() {
         status: filteredStatus,
         timeField,
         celQuery: search,
+        runType: filterRunType ?? null,
       });
       setTotalCount(data.runs.totalCount);
     })();
-  }, [calculatedStartTime, endTime, filteredStatus, timeField, search]);
+  }, [
+    calculatedStartTime,
+    endTime,
+    filteredStatus,
+    timeField,
+    search,
+    filterRunType,
+  ]);
 
   useEffect(() => {
     getTotalCount();
@@ -232,6 +245,7 @@ function RunsComponent() {
           'id',
           'trigger',
           'function',
+          'runType',
           'queuedAt',
           'endedAt',
         ]}

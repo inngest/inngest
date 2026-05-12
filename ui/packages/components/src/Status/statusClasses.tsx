@@ -1,7 +1,9 @@
 import { isAppStatus, type AppStatus } from '../types/app';
 import {
+  isDeferStatus,
   isFunctionRunStatus,
   isReplayRunStatus,
+  type DeferStatus,
   type FunctionRunStatus,
   type ReplayRunStatus,
 } from '../types/functionRun';
@@ -9,15 +11,28 @@ import { isReplayStatus, type ReplayStatus } from '../types/replay';
 import { isWorkerStatus, type GroupedWorkerStatus } from '../types/workers';
 import { cn } from '../utils/classNames';
 
-const backgroundClasses: {
-  [key in
-    | FunctionRunStatus
-    | ReplayRunStatus
-    | GroupedWorkerStatus
-    | AppStatus
-    | ReplayStatus
-    | 'UNKNOWN']: string;
-} = {
+type KnownStatus =
+  | FunctionRunStatus
+  | ReplayRunStatus
+  | DeferStatus
+  | GroupedWorkerStatus
+  | AppStatus
+  | ReplayStatus
+  | 'UNKNOWN';
+
+function isKnownStatus(status: string): status is KnownStatus {
+  return (
+    isFunctionRunStatus(status) ||
+    isReplayRunStatus(status) ||
+    isDeferStatus(status) ||
+    isWorkerStatus(status) ||
+    isAppStatus(status) ||
+    isReplayStatus(status)
+  );
+}
+
+const backgroundClasses: Record<KnownStatus, string> = {
+  ABORTED: 'bg-status-cancelled',
   CANCELLED: 'bg-status-cancelled',
   COMPLETED: 'bg-status-completed',
   FAILED: 'bg-status-failed',
@@ -37,27 +52,11 @@ const backgroundClasses: {
 };
 
 export function getStatusBackgroundClass(status: string): string {
-  if (
-    !isFunctionRunStatus(status) &&
-    !isReplayRunStatus(status) &&
-    !isWorkerStatus(status) &&
-    !isAppStatus(status) &&
-    !isReplayStatus(status)
-  ) {
-    return backgroundClasses['UNKNOWN'];
-  }
-  return backgroundClasses[status];
+  return isKnownStatus(status) ? backgroundClasses[status] : backgroundClasses['UNKNOWN'];
 }
 
-const borderClasses: {
-  [key in
-    | FunctionRunStatus
-    | ReplayRunStatus
-    | GroupedWorkerStatus
-    | AppStatus
-    | ReplayStatus
-    | 'UNKNOWN']: string;
-} = {
+const borderClasses: Record<KnownStatus, string> = {
+  ABORTED: 'border-status-cancelled',
   CANCELLED: 'border-status-cancelled',
   COMPLETED: 'border-status-completed',
   FAILED: 'border-status-failed',
@@ -77,27 +76,11 @@ const borderClasses: {
 };
 
 export function getStatusBorderClass(status: string): string {
-  if (
-    !isFunctionRunStatus(status) &&
-    !isReplayRunStatus(status) &&
-    !isWorkerStatus(status) &&
-    !isAppStatus(status) &&
-    !isReplayStatus(status)
-  ) {
-    return cn('border', borderClasses['UNKNOWN']);
-  }
-  return cn('border', borderClasses[status]);
+  return cn('border', isKnownStatus(status) ? borderClasses[status] : borderClasses['UNKNOWN']);
 }
 
-const textClasses: {
-  [key in
-    | FunctionRunStatus
-    | ReplayRunStatus
-    | GroupedWorkerStatus
-    | AppStatus
-    | ReplayStatus
-    | 'UNKNOWN']: string;
-} = {
+const textClasses: Record<KnownStatus, string> = {
+  ABORTED: 'text-status-cancelledText',
   CANCELLED: 'text-status-cancelledText',
   COMPLETED: 'text-status-completedText',
   FAILED: 'text-status-failedText',
@@ -117,14 +100,5 @@ const textClasses: {
 };
 
 export function getStatusTextClass(status: string): string {
-  if (
-    !isFunctionRunStatus(status) &&
-    !isReplayRunStatus(status) &&
-    !isWorkerStatus(status) &&
-    !isAppStatus(status) &&
-    !isReplayStatus(status)
-  ) {
-    return textClasses['UNKNOWN'];
-  }
-  return textClasses[status];
+  return isKnownStatus(status) ? textClasses[status] : textClasses['UNKNOWN'];
 }

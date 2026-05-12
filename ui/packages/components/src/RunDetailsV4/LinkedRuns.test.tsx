@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRun';
 import { LinkedRuns } from './LinkedRuns';
-import type { InvokedRun } from './runDetailsUtils';
 
 // @inngest/components/* self-imports don't resolve in vitest without a workspace alias.
 vi.mock('../Link', () => ({
@@ -26,6 +25,11 @@ vi.mock('../Table/Cell', () => ({
     <span data-testid="id-cell">{children}</span>
   ),
   StatusCell: ({ status }: { status: string }) => <span data-testid="status-cell">{status}</span>,
+  PillCell: ({ children, type }: { children: React.ReactNode; type?: string }) => (
+    <span data-testid="pill-cell" data-pill-type={type}>
+      {children}
+    </span>
+  ),
 }));
 
 vi.mock('../Tooltip/OptionalTooltip', () => ({
@@ -47,39 +51,28 @@ function makeDefer(overrides: Partial<RunDeferSummary> = {}): RunDeferSummary {
   };
 }
 
-function makeInvoked(overrides: Partial<InvokedRun> = {}): InvokedRun {
-  return {
-    spanID: 'span-1',
-    invokerName: 'parent.step',
-    functionID: 'invoked-fn',
-    runID: '01INVOKED01',
-    status: 'COMPLETED',
-    ...overrides,
-  };
-}
-
 describe('LinkedRuns', () => {
-  it('renders no section headers when all inputs are empty', () => {
+  it('renders Deferred + Invoked sections for a primary run (no deferredFrom)', () => {
     render(<LinkedRuns runID="run-self" invoked={[]} />);
+    expect(screen.getByText('Deferred runs')).toBeTruthy();
+    expect(screen.getByText('Invoked runs')).toBeTruthy();
     expect(screen.queryByText('Parent run')).toBeNull();
-    expect(screen.queryByText('Deferred runs')).toBeNull();
     expect(screen.queryByText('Parallel defers')).toBeNull();
-    expect(screen.queryByText('Invoked runs')).toBeNull();
   });
 
-  it('renders only the Parent section when only deferredFrom is set', () => {
+  it('renders Parent + Parallel defers sections for a deferred run', () => {
     const deferredFrom: RunDeferredFromSummary = {
       parentRunID: '01PARENT01',
       parentRun: null,
     };
     render(<LinkedRuns runID="run-self" invoked={[]} deferredFrom={deferredFrom} />);
     expect(screen.getByText('Parent run')).toBeTruthy();
+    expect(screen.getByText('Parallel defers')).toBeTruthy();
     expect(screen.queryByText('Deferred runs')).toBeNull();
-    expect(screen.queryByText('Parallel defers')).toBeNull();
     expect(screen.queryByText('Invoked runs')).toBeNull();
   });
 
-  it('renders no function link when the parent run is null', () => {
+  it('renders no function pill when the parent run is null', () => {
     const deferredFrom: RunDeferredFromSummary = {
       parentRunID: '01PARENT01',
       parentRun: null,
@@ -88,22 +81,6 @@ describe('LinkedRuns', () => {
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(1);
     expect(links[0]?.getAttribute('href')).toBe('/runs/01PARENT01');
-  });
-
-  it('renders only the Deferred section when only defers is set', () => {
-    render(<LinkedRuns runID="run-self" invoked={[]} defers={[makeDefer()]} />);
-    expect(screen.getByText('Deferred runs')).toBeTruthy();
-    expect(screen.queryByText('Parent run')).toBeNull();
-    expect(screen.queryByText('Parallel defers')).toBeNull();
-    expect(screen.queryByText('Invoked runs')).toBeNull();
-  });
-
-  it('renders only the Invoked section when only invoked is set', () => {
-    render(<LinkedRuns runID="run-self" invoked={[makeInvoked()]} />);
-    expect(screen.getByText('Invoked runs')).toBeTruthy();
-    expect(screen.queryByText('Parent run')).toBeNull();
-    expect(screen.queryByText('Deferred runs')).toBeNull();
-    expect(screen.queryByText('Parallel defers')).toBeNull();
   });
 
   it('parallel defers exclude the current run', () => {
@@ -142,29 +119,6 @@ describe('LinkedRuns', () => {
     expect(screen.queryByText('user-self')).toBeNull();
   });
 
-  it('hides the Parallel defers section when the filter empties the list', () => {
-    const self = makeDefer({
-      id: 'hash-self',
-      userDeferID: 'user-self',
-      run: {
-        id: 'run-self',
-        status: 'COMPLETED',
-        function: { name: 'Self Fn', slug: 'self-fn' },
-      },
-    });
-    const deferredFrom: RunDeferredFromSummary = {
-      parentRunID: '01PARENT01',
-      parentRun: {
-        id: '01PARENT01',
-        status: 'COMPLETED',
-        function: { name: 'Parent Fn', slug: 'parent-fn' },
-        defers: [self],
-      },
-    };
-    render(<LinkedRuns runID="run-self" invoked={[]} deferredFrom={deferredFrom} />);
-    expect(screen.queryByText('Parallel defers')).toBeNull();
-  });
-
   it('renders the userDeferID, not the hashed id', () => {
     render(
       <LinkedRuns
@@ -177,7 +131,7 @@ describe('LinkedRuns', () => {
     expect(screen.queryByText('sha1-hashed-id')).toBeNull();
   });
 
-  it('falls back to fnSlug for the function name when run is null', () => {
+  it('falls back to fnSlug for the function pill when run is null', () => {
     render(
       <LinkedRuns
         runID="run-self"

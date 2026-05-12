@@ -415,6 +415,7 @@ export type FunctionRunV2 = {
   isBatch: Scalars['Boolean'];
   output: Maybe<Scalars['Bytes']>;
   queuedAt: Scalars['Time'];
+  runType: RunType;
   sourceID: Maybe<Scalars['String']>;
   startedAt: Maybe<Scalars['Time']>;
   status: FunctionRunStatus;
@@ -886,11 +887,17 @@ export type RunTraceTrigger = {
   timestamp: Scalars['Time'];
 };
 
+export enum RunType {
+  Defer = 'DEFER',
+  Primary = 'PRIMARY'
+}
+
 export type RunsFilterV2 = {
   appIDs?: InputMaybe<Array<Scalars['UUID']>>;
   from: Scalars['Time'];
   functionIDs?: InputMaybe<Array<Scalars['UUID']>>;
   query?: InputMaybe<Scalars['String']>;
+  runType?: InputMaybe<RunType>;
   status?: InputMaybe<Array<FunctionRunStatus>>;
   timeField?: InputMaybe<RunsV2OrderByField>;
   until?: InputMaybe<Scalars['Time']>;
@@ -1159,16 +1166,18 @@ export type GetRunsQueryVariables = Exact<{
   functionRunCursor?: InputMaybe<Scalars['String']>;
   celQuery?: InputMaybe<Scalars['String']>;
   preview?: InputMaybe<Scalars['Boolean']>;
+  runType?: InputMaybe<RunType>;
 }>;
 
 
-export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, hasAI: boolean, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string } } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
+export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, hasAI: boolean, runType: RunType, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string }, deferredFrom: { __typename?: 'RunDeferredFrom', parentRun: { __typename?: 'FunctionRunV2', function: { __typename?: 'Function', name: string, slug: string } } | null } | null } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
 
 export type CountRunsQueryVariables = Exact<{
   startTime: Scalars['Time'];
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   preview?: InputMaybe<Scalars['Boolean']>;
+  runType?: InputMaybe<RunType>;
 }>;
 
 
@@ -1571,9 +1580,9 @@ export const RerunFromStepDocument = `
 }
     `;
 export const GetRunsDocument = `
-    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null, $preview: Boolean = false) {
+    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null, $preview: Boolean = false, $runType: RunType = null) {
   runs(
-    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField, query: $celQuery}
+    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField, query: $celQuery, runType: $runType}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $functionRunCursor
     preview: $preview
@@ -1597,6 +1606,15 @@ export const GetRunsDocument = `
         startedAt
         status
         hasAI
+        runType
+        deferredFrom {
+          parentRun {
+            function {
+              name
+              slug
+            }
+          }
+        }
       }
     }
     pageInfo {
@@ -1609,9 +1627,9 @@ export const GetRunsDocument = `
 }
     `;
 export const CountRunsDocument = `
-    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $preview: Boolean = false) {
+    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $preview: Boolean = false, $runType: RunType = null) {
   runs(
-    filter: {from: $startTime, status: $status, timeField: $timeField}
+    filter: {from: $startTime, status: $status, timeField: $timeField, runType: $runType}
     orderBy: [{field: $timeField, direction: DESC}]
     preview: $preview
   ) {

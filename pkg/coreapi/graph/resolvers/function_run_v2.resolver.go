@@ -72,6 +72,21 @@ func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.Fun
 	}, nil
 }
 
+// RunType reports whether a run was scheduled as a deferred (child) run or as
+// a primary run, derived from the run_defers linkage. The lookup goes through
+// RunDeferredFromLoader so requests for many runs in the same query batch into
+// a single backend call.
+func (r *functionRunV2Resolver) RunType(ctx context.Context, fn *models.FunctionRunV2) (models.RunType, error) {
+	df, err := loader.LoadOneWithString[cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
+	if err != nil {
+		return "", fmt.Errorf("error retrieving deferred-from linkage: %w", err)
+	}
+	if df != nil {
+		return models.RunTypeDefer, nil
+	}
+	return models.RunTypePrimary, nil
+}
+
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {
 	targetLoader := loader.FromCtx(ctx).LegacyRunTraceLoader
 	if preview != nil && *preview {

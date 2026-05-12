@@ -143,6 +143,10 @@ export const TopInfo = ({
   const hasLinkedRuns =
     Boolean(deferredFrom) || (defers?.length ?? 0) > 0 || invokedRuns.length > 0;
 
+  const headerLabel =
+    deferredFrom?.parentRun?.defers?.find((d) => d.run?.id === runID)?.userDeferID ??
+    trigger?.eventName;
+
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
   const codeBlockActions = useMemo(() => {
@@ -176,7 +180,7 @@ export const TopInfo = ({
           {isPending ? (
             <SkeletonElement />
           ) : (
-            <span className="text-basis text-sm font-normal">{trigger.eventName}</span>
+            <span className="text-basis text-sm font-normal">{headerLabel}</span>
           )}
         </div>
 
