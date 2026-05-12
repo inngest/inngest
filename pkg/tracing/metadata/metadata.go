@@ -161,7 +161,7 @@ func (m Update) ValidateAllowed() error {
 		return err
 	}
 
-	if m.Kind() == "inngest.score" {
+	if m.Kind() == KindInngestScore {
 		return validateScoreValues(m.RawUpdate.Values)
 	}
 
@@ -173,7 +173,7 @@ func (m Update) ValidateAllowedForScope(scope Scope) error {
 		return err
 	}
 
-	if m.Kind() == "inngest.score" && scope != enums.MetadataScopeStep {
+	if m.Kind() == KindInngestScore && scope != enums.MetadataScopeStep {
 		return fmt.Errorf("invalid score scope %q: %w", scope, ErrScoreScopeInvalid)
 	}
 
