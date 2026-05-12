@@ -433,7 +433,7 @@ func (sq *sqliteQuerier) GetRunDeferredFromByChildRunIDs(ctx context.Context, ch
 	if err != nil {
 		return nil, err
 	}
-	return convertSlice(rows, runDeferFromSQLite), nil
+	return convertSlice(rows, runDeferredFromRowFromSQLite), nil
 }
 
 func runDeferFromSQLite(r *sqlc.RunDefer) *db.RunDeferRow {
@@ -442,6 +442,16 @@ func runDeferFromSQLite(r *sqlc.RunDefer) *db.RunDeferRow {
 		DeferID:     r.DeferID,
 		UserDeferID: r.UserDeferID,
 		FnSlug:      r.FnSlug,
+		Status:      r.Status,
+		ChildRunID:  r.ChildRunID,
+	}
+}
+
+func runDeferredFromRowFromSQLite(r *sqlc.GetRunDeferredFromByChildRunIDsRow) *db.RunDeferRow {
+	return &db.RunDeferRow{
+		ParentRunID: r.ParentRunID,
+		DeferID:     r.DeferID,
+		UserDeferID: r.UserDeferID,
 		Status:      r.Status,
 		ChildRunID:  r.ChildRunID,
 	}

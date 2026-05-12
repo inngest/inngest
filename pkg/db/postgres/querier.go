@@ -516,7 +516,7 @@ func (pq *pgQuerier) GetRunDeferredFromByChildRunIDs(ctx context.Context, childR
 	if err != nil {
 		return nil, err
 	}
-	return convertSlice(rows, runDeferFromPG), nil
+	return convertSlice(rows, runDeferredFromRowFromPG), nil
 }
 
 func runDeferFromPG(r *sqlc.RunDefer) *db.RunDeferRow {
@@ -525,6 +525,16 @@ func runDeferFromPG(r *sqlc.RunDefer) *db.RunDeferRow {
 		DeferID:     r.DeferID,
 		UserDeferID: r.UserDeferID,
 		FnSlug:      r.FnSlug,
+		Status:      r.Status,
+		ChildRunID:  r.ChildRunID,
+	}
+}
+
+func runDeferredFromRowFromPG(r *sqlc.GetRunDeferredFromByChildRunIDsRow) *db.RunDeferRow {
+	return &db.RunDeferRow{
+		ParentRunID: r.ParentRunID,
+		DeferID:     r.DeferID,
+		UserDeferID: r.UserDeferID,
 		Status:      r.Status,
 		ChildRunID:  r.ChildRunID,
 	}

@@ -374,9 +374,8 @@ type RunDefer struct {
 }
 
 type RunDeferredFrom struct {
-	ParentRunID  ulid.ULID      `json:"parentRunID"`
-	ParentFnSlug string         `json:"parentFnSlug"`
-	ParentRun    *FunctionRunV2 `json:"parentRun,omitempty"`
+	ParentRunID ulid.ULID      `json:"parentRunID"`
+	ParentRun   *FunctionRunV2 `json:"parentRun,omitempty"`
 }
 
 type RunStep struct {

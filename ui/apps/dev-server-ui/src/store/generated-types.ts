@@ -707,7 +707,6 @@ export enum RunDeferStatus {
 
 export type RunDeferredFrom = {
   __typename?: 'RunDeferredFrom';
-  parentFnSlug: Scalars['String'];
   parentRun: Maybe<FunctionRunV2>;
   parentRunID: Scalars['ULID'];
 };
@@ -1794,7 +1793,6 @@ export type GetRunQuery = {
     deferredFrom: {
       __typename?: 'RunDeferredFrom';
       parentRunID: any;
-      parentFnSlug: string;
       parentRun: {
         __typename?: 'FunctionRunV2';
         id: any;

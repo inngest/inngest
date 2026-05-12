@@ -27,7 +27,6 @@ export type RunDeferSummary = {
 
 export type RunDeferredFromSummary = {
   parentRunID: string;
-  parentFnSlug: string;
   parentRun: {
     id: string;
     status: string;

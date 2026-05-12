@@ -386,9 +386,8 @@ type ComplexityRoot struct {
 	}
 
 	RunDeferredFrom struct {
-		ParentFnSlug func(childComplexity int) int
-		ParentRun    func(childComplexity int) int
-		ParentRunID  func(childComplexity int) int
+		ParentRun   func(childComplexity int) int
+		ParentRunID func(childComplexity int) int
 	}
 
 	RunHistoryCancel struct {
@@ -2414,13 +2413,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunDefer.UserDeferID(childComplexity), true
 
-	case "RunDeferredFrom.parentFnSlug":
-		if e.complexity.RunDeferredFrom.ParentFnSlug == nil {
-			break
-		}
-
-		return e.complexity.RunDeferredFrom.ParentFnSlug(childComplexity), true
-
 	case "RunDeferredFrom.parentRun":
 		if e.complexity.RunDeferredFrom.ParentRun == nil {
 			break
@@ -4189,7 +4181,6 @@ enum RunDeferStatus {
 
 type RunDeferredFrom {
   parentRunID: ULID!
-  parentFnSlug: String!
   parentRun: FunctionRunV2
 }
 
@@ -12790,8 +12781,6 @@ func (ec *executionContext) fieldContext_FunctionRunV2_deferredFrom(ctx context.
 			switch field.Name {
 			case "parentRunID":
 				return ec.fieldContext_RunDeferredFrom_parentRunID(ctx, field)
-			case "parentFnSlug":
-				return ec.fieldContext_RunDeferredFrom_parentFnSlug(ctx, field)
 			case "parentRun":
 				return ec.fieldContext_RunDeferredFrom_parentRun(ctx, field)
 			}
@@ -16433,50 +16422,6 @@ func (ec *executionContext) fieldContext_RunDeferredFrom_parentRunID(ctx context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ULID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RunDeferredFrom_parentFnSlug(ctx context.Context, field graphql.CollectedField, obj *models.RunDeferredFrom) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RunDeferredFrom_parentFnSlug(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ParentFnSlug, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RunDeferredFrom_parentFnSlug(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RunDeferredFrom",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -28218,13 +28163,6 @@ func (ec *executionContext) _RunDeferredFrom(ctx context.Context, sel ast.Select
 		case "parentRunID":
 
 			out.Values[i] = ec._RunDeferredFrom_parentRunID(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "parentFnSlug":
-
-			out.Values[i] = ec._RunDeferredFrom_parentFnSlug(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++

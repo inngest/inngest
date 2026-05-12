@@ -70,7 +70,6 @@ describe('LinkedFunctions', () => {
   it('renders only the Parent section when only deferredFrom is set', () => {
     const deferredFrom: RunDeferredFromSummary = {
       parentRunID: '01PARENT01',
-      parentFnSlug: 'parent-fn',
       parentRun: null,
     };
     render(<LinkedFunctions runID="run-self" invoked={[]} deferredFrom={deferredFrom} />);
@@ -78,6 +77,20 @@ describe('LinkedFunctions', () => {
     expect(screen.queryByText('Deferred functions')).toBeNull();
     expect(screen.queryByText('Parallel defers')).toBeNull();
     expect(screen.queryByText('Invoked functions')).toBeNull();
+  });
+
+  it("renders '-' in the Function cell with no link when the parent run is null", () => {
+    const deferredFrom: RunDeferredFromSummary = {
+      parentRunID: '01PARENT01',
+      parentRun: null,
+    };
+    render(<LinkedFunctions runID="run-self" invoked={[]} deferredFrom={deferredFrom} />);
+    // The parent run ID link exists, but the function cell falls back to '-'.
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]?.getAttribute('href')).toBe('/runs/01PARENT01');
+    // The status cell and the function cell both render '-'.
+    expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders only the Deferred section when only defers is set', () => {
@@ -117,7 +130,6 @@ describe('LinkedFunctions', () => {
     });
     const deferredFrom: RunDeferredFromSummary = {
       parentRunID: '01PARENT01',
-      parentFnSlug: 'parent-fn',
       parentRun: {
         id: '01PARENT01',
         status: 'COMPLETED',
@@ -145,7 +157,6 @@ describe('LinkedFunctions', () => {
     });
     const deferredFrom: RunDeferredFromSummary = {
       parentRunID: '01PARENT01',
-      parentFnSlug: 'parent-fn',
       parentRun: {
         id: '01PARENT01',
         status: 'COMPLETED',

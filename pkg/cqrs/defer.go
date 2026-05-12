@@ -53,9 +53,10 @@ type RunDefer struct {
 
 // RunDeferredFrom is the parent-run linkage of a deferred (child) run,
 // parsed from the child's triggering inngest/deferred.schedule event metadata.
-// ParentRun is nil if the parent row could not be loaded (e.g. pruned).
+// ParentRun is nil if the parent trace_runs row has not been ingested yet,
+// most commonly because the OTel pipeline that populates trace_runs lagged
+// behind or dropped the parent span.
 type RunDeferredFrom struct {
-	ParentRunID  ulid.ULID
-	ParentFnSlug string
-	ParentRun    *TraceRun
+	ParentRunID ulid.ULID
+	ParentRun   *TraceRun
 }

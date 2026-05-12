@@ -64,8 +64,6 @@ const deferStatus = (defer: RunDeferSummary): string => defer.run?.status ?? def
 const ParentFunctionSection = ({ deferredFrom }: { deferredFrom: RunDeferredFromSummary }) => {
   const { pathCreator } = usePathCreator();
   const parent = deferredFrom.parentRun;
-  const fnSlug = parent?.function.slug ?? deferredFrom.parentFnSlug;
-  const fnName = parent?.function.name ?? deferredFrom.parentFnSlug;
 
   return (
     <div className={sectionBorder}>
@@ -87,7 +85,13 @@ const ParentFunctionSection = ({ deferredFrom }: { deferredFrom: RunDeferredFrom
           </Link>
         </RowCell>
         <RowCell className="flex-1 truncate">
-          <Link href={pathCreator.function({ functionSlug: fnSlug })}>{fnName}</Link>
+          {parent ? (
+            <Link href={pathCreator.function({ functionSlug: parent.function.slug })}>
+              {parent.function.name}
+            </Link>
+          ) : (
+            <span className="text-muted">-</span>
+          )}
         </RowCell>
       </div>
     </div>

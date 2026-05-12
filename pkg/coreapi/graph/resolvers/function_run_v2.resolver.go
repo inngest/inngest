@@ -67,9 +67,8 @@ func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.Fun
 	}
 
 	return &models.RunDeferredFrom{
-		ParentRunID:  df.ParentRunID,
-		ParentFnSlug: df.ParentFnSlug,
-		ParentRun:    parentV2,
+		ParentRunID: df.ParentRunID,
+		ParentRun:   parentV2,
 	}, nil
 }
 

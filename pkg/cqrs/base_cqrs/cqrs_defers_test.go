@@ -111,7 +111,6 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, from, "child linkage should still exist after upsert")
 		assert.Equal(t, parent, from.ParentRunID)
-		assert.Equal(t, "fn2", from.ParentFnSlug)
 	})
 
 	t.Run("different parents don't collide", func(t *testing.T) {
@@ -262,7 +261,6 @@ func TestCQRSGetRunDeferredFrom(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equal(t, parent, got.ParentRunID)
-		assert.Equal(t, "parent-fn", got.ParentFnSlug)
 	})
 
 	t.Run("joins to parent TraceRun", func(t *testing.T) {

@@ -527,7 +527,6 @@ enum RunDeferStatus {
 
 type RunDeferredFrom {
   parentRunID: ULID!
-  parentFnSlug: String!
   parentRun: FunctionRunV2
 }
 
