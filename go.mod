@@ -13,7 +13,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
 	github.com/VividCortex/ewma v1.2.0
-	github.com/alicebob/miniredis/v2 v2.37.0
+	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/andybalholm/brotli v1.2.1
 	github.com/aws/aws-lambda-go v1.54.0
 	github.com/aws/smithy-go v1.25.1

@@ -289,7 +289,7 @@ github.com/VividCortex/ewma
 # github.com/agnivade/levenshtein v1.2.1
 ## explicit; go 1.21
 github.com/agnivade/levenshtein
-# github.com/alicebob/miniredis/v2 v2.37.0
+# github.com/alicebob/miniredis/v2 v2.38.0
 ## explicit; go 1.17
 github.com/alicebob/miniredis/v2
 github.com/alicebob/miniredis/v2/fpconv
