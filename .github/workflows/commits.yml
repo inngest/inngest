@@ -12,4 +12,4 @@ jobs:
         uses: ytanikin/pr-conventional-commits@639145d78959c53c43112365837e3abd21ed67c1 # 1.5.2
         with:
           # Keep this list aligned with cliff.toml.
-          task_types: '["feat","fix","doc","test","ci","refactor","perf","chore","revert","style","security","cloud","internal","noop"]'
+          task_types: '["feat","fix","doc","docs","test","ci","refactor","perf","chore","revert","style","security","cloud","internal","noop"]'
