@@ -13,6 +13,7 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { RerunModal as NewRerunModal, RerunModal } from '../Rerun/RerunModal';
+import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
 import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
@@ -23,7 +24,6 @@ import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
-import { ScoresAttrs } from './ScoresAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import {
