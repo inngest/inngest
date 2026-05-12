@@ -128,15 +128,23 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		},
 	}
 
+	for _, md := range req.Metadata {
+		if err := md.ValidateAllowedForScope(scope); err != nil {
+			return publicerr.Wrap(err, 400, "Invalid metadata")
+		}
+	}
+
 	var stateMetadata *statev2.Metadata
 	loadedFromState := false
 	if a.opts.State != nil {
 		md, err := a.opts.State.LoadMetadata(ctx, stateID)
-		if err != nil {
+		if errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
 			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
 				"error", err,
 				"run_id", runID.String(),
 			)
+		} else if err != nil {
+			return publicerr.Wrap(err, 500, "Unable to load run metadata")
 		} else {
 			stateMetadata = &md
 			loadedFromState = true
@@ -168,10 +176,6 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	for _, md := range req.Metadata {
-		if err := md.ValidateAllowedForScope(scope); err != nil {
-			return publicerr.Wrap(err, 400, "Invalid metadata")
-		}
-
 		_, err = tracing.CreateMetadataSpan(
 			ctx,
 			a.opts.TracerProvider,
