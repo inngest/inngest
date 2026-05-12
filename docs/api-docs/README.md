@@ -28,6 +28,8 @@ pnpm generate
 ## Release
 
 Requires the Vercel API and this directory linked to the `api-docs.inngest.com` project.
+The GitHub Action expects `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
+`VERCEL_PROJECT_ID` repository secrets.
 
 ```
 vercel build

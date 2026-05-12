@@ -50,30 +50,38 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
+      - name: Pull Vercel project settings
+        working-directory: docs/api-docs
+        run: vercel pull --yes --environment="${{ inputs.environment }}" --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
       - name: Build (preview)
         if: inputs.environment == 'preview'
         working-directory: docs/api-docs
-        run: vercel build
+        run: vercel build --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Build (production)
         if: inputs.environment == 'production'
         working-directory: docs/api-docs
-        run: vercel build --prod
+        run: vercel build --prod --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to preview
         if: inputs.environment == 'preview'
         working-directory: docs/api-docs
-        run: vercel deploy --prebuilt
+        run: vercel deploy --prebuilt --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to production
         if: inputs.environment == 'production'
         working-directory: docs/api-docs
-        run: vercel deploy --prebuilt --prod
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
