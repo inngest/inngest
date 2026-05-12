@@ -10,9 +10,6 @@ on:
   pull_request:
     paths-ignore:
       - "ui/**"
-  # Release PRs are updated by GITHUB_TOKEN, which does not fan out normal
-  # push/pull_request workflows. release-pr.yml dispatches this explicitly.
-  workflow_dispatch:
 
 permissions:
   contents: read
