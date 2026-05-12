@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -96,6 +97,33 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 			if err != nil {
 				res.Error = fmt.Errorf("error retrieving trace: %w", err)
 				return
+			}
+
+			// Make the run's canonical status available during conversion so
+			// descendant resolvers can suppress terminal "function
+			// success"/"function error" naming for runs that are still
+			// retrying. Prefer function_runs / function_finishes — they
+			// record the run-level outcome — and fall back to the root
+			// span's DynamicStatus if those rows aren't there yet.
+			if rootSpan != nil {
+				rootStatus := models.RunTraceSpanStatusRunning
+				if fr, ferr := tr.reader.GetRun(ctx, req.RunID, uuid.Nil, uuid.Nil); ferr == nil && fr != nil {
+					if mapped, mappedErr := models.ToFunctionRunStatus(fr.Status); mappedErr == nil {
+						switch mapped {
+						case models.FunctionRunStatusCompleted:
+							rootStatus = models.RunTraceSpanStatusCompleted
+						case models.FunctionRunStatusFailed:
+							rootStatus = models.RunTraceSpanStatusFailed
+						case models.FunctionRunStatusCancelled:
+							rootStatus = models.RunTraceSpanStatusCancelled
+						}
+					}
+				} else if rootSpan.Attributes != nil && rootSpan.Attributes.DynamicStatus != nil {
+					if mapped := tr.stepStatusToGQL(rootSpan.Attributes.DynamicStatus); mapped != nil {
+						rootStatus = *mapped
+					}
+				}
+				ctx = withRootRunStatus(ctx, rootStatus)
 			}
 
 			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
@@ -248,6 +276,21 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		UserlandSpan:   userlandSpan,
 	}
 
+	// The run span records its events input via OTel attributes, so the
+	// derived `OutputID` is non-nil even before the function produces any
+	// output. Hide it until the run has actually ended so consumers don't
+	// mistake the input handle for a real output.
+	if span.Name == meta.SpanNameRun {
+		// Reconcile root status with the canonical run-level outcome.
+		if rootStatus, ok := rootRunStatusFromCtx(ctx); ok {
+			gqlSpan.Status = rootStatus
+			status = rootStatus
+		}
+		if !models.RunTraceEnded(status) {
+			gqlSpan.OutputID = nil
+		}
+	}
+
 	if span.Attributes.SkipReason != nil {
 		reason := span.Attributes.SkipReason.String()
 		gqlSpan.SkipReason = &reason
@@ -288,6 +331,15 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					TimedOut:      span.Attributes.StepWaitExpired,
 					ReturnEventID: span.Attributes.StepInvokeFinishEventID,
 					RunID:         span.Attributes.StepInvokeRunID,
+				}
+
+				// On invoke timeout the invoked function may still have
+				// started (and its run ID recorded); the resolved RunID
+				// represents a completed handoff, so clear it when the
+				// invoke timed out before the function returned a result.
+				if si.TimedOut != nil && *si.TimedOut {
+					si.RunID = nil
+					si.ReturnEventID = nil
 				}
 
 				if span.Attributes.StepInvokeTriggerEventID != nil {
@@ -396,6 +448,23 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					omittedStepMetadata = append(omittedStepMetadata, child.Metadata...)
 				}
 
+				// Promote any visible step children of an omitted discovery
+				// to the parent. Some opcodes (e.g. sleep) parent their step
+				// span under the previous discovery rather than the run, so
+				// without this hoist the step would be lost when the
+				// discovery is hidden.
+				if child.SpanTypeName == meta.SpanNameStepDiscovery {
+					for _, gc := range child.ChildrenSpans {
+						if gc == nil || gc.Omit {
+							continue
+						}
+						if gc.SpanTypeName != meta.SpanNameStep {
+							continue
+						}
+						gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, gc)
+					}
+				}
+
 				continue
 			}
 
@@ -450,7 +519,56 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					}
 
 					if cs.Attributes.IsFunctionOutput != nil && *cs.Attributes.IsFunctionOutput {
-						gqlSpan.Name = FinalizationSpanName
+						// The function's terminal output span: name it based
+						// on outcome to match the legacy executor names
+						// consumers (and tests) check against. While the run
+						// is still in progress (a retry pending), we keep
+						// the legacy "execute" placeholder name instead, so
+						// in-progress traces don't prematurely report a
+						// failure. We also only rename when this attempt's
+						// status matches the run-level outcome — intermediate
+						// failed attempts of a successful run should not show
+						// up as "function error".
+						rootStatus, hasRoot := rootRunStatusFromCtx(ctx)
+						runTerminal := hasRoot && models.RunTraceEnded(rootStatus)
+						matchesRun := hasRoot && rootStatus == child.Status
+						switch {
+						case !runTerminal:
+							gqlSpan.Name = consts.OtelExecPlaceholder
+							// The wrapping span should reflect the run-level
+							// state, not the most recent failed attempt.
+							gqlSpan.Status = models.RunTraceSpanStatusRunning
+							gqlSpan.EndedAt = nil
+							// Suppress the latest attempt's output handle —
+							// the placeholder itself hasn't produced output
+							// yet from the consumer's perspective.
+							gqlSpan.OutputID = nil
+						case matchesRun && (child.Status == models.RunTraceSpanStatusFailed ||
+							child.Status == models.RunTraceSpanStatusCancelled):
+							gqlSpan.Name = consts.OtelExecFnErr
+						case matchesRun && child.Status == models.RunTraceSpanStatusCompleted:
+							gqlSpan.Name = consts.OtelExecFnOk
+						case !hasRoot:
+							// Best-effort naming when we can't see the
+							// run-level status.
+							switch child.Status {
+							case models.RunTraceSpanStatusFailed, models.RunTraceSpanStatusCancelled:
+								gqlSpan.Name = consts.OtelExecFnErr
+							case models.RunTraceSpanStatusCompleted:
+								gqlSpan.Name = consts.OtelExecFnOk
+							default:
+								gqlSpan.Name = FinalizationSpanName
+							}
+						default:
+							// Intermediate function-output attempt from a
+							// run that ultimately resolved differently —
+							// hide it so the displayed tree only contains
+							// the work that contributed to the final
+							// outcome (matching v1 behavior).
+							showSpan = false
+							gqlSpan.Omit = true
+							continue
+						}
 					} else if strings.HasPrefix(gqlSpan.Name, "executor.") && child.Name != "" {
 						gqlSpan.Name = child.Name
 					}
@@ -525,6 +643,26 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				// However, we preserve any userland spans from the
 				// successful execution if we have any.
 				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
+			} else if span.Name == meta.SpanNameStepDiscovery && isFunctionLevelExecutionGroup(span) {
+				// Function-level retries appear in v2 as a single discovery
+				// span with multiple `executor.execution` children (one per
+				// attempt). Render the legacy v1 grouping span so consumers
+				// see the attempts under a single node.
+				switch gqlSpan.Status {
+				case models.RunTraceSpanStatusCompleted:
+					gqlSpan.Name = consts.OtelExecFnOk
+				default:
+					gqlSpan.Name = consts.OtelExecPlaceholder
+				}
+				gqlSpan.StepOp = nil
+				gqlSpan.StepInfo = nil
+				count := len(gqlSpan.ChildrenSpans)
+				gqlSpan.Attempts = &count
+				// Legacy consumers expect each attempt's parent to be the
+				// run root, mirroring the synthetic v1 structure.
+				for _, attempt := range gqlSpan.ChildrenSpans {
+					attempt.ParentSpanID = gqlSpan.ParentSpanID
+				}
 			}
 		}
 
@@ -573,6 +711,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		if startedAt != nil && endedAt != nil {
 			dur := int(endedAt.Sub(*startedAt).Milliseconds())
 			gqlSpan.Duration = &dur
+		} else if gqlSpan.StartedAt != nil && gqlSpan.EndedAt != nil {
+			// Discovery spans don't carry timing attributes of their own;
+			// fall back to the merged child timings derived above.
+			dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
+			gqlSpan.Duration = &dur
 		}
 	} else {
 		// Remove ended at.  There's an issue in the data that CQRS is passed in which
@@ -594,6 +737,47 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	}
 
 	return gqlSpan, nil
+}
+
+type rootRunStatusCtxKey struct{}
+
+func withRootRunStatus(ctx context.Context, status models.RunTraceSpanStatus) context.Context {
+	return context.WithValue(ctx, rootRunStatusCtxKey{}, status)
+}
+
+func rootRunStatusFromCtx(ctx context.Context) (models.RunTraceSpanStatus, bool) {
+	v, ok := ctx.Value(rootRunStatusCtxKey{}).(models.RunTraceSpanStatus)
+	return v, ok
+}
+
+// isFunctionLevelExecutionGroup reports whether a discovery span is wrapping a
+// set of function-level execution attempts (no enclosing step.Run/step.Sleep
+// etc). In v1 these attempts were grouped under an "execute" placeholder
+// span; v2 emits them as `executor.execution` children of a single discovery,
+// so we synthesize the placeholder during GQL conversion to preserve the
+// legacy shape consumers expect.
+func isFunctionLevelExecutionGroup(span *cqrs.OtelSpan) bool {
+	if span.Name != meta.SpanNameStepDiscovery || len(span.Children) < 2 {
+		return false
+	}
+	for _, c := range span.Children {
+		if c == nil || c.Name != meta.SpanNameExecution {
+			return false
+		}
+		if c.Attributes == nil {
+			continue
+		}
+		if c.Attributes.StepID != nil && *c.Attributes.StepID != "" {
+			return false
+		}
+		if c.Attributes.StepName != nil && *c.Attributes.StepName != "" {
+			return false
+		}
+		if c.Attributes.StepOp != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (tr *traceReader) GetLegacyRunTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
