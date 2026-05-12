@@ -938,7 +938,7 @@ func (q NormalizedQueries) GetRunDefersByParentRunIDs(ctx context.Context, paren
 	return out, nil
 }
 
-func (q NormalizedQueries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*sqlc_sqlite.RunDefer, error) {
+func (q NormalizedQueries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*sqlc_sqlite.GetRunDeferredFromByChildRunIDsRow, error) {
 	if len(childRunIDs) == 0 {
 		return nil, nil
 	}
@@ -950,13 +950,12 @@ func (q NormalizedQueries) GetRunDeferredFromByChildRunIDs(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*sqlc_sqlite.RunDefer, len(rows))
+	out := make([]*sqlc_sqlite.GetRunDeferredFromByChildRunIDsRow, len(rows))
 	for i, r := range rows {
-		out[i] = &sqlc_sqlite.RunDefer{
+		out[i] = &sqlc_sqlite.GetRunDeferredFromByChildRunIDsRow{
 			ParentRunID: r.ParentRunID,
 			DeferID:     r.DeferID,
 			UserDeferID: r.UserDeferID,
-			FnSlug:      r.FnSlug,
 			Status:      r.Status,
 			ChildRunID:  r.ChildRunID,
 		}

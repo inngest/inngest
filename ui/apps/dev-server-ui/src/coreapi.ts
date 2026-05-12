@@ -436,7 +436,6 @@ export const GET_RUN = gql`
       }
       deferredFrom {
         parentRunID
-        parentFnSlug
         parentRun {
           id
           status

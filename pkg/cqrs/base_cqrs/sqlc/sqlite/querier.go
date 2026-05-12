@@ -54,7 +54,7 @@ type Querier interface {
 	// Queue snapshots
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
-	GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []ulid.ULID) ([]*RunDefer, error)
+	GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []ulid.ULID) ([]*GetRunDeferredFromByChildRunIDsRow, error)
 	GetRunDefersByParentRunIDs(ctx context.Context, parentRunIds []ulid.ULID) ([]*RunDefer, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)

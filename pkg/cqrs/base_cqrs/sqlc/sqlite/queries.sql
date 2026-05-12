@@ -650,6 +650,6 @@ WHERE parent_run_id IN (sqlc.slice('parent_run_ids'))
 ORDER BY defer_id ASC;
 
 -- name: GetRunDeferredFromByChildRunIDs :many
-SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
+SELECT parent_run_id, defer_id, user_defer_id, status, child_run_id
 FROM run_defers
 WHERE child_run_id IN (sqlc.slice('child_run_ids'));

@@ -1198,12 +1198,20 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 }
 
 const getRunDeferredFromByChildRunIDs = `-- name: GetRunDeferredFromByChildRunIDs :many
-SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
+SELECT parent_run_id, defer_id, user_defer_id, status, child_run_id
 FROM run_defers
 WHERE child_run_id IN (/*SLICE:child_run_ids*/?)
 `
 
-func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []ulid.ULID) ([]*RunDefer, error) {
+type GetRunDeferredFromByChildRunIDsRow struct {
+	ParentRunID ulid.ULID
+	DeferID     string
+	UserDeferID string
+	Status      string
+	ChildRunID  ulid.ULID
+}
+
+func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []ulid.ULID) ([]*GetRunDeferredFromByChildRunIDsRow, error) {
 	query := getRunDeferredFromByChildRunIDs
 	var queryParams []interface{}
 	if len(childRunIds) > 0 {
@@ -1219,14 +1227,13 @@ func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunI
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*RunDefer
+	var items []*GetRunDeferredFromByChildRunIDsRow
 	for rows.Next() {
-		var i RunDefer
+		var i GetRunDeferredFromByChildRunIDsRow
 		if err := rows.Scan(
 			&i.ParentRunID,
 			&i.DeferID,
 			&i.UserDeferID,
-			&i.FnSlug,
 			&i.Status,
 			&i.ChildRunID,
 		); err != nil {

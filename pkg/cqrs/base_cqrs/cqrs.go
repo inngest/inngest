@@ -1728,8 +1728,7 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 	out := make(map[ulid.ULID]*cqrs.RunDeferredFrom, len(rows))
 	for _, r := range rows {
 		entry := &cqrs.RunDeferredFrom{
-			ParentRunID:  r.ParentRunID,
-			ParentFnSlug: r.FnSlug,
+			ParentRunID: r.ParentRunID,
 		}
 		if tr, ok := parentsByID[r.ParentRunID]; ok {
 			entry.ParentRun = tr
