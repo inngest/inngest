@@ -52,7 +52,7 @@ jobs:
 
       - name: Pull Vercel project settings
         working-directory: docs/api-docs
-        run: vercel pull --yes --environment="${{ inputs.environment }}" --token="$VERCEL_TOKEN"
+        run: vercel pull --yes --environment="${{ inputs.environment }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
