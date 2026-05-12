@@ -108,6 +108,15 @@ func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 			wantErr: ErrScoreValueInvalid,
 		},
 		{
+			name: "null score is invalid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"score": json.RawMessage(`null`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
 			name: "string score is invalid",
 			update: Update{RawUpdate: RawUpdate{
 				Kind:   "inngest.score",

@@ -190,11 +190,11 @@ func validateScoreValues(values Values) error {
 			return fmt.Errorf("invalid score name %q: %w", name, ErrScoreNameInvalid)
 		}
 
-		var value float64
+		var value *float64
 		if err := json.Unmarshal(raw, &value); err != nil {
 			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
 		}
-		if math.IsNaN(value) || math.IsInf(value, 0) {
+		if value == nil || math.IsNaN(*value) || math.IsInf(*value, 0) {
 			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
 		}
 	}
