@@ -360,7 +360,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// was originally minted.
 	app, err := tx.UpsertAppByName(ctx, appParams)
 	if err != nil {
-		_ = tx.Commit(ctx)
+		_ = tx.Rollback(ctx)
 		return nil, publicerr.Wrap(err, 500, "Error upserting app")
 	}
 	appID = app.ID
