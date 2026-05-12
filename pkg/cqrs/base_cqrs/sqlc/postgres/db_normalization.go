@@ -912,8 +912,15 @@ func (q NormalizedQueries) UpdateRunDeferChildRunID(ctx context.Context, arg sql
 	})
 }
 
-func (q NormalizedQueries) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*sqlc_sqlite.RunDefer, error) {
-	rows, err := q.db.GetRunDefersByParentRun(ctx, parentRunID)
+func (q NormalizedQueries) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIDs []ulid.ULID) ([]*sqlc_sqlite.RunDefer, error) {
+	if len(parentRunIDs) == 0 {
+		return nil, nil
+	}
+	strIDs := make([]string, len(parentRunIDs))
+	for i, id := range parentRunIDs {
+		strIDs[i] = id.String()
+	}
+	rows, err := q.db.GetRunDefersByParentRunIDs(ctx, strIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -931,19 +938,30 @@ func (q NormalizedQueries) GetRunDefersByParentRun(ctx context.Context, parentRu
 	return out, nil
 }
 
-func (q NormalizedQueries) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*sqlc_sqlite.RunDefer, error) {
-	r, err := q.db.GetRunDeferredFromByChildRun(ctx, childRunID)
+func (q NormalizedQueries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*sqlc_sqlite.RunDefer, error) {
+	if len(childRunIDs) == 0 {
+		return nil, nil
+	}
+	strIDs := make([]string, len(childRunIDs))
+	for i, id := range childRunIDs {
+		strIDs[i] = id.String()
+	}
+	rows, err := q.db.GetRunDeferredFromByChildRunIDs(ctx, strIDs)
 	if err != nil {
 		return nil, err
 	}
-	return &sqlc_sqlite.RunDefer{
-		ParentRunID: r.ParentRunID,
-		DeferID:     r.DeferID,
-		UserDeferID: r.UserDeferID,
-		FnSlug:      r.FnSlug,
-		Status:      r.Status,
-		ChildRunID:  r.ChildRunID,
-	}, nil
+	out := make([]*sqlc_sqlite.RunDefer, len(rows))
+	for i, r := range rows {
+		out[i] = &sqlc_sqlite.RunDefer{
+			ParentRunID: r.ParentRunID,
+			DeferID:     r.DeferID,
+			UserDeferID: r.UserDeferID,
+			FnSlug:      r.FnSlug,
+			Status:      r.Status,
+			ChildRunID:  r.ChildRunID,
+		}
+	}
+	return out, nil
 }
 
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {

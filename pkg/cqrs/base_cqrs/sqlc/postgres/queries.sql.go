@@ -1178,36 +1178,51 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
-const getRunDeferredFromByChildRun = `-- name: GetRunDeferredFromByChildRun :one
+const getRunDeferredFromByChildRunIDs = `-- name: GetRunDeferredFromByChildRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE child_run_id = $1
-LIMIT 1
+WHERE child_run_id IN (SELECT UNNEST($1::CHAR(26)[]))
 `
 
-func (q *Queries) GetRunDeferredFromByChildRun(ctx context.Context, childRunID ulid.ULID) (*RunDefer, error) {
-	row := q.db.QueryRowContext(ctx, getRunDeferredFromByChildRun, childRunID)
-	var i RunDefer
-	err := row.Scan(
-		&i.ParentRunID,
-		&i.DeferID,
-		&i.UserDeferID,
-		&i.FnSlug,
-		&i.Status,
-		&i.ChildRunID,
-	)
-	return &i, err
+func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []string) ([]*RunDefer, error) {
+	rows, err := q.db.QueryContext(ctx, getRunDeferredFromByChildRunIDs, pq.Array(childRunIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*RunDefer
+	for rows.Next() {
+		var i RunDefer
+		if err := rows.Scan(
+			&i.ParentRunID,
+			&i.DeferID,
+			&i.UserDeferID,
+			&i.FnSlug,
+			&i.Status,
+			&i.ChildRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-const getRunDefersByParentRun = `-- name: GetRunDefersByParentRun :many
+const getRunDefersByParentRunIDs = `-- name: GetRunDefersByParentRunIDs :many
 SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
 FROM run_defers
-WHERE parent_run_id = $1
+WHERE parent_run_id IN (SELECT UNNEST($1::CHAR(26)[]))
 ORDER BY defer_id ASC
 `
 
-func (q *Queries) GetRunDefersByParentRun(ctx context.Context, parentRunID ulid.ULID) ([]*RunDefer, error) {
-	rows, err := q.db.QueryContext(ctx, getRunDefersByParentRun, parentRunID)
+func (q *Queries) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIds []string) ([]*RunDefer, error) {
+	rows, err := q.db.QueryContext(ctx, getRunDefersByParentRunIDs, pq.Array(parentRunIds))
 	if err != nil {
 		return nil, err
 	}
