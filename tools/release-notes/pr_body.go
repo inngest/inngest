@@ -17,6 +17,7 @@ func prBodyCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "tag", Usage: "Release tag.", Required: true},
 			&cli.StringFlag{Name: "compare-url", Usage: "GitHub compare URL since previous release."},
+			&cli.StringFlag{Name: "compare-label", Usage: "Display label for the GitHub compare URL."},
 			&cli.StringFlag{Name: "base", Value: "main", Usage: "Base branch."},
 			&cli.StringFlag{Name: "head", Value: "release/next", Usage: "Release branch."},
 			&cli.StringFlag{Name: "latest-tag", Usage: "Previous release tag."},
@@ -29,6 +30,7 @@ func prBodyCommand() *cli.Command {
 			return prBodyCommandAction(
 				cmd.String("tag"),
 				cmd.String("compare-url"),
+				cmd.String("compare-label"),
 				cmd.String("base"),
 				cmd.String("head"),
 				cmd.String("latest-tag"),
@@ -40,7 +42,7 @@ func prBodyCommand() *cli.Command {
 	}
 }
 
-func prBodyCommandAction(tag, compareURL, base, head, latestTag, previewPath, existingBodyPath, outputPath string) error {
+func prBodyCommandAction(tag, compareURL, compareLabel, base, head, latestTag, previewPath, existingBodyPath, outputPath string) error {
 	if tag == "" {
 		return errors.New("--tag is required")
 	}
@@ -65,6 +67,7 @@ func prBodyCommandAction(tag, compareURL, base, head, latestTag, previewPath, ex
 	rendered, err := RenderReleasePRBody(ReleasePRBodyInput{
 		Tag:          tag,
 		CompareURL:   compareURL,
+		CompareLabel: compareLabel,
 		Base:         base,
 		Head:         head,
 		LatestTag:    latestTag,
@@ -85,6 +88,7 @@ func prBodyCommandAction(tag, compareURL, base, head, latestTag, previewPath, ex
 type ReleasePRBodyInput struct {
 	Tag          string
 	CompareURL   string
+	CompareLabel string
 	Base         string
 	Head         string
 	LatestTag    string
@@ -113,23 +117,18 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 	}
 
 	manualRelease := NormalizeNote(ExtractMarkerBlock(input.ExistingBody, "release-note:manual-start", "release-note:manual-end"))
-	if manualRelease == "" {
-		manualRelease = "None."
-	}
 	manualMigration := NormalizeNote(ExtractMarkerBlock(input.ExistingBody, "migration-note:manual-start", "migration-note:manual-end"))
-	if manualMigration == "" {
-		manualMigration = "None."
-	}
 
 	var b strings.Builder
 	b.WriteString("<!-- auto-release-pr -->\n")
 	b.WriteString("## Release\n\n")
 	fmt.Fprintf(&b, "This PR prepares `%s`.\n\n", tag)
 	if input.CompareURL != "" {
-		compareLabel := strings.TrimSpace(input.LatestTag)
-		if compareLabel != "" {
-			compareLabel = fmt.Sprintf("%s...%s", compareLabel, base)
-		} else {
+		compareLabel := strings.TrimSpace(input.CompareLabel)
+		if compareLabel == "" && strings.TrimSpace(input.LatestTag) != "" {
+			compareLabel = fmt.Sprintf("%s...%s", strings.TrimSpace(input.LatestTag), base)
+		}
+		if compareLabel == "" {
 			compareLabel = "Compare changes"
 		}
 		fmt.Fprintf(&b, "- Code difference since last tag: [%s](%s)\n", compareLabel, input.CompareURL)
@@ -142,13 +141,19 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 
 	b.WriteString("## Additional Release Notes\n")
 	b.WriteString("<!-- release-note:manual-start -->\n")
-	b.WriteString(manualRelease)
-	b.WriteString("\n<!-- release-note:manual-end -->\n\n")
+	if manualRelease != "" {
+		b.WriteString(manualRelease)
+		b.WriteString("\n")
+	}
+	b.WriteString("<!-- release-note:manual-end -->\n\n")
 
 	b.WriteString("## Additional Migration Notes\n")
 	b.WriteString("<!-- migration-note:manual-start -->\n")
-	b.WriteString(manualMigration)
-	b.WriteString("\n<!-- migration-note:manual-end -->\n\n")
+	if manualMigration != "" {
+		b.WriteString(manualMigration)
+		b.WriteString("\n")
+	}
+	b.WriteString("<!-- migration-note:manual-end -->\n\n")
 
 	b.WriteString("## Notes Preview\n")
 	b.WriteString("<!-- release-note:preview-start -->\n")

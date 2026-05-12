@@ -3,42 +3,13 @@ name: PR Conventional Commit Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
-  merge_group:
 
 jobs:
   validate-pr-title:
     runs-on: ubuntu-latest
     steps:
       - name: PR Conventional Commit Validation
-        if: github.event_name == 'pull_request'
         uses: ytanikin/pr-conventional-commits@639145d78959c53c43112365837e3abd21ed67c1 # 1.5.2
         with:
           # Keep this list aligned with cliff.toml.
           task_types: '["feat","fix","doc","test","ci","refactor","perf","chore","revert","style","security","cloud","internal","noop"]'
-
-      - name: Merge Queue Conventional Commit Validation
-        if: github.event_name == 'merge_group'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
-        run: |
-          head_ref="${MERGE_GROUP_HEAD_REF:-${GITHUB_REF_NAME}}"
-          mapfile -t pr_numbers < <(printf '%s\n' "${head_ref}" | grep -Eo 'pr-[0-9]+' | sed 's/pr-//' | sort -u)
-
-          if [ "${#pr_numbers[@]}" -eq 0 ]; then
-            echo "::error title=Missing pull request number::Could not determine pull request number from merge queue ref: ${head_ref}"
-            exit 1
-          fi
-
-          allowed_types="feat|fix|doc|test|ci|refactor|perf|chore|revert|style|security|cloud|internal|noop"
-          title_regex="^(${allowed_types})(\([A-Za-z0-9._/-]+\))?!?: .+"
-
-          for pr_number in "${pr_numbers[@]}"; do
-            title="$(gh pr view "${pr_number}" --repo "${GITHUB_REPOSITORY}" --json title --jq '.title')"
-            echo "Validating PR #${pr_number}: ${title}"
-
-            if [[ ! "${title}" =~ ${title_regex} ]]; then
-              echo "::error title=Invalid conventional PR title::PR #${pr_number} title must use Conventional Commit format with an allowed type: ${title}"
-              exit 1
-            fi
-          done

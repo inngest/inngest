@@ -118,3 +118,24 @@ func TestNormalizeNotePlaceholders(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePRBodyDropsMendralSummary(t *testing.T) {
+	body := `## Migration note
+
+None.
+
+<!-- MENDRAL_SUMMARY -->
+---
+
+> [!NOTE]
+> AI-generated summary.
+>
+> <sup>Written by [Mendral](https://mendral.com).</sup>
+<!-- /MENDRAL_SUMMARY -->
+`
+
+	sections := ParsePRBody(body)
+	if got := NormalizeNote(sections["migration note"]); got != "" {
+		t.Fatalf("migration note = %q, want empty", got)
+	}
+}

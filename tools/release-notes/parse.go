@@ -62,9 +62,13 @@ func parseHeading(line string) (string, bool) {
 	}
 }
 
-var htmlCommentPattern = regexp.MustCompile(`(?s)<!--.*?-->`)
+var (
+	htmlCommentPattern    = regexp.MustCompile(`(?s)<!--.*?-->`)
+	mendralSummaryPattern = regexp.MustCompile(`(?s)<!--\s*MENDRAL_SUMMARY\s*-->.*?<!--\s*/MENDRAL_SUMMARY\s*-->`)
+)
 
 func CleanMarkdownSection(value string) string {
+	value = mendralSummaryPattern.ReplaceAllString(value, "")
 	value = htmlCommentPattern.ReplaceAllString(value, "")
 	return NormalizeWhitespace(value)
 }
