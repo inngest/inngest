@@ -190,6 +190,10 @@ func (f *fakeTraceReader) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdent
 	return nil, nil
 }
 
+func (f *fakeTraceReader) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
+	return nil, nil
+}
+
 func (f *fakeTraceReader) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
 	return nil, nil
 }

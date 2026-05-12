@@ -1724,6 +1724,61 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, 
 	return &i, err
 }
 
+const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id IN (/*SLICE:run_ids*/?)
+`
+
+func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*TraceRun, error) {
+	query := getTraceRunsByRunIDs
+	var queryParams []interface{}
+	if len(runIDs) > 0 {
+		for _, v := range runIDs {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(runIDs))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TraceRun
+	for rows.Next() {
+		var i TraceRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.FunctionID,
+			&i.TraceID,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Status,
+			&i.SourceID,
+			&i.TriggerIds,
+			&i.Output,
+			&i.IsDebounce,
+			&i.BatchID,
+			&i.CronSchedule,
+			&i.HasAi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), ?1) > 0
 `

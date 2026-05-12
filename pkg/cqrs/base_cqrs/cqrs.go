@@ -1651,6 +1651,19 @@ func (w wrapper) GetRunDefers(ctx context.Context, runID ulid.ULID) ([]cqrs.RunD
 	if err != nil {
 		return nil, err
 	}
+
+	childIDs := make([]ulid.ULID, 0, len(rows))
+	for _, r := range rows {
+		if !r.ChildRunID.IsZero() {
+			childIDs = append(childIDs, r.ChildRunID)
+		}
+	}
+
+	runsByID, err := w.GetTraceRunsByRunIDs(ctx, childIDs)
+	if err != nil {
+		return nil, fmt.Errorf("loading child trace runs for defers: %w", err)
+	}
+
 	out := make([]cqrs.RunDefer, 0, len(rows))
 	for _, r := range rows {
 		entry := cqrs.RunDefer{
@@ -1660,12 +1673,8 @@ func (w wrapper) GetRunDefers(ctx context.Context, runID ulid.ULID) ([]cqrs.RunD
 			Status:      cqrs.RunDeferStatus(r.Status),
 		}
 		if !r.ChildRunID.IsZero() {
-			tr, terr := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: r.ChildRunID})
-			switch {
-			case terr == nil:
+			if tr, ok := runsByID[r.ChildRunID]; ok {
 				entry.Run = tr
-			case !errors.Is(terr, sql.ErrNoRows):
-				logger.StdlibLogger(ctx).Error("error loading child trace run for defer", "error", terr, "child_run_id", r.ChildRunID)
 			}
 		}
 		out = append(out, entry)
@@ -1908,47 +1917,8 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 		return nil, err
 	}
 	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
-	// dedupe this conversion
 	for i, run := range sqlcTraceRuns {
-		start := time.UnixMilli(run.StartedAt)
-		end := time.UnixMilli(run.EndedAt)
-		triggerIDS := strings.Split(string(run.TriggerIds), ",")
-
-		var (
-			isBatch bool
-			batchID *ulid.ULID
-			cron    *string
-		)
-
-		if !run.BatchID.IsZero() {
-			isBatch = true
-			batchID = &run.BatchID
-		}
-
-		if run.CronSchedule.Valid {
-			cron = &run.CronSchedule.String
-		}
-
-		cqrsTraceRuns[i] = &cqrs.TraceRun{
-			AccountID:    run.AccountID,
-			WorkspaceID:  run.WorkspaceID,
-			AppID:        run.AppID,
-			FunctionID:   run.FunctionID,
-			TraceID:      string(run.TraceID),
-			RunID:        run.RunID.String(),
-			QueuedAt:     time.UnixMilli(run.QueuedAt),
-			StartedAt:    start,
-			EndedAt:      end,
-			Duration:     end.Sub(start),
-			SourceID:     run.SourceID,
-			TriggerIDs:   triggerIDS,
-			Output:       run.Output,
-			Status:       enums.RunCodeToStatus(run.Status),
-			BatchID:      batchID,
-			IsBatch:      isBatch,
-			CronSchedule: cron,
-			HasAI:        run.HasAi,
-		}
+		cqrsTraceRuns[i] = traceRunToCQRS(run)
 	}
 	return cqrsTraceRuns, nil
 }
@@ -1959,6 +1929,27 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		return nil, err
 	}
 
+	return traceRunToCQRS(run), nil
+}
+
+func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return map[ulid.ULID]*cqrs.TraceRun{}, nil
+	}
+
+	rows, err := w.q.GetTraceRunsByRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[ulid.ULID]*cqrs.TraceRun, len(rows))
+	for _, row := range rows {
+		out[row.RunID] = traceRunToCQRS(row)
+	}
+	return out, nil
+}
+
+func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 	start := time.UnixMilli(run.StartedAt)
 	end := time.UnixMilli(run.EndedAt)
 	triggerIDS := strings.Split(string(run.TriggerIds), ",")
@@ -1978,13 +1969,13 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		cron = &run.CronSchedule.String
 	}
 
-	trun := cqrs.TraceRun{
+	return &cqrs.TraceRun{
 		AccountID:    run.AccountID,
 		WorkspaceID:  run.WorkspaceID,
 		AppID:        run.AppID,
 		FunctionID:   run.FunctionID,
 		TraceID:      string(run.TraceID),
-		RunID:        id.RunID.String(),
+		RunID:        run.RunID.String(),
 		QueuedAt:     time.UnixMilli(run.QueuedAt),
 		StartedAt:    start,
 		EndedAt:      end,
@@ -1998,8 +1989,6 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		CronSchedule: cron,
 		HasAI:        run.HasAi,
 	}
-
-	return &trun, nil
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {

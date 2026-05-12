@@ -633,6 +633,14 @@ func (sq *sqliteQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.
 	return traceRunFromSQLite(r), nil
 }
 
+func (sq *sqliteQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
+	rows, err := sq.q.GetTraceRunsByRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, traceRunFromSQLite), nil
+}
+
 func (sq *sqliteQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {
 	rows, err := sq.q.GetTraceRunsByTriggerId(ctx, eventID)
 	if err != nil {

@@ -693,6 +693,29 @@ func (q NormalizedQueries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*s
 	return traceRun.ToSQLite()
 }
 
+func (q NormalizedQueries) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*sqlc_sqlite.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+
+	strIDs := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		strIDs[i] = id.String()
+	}
+
+	runs, err := q.db.GetTraceRunsByRunIDs(ctx, strIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRuns := make([]*sqlc_sqlite.TraceRun, len(runs))
+	for i, run := range runs {
+		sqliteRuns[i], _ = run.ToSQLite()
+	}
+
+	return sqliteRuns, nil
+}
+
 func (q NormalizedQueries) GetTraceSpanOutput(ctx context.Context, arg sqlc_sqlite.GetTraceSpanOutputParams) ([]*sqlc_sqlite.Trace, error) {
 	pgArg := GetTraceSpanOutputParams{
 		TraceID: arg.TraceID,
