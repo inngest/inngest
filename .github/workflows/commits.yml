@@ -1,6 +1,9 @@
 name: PR Conventional Commit Validation
 
 on:
+  branches:
+    - main
+    - release/next
   pull_request:
     types: [opened, synchronize, reopened, edited]
 

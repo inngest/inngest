@@ -2,7 +2,9 @@ name: Go
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - release/next
     paths-ignore:
       - "ui/**"
   pull_request:
