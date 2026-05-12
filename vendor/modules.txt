@@ -1381,7 +1381,7 @@ github.com/twmb/franz-go/pkg/sasl/scram
 ## explicit; go 1.24.0
 github.com/twmb/franz-go/pkg/kmsg
 github.com/twmb/franz-go/pkg/kmsg/internal/kbin
-# github.com/urfave/cli/v3 v3.8.0
+# github.com/urfave/cli/v3 v3.9.0
 ## explicit; go 1.22
 github.com/urfave/cli/v3
 # github.com/valyala/fastjson v1.6.10
