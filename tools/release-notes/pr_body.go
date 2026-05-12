@@ -16,7 +16,7 @@ func prBodyCommand() *cli.Command {
 		Usage: "Render a release PR body.",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "tag", Usage: "Release tag.", Required: true},
-			&cli.StringFlag{Name: "ahead", Usage: "Commit count since previous release."},
+			&cli.StringFlag{Name: "compare-url", Usage: "GitHub compare URL since previous release."},
 			&cli.StringFlag{Name: "base", Value: "main", Usage: "Base branch."},
 			&cli.StringFlag{Name: "head", Value: "release/next", Usage: "Release branch."},
 			&cli.StringFlag{Name: "latest-tag", Usage: "Previous release tag."},
@@ -28,7 +28,7 @@ func prBodyCommand() *cli.Command {
 			_ = ctx
 			return prBodyCommandAction(
 				cmd.String("tag"),
-				cmd.String("ahead"),
+				cmd.String("compare-url"),
 				cmd.String("base"),
 				cmd.String("head"),
 				cmd.String("latest-tag"),
@@ -40,7 +40,7 @@ func prBodyCommand() *cli.Command {
 	}
 }
 
-func prBodyCommandAction(tag, ahead, base, head, latestTag, previewPath, existingBodyPath, outputPath string) error {
+func prBodyCommandAction(tag, compareURL, base, head, latestTag, previewPath, existingBodyPath, outputPath string) error {
 	if tag == "" {
 		return errors.New("--tag is required")
 	}
@@ -64,7 +64,7 @@ func prBodyCommandAction(tag, ahead, base, head, latestTag, previewPath, existin
 
 	rendered, err := RenderReleasePRBody(ReleasePRBodyInput{
 		Tag:          tag,
-		Ahead:        ahead,
+		CompareURL:   compareURL,
 		Base:         base,
 		Head:         head,
 		LatestTag:    latestTag,
@@ -84,7 +84,7 @@ func prBodyCommandAction(tag, ahead, base, head, latestTag, previewPath, existin
 
 type ReleasePRBodyInput struct {
 	Tag          string
-	Ahead        string
+	CompareURL   string
 	Base         string
 	Head         string
 	LatestTag    string
@@ -125,8 +125,14 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 	b.WriteString("<!-- auto-release-pr -->\n")
 	b.WriteString("## Release\n\n")
 	fmt.Fprintf(&b, "This PR prepares `%s`.\n\n", tag)
-	if input.Ahead != "" {
-		fmt.Fprintf(&b, "- Commits since last tag: %s\n", input.Ahead)
+	if input.CompareURL != "" {
+		compareLabel := strings.TrimSpace(input.LatestTag)
+		if compareLabel != "" {
+			compareLabel = fmt.Sprintf("%s...%s", compareLabel, base)
+		} else {
+			compareLabel = "Compare changes"
+		}
+		fmt.Fprintf(&b, "- Code difference since last tag: [%s](%s)\n", compareLabel, input.CompareURL)
 	}
 	if input.LatestTag != "" {
 		fmt.Fprintf(&b, "- Previous tag: `%s`\n", input.LatestTag)

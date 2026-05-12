@@ -89,7 +89,7 @@ scripts/release/build-release-notes \
 
 scripts/release/render-release-pr-body \
   --tag v1.2.3 \
-  --ahead 10 \
+  --compare-url "https://github.com/inngest/inngest/compare/v1.2.2...main" \
   --latest-tag v1.2.2 \
   --preview /tmp/RELEASE_NOTES.md \
   --output /tmp/release-pr-body.md

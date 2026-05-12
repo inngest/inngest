@@ -55,14 +55,17 @@ jobs:
           if [ -n "${latest_tag}" ]; then
             ahead="$(git rev-list --count "${latest_tag}"..HEAD)"
             release_range="${latest_tag}..HEAD"
+            compare_url="${{ github.server_url }}/${{ github.repository }}/compare/${latest_tag}...${{ github.event.repository.default_branch }}"
           else
             ahead="$(git rev-list --count HEAD)"
             release_range="HEAD"
+            compare_url=""
           fi
 
           echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
           echo "ahead=${ahead}" >> "$GITHUB_OUTPUT"
           echo "release_range=${release_range}" >> "$GITHUB_OUTPUT"
+          echo "compare_url=${compare_url}" >> "$GITHUB_OUTPUT"
 
           if [ "${ahead}" -eq 0 ]; then
             echo "No unreleased commits found"
@@ -164,7 +167,7 @@ jobs:
         run: |
           scripts/release/render-release-pr-body \
             --tag "${{ steps.normalized-version.outputs.tag }}" \
-            --ahead "${{ steps.changes.outputs.ahead }}" \
+            --compare-url "${{ steps.changes.outputs.compare_url }}" \
             --latest-tag "${{ steps.changes.outputs.latest_tag }}" \
             --base "${{ github.event.repository.default_branch }}" \
             --head "release/next" \
