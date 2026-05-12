@@ -103,10 +103,18 @@ func (sq *sqliteQuerier) UpsertApp(ctx context.Context, arg db.UpsertAppParams) 
 
 func (sq *sqliteQuerier) UpsertAppByName(ctx context.Context, arg db.UpsertAppParams) (*db.App, error) {
 	r, err := sq.q.UpsertAppByName(ctx, sqlc.UpsertAppByNameParams{
-		ID: arg.ID, Name: arg.Name, SdkLanguage: arg.SdkLanguage,
-		SdkVersion: arg.SdkVersion, Framework: arg.Framework, Metadata: arg.Metadata,
-		Status: arg.Status, Error: arg.Error, Checksum: arg.Checksum,
-		Url: arg.Url, Method: arg.Method, AppVersion: arg.AppVersion,
+		ID:          arg.ID,
+		Name:        arg.Name,
+		SdkLanguage: arg.SdkLanguage,
+		SdkVersion:  arg.SdkVersion,
+		Framework:   arg.Framework,
+		Metadata:    arg.Metadata,
+		Status:      arg.Status,
+		Error:       arg.Error,
+		Checksum:    arg.Checksum,
+		Url:         arg.Url,
+		Method:      arg.Method,
+		AppVersion:  arg.AppVersion,
 	})
 	if err != nil {
 		return nil, err
