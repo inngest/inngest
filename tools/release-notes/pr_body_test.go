@@ -55,7 +55,7 @@ Old preview.
 	}
 }
 
-func TestRenderReleasePRBodyDefaultsManualBlocks(t *testing.T) {
+func TestRenderReleasePRBodyRendersEmptyEditableManualBlocks(t *testing.T) {
 	got, err := RenderReleasePRBody(ReleasePRBodyInput{
 		Tag:     "v1.2.3",
 		Preview: "## Changelog\n\n- Entry",
@@ -64,10 +64,38 @@ func TestRenderReleasePRBodyDefaultsManualBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertContains(t, got, "<!-- release-note:manual-start -->\nNone.\n<!-- release-note:manual-end -->")
-	assertContains(t, got, "<!-- migration-note:manual-start -->\nNone.\n<!-- migration-note:manual-end -->")
+	assertContains(t, got, "## Additional Release Notes")
+	assertContains(t, got, "<!-- release-note:manual-start -->\n<!-- release-note:manual-end -->")
+	assertContains(t, got, "## Additional Migration Notes")
+	assertContains(t, got, "<!-- migration-note:manual-start -->\n<!-- migration-note:manual-end -->")
+	assertNotContains(t, got, "None.")
+	assertNotContains(t, got, "N/A")
 	assertContains(t, got, "- Source branch: `release/next`")
 	assertContains(t, got, "- Base branch: `main`")
+}
+
+func TestRenderReleasePRBodyOmitsPlaceholderManualText(t *testing.T) {
+	got, err := RenderReleasePRBody(ReleasePRBodyInput{
+		Tag: "v1.2.3",
+		ExistingBody: `## Additional Release Notes
+<!-- release-note:manual-start -->
+None.
+<!-- release-note:manual-end -->
+
+## Additional Migration Notes
+<!-- migration-note:manual-start -->
+N/A
+<!-- migration-note:manual-end -->`,
+		Preview: "## Changelog\n\n- Entry",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertContains(t, got, "## Additional Release Notes")
+	assertContains(t, got, "## Additional Migration Notes")
+	assertNotContains(t, got, "None.")
+	assertNotContains(t, got, "N/A")
 }
 
 func TestPRBodyCommandWritesOutput(t *testing.T) {

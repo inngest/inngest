@@ -117,13 +117,7 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 	}
 
 	manualRelease := NormalizeNote(ExtractMarkerBlock(input.ExistingBody, "release-note:manual-start", "release-note:manual-end"))
-	if manualRelease == "" {
-		manualRelease = "None."
-	}
 	manualMigration := NormalizeNote(ExtractMarkerBlock(input.ExistingBody, "migration-note:manual-start", "migration-note:manual-end"))
-	if manualMigration == "" {
-		manualMigration = "None."
-	}
 
 	var b strings.Builder
 	b.WriteString("<!-- auto-release-pr -->\n")
@@ -147,13 +141,19 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 
 	b.WriteString("## Additional Release Notes\n")
 	b.WriteString("<!-- release-note:manual-start -->\n")
-	b.WriteString(manualRelease)
-	b.WriteString("\n<!-- release-note:manual-end -->\n\n")
+	if manualRelease != "" {
+		b.WriteString(manualRelease)
+		b.WriteString("\n")
+	}
+	b.WriteString("<!-- release-note:manual-end -->\n\n")
 
 	b.WriteString("## Additional Migration Notes\n")
 	b.WriteString("<!-- migration-note:manual-start -->\n")
-	b.WriteString(manualMigration)
-	b.WriteString("\n<!-- migration-note:manual-end -->\n\n")
+	if manualMigration != "" {
+		b.WriteString(manualMigration)
+		b.WriteString("\n")
+	}
+	b.WriteString("<!-- migration-note:manual-end -->\n\n")
 
 	b.WriteString("## Notes Preview\n")
 	b.WriteString("<!-- release-note:preview-start -->\n")
