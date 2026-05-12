@@ -23,6 +23,7 @@ import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
+import { ScoresAttrs } from './ScoresAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import {
@@ -152,6 +153,9 @@ export const StepInfo = ({
 
   const { booleanFlag } = useBooleanFlag();
   const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const scoreMetadata = trace.metadata?.filter((md) => md.kind === 'inngest.score') ?? [];
+  const nonScoreMetadata = trace.metadata?.filter((md) => md.kind !== 'inngest.score') ?? [];
+  const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -177,7 +181,8 @@ export const StepInfo = ({
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
 
-  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+  const hasNoData =
+    !prettyInput && !prettyOutput && !result?.error && !scoreMetadata.length && !hasMetadataTab;
 
   let emptyStateMessage = 'No output available';
   if (loading) {
@@ -292,12 +297,21 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(metadataIsEnabled && trace.metadata?.length
+              ...(scoreMetadata.length
+                ? [
+                    {
+                      label: 'Scores',
+                      id: 'scores',
+                      node: <ScoresAttrs metadata={scoreMetadata} />,
+                    },
+                  ]
+                : []),
+              ...(hasMetadataTab
                 ? [
                     {
                       label: 'Metadata',
                       id: 'metadata',
-                      node: <MetadataAttrs metadata={trace.metadata} />,
+                      node: <MetadataAttrs metadata={nonScoreMetadata} />,
                     },
                   ]
                 : []),
@@ -314,7 +328,7 @@ export const StepInfo = ({
               </div>
             ) : (
               <Tabs
-                defaultActive={result?.error ? 'error' : 'output'}
+                defaultActive={result?.error ? 'error' : prettyOutput ? 'output' : ''}
                 tabs={[
                   ...(prettyInput
                     ? [
@@ -350,12 +364,21 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(metadataIsEnabled && trace.metadata?.length
+                  ...(scoreMetadata.length
+                    ? [
+                        {
+                          label: 'Scores',
+                          id: 'scores',
+                          node: <ScoresAttrs metadata={scoreMetadata} />,
+                        },
+                      ]
+                    : []),
+                  ...(hasMetadataTab
                     ? [
                         {
                           label: 'Metadata',
                           id: 'metadata',
-                          node: <MetadataAttrs metadata={trace.metadata} />,
+                          node: <MetadataAttrs metadata={nonScoreMetadata} />,
                         },
                       ]
                     : []),

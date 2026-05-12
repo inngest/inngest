@@ -8,6 +8,7 @@ const inngestKindLabels: Record<string, string> = {
   experiment: 'Experiment',
   http: 'HTTP Metadata',
   response_headers: 'Response Headers',
+  score: 'Scores',
   usage: 'Run Usage',
   warnings: 'Warnings',
 };
