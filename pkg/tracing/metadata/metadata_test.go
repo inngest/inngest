@@ -93,7 +93,7 @@ func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 		{
 			name: "flat numeric score is valid",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
 				Values: Values{"accuracy": json.RawMessage(`1`)},
 			}},
@@ -101,7 +101,7 @@ func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 		{
 			name: "nested score object is invalid",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
 				Values: Values{"score": json.RawMessage(`{"value":1}`)},
 			}},
@@ -110,7 +110,7 @@ func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 		{
 			name: "null score is invalid",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
 				Values: Values{"score": json.RawMessage(`null`)},
 			}},
@@ -119,7 +119,7 @@ func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 		{
 			name: "string score is invalid",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
 				Values: Values{"accuracy": json.RawMessage(`"1"`)},
 			}},
@@ -128,7 +128,7 @@ func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 		{
 			name: "invalid score name is rejected",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
 				Values: Values{"bad-name": json.RawMessage(`1`)},
 			}},
@@ -163,7 +163,7 @@ func TestUpdateValidateAllowedForScopeRejectsRunScopedScores(t *testing.T) {
 	t.Parallel()
 
 	update := Update{RawUpdate: RawUpdate{
-		Kind:   "inngest.score",
+		Kind:   KindInngestScore,
 		Op:     enums.MetadataOpcodeMerge,
 		Values: Values{"accuracy": json.RawMessage(`1`)},
 	}}

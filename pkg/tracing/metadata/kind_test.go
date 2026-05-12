@@ -48,7 +48,7 @@ func TestKind_ValidateAllowed(t *testing.T) {
 		},
 		{
 			name:    "inngest.score is allowed",
-			kind:    "inngest.score",
+			kind:    KindInngestScore,
 			wantErr: nil,
 		},
 		{
