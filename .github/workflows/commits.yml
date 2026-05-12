@@ -1,8 +1,15 @@
 name: PR Conventional Commit Validation
 
 on:
-  pull_request:
+  # Use pull_request_target so fork PRs can be labeled with the base repo token.
+  # This workflow must not checkout or run untrusted PR code.
+  pull_request_target:
     types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
 
 jobs:
   validate-pr-title:
