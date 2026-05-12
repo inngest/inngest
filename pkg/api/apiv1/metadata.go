@@ -129,7 +129,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	for _, md := range req.Metadata {
-		if err := md.ValidateAllowedForScope(scope); err != nil {
+		if err := (metadata.ScopedUpdate{Scope: scope, Update: md}).ValidateAllowed(); err != nil {
 			return publicerr.Wrap(err, 400, "Invalid metadata")
 		}
 	}

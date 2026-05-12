@@ -128,6 +128,12 @@ type ScopedUpdate struct {
 	Update
 }
 
+// ValidateAllowed checks raw shape, reserved-kind allowlisting, and any
+// kind-specific scope rules for metadata that already carries its scope.
+func (m ScopedUpdate) ValidateAllowed() error {
+	return m.Update.validateAllowedForScope(m.Scope)
+}
+
 type Update struct {
 	RawUpdate
 }
@@ -152,7 +158,7 @@ func (m Update) Validate() error {
 	return nil
 }
 
-func (m Update) ValidateAllowed() error {
+func (m Update) validateAllowed() error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
@@ -168,8 +174,8 @@ func (m Update) ValidateAllowed() error {
 	return nil
 }
 
-func (m Update) ValidateAllowedForScope(scope Scope) error {
-	if err := m.ValidateAllowed(); err != nil {
+func (m Update) validateAllowedForScope(scope Scope) error {
+	if err := m.validateAllowed(); err != nil {
 		return err
 	}
 
@@ -178,10 +184,6 @@ func (m Update) ValidateAllowedForScope(scope Scope) error {
 	}
 
 	return nil
-}
-
-func (m ScopedUpdate) ValidateAllowed() error {
-	return m.Update.ValidateAllowedForScope(m.Scope)
 }
 
 func validateScoreValues(values Values) error {
