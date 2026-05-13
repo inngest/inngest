@@ -79,6 +79,30 @@ type TracerOpts struct {
 
 	NATS  []exporters.NatsExporterOpts
 	Kafka []exporters.KafkaSpansExporterOpts
+
+	// OTLPLogs configures otel logging pipeline, which sends inngest traces
+	// as logs to an otlp capable provider.  zero val == no export.
+	OTLPLogs OTLPLogsOpts
+}
+
+// OTLPLogsOpts configures the spans-as-logs side pipeline that emits one OTLP
+// LogRecord finalized run + step span.  zero val means no export.  user configged in OSS.
+type OTLPLogsOpts struct {
+	Endpoint        string
+	URLPath         string
+	PayloadCapBytes int
+}
+
+// Enabled reports whether the side pipeline should be wired. Callers populate
+// Endpoint explicitly — env-var resolution happens at the cmd layer so the
+// system tracer can opt out by leaving it empty.
+func (o OTLPLogsOpts) Enabled() bool { return o.Endpoint != "" }
+
+func (o OTLPLogsOpts) urlPath() string {
+	if o.URLPath != "" {
+		return o.URLPath
+	}
+	return "/v1/logs"
 }
 
 func (o TracerOpts) Endpoint() string {
@@ -240,10 +264,11 @@ func HeadersFromTraceState(
 }
 
 type tracer struct {
-	provider   *trace.TracerProvider
-	propagator propagation.TextMapPropagator
-	shutdown   func(context.Context)
-	processor  trace.SpanProcessor
+	provider      *trace.TracerProvider
+	propagator    propagation.TextMapPropagator
+	shutdown      func(context.Context)
+	processor     trace.SpanProcessor
+	logsProcessor trace.SpanProcessor
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
@@ -261,12 +286,17 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 }
 
 func (t *tracer) Export(span trace.ReadOnlySpan) error {
-	if t.processor == nil {
+	if t.processor == nil && t.logsProcessor == nil {
 		logger.StdlibLogger(context.Background()).Trace("no exporter available to export custom spans")
 		return nil
 	}
 
-	t.processor.OnEnd(span)
+	if t.processor != nil {
+		t.processor.OnEnd(span)
+	}
+	if t.logsProcessor != nil {
+		t.logsProcessor.OnEnd(span)
+	}
 	return nil
 }
 
@@ -397,22 +427,36 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 	}
 
 	sp := trace.NewBatchSpanProcessor(exp, trace.WithBatchTimeout(100*time.Millisecond))
-	tp := trace.NewTracerProvider(
+	tpOpts := []trace.TracerProviderOption{
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(opts.ServiceName),
 		)),
-	)
+	}
+
+	logsSP, logsShutdown, err := newSpansAsLogsProcessor(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if logsSP != nil {
+		tpOpts = append(tpOpts, trace.WithSpanProcessor(logsSP))
+	}
+
+	tp := trace.NewTracerProvider(tpOpts...)
 
 	return &tracer{
-		provider:   tp,
-		propagator: newTextMapPropagator(),
-		processor:  sp,
+		provider:      tp,
+		propagator:    newTextMapPropagator(),
+		processor:     sp,
+		logsProcessor: logsSP,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
 			_ = tp.Shutdown(ctx)
+			if logsShutdown != nil {
+				_ = logsShutdown(ctx)
+			}
 		},
 	}, nil
 }
@@ -444,22 +488,36 @@ func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 	}
 
 	sp := trace.NewBatchSpanProcessor(exp)
-	tp := trace.NewTracerProvider(
+	tpOpts := []trace.TracerProviderOption{
 		trace.WithSpanProcessor(sp),
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(opts.ServiceName),
 		)),
-	)
+	}
+
+	logsSP, logsShutdown, err := newSpansAsLogsProcessor(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if logsSP != nil {
+		tpOpts = append(tpOpts, trace.WithSpanProcessor(logsSP))
+	}
+
+	tp := trace.NewTracerProvider(tpOpts...)
 
 	return &tracer{
-		provider:   tp,
-		propagator: newTextMapPropagator(),
-		processor:  sp,
+		provider:      tp,
+		propagator:    newTextMapPropagator(),
+		processor:     sp,
+		logsProcessor: logsSP,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
 			_ = exp.Shutdown(ctx)
 			_ = tp.Shutdown(ctx)
+			if logsShutdown != nil {
+				_ = logsShutdown(ctx)
+			}
 		},
 	}, nil
 }

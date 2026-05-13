@@ -123,11 +123,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
+	logsEndpoint := os.Getenv("INNGEST_OTEL_LOGS_ENDPOINT")
+	logsURLPath := os.Getenv("INNGEST_OTEL_LOGS_URL_PATH")
+	logsPayloadCap, _ := strconv.Atoi(os.Getenv("INNGEST_OTEL_LOGS_PAYLOAD_MAX_BYTES"))
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
 		TraceEndpoint: traceEndpoint,
 		TraceURLPath:  "/dev/traces",
 		Type:          itrace.TracerTypeOTLPHTTP,
+		OTLPLogs: itrace.OTLPLogsOpts{
+			Endpoint:        logsEndpoint,
+			URLPath:         logsURLPath,
+			PayloadCapBytes: logsPayloadCap,
+		},
 	}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

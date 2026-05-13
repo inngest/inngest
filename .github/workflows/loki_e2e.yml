@@ -1,0 +1,36 @@
+name: Loki E2E
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "ui/**"
+  pull_request:
+    paths-ignore:
+      - "ui/**"
+
+permissions:
+  contents: read
+
+jobs:
+  loki-e2e:
+    name: spans-as-logs e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+
+      - name: Pre-pull grafana/otel-lgtm image
+        run: docker pull grafana/otel-lgtm:0.8.1
+
+      - name: Run Loki e2e tests
+        run: go test -tags=e2e_loki -v -timeout=10m ./tests/loki/...
+        env:
+          TEST_MODE: true
