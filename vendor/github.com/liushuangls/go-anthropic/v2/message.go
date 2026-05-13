@@ -561,6 +561,13 @@ type MessagesUsage struct {
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
 	// The number of tokens retrieved from the cache for associated request.
 	CacheReadInputTokens int `json:"cache_read_input_tokens,omitempty"`
+	// docs: https://platform.claude.com/docs/en/api/messages/create#message.usage + (resource) messages.cache_creation
+	CacheCreation MessageUsageCacheCreation `json:"cache_creation"`
+}
+
+type MessageUsageCacheCreation struct {
+	Ephemeral1hInputTokens int `json:"ephemeral_1h_input_tokens"`
+	Ephemeral5mInputTokens int `json:"ephemeral_5m_input_tokens"`
 }
 
 type ToolDefinition struct {
