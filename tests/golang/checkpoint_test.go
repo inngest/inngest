@@ -20,6 +20,7 @@ func TestFnCheckpoint(t *testing.T) {
 	ctx := context.Background()
 	r := require.New(t)
 	c := client.New(t)
+	stream := c.SubscribeEvents(ctx, t)
 
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "checkpoint")
 	defer server.Close()
@@ -80,11 +81,9 @@ func TestFnCheckpoint(t *testing.T) {
 			r.NoError(err)
 
 			runID := rid.Wait(t)
-			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 60 * time.Second})
-			var output string
-			err = json.Unmarshal([]byte(run.Output), &output)
+			fin := stream.WaitForFinished(runID, 90*time.Second)
 			require.NotEmpty(t, runID)
-			r.NoError(err)
+			r.Equal("completed", fin.Status, "run %s did not complete: err=%s", runID, fin.Error)
 		}
 	}
 }

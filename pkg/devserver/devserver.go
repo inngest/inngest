@@ -213,6 +213,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	stateSizeLimitOverrides := make(map[string]int)
 	pauseOverrides := make(map[uuid.UUID]bool)
 
+	var testEventsHub *testapi.Hub
+	if testapi.ShouldEnable() {
+		testEventsHub = testapi.NewHub()
+	}
+
 	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
 	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
 
@@ -508,6 +513,7 @@ func start(ctx context.Context, opts StartOpts) error {
 					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 				},
 				run.NewTraceLifecycleListener(nil),
+				&testapi.Listener{Hub: testEventsHub},
 			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
@@ -757,6 +763,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			UnpauseFunction: func(id uuid.UUID) {
 				delete(pauseOverrides, id)
 			},
+			Hub: testEventsHub,
 		})})
 	}
 

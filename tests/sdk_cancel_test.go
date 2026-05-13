@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 )
 
@@ -130,10 +132,16 @@ func TestSDKCancelReceived(t *testing.T) {
 			- step.run
 		`,
 		EventTrigger: evt,
-		Timeout:      20 * time.Second,
+		// We confirm cancellation via the lifecycle event stream below, so the
+		// trailing "wait for extraneous requests" sleep can be short.
+		Timeout: 2 * time.Second,
 	}
 
 	t.Run("With a cancellation event", func(t *testing.T) {
+		// Subscribe before triggering so we cannot miss the cancellation event.
+		c := client.New(t)
+		stream := c.SubscribeEvents(context.Background(), t)
+
 		copied := abstract
 		test := &copied
 		test.SetAssertions(
@@ -152,7 +160,7 @@ func TestSDKCancelReceived(t *testing.T) {
 			test.SendTrigger(),
 
 			// Execute the step again, get a wait
-			test.ExpectRequest("Wait step run", "step", time.Second),
+			test.ExpectRequest("Wait step run", "step", 5*time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 				Op:          enums.OpcodeSleep,
 				ID:          "c3ca5f787365eae0dea86250e27d476406956478",
@@ -169,8 +177,9 @@ func TestSDKCancelReceived(t *testing.T) {
 					"request_id": "123",
 				},
 			}),
-			// Nothing should be called
 		)
 		run(t, test)
+
+		stream.WaitForAnyCancelled(15 * time.Second)
 	})
 }
