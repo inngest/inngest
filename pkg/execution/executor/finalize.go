@@ -318,9 +318,15 @@ func (e *executor) buildDeferEvents(
 	}
 
 	if e.deferStore != nil && len(deferInserts) > 0 {
-		if err := e.deferStore.InsertRunDefers(ctx, deferInserts); err != nil {
+		_, err := util.WithRetry(ctx, "deferStore.InsertRunDefers",
+			func(ctx context.Context) (struct{}, error) {
+				return struct{}{}, e.deferStore.InsertRunDefers(ctx, deferInserts)
+			},
+			util.NewRetryConf(),
+		)
+		if err != nil {
 			logger.StdlibLogger(ctx).Error(
-				"error persisting run defers",
+				"error persisting run defers after retries",
 				"error", err,
 				"run_id", opts.Metadata.ID.RunID,
 				"count", len(deferInserts),
