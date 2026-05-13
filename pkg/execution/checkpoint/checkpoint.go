@@ -57,12 +57,14 @@ const pkgName = "checkpoint"
 
 var ErrStaleDispatch = errors.New("stale dispatch")
 
-// freshDispatchWindow is the maximum age a dispatch can have and still skip
-// the queue-item load in validateAsyncDispatch. The bound is the lease-extension
-// cadence (QueueLeaseDuration/2) — the earliest path that can fire Requeue is a
-// failed extension, not lease expiry — minus a clock-skew budget for drift
-// between whichever box stamped the timestamp and the box validating.
-const freshDispatchWindow = queue.QueueLeaseDuration/2 - 5*time.Second
+// Disallow dispatch validation if the queue item is younger than this duration.
+// This is to reduce the number of validations, which in turn reduces load on
+// the queue.
+//
+// We chose 10 seconds somewhat arbitrarily. We want a value that will not
+// exceed timeout durations on our users' cloud providers, and some serverless
+// providers have a 10 second timeout.
+const dispatchValidationSkipDuration = 10 * time.Second
 
 type queueItemLoader interface {
 	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
@@ -600,7 +602,7 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	// skew or a buggy SDK) falls through to the existing validation.
 	if input.StepStartedAt != 0 {
 		elapsed := time.Since(time.UnixMilli(input.StepStartedAt))
-		if elapsed >= 0 && elapsed < freshDispatchWindow {
+		if elapsed >= 0 && elapsed < dispatchValidationSkipDuration {
 			return nil
 		}
 	}
