@@ -134,7 +134,18 @@ func IncrBatchBufferErrorsCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-// #13 - Counter: execution schedule operations
+// #13 - Histogram: overflow batches per flush
+func HistogramBatchBufferOverflowBatches(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_buffer_overflow_batches",
+		Description: "Distribution of overflow batches created per flush",
+		Tags:        opts.Tags,
+		Boundaries:  batchBufferFlushSizeBoundaries,
+	})
+}
+
+// #14 - Counter: execution schedule operations
 func IncrBatchBufferScheduleCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
