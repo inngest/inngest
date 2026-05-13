@@ -18,7 +18,7 @@ var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
 	ErrScoreNameInvalid        = errors.New("score name is invalid")
-	ErrScoreScopeInvalid       = errors.New("score metadata must target step scope")
+	ErrScoreScopeInvalid       = errors.New("score metadata must target run or step scope")
 	ErrScoreValueInvalid       = errors.New("score value must be a finite number")
 )
 
@@ -179,7 +179,7 @@ func (m Update) validateAllowedForScope(scope Scope) error {
 		return err
 	}
 
-	if m.Kind() == KindInngestScore && scope != enums.MetadataScopeStep {
+	if m.Kind() == KindInngestScore && scope != enums.MetadataScopeRun && scope != enums.MetadataScopeStep {
 		return fmt.Errorf("invalid score scope %q: %w", scope, ErrScoreScopeInvalid)
 	}
 

@@ -159,7 +159,7 @@ func TestScopedUpdateValidateAllowedScoreValues(t *testing.T) {
 	}
 }
 
-func TestScopedUpdateValidateAllowedRejectsRunScopedScores(t *testing.T) {
+func TestScopedUpdateValidateAllowedScoreScopes(t *testing.T) {
 	t.Parallel()
 
 	update := Update{RawUpdate: RawUpdate{
@@ -169,5 +169,6 @@ func TestScopedUpdateValidateAllowedRejectsRunScopedScores(t *testing.T) {
 	}}
 
 	require.NoError(t, ScopedUpdate{Scope: enums.MetadataScopeStep, Update: update}.ValidateAllowed())
-	require.ErrorIs(t, ScopedUpdate{Scope: enums.MetadataScopeRun, Update: update}.ValidateAllowed(), ErrScoreScopeInvalid)
+	require.NoError(t, ScopedUpdate{Scope: enums.MetadataScopeRun, Update: update}.ValidateAllowed())
+	require.ErrorIs(t, ScopedUpdate{Scope: enums.MetadataScopeStepAttempt, Update: update}.ValidateAllowed(), ErrScoreScopeInvalid)
 }
