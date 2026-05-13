@@ -435,14 +435,14 @@
         "type": "object"
       },
       "v2FunctionRunStatus": {
-        "default": "FUNCTION_RUN_STATUS_UNSPECIFIED",
+        "default": "UNSPECIFIED",
         "enum": [
-          "FUNCTION_RUN_STATUS_UNSPECIFIED",
-          "FUNCTION_RUN_STATUS_QUEUED",
-          "FUNCTION_RUN_STATUS_RUNNING",
-          "FUNCTION_RUN_STATUS_COMPLETED",
-          "FUNCTION_RUN_STATUS_FAILED",
-          "FUNCTION_RUN_STATUS_CANCELLED"
+          "UNSPECIFIED",
+          "QUEUED",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "CANCELLED"
         ],
         "type": "string"
       },
@@ -761,29 +761,29 @@
         "type": "object"
       },
       "v2TraceSpanStatus": {
-        "default": "TRACE_SPAN_STATUS_UNKNOWN",
+        "default": "UNKNOWN",
         "enum": [
-          "TRACE_SPAN_STATUS_UNKNOWN",
-          "TRACE_SPAN_STATUS_RUNNING",
-          "TRACE_SPAN_STATUS_COMPLETED",
-          "TRACE_SPAN_STATUS_FAILED",
-          "TRACE_SPAN_STATUS_WAITING",
-          "TRACE_SPAN_STATUS_CANCELLED",
-          "TRACE_SPAN_STATUS_SKIPPED"
+          "UNKNOWN",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "WAITING",
+          "CANCELLED",
+          "SKIPPED"
         ],
         "type": "string"
       },
       "v2TraceStepOp": {
-        "default": "TRACE_STEP_OP_UNSPECIFIED",
+        "default": "UNSPECIFIED",
         "enum": [
-          "TRACE_STEP_OP_UNSPECIFIED",
-          "TRACE_STEP_OP_RUN",
-          "TRACE_STEP_OP_SLEEP",
-          "TRACE_STEP_OP_WAIT_FOR_EVENT",
-          "TRACE_STEP_OP_INVOKE",
-          "TRACE_STEP_OP_SEND_EVENT",
-          "TRACE_STEP_OP_AI_GATEWAY",
-          "TRACE_STEP_OP_WAIT_FOR_SIGNAL"
+          "UNSPECIFIED",
+          "RUN",
+          "SLEEP",
+          "WAIT_FOR_EVENT",
+          "INVOKE",
+          "SEND_EVENT",
+          "AI_GATEWAY",
+          "WAIT_FOR_SIGNAL"
         ],
         "type": "string"
       },
