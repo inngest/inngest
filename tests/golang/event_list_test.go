@@ -338,6 +338,7 @@ func TestEventList(t *testing.T) {
 					r.NoError(err)
 
 					r.Equal(1, res.TotalCount)
+					r.Len(res.Edges, 1)
 					node := res.Edges[0].Node
 					r.Equal(ulid.MustParse(eventIDs[i]), node.ID)
 					r.Len(node.Runs, 1)
@@ -431,6 +432,7 @@ func TestEventList(t *testing.T) {
 				r.NoError(err)
 
 				r.Equal(1, res.TotalCount)
+				r.Len(res.Edges, 1)
 				node := res.Edges[0].Node
 				r.Equal(ulid.MustParse(eventID), node.ID)
 				r.Len(node.Runs, 2)
