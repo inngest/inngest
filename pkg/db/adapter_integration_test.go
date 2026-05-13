@@ -308,7 +308,7 @@ func TestInsertSpanRoundTrip(t *testing.T) {
 	assert.Equal(t, spanID, fragments[0]["span_id"])
 
 	// Verify output is readable (not double-encoded)
-	outputs, err := q.GetSpanOutput(ctx, []string{spanID})
+	outputs, err := q.GetSpanOutput(ctx, runID, []string{spanID})
 	require.NoError(t, err)
 	require.Len(t, outputs, 1)
 

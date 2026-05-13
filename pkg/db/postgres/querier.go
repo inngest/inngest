@@ -594,8 +594,8 @@ func (pq *pgQuerier) GetStepSpanByStepID(ctx context.Context, arg db.GetStepSpan
 	}, nil
 }
 
-func (pq *pgQuerier) GetSpanOutput(ctx context.Context, ids []string) ([]*db.SpanOutputRow, error) {
-	rows, err := pq.q.GetSpanOutput(ctx, ids)
+func (pq *pgQuerier) GetSpanOutput(ctx context.Context, runID string, ids []string) ([]*db.SpanOutputRow, error) {
+	rows, err := pq.q.GetSpanOutput(ctx, sqlc.GetSpanOutputParams{RunID: runID, Ids: ids})
 	if err != nil {
 		return nil, err
 	}

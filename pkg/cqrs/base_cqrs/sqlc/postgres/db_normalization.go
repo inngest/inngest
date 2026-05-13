@@ -857,8 +857,11 @@ func (q NormalizedQueries) GetSpanBySpanID(ctx context.Context, args sqlc_sqlite
 	return row.ToSQLite()
 }
 
-func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) ([]*sqlc_sqlite.GetSpanOutputRow, error) {
-	rows, err := q.db.GetSpanOutput(ctx, spanIds)
+func (q NormalizedQueries) GetSpanOutput(ctx context.Context, arg sqlc_sqlite.GetSpanOutputParams) ([]*sqlc_sqlite.GetSpanOutputRow, error) {
+	rows, err := q.db.GetSpanOutput(ctx, GetSpanOutputParams{
+		RunID: arg.RunID,
+		Ids:   arg.Ids,
+	})
 	if err != nil {
 		return nil, err
 	}
