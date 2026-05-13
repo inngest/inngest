@@ -362,7 +362,12 @@ func TestBuildDeferEvents(t *testing.T) {
 		events, err := e.buildDeferEvents(ctx, opts, defers)
 		require.NoError(t, err)
 		require.Len(t, events, 1, "event must publish even if the row failed to persist")
-		require.Len(t, store.inserts, 1, "insert was still attempted")
+		seen := map[string]struct{}{}
+		for _, ins := range store.inserts {
+			seen[ins.DeferID] = struct{}{}
+		}
+		assert.Equal(t, map[string]struct{}{"hash-a": {}}, seen,
+			"insert was attempted with the expected defer id")
 	})
 
 	t.Run("nil deferStore still emits events", func(t *testing.T) {

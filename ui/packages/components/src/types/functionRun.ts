@@ -26,7 +26,7 @@ export function isReplayRunStatus(s: string): s is ReplayRunStatus {
 
 // Defer statuses describe the lifecycle of a deferred run scheduling row,
 // not the run itself. Mirrors enums.DeferStatus.
-export const deferStatuses = ['ABORTED'] as const;
+export const deferStatuses = ['ABORTED', 'SCHEDULED'] as const;
 export type DeferStatus = (typeof deferStatuses)[number];
 export function isDeferStatus(s: string): s is DeferStatus {
   return deferStatuses.includes(s as DeferStatus);

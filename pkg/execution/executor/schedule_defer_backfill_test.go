@@ -139,7 +139,18 @@ func TestBackfillDeferChildRunID(t *testing.T) {
 			},
 		}
 		e.backfillDeferChildRunID(ctx, req, ulid.Make(), log)
-		assert.Len(t, store.updates, 2, "store errors must not short-circuit the batch")
+
+		seen := map[string]struct{}{}
+		var attempted []string
+		for _, u := range store.updates {
+			if _, ok := seen[u.DeferID]; ok {
+				continue
+			}
+			seen[u.DeferID] = struct{}{}
+			attempted = append(attempted, u.DeferID)
+		}
+		assert.ElementsMatch(t, []string{"hash-a", "hash-b"}, attempted,
+			"store errors must not short-circuit the batch")
 	})
 }
 

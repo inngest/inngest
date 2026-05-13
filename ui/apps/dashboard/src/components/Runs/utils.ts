@@ -116,6 +116,7 @@ export function parseRunsData(
       return {
         ...edge.node,
         durationMS,
+        runType: 'PRIMARY',
       };
     }) ?? []
   );

@@ -1601,9 +1601,15 @@ func (e *executor) backfillDeferChildRunID(ctx context.Context, req execution.Sc
 			l.Error("invalid parent run id on deferred schedule event", "error", err, "parent_run_id", deferredMeta.ParentRunID)
 			continue
 		}
-		if err := e.deferStore.UpdateRunDeferChildRunID(ctx, parentRunID, deferredMeta.DeferID, childRunID); err != nil {
+		_, err = util.WithRetry(ctx, "deferStore.UpdateRunDeferChildRunID",
+			func(ctx context.Context) (struct{}, error) {
+				return struct{}{}, e.deferStore.UpdateRunDeferChildRunID(ctx, parentRunID, deferredMeta.DeferID, childRunID)
+			},
+			util.NewRetryConf(),
+		)
+		if err != nil {
 			l.Error(
-				"error updating run defer child run id",
+				"error updating run defer child run id after retries",
 				"error", err,
 				"parent_run_id", parentRunID,
 				"defer_id", deferredMeta.DeferID,
