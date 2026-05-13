@@ -585,9 +585,6 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 			PkgName: pkgName,
 			Tags:    map[string]any{"result": result},
 		})
-		metrics.IncrCheckpointAsyncDispatchValidationCounter(ctx, result, metrics.CounterOpt{
-			PkgName: pkgName,
-		})
 	}()
 
 	// Fail open when the SDK didn't echo a request id. Older SDKs predate the
