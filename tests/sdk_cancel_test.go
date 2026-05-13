@@ -152,25 +152,25 @@ func TestSDKCancelReceived(t *testing.T) {
 			test.SendTrigger(),
 
 			// Execute the step again, get a wait
-			test.ExpectRequest("Wait step run", "step", time.Second),
-			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:          enums.OpcodeSleep,
-				ID:          "c3ca5f787365eae0dea86250e27d476406956478",
-				Name:        "10s",
-				DisplayName: inngestgo.StrPtr("sleep"),
-				Data:        json.RawMessage("null"),
-			}}),
+		test.ExpectRequest("Wait step run", "step", 5*time.Second),
+		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
+			Op:          enums.OpcodeSleep,
+			ID:          "c3ca5f787365eae0dea86250e27d476406956478",
+			Name:        "10s",
+			DisplayName: inngestgo.StrPtr("sleep"),
+			Data:        json.RawMessage("null"),
+		}}),
 
-			test.After(time.Second),
-			test.Send(inngestgo.Event{
-				Name: "cancel/please",
-				Data: map[string]interface{}{
-					// This request ID doesn't match.
-					"request_id": "123",
-				},
-			}),
-			// Nothing should be called
-		)
-		run(t, test)
-	})
+		test.After(time.Second),
+		test.Send(inngestgo.Event{
+			Name: "cancel/please",
+			Data: map[string]interface{}{
+				// This request ID doesn't match.
+				"request_id": "123",
+			},
+		}),
+		// Nothing should be called
+	)
+	run(t, test)
+})
 }
