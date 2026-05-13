@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/flags"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -85,7 +86,7 @@ type CheckpointAPIOpts struct {
 	// The default is to always enforce the limits.
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
-	AllowAsyncDispatchValidation checkpoint.AllowAsyncDispatchValidation
+	AllowAsyncDispatchValidation flags.BoolFlag
 }
 
 // checkpointAPI is the base implementation.
