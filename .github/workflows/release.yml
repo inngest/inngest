@@ -89,6 +89,7 @@ jobs:
           args: release --clean --verbose --release-notes=/tmp/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
   npm:
     runs-on: ubuntu-latest
     needs: [goreleaser, check-release-type]
