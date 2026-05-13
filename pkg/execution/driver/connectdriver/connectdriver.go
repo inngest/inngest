@@ -127,6 +127,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder
 		AccountId:      id.Tenant.AccountID.String(),
 		RunId:          id.RunID.String(),
 		RequestId:      requestID,
+		JobId:          requestID,
 	}
 	// If we have a generator step name, ensure we add the step ID parameter
 	if r.Edge.IncomingGeneratorStep != "" {

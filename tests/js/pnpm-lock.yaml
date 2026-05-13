@@ -7,6 +7,7 @@ settings:
 overrides:
   h3@<1.15.6: '>=1.15.6 <2'
   cjs-module-lexer@<=2.2.0: 2.2.0
+  next@<16.2.5: 16.2.5
 
 importers:
 
@@ -998,7 +999,7 @@ packages:
       h3: '>=1.15.6 <2'
       hono: '>=4.2.7'
       koa: '>=2.14.2'
-      next: '>=12.0.0'
+      next: 16.2.5
       react: '>=18.0.0'
       typescript: '>=5.8.0'
       zod: ^3.25.0 || ^4.0.0
