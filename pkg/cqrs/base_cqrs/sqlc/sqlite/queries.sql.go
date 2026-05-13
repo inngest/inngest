@@ -1310,23 +1310,29 @@ SELECT
   COALESCE(CAST(input AS TEXT), '') AS input,
   COALESCE(CAST(output AS TEXT), '') AS output
 FROM spans
-WHERE span_id IN (/*SLICE:ids*/?)
+WHERE run_id = ?1 AND span_id IN (/*SLICE:ids*/?)
 LIMIT 2
 `
+
+type GetSpanOutputParams struct {
+	RunID string
+	Ids   []string
+}
 
 type GetSpanOutputRow struct {
 	Input  interface{}
 	Output interface{}
 }
 
-func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error) {
+func (q *Queries) GetSpanOutput(ctx context.Context, arg GetSpanOutputParams) ([]*GetSpanOutputRow, error) {
 	query := getSpanOutput
 	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
+	queryParams = append(queryParams, arg.RunID)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
 			queryParams = append(queryParams, v)
 		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
 	} else {
 		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
 	}
