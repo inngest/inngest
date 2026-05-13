@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -168,7 +169,9 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 		return nil, fmt.Errorf("error parsing runID: %w", err)
 	}
 
-	run, err := qr.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	// Source the run from v2 trace spans. The legacy trace_runs table is no
+	// longer the canonical source.
+	run, err := traceRunFromV2Spans(ctx, qr.Data, runid)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}
@@ -236,6 +239,111 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 	}
 
 	return &res, nil
+}
+
+// traceRunFromV2Spans reconstructs a TraceRun for the given run ID from v2
+// trace span data (preferred), falling back to the function_runs/finishes
+// tables when no spans have been recorded yet.
+func traceRunFromV2Spans(ctx context.Context, data cqrs.Manager, runID ulid.ULID) (*cqrs.TraceRun, error) {
+	root, rerr := data.GetSpansByRunID(ctx, runID)
+	if rerr == nil && root != nil {
+		tr := traceRunFromOtelSpan(root, runID)
+		// The root span's DynamicStatus tracks the most recent attempt and
+		// can read as Failed mid-retry. function_runs + function_finishes
+		// reflect the canonical run-level outcome — prefer that when
+		// available so callers see Running while retries are pending.
+		if fr, err := data.GetFunctionRun(ctx, uuid.Nil, uuid.Nil, runID); err == nil {
+			if fr.Status != enums.RunStatusUnknown {
+				tr.Status = fr.Status
+			} else {
+				tr.Status = enums.RunStatusRunning
+			}
+			if fr.EndedAt != nil {
+				tr.EndedAt = *fr.EndedAt
+			}
+		}
+		return tr, nil
+	}
+
+	fr, err := data.GetFunctionRun(ctx, uuid.Nil, uuid.Nil, runID)
+	if err != nil {
+		return nil, err
+	}
+	return traceRunFromFunctionRun(fr), nil
+}
+
+func traceRunFromOtelSpan(root *cqrs.OtelSpan, runID ulid.ULID) *cqrs.TraceRun {
+	tr := &cqrs.TraceRun{
+		AppID:      root.AppID,
+		FunctionID: root.FunctionID,
+		TraceID:    root.TraceID,
+		RunID:      runID.String(),
+		QueuedAt:   ulid.Time(runID.Time()),
+		Status:     enums.StepStatusToRunStatus(root.Status),
+	}
+
+	if attrs := root.Attributes; attrs != nil {
+		if attrs.QueuedAt != nil {
+			tr.QueuedAt = *attrs.QueuedAt
+		}
+		if attrs.StartedAt != nil {
+			tr.StartedAt = *attrs.StartedAt
+		}
+		if attrs.EndedAt != nil {
+			tr.EndedAt = *attrs.EndedAt
+		}
+		if attrs.BatchID != nil {
+			tr.BatchID = attrs.BatchID
+			tr.IsBatch = true
+		}
+		if attrs.BatchTimestamp != nil && tr.BatchID == nil {
+			tr.IsBatch = true
+		}
+		if attrs.CronSchedule != nil {
+			tr.CronSchedule = attrs.CronSchedule
+		}
+		if attrs.EventIDs != nil {
+			tr.TriggerIDs = append(tr.TriggerIDs, *attrs.EventIDs...)
+		}
+	}
+
+	if !tr.StartedAt.IsZero() && !tr.EndedAt.IsZero() {
+		tr.Duration = tr.EndedAt.Sub(tr.StartedAt)
+	}
+
+	return tr
+}
+
+func traceRunFromFunctionRun(fr *cqrs.FunctionRun) *cqrs.TraceRun {
+	status := fr.Status
+	if status == enums.RunStatusUnknown {
+		// No finish row yet, so the run is still in flight.
+		status = enums.RunStatusRunning
+	}
+
+	var endedAt time.Time
+	if fr.EndedAt != nil {
+		endedAt = *fr.EndedAt
+	}
+
+	triggerIDs := []string{}
+	if fr.EventID != (ulid.ULID{}) {
+		triggerIDs = append(triggerIDs, fr.EventID.String())
+	}
+
+	return &cqrs.TraceRun{
+		FunctionID:   fr.FunctionID,
+		RunID:        fr.RunID.String(),
+		QueuedAt:     ulid.Time(fr.RunID.Time()),
+		StartedAt:    fr.RunStartedAt,
+		EndedAt:      endedAt,
+		TriggerIDs:   triggerIDs,
+		Output:       fr.Output,
+		Status:       status,
+		BatchID:      fr.BatchID,
+		IsBatch:      fr.BatchID != nil,
+		CronSchedule: fr.Cron,
+	}
 }
 
 func (qr *queryResolver) RunTrace(ctx context.Context, runID string) (*models.RunTraceSpan, error) {
@@ -328,7 +436,7 @@ func (qr *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.
 		return nil, fmt.Errorf("error parsing runID: %w", err)
 	}
 
-	run, err := qr.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	run, err := traceRunFromV2Spans(ctx, qr.Data, runid)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}

@@ -288,10 +288,22 @@ func StringSliceAttr(key string) attr[*[]string] {
 			return attribute.StringSlice(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*[]string, bool) {
-			if slice, ok := v.([]string); ok {
+			switch slice := v.(type) {
+			case []string:
 				return &slice, true
+			case []any:
+				// JSON round-tripping converts string arrays to []any; coerce
+				// the elements back to []string.
+				out := make([]string, 0, len(slice))
+				for _, item := range slice {
+					s, ok := item.(string)
+					if !ok {
+						return nil, false
+					}
+					out = append(out, s)
+				}
+				return &out, true
 			}
-
 			return nil, false
 		},
 	}

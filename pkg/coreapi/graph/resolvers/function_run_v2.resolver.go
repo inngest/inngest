@@ -26,14 +26,11 @@ func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.Functio
 }
 
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {
-	targetLoader := loader.FromCtx(ctx).LegacyRunTraceLoader
-	if preview != nil && *preview {
-		targetLoader = loader.FromCtx(ctx).RunTraceLoader
-	}
-
+	// Traces are sourced from v2 spans. The preview flag is retained for
+	// schema compatibility but no longer routes to the legacy loader.
 	return loader.LoadOne[models.RunTraceSpan](
 		ctx,
-		targetLoader,
+		loader.FromCtx(ctx).RunTraceLoader,
 		&loader.TraceRequestKey{
 			TraceRunIdentifier: &cqrs.TraceRunIdentifier{
 				AppID:      fn.AppID,

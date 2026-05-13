@@ -677,19 +677,22 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for _, s := range handler.Spans() {
-		if err := a.devserver.Data.InsertSpan(ctx, s); err != nil {
-			l.Error("error inserting span", "error", err, "span", *s)
-		}
-	}
+	// v1 trace writes stubbed to verify downstream dependencies; revert this block to restore.
+	// for _, s := range handler.Spans() {
+	// 	if err := a.devserver.Data.InsertSpan(ctx, s); err != nil {
+	// 		l.Error("error inserting span", "error", err, "span", *s)
+	// 	}
+	// }
 
-	for _, r := range handler.TraceRuns() {
-		// l.Debug("trace run", "run", r)
-		r.HasAI = hasAI
-		if err := a.devserver.Data.InsertTraceRun(ctx, r); err != nil {
-			l.Error("error inserting trace run", "error", err, "trace_run", r)
-		}
-	}
+	// for _, r := range handler.TraceRuns() {
+	// 	// l.Debug("trace run", "run", r)
+	// 	r.HasAI = hasAI
+	// 	if err := a.devserver.Data.InsertTraceRun(ctx, r); err != nil {
+	// 		l.Error("error inserting trace run", "error", err, "trace_run", r)
+	// 	}
+	// }
+	_ = handler
+	_ = hasAI
 }
 
 // RemoveApp allows users to de-register an app by its URL
