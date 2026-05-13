@@ -4,7 +4,7 @@ local delta = tonumber(ARGV[1])
 local idempotencyTTL = tonumber(ARGV[2])
 local existing = redis.call("GET", keyIdempotency)
 if existing ~= nil and existing ~= false then
-	return existing
+	return {tonumber(existing), 0}
 end
 local newCapacity = redis.call("INCRBY", keyCapacity, delta)
 if tonumber(newCapacity) < 0 then
@@ -12,4 +12,4 @@ if tonumber(newCapacity) < 0 then
 	newCapacity = 0
 end
 redis.call("SET", keyIdempotency, tostring(newCapacity), "EX", tostring(idempotencyTTL))
-return newCapacity
+return {tonumber(newCapacity), 1}
