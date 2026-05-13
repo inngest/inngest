@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/flags"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -56,18 +57,6 @@ const pkgName = "checkpoint"
 
 var ErrStaleDispatch = errors.New("stale dispatch")
 
-// AllowAsyncDispatchValidation gates the async dispatch validator per account
-// so it can ramp through a staged rollout. Returns true to run the validator;
-// nil or false leaves it off.
-type AllowAsyncDispatchValidation func(ctx context.Context, acctID uuid.UUID) bool
-
-func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.UUID) bool {
-	if a == nil {
-		return false
-	}
-	return a(ctx, acctID)
-}
-
 // freshDispatchWindow is the maximum age a dispatch can have and still skip
 // the queue-item load in validateAsyncDispatch. The bound is the lease-extension
 // cadence (QueueLeaseDuration/2) — the earliest path that can fire Requeue is a
@@ -98,7 +87,7 @@ type Opts struct {
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
-	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
+	AllowAsyncDispatchValidation flags.BoolFlag
 }
 
 func New(o Opts) Checkpointer {

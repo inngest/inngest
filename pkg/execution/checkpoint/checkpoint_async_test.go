@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/flags"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -503,9 +504,9 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 		TracerProvider:  mocks.tracer,
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
-		AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
+		AllowAsyncDispatchValidation: flags.NewBoolFlag(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
-		},
+		}),
 	})
 
 	return mocks, &testData{

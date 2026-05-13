@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/flags"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -81,7 +82,7 @@ type CheckpointAPIOpts struct {
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
-	AllowAsyncDispatchValidation checkpoint.AllowAsyncDispatchValidation
+	AllowAsyncDispatchValidation flags.BoolFlag
 }
 
 // checkpointAPI is the base implementation.
