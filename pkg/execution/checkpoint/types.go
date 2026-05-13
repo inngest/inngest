@@ -51,12 +51,12 @@ type AsyncCheckpoint struct {
 	// by a Requeue. Empty means the SDK did not echo a value, in which case
 	// validation fails open.
 	RequestID string `json:"request_id"`
-	// StepStartedAt is the unix-millisecond epoch the SDK captured when it
-	// began executing the dispatch. The validator uses this to skip the
-	// queue-item load when the dispatch is younger than the minimum requeue
-	// window. Zero means the SDK didn't send it; validation falls through
-	// to the existing RequestID check.
-	StepStartedAt int64 `json:"step_started_at"`
+	// RequestStartedAt is the unix-millisecond epoch the SDK captured when it
+	// began processing the dispatched request. The validator uses this to skip
+	// the queue-item load when the dispatch is younger than the minimum
+	// requeue window. Zero means the SDK didn't send it; validation falls
+	// through to the existing RequestID check.
+	RequestStartedAt int64 `json:"request_started_at"`
 
 	// Plus auth data added from auth.  This is never exposed via JSON
 	// for security.

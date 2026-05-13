@@ -2,7 +2,7 @@
 // step-execution bug — a Requeue that fires while a long-running step body
 // is still executing on the prior dispatch, then the old SDK posts its
 // checkpoint after the new dispatch is already in flight. The fence only
-// engages once the old dispatch's StepStartedAt is older than
+// engages once the old dispatch's RequestStartedAt is older than
 // freshDispatchWindow (see pkg/execution/checkpoint/checkpoint.go); faster
 // Requeue races are an accepted perf trade-off.
 //
@@ -131,7 +131,7 @@ func TestEXE1552DuplicateStepExecutionOnRequeue(t *testing.T) {
 	}
 
 	// The validator's fast-path skips the queue-item load when
-	// time.Since(StepStartedAt) < freshDispatchWindow (10s — see
+	// time.Since(RequestStartedAt) < freshDispatchWindow (10s — see
 	// pkg/execution/checkpoint/checkpoint.go:freshDispatchWindow). To exercise
 	// the entropy-comparison path that the fence relies on, wait past that
 	// window (plus a small clock-skew buffer) before unblocking the OLD SDK so

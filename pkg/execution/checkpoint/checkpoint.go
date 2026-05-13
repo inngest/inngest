@@ -600,8 +600,8 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	// it can't fire until the queue lease expires, so a fresh dispatch is
 	// provably uncontested. Negative elapsed (future-dated stamp from clock
 	// skew or a buggy SDK) falls through to the existing validation.
-	if input.StepStartedAt != 0 {
-		elapsed := time.Since(time.UnixMilli(input.StepStartedAt))
+	if input.RequestStartedAt != 0 {
+		elapsed := time.Since(time.UnixMilli(input.RequestStartedAt))
 		if elapsed >= 0 && elapsed < dispatchValidationSkipDuration {
 			return nil
 		}

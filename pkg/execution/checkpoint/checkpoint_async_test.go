@@ -302,11 +302,11 @@ func TestCheckpointAsyncSteps_StaleDispatchFailsBeforeSave(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
-// TestCheckpointAsyncSteps_StepStartedAtGate covers the StepStartedAt
+// TestCheckpointAsyncSteps_RequestStartedAtGate covers the RequestStartedAt
 // short-circuit: a dispatch younger than freshDispatchWindow skips the queue
 // load (Requeue can't have fired yet); anything else — stale or
 // clock-skewed-future — falls through to the RequestID validator.
-func TestCheckpointAsyncSteps_StepStartedAtGate(t *testing.T) {
+func TestCheckpointAsyncSteps_RequestStartedAtGate(t *testing.T) {
 	cases := []struct {
 		name       string
 		ageOffset  time.Duration
@@ -330,7 +330,7 @@ func TestCheckpointAsyncSteps_StepStartedAtGate(t *testing.T) {
 			mocks, testData := setupAsyncCheckpointTest(t, op)
 
 			testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 4)
-			testData.asyncCheckpoint.StepStartedAt = time.Now().Add(tc.ageOffset).UnixMilli()
+			testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(tc.ageOffset).UnixMilli()
 
 			if tc.expectLoad {
 				mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
