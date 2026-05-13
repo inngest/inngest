@@ -124,6 +124,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		EventKeys:               eventKeys,
 		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
 		Persist:                 true,
+		Poll:                    true,
 		PollInterval:            localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
 		PostgresConnMaxIdleTime: cmd.Int("postgres-conn-max-idle-time"),
 		PostgresConnMaxLifetime: cmd.Int("postgres-conn-max-lifetime"),
