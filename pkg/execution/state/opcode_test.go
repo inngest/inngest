@@ -59,6 +59,7 @@ func TestGeneratorOpcode_StepType(t *testing.T) {
 			{enums.OpcodeWaitForEvent, enums.StepTypeWaitForEvent},
 			{enums.OpcodeWaitForSignal, enums.StepTypeWaitForSignal},
 			{enums.OpcodeInvokeFunction, enums.StepTypeInvoke},
+			{enums.OpcodeGateway, enums.StepTypeFetch},
 			{enums.OpcodeAIGateway, enums.StepTypeAiInfer},
 		}
 		for _, tc := range cases {
