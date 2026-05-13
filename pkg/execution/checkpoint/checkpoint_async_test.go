@@ -364,6 +364,49 @@ func TestCheckpointAsyncSteps_RequestStartedAtGate(t *testing.T) {
 	}
 }
 
+// TestCheckpointAsyncSteps_ValidationDisabledBypassesGate proves the
+// AllowAsyncDispatchValidation flag genuinely turns off validation: a dispatch
+// that would otherwise be rejected as stale (old RequestStartedAt, mismatched
+// RequestID) goes through to the save path without ever loading the queue
+// item.
+func TestCheckpointAsyncSteps_ValidationDisabledBypassesGate(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTestWithValidation(t, false, op)
+
+	// Set up a checkpoint that the validator would reject: stale
+	// RequestStartedAt (well past freshDispatchWindow) and a RequestID for a
+	// generation other than the current one. With validation enabled this
+	// would hit LoadQueueItem and return ErrStaleDispatch.
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
+	testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(-time.Hour).UnixMilli()
+
+	expectedData, err := json.Marshal(map[string]any{
+		"data": json.RawMessage(`{"result":"ok"}`),
+	})
+	require.NoError(err)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	// LoadQueueItem is the validator's first call; it must not have fired.
+	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
 func TestCheckpointAsyncSteps_EmptyRequestIDSkipsValidation(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
@@ -452,8 +495,14 @@ func TestCheckpointAsyncSteps_InvalidQueueRefWithRequestIDFailsBeforeSave(t *tes
 //
 //
 
-// setupAsyncCheckpointTest creates new mocks, asserting that
+// setupAsyncCheckpointTest creates new mocks with dispatch validation enabled.
 func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testMocks, *testData) {
+	return setupAsyncCheckpointTestWithValidation(t, true, ops...)
+}
+
+// setupAsyncCheckpointTestWithValidation creates new mocks and lets the caller
+// toggle the AllowAsyncDispatchValidation gate.
+func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool, ops ...state.GeneratorOpcode) (*testMocks, *testData) {
 	ctx := context.Background()
 
 	// Create mock dependencies
@@ -505,7 +554,7 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
 		AllowAsyncDispatchValidation: flags.NewBoolFlag(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
+			return validationEnabled
 		}),
 	})
 
