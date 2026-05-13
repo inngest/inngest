@@ -277,12 +277,25 @@ func TestAddRunMetadataRejectsInvalidScoreMetadata(t *testing.T) {
 	require.ErrorIs(t, err, metadata.ErrScoreValueInvalid)
 }
 
-func TestAddRunMetadataRejectsRunScopedScoreMetadata(t *testing.T) {
+func TestAddRunMetadataAllowsRunScopedScoreMetadata(t *testing.T) {
 	ctx := t.Context()
 	auth, err := apiv1auth.NilAuthFinder(ctx)
 	require.NoError(t, err)
 
 	runID := ulid.Make()
+	functionID := uuid.New()
+	appID := uuid.New()
+	wantID := statev2.ID{
+		RunID:      runID,
+		FunctionID: functionID,
+		Tenant: statev2.Tenant{
+			AppID:     appID,
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
+	}
+
+	tp := &metadataFallbackTracerProvider{t: t, wantID: wantID}
 	r := router{API: &API{opts: Opts{
 		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{
@@ -290,9 +303,10 @@ func TestAddRunMetadataRejectsRunScopedScoreMetadata(t *testing.T) {
 				SpanID:  "0000000000000001",
 			},
 			RunID:      runID,
-			FunctionID: uuid.New(),
-			AppID:      uuid.New(),
+			FunctionID: functionID,
+			AppID:      appID,
 		}},
+		TracerProvider: tp,
 	}}}
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
@@ -302,7 +316,8 @@ func TestAddRunMetadataRejectsRunScopedScoreMetadata(t *testing.T) {
 			Values: metadata.Values{"accuracy": json.RawMessage(`1`)},
 		}}},
 	})
-	require.ErrorIs(t, err, metadata.ErrScoreScopeInvalid)
+	require.NoError(t, err)
+	require.True(t, tp.called)
 }
 
 func TestAddRunMetadataRejectsDisallowedInngestKind(t *testing.T) {
