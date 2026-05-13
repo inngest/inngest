@@ -230,9 +230,9 @@ type checkpointAsyncSteps struct {
 	Steps     []state.GeneratorOpcode `json:"steps"`
 	// Timestamp is the unix-millisecond epoch when the request was created.
 	Timestamp int `json:"ts"`
-	// StepStartedAt is the unix-millisecond epoch the SDK captured when it
-	// began executing the leased dispatch. Optional; older SDKs omit it.
-	StepStartedAt int64 `json:"step_started_at"`
+	// RequestStartedAt is the unix-millisecond epoch the SDK captured when it
+	// began processing the dispatched request. Optional; older SDKs omit it.
+	RequestStartedAt int64 `json:"request_started_at"`
 }
 
 // TrackLatency tracks how long it took for us to receive the async checkpoint
