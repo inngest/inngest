@@ -320,7 +320,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 		QueueName:   &queueName,
 	}, opts.At, queue.EnqueueOpts{})
 	if err == queue.ErrQueueItemExists {
-		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID)
+		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID, "function_id", opts.FunctionID)
 		return nil
 	}
 	if err != nil {
