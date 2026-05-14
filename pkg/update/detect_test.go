@@ -55,7 +55,7 @@ func TestUpgradeCommand(t *testing.T) {
 		{MethodNPM, "npm install -g inngest-cli@latest"},
 		{MethodHomebrew, "brew upgrade inngest"},
 		{MethodBash, "curl -fsSL https://cli.inngest.com/install.sh | sh"},
-		{MethodBinary, "https://github.com/inngest/inngest/releases/latest"},
+		{MethodBinary, "curl -fsSL https://cli.inngest.com/install.sh | sh"},
 	}
 	for _, tc := range cases {
 		if got := UpgradeCommand(tc.m); got != tc.want {
