@@ -5,10 +5,18 @@ description: How to authenticate with the Inngest REST API.
 
 The Inngest API uses **Bearer token authentication** using your environment's signing key or an API key.
 
-* [Signing keys](https://www.inngest.com/docs/platform/signing-keys) area an ideal method of authentication if you are making requests from an app or context that already has the signing key.
-* [API keys](https://www.inngest.com/docs/platform/api-keys) are ideal for making requests for all other contexts, like CI/CD pipelines, scripts, AI tools, or similar.
+* [API keys](https://www.inngest.com/docs/platform/api-keys) are ideal for making requests for any context outside of your application. For example: CI/CD pipelines, scripts, AI tools, or similar.
+* [Signing keys](https://www.inngest.com/docs/platform/signing-keys) are used by apps to securely communicate with the Inngest platform. When making API requests from your application, a signing key can be used in place of an API Key as a method of convenience.
 
 ## Keys
+
+### API Key authentication (v2 endpoints only)
+
+Inngest cloud allows organization admins to create and manage API keys within the Inngest dashboard. You can create one in [the API key management panel](https://app.inngest.com/settings/api-keys).
+
+<Callout type="info">
+  It's recommended to use API Keys instead of signing keys in most use cases unless you are making requests directly from an application that already has the signing key.
+</Callout>
 
 ### Signing key authentication
 
@@ -16,23 +24,19 @@ You can find your signing key in the Inngest dashboard under your environment's 
 
 Each environment has it's own signing key. Ensure that you are always using the correct key for the environment that you are managing.
 
-### API Key authentication (v2 endpoints only)
-
-Inngest cloud allows organization admins to create and manage API keys within the Inngest dashboard. You can create one in [the API key management panel](https://app.inngest.com/settings/api-keys).
-
 ## Making Authenticated Requests
 
 Include the api key or signing key as a `Bearer` token in the `Authorization` header of every request.
 
-<Tabs items={['Signing key', 'API Key']}>
+<Tabs items={['API Key', 'Signing key']}>
+<Tab value="API Key">
+```http
+Authorization: Bearer sk-inn-api-xxxxxxxxxxxxxxxxxxxx
+```
+</Tab>
 <Tab value="Signing key">
 ```http
 Authorization: Bearer signkey-prod-xxxxxxxxxxxxxxxxxxxx
-```
-</Tab>
-<Tab value="API Key">
-```http
-Authorization: Bearer <api-key>
 ```
 </Tab>
 </Tabs>
@@ -43,7 +47,7 @@ Authorization: Bearer <api-key>
 <Tab value="curl">
 ```bash
 curl -X POST "https://api.inngest.com/v2/apps/demo-app/functions/backfill-data/invoke" \
-  -H "Authorization: Bearer sk-inn-apixxxxxxxxx" \
+  -H "Authorization: Bearer sk-inn-api-xxxxxxxxxxxxxxxxxxxx" \
   -H "Content-Type: application/json" \
   -d '{ "data": { "test": "invoke-a-fn!" } }'
 ```
