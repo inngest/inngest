@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -89,6 +90,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ steps.pr.outputs.head_sha }}
+          persist-credentials: false
 
       - name: Set up Go for PR head
         if: steps.command.outputs.matched == 'true'
@@ -181,7 +183,13 @@ jobs:
         env:
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           PRERELEASE_VERSION: ${{ steps.prerelease-version.outputs.version }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
+          if [ -z "${RELEASE_TOKEN}" ]; then
+            echo "::error title=Missing RELEASE_TOKEN::Configure the release bot token as the RELEASE_TOKEN repository secret."
+            exit 1
+          fi
+
           if ! printf '%s\n' "${HEAD_SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "Prerelease head SHA output is invalid: ${HEAD_SHA}"
             exit 1
@@ -195,6 +203,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git tag "${PRERELEASE_VERSION}" "${HEAD_SHA}"
+          git remote set-url origin "https://x-access-token:${RELEASE_TOKEN}@github.com/${{ github.repository }}.git"
           git push origin "${PRERELEASE_VERSION}"
 
       - name: Comment publish result
