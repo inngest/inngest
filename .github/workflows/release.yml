@@ -83,9 +83,9 @@ jobs:
             echo "- Commit: \`$(git rev-parse HEAD)\`"
           } > /tmp/RELEASE_NOTES.md
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: "~> 2"
+          version: "~> v2"
           args: release --clean --verbose --release-notes=/tmp/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
