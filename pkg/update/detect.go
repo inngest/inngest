@@ -79,4 +79,5 @@ func UpgradeCommand(m Method) string {
 	default:
 		return "curl -fsSL https://cli.inngest.com/install.sh | sh"
 	}
+	return "curl -fsSL https://cli.inngest.com/install.sh | sh"
 }
