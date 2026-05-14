@@ -128,8 +128,8 @@ type ScopedUpdate struct {
 	Update
 }
 
-// ValidateAllowed checks raw shape, reserved-kind allowlisting, and any
-// kind-specific scope rules for metadata that already carries its scope.
+// ValidateAllowed applies reserved-kind rules after a target has been resolved
+// to a scope.
 func (m ScopedUpdate) ValidateAllowed() error {
 	return m.Update.validateAllowedForScope(m.Scope)
 }
@@ -150,6 +150,8 @@ func (m Update) Serialize() (Values, error) {
 	return m.RawUpdate.Values, nil
 }
 
+// Validate checks only generic metadata shape; reserved inngest.* rules depend
+// on scope.
 func (m Update) Validate() error {
 	if err := m.RawUpdate.Kind.Validate(); err != nil {
 		return fmt.Errorf("invalid kind: %w", err)
@@ -158,7 +160,7 @@ func (m Update) Validate() error {
 	return nil
 }
 
-func (m Update) validateAllowed() error {
+func (m Update) validateAllowedKindAndValues() error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
@@ -175,15 +177,24 @@ func (m Update) validateAllowed() error {
 }
 
 func (m Update) validateAllowedForScope(scope Scope) error {
-	if err := m.validateAllowed(); err != nil {
+	if err := m.validateAllowedKindAndValues(); err != nil {
 		return err
 	}
 
-	if m.Kind() == KindInngestScore && scope != enums.MetadataScopeRun && scope != enums.MetadataScopeStep {
+	if m.Kind() == KindInngestScore && !isScoreScope(scope) {
 		return fmt.Errorf("invalid score scope %q: %w", scope, ErrScoreScopeInvalid)
 	}
 
 	return nil
+}
+
+func isScoreScope(scope Scope) bool {
+	switch scope {
+	case enums.MetadataScopeRun, enums.MetadataScopeStep:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateScoreValues(values Values) error {
@@ -193,6 +204,7 @@ func validateScoreValues(values Values) error {
 		}
 
 		var value *float64
+		// Pointer keeps JSON null from looking like numeric zero.
 		if err := json.Unmarshal(raw, &value); err != nil {
 			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
 		}
