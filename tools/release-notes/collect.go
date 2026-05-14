@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,8 +50,13 @@ func collectNotesCommand(inputPath, outputPath, cliffPath, commitRange, repo str
 		return err
 	}
 
+	templateBody, err := readPullRequestTemplate(".github/pull_request_template.md")
+	if err != nil {
+		return err
+	}
+
 	for i := range prs {
-		sections := ParsePRBody(prs[i].Body)
+		sections := ParsePRBodyWithTemplate(prs[i].Body, templateBody)
 		prs[i].Description = sections["description"]
 		prs[i].ReleaseNote = NormalizeNote(sections["release note"])
 		prs[i].MigrationNote = NormalizeNote(sections["migration note"])
@@ -68,6 +74,29 @@ func collectNotesCommand(inputPath, outputPath, cliffPath, commitRange, repo str
 		return err
 	}
 	return os.WriteFile(outputPath, out, 0o644)
+}
+
+func readPullRequestTemplate(path string) (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		data, err := os.ReadFile(filepath.Join(dir, path))
+		if err == nil {
+			return string(data), nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", nil
+		}
+		dir = parent
+	}
 }
 
 func readPRInput(path string) ([]PullRequest, error) {

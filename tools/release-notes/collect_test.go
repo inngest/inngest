@@ -17,7 +17,7 @@ func TestCollectCommandFromInput(t *testing.T) {
 		{
 			Number: 1,
 			Title:  "feat: add thing",
-			Body:   "## Description\n\nAdds a thing.\n\n## Release note\n\nThing is available.\n\n## Migration note\n\nNone.\n",
+			Body:   "## Description\n\nAdds a thing.\n\n## Release note\n\nThing is available.\n\n## Migration note\n\nNone.\n\n*[Check our Pull Request Guidelines](https://github.com/inngest/inngest/blob/main/docs/PULL_REQUEST_GUIDELINES.md)*\n",
 			Files:  []string{"pkg/execution/run.go"},
 		},
 	}
