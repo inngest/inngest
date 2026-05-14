@@ -1931,6 +1931,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			l := l.With("step_metadata", true)
 			for _, opcode := range resp.Generator {
 				for _, md := range opcode.Metadata {
+					// SDK metadata is untrusted; validate before creating spans.
 					if err := md.ValidateAllowed(); err != nil {
 						l.Warn("invalid metadata in driver response", "error", err, "kind", md.Kind())
 						continue
@@ -3712,12 +3713,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	// The step output was already persisted, typically by an earlier
-	// attempt that timed out or errored after succeeding. Clear the error so the
-	// discovery step still enqueues; otherwise the run stalls.
-	// XXX: hasPendingSteps can be stale on duplicate; worst case is
-	// redundant SDK invocations per in-flight parallel siblng.
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// A prior attempt can persist output then fail before enqueueing discovery.
+		// Keep going so pending steps still enqueue; duplicate work is bounded.
 		e.log.Warn("step output already persisted; keeping existing output", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
 		err = nil
 	}
