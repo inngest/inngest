@@ -138,6 +138,7 @@ jobs:
 
       - uses: linear/linear-release-action@v0
         if: needs.check-release-type.outputs.prerelease == ''
+        continue-on-error: true
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
           version: ${{ github.ref_name }}
