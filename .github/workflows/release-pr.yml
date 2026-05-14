@@ -145,15 +145,6 @@ jobs:
             --repo "${{ github.repository }}" \
             --output /tmp/release-pr-notes.json
 
-      - name: Build release notes preview
-        if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
-        run: |
-          scripts/release/build-release-notes \
-            --notes /tmp/release-pr-notes.json \
-            --changelog CHANGELOG.md \
-            --tag "${{ steps.normalized-version.outputs.tag }}" \
-            --output /tmp/release-notes-preview.md
-
       - name: Find existing release PR
         if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
         id: existing-pr
@@ -172,6 +163,16 @@ jobs:
           else
             : > /tmp/existing-release-pr-body.md
           fi
+
+      - name: Build release notes preview
+        if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
+        run: |
+          scripts/release/build-release-notes \
+            --notes /tmp/release-pr-notes.json \
+            --changelog CHANGELOG.md \
+            --tag "${{ steps.normalized-version.outputs.tag }}" \
+            --release-pr-body /tmp/existing-release-pr-body.md \
+            --output /tmp/release-notes-preview.md
 
       - name: Render release PR body
         if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
