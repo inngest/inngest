@@ -8,6 +8,7 @@ import { GetFunctionUsageDocument, GetFunctionsDocument } from '@/gql/graphql';
 type QueryVariables = {
   archived: boolean;
   nameSearch: string | null;
+  appIDs: string[] | null;
   cursor: number | null;
 };
 
@@ -15,7 +16,7 @@ export function useFunctions() {
   const envID = useEnvironment().id;
   const client = useClient();
   return useCallback(
-    async ({ cursor, archived, nameSearch }: QueryVariables) => {
+    async ({ cursor, archived, nameSearch, appIDs }: QueryVariables) => {
       const result = await client
         .query(
           GetFunctionsDocument,
@@ -25,6 +26,7 @@ export function useFunctions() {
             pageSize: 50,
             archived,
             search: nameSearch,
+            appIDs,
           },
           { requestPolicy: 'network-only' },
         )
