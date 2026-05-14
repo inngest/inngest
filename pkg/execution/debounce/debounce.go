@@ -323,6 +323,10 @@ func scopeForDebounceItem(di DebounceItem) queue.Scope {
 
 // DeleteDebounceItem removes a debounce from the map.
 func (d debouncer) DeleteDebounceItem(ctx context.Context, scope queue.Scope, debounceID ulid.ULID, di DebounceItem) error {
+	if err := scope.Validate(); err != nil {
+		return err
+	}
+
 	// Determine the flag value once and pass down to prevent inconsistent values mid-deletion
 	shouldMigrate := d.shouldMigrate(ctx, scope.AccountID)
 
@@ -357,6 +361,10 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, scope queue.Scope, de
 
 // GetDebounceItem returns a DebounceItem given a debounce ID.
 func (d debouncer) GetDebounceItem(ctx context.Context, scope queue.Scope, debounceID ulid.ULID) (*DebounceItem, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	shouldMigrate := d.shouldMigrate(ctx, scope.AccountID)
 
 	// Determine the flag value once and pass down to prevent inconsistent values mid-retrieval
@@ -416,6 +424,10 @@ func getDebounceItem(ctx context.Context, shard queue.QueueShard, scope queue.Sc
 
 // StartExecution swaps out the underlying pointer of the debounce
 func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function, debounceID ulid.ULID) error {
+	if err := scopeForDebounceItem(di).Validate(); err != nil {
+		return err
+	}
+
 	dkey, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
 		return err
@@ -483,6 +495,9 @@ func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di Debounc
 func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Function) error {
 	if fn.Debounce == nil {
 		return fmt.Errorf("fn has no debounce config")
+	}
+	if err := scopeForDebounceItem(di).Validate(); err != nil {
+		return err
 	}
 	ttl, err := str2duration.ParseDuration(fn.Debounce.Period)
 	if err != nil {
@@ -839,6 +854,10 @@ func (d debouncer) debounceKey(ctx context.Context, evt event.TrackedEvent, fn i
 
 // GetDebounceInfo retrieves information about the current debounce for a function and debounce key.
 func (d debouncer) GetDebounceInfo(ctx context.Context, scope queue.Scope, debounceKey string) (*DebounceInfo, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	// Use function ID as debounce key if not specified
 	if debounceKey == "" {
 		debounceKey = scope.FunctionID.String()
@@ -887,6 +906,10 @@ func (d debouncer) GetDebounceInfo(ctx context.Context, scope queue.Scope, debou
 
 // DeleteDebounce deletes the current debounce for a function and debounce key.
 func (d debouncer) DeleteDebounce(ctx context.Context, scope queue.Scope, debounceKey string) (*DeleteDebounceResult, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	// Get the debounce info first
 	info, err := d.GetDebounceInfo(ctx, scope, debounceKey)
 	if err != nil {
@@ -933,6 +956,10 @@ func (d debouncer) DeleteDebounce(ctx context.Context, scope queue.Scope, deboun
 
 // DeleteDebounceByID deletes debounces directly by their IDs.
 func (d debouncer) DeleteDebounceByID(ctx context.Context, scope queue.Scope, debounceIDs ...ulid.ULID) error {
+	if err := scope.Validate(); err != nil {
+		return err
+	}
+
 	if len(debounceIDs) == 0 {
 		return nil
 	}
@@ -963,6 +990,10 @@ func (d debouncer) RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunD
 		EnvID:      opts.EnvID,
 		FunctionID: opts.FunctionID,
 	}
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	info, err := d.GetDebounceInfo(ctx, scope, opts.DebounceKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get debounce info: %w", err)

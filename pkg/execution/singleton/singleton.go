@@ -31,6 +31,10 @@ type store struct {
 }
 
 func (s *store) HandleSingleton(ctx context.Context, scope queue.Scope, key string, cfg inngest.Singleton) (*ulid.ULID, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	return singleton(ctx, s.shards, scope, key, cfg)
 }
 

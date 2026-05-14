@@ -4,35 +4,28 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
 // GetSingletonInfo retrieves the current singleton lock status for a given key.
 func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *pb.SingletonInfoRequest) (*pb.SingletonInfoResponse, error) {
-	fnID, err := uuid.Parse(req.GetFunctionId())
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid function_id: %w", err)
+		return nil, err
 	}
 
 	// Build singleton key: function_id or function_id-suffix
-	singletonKey := fnID.String()
+	singletonKey := scope.FunctionID.String()
 	if req.GetSingletonKey() != "" {
-		singletonKey = fnID.String() + "-" + req.GetSingletonKey()
+		singletonKey = scope.FunctionID.String() + "-" + req.GetSingletonKey()
 	}
 
-	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, scope.AccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}
 
-	runID, err := shard.SingletonGetRunID(ctx, queue.Scope{
-		AccountID:  consts.DevServerAccountID,
-		EnvID:      consts.DevServerEnvID,
-		FunctionID: fnID,
-	}, singletonKey)
+	runID, err := shard.SingletonGetRunID(ctx, scope, singletonKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get singleton info: %w", err)
 	}
@@ -52,27 +45,23 @@ func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *pb.SingletonInfoRe
 
 // DeleteSingletonLock removes an existing singleton lock.
 func (d *debugAPI) DeleteSingletonLock(ctx context.Context, req *pb.DeleteSingletonLockRequest) (*pb.DeleteSingletonLockResponse, error) {
-	fnID, err := uuid.Parse(req.GetFunctionId())
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid function_id: %w", err)
+		return nil, err
 	}
 
 	// Build singleton key: function_id or function_id-suffix
-	singletonKey := fnID.String()
+	singletonKey := scope.FunctionID.String()
 	if req.GetSingletonKey() != "" {
-		singletonKey = fnID.String() + "-" + req.GetSingletonKey()
+		singletonKey = scope.FunctionID.String() + "-" + req.GetSingletonKey()
 	}
 
-	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, scope.AccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}
 
-	runID, err := shard.SingletonReleaseRunID(ctx, queue.Scope{
-		AccountID:  consts.DevServerAccountID,
-		EnvID:      consts.DevServerEnvID,
-		FunctionID: fnID,
-	}, singletonKey)
+	runID, err := shard.SingletonReleaseRunID(ctx, scope, singletonKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete singleton lock: %w", err)
 	}

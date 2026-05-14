@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/debounce"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"github.com/oklog/ulid/v2"
 )
@@ -19,15 +16,9 @@ func (d *debugAPI) GetDebounceInfo(ctx context.Context, req *pb.DebounceInfoRequ
 		return nil, fmt.Errorf("debouncer not configured")
 	}
 
-	fnID, err := uuid.Parse(req.GetFunctionId())
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid function_id: %w", err)
-	}
-
-	scope := queue.Scope{
-		AccountID:  consts.DevServerAccountID,
-		EnvID:      consts.DevServerEnvID,
-		FunctionID: fnID,
+		return nil, err
 	}
 
 	// Use the debouncer to get debounce info
@@ -68,16 +59,12 @@ func (d *debugAPI) DeleteDebounce(ctx context.Context, req *pb.DeleteDebounceReq
 		return nil, fmt.Errorf("debouncer not configured")
 	}
 
-	fnID, err := uuid.Parse(req.GetFunctionId())
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid function_id: %w", err)
+		return nil, err
 	}
 
-	result, err := d.debouncer.DeleteDebounce(ctx, queue.Scope{
-		AccountID:  consts.DevServerAccountID,
-		EnvID:      consts.DevServerEnvID,
-		FunctionID: fnID,
-	}, req.GetDebounceKey())
+	result, err := d.debouncer.DeleteDebounce(ctx, scope, req.GetDebounceKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete debounce: %w", err)
 	}
@@ -112,10 +99,12 @@ func (d *debugAPI) DeleteDebounceByID(ctx context.Context, req *pb.DeleteDebounc
 		parsed[i] = u
 	}
 
-	err := d.debouncer.DeleteDebounceByID(ctx, queue.Scope{
-		AccountID: consts.DevServerAccountID,
-		EnvID:     consts.DevServerEnvID,
-	}, parsed...)
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
+	if err != nil {
+		return nil, err
+	}
+
+	err = d.debouncer.DeleteDebounceByID(ctx, scope, parsed...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete debounce by ID: %w", err)
 	}
@@ -131,16 +120,16 @@ func (d *debugAPI) RunDebounce(ctx context.Context, req *pb.RunDebounceRequest) 
 		return nil, fmt.Errorf("debouncer not configured")
 	}
 
-	fnID, err := uuid.Parse(req.GetFunctionId())
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
 	if err != nil {
-		return nil, fmt.Errorf("invalid function_id: %w", err)
+		return nil, err
 	}
 
 	result, err := d.debouncer.RunDebounce(ctx, debounce.RunDebounceOpts{
-		FunctionID:  fnID,
+		FunctionID:  scope.FunctionID,
 		DebounceKey: req.GetDebounceKey(),
-		AccountID:   consts.DevServerAccountID,
-		EnvID:       consts.DevServerEnvID,
+		AccountID:   scope.AccountID,
+		EnvID:       scope.EnvID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run debounce: %w", err)
