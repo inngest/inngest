@@ -968,30 +968,6 @@ func IncrDefersFinalizedCounter(ctx context.Context, status string, opts Counter
 	})
 }
 
-// IncrCheckpointAsyncDispatchValidationCounter records the outcome of an
-// async checkpoint dispatch staleness check. Result is one of:
-//   - "passed":  the entropy check ran and the dispatch was fresh
-//   - "stale":   the entropy check ran and the dispatch was rejected
-//   - "skipped": the validator short-circuited (empty request id, fresh-window
-//     fast path, queue backend without LoadQueueItem, transient load error,
-//     or a pre-rollout queue item with GenerationID=0)
-//
-// During rollout, the passed/skipped split tells operators whether the
-// validator is actually engaging or silently falling open.
-func IncrCheckpointAsyncDispatchValidationCounter(ctx context.Context, result string, opts CounterOpt) {
-	if opts.Tags == nil {
-		opts.Tags = map[string]any{}
-	}
-	opts.Tags["result"] = result
-
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "checkpoint_async_dispatch_validation_total",
-		Description: "Total number of async checkpoint dispatch validations, tagged by passed/stale/skipped result",
-		Tags:        opts.Tags,
-	})
-}
-
 // IncrDefersRejectedCounter records a soft-rejected defer. Reason is one
 // of "per_defer_size", "aggregate_size", "per_run_count", "invalid_opts".
 func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterOpt) {

@@ -20,16 +20,11 @@ type sdkJobIDCtxKey struct{}
 // producer (executor) and the validator (checkpoint package): a drift in
 // either the seed format or the entropy derivation would silently break
 // fencing for in-flight runs.
-func DispatchRequestID(ts time.Time, runID ulid.ULID, generationID int) ulid.ULID {
-	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", runID, generationID))
-}
-
-// DispatchRequestIDEntropy returns the entropy portion of the dispatch
-// RequestID. The validator compares this against the entropy of the
-// SDK-echoed RequestID; the dispatch timestamp doesn't participate in
-// fencing.
-func DispatchRequestIDEntropy(runID ulid.ULID, generationID int) []byte {
-	return DispatchRequestID(time.Unix(0, 0), runID, generationID).Entropy()
+func DispatchRequestID(runID ulid.ULID, jobID string, generationID int) ulid.ULID {
+	return util.MustDeterministicULID(
+		time.UnixMilli(int64(runID.Time())),
+		fmt.Appendf(nil, "%s:%s:%d", runID, jobID, generationID),
+	)
 }
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK

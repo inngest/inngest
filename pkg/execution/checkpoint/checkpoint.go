@@ -1,7 +1,6 @@
 package checkpoint
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -468,12 +467,6 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
-	if c.AllowAsyncDispatchValidation.Enabled(ctx, input.AccountID) {
-		if err := c.validateAsyncDispatch(ctx, input); err != nil {
-			return err
-		}
-	}
-
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, md.ID)
@@ -573,6 +566,23 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return err
 	}
 
+	// IMPORTANT: Validation must occur after processing the request. What that
+	// seems illogical, we're doing it because work actually did complete and we
+	// need to update state.
+	//
+	// A concrete example of this need is an HTTP timeout while checkpointing is
+	// enabled. In that situation, the HTTP response (the timeout) was processed
+	// before the SDK sent the outgoing checkpoint request. That means that the
+	// HTTP response processing already incremented the queue item's generation
+	// ID, guaranteeing that our dispatch validation will fail. If we don't
+	// still save the step in that situation, we'll keep retrying the step even
+	// though the user code actually completed it.
+	if c.AllowAsyncDispatchValidation.Enabled(ctx, input.AccountID) {
+		if err := c.validateAsyncDispatch(ctx, input); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -645,11 +655,17 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		return nil
 	}
 
+	var jobID string
+	if item.Data.JobID == nil {
+		return nil
+	}
+	jobID = *item.Data.JobID
+
 	result = "passed"
 
 	// Compare only the entropy: the dispatch timestamp isn't recoverable
 	// from the SDK-echoed RequestID and isn't part of the fence.
-	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
+	if parsed != driver.DispatchRequestID(input.RunID, jobID, item.GenerationID) {
 		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
 	}
 
