@@ -15,7 +15,7 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
-import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
+import { ScoresAttrs, collectScoreMetadata } from '../RunDetails/ScoresAttrs';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -52,14 +52,6 @@ interface ActionConfig {
   title: string;
   disabled?: boolean;
   onClick?: () => void;
-}
-
-function collectScoreMetadata(trace?: Trace): NonNullable<Trace['metadata']> {
-  // Scores are emitted on step spans, so run-level views aggregate them from children.
-  const metadata = trace?.metadata?.filter((md) => md.kind === 'inngest.score') ?? [];
-  const childMetadata = trace?.childrenSpans?.flatMap((child) => collectScoreMetadata(child)) ?? [];
-
-  return [...metadata, ...childMetadata];
 }
 
 export const actionConfigs = (
