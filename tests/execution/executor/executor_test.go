@@ -131,8 +131,9 @@ func TestScheduleRaceCondition(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
@@ -297,8 +298,9 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
@@ -469,8 +471,9 @@ func TestFinalize(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
@@ -720,8 +723,9 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up database and function loader
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
@@ -924,8 +928,9 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
@@ -1108,8 +1113,9 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	dbcqrs := base_cqrs.NewCQRS(dbsqlite.New(db))
 	loader := dbcqrs.(state.FunctionLoader)
@@ -1285,8 +1291,9 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 func TestExecutorScheduleRateLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
@@ -1486,8 +1493,9 @@ func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context
 func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
@@ -1675,8 +1683,9 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
@@ -1792,8 +1801,9 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
