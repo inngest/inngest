@@ -1210,6 +1210,101 @@ service V2 {
     };
   }
 
+  rpc QueryInsights(QueryInsightsRequest) returns (QueryInsightsResponse) {
+    option (google.api.http) = {
+      post: "/insights/query",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Query insights"
+      tags: "Insights"
+      tags: "Beta"
+      description: "Query Insights using the provided SQL query."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Query executed successfully"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2SyncAppResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - environment not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "422"
+        value: {
+          description: "Unprocessable Entity - Query validation or execution failed."
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2SyncAppResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -1722,4 +1817,108 @@ message SyncAppData {
 message SyncAppError {
   string code = 1;
   string message = 2;
+}
+
+message QueryInsightsRequest {
+  string query = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The insights query to execute, written in modified ClickHouse SQL"
+    }
+  ];
+}
+
+message QueryInsightsResponse {
+  repeated InsightsColumn columns = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Column metadata for the insights query result"
+    }
+  ];
+  repeated InsightsRow rows = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Rows of the insights query result, where each row contains a list of values corresponding to the columns"
+    }
+  ];
+  repeated InsightsDiagnostic diagnostics = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Any non-fatal diagnostics related to the insights query execution"
+    }
+  ];
+}
+
+message InsightsColumn {
+  string name = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Name of the column in the insights query result"
+    }
+  ];
+  InsightsColumnType type = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Data type of the column (e.g., 'string', 'number', 'boolean')"
+    }
+  ];
+}
+
+enum InsightsColumnType {
+  VALUE_TYPE_UNSPECIFIED = 0;
+  STRING = 1;
+  NUMBER = 2;
+  BOOLEAN = 3;
+  DATETIME = 4;
+  COMPLEX = 5;
+}
+
+message InsightsRow {
+  repeated google.protobuf.Value values = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)"
+    }
+  ];
+}
+
+message InsightsDiagnostic {
+  InsightsDiagnosticSeverity severity = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Severity level of the diagnostic (e.g., 'error', 'warning', 'info')"
+    }
+  ];
+  string code = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Machine-readable code representing the type of diagnostic"
+    }
+  ];
+  string message = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Human-readable message describing the diagnostic"
+    }
+  ];
+  optional InsightsDiagnosticPosition position = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional position in the query string where the diagnostic applies, useful for pointing out syntax errors or other issues in the query"
+    }
+  ];
+}
+
+enum InsightsDiagnosticSeverity {
+  SEVERITY_UNSPECIFIED = 0;
+  ERROR = 1;
+  WARNING = 2;
+  INFO = 3;
+}
+
+message InsightsDiagnosticPosition {
+  int32 start = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Starting character index in the query string where the diagnostic applies"
+    }
+  ];
+  int32 end = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Ending character index in the query string where the diagnostic applies"
+    }
+  ];
+  string context = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Snippet of the query string around the position to provide context for the diagnostic"
+    }
+  ];
 }
