@@ -217,6 +217,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const [functions] = useQuery({
     query: GetFunctionsDocument,
     variables: {
+      appIDs: null,
       archived: false,
       environmentID: env.id,
       page: 1,

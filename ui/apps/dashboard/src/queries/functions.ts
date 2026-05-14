@@ -66,10 +66,11 @@ const GetFunctionsDocument = graphql(`
     $page: Int
     $archived: Boolean
     $search: String
+    $appIDs: [UUID!]
     $pageSize: Int
   ) {
     workspace(id: $environmentID) {
-      workflows(archived: $archived, search: $search) @paginated(perPage: $pageSize, page: $page) {
+      workflows(archived: $archived, search: $search, appIDs: $appIDs) @paginated(perPage: $pageSize, page: $page) {
         page {
           page
           perPage
@@ -99,11 +100,13 @@ const GetFunctionsDocument = graphql(`
 export function useFunctionsPage({
   archived,
   search,
+  appIDs,
   envID,
   page,
 }: {
   archived: boolean;
   search: string;
+  appIDs?: string[] | null;
   envID: string;
   page: number;
 }) {
@@ -113,6 +116,7 @@ export function useFunctionsPage({
     variables: {
       archived,
       search,
+      appIDs: appIDs ?? null,
       environmentID: envID,
       page,
       pageSize,
