@@ -253,6 +253,9 @@ DO UPDATE SET
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
 
+-- name: GetTraceRunsByRunIDs :many
+SELECT * FROM trace_runs WHERE run_id IN (sqlc.slice('run_ids'));
+
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;
 
@@ -620,3 +623,33 @@ WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
+
+
+--
+-- Run defers
+--
+
+-- name: InsertRunDefer :exec
+INSERT INTO run_defers
+    (parent_run_id, defer_id, user_defer_id, fn_slug, status) VALUES
+    (?, ?, ?, ?, ?)
+ON CONFLICT(parent_run_id, defer_id) DO UPDATE SET
+    user_defer_id = excluded.user_defer_id,
+    fn_slug = excluded.fn_slug,
+    status = excluded.status;
+
+-- name: UpdateRunDeferChildRunID :exec
+UPDATE run_defers
+SET child_run_id = ?
+WHERE parent_run_id = ? AND defer_id = ?;
+
+-- name: GetRunDefersByParentRunIDs :many
+SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
+FROM run_defers
+WHERE parent_run_id IN (sqlc.slice('parent_run_ids'))
+ORDER BY defer_id ASC;
+
+-- name: GetRunDeferredFromByChildRunIDs :many
+SELECT parent_run_id, defer_id, user_defer_id, status, child_run_id
+FROM run_defers
+WHERE child_run_id IN (sqlc.slice('child_run_ids'));

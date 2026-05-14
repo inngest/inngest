@@ -1178,6 +1178,86 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
+const getRunDeferredFromByChildRunIDs = `-- name: GetRunDeferredFromByChildRunIDs :many
+SELECT parent_run_id, defer_id, user_defer_id, status, child_run_id
+FROM run_defers
+WHERE child_run_id IN (SELECT UNNEST($1::BYTEA[]))
+`
+
+type GetRunDeferredFromByChildRunIDsRow struct {
+	ParentRunID ulid.ULID
+	DeferID     string
+	UserDeferID string
+	Status      string
+	ChildRunID  ulid.ULID
+}
+
+func (q *Queries) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds [][]byte) ([]*GetRunDeferredFromByChildRunIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRunDeferredFromByChildRunIDs, pq.Array(childRunIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunDeferredFromByChildRunIDsRow
+	for rows.Next() {
+		var i GetRunDeferredFromByChildRunIDsRow
+		if err := rows.Scan(
+			&i.ParentRunID,
+			&i.DeferID,
+			&i.UserDeferID,
+			&i.Status,
+			&i.ChildRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRunDefersByParentRunIDs = `-- name: GetRunDefersByParentRunIDs :many
+SELECT parent_run_id, defer_id, user_defer_id, fn_slug, status, child_run_id
+FROM run_defers
+WHERE parent_run_id IN (SELECT UNNEST($1::BYTEA[]))
+ORDER BY defer_id ASC
+`
+
+func (q *Queries) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIds [][]byte) ([]*RunDefer, error) {
+	rows, err := q.db.QueryContext(ctx, getRunDefersByParentRunIDs, pq.Array(parentRunIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*RunDefer
+	for rows.Next() {
+		var i RunDefer
+		if err := rows.Scan(
+			&i.ParentRunID,
+			&i.DeferID,
+			&i.UserDeferID,
+			&i.FnSlug,
+			&i.Status,
+			&i.ChildRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRunSpanByRunID = `-- name: GetRunSpanByRunID :one
 SELECT
   run_id,
@@ -1637,6 +1717,51 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 	return &i, err
 }
 
+const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id IN (SELECT UNNEST($1::CHAR(26)[]))
+`
+
+func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []string) ([]*TraceRun, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceRunsByRunIDs, pq.Array(runIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TraceRun
+	for rows.Next() {
+		var i TraceRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.FunctionID,
+			&i.TraceID,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Status,
+			&i.SourceID,
+			&i.TriggerIds,
+			&i.Output,
+			&i.IsDebounce,
+			&i.BatchID,
+			&i.CronSchedule,
+			&i.HasAi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE POSITION($1 IN convert_from(trigger_ids, 'UTF8')) > 0
 `
@@ -2049,6 +2174,37 @@ type InsertQueueSnapshotChunkParams struct {
 
 func (q *Queries) InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error {
 	_, err := q.db.ExecContext(ctx, insertQueueSnapshotChunk, arg.SnapshotID, arg.ChunkID, arg.Data)
+	return err
+}
+
+const insertRunDefer = `-- name: InsertRunDefer :exec
+
+INSERT INTO run_defers
+    (parent_run_id, defer_id, user_defer_id, fn_slug, status) VALUES
+    ($1, $2, $3, $4, $5)
+ON CONFLICT (parent_run_id, defer_id) DO UPDATE SET
+    user_defer_id = EXCLUDED.user_defer_id,
+    fn_slug = EXCLUDED.fn_slug,
+    status = EXCLUDED.status
+`
+
+type InsertRunDeferParams struct {
+	ParentRunID ulid.ULID
+	DeferID     string
+	UserDeferID string
+	FnSlug      string
+	Status      string
+}
+
+// Run defers
+func (q *Queries) InsertRunDefer(ctx context.Context, arg InsertRunDeferParams) error {
+	_, err := q.db.ExecContext(ctx, insertRunDefer,
+		arg.ParentRunID,
+		arg.DeferID,
+		arg.UserDeferID,
+		arg.FnSlug,
+		arg.Status,
+	)
 	return err
 }
 
@@ -2470,6 +2626,23 @@ func (q *Queries) UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionCo
 		&i.ArchivedAt,
 	)
 	return &i, err
+}
+
+const updateRunDeferChildRunID = `-- name: UpdateRunDeferChildRunID :exec
+UPDATE run_defers
+SET child_run_id = $1
+WHERE parent_run_id = $2 AND defer_id = $3
+`
+
+type UpdateRunDeferChildRunIDParams struct {
+	ChildRunID  ulid.ULID
+	ParentRunID ulid.ULID
+	DeferID     string
+}
+
+func (q *Queries) UpdateRunDeferChildRunID(ctx context.Context, arg UpdateRunDeferChildRunIDParams) error {
+	_, err := q.db.ExecContext(ctx, updateRunDeferChildRunID, arg.ChildRunID, arg.ParentRunID, arg.DeferID)
+	return err
 }
 
 const upsertApp = `-- name: UpsertApp :one

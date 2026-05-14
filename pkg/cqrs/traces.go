@@ -412,6 +412,9 @@ type TraceReader interface {
 	GetTraceRunsCount(ctx context.Context, opt GetTraceRunOpt) (int, error)
 	// GetTraceRun retrieve the specified run
 	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
+	// GetTraceRunsByRunIDs retrieves multiple runs in a single query, keyed by
+	// run ID. Missing runs are simply absent from the returned map.
+	GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*TraceRun, error)
 	// GetTraceSpansByRun retrieves all the spans related to the trace
 	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
 	// LegacyGetSpanOutput retrieves the output for the specified span
@@ -482,6 +485,17 @@ func GetRunOptFromContext(ctx context.Context) GetRunOpt {
 	return opt
 }
 
+// RunTypeFilter narrows the run list to primary runs, deferred (child) runs,
+// or both. The zero value (RunTypeFilterAny) preserves the legacy "show
+// everything" behavior.
+type RunTypeFilter int
+
+const (
+	RunTypeFilterAny RunTypeFilter = iota
+	RunTypeFilterPrimary
+	RunTypeFilterDefer
+)
+
 type GetTraceRunFilter struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
@@ -492,6 +506,7 @@ type GetTraceRunFilter struct {
 	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
+	RunType     RunTypeFilter
 }
 
 type GetTraceRunOrder struct {

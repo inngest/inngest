@@ -11,6 +11,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -210,6 +211,7 @@ func (e *executor) buildDeferEvents(
 
 	now := e.now()
 	var events []event.Event
+	var deferInserts []cqrs.RunDeferInsert
 
 	for _, d := range defers {
 		if err := d.Validate(); err != nil {
@@ -220,6 +222,28 @@ func (e *executor) buildDeferEvents(
 			)
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
+		}
+
+		// The GraphQL `defers` field surfaces both SCHEDULED and ABORTED rows;
+		// Rejected and any future enum value are out of contract and skipped
+		// rather than persisted as an unknown string.
+		if e.deferStore != nil {
+			var deferRowStatus cqrs.RunDeferStatus
+			switch d.ScheduleStatus {
+			case enums.DeferStatusAfterRun:
+				deferRowStatus = cqrs.RunDeferStatusScheduled
+			case enums.DeferStatusAborted:
+				deferRowStatus = cqrs.RunDeferStatusAborted
+			}
+			if deferRowStatus != "" {
+				deferInserts = append(deferInserts, cqrs.RunDeferInsert{
+					ParentRunID: opts.Metadata.ID.RunID,
+					DeferID:     d.HashedID,
+					UserDeferID: d.UserlandID,
+					FnSlug:      d.FnSlug,
+					Status:      deferRowStatus,
+				})
+			}
 		}
 
 		// TODO: what about an immediate execution mode?
@@ -271,6 +295,7 @@ func (e *executor) buildDeferEvents(
 			FnSlug:       d.FnSlug,
 			ParentFnSlug: fnSlug,
 			ParentRunID:  opts.Metadata.ID.RunID.String(),
+			DeferID:      d.HashedID,
 		}
 		if err := deferredMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(
@@ -290,6 +315,23 @@ func (e *executor) buildDeferEvents(
 			Data:      data,
 		})
 		metrics.IncrDefersFinalizedCounter(ctx, "after_run", metrics.CounterOpt{PkgName: pkgName})
+	}
+
+	if e.deferStore != nil && len(deferInserts) > 0 {
+		_, err := util.WithRetry(ctx, "deferStore.InsertRunDefers",
+			func(ctx context.Context) (struct{}, error) {
+				return struct{}{}, e.deferStore.InsertRunDefers(ctx, deferInserts)
+			},
+			util.NewRetryConf(),
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error persisting run defers after retries",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+				"count", len(deferInserts),
+			)
+		}
 	}
 
 	return events, nil

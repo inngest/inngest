@@ -1,10 +1,18 @@
 import { useMemo } from 'react';
+import { type PillKind } from '@inngest/components/Pill';
 import { IDCell, PillCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { formatMilliseconds } from '@inngest/components/utils/date';
+import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';
+import { type RunType } from '../types/functionRun';
 import type { Run, ViewScope } from './types';
+
+const runTypePill: Record<RunType, { kind: PillKind; label: string }> = {
+  PRIMARY: { kind: 'primary', label: 'Primary' },
+  DEFER: { kind: 'info', label: 'Defer' },
+};
 
 const columnHelper = createColumnHelper<Run>();
 
@@ -15,6 +23,7 @@ const columnsIDs = [
   'function',
   'id',
   'queuedAt',
+  'runType',
   'startedAt',
   'status',
   'trigger',
@@ -92,13 +101,26 @@ const columns = [
   columnHelper.accessor('function', {
     cell: (info) => {
       const data = info.row.original;
+      const fnName = info.getValue().name;
 
       if (data.hasAI) {
-        return <AICell>{info.getValue().name}</AICell>;
+        return <AICell>{fnName}</AICell>;
       }
+
+      const parentName = data.deferredFrom?.parentRun?.function?.name;
+      if (parentName) {
+        return (
+          <div className="text-nowrap flex items-center gap-1">
+            <span className="text-muted text-sm font-medium">{parentName}</span>
+            <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
+            <TextCell>{fnName}</TextCell>
+          </div>
+        );
+      }
+
       return (
-        <div className="flex items-center text-nowrap">
-          <TextCell>{info.getValue().name}</TextCell>
+        <div className="text-nowrap flex items-center">
+          <TextCell>{fnName}</TextCell>
         </div>
       );
     },
@@ -106,10 +128,28 @@ const columns = [
     enableSorting: false,
     id: ensureColumnID('function'),
   }),
+  columnHelper.accessor('runType', {
+    cell: (info) => {
+      const runType = info.getValue();
+      const pill = runTypePill[runType];
+      if (!pill) return null;
+
+      return (
+        <div className="flex items-center">
+          <PillCell type={runType} kind={pill.kind} className="bg-transparent">
+            {pill.label}
+          </PillCell>
+        </div>
+      );
+    },
+    header: 'Type',
+    enableSorting: false,
+    id: ensureColumnID('runType'),
+  }),
   columnHelper.accessor('app', {
     cell: (info) => {
       return (
-        <div className="flex items-center text-nowrap">
+        <div className="text-nowrap flex items-center">
           <TextCell>{info.getValue().externalID}</TextCell>
         </div>
       );

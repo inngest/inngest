@@ -1624,6 +1624,181 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	return nil, err
 }
 
+func (w wrapper) InsertRunDefer(ctx context.Context, parentRunID ulid.ULID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
+	return w.q.InsertRunDefer(ctx, dbpkg.InsertRunDeferParams{
+		ParentRunID: parentRunID,
+		DeferID:     deferID,
+		UserDeferID: userDeferID,
+		FnSlug:      fnSlug,
+		Status:      string(status),
+	})
+}
+
+func (w wrapper) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInsert) error {
+	if len(defers) == 0 {
+		return nil
+	}
+	params := make([]dbpkg.InsertRunDeferParams, len(defers))
+	for i, d := range defers {
+		params[i] = dbpkg.InsertRunDeferParams{
+			ParentRunID: d.ParentRunID,
+			DeferID:     d.DeferID,
+			UserDeferID: d.UserDeferID,
+			FnSlug:      d.FnSlug,
+			Status:      string(d.Status),
+		}
+	}
+	return w.q.InsertRunDefers(ctx, params)
+}
+
+func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error {
+	return w.q.UpdateRunDeferChildRunID(ctx, dbpkg.UpdateRunDeferChildRunIDParams{
+		ChildRunID:  childRunID,
+		ParentRunID: parentRunID,
+		DeferID:     deferID,
+	})
+}
+
+// GetRunDefers returns defers attached to each parent run, keyed by parent
+// run ID. Each entry is paired with the child TraceRun if one has been
+// created; aborted and not-yet-scheduled defers leave Run nil. Parents with
+// no defers are omitted.
+func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]cqrs.RunDefer, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := w.q.GetRunDefersByParentRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	childIDs := make([]ulid.ULID, 0, len(rows))
+	for _, r := range rows {
+		if !r.ChildRunID.IsZero() {
+			childIDs = append(childIDs, r.ChildRunID)
+		}
+	}
+
+	runsByID, err := w.GetTraceRunsByRunIDs(ctx, childIDs)
+	if err != nil {
+		return nil, fmt.Errorf("loading child trace runs for defers: %w", err)
+	}
+
+	out := make(map[ulid.ULID][]cqrs.RunDefer, len(runIDs))
+	for _, r := range rows {
+		entry := cqrs.RunDefer{
+			ID:          r.DeferID,
+			UserDeferID: r.UserDeferID,
+			FnSlug:      r.FnSlug,
+			Status:      cqrs.RunDeferStatus(r.Status),
+		}
+		if !r.ChildRunID.IsZero() {
+			if tr, ok := runsByID[r.ChildRunID]; ok {
+				entry.Run = tr
+			}
+		}
+		out[r.ParentRunID] = append(out[r.ParentRunID], entry)
+	}
+	return out, nil
+}
+
+// getDeferChildRunIDs returns the set of run_defers.child_run_id values
+// (string form) currently linked to a child run. Used to narrow the runs list
+// by primary vs deferred RunType without doing a cross-type SQL join, since
+// run_defers.child_run_id is stored as binary while trace_runs.run_id /
+// spans.run_id are stored as 26-char ULID strings.
+//
+// Unscoped: returns every linked child globally. Acceptable for the dev
+// server (single-tenant); a multi-tenant caller would need to push
+// workspace/account scoping in.
+func (w wrapper) getDeferChildRunIDs(ctx context.Context) ([]string, error) {
+	rows, err := w.adapter.Conn().QueryContext(ctx,
+		"SELECT child_run_id FROM run_defers WHERE child_run_id IS NOT NULL")
+	if err != nil {
+		return nil, fmt.Errorf("loading deferred child run ids: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id ulid.ULID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning deferred child run id: %w", err)
+		}
+		ids = append(ids, id.String())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating deferred child run ids: %w", err)
+	}
+	return ids, nil
+}
+
+// loadDeferChildRunIDsForFilter returns the linked-child run IDs only when
+// the filter narrows by RunType; otherwise it returns nil so callers can skip
+// the per-request load.
+func (w wrapper) loadDeferChildRunIDsForFilter(ctx context.Context, runType cqrs.RunTypeFilter) ([]string, error) {
+	if runType == cqrs.RunTypeFilterAny {
+		return nil, nil
+	}
+	return w.getDeferChildRunIDs(ctx)
+}
+
+// deferRunTypeFilter returns the goqu expression(s) needed to narrow `run_id`
+// to primary vs deferred (child) runs based on the resolved set. Returns nil
+// when no filter is needed.
+func deferRunTypeFilter(runType cqrs.RunTypeFilter, deferChildRunIDs []string) sq.Expression {
+	switch runType {
+	case cqrs.RunTypeFilterPrimary:
+		if len(deferChildRunIDs) == 0 {
+			return nil
+		}
+		return sq.C("run_id").NotIn(deferChildRunIDs)
+	case cqrs.RunTypeFilterDefer:
+		if len(deferChildRunIDs) == 0 {
+			// No deferred children exist; force an empty result.
+			return sq.L("1 = 0")
+		}
+		return sq.C("run_id").In(deferChildRunIDs)
+	}
+	return nil
+}
+
+// GetRunDeferredFrom returns the parent linkage for each deferred child run,
+// keyed by child run ID. Runs with no linkage are omitted.
+func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.RunDeferredFrom, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := w.q.GetRunDeferredFromByChildRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	parentIDs := make([]ulid.ULID, 0, len(rows))
+	for _, r := range rows {
+		parentIDs = append(parentIDs, r.ParentRunID)
+	}
+	parentsByID, err := w.GetTraceRunsByRunIDs(ctx, parentIDs)
+	if err != nil {
+		return nil, fmt.Errorf("loading parent trace runs for deferred-from linkage: %w", err)
+	}
+
+	out := make(map[ulid.ULID]*cqrs.RunDeferredFrom, len(rows))
+	for _, r := range rows {
+		entry := &cqrs.RunDeferredFrom{
+			ParentRunID: r.ParentRunID,
+		}
+		if tr, ok := parentsByID[r.ParentRunID]; ok {
+			entry.ParentRun = tr
+		}
+		out[r.ChildRunID] = entry
+	}
+	return out, nil
+}
+
 func toCQRSRun(run dbpkg.FunctionRun, finish dbpkg.FunctionFinish) *cqrs.FunctionRun {
 	copied := cqrs.FunctionRun{
 		RunID:           run.RunID,
@@ -1835,47 +2010,8 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 		return nil, err
 	}
 	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
-	// dedupe this conversion
 	for i, run := range sqlcTraceRuns {
-		start := time.UnixMilli(run.StartedAt)
-		end := time.UnixMilli(run.EndedAt)
-		triggerIDS := strings.Split(string(run.TriggerIds), ",")
-
-		var (
-			isBatch bool
-			batchID *ulid.ULID
-			cron    *string
-		)
-
-		if !run.BatchID.IsZero() {
-			isBatch = true
-			batchID = &run.BatchID
-		}
-
-		if run.CronSchedule.Valid {
-			cron = &run.CronSchedule.String
-		}
-
-		cqrsTraceRuns[i] = &cqrs.TraceRun{
-			AccountID:    run.AccountID,
-			WorkspaceID:  run.WorkspaceID,
-			AppID:        run.AppID,
-			FunctionID:   run.FunctionID,
-			TraceID:      string(run.TraceID),
-			RunID:        run.RunID.String(),
-			QueuedAt:     time.UnixMilli(run.QueuedAt),
-			StartedAt:    start,
-			EndedAt:      end,
-			Duration:     end.Sub(start),
-			SourceID:     run.SourceID,
-			TriggerIDs:   triggerIDS,
-			Output:       run.Output,
-			Status:       enums.RunCodeToStatus(run.Status),
-			BatchID:      batchID,
-			IsBatch:      isBatch,
-			CronSchedule: cron,
-			HasAI:        run.HasAi,
-		}
+		cqrsTraceRuns[i] = traceRunToCQRS(run)
 	}
 	return cqrsTraceRuns, nil
 }
@@ -1886,6 +2022,27 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		return nil, err
 	}
 
+	return traceRunToCQRS(run), nil
+}
+
+func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return map[ulid.ULID]*cqrs.TraceRun{}, nil
+	}
+
+	rows, err := w.q.GetTraceRunsByRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[ulid.ULID]*cqrs.TraceRun, len(rows))
+	for _, row := range rows {
+		out[row.RunID] = traceRunToCQRS(row)
+	}
+	return out, nil
+}
+
+func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 	start := time.UnixMilli(run.StartedAt)
 	end := time.UnixMilli(run.EndedAt)
 	triggerIDS := strings.Split(string(run.TriggerIds), ",")
@@ -1905,13 +2062,13 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		cron = &run.CronSchedule.String
 	}
 
-	trun := cqrs.TraceRun{
+	return &cqrs.TraceRun{
 		AccountID:    run.AccountID,
 		WorkspaceID:  run.WorkspaceID,
 		AppID:        run.AppID,
 		FunctionID:   run.FunctionID,
 		TraceID:      string(run.TraceID),
-		RunID:        id.RunID.String(),
+		RunID:        run.RunID.String(),
 		QueuedAt:     time.UnixMilli(run.QueuedAt),
 		StartedAt:    start,
 		EndedAt:      end,
@@ -1925,8 +2082,6 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		CronSchedule: cron,
 		HasAI:        run.HasAi,
 	}
-
-	return &trun, nil
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
@@ -2095,7 +2250,7 @@ type runsQueryBuilder struct {
 	cursorLayout *cqrs.TracePageCursor
 }
 
-func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt, deferChildRunIDs []string) *runsQueryBuilder {
 	l := logger.StdlibLogger(ctx)
 
 	// filters
@@ -2119,6 +2274,9 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	}
 	// Skipped runs should only be visible in event-scoped queries, not the runs list
 	filter = append(filter, sq.C("status").Neq(enums.RunStatusSkipped.ToCode()))
+	if expr := deferRunTypeFilter(opt.Filter.RunType, deferChildRunIDs); expr != nil {
+		filter = append(filter, expr)
+	}
 	tsfield := strings.ToLower(opt.Filter.TimeField.String())
 	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
 
@@ -2267,7 +2425,12 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		}
 	}
 
-	builder := newRunsQueryBuilder(ctx, opt)
+	deferChildRunIDs, err := w.loadDeferChildRunIDsForFilter(ctx, opt.Filter.RunType)
+	if err != nil {
+		return nil, err
+	}
+
+	builder := newRunsQueryBuilder(ctx, opt, deferChildRunIDs)
 	filter := builder.filter
 	order := builder.order
 	reqcursor := builder.cursor
@@ -2947,7 +3110,12 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	l := logger.StdlibLogger(ctx)
 	h := w.helpers()
 
-	builder := newSpanRunsQueryBuilder(ctx, opt)
+	deferChildRunIDs, err := w.loadDeferChildRunIDsForFilter(ctx, opt.Filter.RunType)
+	if err != nil {
+		return nil, err
+	}
+
+	builder := newSpanRunsQueryBuilder(ctx, opt, deferChildRunIDs)
 
 	// Parse CEL expressions using adapter's converter
 	var celFilters []sq.Expression
@@ -3225,7 +3393,7 @@ func (w wrapper) convertSpanRunRows(
 
 // newSpanRunsQueryBuilder creates a query builder for span-based runs Similar
 // to newRunsQueryBuilder but adapted for spans table structure
-func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt, deferChildRunIDs []string) *runsQueryBuilder {
 	l := logger.StdlibLogger(ctx)
 
 	// filters
@@ -3258,6 +3426,9 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		sq.C("status").IsNull(),
 		sq.C("status").Neq(enums.RunStatusSkipped.String()),
 	))
+	if expr := deferRunTypeFilter(opt.Filter.RunType, deferChildRunIDs); expr != nil {
+		filter = append(filter, expr)
+	}
 
 	// Map time fields - spans use start_time/end_time instead of
 	// queued_at/started_at/ended_at

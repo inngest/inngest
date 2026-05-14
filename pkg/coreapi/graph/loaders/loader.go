@@ -122,18 +122,21 @@ func LoadManyWithString[T interface{}](
 }
 
 type Loaders struct {
-	RunTraceLoader       *dataloader.Loader
-	LegacyRunTraceLoader *dataloader.Loader
-	RunSpanLoader        *dataloader.Loader
-	EventLoader          *dataloader.Loader
-	DebugRunLoader       *dataloader.Loader
-	DebugSessionLoader   *dataloader.Loader
+	RunTraceLoader        *dataloader.Loader
+	LegacyRunTraceLoader  *dataloader.Loader
+	RunSpanLoader         *dataloader.Loader
+	EventLoader           *dataloader.Loader
+	DebugRunLoader        *dataloader.Loader
+	DebugSessionLoader    *dataloader.Loader
+	RunDefersLoader       *dataloader.Loader
+	RunDeferredFromLoader *dataloader.Loader
 }
 
 func NewLoaders(params LoaderParams) *Loaders {
 	loaders := &Loaders{}
 	tr := &traceReader{loaders: loaders, reader: params.DB}
 	er := &eventReader{loaders: loaders, reader: params.DB}
+	dr := &deferReader{reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.LegacyRunTraceLoader = dataloader.NewBatchedLoader(tr.GetLegacyRunTrace)
@@ -141,6 +144,8 @@ func NewLoaders(params LoaderParams) *Loaders {
 	loaders.EventLoader = dataloader.NewBatchedLoader(er.GetEvents)
 	loaders.DebugRunLoader = dataloader.NewBatchedLoader(tr.GetDebugRunTrace)
 	loaders.DebugSessionLoader = dataloader.NewBatchedLoader(tr.GetDebugSessionTrace)
+	loaders.RunDefersLoader = dataloader.NewBatchedLoader(dr.GetRunDefers)
+	loaders.RunDeferredFromLoader = dataloader.NewBatchedLoader(dr.GetRunDeferredFrom)
 
 	return loaders
 }

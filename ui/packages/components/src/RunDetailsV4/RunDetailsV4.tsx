@@ -293,6 +293,7 @@ export const RunDetailsV4 = ({
               standalone={standalone}
               result={resultData}
               isDurableEndpoint={runData?.isDurableEndpoint}
+              isDeferred={Boolean(runData?.deferredFrom)}
             />
             {showError && (
               <ErrorCard
@@ -363,6 +364,8 @@ export const RunDetailsV4 = ({
               result={resultData}
               trace={runData?.trace}
               isDurableEndpoint={runData?.isDurableEndpoint}
+              defers={runData?.defers}
+              deferredFrom={runData?.deferredFrom}
             />
           )}
         </div>

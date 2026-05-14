@@ -20,4 +20,8 @@ type HistoryReader interface {
 	// GetFunctionRunHistory must return history for the given function run,
 	// ordered from oldest to newest.
 	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*history.History, error)
+
+	GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDefer, error)
+
+	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*RunDeferredFrom, error)
 }

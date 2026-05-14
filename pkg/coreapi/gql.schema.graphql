@@ -453,6 +453,8 @@ input RunsFilterV2 {
   functionIDs: [UUID!]
   appIDs: [UUID!]
 
+  runType: RunType
+
   query: String # CEL query string
 }
 
@@ -497,6 +499,9 @@ type FunctionRunV2 {
 
   trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
+  defers: [RunDefer!]!
+  deferredFrom: RunDeferredFrom
+  runType: RunType!
 }
 
 type RunsV2Connection {
@@ -508,6 +513,29 @@ type RunsV2Connection {
 type FunctionRunV2Edge {
   node: FunctionRunV2!
   cursor: String!
+}
+
+type RunDefer {
+  id: String!
+  userDeferID: String!
+  fnSlug: String!
+  status: RunDeferStatus!
+  run: FunctionRunV2
+}
+
+enum RunDeferStatus {
+  SCHEDULED
+  ABORTED
+}
+
+enum RunType {
+  PRIMARY
+  DEFER
+}
+
+type RunDeferredFrom {
+  parentRunID: ULID!
+  parentRun: FunctionRunV2
 }
 
 enum RunTraceSpanStatus {

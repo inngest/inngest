@@ -8,7 +8,6 @@ import {
   IDElement,
   LinkElement,
   OptimisticElementWrapper,
-  SkeletonElement,
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
@@ -31,6 +30,7 @@ type Props = {
   runID: string;
   result?: TraceResult;
   isDurableEndpoint?: boolean;
+  isDeferred?: boolean;
 };
 
 type Run = {
@@ -63,6 +63,7 @@ export const RunInfo = ({
   standalone,
   result,
   isDurableEndpoint,
+  isDeferred,
 }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
@@ -82,11 +83,9 @@ export const RunInfo = ({
                 expanded ? 'rotate-90' : ''
               }`}
             />
-            {isLazyDone(run) ? (
-              <span className="text-basis text-sm font-normal">{run.fn.name}</span>
-            ) : (
-              <SkeletonElement />
-            )}
+            <span className="text-basis text-sm font-normal">
+              {isDeferred ? 'Companion function' : 'Normal function'}
+            </span>
           </div>
 
           {isLazyDone(run) && (

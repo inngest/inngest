@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -448,6 +449,97 @@ func (pq *pgQuerier) HistoryCountRuns(ctx context.Context) (int64, error) {
 	return pq.q.HistoryCountRuns(ctx)
 }
 
+// --- Run defers ---
+
+func (pq *pgQuerier) InsertRunDefer(ctx context.Context, arg db.InsertRunDeferParams) error {
+	return pq.q.InsertRunDefer(ctx, sqlc.InsertRunDeferParams{
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+		UserDeferID: arg.UserDeferID,
+		FnSlug:      arg.FnSlug,
+		Status:      arg.Status,
+	})
+}
+
+func (pq *pgQuerier) InsertRunDefers(ctx context.Context, defers []db.InsertRunDeferParams) error {
+	if len(defers) == 0 {
+		return nil
+	}
+	var sb strings.Builder
+	sb.WriteString(`INSERT INTO run_defers (parent_run_id, defer_id, user_defer_id, fn_slug, status) VALUES `)
+	args := make([]any, 0, len(defers)*5)
+	for i, d := range defers {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		base := i * 5
+		fmt.Fprintf(&sb, "($%d,$%d,$%d,$%d,$%d)", base+1, base+2, base+3, base+4, base+5)
+		args = append(args, d.ParentRunID[:], d.DeferID, d.UserDeferID, d.FnSlug, d.Status)
+	}
+	sb.WriteString(` ON CONFLICT (parent_run_id, defer_id) DO UPDATE SET user_defer_id = EXCLUDED.user_defer_id, fn_slug = EXCLUDED.fn_slug, status = EXCLUDED.status`)
+	_, err := pq.db.ExecContext(ctx, sb.String(), args...)
+	return err
+}
+
+func (pq *pgQuerier) UpdateRunDeferChildRunID(ctx context.Context, arg db.UpdateRunDeferChildRunIDParams) error {
+	return pq.q.UpdateRunDeferChildRunID(ctx, sqlc.UpdateRunDeferChildRunIDParams{
+		ChildRunID:  arg.ChildRunID,
+		ParentRunID: arg.ParentRunID,
+		DeferID:     arg.DeferID,
+	})
+}
+
+func (pq *pgQuerier) GetRunDefersByParentRunIDs(ctx context.Context, parentRunIDs []ulid.ULID) ([]*db.RunDeferRow, error) {
+	if len(parentRunIDs) == 0 {
+		return nil, nil
+	}
+	byteIDs := make([][]byte, len(parentRunIDs))
+	for i, id := range parentRunIDs {
+		byteIDs[i] = id[:]
+	}
+	rows, err := pq.q.GetRunDefersByParentRunIDs(ctx, byteIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, runDeferFromPG), nil
+}
+
+func (pq *pgQuerier) GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*db.RunDeferRow, error) {
+	if len(childRunIDs) == 0 {
+		return nil, nil
+	}
+	byteIDs := make([][]byte, len(childRunIDs))
+	for i, id := range childRunIDs {
+		byteIDs[i] = id[:]
+	}
+	rows, err := pq.q.GetRunDeferredFromByChildRunIDs(ctx, byteIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, runDeferredFromRowFromPG), nil
+}
+
+func runDeferFromPG(r *sqlc.RunDefer) *db.RunDeferRow {
+	return &db.RunDeferRow{
+		ParentRunID: r.ParentRunID,
+		DeferID:     r.DeferID,
+		UserDeferID: r.UserDeferID,
+		FnSlug:      r.FnSlug,
+		Status:      r.Status,
+		ChildRunID:  r.ChildRunID,
+	}
+}
+
+func runDeferredFromRowFromPG(r *sqlc.GetRunDeferredFromByChildRunIDsRow) *db.RunDeferRow {
+	return &db.RunDeferRow{
+		ParentRunID: r.ParentRunID,
+		DeferID:     r.DeferID,
+		UserDeferID: r.UserDeferID,
+		Status:      r.Status,
+		ChildRunID:  r.ChildRunID,
+	}
+}
+
 // --- Queue Snapshots ---
 
 func (pq *pgQuerier) InsertQueueSnapshotChunk(ctx context.Context, arg db.InsertQueueSnapshotChunkParams) error {
@@ -671,6 +763,21 @@ func (pq *pgQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.Trac
 		return nil, err
 	}
 	return traceRunFromPG(r), nil
+}
+
+func (pq *pgQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	strIDs := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		strIDs[i] = id.String()
+	}
+	rows, err := pq.q.GetTraceRunsByRunIDs(ctx, strIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, traceRunFromPG), nil
 }
 
 func (pq *pgQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {

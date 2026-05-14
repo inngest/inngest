@@ -28,6 +28,7 @@ type Manager interface {
 	FunctionRunManager
 	EventManager
 	HistoryManager
+	DeferStore
 
 	// Trace / dev only
 	TraceReadWriter

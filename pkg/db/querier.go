@@ -65,6 +65,13 @@ type Querier interface {
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
 	HistoryCountRuns(ctx context.Context) (int64, error)
 
+	// Run defers
+	InsertRunDefer(ctx context.Context, arg InsertRunDeferParams) error
+	InsertRunDefers(ctx context.Context, defers []InsertRunDeferParams) error
+	UpdateRunDeferChildRunID(ctx context.Context, arg UpdateRunDeferChildRunIDParams) error
+	GetRunDefersByParentRunIDs(ctx context.Context, parentRunIDs []ulid.ULID) ([]*RunDeferRow, error)
+	GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIDs []ulid.ULID) ([]*RunDeferRow, error)
+
 	// Queue Snapshots
 	InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error
 	DeleteOldQueueSnapshots(ctx context.Context, limit int64) (int64, error)
@@ -87,6 +94,7 @@ type Querier interface {
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
 	InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
+	GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)

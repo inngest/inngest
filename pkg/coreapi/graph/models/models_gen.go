@@ -307,6 +307,9 @@ type FunctionRunV2 struct {
 	Output         *string           `json:"output,omitempty"`
 	Trace          *RunTraceSpan     `json:"trace,omitempty"`
 	HasAi          bool              `json:"hasAI"`
+	Defers         []*RunDefer       `json:"defers"`
+	DeferredFrom   *RunDeferredFrom  `json:"deferredFrom,omitempty"`
+	RunType        RunType           `json:"runType"`
 }
 
 type FunctionRunV2Edge struct {
@@ -363,6 +366,19 @@ type RetryConfiguration struct {
 	IsDefault *bool `json:"isDefault,omitempty"`
 }
 
+type RunDefer struct {
+	ID          string         `json:"id"`
+	UserDeferID string         `json:"userDeferID"`
+	FnSlug      string         `json:"fnSlug"`
+	Status      RunDeferStatus `json:"status"`
+	Run         *FunctionRunV2 `json:"run,omitempty"`
+}
+
+type RunDeferredFrom struct {
+	ParentRunID ulid.ULID      `json:"parentRunID"`
+	ParentRun   *FunctionRunV2 `json:"parentRun,omitempty"`
+}
+
 type RunStep struct {
 	StepID string  `json:"stepID"`
 	Name   string  `json:"name"`
@@ -403,6 +419,7 @@ type RunsFilterV2 struct {
 	Status      []FunctionRunStatus `json:"status,omitempty"`
 	FunctionIDs []uuid.UUID         `json:"functionIDs,omitempty"`
 	AppIDs      []uuid.UUID         `json:"appIDs,omitempty"`
+	RunType     *RunType            `json:"runType,omitempty"`
 	Query       *string             `json:"query,omitempty"`
 }
 
@@ -961,6 +978,47 @@ func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+type RunDeferStatus string
+
+const (
+	RunDeferStatusScheduled RunDeferStatus = "SCHEDULED"
+	RunDeferStatusAborted   RunDeferStatus = "ABORTED"
+)
+
+var AllRunDeferStatus = []RunDeferStatus{
+	RunDeferStatusScheduled,
+	RunDeferStatusAborted,
+}
+
+func (e RunDeferStatus) IsValid() bool {
+	switch e {
+	case RunDeferStatusScheduled, RunDeferStatusAborted:
+		return true
+	}
+	return false
+}
+
+func (e RunDeferStatus) String() string {
+	return string(e)
+}
+
+func (e *RunDeferStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunDeferStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunDeferStatus", str)
+	}
+	return nil
+}
+
+func (e RunDeferStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
 type RunTraceSpanStatus string
 
 const (
@@ -1009,6 +1067,47 @@ func (e *RunTraceSpanStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e RunTraceSpanStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunType string
+
+const (
+	RunTypePrimary RunType = "PRIMARY"
+	RunTypeDefer   RunType = "DEFER"
+)
+
+var AllRunType = []RunType{
+	RunTypePrimary,
+	RunTypeDefer,
+}
+
+func (e RunType) IsValid() bool {
+	switch e {
+	case RunTypePrimary, RunTypeDefer:
+		return true
+	}
+	return false
+}
+
+func (e RunType) String() string {
+	return string(e)
+}
+
+func (e *RunType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunType", str)
+	}
+	return nil
+}
+
+func (e RunType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

@@ -120,6 +120,17 @@ sql:
               package: "ulid"
               type: "ULID"
 
+          - column: "run_defers.parent_run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "run_defers.child_run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
           - column: "worker_connections.id"
             go_type:
               import: "github.com/oklog/ulid/v2"
@@ -280,6 +291,17 @@ sql:
           - column: "trace_runs.function_id"
             go_type: "github.com/google/uuid.UUID"
           - column: "trace_runs.batch_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "run_defers.parent_run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "run_defers.child_run_id"
             go_type:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"

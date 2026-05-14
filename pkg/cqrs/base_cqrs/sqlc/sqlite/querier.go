@@ -54,6 +54,8 @@ type Querier interface {
 	// Queue snapshots
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
+	GetRunDeferredFromByChildRunIDs(ctx context.Context, childRunIds []ulid.ULID) ([]*GetRunDeferredFromByChildRunIDsRow, error)
+	GetRunDefersByParentRunIDs(ctx context.Context, parentRunIds []ulid.ULID) ([]*RunDefer, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)
 	GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error)
@@ -62,6 +64,7 @@ type Querier interface {
 	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
 	GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*GetStepSpanByStepIDRow, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
+	GetTraceRunsByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
@@ -82,6 +85,10 @@ type Querier interface {
 	//
 	InsertHistory(ctx context.Context, arg InsertHistoryParams) error
 	InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error
+	//
+	// Run defers
+	//
+	InsertRunDefer(ctx context.Context, arg InsertRunDeferParams) error
 	// New
 	InsertSpan(ctx context.Context, arg InsertSpanParams) error
 	//
@@ -96,6 +103,7 @@ type Querier interface {
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+	UpdateRunDeferChildRunID(ctx context.Context, arg UpdateRunDeferChildRunIDParams) error
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
 	//
 	// functions

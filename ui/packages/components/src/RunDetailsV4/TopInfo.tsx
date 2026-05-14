@@ -15,6 +15,7 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRun';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -23,8 +24,10 @@ import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
+import { LinkedRuns } from './LinkedRuns';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
+import { collectInvokedRuns } from './runDetailsUtils';
 import type { Trace } from './types';
 
 type TopInfoProps = {
@@ -35,6 +38,8 @@ type TopInfoProps = {
   resultLoading?: boolean;
   trace?: Trace;
   isDurableEndpoint?: boolean;
+  defers?: RunDeferSummary[];
+  deferredFrom?: RunDeferredFromSummary | null;
 };
 
 export type Trigger = {
@@ -93,6 +98,8 @@ export const TopInfo = ({
   resultLoading,
   trace,
   isDurableEndpoint,
+  defers,
+  deferredFrom,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
@@ -132,6 +139,14 @@ export const TopInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
+  const invokedRuns = collectInvokedRuns(trace);
+  const hasLinkedRuns =
+    Boolean(deferredFrom) || (defers?.length ?? 0) > 0 || invokedRuns.length > 0;
+
+  const headerLabel =
+    deferredFrom?.parentRun?.defers?.find((d) => d.run?.id === runID)?.userDeferID ??
+    trigger?.eventName;
+
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
   const codeBlockActions = useMemo(() => {
@@ -165,7 +180,7 @@ export const TopInfo = ({
           {isPending ? (
             <SkeletonElement />
           ) : (
-            <span className="text-basis text-sm font-normal">{trigger.eventName}</span>
+            <span className="text-basis text-sm font-normal">{headerLabel}</span>
           )}
         </div>
 
@@ -333,6 +348,22 @@ export const TopInfo = ({
                     label: 'Metadata',
                     id: 'metadata',
                     node: <MetadataAttrs metadata={trace.metadata} />,
+                  },
+                ]
+              : []),
+            ...(hasLinkedRuns
+              ? [
+                  {
+                    label: 'Linked runs',
+                    id: 'linked',
+                    node: (
+                      <LinkedRuns
+                        runID={runID}
+                        defers={defers}
+                        deferredFrom={deferredFrom}
+                        invoked={invokedRuns}
+                      />
+                    ),
                   },
                 ]
               : []),
