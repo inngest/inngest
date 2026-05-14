@@ -216,7 +216,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncStep"},
-					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, runCtx.AttemptCount())),
+					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -254,7 +254,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncErr"},
-					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, runCtx.AttemptCount())),
+					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -494,7 +494,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.AsyncStep"},
-					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, 0)),
+					Seed:       stepDynamicSeed(op, 0),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
