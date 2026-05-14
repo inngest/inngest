@@ -1232,7 +1232,7 @@ service V2 {
           description: "Query executed successfully"
           schema: {
             json_schema: {
-              ref: "#/definitions/v2SyncAppResponse"
+              ref: "#/definitions/QueryInsightsResponse"
             }
           }
         }
@@ -1287,7 +1287,7 @@ service V2 {
           description: "Unprocessable Entity - Query validation or execution failed."
           schema: {
             json_schema: {
-              ref: "#/definitions/v2SyncAppResponse"
+              ref: "#/definitions/v2ErrorResponse"
             }
           }
         }
