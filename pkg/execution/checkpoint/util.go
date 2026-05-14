@@ -30,6 +30,18 @@ func stepRunAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID
 	)
 }
 
+func stepPlannedAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID ulid.ULID) *meta.SerializableAttrs {
+	return attrs.Merge(
+		meta.NewAttrSet(
+			meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
+			meta.Attr(meta.Attrs.RunID, &runID),
+			meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
+			meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
+			meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusRunning)),
+		),
+	)
+}
+
 func stepErrorAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID ulid.ULID, status enums.StepStatus) *meta.SerializableAttrs {
 	return attrs.Merge(
 		meta.NewAttrSet(
