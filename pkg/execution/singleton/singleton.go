@@ -19,7 +19,7 @@ var (
 )
 
 type Singleton interface {
-	HandleSingleton(ctx context.Context, key string, c inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error)
+	HandleSingleton(ctx context.Context, scope queue.Scope, key string, c inngest.Singleton) (*ulid.ULID, error)
 }
 
 func New(ctx context.Context, shards queue.ShardRegistry) Singleton {
@@ -30,8 +30,12 @@ type store struct {
 	shards queue.ShardRegistry
 }
 
-func (s *store) HandleSingleton(ctx context.Context, key string, cfg inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
-	return singleton(ctx, s.shards, key, cfg, accountID)
+func (s *store) HandleSingleton(ctx context.Context, scope queue.Scope, key string, cfg inngest.Singleton) (*ulid.ULID, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
+	return singleton(ctx, s.shards, scope, key, cfg)
 }
 
 // SingletonKey returns the singleton key given a function ID, singleton config,
@@ -65,16 +69,16 @@ func hash(res any, id uuid.UUID) string {
 // - If the mode is SingletonModeSkip, it returns the currently held run ID without modifying the lock.
 //
 // - If the mode is SingletonModeCancel, it attempts to release the lock and returns the run ID that was released.
-func singleton(ctx context.Context, shards queue.ShardRegistry, key string, s inngest.Singleton, accountID uuid.UUID) (*ulid.ULID, error) {
-	shard, err := shards.Resolve(ctx, accountID, nil)
+func singleton(ctx context.Context, shards queue.ShardRegistry, scope queue.Scope, key string, s inngest.Singleton) (*ulid.ULID, error) {
+	shard, err := shards.Resolve(ctx, scope.AccountID, nil)
 	if err != nil {
 		return nil, err
 	}
 	switch s.Mode {
 	case enums.SingletonModeSkip:
-		return shard.SingletonGetRunID(ctx, key)
+		return shard.SingletonGetRunID(ctx, scope, key)
 	case enums.SingletonModeCancel:
-		return shard.SingletonReleaseRunID(ctx, key)
+		return shard.SingletonReleaseRunID(ctx, scope, key)
 	default:
 		return nil, fmt.Errorf("singleton mode %d not implemented", s.Mode)
 	}

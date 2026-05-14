@@ -170,6 +170,8 @@ func TestGetSingletonInfoHandler(t *testing.T) {
 	d := &debugAPI{shards: shardRegistry}
 
 	functionID := uuid.New()
+	accountID := uuid.New()
+	envID := uuid.New()
 	singletonKey := functionID.String()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
@@ -181,6 +183,8 @@ func TestGetSingletonInfoHandler(t *testing.T) {
 	// Test handler correctly converts store response to protobuf
 	resp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
 		FunctionId: functionID.String(),
+		AccountId:  accountID.String(),
+		EnvId:      envID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.HasLock)
@@ -234,6 +238,8 @@ func TestGetDebounceInfoHandler(t *testing.T) {
 	resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+		EnvId:       workspaceID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.HasDebounce)
@@ -450,6 +456,8 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 	d := &debugAPI{shards: shardRegistry}
 
 	functionID := uuid.New()
+	accountID := uuid.New()
+	envID := uuid.New()
 	singletonKey := functionID.String()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
@@ -461,6 +469,8 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 	// Test handler correctly deletes the lock
 	resp, err := d.DeleteSingletonLock(ctx, &pb.DeleteSingletonLockRequest{
 		FunctionId: functionID.String(),
+		AccountId:  accountID.String(),
+		EnvId:      envID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Deleted)
@@ -469,6 +479,8 @@ func TestDeleteSingletonLockHandler(t *testing.T) {
 	// Verify lock no longer exists
 	infoResp, err := d.GetSingletonInfo(ctx, &pb.SingletonInfoRequest{
 		FunctionId: functionID.String(),
+		AccountId:  accountID.String(),
+		EnvId:      envID.String(),
 	})
 	require.NoError(t, err)
 	require.False(t, infoResp.HasLock)
@@ -595,6 +607,8 @@ func TestDeleteDebounceHandler(t *testing.T) {
 	resp, err := d.DeleteDebounce(ctx, &pb.DeleteDebounceRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+		EnvId:       workspaceID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Deleted)
@@ -605,6 +619,8 @@ func TestDeleteDebounceHandler(t *testing.T) {
 	infoResp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+		EnvId:       workspaceID.String(),
 	})
 	require.NoError(t, err)
 	require.False(t, infoResp.HasDebounce)
@@ -656,11 +672,72 @@ func TestRunDebounceHandler(t *testing.T) {
 	resp, err := d.RunDebounce(ctx, &pb.RunDebounceRequest{
 		FunctionId:  functionID.String(),
 		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+		EnvId:       workspaceID.String(),
 	})
 	require.NoError(t, err)
 	require.True(t, resp.Scheduled)
 	require.NotEmpty(t, resp.DebounceId)
 	require.Equal(t, eventID.String(), resp.EventId)
+}
+
+func TestDeleteDebounceByIDHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	redisDebouncer := setupDebouncer(t, rc)
+	d := &debugAPI{debouncer: redisDebouncer}
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	di := debounce.DebounceItem{
+		AccountID:       accountID,
+		WorkspaceID:     workspaceID,
+		AppID:           appID,
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         eventID,
+		Event: event.Event{
+			Name:      "test/debounce-event",
+			ID:        eventID.String(),
+			Timestamp: time.Now().UnixMilli(),
+			Data:      map[string]any{"key": "value"},
+		},
+	}
+
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Key:     nil,
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+
+	err := redisDebouncer.Debounce(ctx, di, fn)
+	require.NoError(t, err)
+
+	infoResp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
+		FunctionId:  functionID.String(),
+		DebounceKey: functionID.String(),
+		AccountId:   accountID.String(),
+		EnvId:       workspaceID.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, infoResp.HasDebounce)
+
+	resp, err := d.DeleteDebounceByID(ctx, &pb.DeleteDebounceByIDRequest{
+		DebounceIds: []string{infoResp.DebounceId},
+		AccountId:   accountID.String(),
+		EnvId:       workspaceID.String(),
+		FunctionId:  functionID.String(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{infoResp.DebounceId}, resp.DeletedIds)
 }
 
 func TestDeleteDebounceNilDebouncer(t *testing.T) {
