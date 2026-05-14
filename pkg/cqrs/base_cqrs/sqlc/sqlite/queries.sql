@@ -462,7 +462,8 @@ SELECT
   COALESCE(CAST(output AS TEXT), '') AS output
 FROM spans
 WHERE span_id IN (sqlc.slice('ids'))
-LIMIT 2;
+   OR (dynamic_span_id IN (sqlc.slice('dyn_ids')) AND output IS NOT NULL)
+LIMIT 4;
 
 -- name: GetRunSpanByRunID :one
 SELECT
