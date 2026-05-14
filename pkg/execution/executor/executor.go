@@ -1605,9 +1605,21 @@ func (e *executor) backfillDeferChildRunID(ctx context.Context, req execution.Sc
 			l.Error("invalid parent run id on deferred schedule event", "error", err, "parent_run_id", deferredMeta.ParentRunID)
 			continue
 		}
+		// The parent run shares this child's tenant (defers stay within a
+		// workspace), so AccountID/EnvID can be lifted off req. FunctionID
+		// and AppID on the parent are not known here and are left zero —
+		// tenant-aware DeferStore implementations only need account/env to
+		// scope the write.
+		parentID := sv2.ID{
+			RunID: parentRunID,
+			Tenant: sv2.Tenant{
+				AccountID: req.AccountID,
+				EnvID:     req.WorkspaceID,
+			},
+		}
 		_, err = util.WithRetry(ctx, "deferStore.UpdateRunDeferChildRunID",
 			func(ctx context.Context) (struct{}, error) {
-				return struct{}{}, e.deferStore.UpdateRunDeferChildRunID(ctx, parentRunID, deferredMeta.DeferID, childRunID)
+				return struct{}{}, e.deferStore.UpdateRunDeferChildRunID(ctx, parentID, deferredMeta.DeferID, childRunID)
 			},
 			util.NewRetryConf(),
 		)

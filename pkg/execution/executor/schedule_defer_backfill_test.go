@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -50,9 +51,9 @@ func TestBackfillDeferChildRunID(t *testing.T) {
 		for _, u := range store.updates {
 			updatesByDeferID[u.DeferID] = u
 		}
-		assert.Equal(t, parentA, updatesByDeferID["hash-a"].ParentRunID)
+		assert.Equal(t, parentA, updatesByDeferID["hash-a"].ID.RunID)
 		assert.Equal(t, childRunID, updatesByDeferID["hash-a"].ChildRunID)
-		assert.Equal(t, parentB, updatesByDeferID["hash-b"].ParentRunID)
+		assert.Equal(t, parentB, updatesByDeferID["hash-b"].ID.RunID)
 		assert.Equal(t, childRunID, updatesByDeferID["hash-b"].ChildRunID)
 	})
 
@@ -126,6 +127,29 @@ func TestBackfillDeferChildRunID(t *testing.T) {
 		}
 		e.backfillDeferChildRunID(ctx, req, ulid.Make(), log)
 		assert.Empty(t, store.updates, "empty defer_id must not reach the store")
+	})
+
+	t.Run("propagates tenant from ScheduleRequest into parent ID", func(t *testing.T) {
+		// The parent run shares the child's tenant; AccountID and EnvID on
+		// the ScheduleRequest must travel to the DeferStore so tenant-aware
+		// implementations can scope the write.
+		store := &fakeDeferStore{}
+		e := &executor{log: log, deferStore: store}
+
+		accountID := uuid.New()
+		envID := uuid.New()
+		req := execution.ScheduleRequest{
+			AccountID:   accountID,
+			WorkspaceID: envID,
+			Events: []event.TrackedEvent{
+				event.NewBaseTrackedEventWithID(scheduleEvent(t, ulid.Make(), "hash-a"), ulid.Make()),
+			},
+		}
+		e.backfillDeferChildRunID(ctx, req, ulid.Make(), log)
+
+		require.Len(t, store.updates, 1)
+		assert.Equal(t, accountID, store.updates[0].ID.Tenant.AccountID)
+		assert.Equal(t, envID, store.updates[0].ID.Tenant.EnvID)
 	})
 
 	t.Run("store error does not abort the loop", func(t *testing.T) {

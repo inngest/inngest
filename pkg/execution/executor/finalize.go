@@ -237,7 +237,7 @@ func (e *executor) buildDeferEvents(
 			}
 			if deferRowStatus != "" {
 				deferInserts = append(deferInserts, cqrs.RunDeferInsert{
-					ParentRunID: opts.Metadata.ID.RunID,
+					ID:          opts.Metadata.ID,
 					DeferID:     d.HashedID,
 					UserDeferID: d.UserlandID,
 					FnSlug:      d.FnSlug,

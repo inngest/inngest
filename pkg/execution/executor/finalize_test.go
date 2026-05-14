@@ -29,7 +29,7 @@ type fakeDeferStore struct {
 }
 
 type deferInsertCall struct {
-	ParentRunID ulid.ULID
+	ID          sv2.ID
 	DeferID     string
 	UserDeferID string
 	FnSlug      string
@@ -37,14 +37,14 @@ type deferInsertCall struct {
 }
 
 type deferUpdateCall struct {
-	ParentRunID ulid.ULID
-	DeferID     string
-	ChildRunID  ulid.ULID
+	ID         sv2.ID
+	DeferID    string
+	ChildRunID ulid.ULID
 }
 
-func (f *fakeDeferStore) InsertRunDefer(_ context.Context, parentRunID ulid.ULID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
+func (f *fakeDeferStore) InsertRunDefer(_ context.Context, id sv2.ID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
 	f.inserts = append(f.inserts, deferInsertCall{
-		ParentRunID: parentRunID,
+		ID:          id,
 		DeferID:     deferID,
 		UserDeferID: userDeferID,
 		FnSlug:      fnSlug,
@@ -55,18 +55,18 @@ func (f *fakeDeferStore) InsertRunDefer(_ context.Context, parentRunID ulid.ULID
 
 func (f *fakeDeferStore) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInsert) error {
 	for _, d := range defers {
-		if err := f.InsertRunDefer(ctx, d.ParentRunID, d.DeferID, d.UserDeferID, d.FnSlug, d.Status); err != nil {
+		if err := f.InsertRunDefer(ctx, d.ID, d.DeferID, d.UserDeferID, d.FnSlug, d.Status); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (f *fakeDeferStore) UpdateRunDeferChildRunID(_ context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error {
+func (f *fakeDeferStore) UpdateRunDeferChildRunID(_ context.Context, id sv2.ID, deferID string, childRunID ulid.ULID) error {
 	f.updates = append(f.updates, deferUpdateCall{
-		ParentRunID: parentRunID,
-		DeferID:     deferID,
-		ChildRunID:  childRunID,
+		ID:         id,
+		DeferID:    deferID,
+		ChildRunID: childRunID,
 	})
 	return f.updateErr
 }
@@ -157,7 +157,8 @@ func TestBuildDeferEvents(t *testing.T) {
 		require.Len(t, events, 1)
 
 		require.Len(t, store.inserts, 1)
-		assert.Equal(t, runID, store.inserts[0].ParentRunID)
+		assert.Equal(t, runID, store.inserts[0].ID.RunID)
+		assert.Equal(t, opts.Metadata.ID.Tenant, store.inserts[0].ID.Tenant)
 		assert.Equal(t, "hash-a", store.inserts[0].DeferID)
 		assert.Equal(t, "user-a", store.inserts[0].UserDeferID)
 		assert.Equal(t, "child-fn", store.inserts[0].FnSlug)
@@ -448,4 +449,3 @@ func TestBuildDeferEvents(t *testing.T) {
 		assert.Equal(t, "from-optional", meta.ParentFnSlug)
 	})
 }
-

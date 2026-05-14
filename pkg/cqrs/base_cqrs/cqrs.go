@@ -29,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -1624,9 +1625,9 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	return nil, err
 }
 
-func (w wrapper) InsertRunDefer(ctx context.Context, parentRunID ulid.ULID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
+func (w wrapper) InsertRunDefer(ctx context.Context, id sv2.ID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
 	return w.q.InsertRunDefer(ctx, dbpkg.InsertRunDeferParams{
-		ParentRunID: parentRunID,
+		ParentRunID: id.RunID,
 		DeferID:     deferID,
 		UserDeferID: userDeferID,
 		FnSlug:      fnSlug,
@@ -1641,7 +1642,7 @@ func (w wrapper) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInse
 	params := make([]dbpkg.InsertRunDeferParams, len(defers))
 	for i, d := range defers {
 		params[i] = dbpkg.InsertRunDeferParams{
-			ParentRunID: d.ParentRunID,
+			ParentRunID: d.ID.RunID,
 			DeferID:     d.DeferID,
 			UserDeferID: d.UserDeferID,
 			FnSlug:      d.FnSlug,
@@ -1651,10 +1652,10 @@ func (w wrapper) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInse
 	return w.q.InsertRunDefers(ctx, params)
 }
 
-func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error {
+func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, id sv2.ID, deferID string, childRunID ulid.ULID) error {
 	return w.q.UpdateRunDeferChildRunID(ctx, dbpkg.UpdateRunDeferChildRunIDParams{
 		ChildRunID:  childRunID,
-		ParentRunID: parentRunID,
+		ParentRunID: id.RunID,
 		DeferID:     deferID,
 	})
 }

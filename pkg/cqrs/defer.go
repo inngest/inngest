@@ -3,6 +3,7 @@ package cqrs
 import (
 	"context"
 
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -12,14 +13,23 @@ import (
 // deferID is the SHA1 hash of the user-supplied defer id (the join key with
 // UpdateRunDeferChildRunID). userDeferID preserves the original string so the
 // UI can show the id the SDK caller typed.
+//
+// The id parameter on each method is the **parent** run identifier. It carries
+// the run's tenant (account, env, app) so downstream tenant-aware
+// implementations (e.g. ClickHouse) can scope writes without each call site
+// having to plumb separate accountID/envID parameters. Single-tenant
+// implementations (the dev-server Postgres) just unpack id.RunID.
 type DeferStore interface {
-	InsertRunDefer(ctx context.Context, parentRunID ulid.ULID, deferID, userDeferID, fnSlug string, status RunDeferStatus) error
+	InsertRunDefer(ctx context.Context, id sv2.ID, deferID, userDeferID, fnSlug string, status RunDeferStatus) error
 	InsertRunDefers(ctx context.Context, defers []RunDeferInsert) error
-	UpdateRunDeferChildRunID(ctx context.Context, parentRunID ulid.ULID, deferID string, childRunID ulid.ULID) error
+	UpdateRunDeferChildRunID(ctx context.Context, id sv2.ID, deferID string, childRunID ulid.ULID) error
 }
 
+// RunDeferInsert is a single defer row to be persisted. ID is the parent
+// run identifier (run id + tenant); the child run id is set later via
+// UpdateRunDeferChildRunID once the deferred.schedule event fires.
 type RunDeferInsert struct {
-	ParentRunID ulid.ULID
+	ID          sv2.ID
 	DeferID     string
 	UserDeferID string
 	FnSlug      string
