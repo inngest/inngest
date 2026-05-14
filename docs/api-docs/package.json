@@ -29,7 +29,7 @@
     "@tailwindcss/vite": "4.3.0",
     "@tanstack/eslint-config": "0.4.0",
     "@types/mdx": "2.0.13",
-    "@types/node": "24.12.3",
+    "@types/node": "24.12.4",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
