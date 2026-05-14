@@ -164,7 +164,7 @@ jobs:
 
       - name: Validate release snapshot
         if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run == 'true'
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "~> v2"
           args: release --snapshot --skip=publish --clean --verbose
