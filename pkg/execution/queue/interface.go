@@ -243,42 +243,14 @@ type DebounceOperations interface {
 	DebounceDeletePointer(ctx context.Context, fnID uuid.UUID, key string) error
 }
 
-type ShardOperations interface {
-	SingletonOperations
-	DebounceOperations
-
-	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
+// PeekOperations is the per-shard surface for queue peeking.
+type PeekOperations interface {
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
 	PeekRandom(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*QueueItem, error)
-	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error)
-	ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...ExtendLeaseOptionFn) (*ulid.ULID, error)
-	Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
-	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
-	Dequeue(ctx context.Context, i QueueItem, opts ...DequeueOptionFn) error
-
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
-	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error)
-	PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error
-
-	Scavenge(ctx context.Context, limit int) (int, error)
-	Instrument(ctx context.Context) error
-
-	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-	ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-
-	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error
-	ResetAttemptsByJobID(ctx context.Context, jobID string) error
-
 	PeekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error)
 	SetPeekEWMA(ctx context.Context, fnID *uuid.UUID, val int64) error
-	PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error)
-
-	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
-	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
-	ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error
-
 	AccountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
-
 	PeekAccountPartitions(
 		ctx context.Context,
 		accountID uuid.UUID,
@@ -286,31 +258,25 @@ type ShardOperations interface {
 		peekUntil time.Time,
 		sequential bool,
 	) ([]*QueuePartition, error)
-
 	PeekGlobalPartitions(
 		ctx context.Context,
 		peekLimit int64,
 		peekUntil time.Time,
 		sequential bool,
 	) ([]*QueuePartition, error)
+}
 
-	RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error
-	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
-
+// ShadowProcessingOperations is the per-shard surface for shadow partition,
+// backlog, and backlog normalization processing.
+type ShadowProcessingOperations interface {
 	LeaseBacklogForNormalization(ctx context.Context, bl *QueueBacklog) error
 	ExtendBacklogNormalizationLease(ctx context.Context, now time.Time, bl *QueueBacklog) error
-	ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error)
-	BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*PeekResult[QueueItem], error)
-	PeekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error)
-
-	PeekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
 
 	ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, requeueAt *time.Time) error
 	ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error)
 	ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error)
-	ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error)
+
 	BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error
-	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) (*BacklogPeekResult, error)
 	BacklogRefill(
 		ctx context.Context,
 		b *QueueBacklog,
@@ -324,25 +290,75 @@ type ShardOperations interface {
 	BacklogSize(ctx context.Context, backlogID string) (int64, error)
 	BacklogByID(ctx context.Context, backlogID string) (*QueueBacklog, error)
 
-	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
+	ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
-	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
+	ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error)
+	BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*PeekResult[QueueItem], error)
+	PeekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error)
+	PeekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
+	ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error)
+	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
+	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) (*BacklogPeekResult, error)
+}
+
+// InsightsOperations is the per-shard surface for queue inspection and metrics.
+type InsightsOperations interface {
+	Instrument(ctx context.Context) error
+	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context) (int64, error)
 
+	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
+	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
+	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)
+	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
+}
+
+type ShardOperations interface {
+	SingletonOperations
+	DebounceOperations
+	PeekOperations
+	ShadowProcessingOperations
+	InsightsOperations
+
+	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
+
+	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error)
+	ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...ExtendLeaseOptionFn) (*ulid.ULID, error)
+
+	Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
+	RequeueByJobID(ctx context.Context, jobID string, at time.Time) error
+
+	Dequeue(ctx context.Context, i QueueItem, opts ...DequeueOptionFn) error
 	DequeueByJobID(ctx context.Context, jobID string) error
+
+	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error)
+	PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error
+
+	Scavenge(ctx context.Context, limit int) (int, error)
+
+	RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error
+
+	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error
+	ResetAttemptsByJobID(ctx context.Context, jobID string) error
+
+	PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error)
+
+	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
+	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
+	ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error
+
+	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
+
+	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
 
 	ItemExists(ctx context.Context, jobID string) (bool, error)
 	ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error)
-	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 	PartitionByID(ctx context.Context, partitionID string) (*PartitionInspectionResult, error)
 
 	UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error
 
-	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
-	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)
-	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
 	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
 
