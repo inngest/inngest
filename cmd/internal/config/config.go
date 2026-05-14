@@ -23,6 +23,9 @@ type Config struct {
 	NoDiscovery *bool    `koanf:"no-discovery"`
 	NoPoll      *bool    `koanf:"no-poll"`
 	Host        string   `koanf:"host"`
+	APIHost     string   `koanf:"api-host"`
+	APIPort     int      `koanf:"api-port"`
+	APICloud    bool     `koanf:"api-cloud"`
 	Port        string   `koanf:"port"`
 
 	// Advanced dev command configuration
