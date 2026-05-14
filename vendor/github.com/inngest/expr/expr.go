@@ -192,9 +192,10 @@ func NewAggregateEvaluator[T Evaluable](
 		eval:   opts.Eval,
 		parser: opts.Parser,
 		engines: map[EngineType]MatchingEngine{
-			EngineTypeStringHash: newStringEqualityMatcher(),
-			EngineTypeNullMatch:  newNullMatcher(),
-			EngineTypeBTree:      newNumberMatcher(),
+			EngineTypeStringHash:  newStringEqualityMatcher(),
+			EngineTypeNullMatch:   newNullMatcher(),
+			EngineTypeBTree:       newNumberMatcher(),
+			EngineTypeStringBTree: newStringBTreeMatcher(),
 		},
 		lock:            &sync.RWMutex{},
 		constants:       map[uuid.UUID]struct{}{},
@@ -698,7 +699,7 @@ func (a *aggregator[T]) GC(ctx context.Context) bool {
 	parseDuration := time.Since(parseStart)
 
 	// Remove null and number engine parts first (small and fast, no timeout needed)
-	for _, et := range []EngineType{EngineTypeNullMatch, EngineTypeBTree} {
+	for _, et := range []EngineType{EngineTypeNullMatch, EngineTypeBTree, EngineTypeStringBTree} {
 		if parts := partsByEngine[et]; len(parts) > 0 {
 			if engine, ok := a.engines[et]; ok {
 				count, err := engine.Remove(context.Background(), parts)
@@ -1002,8 +1003,11 @@ func engineType(p Predicate) EngineType {
 		// NOTE: operators.In acts as operators.Equals, but iterates over the given
 		// array to check each item.
 		if p.Operator == operators.In || p.Operator == operators.Equals || p.Operator == operators.NotEquals {
-			// StringHash is only used for matching on in/equality.
 			return EngineTypeStringHash
+		}
+		if p.Operator == operators.Greater || p.Operator == operators.GreaterEquals ||
+			p.Operator == operators.Less || p.Operator == operators.LessEquals {
+			return EngineTypeStringBTree
 		}
 	case nil:
 		// Only allow this if we're not comparing two idents.each element of the array and

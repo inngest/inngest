@@ -848,7 +848,7 @@ github.com/hashicorp/go-version
 github.com/hashicorp/golang-lru/v2
 github.com/hashicorp/golang-lru/v2/internal
 github.com/hashicorp/golang-lru/v2/simplelru
-# github.com/inngest/expr v0.0.0-20260504155224-a6e988c15b55
+# github.com/inngest/expr v0.0.0-20260514173007-229b5d65a82d
 ## explicit; go 1.24
 github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48

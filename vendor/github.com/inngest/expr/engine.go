@@ -16,6 +16,7 @@ const (
 	EngineTypeStringHash
 	EngineTypeNullMatch
 	EngineTypeBTree
+	EngineTypeStringBTree
 	// EngineTypeART
 )
 
