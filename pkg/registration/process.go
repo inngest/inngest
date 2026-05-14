@@ -63,7 +63,7 @@ func (r *ProcessResult) SetSemaphoreCapacity(ctx context.Context, sm constrainta
 			// add the idempotency key to the fn ID.  this resets after the semaphore idempotency period,
 			// eg 20 seconds, but ensures simultaneous deploys still update the sem.
 			ik := fmt.Sprintf("%s-%s", r.opts.IdempotencyKey, df.ID.String())
-			_ = sm.SetCapacity(ctx, df.AccountID, semID, ik, int64(fc.Limit))
+			_, _ = sm.SetCapacity(ctx, df.AccountID, semID, ik, int64(fc.Limit))
 		}
 	}
 }

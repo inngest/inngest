@@ -4,8 +4,8 @@ local capacity = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
 local existing = redis.call("GET", keyIdempotency)
 if existing ~= nil and existing ~= false then
-	return existing
+	return {tonumber(existing), 0}
 end
 redis.call("SET", keyCapacity, capacity)
 redis.call("SET", keyIdempotency, capacity, "EX", tostring(idempotencyTTL))
-return capacity
+return {tonumber(capacity), 1}
