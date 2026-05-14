@@ -1573,19 +1573,19 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(res.RefilledItems))
 
-	loaded, err := q.ItemByID(ctx, shard, item1.ID)
+	loaded, err := q.LoadQueueItem(ctx, shard.Name(), item1.ID)
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item1.ID)
 	require.NotNil(t, loaded.CapacityLease)
 	require.Equal(t, capacityLeaseID, loaded.CapacityLease.LeaseID)
 
-	loaded, err = q.ItemByID(ctx, shard, item2.ID)
+	loaded, err = q.LoadQueueItem(ctx, shard.Name(), item2.ID)
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item2.ID)
 	require.NotNil(t, loaded.CapacityLease)
 	require.Equal(t, capacityLeaseID2, loaded.CapacityLease.LeaseID)
 
-	loaded, err = q.ItemByID(ctx, shard, item3.ID)
+	loaded, err = q.LoadQueueItem(ctx, shard.Name(), item3.ID)
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item3.ID)
 	require.NotNil(t, loaded.CapacityLease)
