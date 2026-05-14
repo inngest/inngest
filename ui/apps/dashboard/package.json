@@ -114,7 +114,7 @@
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.6"
   },
-  "packageManager": "pnpm@11.0.9",
+  "packageManager": "pnpm@11.1.0",
   "engines": {
     "node": "24.x",
     "pnpm": "11.x"
