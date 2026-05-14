@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
@@ -27,7 +28,11 @@ func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *pb.SingletonInfoRe
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}
 
-	runID, err := shard.SingletonGetRunID(ctx, singletonKey)
+	runID, err := shard.SingletonGetRunID(ctx, queue.Scope{
+		AccountID:  consts.DevServerAccountID,
+		EnvID:      consts.DevServerEnvID,
+		FunctionID: fnID,
+	}, singletonKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get singleton info: %w", err)
 	}
@@ -63,7 +68,11 @@ func (d *debugAPI) DeleteSingletonLock(ctx context.Context, req *pb.DeleteSingle
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}
 
-	runID, err := shard.SingletonReleaseRunID(ctx, singletonKey)
+	runID, err := shard.SingletonReleaseRunID(ctx, queue.Scope{
+		AccountID:  consts.DevServerAccountID,
+		EnvID:      consts.DevServerEnvID,
+		FunctionID: fnID,
+	}, singletonKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete singleton lock: %w", err)
 	}

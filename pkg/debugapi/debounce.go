@@ -8,8 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/debounce"
-	"github.com/oklog/ulid/v2"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
+	"github.com/oklog/ulid/v2"
 )
 
 // GetDebounceInfo retrieves the currently debounced event for a function and debounce key.
@@ -23,8 +24,14 @@ func (d *debugAPI) GetDebounceInfo(ctx context.Context, req *pb.DebounceInfoRequ
 		return nil, fmt.Errorf("invalid function_id: %w", err)
 	}
 
+	scope := queue.Scope{
+		AccountID:  consts.DevServerAccountID,
+		EnvID:      consts.DevServerEnvID,
+		FunctionID: fnID,
+	}
+
 	// Use the debouncer to get debounce info
-	info, err := d.debouncer.GetDebounceInfo(ctx, fnID, req.GetDebounceKey())
+	info, err := d.debouncer.GetDebounceInfo(ctx, scope, req.GetDebounceKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get debounce info: %w", err)
 	}
@@ -66,7 +73,11 @@ func (d *debugAPI) DeleteDebounce(ctx context.Context, req *pb.DeleteDebounceReq
 		return nil, fmt.Errorf("invalid function_id: %w", err)
 	}
 
-	result, err := d.debouncer.DeleteDebounce(ctx, fnID, req.GetDebounceKey())
+	result, err := d.debouncer.DeleteDebounce(ctx, queue.Scope{
+		AccountID:  consts.DevServerAccountID,
+		EnvID:      consts.DevServerEnvID,
+		FunctionID: fnID,
+	}, req.GetDebounceKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete debounce: %w", err)
 	}
@@ -101,7 +112,10 @@ func (d *debugAPI) DeleteDebounceByID(ctx context.Context, req *pb.DeleteDebounc
 		parsed[i] = u
 	}
 
-	err := d.debouncer.DeleteDebounceByID(ctx, parsed...)
+	err := d.debouncer.DeleteDebounceByID(ctx, queue.Scope{
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
+	}, parsed...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete debounce by ID: %w", err)
 	}
@@ -126,6 +140,7 @@ func (d *debugAPI) RunDebounce(ctx context.Context, req *pb.RunDebounceRequest) 
 		FunctionID:  fnID,
 		DebounceKey: req.GetDebounceKey(),
 		AccountID:   consts.DevServerAccountID,
+		EnvID:       consts.DevServerEnvID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run debounce: %w", err)
