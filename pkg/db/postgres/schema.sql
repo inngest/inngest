@@ -190,6 +190,19 @@ CREATE TABLE public.queue_snapshot_chunks (
 );
 
 --
+-- Name: run_defers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.run_defers (
+    parent_run_id bytea NOT NULL,
+    defer_id character varying NOT NULL,
+    user_defer_id character varying DEFAULT ''::character varying NOT NULL,
+    fn_slug character varying NOT NULL,
+    status character varying NOT NULL,
+    child_run_id bytea
+);
+
+--
 -- Name: spans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -264,19 +277,6 @@ CREATE TABLE public.traces (
     events bytea NOT NULL,
     links bytea NOT NULL,
     run_id character(26)
-);
-
---
--- Name: run_defers; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.run_defers (
-    parent_run_id bytea NOT NULL,
-    defer_id character varying NOT NULL,
-    user_defer_id character varying DEFAULT ''::character varying NOT NULL,
-    fn_slug character varying NOT NULL,
-    status character varying NOT NULL,
-    child_run_id bytea
 );
 
 --
@@ -355,18 +355,18 @@ ALTER TABLE ONLY public.queue_snapshot_chunks
     ADD CONSTRAINT queue_snapshot_chunks_pkey PRIMARY KEY (snapshot_id, chunk_id);
 
 --
--- Name: spans spans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.spans
-    ADD CONSTRAINT spans_pkey PRIMARY KEY (trace_id, span_id);
-
---
 -- Name: run_defers run_defers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.run_defers
     ADD CONSTRAINT run_defers_pkey PRIMARY KEY (parent_run_id, defer_id);
+
+--
+-- Name: spans spans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.spans
+    ADD CONSTRAINT spans_pkey PRIMARY KEY (trace_id, span_id);
 
 --
 -- Name: trace_runs trace_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -387,12 +387,6 @@ ALTER TABLE ONLY public.worker_connections
 --
 
 CREATE UNIQUE INDEX functions_app_id_slug_active_key ON public.functions USING btree (app_id, slug) WHERE (archived_at IS NULL);
-
---
--- Name: idx_run_defers_child; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_run_defers_child ON public.run_defers USING btree (child_run_id);
 
 --
 -- Name: idx_events_internal_id; Type: INDEX; Schema: public; Owner: -
@@ -447,6 +441,12 @@ CREATE INDEX idx_history_id ON public.history USING btree (id);
 --
 
 CREATE INDEX idx_history_run_id_created ON public.history USING btree (run_id, created_at);
+
+--
+-- Name: idx_run_defers_child; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_run_defers_child ON public.run_defers USING btree (child_run_id);
 
 --
 -- Name: idx_spans_account_status_time; Type: INDEX; Schema: public; Owner: -
