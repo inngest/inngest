@@ -16,8 +16,9 @@ jobs:
         run: |
           prerelease=$(echo ${{ github.ref_name }} | awk -F '-' '{print $2}' | awk -F '.' '{print $1}')
           echo "prerelease=$prerelease" >> $GITHUB_OUTPUT
+
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04-4
     needs: [check-release-type]
     steps:
       - name: Login to Docker Hub
