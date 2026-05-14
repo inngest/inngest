@@ -1232,7 +1232,7 @@ service V2 {
           description: "Query executed successfully"
           schema: {
             json_schema: {
-              ref: "#/definitions/QueryInsightsResponse"
+              ref: "#/definitions/v2QueryInsightsResponse"
             }
           }
         }
