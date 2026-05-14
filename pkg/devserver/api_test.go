@@ -26,6 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -827,6 +828,231 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		require.Len(t, sm.setCalls, 2)
 		require.Equal(t, constraintapi.SemaphoreIDFn(persistedID), sm.setCalls[1].name)
 		require.Equal(t, int64(3), sm.setCalls[1].capacity)
+	})
+
+	t.Run("v1.13 legacy URL-keyed app row is adopted on resync, function UUID survives", func(t *testing.T) {
+		// In v1.13.x and earlier, register() seeded the deterministic app id
+		// from r.URL. v1.15.0 (#3361) flipped the seed to r.AppName. Customer
+		// DBs created on the old code therefore hold rows keyed by sha1(URL),
+		// while a re-sync on the new code computes sha1(AppName) — a
+		// different uuid. Without the partial unique index + UpsertAppByName,
+		// the new register would insert a parallel row and orphan the
+		// pre-existing functions. This test pre-populates the v1.13 state and
+		// asserts adoption: legacy id is reused, function uuid is unchanged.
+		ds := newTestDevServer(t)
+		api := &devapi{devserver: ds}
+
+		legacyAppID := inngest.DeterministicAppUUID(util.NormalizeAppURL(req.URL, false))
+		nameAppID := inngest.DeterministicAppUUID(req.AppName)
+		require.NotEqual(t, legacyAppID, nameAppID, "fixture must reproduce the seed mismatch")
+
+		_, err := ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:   legacyAppID,
+			Name: req.AppName,
+			Url:  req.URL,
+		})
+		require.NoError(t, err)
+
+		legacyFnID := uuid.New()
+		fnConfig, err := json.Marshal(inngest.Function{
+			ID:   legacyFnID,
+			Name: "Test Function",
+			Slug: "test-function",
+			Triggers: []inngest.Trigger{
+				{EventTrigger: &inngest.EventTrigger{Event: "test/event"}},
+			},
+		})
+		require.NoError(t, err)
+		_, err = ds.Data.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+			ID:        legacyFnID,
+			AppID:     legacyAppID,
+			Name:      "Test Function",
+			Slug:      "test-function",
+			Config:    string(fnConfig),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+
+		_, err = api.register(ctx, req)
+		require.NoError(t, err)
+
+		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Len(t, apps, 1, "register must adopt the legacy row, not insert a parallel one")
+		require.Equal(t, legacyAppID, apps[0].ID, "legacy URL-derived id must be preserved")
+		require.Equal(t, req.AppName, apps[0].Name)
+
+		funcs, err := ds.Data.GetFunctionsByAppInternalID(ctx, legacyAppID)
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		require.Equal(t, legacyFnID, funcs[0].ID, "function uuid must survive the upgrade")
+		require.Equal(t, legacyAppID, funcs[0].AppID, "function must remain attached to the legacy app id")
+	})
+
+	t.Run("placeholder upsert with empty name does not clobber an existing real name", func(t *testing.T) {
+		// The -u startup loop, autodiscovery, and the UI add-app flow upsert
+		// with name="" to set the unreachable error on a URL-derived id.
+		// Before the fix in queries.sql, that ON CONFLICT(id) update would
+		// blank the existing row's name to '' (the "state iii" precondition
+		// for the v1.13 → v1.19 orphaning bug). The query now skips the name
+		// assignment when excluded.name is empty.
+		ds := newTestDevServer(t)
+
+		legacyAppID := inngest.DeterministicAppUUID(util.NormalizeAppURL(req.URL, false))
+		_, err := ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:   legacyAppID,
+			Name: req.AppName,
+			Url:  req.URL,
+		})
+		require.NoError(t, err)
+
+		// Mimic service.go:315: placeholder UpsertApp with name="" and an
+		// unreachable error. This must not erase the existing row's name.
+		_, err = ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:  legacyAppID,
+			Url: req.URL,
+			Error: sql.NullString{
+				Valid:  true,
+				String: deploy.DeployErrUnreachable.Error(),
+			},
+		})
+		require.NoError(t, err)
+
+		app, err := ds.Data.GetAppByID(ctx, legacyAppID)
+		require.NoError(t, err)
+		require.Equal(t, req.AppName, app.Name, "placeholder upsert must not blank the name")
+	})
+
+	t.Run("fresh install with no legacy row uses name-derived ID", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		api := &devapi{devserver: ds}
+
+		_, err := api.register(ctx, req)
+		require.NoError(t, err)
+
+		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Len(t, apps, 1)
+		require.Equal(t, inngest.DeterministicAppUUID(req.AppName), apps[0].ID,
+			"fresh install must mint the name-derived id, not adopt anything")
+		require.Equal(t, req.AppName, apps[0].Name)
+	})
+
+	t.Run("URL-keyed row with blanked name and attached functions is adopted, not deleted", func(t *testing.T) {
+		// Customer's actual post-upgrade state (T-7175 re-open):
+		//   - id = sha1(URL)  (the pre-v1.15 deterministic id)
+		//   - name = ''       (blanked by an earlier -u / autodiscovery upsert
+		//                      before the CASE WHEN excluded.name = '' guard
+		//                      shipped)
+		//   - active, with the original function rows still attached
+		//
+		// The pre-fix cleanup loop matched (name='' && URL matches), soft-
+		// deleted the row, and let UpsertAppByName insert a fresh row at
+		// sha1(r.AppName). GetActiveFunctionByAppAndSlug then couldn't see
+		// the legacy functions (their app is archived), so SDK-minted uuids
+		// replaced the originals - same orphaning failure mode as the
+		// original v1.13 → v1.19 bug, just from a different starting state.
+		//
+		// The fix adopts the row by id (renaming '' → r.AppName) when it
+		// has attached functions; UpsertAppByName then resolves it by name.
+		ds := newTestDevServer(t)
+		api := &devapi{devserver: ds}
+
+		legacyAppID := inngest.DeterministicAppUUID(util.NormalizeAppURL(req.URL, false))
+
+		_, err := ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:   legacyAppID,
+			Name: "", // blanked by the upstream defect
+			Url:  req.URL,
+		})
+		require.NoError(t, err)
+
+		legacyFnID := uuid.New()
+		fnConfig, err := json.Marshal(inngest.Function{
+			ID:   legacyFnID,
+			Name: "Test Function",
+			Slug: "test-function",
+			Triggers: []inngest.Trigger{
+				{EventTrigger: &inngest.EventTrigger{Event: "test/event"}},
+			},
+		})
+		require.NoError(t, err)
+		_, err = ds.Data.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+			ID:        legacyFnID,
+			AppID:     legacyAppID,
+			Name:      "Test Function",
+			Slug:      "test-function",
+			Config:    string(fnConfig),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+
+		_, err = api.register(ctx, req)
+		require.NoError(t, err)
+
+		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Len(t, apps, 1, "adoption must leave exactly one active row")
+		require.Equal(t, legacyAppID, apps[0].ID, "legacy id must be preserved by adoption")
+		require.Equal(t, req.AppName, apps[0].Name, "adoption must restore the real app name")
+
+		// The original function uuid must survive — both because the apps
+		// row was not archived (the adoption path) and because
+		// GetActiveFunctionByAppAndSlug now finds the row via apps.name.
+		funcs, err := ds.Data.GetFunctionsByAppInternalID(ctx, legacyAppID)
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		require.Equal(t, legacyFnID, funcs[0].ID, "function uuid must survive adoption")
+		require.Equal(t, legacyAppID, funcs[0].AppID)
+
+		// And the candidate name-derived id was never written: only the
+		// adopted legacy row exists.
+		nameAppID := inngest.DeterministicAppUUID(req.AppName)
+		if nameAppID != legacyAppID {
+			_, err = ds.Data.GetAppByID(ctx, nameAppID)
+			require.ErrorIs(t, err, sql.ErrNoRows)
+		}
+	})
+
+	t.Run("archived app row is revived on resync, function UUID survives", func(t *testing.T) {
+		// Customer archives an app via the UI (or any path that flips
+		// archived_at), then re-syncs from the SDK under the same name.
+		// UpsertAppByName must revive the archived row in place: same id,
+		// archived_at cleared, function uuid unchanged.
+		ds := newTestDevServer(t)
+		api := &devapi{devserver: ds}
+
+		// First sync to create the app + a function. The deterministic
+		// candidate id IS the row's id since this is a fresh install.
+		_, err := api.register(ctx, req)
+		require.NoError(t, err)
+
+		appID := inngest.DeterministicAppUUID(req.AppName)
+		funcs, err := ds.Data.GetFunctionsByAppInternalID(ctx, appID)
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		originalFnID := funcs[0].ID
+
+		// Archive the app (simulating the UI archive action).
+		require.NoError(t, ds.Data.DeleteApp(ctx, appID))
+		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Empty(t, apps, "archived row must drop out of the active listing")
+
+		// Resync with the same payload. The archived row should revive.
+		_, err = api.register(ctx, req)
+		require.NoError(t, err, "resync after archive must not collide on PK")
+
+		apps, err = ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
+		require.NoError(t, err)
+		require.Len(t, apps, 1, "revival must reuse the row, not create a parallel one")
+		require.Equal(t, appID, apps[0].ID, "revived row keeps its original id")
+		require.Equal(t, req.AppName, apps[0].Name)
+
+		funcs, err = ds.Data.GetFunctionsByAppInternalID(ctx, appID)
+		require.NoError(t, err)
+		require.Len(t, funcs, 1)
+		require.Equal(t, originalFnID, funcs[0].ID, "function uuid must survive archive + revive")
 	})
 }
 

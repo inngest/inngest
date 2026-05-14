@@ -253,39 +253,21 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
 	syncID := uuid.New()
 
-	// Clean up URL-based placeholder apps before the checksum check to ensure
-	// zombie placeholders are always removed, even if the checksum matches and
-	// we return early below.
-	//
-	// We iterate all apps rather than using GetAppByURL because that query
-	// returns LIMIT 1 and may find the real (named) app instead of the
-	// placeholder when both share the same URL.
-	if allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID); err == nil {
-		normalizedURL := util.NormalizeAppURL(r.URL, false)
-		for _, app := range allApps {
-			if app.Name == "" && util.NormalizeAppURL(app.Url, false) == normalizedURL {
-				// Since there's an app with the same URL but no name, we can
-				// assume it was a failed sync. We should delete it since we're
-				// in the process of syncing a replacement app.
-				//
-				// This situation happens when a user enters an unreachable URL
-				// in the UI. It'll still create an app, but in a placeholder
-				// state.
-				if err := a.devserver.Data.DeleteApp(ctx, app.ID); err != nil {
-					l.Error("error deleting app", "error", err)
-				}
-			}
-		}
-	}
-
 	method := enums.AppMethodServe
 	if r.IsConnect() {
 		method = enums.AppMethodConnect
 	}
 
+	// Candidate id for a fresh INSERT. UpsertAppByName uses the partial unique
+	// index apps_name_unique_key (name) WHERE name <> '' as the conflict
+	// target, so on conflict the existing row's id is preserved. This is what
+	// makes upgrades from <v1.15 (when register() derived ids from r.URL
+	// instead of r.AppName) keep their original id and the function rows
+	// hanging off it. The placeholder paths (-u startup, autodiscovery, UI
+	// add-by-URL) all upsert with name='' and so are excluded from the index
+	// — they continue to use UpsertApp keyed by id.
 	appID := inngest.DeterministicAppUUID(r.AppName)
 	appParams := cqrs.UpsertAppParams{
-		// Use a deterministic ID for the app in dev.
 		ID:          appID,
 		Name:        r.AppName,
 		SdkLanguage: r.SDKLanguage(),
@@ -300,13 +282,57 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		AppVersion: r.AppVersion,
 	}
 
+	// Reconcile any URL-matched empty-name row sharing this URL before the
+	// checksum check. Two shapes can land here:
+	//
+	//   1. A true placeholder (UI add-app flow, -u startup, autodiscovery)
+	//      with no functions attached. Soft-delete it; UpsertAppByName below
+	//      can't reach it (the partial unique index excludes name='').
+	//
+	//   2. A legacy SDK row whose name was blanked by the v1.15 ON
+	//      CONFLICT(id) clobber before the CASE WHEN excluded.name = '' guard
+	//      shipped, with the original functions still attached. Deleting it
+	//      would orphan those function rows (their app_id points at the
+	//      now-archived placeholder; the join in GetActiveFunctionByAppAndSlug
+	//      filters archived apps, so the SDK-resolved slugs miss them and
+	//      fresh SDK-minted uuids replace the originals). Adopt it instead:
+	//      UpsertApp by id with name = r.AppName so the row re-enters the
+	//      active universe under the correct name, and UpsertAppByName below
+	//      then finds it by name and refreshes its mutable fields.
+	//
+	// Iterate all apps rather than using GetAppByURL because that query
+	// returns LIMIT 1 and may find the real (named) app instead when both
+	// share the same URL.
+	if allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID); err == nil {
+		normalizedURL := util.NormalizeAppURL(r.URL, false)
+		for _, app := range allApps {
+			if app.Name != "" || util.NormalizeAppURL(app.Url, false) != normalizedURL {
+				continue
+			}
+			fns, fnsErr := a.devserver.Data.GetFunctionsByAppInternalID(ctx, app.ID)
+			if fnsErr == nil && len(fns) > 0 {
+				// Legacy row with attached functions — adopt the row by id
+				// rather than deleting and starting over.
+				adopt := appParams
+				adopt.ID = app.ID
+				if _, err := a.devserver.Data.UpsertApp(ctx, adopt); err != nil {
+					l.Error("error adopting URL-keyed legacy app row", "appID", app.ID, "error", err)
+				}
+				continue
+			}
+			if err := a.devserver.Data.DeleteApp(ctx, app.ID); err != nil {
+				l.Error("error deleting app", "error", err)
+			}
+		}
+	}
+
 	if deploy.HasBlockedSDKVersion(r.SDKLanguage(), r.SDKVersion()) {
 		appParams.Error = sql.NullString{
 			String: deploy.DeployErrBlockedSDKVersion.Error(),
 			Valid:  true,
 		}
 
-		if _, err := a.devserver.Data.UpsertApp(ctx, appParams); err != nil {
+		if _, err := a.devserver.Data.UpsertAppByName(ctx, appParams); err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error updating app error")
 		}
 
@@ -350,15 +376,30 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		return nil, publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
+	// Resolve the canonical app row first so the function-insert loop below
+	// uses the correct app_id. UpsertAppByName conflicts on the partial unique
+	// index apps_name_active_key, so an existing active row with this name is
+	// adopted and the legacy id is returned in `app.ID` regardless of how it
+	// was originally minted.
+	app, err := tx.UpsertAppByName(ctx, appParams)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return nil, publicerr.Wrap(err, 500, "Error upserting app")
+	}
+	appID = app.ID
+	appParams.ID = app.ID
+
 	defer func() {
-		// We want to save an app at the end, after handling each error.
+		// On error, persist the message to the row by re-upserting. On
+		// success the earlier UpsertAppByName call has already written the
+		// canonical state, so the deferred upsert is a no-op idempotent update.
 		if err != nil {
 			appParams.Error = sql.NullString{
 				String: err.Error(),
 				Valid:  true,
 			}
+			_, _ = tx.UpsertAppByName(ctx, appParams)
 		}
-		_, _ = tx.UpsertApp(ctx, appParams)
 		err = tx.Commit(ctx)
 		if err != nil {
 			l.Error("error registering functions", "error", err)

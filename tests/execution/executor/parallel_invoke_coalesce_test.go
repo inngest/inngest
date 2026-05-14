@@ -83,8 +83,9 @@ func (c *countingTracerProvider) count(name string) int {
 func TestParallelPauseBackedOpsCoalesceDiscovery(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
