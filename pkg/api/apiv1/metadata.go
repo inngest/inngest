@@ -128,6 +128,8 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		},
 	}
 
+	// Validate before loading state so bad reserved metadata cannot create spans
+	// or touch size accounting.
 	for _, md := range req.Metadata {
 		if err := (metadata.ScopedUpdate{Scope: scope, Update: md}).ValidateAllowed(); err != nil {
 			return publicerr.Wrap(err, 400, "Invalid metadata")
@@ -138,7 +140,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	loadedFromState := false
 	if a.opts.State != nil {
 		md, err := a.opts.State.LoadMetadata(ctx, stateID)
-		if errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
+		if isMissingMetadataState(err) {
 			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
 				"error", err,
 				"run_id", runID.String(),
@@ -210,6 +212,10 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	return nil
 }
 
+func isMissingMetadataState(err error) bool {
+	return errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound)
+}
+
 func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget) (*cqrs.OtelSpan, metadata.Scope, error) {
 	var scope metadata.Scope
 	var span *cqrs.OtelSpan
@@ -220,15 +226,9 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 		scope = enums.MetadataScopeRun
 		span, err = a.opts.TraceReader.GetRunSpanByRunID(ctx, runID, auth.AccountID(), auth.WorkspaceID())
 	case target.StepAttempt == nil || target.SpanID == nil:
-		var stepID string
-		if target.StepIndex == nil || *target.StepIndex == 0 {
-			sum := sha1.Sum([]byte(*target.StepID))
-			stepID = hex.EncodeToString(sum[:])
-		} else {
-
-			sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", *target.StepID, *target.StepIndex))
-			stepID = hex.EncodeToString(sum[:])
-		}
+		// Extended trace metadata needs both span_id and attempt; otherwise the
+		// target is the step execution span.
+		stepID := hashedStepID(*target.StepID, target.StepIndex)
 
 		if target.StepAttempt == nil || *target.StepAttempt < 0 {
 			scope = enums.MetadataScopeStep
@@ -250,4 +250,14 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 	}
 
 	return span, scope, nil
+}
+
+func hashedStepID(stepID string, stepIndex *int) string {
+	if stepIndex == nil || *stepIndex == 0 {
+		sum := sha1.Sum([]byte(stepID))
+		return hex.EncodeToString(sum[:])
+	}
+
+	sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", stepID, *stepIndex))
+	return hex.EncodeToString(sum[:])
 }
