@@ -124,6 +124,8 @@ func TestParsePRBodyDropsMendralSummary(t *testing.T) {
 
 None.
 
+*[Check our Pull Request Guidelines](https://github.com/inngest/inngest/blob/main/docs/PULL_REQUEST_GUIDELINES.md)*
+
 <!-- MENDRAL_SUMMARY -->
 ---
 
