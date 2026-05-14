@@ -78,8 +78,8 @@ type QueueManager interface {
 	BacklogByID(ctx context.Context, queueShard QueueShard, backlogID string) (*QueueBacklog, error)
 	// PartitionByID retrieves the partition by the partition ID
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
-	// ItemByID retrieves the queue item by the jobID
-	ItemByID(ctx context.Context, queueShard QueueShard, jobID string) (*QueueItem, error)
+	// LoadQueueItem retrieves the queue item by the item ID.
+	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error)
 
 	// ItemExists checks if an item with jobID exists in the queue
 	ItemExists(ctx context.Context, queueShard QueueShard, jobID string) (bool, error)
@@ -333,7 +333,6 @@ type ShardOperations interface {
 
 	DequeueByJobID(ctx context.Context, jobID string) error
 
-	ItemByID(ctx context.Context, jobID string) (*QueueItem, error)
 	ItemExists(ctx context.Context, jobID string) (bool, error)
 	ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error)
 	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)

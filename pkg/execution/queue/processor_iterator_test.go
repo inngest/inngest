@@ -336,10 +336,6 @@ func (m *mockShardForIterator) DequeueByJobID(ctx context.Context, jobID string)
 	return nil
 }
 
-func (m *mockShardForIterator) ItemByID(ctx context.Context, jobID string) (*QueueItem, error) {
-	return nil, nil
-}
-
 func (m *mockShardForIterator) ItemExists(ctx context.Context, jobID string) (bool, error) {
 	return false, nil
 }

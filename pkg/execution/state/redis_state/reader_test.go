@@ -944,11 +944,11 @@ func TestItemsByBacklog(t *testing.T) {
 			expectedItems: 10,
 		},
 		{
-			name:          "with out of range interval",
-			num:           10,
-			from:          clock.Now(),
-			until:         clock.Now().Add(7 * time.Second).Truncate(time.Second),
-			interval:      time.Second,
+			name:     "with out of range interval",
+			num:      10,
+			from:     clock.Now(),
+			until:    clock.Now().Add(7 * time.Second).Truncate(time.Second),
+			interval: time.Second,
 			// 10 items enqueued at 0s–9s; the inclusive [from, until] window
 			// covers 0s–7s, so 8 items (at offsets 0–7) are returned.
 			expectedItems: 8,
@@ -1344,7 +1344,7 @@ func TestQueueIterator(t *testing.T) {
 	}
 }
 
-func TestItemByID(t *testing.T) {
+func TestLoadQueueItem(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()
 
@@ -1383,7 +1383,7 @@ func TestItemByID(t *testing.T) {
 		enqueued, err := enqueue(ctx, shard)
 		require.NoError(t, err)
 
-		res, err := q1.ItemByID(ctx, shard, enqueued.ID)
+		res, err := q1.LoadQueueItem(ctx, shard.Name(), enqueued.ID)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Equal(t, enqueued.ID, res.ID)
@@ -1393,7 +1393,7 @@ func TestItemByID(t *testing.T) {
 		_, err := enqueue(ctx, shard)
 		require.NoError(t, err)
 
-		res, err := q1.ItemByID(ctx, shard, "random")
+		res, err := q1.LoadQueueItem(ctx, shard.Name(), "random")
 		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
 		require.Nil(t, res)
 	})

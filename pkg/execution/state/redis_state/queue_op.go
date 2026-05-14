@@ -16,7 +16,7 @@ import (
 )
 
 func (q *queue) DequeueByJobID(ctx context.Context, jobID string) error {
-	item, err := q.ItemByID(ctx, jobID)
+	item, err := q.LoadQueueItem(ctx, jobID)
 	switch err {
 	case nil:
 		// no-op
