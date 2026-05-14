@@ -1,5 +1,3 @@
-import { useMemo } from 'react';
-
 import { TimeElement } from '../DetailsCard/Element';
 
 type ScoreMetadata = {
@@ -12,6 +10,19 @@ type ScoreRow = {
   updatedAt: string;
   value: number;
 };
+
+type ScoreTrace = {
+  metadata?: Array<ScoreMetadata & { kind: string }>;
+  childrenSpans?: ScoreTrace[];
+};
+
+export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
+  // Run views need child spans because scores attach where they are emitted.
+  const metadata = trace?.metadata?.filter((md) => md.kind === 'inngest.score') ?? [];
+  const childMetadata = trace?.childrenSpans?.flatMap((child) => collectScoreMetadata(child)) ?? [];
+
+  return [...metadata, ...childMetadata];
+}
 
 function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   return metadata
@@ -31,7 +42,7 @@ function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
 }
 
 export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
-  const rows = useMemo(() => scoreRows(metadata), [metadata]);
+  const rows = scoreRows(metadata);
 
   if (rows.length === 0) {
     return (
