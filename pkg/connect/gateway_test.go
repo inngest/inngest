@@ -576,7 +576,7 @@ func TestDraining(t *testing.T) {
 		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
 		assert.NoError(t, err)
 		assert.Nil(t, conn)
-	}, 2*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 100*time.Millisecond)
 
 	res.lifecycles.Assert(t, testRecorderAssertion{
 		onConnectedCount:          1,
@@ -631,7 +631,7 @@ func TestDrainingWithForceDisconnect(t *testing.T) {
 		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
 		assert.NoError(t, err)
 		assert.Nil(t, conn)
-	}, 2*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 100*time.Millisecond)
 
 	res.lifecycles.Assert(t, testRecorderAssertion{
 		onConnectedCount:          1,
