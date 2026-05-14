@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # Use the release bot token so tag pushes trigger the Release workflow.
+  GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
 concurrency:
   group: release-tag-${{ github.event.pull_request.number }}
   cancel-in-progress: false
@@ -17,11 +21,19 @@ jobs:
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'release/next' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      - name: Validate release token
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error title=Missing RELEASE_TOKEN::Configure the release bot token as the RELEASE_TOKEN repository secret."
+            exit 1
+          fi
+
       - name: Checkout merged release commit
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.merge_commit_sha }}
+          token: ${{ env.GH_TOKEN }}
 
       - name: Determine release tag
         id: release

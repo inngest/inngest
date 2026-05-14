@@ -11,6 +11,9 @@ on:
     # entry reflects the day the release PR is regenerated.
     - cron: "17 9 * * *"
   workflow_dispatch:
+  pull_request_target:
+    types:
+      - edited
 
 permissions:
   contents: write
@@ -26,6 +29,7 @@ concurrency:
 
 jobs:
   create-release-pr:
+    if: github.event_name != 'pull_request_target' || (github.event.pull_request.head.ref == 'release/next' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.state == 'open')
     runs-on: depot-ubuntu-22.04-4
     steps:
       - name: Validate release token
@@ -145,15 +149,6 @@ jobs:
             --repo "${{ github.repository }}" \
             --output /tmp/release-pr-notes.json
 
-      - name: Build release notes preview
-        if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
-        run: |
-          scripts/release/build-release-notes \
-            --notes /tmp/release-pr-notes.json \
-            --changelog CHANGELOG.md \
-            --tag "${{ steps.normalized-version.outputs.tag }}" \
-            --output /tmp/release-notes-preview.md
-
       - name: Find existing release PR
         if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
         id: existing-pr
@@ -172,6 +167,16 @@ jobs:
           else
             : > /tmp/existing-release-pr-body.md
           fi
+
+      - name: Build release notes preview
+        if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
+        run: |
+          scripts/release/build-release-notes \
+            --notes /tmp/release-pr-notes.json \
+            --changelog CHANGELOG.md \
+            --tag "${{ steps.normalized-version.outputs.tag }}" \
+            --release-pr-body /tmp/existing-release-pr-body.md \
+            --output /tmp/release-notes-preview.md
 
       - name: Render release PR body
         if: steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0' && steps.version-check.outputs.skip == 'false'
@@ -223,6 +228,14 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.normalized-version.outputs.tag }}
         run: |
+          current_title="$(gh pr view "${{ steps.existing-pr.outputs.pr_number }}" --json title --jq '.title')"
+          desired_title="chore(release): ${RELEASE_TAG}"
+
+          if [ "${current_title}" = "${desired_title}" ] && cmp -s /tmp/existing-release-pr-body.md /tmp/release-pr-body.md; then
+            echo "Release PR title and body are already up to date"
+            exit 0
+          fi
+
           gh pr edit "${{ steps.existing-pr.outputs.pr_number }}" \
-            --title "chore(release): ${RELEASE_TAG}" \
+            --title "${desired_title}" \
             --body-file /tmp/release-pr-body.md

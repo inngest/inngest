@@ -1,3 +1,5 @@
+version: 2
+
 before:
   hooks:
     - go mod tidy
@@ -67,7 +69,8 @@ docker_manifests:
 archives:
   - format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
     files:
       - LICENSE.md
 
@@ -75,7 +78,7 @@ checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Tag }}-next"
+  version_template: "{{ incpatch .Tag }}-next"
 
 changelog:
   sort: asc
