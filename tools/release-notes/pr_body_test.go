@@ -48,6 +48,9 @@ Old preview.
 	assertContains(t, got, "- Previous tag: `v1.2.2`")
 	assertContains(t, got, "Keep this release context.")
 	assertContains(t, got, "Keep this migration context.")
+	assertContains(t, got, "## Final Release Page Preview")
+	assertContains(t, got, "release notes body that will be published to the GitHub Release page")
+	assertContains(t, got, "<summary>Rendered release notes body</summary>")
 	assertContains(t, got, "New preview.")
 
 	if strings.Contains(got, "Old preview.") {
@@ -64,14 +67,17 @@ func TestRenderReleasePRBodyRendersEmptyEditableManualBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertContains(t, got, "## Additional Release Notes")
+	assertContains(t, got, "### Additional Release Notes")
 	assertContains(t, got, "<!-- release-note:manual-start -->\n<!-- release-note:manual-end -->")
-	assertContains(t, got, "## Additional Migration Notes")
+	assertContains(t, got, "### Additional Migration Notes")
 	assertContains(t, got, "<!-- migration-note:manual-start -->\n<!-- migration-note:manual-end -->")
 	assertNotContains(t, got, "None.")
 	assertNotContains(t, got, "N/A")
 	assertContains(t, got, "- Source branch: `release/next`")
 	assertContains(t, got, "- Base branch: `main`")
+	assertContains(t, got, "<details open>")
+	assertContains(t, got, "<!-- release-note:preview-start -->\n## Changelog")
+	assertContains(t, got, "<!-- release-note:preview-end -->\n\n</details>")
 }
 
 func TestRenderReleasePRBodyOmitsPlaceholderManualText(t *testing.T) {
@@ -92,8 +98,8 @@ N/A
 		t.Fatal(err)
 	}
 
-	assertContains(t, got, "## Additional Release Notes")
-	assertContains(t, got, "## Additional Migration Notes")
+	assertContains(t, got, "### Additional Release Notes")
+	assertContains(t, got, "### Additional Migration Notes")
 	assertNotContains(t, got, "None.")
 	assertNotContains(t, got, "N/A")
 }

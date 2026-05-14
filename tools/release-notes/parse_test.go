@@ -139,3 +139,51 @@ None.
 		t.Fatalf("migration note = %q, want empty", got)
 	}
 }
+
+func TestParsePRBodyWithTemplateDropsUnmodifiedTemplateText(t *testing.T) {
+	template := `## Description
+
+<!-- What changed? Include screenshots if you modify the UI. -->
+
+## Release note
+
+<!-- User-facing release note. Use "None" if this does not need release notes. -->
+None.
+
+## Migration note
+
+<!-- Upgrade, deployment, config, schema, or compatibility notes. Use "None" if none. -->
+None.
+
+*[Check our Pull Request Guidelines](https://github.com/inngest/inngest/blob/main/docs/PULL_REQUEST_GUIDELINES.md)*
+`
+
+	body := `## Description
+
+<!-- What changed? Include screenshots if you modify the UI. -->
+Fixes a thing.
+
+## Release note
+
+<!-- User-facing release note. Use "None" if this does not need release notes. -->
+None.
+
+## Migration note
+
+<!-- Upgrade, deployment, config, schema, or compatibility notes. Use "None" if none. -->
+Set the new flag before rollout.
+
+*[Check our Pull Request Guidelines](https://github.com/inngest/inngest/blob/main/docs/PULL_REQUEST_GUIDELINES.md)*
+`
+
+	sections := ParsePRBodyWithTemplate(body, template)
+	if got := NormalizeNote(sections["description"]); got != "Fixes a thing." {
+		t.Fatalf("description = %q", got)
+	}
+	if got := NormalizeNote(sections["release note"]); got != "" {
+		t.Fatalf("release note = %q, want empty", got)
+	}
+	if got := NormalizeNote(sections["migration note"]); got != "Set the new flag before rollout." {
+		t.Fatalf("migration note = %q", got)
+	}
+}

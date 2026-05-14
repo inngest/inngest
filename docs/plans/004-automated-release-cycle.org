@@ -153,25 +153,31 @@ The release PR body should contain machine-owned and human-owned sections:
 
 #+begin_src markdown
 <!-- auto-release-pr -->
-## Release
-
 This PR prepares `vX.Y.Z`.
 
-## Additional Release Notes
+### Additional Release Notes
 <!-- release-note:manual-start -->
-None.
 <!-- release-note:manual-end -->
 
-## Additional Migration Notes
+### Additional Migration Notes
 <!-- migration-note:manual-start -->
-None.
 <!-- migration-note:manual-end -->
 
-## Notes Preview
+## Final Release Page Preview
+
+> This generated preview is the release notes body that will be published to
+> the GitHub Release page. It intentionally includes the additional notes above,
+> followed by collected PR notes and the changelog.
+
+<details open>
+<summary>Rendered release notes body</summary>
+
 <!-- release-note:preview-start -->
 Full generated release preview goes here, including release notes, migration
 notes, and generated changelog entries.
 <!-- release-note:preview-end -->
+
+</details>
 #+end_src
 
 When the workflow updates an existing release PR, it should preserve the manual

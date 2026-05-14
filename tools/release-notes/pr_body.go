@@ -121,7 +121,6 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 
 	var b strings.Builder
 	b.WriteString("<!-- auto-release-pr -->\n")
-	b.WriteString("## Release\n\n")
 	fmt.Fprintf(&b, "This PR prepares `%s`.\n\n", tag)
 	if input.CompareURL != "" {
 		compareLabel := strings.TrimSpace(input.CompareLabel)
@@ -134,12 +133,12 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 		fmt.Fprintf(&b, "- Code difference since last tag: [%s](%s)\n", compareLabel, input.CompareURL)
 	}
 	if input.LatestTag != "" {
-		fmt.Fprintf(&b, "- Previous tag: `%s`\n", input.LatestTag)
+		fmt.Fprintf(&b, "- Previous tag: `%s`\n", input.LatestTag) // TODO make this a link of previous tag
 	}
 	fmt.Fprintf(&b, "- Source branch: `%s`\n", head)
 	fmt.Fprintf(&b, "- Base branch: `%s`\n\n", base)
 
-	b.WriteString("## Additional Release Notes\n")
+	b.WriteString("### Additional Release Notes\n")
 	b.WriteString("<!-- release-note:manual-start -->\n")
 	if manualRelease != "" {
 		b.WriteString(manualRelease)
@@ -147,7 +146,7 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 	}
 	b.WriteString("<!-- release-note:manual-end -->\n\n")
 
-	b.WriteString("## Additional Migration Notes\n")
+	b.WriteString("### Additional Migration Notes\n")
 	b.WriteString("<!-- migration-note:manual-start -->\n")
 	if manualMigration != "" {
 		b.WriteString(manualMigration)
@@ -155,10 +154,14 @@ func RenderReleasePRBody(input ReleasePRBodyInput) (string, error) {
 	}
 	b.WriteString("<!-- migration-note:manual-end -->\n\n")
 
-	b.WriteString("## Notes Preview\n")
+	b.WriteString("## Final Release Page Preview\n\n")
+	b.WriteString("> This generated preview is the release notes body that will be published to the GitHub Release page. It intentionally includes the additional notes above, followed by collected PR notes and the changelog.\n\n")
+	b.WriteString("<details open>\n")
+	b.WriteString("<summary>Rendered release notes body</summary>\n\n")
 	b.WriteString("<!-- release-note:preview-start -->\n")
 	b.WriteString(preview)
-	b.WriteString("\n<!-- release-note:preview-end -->\n")
+	b.WriteString("\n<!-- release-note:preview-end -->\n\n")
+	b.WriteString("</details>\n")
 
 	return b.String(), nil
 }

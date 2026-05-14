@@ -6,6 +6,26 @@ import (
 )
 
 func ParsePRBody(body string) map[string]string {
+	return ParsePRBodyWithTemplate(body, "")
+}
+
+func ParsePRBodyWithTemplate(body, template string) map[string]string {
+	sections := parsePRBodySections(body)
+	if template == "" {
+		return sections
+	}
+
+	templateSections := parsePRBodySections(template)
+	for section, templateValue := range templateSections {
+		if sections[section] == "" {
+			continue
+		}
+		sections[section] = RemoveTemplateText(sections[section], templateValue)
+	}
+	return sections
+}
+
+func parsePRBodySections(body string) map[string]string {
 	sections := map[string]string{}
 	var current string
 	var lines []string
@@ -71,6 +91,32 @@ func CleanMarkdownSection(value string) string {
 	value = mendralSummaryPattern.ReplaceAllString(value, "")
 	value = htmlCommentPattern.ReplaceAllString(value, "")
 	return NormalizeWhitespace(value)
+}
+
+func RemoveTemplateText(value, templateValue string) string {
+	value = NormalizeWhitespace(value)
+	templateValue = NormalizeWhitespace(templateValue)
+	if value == "" || templateValue == "" {
+		return value
+	}
+
+	templateLines := map[string]struct{}{}
+	for _, line := range strings.Split(templateValue, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			templateLines[line] = struct{}{}
+		}
+	}
+
+	lines := strings.Split(value, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if _, ok := templateLines[strings.TrimSpace(line)]; ok {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return NormalizeWhitespace(strings.Join(kept, "\n"))
 }
 
 func NormalizeNote(value string) string {
