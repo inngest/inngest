@@ -67,6 +67,8 @@ const (
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
 	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
+	// V2QueryInsightsProcedure is the fully-qualified name of the V2's QueryInsights RPC.
+	V2QueryInsightsProcedure = "/api.v2.V2/QueryInsights"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -90,6 +92,7 @@ type V2Client interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -199,6 +202,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		queryInsights: connect.NewClient[v2.QueryInsightsRequest, v2.QueryInsightsResponse](
+			httpClient,
+			baseURL+V2QueryInsightsProcedure,
+			connect.WithSchema(v2Methods.ByName("QueryInsights")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -220,6 +229,7 @@ type v2Client struct {
 	syncApp                 *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace        *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	invokeFunction          *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
+	queryInsights           *connect.Client[v2.QueryInsightsRequest, v2.QueryInsightsResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -302,6 +312,11 @@ func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.I
 	return c.invokeFunction.CallUnary(ctx, req)
 }
 
+// QueryInsights calls api.v2.V2.QueryInsights.
+func (c *v2Client) QueryInsights(ctx context.Context, req *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error) {
+	return c.queryInsights.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -323,6 +338,7 @@ type V2Handler interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -428,6 +444,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2QueryInsightsHandler := connect.NewUnaryHandler(
+		V2QueryInsightsProcedure,
+		svc.QueryInsights,
+		connect.WithSchema(v2Methods.ByName("QueryInsights")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -462,6 +484,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2InvokeFunctionProcedure:
 			v2InvokeFunctionHandler.ServeHTTP(w, r)
+		case V2QueryInsightsProcedure:
+			v2QueryInsightsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -533,4 +557,8 @@ func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request
 
 func (UnimplementedV2Handler) InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.InvokeFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.QueryInsights is not implemented"))
 }

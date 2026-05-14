@@ -280,3 +280,6 @@ func (s *Service) PatchEnv(ctx context.Context, req *apiv2.PatchEnvRequest) (*ap
 func (s *Service) SyncApp(ctx context.Context, req *apiv2.SyncAppRequest) (*apiv2.SyncAppResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "App sync not implemented in OSS")
 }
+func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (*apiv2.QueryInsightsResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
+}
