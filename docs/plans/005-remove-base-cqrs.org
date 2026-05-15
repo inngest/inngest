@@ -344,7 +344,7 @@ Action items:
 - [ ] move SQLite connection opening into =pkg/db/sqlite=
 - [ ] move Postgres connection opening into =pkg/db/postgres=
 - [ ] move goose migration wiring into each dialect package
-- [ ] move migration filesystem ownership fully into each dialect package
+- [X] move migration filesystem ownership fully into each dialect package
 - [ ] move SQLite sqlc package under =pkg/db/sqlite/sqlc=
 - [ ] move Postgres sqlc package under =pkg/db/postgres/sqlc=
 - [ ] update sqlc/codegen configuration to target the new package paths
@@ -359,6 +359,15 @@ Action items:
 - [ ] add or update tests covering dialect-local bootstrap and migration wiring
 - [ ] keep SQLite and Postgres bootstrap test coverage at parity
 - [ ] run the bootstrap, migration, and adapter-focused DAL tests after the move
+
+Review notes from 2026-05-15:
+
+- migration files and embedded migration filesystems now live in
+  =pkg/db/sqlite= and =pkg/db/postgres=
+- =base_cqrs.New()= still owns connection opening and goose execution, so
+  dialect-local =Open()= / =Migrate()= work remains open
+- SQLite and Postgres adapters still import sqlc packages from
+  =pkg/cqrs/base_cqrs/sqlc=
 
 Expected call-site shape after this phase:
 
@@ -475,16 +484,16 @@ Move history read and write contracts, payload types, and implementations under
 
 Action items:
 
-- [ ] define =cqrs.HistoryReader=
-- [ ] define =cqrs.HistoryWriter=
-- [ ] embed those interfaces in =cqrs.Manager=
-- [ ] move payload and result types currently owned by =pkg/history_reader=
+- [X] define =cqrs.HistoryReader=
+- [X] define =cqrs.HistoryWriter=
+- [X] embed those interfaces in =cqrs.Manager=
+- [X] move payload and result types currently owned by =pkg/history_reader=
   into =pkg/cqrs=
-- [ ] move payload types currently owned by =pkg/execution/history= into
-  =pkg/cqrs=
-- [ ] add only minimal temporary compatibility shims where migration staging
+- [ ] replace temporary =pkg/cqrs= aliases to =pkg/execution/history= payload
+  types with CQRS-owned concrete types
+- [X] add only minimal temporary compatibility shims where migration staging
   requires them
-- [ ] mark compatibility shims as =DEPRECATED=
+- [X] mark compatibility shims as =DEPRECATED=
 - [ ] add explicit removal tasks for every temporary shim introduced
 - [ ] move supporting run and run-history mapping helpers into
   =pkg/cqrs/manager=
@@ -515,6 +524,19 @@ Action items:
 - [ ] add regression coverage for executor history writes and API history reads
 - [ ] run history-focused DAL tests after each call-site migration that changes
   the active history path
+
+Review notes from 2026-05-15:
+
+- =pkg/cqrs= now defines =HistoryReader=, =HistoryWriter=, and CQRS-owned
+  run-history query/result types
+- =cqrs.Manager= embeds the narrower history reader and writer interfaces
+- =pkg/history_reader= is a deprecated compatibility shim; gqlgen-bound history
+  structs remain real named shim types until GraphQL moves directly to
+  =pkg/cqrs=
+- execution history payloads are currently exposed through aliases in
+  =pkg/cqrs/history.go=, so final type ownership is not complete
+- history read/write implementations and runtime call sites still live on the
+  legacy =base_cqrs= / =history_reader= / =history_drivers= path
 
 Completion checklist:
 
