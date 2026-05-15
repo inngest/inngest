@@ -40,10 +40,10 @@ pkg/db ──> pkg/run (for ExprSQLConverter)
          ──> goqu (for dynamic SQL helpers)
 
 pkg/db/sqlite ──> pkg/db (domain types + interfaces)
-               ──> pkg/cqrs/base_cqrs/sqlc/sqlite (generated queries)
+               ──> pkg/db/sqlite/sqlc (generated queries)
 
 pkg/db/postgres ──> pkg/db (domain types + interfaces)
-                 ──> pkg/cqrs/base_cqrs/sqlc/postgres (generated queries)
+                 ──> pkg/db/postgres/sqlc (generated queries)
 
 pkg/cqrs/base_cqrs ──> pkg/db (via Adapter interface, future)
 ```

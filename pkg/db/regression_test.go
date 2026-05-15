@@ -377,7 +377,7 @@ func TestFunctionRunWithoutFinish(t *testing.T) {
 }
 
 // TestGetFunctionRunFinishesByRunIDsMultiple reproduces a sqlc slice-generation
-// bug on Postgres: the generated query at pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql.go
+// bug on Postgres: the generated query at pkg/db/postgres/sqlc/queries.sql.go
 // contains a literal "WHERE run_id IN ($1)" placeholder instead of the
 // "/*SLICE:run_ids*/?" marker, so the runtime parameter expansion is a no-op
 // and pgx rejects multi-ID calls with "mismatched param and argument count".

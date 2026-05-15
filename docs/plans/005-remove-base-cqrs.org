@@ -345,20 +345,20 @@ Action items:
 - [X] move Postgres connection opening into =pkg/db/postgres=
 - [X] move goose migration wiring into each dialect package
 - [X] move migration filesystem ownership fully into each dialect package
-- [ ] move SQLite sqlc package under =pkg/db/sqlite/sqlc=
-- [ ] move Postgres sqlc package under =pkg/db/postgres/sqlc=
-- [ ] update sqlc/codegen configuration to target the new package paths
-- [ ] update adapter imports to use dialect-local sqlc packages
-- [ ] decide whether =Open()= implicitly runs migrations or whether =Open()=
+- [X] move SQLite sqlc package under =pkg/db/sqlite/sqlc=
+- [X] move Postgres sqlc package under =pkg/db/postgres/sqlc=
+- [X] update sqlc/codegen configuration to target the new package paths
+- [X] update adapter imports to use dialect-local sqlc packages
+- [X] decide whether =Open()= implicitly runs migrations or whether =Open()=
   and =Migrate()= remain separate calls
 - [X] update devserver to stop calling =base_cqrs.New()=
 - [X] update test helpers to stop calling =base_cqrs.New()=
 - [X] update adapter integration tests to use dialect-local bootstrap
 - [X] update regression tests to use dialect-local bootstrap
 - [X] verify connection cleanup behavior is unchanged after the move
-- [ ] add or update tests covering dialect-local bootstrap and migration wiring
-- [ ] keep SQLite and Postgres bootstrap test coverage at parity
-- [ ] run the bootstrap, migration, and adapter-focused DAL tests after the move
+- [X] add or update tests covering dialect-local bootstrap and migration wiring
+- [X] keep SQLite and Postgres bootstrap test coverage at parity
+- [X] run the bootstrap, migration, and adapter-focused DAL tests after the move
 
 Review notes from 2026-05-15:
 
@@ -366,10 +366,12 @@ Review notes from 2026-05-15:
   =pkg/db/sqlite= and =pkg/db/postgres=
 - =pkg/db/sqlite.Open()=, =pkg/db/postgres.Open()=, and dialect-local
   =Migrate()= helpers now own connection opening and goose execution
+- =Open()= preserves the old =base_cqrs.New()= behavior by running migrations
+  implicitly; =Migrate()= remains available for explicit migration calls
 - =base_cqrs.New()= and =BaseCQRSOptions= have been removed after migrating
   runtime and test call sites to dialect-local bootstrap
-- SQLite and Postgres adapters still import sqlc packages from
-  =pkg/cqrs/base_cqrs/sqlc=
+- SQLite and Postgres adapters now import dialect-local sqlc packages from
+  =pkg/db/sqlite/sqlc= and =pkg/db/postgres/sqlc=
 
 Expected call-site shape after this phase:
 
@@ -393,9 +395,9 @@ Completion checklist:
 - [X] no tests call =base_cqrs.New()=
 - [X] migrations are run by the dialect package that owns them
 - [X] no =pkg/cqrs= package owns connection opening or migration wiring
-- [ ] sqlc code no longer lives under =pkg/cqrs/base_cqrs/sqlc=
-- [ ] dialect-local bootstrap and migration tests are green
-- [ ] adapter-focused DAL verification is green after the package move
+- [X] sqlc code no longer lives under =pkg/cqrs/base_cqrs/sqlc=
+- [X] dialect-local bootstrap and migration tests are green
+- [X] adapter-focused DAL verification is green after the package move
 
 ** Phase 3: move the composite manager
 
