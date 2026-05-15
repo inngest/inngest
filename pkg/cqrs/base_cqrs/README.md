@@ -2,7 +2,7 @@
 
 `pkg/cqrs/base_cqrs` is the legacy home of the composite CQRS manager
 and history implementations while the tree is being moved to
-the new package boundaries defined in `docs/plans/002-remove-base-cqrs.org`.
+the new package boundaries defined in `docs/plans/005-remove-base-cqrs.org`.
 
 Current responsibilities still living here:
 
