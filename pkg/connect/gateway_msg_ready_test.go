@@ -52,7 +52,7 @@ func TestHandleWorkerReadyIgnoresDrainingConnection(t *testing.T) {
 	require.Equal(t, connectpb.ConnectionStatus_READY, conn.Status)
 }
 
-func TestHandleWorkerReadyStatusUpdateFailureIsNonFatal(t *testing.T) {
+func TestHandleWorkerReadyStatusUpdateFailureIsNonFatalUntilThreshold(t *testing.T) {
 	res := createTestingGateway(t)
 	handshake(t, res)
 
@@ -63,8 +63,15 @@ func TestHandleWorkerReadyStatusUpdateFailureIsNonFatal(t *testing.T) {
 
 	ch := newTestConnectionHandler(t, res)
 
+	for range maxConsecutiveConnStatusUpdateFailures - 1 {
+		serr := ch.handleWorkerReady()
+		require.Nil(t, serr)
+	}
+
 	serr := ch.handleWorkerReady()
-	require.Nil(t, serr)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
+	require.Contains(t, serr.Msg, "could not update connection status")
 }
 
 func TestHandleWorkerReadyMissingInstanceIDIsFatal(t *testing.T) {

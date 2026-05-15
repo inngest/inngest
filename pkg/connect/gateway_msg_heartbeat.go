@@ -28,8 +28,8 @@ func (c *connectionHandler) handleWorkerHeartbeat() *connecterrors.SocketError {
 		"conn_draining", c.draining.Load(),
 		"svc_draining", c.svc.isDraining.Load(),
 	)
-	if err != nil {
-		c.log.ReportError(err, "failed to update connection status after heartbeat")
+	if serr := c.handleConnStatusUpdateResult(err, "failed to update connection status after heartbeat"); serr != nil {
+		return serr
 	}
 
 	if c.conn.Data.InstanceId == "" {

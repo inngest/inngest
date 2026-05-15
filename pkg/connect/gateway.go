@@ -112,6 +112,8 @@ type connectionHandler struct {
 	// Forward blocks until the ACK arrives or times out.
 	pendingAcks sync.Map // requestID -> chan struct{}
 
+	consecutiveConnStatusUpdateFailures atomic.Int64
+
 	lastHeartbeatLock       sync.Mutex
 	lastHeartbeatReceivedAt time.Time
 
