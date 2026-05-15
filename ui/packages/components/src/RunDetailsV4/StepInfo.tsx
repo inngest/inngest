@@ -211,6 +211,8 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
+  const supportsInputs = trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY';
+  const editableInput = prettyInput || supportsInputs;
   const showRerunFromStep = !isDurableEndpoint && runID && trace.stepID;
 
   const responseHeaderMetadata = trace.metadata?.filter(
@@ -302,6 +304,7 @@ export const StepInfo = ({
               runID={runID}
               stepID={trace.stepID!}
               input={prettyInput || result?.input || ''}
+              editableInput={!!editableInput}
             />
           </>
         )}
