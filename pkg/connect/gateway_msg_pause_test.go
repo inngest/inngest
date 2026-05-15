@@ -31,3 +31,23 @@ func TestHandleWorkerPauseMarksConnectionDrainingAndStopsForwarding(t *testing.T
 	require.NoError(t, err)
 	require.Equal(t, connectpb.ConnectionStatus_DRAINING, conn.Status)
 }
+
+func TestHandleWorkerPauseDuringGatewayDrainIsNonFatal(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	ch := newTestConnectionHandler(t, res)
+	res.svc.wsConnections.Store(res.connID.String(), ch)
+	res.svc.isDraining.Store(true)
+
+	serr := ch.handleWorkerPause()
+	require.Nil(t, serr)
+	require.True(t, ch.draining.Load())
+
+	_, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.False(t, ok)
+
+	conn, err := res.stateManager.GetConnection(t.Context(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.Equal(t, connectpb.ConnectionStatus_DRAINING, conn.Status)
+}

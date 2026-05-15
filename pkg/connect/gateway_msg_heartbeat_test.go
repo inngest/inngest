@@ -2,11 +2,46 @@ package connect
 
 import (
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/connect/state"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHandleWorkerHeartbeatWritesGatewayHeartbeat(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount: 1,
+		onSyncedCount:    1,
+		onReadyCount:     1,
+		onHeartbeatCount: 1,
+	})
+}
+
+func TestHandleWorkerHeartbeatKeepsDrainingStatus(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	sendWorkerPauseMessage(t, res.ws)
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
+
+	conn, err := res.stateManager.GetConnection(t.Context(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.Equal(t, connectpb.ConnectionStatus_DRAINING, conn.Status)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount:     1,
+		onSyncedCount:        1,
+		onReadyCount:         1,
+		onHeartbeatCount:     1,
+		onStartDrainingCount: 1,
+	})
+}
 
 func TestHandleWorkerHeartbeatMissingInstanceIDIsFatal(t *testing.T) {
 	res := createTestingGateway(t)
