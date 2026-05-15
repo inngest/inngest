@@ -1,6 +1,7 @@
 package connect
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -41,6 +42,18 @@ func TestHandleWorkerHeartbeatKeepsDrainingStatus(t *testing.T) {
 		onHeartbeatCount:     1,
 		onStartDrainingCount: 1,
 	})
+}
+
+func TestHandleWorkerHeartbeatStatusUpdateFailureWritesGatewayHeartbeat(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	res.svc.stateManager = upsertConnectionErrorStateManager{
+		StateManager: res.svc.stateManager,
+		err:          errors.New("upsert connection failed"),
+	}
+
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
 }
 
 func TestHandleWorkerHeartbeatMissingInstanceIDIsFatal(t *testing.T) {
