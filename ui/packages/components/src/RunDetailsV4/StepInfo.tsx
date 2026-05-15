@@ -14,7 +14,6 @@ import {
 } from '../DetailsCard/Element';
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
-import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -177,7 +176,6 @@ export const StepInfo = ({
   debug?: boolean;
   isDurableEndpoint?: boolean;
 }) => {
-  const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
@@ -213,8 +211,9 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
-  const showRerunFromStep =
-    !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
+  const supportsInputs = trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY';
+  const editableInput = prettyInput || supportsInputs;
+  const showRerunFromStep = !isDurableEndpoint && runID && trace.stepID;
 
   const responseHeaderMetadata = trace.metadata?.filter(
     (md) => md.kind === 'inngest.response_headers'
@@ -305,6 +304,7 @@ export const StepInfo = ({
               runID={runID}
               stepID={trace.stepID!}
               input={prettyInput || result?.input || ''}
+              editableInput={!!editableInput}
             />
           </>
         )}
