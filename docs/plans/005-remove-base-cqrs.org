@@ -351,11 +351,11 @@ Action items:
 - [ ] update adapter imports to use dialect-local sqlc packages
 - [ ] decide whether =Open()= implicitly runs migrations or whether =Open()=
   and =Migrate()= remain separate calls
-- [ ] update devserver to stop calling =base_cqrs.New()=
-- [ ] update test helpers to stop calling =base_cqrs.New()=
-- [ ] update adapter integration tests to use dialect-local bootstrap
-- [ ] update regression tests to use dialect-local bootstrap
-- [ ] verify connection cleanup behavior is unchanged after the move
+- [X] update devserver to stop calling =base_cqrs.New()=
+- [X] update test helpers to stop calling =base_cqrs.New()=
+- [X] update adapter integration tests to use dialect-local bootstrap
+- [X] update regression tests to use dialect-local bootstrap
+- [X] verify connection cleanup behavior is unchanged after the move
 - [ ] add or update tests covering dialect-local bootstrap and migration wiring
 - [ ] keep SQLite and Postgres bootstrap test coverage at parity
 - [ ] run the bootstrap, migration, and adapter-focused DAL tests after the move
@@ -366,8 +366,8 @@ Review notes from 2026-05-15:
   =pkg/db/sqlite= and =pkg/db/postgres=
 - =pkg/db/sqlite.Open()=, =pkg/db/postgres.Open()=, and dialect-local
   =Migrate()= helpers now own connection opening and goose execution
-- =base_cqrs.New()= is temporarily left as a delegating compatibility wrapper
-  until call sites are migrated
+- =base_cqrs.New()= and =BaseCQRSOptions= have been removed after migrating
+  runtime and test call sites to dialect-local bootstrap
 - SQLite and Postgres adapters still import sqlc packages from
   =pkg/cqrs/base_cqrs/sqlc=
 
@@ -389,10 +389,10 @@ mgr := manager.New(adapter)
 
 Completion checklist:
 
-- [ ] no runtime code calls =base_cqrs.New()=
-- [ ] no tests call =base_cqrs.New()=
-- [ ] migrations are run by the dialect package that owns them
-- [ ] no =pkg/cqrs= package owns connection opening or migration wiring
+- [X] no runtime code calls =base_cqrs.New()=
+- [X] no tests call =base_cqrs.New()=
+- [X] migrations are run by the dialect package that owns them
+- [X] no =pkg/cqrs= package owns connection opening or migration wiring
 - [ ] sqlc code no longer lives under =pkg/cqrs/base_cqrs/sqlc=
 - [ ] dialect-local bootstrap and migration tests are green
 - [ ] adapter-focused DAL verification is green after the package move

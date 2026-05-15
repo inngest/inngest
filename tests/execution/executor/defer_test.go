@@ -65,7 +65,7 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 	t.Helper()
 	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 	adapter := dbsqlite.New(db)
 	dbcqrs := base_cqrs.NewCQRS(adapter)
@@ -872,7 +872,7 @@ func TestDeferAbort(t *testing.T) {
 		ctx := infra.ctx
 
 		const (
-			deferStepID  = "step-defer"
+			deferStepID = "step-defer"
 			abortStepID = "step-abort"
 		)
 		seed := statev2.Defer{
@@ -984,7 +984,7 @@ func TestDeferAbort(t *testing.T) {
 		countingQ := &enqueueCountingQueue{Queue: infra.rq}
 
 		const (
-			deferStepID  = "step-defer"
+			deferStepID = "step-defer"
 			abortStepID = "step-abort"
 		)
 

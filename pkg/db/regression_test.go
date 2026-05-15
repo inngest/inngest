@@ -1076,7 +1076,7 @@ func TestEventListFiltering(t *testing.T) {
 func newSQLiteTestAdapter(t *testing.T) (db.Adapter, func()) {
 	t.Helper()
 
-	conn, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{
+	conn, err := dbsqlite.Open(t.Context(), dbsqlite.Options{
 		Persist: false,
 		ForTest: true,
 	})
