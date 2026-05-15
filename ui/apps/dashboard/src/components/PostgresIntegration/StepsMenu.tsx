@@ -1,7 +1,3 @@
-'use client';
-
-import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
 import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
 import {
   IntegrationSteps,
@@ -14,9 +10,8 @@ import { RiExternalLinkLine } from '@remixicon/react';
 import { pathCreator } from '@/utils/urls';
 import { useSteps } from './Context';
 
-const Menu = dynamic(() => import('@inngest/components/PostgresIntegrations/StepsMenu'), {
-  ssr: false,
-});
+import Menu from '@inngest/components/PostgresIntegrations/StepsMenu';
+import { useNavigate } from '@tanstack/react-router';
 
 export default function NeonStepsMenu({
   step,
@@ -25,10 +20,12 @@ export default function NeonStepsMenu({
   step: string;
   steps?: IntegrationSteps[];
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { stepsCompleted } = useSteps();
   if (!isValidStep(step)) {
-    router.push(pathCreator.pgIntegrationStep({ integration: 'supabase' }));
+    navigate({
+      to: pathCreator.pgIntegrationStep({ integration: 'supabase' }),
+    });
     return;
   }
 

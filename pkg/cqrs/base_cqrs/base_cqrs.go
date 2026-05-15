@@ -1,26 +1,24 @@
 package base_cqrs
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
-	"embed"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/inngest/inngest/pkg/consts"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
+	"github.com/inngest/inngest/pkg/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/oklog/ulid/v2"
+	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
 
@@ -30,9 +28,9 @@ var (
 )
 
 type BaseCQRSOptions struct {
-	// InMemory indicates that the sqlite should run in memory only and not persist data to disk.
-	// This is expected to be used for the Dev server and testing.
-	InMemory bool
+	// Persist indicates that the sqlite db should persist data to disk.
+	// This can be used for the Dev server, testing, and single-node services.
+	Persist bool
 	// ForTest indicates that the database handler is created for testing purposes.
 	// By default database handlers are all singletons, but when this flag is enabled, they will create temporary handlers.
 	//
@@ -46,8 +44,10 @@ type BaseCQRSOptions struct {
 	Directory string
 }
 
-func New(opts BaseCQRSOptions) (*sql.DB, error) {
+func New(ctx context.Context, opts BaseCQRSOptions) (*sql.DB, error) {
 	var err error
+
+	l := logger.StdlibLogger(ctx)
 
 	if opts.PostgresURI != "" {
 		if !strings.HasPrefix(opts.PostgresURI, "postgres://") && !strings.HasPrefix(opts.PostgresURI, "postgresql://") {
@@ -57,21 +57,16 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 			return nil, fmt.Errorf("unsupported database URL format")
 		}
 
-		o.Do(func() {
-			db, err = sql.Open("pgx", opts.PostgresURI)
-		})
-	} else if opts.InMemory {
 		if opts.ForTest {
-			// initializes a temporary database every time for test purposes
-			dbName := fmt.Sprintf("sqlite_%s", strings.ToLower(ulid.MustNew(ulid.Now(), rand.Reader).String()))
-			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName))
+			// For tests, create a new connection each time
+			db, err = sql.Open("pgx", opts.PostgresURI)
 		} else {
-			// initialize the db once
 			o.Do(func() {
-				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+				db, err = sql.Open("pgx", opts.PostgresURI)
 			})
 		}
-	} else {
+		l = l.With("db", "postgres")
+	} else if opts.Persist {
 		o.Do(func() {
 			// make the dir if it doesn't exist
 			dir := consts.DefaultInngestConfigDir
@@ -98,7 +93,22 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 
 			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
 		})
+		l = l.With("db", "sqlite", "mode", "persisted")
+	} else {
+		// In-memory
+		if opts.ForTest {
+			// initializes a temporary database every time for test purposes
+			dbName := fmt.Sprintf("sqlite_%s", strings.ToLower(ulid.MustNew(ulid.Now(), rand.Reader).String()))
+			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName))
+		} else {
+			// initialize the db once
+			o.Do(func() {
+				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+			})
+		}
+		l = l.With("db", "sqlite", "mode", "memory")
 	}
+	l.Info("initialized database")
 
 	if err != nil {
 		return nil, err
@@ -112,89 +122,32 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 	if err := up(db, opts); err != nil {
 		return nil, err
 	}
+	l.Info("ran database migrations")
 
 	return db, err
 }
 
-// FS contains the filesystem of the stdlib, containing all migrations in subdirs
-// relative to this package.
-//
-//go:embed **/**/*.sql
-var FS embed.FS
-
 func up(db *sql.DB, opts BaseCQRSOptions) error {
-	var (
-		err    error
-		src    source.Driver
-		driver database.Driver
-		dbName string
-	)
-
-	// Grab the migration driver.
-	if opts.PostgresURI != "" {
-		src, err = iofs.New(FS, path.Join("migrations", "postgres"))
-		if err != nil {
-			return err
-		}
-
-		dbName = "postgres"
-		parsedURL, err := url.Parse(opts.PostgresURI)
-		if err != nil {
-			return fmt.Errorf("error parsing postgres URI to retrieve DB name: invalid format")
-		}
-
-		if parsedURL.Path != "" && parsedURL.Path != "/" {
-			// Remove the leading slash
-			dbName = parsedURL.Path[1:]
-		}
-
-		driver, err = postgres.WithInstance(db, &postgres.Config{
-			MigrationsTable: "migrations",
-			DatabaseName:    dbName,
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		src, err = iofs.New(FS, path.Join("migrations", "sqlite"))
-		if err != nil {
-			return err
-		}
-
-		driver, err = sqlite.WithInstance(db, &sqlite.Config{
-			MigrationsTable: "migrations",
-			NoTxWrap:        true,
-		})
-		if err != nil {
-			return err
-		}
-
-		dbName = "file:inngest?mode=memory&cache=shared"
-		if !opts.InMemory {
-			dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
-		}
-	}
-
-	m, err := migrate.NewWithInstance("iofs", src, dbName, driver)
+	dialect, migrationsFS, err := gooseConfig(opts)
 	if err != nil {
 		return err
 	}
 
-	v, dirty, err := m.Version()
-	if err != migrate.ErrNilVersion && err != nil {
+	provider, err := goose.NewProvider(dialect, db, migrationsFS)
+	if err != nil {
 		return err
 	}
 
-	if dirty {
-		if err = m.Migrate(v); err != nil {
-			return fmt.Errorf("error migrating to version %d resetting dirty: %w", v, err)
-		}
-	}
-
-	err = m.Up()
-	if err == migrate.ErrNoChange {
-		return nil
-	}
-
+	_, err = provider.Up(context.Background())
 	return err
+}
+
+func gooseConfig(opts BaseCQRSOptions) (goose.Dialect, fs.FS, error) {
+	if opts.PostgresURI != "" {
+		migrationsFS, err := fs.Sub(dbpostgres.MigrationsFS, "migrations")
+		return goose.DialectPostgres, migrationsFS, err
+	}
+
+	migrationsFS, err := fs.Sub(dbsqlite.MigrationsFS, "migrations")
+	return goose.DialectSQLite3, migrationsFS, err
 }

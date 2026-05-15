@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
@@ -15,6 +16,10 @@ import (
 
 // GetEventRuns returns function runs given an event ID.
 func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
+	if a.opts.RateLimited(r, w, "/v1/runs/{runID}") {
+		return
+	}
+
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -28,8 +33,12 @@ func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
-
+	fr, err := a.opts.TraceReader.GetRun(
+		cqrs.WithGetRunOpt(ctx, cqrs.GetRunOpt{IncludeOutput: true}),
+		runID,
+		auth.AccountID(),
+		auth.WorkspaceID(),
+	)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
 		return
@@ -47,7 +56,6 @@ func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 	}
 
 	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
-
 	if err != nil {
 		return publicerr.Wrapf(err, 404, "Unable to load function run: %s", runID)
 	}
@@ -97,21 +105,19 @@ func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
-
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
 		return
 	}
 
-	shard, err := a.opts.QueueShardSelector(ctx, auth.AccountID(), nil)
+	shard, err := a.opts.QueueShards.Resolve(ctx, auth.AccountID(), nil)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Internal server error"))
 		return
 	}
 
-	jobs, err := a.opts.JobQueueReader.RunJobs(
+	jobs, err := shard.RunJobs(
 		ctx,
-		shard.Name,
 		auth.WorkspaceID(),
 		fr.FunctionID,
 		runID,

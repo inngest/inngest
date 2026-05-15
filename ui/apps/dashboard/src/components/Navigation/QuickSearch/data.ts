@@ -31,7 +31,13 @@ const quickSearchQuery = graphql(`
   }
 `);
 
-export function useQuickSearch({ envSlug, term }: { envSlug: string; term: string }) {
+export function useQuickSearch({
+  envSlug,
+  term,
+}: {
+  envSlug: string;
+  term: string;
+}) {
   const client = useClient();
 
   return useQuery({

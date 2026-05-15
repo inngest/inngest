@@ -14,13 +14,19 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
+)
+
+const (
+	pkgName = "coreapi.graph.resolvers"
 )
 
 func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.FunctionRun) (*int, error) {
@@ -266,10 +272,6 @@ func (r *mutationResolver) Rerun(
 	debugSessionID *ulid.ULID,
 	debugRunID *ulid.ULID,
 ) (ulid.ULID, error) {
-	if debugSessionID != nil && debugRunID == nil {
-		debugRunID = &runID
-	}
-
 	accountID := consts.DevServerAccountID
 	workspaceID := consts.DevServerEnvID
 
@@ -336,14 +338,14 @@ func (r *mutationResolver) Rerun(
 		originalRunID = fnrun.OriginalRunID
 	}
 
-	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
+	newRunID, _, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
 		AppID:    fnCQRS.AppID,
 		Events: []event.TrackedEvent{
-			// We need NewOSSTrackedEventWithID to ensure that the tracked event
-			// has the same ID as the original event. Calling NewOSSTrackedEvent
+			// We need NewBaseTrackedEventWithID to ensure that the tracked event
+			// has the same ID as the original event. Calling NewBaseTrackedEvent
 			// will result in the creation of a new ID
-			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
+			event.NewBaseTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
 		OriginalRunID:  originalRunID,
 		AccountID:      consts.DevServerAccountID,
@@ -351,10 +353,21 @@ func (r *mutationResolver) Rerun(
 		WorkspaceID:    consts.DevServerEnvID,
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
+		// NOTE: Bypass rate limits for reruns, as the user explicitly expects this to trigger
+		PreventRateLimit: true,
 	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "rerun",
+			"status": executor.ScheduleStatus(err),
+		},
+	})
+
 	if err != nil {
 		return ulid.Zero, err
 	}
 
-	return identifier.ID.RunID, nil
+	return *newRunID, nil
 }

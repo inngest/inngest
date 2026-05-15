@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import {
@@ -21,15 +19,25 @@ export const ActionsMenu = (row: Row<EventType>) => {
   const { isArchived } = useEnvironment();
 
   const [isSendEventModalVisible, setIsSendEventModalVisible] = useState(false);
-  const [isArchiveEventModalVisible, setIsArchiveEventModalVisible] = useState(false);
+  const [isArchiveEventModalVisible, setIsArchiveEventModalVisible] =
+    useState(false);
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button kind="secondary" appearance="outlined" size="small" icon={<RiMoreFill />} />
+          <Button
+            kind="secondary"
+            appearance="outlined"
+            size="small"
+            icon={<RiMoreFill />}
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <OptionalTooltip tooltip={isArchived && 'Cannot send events. Environment is archived.'}>
+          <OptionalTooltip
+            tooltip={
+              isArchived && 'Cannot send events. Environment is archived.'
+            }
+          >
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
@@ -41,7 +49,9 @@ export const ActionsMenu = (row: Row<EventType>) => {
               Send test event
             </DropdownMenuItem>
           </OptionalTooltip>
-          <OptionalTooltip tooltip={row.original.archived && 'Send event to unarchive it.'}>
+          <OptionalTooltip
+            tooltip={row.original.archived && 'Send event to unarchive it.'}
+          >
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();

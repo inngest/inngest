@@ -1,14 +1,14 @@
 import { type ChartProps } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
 
 import { type TimeSeries } from '@/gql/graphql';
-import tailwindConfig from '../../../../tailwind.config';
-
-const {
-  theme: { textColor, colors, borderColor, backgroundColor },
-} = resolveConfig(tailwindConfig);
+import {
+  textColor,
+  colors,
+  borderColor,
+  backgroundColor,
+} from '@/utils/tailwind';
 
 type ChartPoint = {
   time: Date;
@@ -21,7 +21,7 @@ type ChartPoint = {
  */
 function transformChartData(
   data: TimeSeries['data'],
-  includedStepCountLimit: number = Infinity
+  includedStepCountLimit: number = Infinity,
 ): {
   categories: string[];
   includedValues: number[];
@@ -44,7 +44,10 @@ function transformChartData(
       additionalCount = 0;
       includedCount = pointCount;
     } else {
-      additionalCount = Math.min(pointCount, cumulativeCount - includedStepCountLimit);
+      additionalCount = Math.min(
+        pointCount,
+        cumulativeCount - includedStepCountLimit,
+      );
       includedCount = Math.max(0, pointCount - additionalCount);
     }
 
@@ -75,14 +78,14 @@ function transformChartData(
 export function createChartOptions(
   data: TimeSeries['data'],
   includedStepCountLimit: number = Infinity,
-  type: string
+  type: string,
 ): Partial<ChartProps['option']> {
   const dark = isDark();
 
   // Transform raw data
   const { categories, includedValues, additionalValues } = transformChartData(
     data,
-    includedStepCountLimit
+    includedStepCountLimit,
   );
 
   const datasetNames = {
@@ -105,7 +108,10 @@ export function createChartOptions(
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { fontSize: '12px', color: resolveColor(textColor.subtle, dark, '#4B4B4B') },
+      textStyle: {
+        fontSize: '12px',
+        color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
+      },
       data: [datasetNames.includedCount, datasetNames.additionalCount],
     },
     xAxis: {
@@ -114,10 +120,14 @@ export function createChartOptions(
       axisTick: {
         alignWithLabel: true,
         length: 2,
-        lineStyle: { color: resolveColor(borderColor.contrast, dark, '#242424') },
+        lineStyle: {
+          color: resolveColor(borderColor.contrast, dark, '#242424'),
+        },
       },
       axisLine: {
-        lineStyle: { color: resolveColor(borderColor.contrast, dark, '#242424') },
+        lineStyle: {
+          color: resolveColor(borderColor.contrast, dark, '#242424'),
+        },
       },
       axisLabel: {
         fontSize: 11,
@@ -128,7 +138,10 @@ export function createChartOptions(
         formatter: function (value: string) {
           const day = new Date(value).getUTCDate(); // Extract day in UTC
           const suffixes = ['th', 'st', 'nd', 'rd'];
-          const suffix = suffixes[day % 10 <= 3 && Math.floor(day / 10) !== 1 ? day % 10 : 0];
+          const suffix =
+            suffixes[
+              day % 10 <= 3 && Math.floor(day / 10) !== 1 ? day % 10 : 0
+            ];
           return `${day}${suffix}`;
         },
       },
@@ -164,7 +177,10 @@ export function createChartOptions(
         data: includedValues,
         type: 'bar',
         stack: 'usage',
-        itemStyle: { color: resolveColor(colors.secondary.moderate, dark, '#2389F1') },
+
+        itemStyle: {
+          color: resolveColor(colors.primary['moderate'], dark, '#2C9B63'),
+        },
         barWidth: '98%',
         barGap: '-98%',
       },
@@ -173,7 +189,9 @@ export function createChartOptions(
         data: additionalValues,
         type: 'bar',
         stack: 'usage',
-        itemStyle: { color: resolveColor(colors.accent.subtle, dark, '#EC9923') },
+        itemStyle: {
+          color: resolveColor(colors.primary['2xSubtle'], dark, '#C4EFD4'),
+        },
         barWidth: '98%',
         barGap: '-98%',
       },

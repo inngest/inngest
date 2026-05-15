@@ -1,0 +1,216 @@
+name: PR Prerelease
+
+on:
+  issue_comment:
+    types:
+      - created
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: prerelease-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  prerelease:
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workflow scripts
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+
+      - name: Build release helper
+        run: go build -o /tmp/release-notes ./tools/release-notes
+
+      - name: Parse prerelease command
+        id: command
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          printf '%s' "${COMMENT_BODY}" > /tmp/prerelease-comment.md
+          /tmp/release-notes prerelease-command \
+            --comment-file /tmp/prerelease-comment.md \
+            --output "$GITHUB_OUTPUT"
+
+      - name: Stop for unrelated comments
+        if: steps.command.outputs.matched != 'true'
+        run: echo "Comment is not a prerelease command"
+
+      - name: Verify commenter permission
+        if: steps.command.outputs.matched == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: |
+          permission="$(gh api "repos/${{ github.repository }}/collaborators/${COMMENTER}/permission" --jq '.permission')"
+          case "${permission}" in
+            admin|maintain|write)
+              echo "Commenter ${COMMENTER} has ${permission} permission"
+              ;;
+            *)
+              gh issue comment "${{ github.event.issue.number }}" --body "Prerelease request denied: @${COMMENTER} does not have maintainer permission."
+              exit 1
+              ;;
+          esac
+
+      - name: Load pull request
+        if: steps.command.outputs.matched == 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" > /tmp/prerelease-pr.json
+
+          head_repo="$(jq -r '.head.repo.full_name' /tmp/prerelease-pr.json)"
+          head_sha="$(jq -r '.head.sha' /tmp/prerelease-pr.json)"
+          head_ref="$(jq -r '.head.ref' /tmp/prerelease-pr.json)"
+
+          if [ "${head_repo}" != "${{ github.repository }}" ]; then
+            gh issue comment "${{ github.event.issue.number }}" --body "Prerelease request denied: publishing from forked PRs is not supported."
+            exit 1
+          fi
+
+          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+          echo "head_ref=${head_ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR head
+        if: steps.command.outputs.matched == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr.outputs.head_sha }}
+          persist-credentials: false
+
+      - name: Set up Go for PR head
+        if: steps.command.outputs.matched == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+
+      - name: Install pnpm for release snapshot
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.18.2
+
+      - name: Set up Docker Buildx for release snapshot
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run == 'true'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Compute stable base version
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.version == ''
+        id: stable-version
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4
+        with:
+          config: cliff.toml
+          args: --bumped-version
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Normalize stable base version
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.version == ''
+        id: normalized-stable-version
+        env:
+          RAW_VERSION: ${{ steps.stable-version.outputs.content }}
+        run: |
+          case "${RAW_VERSION}" in
+            v*) stable_version="${RAW_VERSION}" ;;
+            *) stable_version="v${RAW_VERSION}" ;;
+          esac
+
+          echo "version=${stable_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Select prerelease version
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.version == ''
+        id: selected-version
+        env:
+          CHANNEL: ${{ steps.command.outputs.channel }}
+          STABLE_VERSION: ${{ steps.normalized-stable-version.outputs.version }}
+        run: |
+          git fetch --tags origin
+          git tag --list "${STABLE_VERSION}-${CHANNEL}.*" > /tmp/existing-prerelease-tags
+
+          /tmp/release-notes prerelease-version \
+            --channel "${CHANNEL}" \
+            --stable-version "${STABLE_VERSION}" \
+            --existing-tags-file /tmp/existing-prerelease-tags \
+            --output "$GITHUB_OUTPUT"
+
+      - name: Export prerelease version
+        if: steps.command.outputs.matched == 'true'
+        id: prerelease-version
+        env:
+          EXPLICIT_VERSION: ${{ steps.command.outputs.version }}
+          SELECTED_VERSION: ${{ steps.selected-version.outputs.version }}
+        run: |
+          version="${EXPLICIT_VERSION:-${SELECTED_VERSION}}"
+          if [ -z "${version}" ]; then
+            echo "Unable to determine prerelease version"
+            exit 1
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release snapshot
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run == 'true'
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: "~> v2"
+          args: release --snapshot --skip=publish --clean --verbose
+
+      - name: Comment dry-run result
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PRERELEASE_VERSION: ${{ steps.prerelease-version.outputs.version }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" --body "Prerelease dry run passed for \`${HEAD_SHA}\` as \`${PRERELEASE_VERSION}\`."
+
+      - name: Create prerelease tag
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run != 'true'
+        env:
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PRERELEASE_VERSION: ${{ steps.prerelease-version.outputs.version }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "${RELEASE_TOKEN}" ]; then
+            echo "::error title=Missing RELEASE_TOKEN::Configure the release bot token as the RELEASE_TOKEN repository secret."
+            exit 1
+          fi
+
+          if ! printf '%s\n' "${HEAD_SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Prerelease head SHA output is invalid: ${HEAD_SHA}"
+            exit 1
+          fi
+
+          if ! printf '%s\n' "${PRERELEASE_VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$'; then
+            echo "Prerelease version output is invalid: ${PRERELEASE_VERSION}"
+            exit 1
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag "${PRERELEASE_VERSION}" "${HEAD_SHA}"
+          git remote set-url origin "https://x-access-token:${RELEASE_TOKEN}@github.com/${{ github.repository }}.git"
+          git push origin "${PRERELEASE_VERSION}"
+
+      - name: Comment publish result
+        if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PRERELEASE_VERSION: ${{ steps.prerelease-version.outputs.version }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" --body "Prerelease \`${PRERELEASE_VERSION}\` was tagged from \`${HEAD_SHA}\`. The release workflow will publish artifacts from that tag."

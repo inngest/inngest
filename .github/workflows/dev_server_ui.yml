@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - "ui/**"
+      - "pkg/coreapi/**/*.graphql"
   pull_request:
     paths:
       - "ui/**"
+      - "pkg/coreapi/**/*.graphql"
 
 jobs:
   build:
@@ -16,13 +18,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4.0.0
         with:
-          version: "8.15.8"
+          version: "10.18.2"
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install
         run: pnpm install --frozen-lockfile
         working-directory: ui/apps/dev-server-ui
-      - name: Type check
-        run: pnpm type-check
+      - name: Build
+        run: pnpm build
         working-directory: ui/apps/dev-server-ui

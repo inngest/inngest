@@ -7,7 +7,7 @@ type CalculatedStartTimeProps = {
   defaultTime?: string;
 };
 
-export const DEFAULT_TIME = '3d';
+export const DEFAULT_TIME = '1d';
 
 export const useCalculatedStartTime = ({
   lastDays,

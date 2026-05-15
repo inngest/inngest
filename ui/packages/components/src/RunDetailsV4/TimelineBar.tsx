@@ -1,0 +1,984 @@
+/**
+ * TimelineBar component - Composable timeline row visualization.
+ * Feature: 001-composable-timeline-bar
+ *
+ * This component renders a single row in the timeline with:
+ * - Left panel: name, optional icon, duration
+ * - Right panel: visual bar positioned by percentage
+ * - Optional expansion to show nested children
+ */
+
+import { memo, useMemo, useState, type CSSProperties } from 'react';
+import {
+  RiArrowRightFill,
+  RiArrowRightLine,
+  RiArrowRightSFill,
+  RiBuilding2Line,
+  RiCheckboxCircleFill,
+  RiCloseCircleFill,
+  RiFlashlightLine,
+  RiFlaskLine,
+  RiFunctionLine,
+  RiInformationLine,
+  RiMailLine,
+  RiSettings3Line,
+  RiStopCircleFill,
+  RiTimeLine,
+} from '@remixicon/react';
+import { format } from 'date-fns';
+
+import { formatVariantWeight } from '../Experiments/format';
+import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
+import { usePathCreator } from '../SharedContext/usePathCreator';
+import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
+import { cn } from '../utils/classNames';
+import type {
+  BarHeight,
+  BarIcon,
+  BarPattern,
+  BarSegment,
+  BarStyle,
+  BarStyleKey,
+  TimelineBarProps,
+  TimingDetail,
+} from './TimelineBar.types';
+import { formatDuration } from './runDetailsUtils';
+import { formatLabel } from './utils/formatting';
+import { TIMELINE_CONSTANTS } from './utils/timing';
+
+// ============================================================================
+// Style Configurations
+// ============================================================================
+
+/**
+ * Consolidated style configurations for all bar types.
+ * Each entry contains visual style, status-based coloring flag, icon, height, and pattern.
+ */
+export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
+  root: {
+    barColor: 'bg-status-completed',
+    barHeight: 'short',
+    statusBased: true,
+  },
+  'step.run': {
+    barColor: 'bg-status-completed',
+    statusBased: true,
+  },
+  'step.sleep': {
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
+  },
+  'step.waitForEvent': {
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
+  },
+  'step.invoke': {
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
+  },
+  'timing.inngest': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    durationColor: 'text-basis',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.queue': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.concurrency': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.discovery': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    outlined: true,
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.finalization': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    outlined: true,
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.server': {
+    barColor: 'bg-status-completed',
+    barHeight: 'tall',
+    durationColor: 'text-basis',
+    labelFormat: 'default',
+    pattern: 'barber-pole',
+    statusBased: true,
+    textColor: 'text-light',
+  },
+  'timing.connecting': {
+    barColor: 'bg-status-completed',
+    pattern: 'dotted',
+    labelFormat: 'uppercase',
+    barHeight: 'thin',
+    statusBased: true,
+  },
+  // HTTP timing phases (children of SERVER bar)
+  'timing.http.dns': {
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.tcp': {
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.tls': {
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.server': {
+    barColor: 'bg-status-completed',
+    barHeight: 'tall',
+    pattern: 'barber-pole',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'timing.http.transfer': {
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
+    labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  default: {
+    barColor: 'bg-surfaceMuted',
+    statusBased: true,
+  },
+};
+
+/**
+ * CSS pattern definitions for bar fills.
+ * Barber-pole uses semi-transparent white stripes to work on any background color.
+ */
+export const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
+  solid: {},
+  'barber-pole': {
+    backgroundImage: `repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 6px,
+      rgba(255, 255, 255, 0.15) 6px,
+      rgba(255, 255, 255, 0.15) 8px
+    )`,
+  },
+  'vertical-lines': {
+    WebkitMaskImage: `repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      black 3px,
+      black 5px
+    )`,
+    maskImage: `repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      black 3px,
+      black 5px
+    )`,
+  },
+  dotted: {
+    WebkitMaskImage: `repeating-linear-gradient(
+      90deg,
+      black 0px,
+      black 3px,
+      transparent 3px,
+      transparent 7px
+    )`,
+    maskImage: `repeating-linear-gradient(
+      90deg,
+      black 0px,
+      black 3px,
+      transparent 3px,
+      transparent 7px
+    )`,
+  },
+};
+
+/**
+ * Get the complete style configuration for a bar style key.
+ * Falls back to 'default' if the key is not found.
+ */
+function getBarStyle(styleKey: BarStyleKey): BarStyle {
+  return BAR_STYLES[styleKey];
+}
+
+/**
+ * Get the bar color class, using status-based coloring when appropriate.
+ */
+function getBarColor(styleKey: BarStyleKey, status?: string): string {
+  const barStyle = getBarStyle(styleKey);
+
+  if (status && barStyle.statusBased) {
+    return getStatusBackgroundClass(status);
+  }
+
+  return barStyle.barColor;
+}
+
+/**
+ * Get the icon for a root bar based on run status.
+ */
+function getRootIcon(styleKey: BarStyleKey, status?: string): BarIcon | undefined {
+  if (styleKey !== 'root') return undefined;
+  switch (status) {
+    case 'FAILED':
+      return 'close-circle';
+    case 'CANCELLED':
+      return 'stop-circle';
+    default:
+      return 'checkbox';
+  }
+}
+
+/**
+ * Get the CSS pattern for a bar pattern type.
+ */
+function getBarPattern(pattern?: BarPattern): CSSProperties {
+  return pattern ? BAR_PATTERNS[pattern] : BAR_PATTERNS.solid;
+}
+
+/**
+ * Transform bar positions based on view offsets (for zooming).
+ * Takes the original bar position and clips/scales it to the visible view window.
+ *
+ * @param startPercent - Original start position (0-100)
+ * @param widthPercent - Original width (0-100)
+ * @param viewStartOffset - Start of visible window (0-100, default 0)
+ * @param viewEndOffset - End of visible window (0-100, default 100)
+ * @returns Transformed start and width for the visible portion, or null if completely outside
+ */
+function transformBarPosition(
+  startPercent: number,
+  widthPercent: number,
+  viewStartOffset: number = 0,
+  viewEndOffset: number = 100
+): { startPercent: number; widthPercent: number } | null {
+  const barEnd = startPercent + widthPercent;
+  const viewWidth = viewEndOffset - viewStartOffset;
+
+  // If view width is 0 or negative, return null
+  if (viewWidth <= 0) return null;
+
+  // Check if bar is completely outside the view window
+  if (barEnd <= viewStartOffset || startPercent >= viewEndOffset) {
+    return null;
+  }
+
+  // Clip the bar to the view window
+  const clippedStart = Math.max(startPercent, viewStartOffset);
+  const clippedEnd = Math.min(barEnd, viewEndOffset);
+  const clippedWidth = clippedEnd - clippedStart;
+
+  // Transform to the 0-100 scale of the visible window
+  const transformedStart = ((clippedStart - viewStartOffset) / viewWidth) * 100;
+  const transformedWidth = (clippedWidth / viewWidth) * 100;
+
+  return {
+    startPercent: transformedStart,
+    widthPercent: transformedWidth,
+  };
+}
+
+// ============================================================================
+// Icon Mapping
+// ============================================================================
+
+const ICON_MAP: Record<BarIcon, React.ComponentType<{ className?: string }>> = {
+  gear: RiSettings3Line,
+  building: RiBuilding2Line,
+  lightning: RiFlashlightLine,
+  function: RiFunctionLine,
+  clock: RiTimeLine,
+  mail: RiMailLine,
+  arrow: RiArrowRightLine,
+  checkbox: RiCheckboxCircleFill,
+  'close-circle': RiCloseCircleFill,
+  'stop-circle': RiStopCircleFill,
+  experiment: RiFlaskLine,
+  none: () => null,
+};
+
+/** Icons that should derive their color from run status */
+const STATUS_ICONS = new Set<BarIcon>(['checkbox', 'close-circle', 'stop-circle']);
+
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+/**
+ * Renders the icon for a bar based on style or explicit prop.
+ */
+function BarIconComponent({
+  icon,
+  className,
+  status,
+}: {
+  icon?: BarIcon;
+  className?: string;
+  status?: string;
+}) {
+  if (!icon || icon === 'none') return null;
+  const IconComponent = ICON_MAP[icon];
+  // Status icons (checkbox, close-circle, stop-circle) derive color from run status
+  const statusColor = STATUS_ICONS.has(icon) && status ? getStatusTextClass(status) : undefined;
+  return IconComponent ? (
+    <IconComponent
+      className={cn('h-3.5 w-3.5 shrink-0', className, statusColor)}
+      data-testid="bar-icon"
+    />
+  ) : null;
+}
+
+/**
+ * Renders the expand/collapse toggle button as a solid triangle.
+ */
+function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?: () => void }) {
+  return (
+    <div
+      role={expanded ? 'button' : undefined}
+      aria-label={expanded ? 'Collapse' : 'Expand'}
+      className={cn('flex items-center justify-center p-0', expanded && 'cursor-pointer')}
+      onClick={
+        expanded
+          ? (e) => {
+              e.stopPropagation();
+              onCollapse?.();
+            }
+          : undefined
+      }
+    >
+      <RiArrowRightSFill
+        className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')}
+        style={{ transitionDuration: `${TIMELINE_CONSTANTS.TRANSITION_MS}ms` }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Hover card content for a timeline bar, showing duration/delay and start/end timestamps.
+ */
+function BarHoverCardContent({
+  name,
+  startTime,
+  endTime,
+  delayMs,
+  timingDetails,
+  styleLabel,
+}: {
+  name: string;
+  startTime: Date;
+  endTime: Date | null;
+  delayMs?: number;
+  timingDetails?: TimingDetail[];
+  styleLabel?: string;
+}) {
+  const startTimestamp = format(startTime, 'yyyy-MM-dd HH:mm:ss.SSS');
+  const endTimestamp = endTime ? format(endTime, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
+
+  const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
+  const hasDetails = timingDetails && timingDetails.length > 0;
+
+  return (
+    <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+      <p className="text-basis mb-1.5 font-medium">{name}</p>
+      {styleLabel && <p className="text-light mb-1.5 font-mono text-[11px]">{styleLabel}</p>}
+      <div className="flex flex-col gap-1">
+        <div
+          className={cn(
+            'flex flex-col gap-1',
+            (hasDetails || delayMs != null) && 'border-subtle border-b pb-1.5'
+          )}
+        >
+          <div className="flex justify-between gap-6">
+            <span className="text-light font-mono uppercase">Duration</span>
+            <span className="text-basis tabular-nums">
+              {durationMs > 0 ? formatDuration(durationMs) : '-'}
+            </span>
+          </div>
+          {delayMs != null && (
+            <div className="flex justify-between gap-6">
+              <span className="text-light font-mono uppercase">Delay</span>
+              <span className="text-basis tabular-nums">
+                {delayMs > 0 ? formatDuration(delayMs) : '-'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {hasDetails && (
+          <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
+            {timingDetails.map((detail) => (
+              <div key={detail.label} className="flex justify-between gap-6">
+                <span className="text-light font-mono uppercase">{detail.label}</span>
+                <span className="text-basis tabular-nums">
+                  {detail.durationMs > 0 ? formatDuration(detail.durationMs) : '-'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div
+          className={cn(!hasDetails && delayMs == null && 'mt-0.5', 'flex justify-between gap-6')}
+        >
+          <span className="text-light font-mono uppercase">Start</span>
+          <span className="text-basis tabular-nums">{startTimestamp}</span>
+        </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-light font-mono uppercase">End</span>
+          {endTimestamp !== null ? (
+            <span className="text-basis tabular-nums">{endTimestamp}</span>
+          ) : (
+            <span className="text-light italic">In progress</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Experiment badge shown beside a step that ran under an experiment. Renders
+ * the flask icon in the standard IconTile treatment (subtle bg + border, thin
+ * rounded) with a hover card, and links to the experiment page when a
+ * `pathCreator.experiment` is provided by the host app (cloud dashboard).
+ */
+function ExperimentBadge({ metadata }: { metadata?: TimelineBarProps['experimentMetadata'] }) {
+  const { pathCreator } = usePathCreator();
+  const href =
+    pathCreator.experiment && metadata?.experimentName && metadata?.functionSlug
+      ? pathCreator.experiment({
+          experimentName: metadata.experimentName,
+          functionSlug: metadata.functionSlug,
+        })
+      : null;
+
+  const badgeClass =
+    'bg-canvasSubtle border-subtle text-subtle hover:bg-canvasMuted inline-flex h-5 w-5 items-center justify-center rounded border transition-colors';
+
+  const badge = <RiFlaskLine className="h-3 w-3" />;
+
+  return (
+    <HoverCardRoot openDelay={200} closeDelay={0}>
+      <HoverCardTrigger asChild>
+        {href ? (
+          <a
+            href={href}
+            className={badgeClass}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {badge}
+          </a>
+        ) : (
+          <span
+            className={badgeClass}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {badge}
+          </span>
+        )}
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" className="border-muted max-w-none border">
+        <ExperimentHoverCardContent metadata={metadata} />
+      </HoverCardContent>
+    </HoverCardRoot>
+  );
+}
+
+/**
+ * Hover card content for the experiment badge, showing experiment name and variant weights.
+ * The selected variant is shown bold above the divider; other variants are shown lighter below.
+ */
+function ExperimentHoverCardContent({
+  metadata,
+}: {
+  metadata?: TimelineBarProps['experimentMetadata'];
+}) {
+  if (!metadata) {
+    return (
+      <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+        <p className="text-light">No experiment data</p>
+      </div>
+    );
+  }
+
+  const { experimentName, variantSelected, variantWeights } = metadata;
+  const availableVariants = metadata.availableVariants ?? [];
+
+  // Separate selected variant from the rest
+  const otherVariants = availableVariants.filter((v) => v !== variantSelected);
+
+  return (
+    <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+      <p className="text-light mb-0.5">Experiment name</p>
+      <p className="text-basis mb-2 font-medium">{experimentName}</p>
+
+      {(availableVariants.length > 0 || variantSelected) && (
+        <div>
+          {/* Header row */}
+          <div className="border-subtle flex justify-between gap-6 border-b pb-1">
+            <span className="text-light">Variant</span>
+            {variantWeights && <span className="text-light">Weight</span>}
+          </div>
+
+          {/* Selected variant — bold, above the darker divider */}
+          <div className="border-muted flex items-center justify-between gap-6 border-b py-1">
+            <span className="text-basis flex items-center gap-1 font-medium">
+              <RiArrowRightFill className="text-basis h-3 w-3 shrink-0" />
+              {variantSelected}
+            </span>
+            {variantWeights && variantWeights[variantSelected] != null && (
+              <span className="text-basis font-medium tabular-nums">
+                {formatVariantWeight(variantWeights[variantSelected]!)}
+              </span>
+            )}
+          </div>
+
+          {/* Other variants — lighter */}
+          {otherVariants.map((variant) => (
+            <div
+              key={variant}
+              className="border-subtle flex items-center justify-between gap-6 border-b py-1 last:border-b-0"
+            >
+              <span className="text-light ml-4">{variant}</span>
+              {variantWeights && variantWeights[variant] != null && (
+                <span className="text-light tabular-nums">
+                  {formatVariantWeight(variantWeights[variant]!)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
+
+/**
+ * Renders the visual bar in the right panel.
+ * For compound bars with segments, each segment is independently transformed
+ * based on view offsets to only show the visible portion.
+ */
+const VisualBar = memo(function VisualBar({
+  startPercent,
+  widthPercent,
+  style,
+  segments,
+  originalBarStart,
+  originalBarWidth,
+  viewStartOffset = 0,
+  viewEndOffset = 100,
+  status,
+  expanded,
+}: {
+  startPercent: number;
+  widthPercent: number;
+  style: TimelineBarProps['style'];
+  segments?: BarSegment[];
+  /** Original bar start before transform (for segment calculation) */
+  originalBarStart?: number;
+  /** Original bar width before transform (for segment calculation) */
+  originalBarWidth?: number;
+  /** View start offset for segment filtering */
+  viewStartOffset?: number;
+  /** View end offset for segment filtering */
+  viewEndOffset?: number;
+  /** Run status for status-based coloring */
+  status?: string;
+  /** Whether the parent row is expanded */
+  expanded?: boolean;
+}) {
+  const barStyle = getBarStyle(style);
+  const pattern = getBarPattern(barStyle.pattern);
+  const heightClass = BAR_HEIGHT_CLASSES[barStyle.barHeight ?? 'tall'];
+  const barColor = getBarColor(style, status);
+
+  // Memoize segment transformation to avoid recalculating on every render
+  const transformedSegments = useMemo(() => {
+    if (!segments || segments.length === 0) return [];
+
+    return segments
+      .map((segment) => {
+        // Convert segment position from bar-relative to timeline-absolute
+        const barStart = originalBarStart ?? 0;
+        const barWidth = originalBarWidth ?? 100;
+        const segmentAbsoluteStart = barStart + (segment.startPercent / 100) * barWidth;
+        const segmentAbsoluteWidth = (segment.widthPercent / 100) * barWidth;
+
+        // Transform to view coordinates
+        const transformed = transformBarPosition(
+          segmentAbsoluteStart,
+          segmentAbsoluteWidth,
+          viewStartOffset,
+          viewEndOffset
+        );
+
+        if (!transformed) return null;
+
+        return {
+          ...segment,
+          transformedStart: transformed.startPercent,
+          transformedWidth: transformed.widthPercent,
+        };
+      })
+      .filter(Boolean);
+  }, [segments, originalBarStart, originalBarWidth, viewStartOffset, viewEndOffset]);
+
+  // Render compound bar with segments if provided
+  if (segments && segments.length > 0) {
+    // If no segments are visible, don't render the container
+    if (transformedSegments.length === 0) return null;
+
+    return (
+      <div
+        data-testid="timeline-bar-visual"
+        className="absolute h-full"
+        style={{
+          left: '0%',
+          width: '100%',
+          opacity: expanded ? 0 : 1,
+        }}
+      >
+        {transformedSegments.map((segment) => {
+          if (!segment) return null;
+          const segmentStyle = getBarStyle(segment.style);
+          const segmentPattern = getBarPattern(segmentStyle.pattern);
+          const segmentHeightClass = BAR_HEIGHT_CLASSES[segmentStyle.barHeight ?? 'tall'];
+          const segmentColor = getBarColor(segment.style, segment.status);
+          const isOutlined = segmentStyle.outlined;
+          return (
+            <div
+              key={segment.id}
+              className={cn(
+                'absolute top-1/2 -translate-y-1/2',
+                segmentHeightClass,
+                isOutlined ? 'bg-canvasBase' : segmentColor
+              )}
+              style={{
+                left: `${segment.transformedStart}%`,
+                width: `${segment.transformedWidth}%`,
+                minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
+                ...(isOutlined
+                  ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+                  : segmentPattern),
+              }}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Render simple bar
+  const isOutlined = barStyle.outlined;
+  return (
+    <div
+      data-testid="timeline-bar-visual"
+      className={cn(
+        'absolute top-1/2 -translate-y-1/2',
+        heightClass,
+        isOutlined ? 'bg-canvasBase' : barColor
+      )}
+      style={{
+        left: `${startPercent}%`,
+        width: `${widthPercent}%`,
+        minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
+        opacity: expanded ? 0 : 1,
+        ...(isOutlined
+          ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+          : pattern),
+      }}
+    />
+  );
+});
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+/**
+ * TimelineBar component renders a single row in the timeline visualization.
+ *
+ * Features:
+ * - Configurable positioning via startPercent/widthPercent
+ * - Style-based visual appearance
+ * - Optional expand/collapse for nested children
+ * - Optional icon display
+ * - Depth-based indentation
+ * - Selection highlighting
+ */
+export function TimelineBar({
+  name,
+  duration,
+  icon,
+  startPercent,
+  widthPercent,
+  depth,
+  leftWidth,
+  style,
+  segments,
+  expandable,
+  expanded,
+  onToggle,
+  onClick,
+  selected,
+  children,
+  orgName,
+  status,
+  viewStartOffset = 0,
+  viewEndOffset = 100,
+  startTime,
+  endTime,
+  delayMs,
+  actions,
+  timingDetails,
+  styleLabel,
+  hasExperiment,
+  insideExperiment,
+  experimentMetadata,
+}: TimelineBarProps): JSX.Element {
+  const showExperimentBackground = hasExperiment || insideExperiment;
+  const barStyle = getBarStyle(style);
+  const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
+
+  // Format the display name based on style
+  let displayName = name;
+  if (barStyle.labelFormat) {
+    displayName = formatLabel(name, barStyle.labelFormat);
+  }
+
+  // For SERVER timing, show org name or fallback
+  if (style === 'timing.server') {
+    displayName = orgName ? `${orgName} server` : 'Your server';
+  }
+
+  // Calculate indentation (base padding + depth-based indent)
+  const indentPx =
+    TIMELINE_CONSTANTS.BASE_LEFT_PADDING_PX + depth * TIMELINE_CONSTANTS.INDENT_WIDTH_PX;
+
+  // Transform bar position based on view offsets
+  const transformed = useMemo(
+    () => transformBarPosition(startPercent, widthPercent, viewStartOffset, viewEndOffset),
+    [startPercent, widthPercent, viewStartOffset, viewEndOffset]
+  );
+
+  // Hover card state — controlled so hover target (full right panel) is separate from anchor (bar position)
+  const showHoverCard = !!startTime;
+  const [hoverCardOpen, setHoverCardOpen] = useState(false);
+
+  return (
+    <div data-testid="timeline-bar-container" className="relative">
+      {/* Main row */}
+      <div
+        data-testid="timeline-bar-row"
+        className="relative isolate flex h-7 cursor-pointer items-center"
+        onClick={() => {
+          onClick?.();
+          if (expandable) {
+            onToggle?.();
+          }
+        }}
+        style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
+      >
+        {/* Selection / hover highlight - extends from indent to full width */}
+        {(selected || hoverCardOpen) && (
+          <div
+            className={cn(
+              'pointer-events-none absolute inset-y-0 right-0 -z-10',
+              selected ? 'bg-secondary-3xSubtle' : 'bg-canvasSubtle'
+            )}
+            style={{
+              left: `${indentPx - 24}px`,
+            }}
+          />
+        )}
+        {/* Left panel - name, icon, controls */}
+        <div
+          data-testid="timeline-bar-left"
+          className="relative flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-2"
+          style={{
+            width: `${leftWidth}%`,
+            paddingLeft: `${indentPx}px`,
+          }}
+        >
+          {/* Expand toggle - absolutely positioned to sit on the parent's vertical line */}
+          {expandable && (
+            <div
+              className="absolute flex items-center justify-center"
+              style={{ left: `${indentPx - 20}px` }}
+            >
+              <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />
+            </div>
+          )}
+
+          {/* Icon */}
+          <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
+
+          {/* Name + actions wrapper */}
+          <div className="flex min-w-0 flex-1 items-center">
+            {/* Name */}
+            <span
+              className={cn(
+                'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
+                barStyle.textColor ?? 'text-basis',
+                !effectiveIcon && 'pl-1.5'
+              )}
+            >
+              {displayName}
+              {(style === 'timing.inngest' || style === 'timing.server') && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className=" ml-1 inline-flex shrink-0 cursor-help align-middle"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <RiInformationLine className="text-light h-3.5 w-3.5" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className=" max-w-xs text-xs shadow-lg">
+                    {style === 'timing.inngest'
+                      ? 'Time spent on queue delays, concurrency limits, processing delays, and related overhead'
+                      : 'Time spent on your server executing the function'}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </span>
+
+            {/* Actions slot */}
+            {actions}
+          </div>
+
+          {/* Duration */}
+          <span
+            className={cn(
+              'shrink-0 text-xs font-medium tabular-nums',
+              barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+            )}
+          >
+            {formatDuration(duration)}
+          </span>
+        </div>
+
+        {/* Experiment badge - centered between left panel and bars */}
+        <span className="inline-flex w-7 shrink-0 items-center justify-center">
+          {hasExperiment && <ExperimentBadge metadata={experimentMetadata} />}
+        </span>
+
+        {/* Right panel - visual bar with optional hover card */}
+        <div
+          data-testid="timeline-bar-right"
+          className="relative h-full flex-1"
+          style={{ width: `${100 - leftWidth}%` }}
+          onMouseEnter={showHoverCard ? () => setHoverCardOpen(true) : undefined}
+          onMouseLeave={showHoverCard ? () => setHoverCardOpen(false) : undefined}
+        >
+          {/* Center line */}
+          <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
+
+          {/* Dotted background pattern for experiment steps and their children */}
+          {showExperimentBackground && (
+            <div
+              className="bg-canvasSubtle pointer-events-none absolute inset-0"
+              style={{
+                backgroundImage:
+                  'radial-gradient(circle, rgb(var(--color-border-muted)) 1px, transparent 1px)',
+                backgroundSize: '7px 7px',
+              }}
+            />
+          )}
+
+          {/* Bar container, centered vertically */}
+          <div className="absolute inset-y-0 flex w-full items-center">
+            {transformed && (
+              <>
+                <VisualBar
+                  startPercent={transformed.startPercent}
+                  widthPercent={transformed.widthPercent}
+                  style={style}
+                  segments={segments}
+                  originalBarStart={startPercent}
+                  originalBarWidth={widthPercent}
+                  viewStartOffset={viewStartOffset}
+                  viewEndOffset={viewEndOffset}
+                  status={status}
+                  expanded={expandable && expanded}
+                />
+                {showHoverCard && (
+                  <HoverCardRoot open={hoverCardOpen} closeDelay={0}>
+                    <HoverCardTrigger asChild>
+                      <div
+                        className="pointer-events-none absolute inset-y-0"
+                        style={{
+                          left: `${transformed.startPercent}%`,
+                          width: `${transformed.widthPercent}%`,
+                          minWidth: '4px',
+                        }}
+                      />
+                    </HoverCardTrigger>
+                    <HoverCardContent side="top" className="border-muted max-w-none border">
+                      <BarHoverCardContent
+                        name={displayName}
+                        startTime={startTime!}
+                        endTime={endTime ?? null}
+                        delayMs={delayMs}
+                        timingDetails={timingDetails}
+                        styleLabel={styleLabel}
+                      />
+                    </HoverCardContent>
+                  </HoverCardRoot>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Vertical guide line from arrow to bottom of expanded area */}
+      {expanded && (
+        <div
+          className="bg-canvasMuted absolute w-px"
+          style={{
+            left: `${indentPx + 8}px`,
+            top: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px`,
+            bottom: 0,
+          }}
+        />
+      )}
+
+      {/* Children (expanded content) */}
+      {expanded && children}
+    </div>
+  );
+}

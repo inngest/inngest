@@ -98,7 +98,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 			name: "concurrency, no plan limit (i.e. dev-server)",
 			fn: mergeWithDefaultFunction(&inngest.Function{
 				Concurrency: &inngest.ConcurrencyLimits{
-					Limits: []inngest.Concurrency{
+					Limits: []inngest.StepConcurrency{
 						{
 							Scope: enums.ConcurrencyScopeAccount,
 							Limit: 20,
@@ -138,7 +138,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 			name: "concurrency, with plan limit (i.e. cloud)",
 			fn: mergeWithDefaultFunction(&inngest.Function{
 				Concurrency: &inngest.ConcurrencyLimits{
-					Limits: []inngest.Concurrency{
+					Limits: []inngest.StepConcurrency{
 						{
 							Scope: enums.ConcurrencyScopeAccount,
 							Limit: 20,
@@ -284,7 +284,6 @@ func mergeWithDefaultFunction(overlay *inngest.Function) *inngest.Function {
 		return nil
 	}
 	return base
-
 }
 
 func mergeWithDefaultFunctionConfiguration(overlay *FunctionConfiguration) *FunctionConfiguration {

@@ -1,6 +1,6 @@
 # Inngest Dashboard
 
-This is the web application for Inngest Cloud. It’s a Next.js app that uses GraphQL to communicate
+This is the web application for Inngest Cloud. It’s a Tanstack Start app that uses GraphQL to communicate
 with the [Inngest Cloud "App API"](https://github.com/inngest/monorepo). The app is hosted on Vercel and is the
 primary way to interact with Inngest Cloud.
 
@@ -11,8 +11,8 @@ Before being able to run the app for the first time, you need to follow the step
 ### Prerequisites
 
 - Set up the [Cloud monorepo](https://github.com/inngest/monorepo) and have all backend services running locally
-- [Node.js 18](https://nodejs.org/en/download/)
-- Join the company's Vercel account
+- [Node.js](https://nodejs.org/en/download/)
+- Install 1Password Desktop App
 
 ### Instructions
 
@@ -21,9 +21,7 @@ Before being able to run the app for the first time, you need to follow the step
    [Corepack](https://nodejs.org/docs/latest-v18.x/api/corepack.html) by running
    `corepack enable; corepack prepare`
 3. Install dependencies by running `pnpm install`
-4. Link local project to our `ui` Vercel project by running `pnpm vercel link -p ui`
-   - Make sure the command prints out `Linked to inngest/ui` and not a `ui` project in your personal scope
-5. Download environment variables by running `pnpm env:pull`
+4. Setup local environment variables following [this guide](https://www.notion.so/inngest/Setup-env-local-for-development-351b64753bbd8068bceed9825558ec33?source=copy_link)
 
 ## Developing
 
@@ -39,7 +37,7 @@ $ pnpm dev
 
 This will start a local server that will automatically rebuild the app and refresh the page when you
 make changes to the code. The app will be available at
-[http://localhost:3000](http://localhost:3000).
+[http://localhost:5173](http://localhost:5173).
 
 This is how you will run the app most of the time.
 
@@ -84,32 +82,6 @@ Staged files are automatically formatted when committing.
 
 We recommend using an [editor integration for Prettier](https://prettier.io/docs/en/editors.html).
 
-### Environment Variables
-
-Environment variables are managed with the [Vercel CLI](https://vercel.com/docs/cli/env). Use the
-following commands to manage them:
-
-```sh
-# Link the project on Vercel
-$ pnpm vercel link -p ui # and follow the steps
-
-# Download development environment variables for running the app locally
-$ pnpm env:pull
-
-# Add a new environment variable
-$ pnpm env:add
-
-# Remove an environment variable
-$ pnpm env:rm
-```
-
-Check the [Vercel documentation](https://vercel.com/docs/concepts/projects/environment-variables)
-for more information.
-
-You should **never commit environment variables** to the repository. If you need to add a new
-environment variable, add it with the `pnpm env:add` command and then download it with the
-`pnpm env:pull` command.
-
 ### Sign In
 
 Once you've run `make test-events` in the [Backend Monorepo](https://github.com/inngest/monorepo),
@@ -126,20 +98,20 @@ you can sign in using these credentials:
 
 ```javascript
 // Good
-const environmentID = '';
+const environmentID = "";
 
 // Bad
-const environmentId = '';
+const environmentId = "";
 ```
 
 - Naming (for both copy and code) should follow our [Product nomenclature](https://www.notion.so/inngest/Nomenclature-Taxonomy-aba427349a724183b90784f0b80d5a35).
 
 ```javascript
 // Good - terminology we use for external comms
-const environment = '';
+const environment = "";
 
 // Bad - deprecated terminology
-const workspace = '';
+const workspace = "";
 ```
 
 ### Language and Copy Conventions

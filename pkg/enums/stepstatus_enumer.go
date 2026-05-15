@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _StepStatusName = "UnknownScheduledRunningWaitingSleepingInvokingCompletedFailedErroredCancelledTimedOut"
+const _StepStatusName = "UnknownScheduledRunningWaitingSleepingInvokingCompletedFailedErroredCancelledTimedOutSkippedQueued"
 
-var _StepStatusIndex = [...]uint8{0, 7, 16, 23, 30, 38, 46, 55, 61, 68, 77, 85}
+var _StepStatusIndex = [...]uint8{0, 7, 16, 23, 30, 38, 46, 55, 61, 68, 77, 85, 92, 98}
 
-const _StepStatusLowerName = "unknownscheduledrunningwaitingsleepinginvokingcompletedfailederroredcancelledtimedout"
+const _StepStatusLowerName = "unknownscheduledrunningwaitingsleepinginvokingcompletedfailederroredcancelledtimedoutskippedqueued"
 
 func (i StepStatus) String() string {
 	if i < 0 || i >= StepStatus(len(_StepStatusIndex)-1) {
@@ -38,9 +38,11 @@ func _StepStatusNoOp() {
 	_ = x[StepStatusErrored-(8)]
 	_ = x[StepStatusCancelled-(9)]
 	_ = x[StepStatusTimedOut-(10)]
+	_ = x[StepStatusSkipped-(11)]
+	_ = x[StepStatusQueued-(12)]
 }
 
-var _StepStatusValues = []StepStatus{StepStatusUnknown, StepStatusScheduled, StepStatusRunning, StepStatusWaiting, StepStatusSleeping, StepStatusInvoking, StepStatusCompleted, StepStatusFailed, StepStatusErrored, StepStatusCancelled, StepStatusTimedOut}
+var _StepStatusValues = []StepStatus{StepStatusUnknown, StepStatusScheduled, StepStatusRunning, StepStatusWaiting, StepStatusSleeping, StepStatusInvoking, StepStatusCompleted, StepStatusFailed, StepStatusErrored, StepStatusCancelled, StepStatusTimedOut, StepStatusSkipped, StepStatusQueued}
 
 var _StepStatusNameToValueMap = map[string]StepStatus{
 	_StepStatusName[0:7]:        StepStatusUnknown,
@@ -65,6 +67,10 @@ var _StepStatusNameToValueMap = map[string]StepStatus{
 	_StepStatusLowerName[68:77]: StepStatusCancelled,
 	_StepStatusName[77:85]:      StepStatusTimedOut,
 	_StepStatusLowerName[77:85]: StepStatusTimedOut,
+	_StepStatusName[85:92]:      StepStatusSkipped,
+	_StepStatusLowerName[85:92]: StepStatusSkipped,
+	_StepStatusName[92:98]:      StepStatusQueued,
+	_StepStatusLowerName[92:98]: StepStatusQueued,
 }
 
 var _StepStatusNames = []string{
@@ -79,6 +85,8 @@ var _StepStatusNames = []string{
 	_StepStatusName[61:68],
 	_StepStatusName[68:77],
 	_StepStatusName[77:85],
+	_StepStatusName[85:92],
+	_StepStatusName[92:98],
 }
 
 // StepStatusString retrieves an enum value from the enum constants string name.

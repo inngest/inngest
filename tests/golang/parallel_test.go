@@ -31,9 +31,9 @@ func TestParallelSteps(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngestgo.ConfigStepConcurrency{
+		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
-		}},
+		}}},
 		inngestgo.EventTrigger("test/parallel", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -143,16 +143,14 @@ func TestParallelCoalesce(t *testing.T) {
 		stepB1Counter      int32
 		stepB2Counter      int32
 		stepAfterCounter   int32
-		runID              string
 	)
+	rid := NewRunID()
 	_, err := inngestgo.CreateFunction(
 		ic,
 		inngestgo.FunctionOpts{ID: "fn"},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			if runID == "" {
-				runID = input.InputCtx.RunID
-			}
+			rid.Send(input.InputCtx.RunID)
 
 			res := group.Parallel(ctx,
 				func(ctx context.Context) (any, error) {
@@ -229,7 +227,7 @@ func TestParallelCoalesce(t *testing.T) {
 	_, err = ic.Send(ctx, inngestgo.Event{Name: eventName})
 	r.NoError(err)
 
-	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t))
 	r.Equal(int32(1), stepA1Counter)
 	r.Equal(int32(1), stepA2Counter)
 	r.Equal(int32(1), stepA3Counter)
@@ -253,17 +251,15 @@ func TestParallelSequential(t *testing.T) {
 		counterA2 int32
 		counterB1 int32
 		counterB2 int32
-		runID     string
 		stepOrder []string
 	)
+	rid := NewRunID()
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			if runID == "" {
-				runID = input.InputCtx.RunID
-			}
+			rid.Send(input.InputCtx.RunID)
 
 			res := group.Parallel(ctx,
 				func(ctx context.Context) (any, error) {
@@ -314,7 +310,7 @@ func TestParallelSequential(t *testing.T) {
 	_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 	r.NoError(err)
 
-	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+	c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t), client.WaitForRunStatusOpts{
 		Timeout: 20 * time.Second,
 	})
 	r.Equal(int32(1), atomic.LoadInt32(&counterA1))
@@ -323,8 +319,13 @@ func TestParallelSequential(t *testing.T) {
 	r.Equal(int32(1), atomic.LoadInt32(&counterB2))
 
 	// a2 completes after b1 because "optimized parallelism" doesn't continue
-	// until all parallel steps end
-	r.Equal([]string{"a1", "b1", "a2", "b2", "end"}, stepOrder)
+	// until all parallel steps end.  The trailing "end" evaluation can replay
+	// during discovery, so only the step ordering itself is stable.
+	r.GreaterOrEqual(len(stepOrder), 5)
+	r.Equal([]string{"a1", "b1", "a2", "b2"}, stepOrder[:4])
+	for _, item := range stepOrder[4:] {
+		r.Equal("end", item)
+	}
 }
 
 func TestParallelDisabledOptimization(t *testing.T) {
@@ -348,17 +349,15 @@ func TestParallelDisabledOptimization(t *testing.T) {
 			counterA2 int32
 			counterB1 int32
 			counterB2 int32
-			runID     string
 			stepOrder []string
 		)
+		rid := NewRunID()
 		_, err := inngestgo.CreateFunction(
 			inngestClient,
 			inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				if runID == "" {
-					runID = input.InputCtx.RunID
-				}
+				rid.Send(input.InputCtx.RunID)
 
 				res := group.ParallelWithOpts(ctx,
 					group.ParallelOpts{ParallelMode: enums.ParallelModeRace},
@@ -410,7 +409,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 		r.NoError(err)
 
-		c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+		c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t), client.WaitForRunStatusOpts{
 			Timeout: 20 * time.Second,
 		})
 		r.Equal(int32(1), atomic.LoadInt32(&counterA1))
@@ -419,8 +418,9 @@ func TestParallelDisabledOptimization(t *testing.T) {
 		r.Equal(int32(1), atomic.LoadInt32(&counterB2))
 
 		// Steps are in logical order because disabling optimized parallelism causes
-		// the parallel groups to race
-		r.Equal([]string{"a1", "a2", "b1", "b2", "end"}, stepOrder)
+		// the parallel groups to race.  This also schedules another "end" lookup,
+		// as each parallel function schedules another job.
+		r.Equal([]string{"a1", "a2", "b1", "b2", "end", "end"}, stepOrder)
 	})
 
 	t.Run("all step kinds", func(t *testing.T) {
@@ -454,17 +454,15 @@ func TestParallelDisabledOptimization(t *testing.T) {
 				var (
 					counterRequest int32
 					counterRun     int32
-					runID          string
 				)
+				rid := NewRunID()
 				_, err := inngestgo.CreateFunction(
 					inngestClient,
 					inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
 					inngestgo.EventTrigger(eventName, nil),
 					func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 						atomic.AddInt32(&counterRequest, 1)
-						if runID == "" {
-							runID = input.InputCtx.RunID
-						}
+						rid.Send(input.InputCtx.RunID)
 
 						res := group.ParallelWithOpts(ctx,
 							group.ParallelOpts{ParallelMode: tc.parallelMode},
@@ -516,7 +514,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 				_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 				r.NoError(err)
 
-				c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+				c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t), client.WaitForRunStatusOpts{
 					Timeout: 20 * time.Second,
 				})
 				r.Equal(tc.expRequestCount, atomic.LoadInt32(&counterRequest))
@@ -545,10 +543,8 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
 	defer server.Close()
 
-	var (
-		counter int32
-		runID   string
-	)
+	var counter int32
+	rid := NewRunID()
 	eventName := randomSuffix("event")
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -558,9 +554,7 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 		},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			if runID == "" {
-				runID = input.InputCtx.RunID
-			}
+			rid.Send(input.InputCtx.RunID)
 
 			// Need 2 waits (each with a different timeout) to replicate the bug
 			waitTimeouts := []time.Duration{
@@ -610,9 +604,102 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 
 	_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 	r.NoError(err)
-	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+	c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t), client.WaitForRunStatusOpts{
 		Timeout: 10 * time.Second,
 	})
 
 	r.Equal(1, int(atomic.LoadInt32(&counter)))
+}
+
+func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
+	ctx := context.Background()
+	c := client.New(t)
+
+	testID := fmt.Sprintf("parallel-fail-%d", time.Now().UnixNano())
+	inngestClient, server, registerFuncs := NewSDKHandler(t, testID)
+	defer server.Close()
+
+	failureCount := int32(0)
+	runID := ""
+
+	functionID := fmt.Sprintf("parallel-fail-test-%d", time.Now().UnixNano())
+	eventName := fmt.Sprintf("test/parallel-fail-%d", time.Now().UnixNano())
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:      functionID,
+			Retries: inngestgo.Ptr(0),
+		},
+		inngestgo.EventTrigger(eventName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+
+			res := group.Parallel(ctx,
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "step-a", func(ctx context.Context) (any, error) {
+						return nil, fmt.Errorf("step a failed")
+					})
+				},
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "step-b", func(ctx context.Context) (any, error) {
+						return nil, fmt.Errorf("step b failed")
+					})
+				},
+			)
+
+			// Check if any parallel step failed and propagate error to trigger onFailure
+			if err := res.AnyError(); err != nil {
+				return nil, err
+			}
+
+			return res, nil
+		},
+	)
+	require.NoError(t, err)
+
+	// onFailure equivalent function
+	handlerID := fmt.Sprintf("handle-parallel-failures-%d", time.Now().UnixNano())
+	expectedFunctionID := fmt.Sprintf("%s-%s", testID, functionID)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:      handlerID,
+			Retries: inngestgo.Ptr(0),
+		},
+		inngestgo.EventTrigger(
+			"inngest/function.failed",
+			inngestgo.StrPtr(fmt.Sprintf("event.data.function_id == '%s'", expectedFunctionID)),
+		),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&failureCount, 1)
+
+			assert.NotEmpty(t, input.Event.Data["run_id"])
+			assert.Equal(t, expectedFunctionID, input.Event.Data["function_id"])
+
+			return "handled", nil
+		},
+	)
+	require.NoError(t, err)
+
+	registerFuncs()
+
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
+		Name: eventName,
+		Data: map[string]any{"test": true},
+	})
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.Equal(t, 1, int(atomic.LoadInt32(&failureCount)))
+	}, 15*time.Second, 500*time.Millisecond)
+
+	run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+		Status:  models.FunctionStatusFailed,
+		Timeout: 10 * time.Second,
+	})
+	require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 }

@@ -12,7 +12,8 @@ ON CONFLICT(id) DO UPDATE SET
     checksum = excluded.checksum,
     archived_at = NULL,
     "method" = excluded.method,
-    app_version = excluded.app_version
+    app_version = excluded.app_version,
+    url = excluded.url
 RETURNING *;
 
 -- name: GetApp :one
@@ -52,10 +53,17 @@ UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
 
 -- note - this is very basic right now.
--- name: InsertFunction :one
+-- name: UpsertFunction :one
 INSERT INTO functions
 	(id, app_id, name, slug, config, created_at) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING *;
+	(?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET
+	app_id = excluded.app_id,
+	name = excluded.name,
+	slug = excluded.slug,
+	config = excluded.config,
+	archived_at = NULL
+RETURNING *;
 
 -- name: GetFunctions :many
 SELECT functions.*
@@ -75,6 +83,19 @@ SELECT * FROM functions WHERE id = ?;
 
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = ? AND archived_at IS NULL;
+
+-- name: GetFunctionByAppNameAndSlug :one
+-- Look up a function by the app's user-facing name, not its internal UUID.
+-- The dev server derives app UUIDs from different inputs at different sites
+-- (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+-- row even when the function exists. Joining on apps.name routes through the
+-- one identifier that's stable across both paths.
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = ?
+  AND functions.slug = ?
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL;
 
 -- name: UpdateFunctionConfig :one
 UPDATE functions SET config = ?, archived_at = NULL WHERE id = ? RETURNING *;
@@ -280,10 +301,10 @@ WHERE snapshot_id NOT IN (
 
 -- name: InsertWorkerConnection :exec
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, max_worker_concurrency, connected_at, last_heartbeat_at, disconnected_at,
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id, app_name)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -297,6 +318,7 @@ DO UPDATE SET
     instance_id = excluded.instance_id,
     status = excluded.status,
     worker_ip = excluded.worker_ip,
+    max_worker_concurrency = excluded.max_worker_concurrency,
 
     connected_at = excluded.connected_at,
     last_heartbeat_at = excluded.last_heartbeat_at,
@@ -341,32 +363,260 @@ INSERT INTO spans (
   attributes,
   links,
   output,
+  input,
   debug_run_id,
-  debug_session_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  debug_session_id,
+  status,
+  event_ids
+) VALUES (
+  sqlc.arg(span_id),
+  sqlc.arg(trace_id),
+  sqlc.narg(parent_span_id),
+  sqlc.arg(name),
+  sqlc.arg(start_time),
+  sqlc.arg(end_time),
+  sqlc.arg(run_id),
+  sqlc.arg(account_id),
+  sqlc.arg(app_id),
+  sqlc.arg(function_id),
+  sqlc.arg(env_id),
+  sqlc.narg(dynamic_span_id),
+  CAST(sqlc.narg(attributes) AS TEXT),
+  CAST(sqlc.narg(links) AS TEXT),
+  CAST(sqlc.narg(output) AS TEXT),
+  CAST(sqlc.narg(input) AS TEXT),
+  sqlc.narg(debug_run_id),
+  sqlc.narg(debug_session_id),
+  sqlc.narg(status),
+  CAST(sqlc.narg(event_ids) AS TEXT)
+);
 
 -- name: GetSpansByRunID :many
 SELECT
+  run_id,
   trace_id,
   dynamic_span_id,
   MIN(start_time) as start_time,
   MAX(end_time) AS end_time,
   parent_span_id,
   json_group_array(json_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE run_id = ?
-GROUP BY dynamic_span_id
+GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
 
--- name: GetSpanOutput :one
+-- name: GetSpansByDebugRunID :many
 SELECT
-  -- input, TODO
-  output
+  trace_id,
+  run_id,
+  debug_session_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
 FROM spans
-WHERE span_id = ?
+WHERE debug_run_id = ?
+GROUP BY trace_id, run_id, debug_session_id, dynamic_span_id, parent_span_id
+ORDER BY start_time;
+
+-- name: GetSpansByDebugSessionID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_run_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_session_id = ?
+GROUP BY trace_id, run_id, debug_run_id, dynamic_span_id, parent_span_id
+ORDER BY start_time;
+
+-- name: GetSpanOutput :many
+SELECT
+  COALESCE(CAST(input AS TEXT), '') AS input,
+  COALESCE(CAST(output AS TEXT), '') AS output
+FROM spans
+WHERE span_id IN (sqlc.slice('ids'))
+LIMIT 2;
+
+-- name: GetRunSpanByRunID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM(name = 'executor.run') > 0
+ORDER BY start_time ASC
+LIMIT 1;
+
+-- name: GetStepSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE span_id IN (
+  SELECT
+    parent_span_id
+  FROM spans execSpans
+  WHERE execSpans.run_id = sqlc.arg(run_id) AND execSpans.account_id = sqlc.arg(account_id) AND name != 'userland'
+  GROUP BY dynamic_span_id, parent_span_id
+  HAVING
+    SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+    AND
+    SUM(name = 'executor.execution') > 0
+  ORDER BY MIN(start_time)
+  LIMIT 1
+) AND name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM(name = 'executor.step.discovery') > 0
+UNION ALL
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = sqlc.arg(run_id) AND account_id = sqlc.arg(account_id) AND name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  AND
+  SUM(name = 'executor.step') > 0
+ORDER BY start_time ASC
+LIMIT 1;
+
+-- name: GetExecutionSpanByStepIDAndAttempt :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ? AND name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = CAST(sqlc.arg(step_attempt) AS INTEGER)) > 0
+  AND
+  SUM(name IN ('executor.step', 'executor.execution')) > 0
+ORDER BY start_time ASC
+LIMIT 1;
+
+-- name: GetLatestExecutionSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans b
+WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id) AND b.name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  AND
+  SUM(name IN ('executor.step', 'executor.execution')) > 0
+ORDER BY start_time DESC
+LIMIT 1;
+
+-- name: GetSpanBySpanID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND span_id = ? AND account_id = ?
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+ORDER BY start_time ASC
 LIMIT 1;

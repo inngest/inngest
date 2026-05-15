@@ -3,6 +3,10 @@ package state
 import (
 	"context"
 	"crypto/rand"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -12,8 +16,6 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
-	"testing"
-	"time"
 )
 
 func TestLeaseRequest(t *testing.T) {
@@ -36,7 +38,10 @@ func TestLeaseRequest(t *testing.T) {
 	var requestStateManager RequestStateManager = connManager
 
 	envID := uuid.New()
+	instanceID := "instance-1"
+	isWorkerCapacityUnlimited := true
 	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	executorIP := net.IPv4(1, 1, 1, 1)
 
 	var existingLeaseID ulid.ULID
 
@@ -53,18 +58,22 @@ func TestLeaseRequest(t *testing.T) {
 
 	t.Run("extending missing lease should not work", func(t *testing.T) {
 		otherLeaseID := ulid.MustNew(ulid.Now(), rand.Reader)
-		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration, isWorkerCapacityUnlimited)
 		require.Nil(t, leaseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrRequestLeaseNotFound)
 	})
 
 	t.Run("leasing request should work", func(t *testing.T) {
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, executorIP)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
 		existingLeaseID = *leaseID
+
+		ip, err := requestStateManager.GetExecutorIP(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Equal(t, executorIP, ip)
 	})
 
 	t.Run("should report active lease as leased", func(t *testing.T) {
@@ -74,22 +83,35 @@ func TestLeaseRequest(t *testing.T) {
 	})
 
 	t.Run("leasing again should not work", func(t *testing.T) {
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		ip, err := requestStateManager.GetExecutorIP(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Equal(t, executorIP, ip)
+
+		// Simulate a new executor
+		newIP := net.IPv4(1, 2, 3, 4)
+
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, newIP)
 		require.Nil(t, leaseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrRequestLeased)
+
+		// Expect the IP to have been updated. This is useful to allow gRPC responses in case the
+		// original executor terminated while processing the request.
+		ip, err = requestStateManager.GetExecutorIP(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Equal(t, newIP, ip)
 	})
 
 	t.Run("extending somebody else's lease should not work", func(t *testing.T) {
 		otherLeaseID := ulid.MustNew(ulid.Now(), rand.Reader)
-		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration, isWorkerCapacityUnlimited)
 		require.Nil(t, leaseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrRequestLeased)
 	})
 
 	t.Run("extending own lease should work", func(t *testing.T) {
-		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, existingLeaseID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, existingLeaseID, consts.ConnectWorkerRequestLeaseDuration, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.NotEqual(t, existingLeaseID, leaseID)
@@ -108,7 +130,7 @@ func TestLeaseRequest(t *testing.T) {
 	})
 
 	t.Run("leasing expired item should work", func(t *testing.T) {
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, executorIP)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -120,7 +142,7 @@ func TestLeaseRequest(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, leased)
 
-		newLeaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, existingLeaseID, 0)
+		newLeaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, existingLeaseID, 0, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Nil(t, newLeaseID)
 
@@ -128,7 +150,7 @@ func TestLeaseRequest(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, leased)
 
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, executorIP)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 

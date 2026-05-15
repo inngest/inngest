@@ -31,7 +31,19 @@ import (
 const (
 	GatewayInstrumentInterval = 20 * time.Second
 	GatewayGCInterval         = 30 * time.Minute
+
+	// DefaultGatewayPort is the default HTTP port the connect gateway binds to.
+	DefaultGatewayPort = 8289
+
+	// ReadyPath is the URL path of the gateway's readiness endpoint. Exported
+	// so callers (notably cmd/doctor/healthcheck) can probe the same path the
+	// gateway registers without the two drifting apart.
+	ReadyPath = "/ready"
 )
+
+// WorkerStatusIntervalFunc returns the status reporting interval for a given
+// account and environment. Returning 0 disables status reporting.
+type WorkerStatusIntervalFunc func(ctx context.Context, accountID uuid.UUID, envID uuid.UUID) time.Duration
 
 type gatewayOpt func(*connectGatewaySvc)
 
@@ -66,6 +78,7 @@ type connectGatewaySvc struct {
 	pb.ConnectGatewayServer
 
 	gatewayPublicPort int
+	grpcConfig        connectConfig.ConnectGRPCConfig
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
@@ -90,6 +103,8 @@ type connectGatewaySvc struct {
 	workerHeartbeatInterval                               time.Duration
 	workerRequestExtendLeaseInterval                      time.Duration
 	workerRequestLeaseDuration                            time.Duration
+	workerStatusInterval                                  WorkerStatusIntervalFunc
+	drainAckTimeout                                       time.Duration
 
 	hostname  string
 	ipAddress net.IP
@@ -103,6 +118,8 @@ type connectGatewaySvc struct {
 	connectionCount connectionCounter
 	drainListener   *drainListener
 	stateUpdateLock sync.Mutex
+	gatewayStatus   state.GatewayStatus
+	gatewayStatusOK bool
 
 	grpcClientManager *grpc.GRPCClientManager[pb.ConnectExecutorClient]
 }
@@ -166,6 +183,12 @@ func WithGatewayPublicPort(port int) gatewayOpt {
 	}
 }
 
+func WithGRPCConfig(config connectConfig.ConnectGRPCConfig) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.grpcConfig = config
+	}
+}
+
 func WithApiBaseUrl(url string) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.apiBaseUrl = url
@@ -196,9 +219,21 @@ func WithWorkerRequestLeaseDuration(duration time.Duration) gatewayOpt {
 	}
 }
 
+func WithWorkerStatusInterval(fn WorkerStatusIntervalFunc) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerStatusInterval = fn
+	}
+}
+
 func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.consecutiveWorkerHeartbeatMissesBeforeConnectionClose = misses
+	}
+}
+
+func WithDrainAckTimeout(d time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.drainAckTimeout = d
 	}
 }
 
@@ -208,11 +243,20 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		lifecycles:        []ConnectGatewayLifecycleListener{},
 		drainListener:     newDrainListener(),
 		gatewayPublicPort: 8080,
+		grpcConfig: connectConfig.NewGRPCConfig(
+			context.Background(),
+			grpc.DefaultConnectGRPCIP, grpc.DefaultConnectGatewayGRPCPort,
+			grpc.DefaultConnectGRPCIP, grpc.DefaultConnectExecutorGRPCPort,
+		),
 
-		workerHeartbeatInterval:                               consts.ConnectWorkerHeartbeatInterval,
-		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
-		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
+		workerHeartbeatInterval:          consts.ConnectWorkerHeartbeatInterval,
+		workerRequestExtendLeaseInterval: consts.ConnectWorkerRequestExtendLeaseInterval,
+		workerRequestLeaseDuration:       consts.ConnectWorkerRequestLeaseDuration,
+		workerStatusInterval: func(_ context.Context, _ uuid.UUID, _ uuid.UUID) time.Duration {
+			return consts.ConnectWorkerStatusInterval
+		},
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
+		drainAckTimeout: 25 * time.Second,
 
 		grpcServer: grpcLib.NewServer(),
 	}
@@ -246,11 +290,16 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		r.Mount("/v0", v0Router)
 
 		// Readiness must be served to traffic port for load balancer health checks
-		r.Get("/ready", readinessHandler)
+		r.Get(ReadyPath, readinessHandler)
 	})
 
 	gateway.maintenanceApi = newMaintenanceApi(gateway)
-	gateway.maintenanceApi.Get("/ready", readinessHandler)
+	gateway.maintenanceApi.Get(ReadyPath, readinessHandler)
+
+	// Optionally mount maintenance API on the gateway public routes
+	if os.Getenv("INTERNAL_CONNECT_MAINTENANCE") == "1" {
+		gateway.gatewayRoutes.Mount("/maintenance", gateway.maintenanceApi)
+	}
 
 	return gateway
 }
@@ -275,9 +324,14 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	}
 	c.hostname = hostname
 
-	c.ipAddress = connectConfig.Gateway(ctx).GRPCIP
+	c.ipAddress = c.grpcConfig.Gateway.IP
+	c.logger = c.logger.With(
+		"gateway_group", c.groupName,
+		"gateway_hostname", c.hostname,
+		"gateway_ip", c.ipAddress.String(),
+	)
 
-	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
+	if err := c.updateGatewayState(state.GatewayStatusStarting, "gateway service starting"); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
 	}
 
@@ -302,7 +356,7 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 				status = state.GatewayStatusDraining
 			}
 
-			err := c.updateGatewayState(status)
+			err := c.updateGatewayState(status, "gateway heartbeat")
 			if err != nil {
 				c.logger.Error(fmt.Sprintf("could not update gateway state: %v", err))
 			}
@@ -413,7 +467,10 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		c.connectionCount.Wait()
 
 		c.logger.Info("shutting down gateway api")
-		_ = server.Shutdown(ctx)
+		_ = server.Shutdown(context.Background())
+
+		c.logger.Info("shutting down gateway grpc server")
+		c.grpcServer.GracefulStop()
 	}()
 
 	eg := errgroup.Group{}
@@ -428,10 +485,8 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return err
 	})
 
-	connectConfig := connectConfig.Gateway(ctx)
-
 	eg.Go(func() error {
-		addr := fmt.Sprintf(":%d", connectConfig.GRPCPort)
+		addr := fmt.Sprintf(":%d", c.grpcConfig.Gateway.Port)
 
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
@@ -442,7 +497,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	})
 
 	if !c.isDraining.Load() {
-		err := c.updateGatewayState(state.GatewayStatusActive)
+		err := c.updateGatewayState(state.GatewayStatusActive, "gateway server started")
 		if err != nil {
 			return fmt.Errorf("could not update gateway state: %w", err)
 		}
@@ -460,9 +515,12 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	return eg.Wait()
 }
 
-func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error {
+func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus, reason string) error {
 	c.stateUpdateLock.Lock()
 	defer c.stateUpdateLock.Unlock()
+
+	previous := c.gatewayStatus
+	previousOK := c.gatewayStatusOK
 
 	err := c.stateManager.UpsertGateway(context.Background(), &state.Gateway{
 		Id:                c.gatewayId,
@@ -472,9 +530,26 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 		IPAddress:         c.ipAddress,
 	})
 	if err != nil {
-		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)
+		c.logger.Error("failed to update gateway status in state", "status", status, "reason", reason, "error", err)
 
 		return fmt.Errorf("could not upsert gateway: %w", err)
+	}
+
+	c.gatewayStatus = status
+	c.gatewayStatusOK = true
+
+	if !previousOK || previous != status {
+		from := ""
+		if previousOK {
+			from = string(previous)
+		}
+		c.logger.Info("gateway status transition",
+			"from", from,
+			"to", status,
+			"reason", reason,
+			"active_connections", c.connectionCount.Count(),
+			"is_draining", c.isDraining.Load(),
+		)
 	}
 
 	return nil
@@ -523,21 +598,25 @@ func (c *connectGatewaySvc) GetState() (*state.Gateway, error) {
 }
 
 func (c *connectGatewaySvc) DrainGateway() error {
-	err := c.updateGatewayState(state.GatewayStatusDraining)
+	c.logger.Info("gateway drain requested", "active_connections", c.connectionCount.Count())
+	err := c.updateGatewayState(state.GatewayStatusDraining, "gateway drain requested")
 	if err != nil {
 		return fmt.Errorf("could not update gateway state: %w", err)
 	}
 	c.isDraining.Store(true)
 	c.drainListener.Notify()
+	c.logger.Info("gateway drain notification sent", "active_connections", c.connectionCount.Count())
 	return nil
 }
 
 func (c *connectGatewaySvc) ActivateGateway() error {
-	err := c.updateGatewayState(state.GatewayStatusActive)
+	c.logger.Info("gateway activation requested", "active_connections", c.connectionCount.Count())
+	err := c.updateGatewayState(state.GatewayStatusActive, "gateway activation requested")
 	if err != nil {
 		return fmt.Errorf("could not update gateway state: %w", err)
 	}
 	c.isDraining.Store(false)
+	c.logger.Info("gateway activated", "active_connections", c.connectionCount.Count())
 	return nil
 }
 
@@ -550,7 +629,7 @@ func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, envID uui
 	}
 	executorIP := ip.String()
 
-	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", c.grpcConfig.Executor.Port))
 
 	return c.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
 }

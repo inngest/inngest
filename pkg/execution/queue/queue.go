@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ type Queue interface {
 	JobQueueReader
 	Migrator
 	Unpauser
+	AttemptResetter
 }
 
 type RunInfo struct {
@@ -28,6 +30,8 @@ type RunInfo struct {
 	// on the same function by limiting the number of continues possible within a given chain.
 	ContinueCount       uint
 	RefilledFromBacklog string
+	CapacityLease       *CapacityLease
+	ScavengeCount       int
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
@@ -51,15 +55,16 @@ type EnqueueOpts struct {
 	PassthroughJobId       bool
 	ForceQueueShardName    string
 	NormalizeFromBacklogID string
+	// IdempotencyPeriod allows customizing the idempotency period for this queue
+	// item.  For example, after a debounce queue has been consumed we want to remove
+	// the idempotency key immediately;  the same debounce key should become available
+	// for another debounced function run.
+	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
 }
 
 type Producer interface {
 	// Enqueue allows an item to be enqueued ton run at the given time.
 	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
-}
-
-type Enqueuer interface {
-	EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error)
 }
 
 type Consumer interface {
@@ -87,12 +92,12 @@ type Migrator interface {
 }
 
 type Unpauser interface {
-	UnpauseFunction(ctx context.Context, shard string, acctID, fnID uuid.UUID) error
+	UnpauseFunction(ctx context.Context, shard string, acctID, envID, fnID uuid.UUID) error
 }
 
-type QueueDirectAccess interface {
-	RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error
-	LoadQueueItem(ctx context.Context, shard string, itemID string) (*QueueItem, error)
+// AttemptResetter resets queue item attempts after a successful checkpoint.
+type AttemptResetter interface {
+	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries
@@ -120,6 +125,9 @@ type RetryAtSpecifier interface {
 }
 
 func RetryAtError(err error, at *time.Time) error {
+	if err == nil {
+		err = fmt.Errorf("retry at")
+	}
 	return retryAtError{cause: err, at: at}
 }
 
@@ -196,7 +204,8 @@ type alwaysRetry struct {
 func (a alwaysRetry) AlwaysRetryable() {}
 
 func IsAlwaysRetryable(err error) bool {
-	return errors.Is(err, alwaysRetry{})
+	var ar alwaysRetry
+	return errors.As(err, &ar)
 }
 
 type JobResponse struct {

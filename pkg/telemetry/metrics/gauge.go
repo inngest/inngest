@@ -110,3 +110,57 @@ func GaugeShadowPartitionSize(ctx context.Context, value int64, opts GaugeOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func GaugeShardLeaseCapacity(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "shard_lease_capacity",
+		Description: "The lease capacity of a queue shard",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeActiveShardLease(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "active_shard_lease",
+		Description: "Whether this worker holds an active shard lease",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeAggregatorPendingDeletes(ctx context.Context, value int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, value, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "aggr_evaluables_pending_deletes",
+		Description: "Number of pending deletes in the aggregator",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugePartitionProcessorCapacity(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "partition_processor_capacity",
+		Description: "Available capacity in the partition processor pool",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugePartitionProcessorInFlight(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "partition_processor_in_flight",
+		Description: "Number of partitions currently being processed",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeConstraintAPICacheSize(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_cache_size",
+		Description: "Current number of items in the constraint cache",
+		Tags:        opts.Tags,
+	})
+}

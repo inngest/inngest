@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/consts"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -43,7 +42,7 @@ func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, reque
 }
 
 // LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration, executorIP net.IP) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -65,7 +64,7 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 		fmt.Sprintf("%d", now.UnixMilli()),
 
 		// Mapping the request to the current executor
-		connectConfig.Executor(ctx).GRPCIP.String(),
+		executorIP.String(),
 	}
 
 	status, err := scripts["lease"].Exec(
@@ -90,9 +89,11 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 // ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 // the current lease does not match the passed leaseID (ErrRequestLeased).
-func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
+		r.workerRequestsKey(envID, instanceID),
+		r.requestWorkerKey(envID, requestID),
 	}
 
 	now := r.c.Now()
@@ -111,6 +112,11 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		newLeaseID.String(),
 		fmt.Sprintf("%d", int(keyExpiry.Seconds())),
 		fmt.Sprintf("%d", now.UnixMilli()),
+		fmt.Sprintf("%d", int(consts.ConnectWorkerCapacityManagerTTL.Seconds())),        // Set TTL
+		fmt.Sprintf("%d", int(consts.ConnectWorkerRequestToWorkerMappingTTL.Seconds())), // Request TTL
+		instanceID,
+		fmt.Sprintf("%t", isWorkerCapacityUnlimited),
+		requestID,
 	}
 
 	status, err := scripts["extend_lease"].Exec(
@@ -124,6 +130,8 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 	}
 
 	switch status {
+	case -3:
+		return nil, ErrRequestWorkerDoesNotExist
 	case -2:
 		return nil, ErrRequestLeased
 	case -1:
@@ -200,6 +208,22 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	return lease.ExecutorIP, nil
 }
 
+// GetAssignedWorkerID retrieves the instance ID of the worker that is assigned to the request.
+func (r *redisConnectionStateManager) GetAssignedWorkerID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
+	requestWorkerKey := r.requestWorkerKey(envID, requestID)
+
+	instanceID, err := r.client.Do(ctx, r.client.B().Get().Key(requestWorkerKey).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// No mapping exists - request may not have a worker capacity lease
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get worker instance ID: %w", err)
+	}
+
+	return instanceID, nil
+}
+
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 // in case Redis PubSub fails to notify the executor.
 func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uuid.UUID, requestID string, resp *connpb.SDKResponse) error {
@@ -233,7 +257,6 @@ func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uu
 
 // GetResponse retrieves the response for a given request, if exists. Otherwise, the response will be nil.
 func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uuid.UUID, requestID string) (*connpb.SDKResponse, error) {
-
 	cmd := r.client.
 		B().
 		Get().
@@ -241,12 +264,11 @@ func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uui
 		Build()
 
 	res, err := r.client.Do(ctx, cmd).ToString()
-	if err != nil && !rueidis.IsRedisNil(err) {
-		return nil, fmt.Errorf("could not fetch response: %w", err)
-	}
-
-	if rueidis.IsRedisNil(err) {
+	if err != nil && (rueidis.IsRedisNil(err) || errors.Is(err, context.Canceled)) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch response: %w", err)
 	}
 
 	reply := &connpb.SDKResponse{}

@@ -23,6 +23,7 @@
 
 # Go workspace file
 go.work
+go.work.sum
 
 # End of https://www.toptal.com/developers/gitignore/api/go
 
@@ -37,3 +38,4 @@ node_modules
 
 # AI
 CLAUDE.md
+/.claude/

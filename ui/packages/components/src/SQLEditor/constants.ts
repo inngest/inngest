@@ -3,9 +3,10 @@ import type { editor } from 'monaco-editor';
 import { FONT, LINE_HEIGHT } from '../utils/monaco';
 
 export const EDITOR_OPTIONS: editor.IEditorOptions = {
-  autoClosingBrackets: 'always',
-  autoClosingQuotes: 'always',
+  autoClosingBrackets: 'beforeWhitespace',
+  autoClosingQuotes: 'beforeWhitespace',
   contextmenu: false,
+  fixedOverflowWidgets: true,
   fontFamily: FONT.font,
   fontSize: FONT.size,
   fontWeight: 'light',
@@ -35,9 +36,19 @@ export const EDITOR_OPTIONS: editor.IEditorOptions = {
     vertical: 'visible',
     verticalScrollbarSize: 10,
   },
+  quickSuggestions: {
+    other: true,
+    comments: false,
+    strings: true,
+  },
   suggest: {
+    showFunctions: true,
+    showKeywords: true,
+    showSnippets: true,
     showWords: false,
   },
+  suggestOnTriggerCharacters: true,
+  acceptSuggestionOnEnter: 'on',
   wordWrap: 'off',
   wrappingStrategy: 'advanced',
 };

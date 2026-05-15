@@ -6,6 +6,7 @@ import { useClient } from 'urql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
+// prettier-ignore
 const query = graphql(`
   query GetEventTypesV2($envID: ID!, $cursor: String, $archived: Boolean, $nameSearch: String) {
     environment: workspace(id: $envID) {
@@ -59,7 +60,7 @@ export function useEventTypes() {
             cursor,
             nameSearch,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -83,7 +84,7 @@ export function useEventTypes() {
         pageInfo: eventTypesData.pageInfo,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -91,6 +92,7 @@ type VolumeQueryVariables = {
   eventName: string;
 };
 
+// prettier-ignore
 const volumeQuery = graphql(`
   query GetEventTypeVolumeV2($envID: ID!, $eventName: String!, $startTime: Time!, $endTime: Time!) {
     environment: workspace(id: $envID) {
@@ -114,7 +116,10 @@ export function useEventTypeVolume() {
 
   return useCallback(
     async ({ eventName }: VolumeQueryVariables) => {
-      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
+      const startTime = getTimestampDaysAgo({
+        currentDate: new Date(),
+        days: 1,
+      }).toISOString();
       const endTime = new Date().toISOString();
       const result = await client
         .query(
@@ -125,7 +130,7 @@ export function useEventTypeVolume() {
             startTime,
             endTime,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -152,10 +157,11 @@ export function useEventTypeVolume() {
         },
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
+// prettier-ignore
 const eventTypeQuery = graphql(`
   query GetEventType($envID: ID!, $eventName: String!) {
     environment: workspace(id: $envID) {
@@ -182,7 +188,9 @@ export function useEventType({ eventName }: { eventName: string }) {
   return useQuery({
     queryKey: ['event-type', envID, eventName],
     queryFn: async () => {
-      const result = await client.query(eventTypeQuery, { envID, eventName }).toPromise();
+      const result = await client
+        .query(eventTypeQuery, { envID, eventName })
+        .toPromise();
 
       if (result.error) {
         throw result.error;
@@ -202,6 +210,7 @@ export function useEventType({ eventName }: { eventName: string }) {
   });
 }
 
+// prettier-ignore
 export const allEventTypesQuery = graphql(`
   query GetAllEventNames($envID: ID!) {
     environment: workspace(id: $envID) {
@@ -237,6 +246,7 @@ export function useAllEventTypes() {
     const events = eventsData.edges.map(({ node }) => ({
       id: node.name,
       name: node.name,
+      latestSchema: '',
     }));
 
     return events;

@@ -19,14 +19,46 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/strduration"
 	"github.com/xhit/go-str2duration/v2"
 )
 
 const (
 	DefaultStepName = "step-1"
 )
+
+// DeployedFunction reresents a synced function deployed to an Inngest environment.
+//
+// This contains the function definition, alongside tenant identifiers and whether the
+// function is paused, draining, etc.
+type DeployedFunction struct {
+	// ID is an internal surrogate key representing this function.
+	ID uuid.UUID
+	// Slug is the function slug.
+	Slug string
+	// Function represents the deployed function
+	Function Function
+	// AccountID represents the account that the function is owned by
+	AccountID uuid.UUID
+	// EnvironmentID represents the environment that the function is deployed to
+	EnvironmentID uuid.UUID
+	// AppID represents the app that the function belongs to
+	AppID uuid.UUID
+	// AppName represents the app ID defined in user code.
+	AppName string
+	// PausedAt, if non-zero, indicates that the function is paused as of the given time.
+	PausedAt time.Time
+	// DrainedAt, if non-zero, indicates that the function is draining as of the given time.
+	DrainedAt time.Time
+}
+
+type ScheduledCronTrigger struct {
+	Expression string
+	Jitter     time.Duration
+}
 
 // Function represents a step function which is triggered whenever an event
 // is received or on a schedule.  In essence, it contains:
@@ -49,6 +81,8 @@ type Function struct {
 	// FunctionVersion represents the version of this specific function.  The same
 	// function ID may be updated many times over the lifetime of a function; this
 	// represents the specific version for the functon ID.
+	//
+	// deprecated:  this should be removed.
 	FunctionVersion int `json:"fv"`
 
 	// Name is the descriptive name for the function
@@ -69,6 +103,13 @@ type Function struct {
 	Concurrency *ConcurrencyLimits `json:"concurrency,omitempty"`
 
 	Debounce *Debounce `json:"debounce,omitempty"`
+
+	// Checkpint represents checkpointing configuration.  If nil, checkpointing
+	// is not enabled for this function.
+	//
+	// Note that checkpointing is an SDK concern and is not controlled by the executor.
+	// This is included in function configuration for the UI only.
+	Checkpoint *Checkpoint `json:"checkpoint,omitempty"`
 
 	// Trigger represnets the trigger for the function.
 	Triggers MultipleTriggers `json:"triggers"`
@@ -104,6 +145,23 @@ type Function struct {
 	//
 	// Sometimes, we may include additional information for eg. sync-based functions.
 	Driver FunctionDriver `json:"driver,omitzero"`
+}
+
+func (f Function) MaxAttempts() int {
+	if len(f.Steps) == 0 {
+		return consts.DefaultRetryCount
+	}
+	// TODO: Improve this please...
+	return f.Steps[0].RetryCount() + 1
+}
+
+func (f Function) HasCronExpression(cron string) bool {
+	for _, f := range f.Triggers {
+		if f.CronTrigger != nil && f.CronTrigger.Cron == cron {
+			return true
+		}
+	}
+	return false
 }
 
 type RateLimit struct {
@@ -293,6 +351,7 @@ func (f Function) GetSlug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
 
+// IsScheduled indicates if the function is a cron function or not
 func (f Function) IsScheduled() bool {
 	for _, t := range f.Triggers {
 		if t.CronTrigger != nil {
@@ -300,6 +359,51 @@ func (f Function) IsScheduled() bool {
 		}
 	}
 	return false
+}
+
+// ScheduleExpression returns all the cron expression strings for the function
+func (f Function) ScheduleExpressions() []string {
+	cronTriggers := f.ScheduleTriggers()
+
+	var cronExpressions []string
+	for _, t := range cronTriggers {
+		cronExpressions = append(cronExpressions, t.Expression)
+	}
+	return cronExpressions
+}
+
+// ScheduleTriggers returns all cron trigger expressions together with their parsed jitter.
+// Jitter validation is expected to have already occurred at the registration boundary
+// via CronTrigger.Validate(). If parsing fails here, jitter defaults to zero.
+func (f Function) ScheduleTriggers() []ScheduledCronTrigger {
+	var cronTriggers []ScheduledCronTrigger
+	for _, t := range f.Triggers {
+		if t.CronTrigger == nil {
+			continue
+		}
+
+		jitter, err := t.CronTrigger.JitterDuration()
+		if err != nil {
+			logger.StdlibLogger(context.Background()).Warn("unparseable cron jitter, defaulting to zero")
+		}
+
+		cronTriggers = append(cronTriggers, ScheduledCronTrigger{
+			Expression: t.CronTrigger.Cron,
+			Jitter:     jitter,
+		})
+	}
+	return cronTriggers
+}
+
+// CronJitter returns the parsed jitter duration for the given cron expression,
+// or zero if the expression is not found or jitter is not configured.
+func (f Function) CronJitter(expr string) time.Duration {
+	for _, t := range f.ScheduleTriggers() {
+		if t.Expression == expr {
+			return t.Jitter
+		}
+	}
+	return 0
 }
 
 func (f Function) IsBatchEnabled() bool {
@@ -314,9 +418,6 @@ func (f Function) Validate(ctx context.Context) error {
 	var err error
 	if f.Name == "" {
 		err = multierror.Append(err, fmt.Errorf("A function name is required"))
-	}
-	if len(f.Triggers) == 0 {
-		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
 	}
 
 	if f.Concurrency != nil {
@@ -374,8 +475,12 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	if len(f.Steps) != 1 {
-		err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
+	if f.Driver.URI == "" {
+		// Backwards compatible functions:  we used to store driver information in "steps", allowing DAGs
+		// in functions.  We no longer need this.
+		if len(f.Steps) != 1 {
+			err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
+		}
 	}
 
 	// Validate priority expression
@@ -453,7 +558,7 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
 	}
 
-	val, _, err := expr.Evaluate(ctx, expressions.NewData(map[string]any{"event": event}))
+	val, err := expr.Evaluate(ctx, expressions.NewData(map[string]any{"event": event}))
 	if err != nil {
 		return 0, fmt.Errorf("Priority.Run expression errored: %s", err)
 	}
@@ -496,7 +601,7 @@ func (f Function) URI() *url.URL {
 	return &url.URL{}
 }
 
-// DeterminsiticAppUUID returns a deterministic V3 UUID based off of the SHA1
+// DeterministicAppUUID returns a deterministic V3 UUID based off of the SHA1
 // hash of the app's URL.
 func DeterministicAppUUID(url string) uuid.UUID {
 	return DeterministicSha1UUID(url)
@@ -530,4 +635,30 @@ type Singleton struct {
 	// Mode determines how to handle a new run when another singleton instance is already active.
 	// Use `skip` to skip the new run, or `cancel` to stop the current instance and run the new one.
 	Mode enums.SingletonMode `json:"mode"`
+}
+
+// Checkpoint represents checkpoint configuration.
+type Checkpoint struct {
+	// BatchSteps represents the maximum number of steps to execute before checkpointing. When this
+	// limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
+	//
+	// This must be higher than zero to enable batching of steps.  When enabled with BatchInterval,
+	// whichever limit is hit first will checkpoint steps.
+	BatchSteps int `json:"batch_steps,omitempty,omitzero"`
+
+	// BatchInterval represents the maximum time that we wait after a step runs before checkpointing.
+	// When this limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
+	//
+	// This must be higher than zero to enable batching based off of durations.  When enabled with BatchSteps,
+	// whichever lmiit is hit first will checkpoint steps.
+	//
+	// This is a string-encoded time.Duration field.
+	BatchInterval strduration.Duration `json:"batch_interval,omitempty,omitzero"`
+
+	// MaxRuntime indicates the maximum duration that a function can execute for before Inngest requires
+	// a fresh re-entry.  This is useful for serverless functions, ensuring that a fresh request is made
+	// after a maximum amount of time.
+	//
+	// This is a string-encoded time.Duration field.
+	MaxRuntime strduration.Duration `json:"max_runtime,omitempty,omitzero"`
 }

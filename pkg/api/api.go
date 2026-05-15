@@ -24,6 +24,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Constants set here are leveraged by start, dev, and, healthcheck commands
+const (
+	DefaultAPIPort = 8288
+	HealthPath     = "/health"
+)
+
 type EventHandler func(context.Context, *event.Event, *event.SeededID) (string, error)
 
 type Options struct {
@@ -67,7 +73,7 @@ func NewAPI(o Options) (chi.Router, error) {
 	api.Use(cors.Handler)
 	api.Use(headers.StaticHeadersMiddleware(o.Config.GetServerKind()))
 
-	api.Get("/health", api.HealthCheck)
+	api.Get(HealthPath, api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)
 	api.Post("/invoke/{slug}", api.Invoke)
 
@@ -342,7 +348,7 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 		r.Header.Get(headers.HeaderEventIDSeed),
 		0,
 	)
-	evtID, err := a.handler(r.Context(), &evt, seed)
+	evtID, err := a.handler(r.Context(), &evt.Event, seed)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to create invocation event: %s", err))
 		return

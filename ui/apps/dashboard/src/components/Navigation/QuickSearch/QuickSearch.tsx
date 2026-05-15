@@ -1,8 +1,10 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip/Tooltip';
 import { RiSearchLine } from '@remixicon/react';
 
 import { QuickSearchModal } from './QuickSearchModal';
@@ -45,11 +47,17 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
               kind="secondary"
               onClick={() => setIsOpen(true)}
               size="small"
-              label={<span className="hidden group-hover/search:block">Search</span>}
+              label={
+                <span className="hidden group-hover/search:block">Search</span>
+              }
             />
           </TooltipTrigger>
 
-          <TooltipContent className="w-32 rounded text-xs" side="bottom" sideOffset={2}>
+          <TooltipContent
+            className="w-32 rounded text-xs"
+            side="bottom"
+            sideOffset={2}
+          >
             You can also use <span className="font-bold">⌘ K</span> or{' '}
             <span className="font-bold">Ctrl K</span> to search
           </TooltipContent>

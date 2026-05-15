@@ -44,6 +44,12 @@ const (
 	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
 	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
 
+	// MaxMetadataSpanSize is the maximum size of a single metadata span in bytes (64 KB).
+	MaxMetadataSpanSize = 64 * 1024
+
+	// MaxRunMetadataSize is the maximum cumulative metadata size per function run in bytes (1 MB).
+	MaxRunMetadataSize = 1024 * 1024
+
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
 	MaxRetries = 20
@@ -65,6 +71,18 @@ const (
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 
+	// MaxDefersPerRun is the maximum number of defers allowed per function run.
+	MaxDefersPerRun = 20
+
+	// MaxDeferInputSize is the maximum size of the Input payload on a single defer.
+	MaxDeferInputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxDeferInputAggregateSize is the maximum total size, in bytes, of all
+	// defer input payloads combined for a single function run. Must be a
+	// separate budget than DefaultMaxStateSizeLimit, so that defers can't fail
+	// the parent run.
+	MaxDeferInputAggregateSize = 1024 * 1024 * 4 // 4MB
+
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
@@ -83,8 +101,8 @@ const (
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
 	// FunctionIdempotencyTombstone indicates the run associated with this idempotency key
-	// has already finished
-	FunctionIdempotencyTombstone = "-"
+	// has already finished.  This is a prefix;  the run ID is still stored after this.
+	FunctionIdempotencyTombstone = '-'
 
 	DefaultBatchSizeLimit = 100
 	DefaultBatchTimeout   = 60 * time.Second
@@ -141,17 +159,30 @@ const (
 
 	RedisBlockingPoolSize = 10
 
+	// DefaultWorkerConcurrency is the default per-app worker concurrency used when
+	// a connect worker does not specify MaxWorkerConcurrency.
+	DefaultWorkerConcurrency int64 = 1000
+
 	ConnectWorkerHeartbeatInterval  = 10 * time.Second
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
 	ConnectGCThreshold              = 5 * time.Minute
 
-	ConnectWorkerRequestLeaseDuration = 20 * time.Second
+	ConnectWorkerRequestLeaseDuration = 2 * time.Minute
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
+	ConnectWorkerStatusInterval       = 0 * time.Second // disabled by default
+
+	// ConnectWorkerCapacityForNoConcurrencyLimit is used to indicate that a worker has no capacity limit.
+	// Due to integer overflows of using negative numbers, we use 0 to indicate no limit.``
+	ConnectWorkerCapacityForNoConcurrencyLimit = 0
 
 	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
+
+	ConstraintAPIScavengerTick = 500 * time.Millisecond
 )
 
 var (
+	ConnectWorkerRequestToWorkerMappingTTL  = 6 * ConnectWorkerRequestLeaseDuration  // 2 minutes so in case of gateway failure, we don't lose the mapping for too long
+	ConnectWorkerCapacityManagerTTL         = 45 * ConnectWorkerRequestLeaseDuration // 15 minutes
 	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
 	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
 	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions

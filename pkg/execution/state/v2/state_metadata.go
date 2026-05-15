@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
@@ -17,11 +18,13 @@ import (
 )
 
 const (
-	cronScheduleKey = "__cron"
-	fnslugKey       = "__fnslug"
-	traceLinkKey    = "__tracelink"
-	debounceKey     = "__debounce"
-	evtmapKey       = "__evtmap"
+	cronScheduleKey   = "__cron"
+	fnslugKey         = "__fnslug"
+	traceLinkKey      = "__tracelink"
+	debounceKey       = "__debounce"
+	evtmapKey         = "__evtmap"
+	debugSessionIDKey = "__debug_session_id"
+	debugRunIDKey     = "__debug_run_id"
 )
 
 type ID struct {
@@ -53,12 +56,14 @@ func V1FromMetadata(md Metadata) statev1.Identifier {
 		WorkflowVersion:       md.Config.FunctionVersion,
 		WorkspaceID:           md.ID.Tenant.EnvID,
 		AccountID:             md.ID.Tenant.AccountID,
+		AppID:                 md.ID.Tenant.AppID,
 		EventID:               md.Config.EventID(),
 		EventIDs:              md.Config.EventIDs,
 		BatchID:               md.Config.BatchID,
 		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
 		PriorityFactor:        md.Config.PriorityFactor,
 		OriginalRunID:         md.Config.OriginalRunID,
+		Semaphores:            md.Config.Semaphores,
 	}
 }
 
@@ -179,6 +184,10 @@ type Config struct {
 	ForceStepPlan bool
 	// Context allows storing arbitrary context for a run.
 	Context map[string]any
+
+	// Semaphores stores the semaphore constraints acquired by the start job.
+	// This is the source of truth for Finalize() to release manual-release semaphores.
+	Semaphores []constraintapi.Semaphore
 
 	mu *sync.RWMutex
 }
@@ -346,7 +355,6 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 			}
 
 		}
-
 	}
 	return nil
 }
@@ -359,7 +367,11 @@ func (c *Config) NewSetFunctionTrace(carrier *meta.SpanReference) {
 	c.Context[meta.PropagationKey] = *carrier
 }
 
-func (c *Config) NewFunctionTrace() *meta.SpanReference {
+// RootSpanFromConfig is deprecated.  Use tracing.RunSpanRefFromMetadata.
+func (c *Config) RootSpanFromConfig() *meta.SpanReference {
+	if c == nil || c.mu == nil {
+		return nil
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -421,6 +433,62 @@ func (c *Config) EventIDMapping() map[string]ulid.ULID {
 	return nil
 }
 
+func (c *Config) SetDebugSessionID(debugSessionID ulid.ULID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[debugSessionIDKey] = debugSessionID.String()
+}
+
+// DebugSessionID retrieves the stored debug session ID if available
+func (c *Config) DebugSessionID() *ulid.ULID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[debugSessionIDKey]; ok {
+		if s, ok := v.(string); ok {
+			if id, err := ulid.Parse(s); err == nil {
+				return &id
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) SetDebugRunID(debugRunID ulid.ULID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[debugRunIDKey] = debugRunID.String()
+}
+
+// DebugRunID retrieves the stored debug run ID if available
+func (c *Config) DebugRunID() *ulid.ULID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[debugRunIDKey]; ok {
+		if s, ok := v.(string); ok {
+			if id, err := ulid.Parse(s); err == nil {
+				return &id
+			}
+		}
+	}
+
+	return nil
+}
+
 // RunMetrics stores state-level run metrics.
 type RunMetrics struct {
 	// StateSize stores the total size, in bytes, of all events and step output.
@@ -432,6 +500,26 @@ type RunMetrics struct {
 
 	// StepCount represents the total number of steps already completed.
 	StepCount int
+
+	// MetadataSize tracks the cumulative metadata size in bytes across all
+	// steps in a run. This value is persisted to Redis via the saveResponse
+	// Lua script and loaded at the start of each step execution. During a
+	// step, it grows in-memory as metadata spans are created.
+	//
+	// Use TryAddMetadataSize / RollbackMetadataSize for concurrent access.
+	MetadataSize int
+
+	// MetadataSizeLoaded stores the MetadataSize value as loaded from Redis
+	// at the start of a step execution. This is used to compute the delta
+	// (MetadataSize - MetadataSizeLoaded) that gets persisted back to Redis
+	// when the step output is saved.
+	MetadataSizeLoaded int
+
+	// metadataMu guards concurrent access to MetadataSize and
+	// MetadataSizeLoaded. It is a pointer so that RunMetrics remains safe
+	// to copy by value (no copylocks violation) — all copies share the
+	// same mutex. Lazily allocated on first use via mu().
+	metadataMu *sync.Mutex
 
 	// TODO
 
@@ -446,6 +534,62 @@ type RunMetrics struct {
 	// Steps stores the current number of in-progress or pending steps for the run.
 	// This is usually 1, but may be > 1 in the case of step parallelism.
 	// Steps int
+}
+
+// mu returns the mutex for guarding MetadataSize fields, lazily allocating
+// it on first use. This is safe because RunMetrics is always constructed in
+// a single goroutine before being shared for concurrent access.
+func (rm *RunMetrics) mu() *sync.Mutex {
+	if rm.metadataMu == nil {
+		rm.metadataMu = &sync.Mutex{}
+	}
+	return rm.metadataMu
+}
+
+// TryAddMetadataSize atomically checks whether adding spanSize would exceed
+// the given limit and, if not, increments MetadataSize. Returns true on
+// success, false if the limit would be exceeded.
+func (rm *RunMetrics) TryAddMetadataSize(spanSize, limit int) bool {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	if rm.MetadataSize+spanSize > limit {
+		return false
+	}
+	rm.MetadataSize += spanSize
+	return true
+}
+
+// RollbackMetadataSize decrements MetadataSize by the given amount. This is
+// used to undo an optimistic TryAddMetadataSize when span creation fails.
+func (rm *RunMetrics) RollbackMetadataSize(spanSize int) {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	rm.MetadataSize -= spanSize
+}
+
+// SwapMetadataSizeDelta returns the current delta (MetadataSize - MetadataSizeLoaded)
+// and advances MetadataSizeLoaded to MetadataSize. This ensures that each caller
+// in a concurrent group of handlers claims only its own contribution, preventing
+// double-counting when multiple goroutines persist deltas via SaveStep.
+func (rm *RunMetrics) SwapMetadataSizeDelta() int {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	delta := rm.MetadataSize - rm.MetadataSizeLoaded
+	rm.MetadataSizeLoaded = rm.MetadataSize
+	return delta
+}
+
+// MetadataSizeDelta returns MetadataSize - MetadataSizeLoaded without advancing
+// the loaded baseline. Use this in sequential code paths (e.g. checkpoint) where
+// the entire delta is persisted in a single call at the end.
+func (rm *RunMetrics) MetadataSizeDelta() int {
+	m := rm.mu()
+	m.Lock()
+	defer m.Unlock()
+	return rm.MetadataSize - rm.MetadataSizeLoaded
 }
 
 // MutableConfig represents mutable config options.

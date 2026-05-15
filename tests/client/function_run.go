@@ -94,7 +94,8 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			first: $first,
 			after: %s,
 			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query, functionIDs: $ids },
-			orderBy: %s
+			orderBy: %s,
+			preview: true
 		) {
 			edges {
 				cursor
@@ -112,7 +113,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 				endCursor
 				hasNextPage
 			}
-			totalCount
+			totalCount(preview: true)
 		}
 	}`,
 		cursor,
@@ -159,6 +160,10 @@ type Run struct {
 func (c *Client) Run(ctx context.Context, runID string) Run {
 	c.Helper()
 
+	if runID == "" {
+		c.Fatalf("runID cannot be empty")
+	}
+
 	query := `
 		query GetRun($runID: ID!) {
 			functionRun(query: { functionRunId: $runID }) {
@@ -195,19 +200,17 @@ type WaitForRunStatusOpts struct {
 
 func (c *Client) WaitForRunStatus(
 	ctx context.Context,
-	t *testing.T,
+	t require.TestingT,
 	expectedStatus string,
-	runID *string,
+	runID string,
 	opts ...WaitForRunStatusOpts,
 ) Run {
-	t.Helper()
-
 	var o WaitForRunStatusOpts
 	if len(opts) > 0 {
 		o = opts[0]
 	}
 
-	timeout := 5 * time.Second
+	timeout := 20 * time.Second
 	if o.Timeout > 0 {
 		timeout = o.Timeout
 	}
@@ -215,26 +218,18 @@ func (c *Client) WaitForRunStatus(
 	start := time.Now()
 	var run Run
 	for {
-		if runID != nil && *runID != "" {
-			run = c.Run(ctx, *runID)
-			if run.Status == expectedStatus {
-				break
-			}
+		run = c.Run(ctx, runID)
+		if run.Status == expectedStatus {
+			return run
 		}
 
 		if time.Since(start) > timeout {
-			var msg string
-			if runID == nil || *runID == "" {
-				msg = "Run ID is empty"
-			} else {
-				msg = fmt.Sprintf("Expected status %s, got %s", expectedStatus, run.Status)
-			}
-			t.Fatal(msg)
+			break
 		}
-
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s (runID: %s)", expectedStatus, run.Status, runID)
 	return run
 }
 
@@ -256,14 +251,14 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 			return
 		}
 
-		run, err := c.RunTraces(ctx, *runID)
+		run, err := c.RunTraces(ctx, *runID, opts.NewTraces)
 		if !a.NoError(err) {
 			return
 		}
 		if !a.NotNil(run) {
 			return
 		}
-		if !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
+		if opts.Status != "" && !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
 			return
 		}
 
@@ -280,14 +275,15 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 }
 
 type WaitForRunTracesOptions struct {
-	Status   models.FunctionStatus
-	Timeout  time.Duration
-	Interval time.Duration
+	Status    models.FunctionStatus
+	Timeout   time.Duration
+	Interval  time.Duration
+	NewTraces bool
 
 	ChildSpanCount int
 }
 
-func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
+func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
@@ -295,7 +291,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	}
 
 	query := `
-		query GetTraceRun($runID: String!) {
+	  query GetTraceRun($runID: String!, $preview: Boolean) {
 	  	run(runID: $runID) {
 				status
 				traceID
@@ -304,7 +300,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 				cronSchedule
         endedAt
 
-				trace {
+				trace(preview: $preview) {
 					...TraceDetails
 					childrenSpans {
 						...TraceDetails
@@ -358,7 +354,8 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
-			"runID": runID,
+			"runID":   runID,
+			"preview": newTraces,
 		},
 	})
 	if err != nil {

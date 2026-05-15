@@ -1,9 +1,16 @@
-import type { Config } from 'tailwindcss';
+import containerQueries from '@tailwindcss/container-queries';
 
-import sharedConfig from '../../packages/components/tailwind.config';
+import baseConfig from '../../packages/components/tailwind.config';
+//
+// re-exporting baseConfig for upstream use by resolveConfig which does not traverse that
+export { baseConfig };
 
+/** @type {import('tailwindcss').Config} */
 export default {
-  ...sharedConfig,
-  content: ['./src/**/*.{ts,tsx}', '../../packages/components/src/**/*.{ts,tsx}'],
-  plugins: [require('@tailwindcss/forms'), require('@headlessui/tailwindcss')],
-} satisfies Config;
+  content: [
+    './src/**/*.{js,jsx,ts,tsx}',
+    '../../packages/components/src/**/*.{ts,tsx}',
+  ],
+  presets: [baseConfig],
+  plugins: [containerQueries],
+};

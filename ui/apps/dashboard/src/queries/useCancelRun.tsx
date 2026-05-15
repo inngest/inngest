@@ -19,13 +19,18 @@ export const useCancelRun = () => {
   const env = useEnvironment();
   const [, mutate] = useMutation(mutation);
 
-  async function cancelRun({ runID }: CancelRunPayload): Promise<CancelRunResult> {
+  async function cancelRun({
+    runID,
+  }: CancelRunPayload): Promise<CancelRunResult> {
     try {
       return await mutate({ envID: env.id, runID });
     } catch (error) {
       console.error('error cancelling function run', error);
       return {
-        error: error instanceof Error ? error : new Error('Error cancelling function run'),
+        error:
+          error instanceof Error
+            ? error
+            : new Error('Error cancelling function run'),
         data: undefined,
       };
     }

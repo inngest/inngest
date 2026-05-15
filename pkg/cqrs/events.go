@@ -61,12 +61,24 @@ func (e Event) GetInternalID() ulid.ULID {
 	return e.InternalID()
 }
 
+func (e Event) GetAccountID() uuid.UUID {
+	return e.AccountID
+}
+
 func (e Event) GetWorkspaceID() uuid.UUID {
 	return e.WorkspaceID
 }
 
 func (e Event) GetEvent() event.Event {
 	return e.Event()
+}
+
+func (e Event) GetReceivedAt() time.Time {
+	// Don't use the ID timestamp as the received time, since it may be
+	// different. The ID can be "seeded" by the client for idempotent
+	// client-side retries. Therefore the ID timestamp can be appreciably
+	// earlier than the actual event received time.
+	return e.ReceivedAt
 }
 
 type EventManager interface {

@@ -1,0 +1,514 @@
+package constraintapi
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/require"
+)
+
+func TestRedisCapacityManager_RateLimit(t *testing.T) {
+	r := miniredis.RunT(t)
+	ctx := context.Background()
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	cm, err := NewRedisCapacityManager(
+		WithClient(rc),
+		WithShardName("test"),
+		WithClock(clock),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, cm)
+
+	// The following tests are essential functionality. We also have detailed test for each method,
+	// to cover edge cases.
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	var leaseID ulid.ULID
+	leaseIdempotencyKey := "event1"
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		RateLimit: []RateLimitConfig{
+			{
+				KeyExpressionHash: "expr-hash",
+				Limit:             120,
+				Period:            60,
+			},
+		},
+	}
+
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindRateLimit,
+			RateLimit: &RateLimitConstraint{
+				KeyExpressionHash: "expr-hash",
+				EvaluatedKeyHash:  "test-value",
+			},
+		},
+	}
+
+	acquireReq := &CapacityAcquireRequest{
+		AccountID:            accountID,
+		EnvID:                envID,
+		FunctionID:           fnID,
+		AppID:                uuid.New(),
+		Amount:               1,
+		LeaseIdempotencyKeys: []string{leaseIdempotencyKey},
+		IdempotencyKey:       "event1",
+		LeaseRunIDs:          nil,
+		Duration:             5 * time.Second,
+		Source: LeaseSource{
+			Service:           ServiceExecutor,
+			Location:          CallerLocationSchedule,
+			RunProcessingMode: RunProcessingModeBackground,
+		},
+		Configuration:   config,
+		Constraints:     constraints,
+		CurrentTime:     clock.Now(),
+		MaximumLifetime: time.Minute,
+	}
+
+	_, _, _, fingerprint, err := buildRequestState(acquireReq)
+	require.NoError(t, err)
+
+	acquireIdempotencyKey := fmt.Sprintf("event1-%s", fingerprint)
+
+	t.Run("Acquire", func(t *testing.T) {
+		enableDebugLogs = true
+
+		resp, err := cm.Acquire(ctx, acquireReq)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+
+		// internal state should match
+		t.Log(resp.internalDebugState.Debug)
+		require.Equal(t, 3, resp.internalDebugState.Status)
+		require.Equal(t, 1, resp.internalDebugState.Granted)
+
+		// One lease should have been granted
+		require.Len(t, resp.Leases, 1)
+		require.Equal(t, leaseIdempotencyKey, resp.Leases[0].IdempotencyKey)
+
+		// Don't expect limiting constraint
+		require.Nil(t, resp.LimitingConstraints)
+		require.Empty(t, resp.ExhaustedConstraints)
+
+		// RetryAfter should not be set
+		require.Zero(t, resp.RetryAfter)
+
+		leaseID = resp.Leases[0].LeaseID
+
+		// TODO: Verify all keys have been created as expected + TTLs set
+		require.Len(t, r.Keys(), 7)
+		require.True(t, r.Exists(constraints[0].RateLimit.StateKey(accountID, envID, fnID))) // rate limit state exists
+		require.True(t, r.Exists(cm.keyScavengerShard()))
+		require.True(t, r.Exists(cm.keyAccountLeases(accountID)))
+		require.True(t, r.Exists(cm.keyLeaseDetails(accountID, leaseID)))
+		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(accountID, leaseIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey)))
+	})
+
+	var checkHash string
+	t.Run("Check", func(t *testing.T) {
+		req := &CapacityCheckRequest{
+			AccountID:     accountID,
+			EnvID:         envID,
+			FunctionID:    fnID,
+			Configuration: config,
+			Constraints:   constraints,
+		}
+
+		_, _, hash, err := buildCheckRequestData(req)
+		require.NoError(t, err)
+		require.NotZero(t, hash)
+		checkHash = hash
+
+		resp, userErr, internalErr := cm.Check(ctx, req)
+		require.NoError(t, userErr)
+		require.NoError(t, internalErr)
+		require.NotNil(t, resp)
+
+		require.Equal(t, 12, resp.AvailableCapacity)
+		require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+		require.Equal(t, 120, resp.Usage[0].Limit)
+		require.Equal(t, 1, resp.Usage[0].Used)
+
+		// Verify that constraint is not exhausted (still has capacity)
+		require.Empty(t, resp.ExhaustedConstraints, "Rate limit should not be exhausted after using 1 of 120 capacity")
+		require.True(t, resp.RetryAfter.IsZero(), "RetryAfter should not be set when constraints are not exhausted")
+	})
+
+	t.Run("Extend", func(t *testing.T) {
+		enableDebugLogs = true
+
+		// Simulate that 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		opIdempotencyKey := "extend-test"
+
+		resp, err := cm.ExtendLease(ctx, &CapacityExtendLeaseRequest{
+			IdempotencyKey: opIdempotencyKey,
+			Duration:       5 * time.Second,
+			AccountID:      accountID,
+			LeaseID:        leaseID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		t.Log(resp.internalDebugState.Debug)
+
+		require.Equal(t, 4, resp.internalDebugState.Status, r.Dump())
+		require.NotEqual(t, ulid.Zero, resp.internalDebugState.LeaseID)
+
+		require.NotNil(t, resp.LeaseID)
+
+		// TODO: Verify all respective keys have been updated
+
+		leaseID = *resp.LeaseID
+	})
+
+	t.Run("Release", func(t *testing.T) {
+		enableDebugLogs = true
+
+		// Simulate that 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		t.Log(r.Dump())
+
+		opIdempotencyKey := "release-test"
+
+		resp, err := cm.Release(ctx, &CapacityReleaseRequest{
+			IdempotencyKey: opIdempotencyKey,
+			AccountID:      accountID,
+			LeaseID:        leaseID,
+			Source: LeaseSource{
+				Service:           ServiceExecutor,
+				Location:          CallerLocationSchedule,
+				RunProcessingMode: RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		t.Log(resp.internalDebugState.Debug)
+
+		require.Equal(t, 3, resp.internalDebugState.Status, r.Dump())
+		require.Equal(t, 0, resp.internalDebugState.Remaining)
+
+		// Verify release response metadata
+		require.Equal(t, accountID, resp.AccountID)
+		require.Equal(t, envID, resp.EnvID)
+		require.Equal(t, fnID, resp.FunctionID)
+		require.Equal(t, ServiceExecutor, resp.CreationSource.Service)
+		require.Equal(t, CallerLocationSchedule, resp.CreationSource.Location)
+		require.Equal(t, RunProcessingModeBackground, resp.CreationSource.RunProcessingMode)
+
+		// TODO: Verify all respective keys have been updated
+		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
+		keys := r.Keys()
+		require.Len(t, keys, 5, r.Dump())
+		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(accountID, "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "ext", "extend-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "rel", "release-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "chk", checkHash))
+	})
+}
+
+func TestRedisRequestState_AppIDRoundTrip(t *testing.T) {
+	appID := uuid.New()
+
+	state := redisRequestState{
+		AppID: appID,
+	}
+
+	body, err := json.Marshal(state)
+	require.NoError(t, err)
+	require.Contains(t, string(body), `"ai":`)
+
+	var decoded redisRequestState
+	require.NoError(t, json.Unmarshal(body, &decoded))
+	require.Equal(t, appID, decoded.AppID)
+
+	var knownGood redisRequestState
+	require.NoError(t, json.Unmarshal([]byte(`{"ai":"`+appID.String()+`"}`), &knownGood))
+	require.Equal(t, appID, knownGood.AppID)
+}
+
+func TestRedisCapacityManager_Concurrency(t *testing.T) {
+	r := miniredis.RunT(t)
+	ctx := context.Background()
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	cm, err := NewRedisCapacityManager(
+		WithClient(rc),
+		WithShardName("test"),
+		WithClock(clock),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, cm)
+
+	// The following tests are essential functionality. We also have detailed test for each method,
+	// to cover edge cases.
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	var leaseID ulid.ULID
+	leaseIdempotencyKey := "event1"
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			AccountConcurrency:  20,
+			FunctionConcurrency: 5,
+		},
+	}
+
+	acctConcurrency := fmt.Sprintf("{q}:concurrency:account:%s", accountID)
+	fnConcurrency := fmt.Sprintf("{q}:concurrency:p:%s", fnID)
+
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             enums.ConcurrencyScopeAccount,
+			},
+		},
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             enums.ConcurrencyScopeFn,
+			},
+		},
+	}
+
+	acquireReq := &CapacityAcquireRequest{
+		AccountID:            accountID,
+		EnvID:                envID,
+		FunctionID:           fnID,
+		Amount:               1,
+		LeaseIdempotencyKeys: []string{leaseIdempotencyKey},
+		IdempotencyKey:       "event1",
+		LeaseRunIDs:          nil,
+		Duration:             5 * time.Second,
+		Source: LeaseSource{
+			Service:           ServiceExecutor,
+			Location:          CallerLocationSchedule,
+			RunProcessingMode: RunProcessingModeBackground,
+		},
+		Configuration:   config,
+		Constraints:     constraints,
+		CurrentTime:     clock.Now(),
+		MaximumLifetime: time.Minute,
+	}
+
+	_, _, _, fingerprint, err := buildRequestState(acquireReq)
+	require.NoError(t, err)
+
+	acquireIdempotencyKey := fmt.Sprintf("event1-%s", fingerprint)
+
+	t.Run("Acquire", func(t *testing.T) {
+		enableDebugLogs = true
+
+		var err error
+		resp, err := cm.Acquire(ctx, acquireReq)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+
+		// internal state should match
+		t.Log(resp.internalDebugState.Debug)
+		require.Equal(t, 3, resp.internalDebugState.Status)
+		require.Equal(t, 1, resp.internalDebugState.Granted)
+
+		// One lease should have been granted
+		require.Len(t, resp.Leases, 1)
+
+		// Don't expect limiting constraint
+		require.Nil(t, resp.LimitingConstraints)
+		require.Empty(t, resp.ExhaustedConstraints)
+
+		// RetryAfter should not be set
+		require.Zero(t, resp.RetryAfter)
+
+		leaseID = resp.Leases[0].LeaseID
+
+		// TODO: Verify all keys have been created as expected + TTLs set
+		require.Len(t, r.Keys(), 8)
+		require.False(t, r.Exists(acctConcurrency)) // we do not modify the in progress items directly
+		require.True(t, r.Exists(constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID)), r.Dump())
+		require.False(t, r.Exists(fnConcurrency)) // we do not modify the in progress items directly
+		require.True(t, r.Exists(constraints[1].Concurrency.InProgressLeasesKey(accountID, envID, fnID)), r.Dump())
+
+		require.True(t, r.Exists(cm.keyScavengerShard()))
+		require.True(t, r.Exists(cm.keyAccountLeases(accountID)))
+		require.True(t, r.Exists(cm.keyLeaseDetails(accountID, leaseID)))
+		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(accountID, leaseIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey)))
+
+		keyRequestState := cm.keyRequestState(accountID, resp.RequestID)
+		require.True(t, r.Exists(keyRequestState))
+
+		requestState, err := r.Get(keyRequestState)
+		require.NoError(t, err)
+
+		var state redisRequestState
+		require.NoError(t, json.Unmarshal([]byte(requestState), &state))
+
+		// Ensure we include metadata in state
+		require.Equal(t, CallerLocationSchedule, state.Metadata.SourceLocation)
+		require.Equal(t, ServiceExecutor, state.Metadata.SourceService)
+		require.Equal(t, RunProcessingModeBackground, state.Metadata.SourceRunProcessingMode)
+	})
+
+	var checkHash string
+	t.Run("Check", func(t *testing.T) {
+		enableDebugLogs = true
+
+		req := &CapacityCheckRequest{
+			AccountID:     accountID,
+			EnvID:         envID,
+			FunctionID:    fnID,
+			Configuration: config,
+			Constraints:   constraints,
+		}
+
+		_, _, hash, err := buildCheckRequestData(req)
+		require.NoError(t, err)
+		require.NotZero(t, hash)
+		checkHash = hash
+
+		resp, userErr, internalErr := cm.Check(ctx, req)
+		require.NoError(t, userErr)
+		require.NoError(t, internalErr)
+		require.NotNil(t, resp)
+
+		t.Log(resp.internalDebugState.Debug)
+
+		mem, err := r.ZMembers(constraints[0].Concurrency.InProgressLeasesKey(accountID, envID, fnID))
+		require.NoError(t, err)
+		require.Len(t, mem, 1)
+		mem, err = r.ZMembers(constraints[1].Concurrency.InProgressLeasesKey(accountID, envID, fnID))
+		require.NoError(t, err)
+		require.Len(t, mem, 1)
+
+		require.Equal(t, 4, resp.AvailableCapacity, r.Dump())
+		require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
+		require.Equal(t, enums.ConcurrencyScopeAccount, resp.LimitingConstraints[0].Concurrency.Scope)
+		require.Equal(t, enums.ConcurrencyScopeFn, resp.LimitingConstraints[1].Concurrency.Scope)
+		require.Equal(t, 20, resp.Usage[0].Limit)
+		require.Equal(t, 1, resp.Usage[0].Used)
+		require.Equal(t, 5, resp.Usage[1].Limit)
+		require.Equal(t, 1, resp.Usage[1].Used)
+
+		// Verify that constraints are not exhausted (still have capacity)
+		require.Empty(t, resp.ExhaustedConstraints, "Concurrency constraints should not be exhausted (account: 1/20, function: 1/5)")
+		require.True(t, resp.RetryAfter.IsZero(), "RetryAfter should not be set when constraints are not exhausted")
+	})
+
+	t.Run("Extend", func(t *testing.T) {
+		enableDebugLogs = true
+
+		// Simulate that 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		opIdempotencyKey := "extend-test"
+
+		resp, err := cm.ExtendLease(ctx, &CapacityExtendLeaseRequest{
+			IdempotencyKey: opIdempotencyKey,
+			Duration:       5 * time.Second,
+			AccountID:      accountID,
+			LeaseID:        leaseID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		t.Log(resp.internalDebugState.Debug)
+
+		require.Equal(t, 4, resp.internalDebugState.Status, r.Dump())
+		require.NotEqual(t, ulid.Zero, resp.internalDebugState.LeaseID)
+
+		require.NotNil(t, resp.LeaseID)
+
+		// TODO: Verify all respective keys have been updated
+
+		leaseID = *resp.LeaseID
+	})
+
+	t.Run("Release", func(t *testing.T) {
+		enableDebugLogs = true
+
+		// Simulate that 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		t.Log(r.Dump())
+
+		opIdempotencyKey := "release-test"
+
+		resp, err := cm.Release(ctx, &CapacityReleaseRequest{
+			IdempotencyKey: opIdempotencyKey,
+			AccountID:      accountID,
+			LeaseID:        leaseID,
+			Source: LeaseSource{
+				Service:           ServiceExecutor,
+				Location:          CallerLocationSchedule,
+				RunProcessingMode: RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		t.Log(resp.internalDebugState.Debug)
+
+		require.Equal(t, 3, resp.internalDebugState.Status, r.Dump())
+		require.Equal(t, 0, resp.internalDebugState.Remaining)
+
+		// Verify release response metadata
+		require.Equal(t, accountID, resp.AccountID)
+		require.Equal(t, envID, resp.EnvID)
+		require.Equal(t, fnID, resp.FunctionID)
+		require.Equal(t, ServiceExecutor, resp.CreationSource.Service)
+		require.Equal(t, CallerLocationSchedule, resp.CreationSource.Location)
+		require.Equal(t, RunProcessingModeBackground, resp.CreationSource.RunProcessingMode)
+
+		// TODO: Verify all respective keys have been updated
+		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
+		keys := r.Keys()
+		require.Len(t, keys, 5, r.Dump())
+		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(accountID, "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "acq", acquireIdempotencyKey))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "ext", "extend-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "rel", "release-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(accountID, "chk", checkHash))
+	})
+}

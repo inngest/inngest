@@ -1,5 +1,3 @@
-'use client';
-
 import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
@@ -8,7 +6,12 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { RiArchive2Line, RiFirstAidKitLine, RiMore2Line, RiRefreshLine } from '@remixicon/react';
+import {
+  RiArchive2Line,
+  RiFirstAidKitLine,
+  RiMore2Line,
+  RiRefreshLine,
+} from '@remixicon/react';
 
 export type AppActions = {
   isArchived: boolean;
@@ -34,7 +37,13 @@ export const ActionsMenu = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} raw />
+        <Button
+          kind="primary"
+          appearance="outlined"
+          size="medium"
+          icon={<RiMore2Line />}
+          raw
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {!disableResync && (
@@ -43,7 +52,11 @@ export const ActionsMenu = ({
             Resync app
           </DropdownMenuItem>
         )}
-        <OptionalTooltip tooltip={disableValidate ? 'App health check not available.' : undefined}>
+        <OptionalTooltip
+          tooltip={
+            disableValidate ? 'App health check not available.' : undefined
+          }
+        >
           <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
             <RiFirstAidKitLine className="h-4 w-4" />
             Check app health
@@ -52,7 +65,9 @@ export const ActionsMenu = ({
         {(!isArchived || showUnarchive) && (
           <OptionalTooltip
             tooltip={
-              disableArchive ? 'Parent app is archived. Archive action not available.' : undefined
+              disableArchive
+                ? 'Parent app is archived. Archive action not available.'
+                : undefined
             }
           >
             <DropdownMenuItem

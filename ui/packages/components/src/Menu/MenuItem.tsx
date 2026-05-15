@@ -1,9 +1,7 @@
-'use client';
-
 import type { ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
-import { OptionalLink } from '@inngest/components/Link/OptionalLink';
+import { useLocation, type LinkComponentProps } from '@tanstack/react-router';
 
+import { OptionalLink } from '../Link/OptionalLink';
 import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
@@ -13,6 +11,7 @@ export const MenuItem = ({
   icon,
   collapsed,
   href,
+  to,
   prefetch = false,
   comingSoon = false,
   beta = false,
@@ -23,21 +22,22 @@ export const MenuItem = ({
   icon: ReactNode;
   collapsed: boolean;
   href?: string;
-  prefetch?: boolean;
+  to?: LinkComponentProps['to'];
+  prefetch?: false | 'intent' | 'viewport' | 'render';
   comingSoon?: boolean;
   beta?: boolean;
   error?: boolean;
   className?: string;
 }) => {
-  const pathname = usePathname();
-  const active = href && pathname.startsWith(href);
+  const location = useLocation();
+  const active = (href || to) && location.href.startsWith(href || to || '');
 
   return (
-    <OptionalLink href={comingSoon ? '' : href} prefetch={prefetch}>
+    <OptionalLink href={comingSoon ? '' : href} to={comingSoon ? undefined : to} preload={prefetch}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={cn(
-            `my-1 flex h-8 w-full flex-row items-center rounded px-1.5  ${
+            `my-0.5 flex h-8 w-full flex-row items-center rounded px-1.5  ${
               comingSoon
                 ? 'text-disabled hover:bg-disabled cursor-not-allowed'
                 : active

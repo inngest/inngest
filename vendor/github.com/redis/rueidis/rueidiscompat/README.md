@@ -4,7 +4,7 @@ Though it is easier to know what command will be sent to redis at first glance i
 users may sometimes feel it too verbose to write.
 
 For users who don't like the command builder, `rueidiscompat.Adapter`, contributed mainly by [@418Coffee](https://github.com/418Coffee), is an alternative.
-It is a high level API which is close to go-redis's `Cmdable` interface.
+It is a high-level API that is close to go-redis's `Cmdable` interface.
 
 ### Migrating from go-redis
 
@@ -103,7 +103,7 @@ func main() {
 		if err != nil && err != rueidiscompat.Nil {
 			return err
 		}
-		// Operation is commited only if the watched keys remain unchanged.
+		// Operation is committed only if the watched keys remain unchanged.
 		_, err = tx.TxPipelined(ctx, func(pipe rueidiscompat.Pipeliner) error {
 			pipe.Set(ctx, key, n+1, 0)
 			return nil

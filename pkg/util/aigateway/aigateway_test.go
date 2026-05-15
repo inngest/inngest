@@ -1,7 +1,6 @@
 package aigateway
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -50,7 +49,7 @@ func TestParseOutput(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		out, err := ParseOutput(context.Background(), test.format, []byte(test.input))
+		out, err := ParseOutput(test.format, []byte(test.input))
 		require.EqualValues(t, test.expected, out, test.description)
 		require.EqualValues(t, test.err, err, test.description)
 	}

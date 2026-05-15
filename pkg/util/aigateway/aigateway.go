@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/sashabaranov/go-openai"
@@ -15,7 +14,7 @@ import (
 // Note that this is not stored, and instead is computed just in time for each input
 // depending on the UI.
 type ParsedInferenceRequest struct {
-	URL                 url.URL  `json:"url"`
+	URL                 string   `json:"url"`
 	Model               string   `json:"model"`
 	Seed                *int     `json:"seed,omitempty"`
 	Temprature          float32  `json:"temperature,omitempty"`
@@ -79,7 +78,7 @@ func ParseUnknownInput(ctx context.Context, req json.RawMessage) (ParsedInferenc
 // * Mistral
 // * Cohere
 // * Groq (must include URL)
-func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error) {
+func ParseInput(req Request) (ParsedInferenceRequest, error) {
 	switch req.Format {
 	case FormatOpenAIChat:
 		// OpenAI Chat is the default format, so fall through to the default.
@@ -125,6 +124,7 @@ func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error
 		}
 
 		return ParsedInferenceRequest{
+			URL:                 req.URL,
 			Model:               rf.Model,
 			Seed:                rf.Seed,
 			Temprature:          rf.Temperature,
@@ -139,7 +139,7 @@ func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error
 
 }
 
-func ParseOutput(ctx context.Context, format string, response []byte) (ParsedInferenceResponse, error) {
+func ParseOutput(format string, response []byte) (ParsedInferenceResponse, error) {
 	switch format {
 	case FormatAnthropic:
 		r := anthropic.MessagesResponse{}

@@ -53,12 +53,28 @@ const (
 	// V2FetchAccountSigningKeysProcedure is the fully-qualified name of the V2's
 	// FetchAccountSigningKeys RPC.
 	V2FetchAccountSigningKeysProcedure = "/api.v2.V2/FetchAccountSigningKeys"
+	// V2CreateWebhookProcedure is the fully-qualified name of the V2's CreateWebhook RPC.
+	V2CreateWebhookProcedure = "/api.v2.V2/CreateWebhook"
+	// V2ListWebhooksProcedure is the fully-qualified name of the V2's ListWebhooks RPC.
+	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
+	// V2PatchEnvProcedure is the fully-qualified name of the V2's PatchEnv RPC.
+	V2PatchEnvProcedure = "/api.v2.V2/PatchEnv"
+	// V2GetFunctionRunProcedure is the fully-qualified name of the V2's GetFunctionRun RPC.
+	V2GetFunctionRunProcedure = "/api.v2.V2/GetFunctionRun"
+	// V2SyncAppProcedure is the fully-qualified name of the V2's SyncApp RPC.
+	V2SyncAppProcedure = "/api.v2.V2/SyncApp"
+	// V2GetFunctionTraceProcedure is the fully-qualified name of the V2's GetFunctionTrace RPC.
+	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
+	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
+	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
 )
 
 // V2Client is a client for the api.v2.V2 service.
 type V2Client interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
-	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
+	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
+	// in the swagger definitions. This path is stripped by the convert-openapi tool.
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
@@ -67,6 +83,13 @@ type V2Client interface {
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
+	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
+	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
+	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
+	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
+	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -134,6 +157,48 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
 			connect.WithClientOptions(opts...),
 		),
+		createWebhook: connect.NewClient[v2.CreateWebhookRequest, v2.CreateWebhookResponse](
+			httpClient,
+			baseURL+V2CreateWebhookProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateWebhook")),
+			connect.WithClientOptions(opts...),
+		),
+		listWebhooks: connect.NewClient[v2.ListWebhooksRequest, v2.ListWebhooksResponse](
+			httpClient,
+			baseURL+V2ListWebhooksProcedure,
+			connect.WithSchema(v2Methods.ByName("ListWebhooks")),
+			connect.WithClientOptions(opts...),
+		),
+		patchEnv: connect.NewClient[v2.PatchEnvRequest, v2.PatchEnvsResponse](
+			httpClient,
+			baseURL+V2PatchEnvProcedure,
+			connect.WithSchema(v2Methods.ByName("PatchEnv")),
+			connect.WithClientOptions(opts...),
+		),
+		getFunctionRun: connect.NewClient[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse](
+			httpClient,
+			baseURL+V2GetFunctionRunProcedure,
+			connect.WithSchema(v2Methods.ByName("GetFunctionRun")),
+			connect.WithClientOptions(opts...),
+		),
+		syncApp: connect.NewClient[v2.SyncAppRequest, v2.SyncAppResponse](
+			httpClient,
+			baseURL+V2SyncAppProcedure,
+			connect.WithSchema(v2Methods.ByName("SyncApp")),
+			connect.WithClientOptions(opts...),
+		),
+		getFunctionTrace: connect.NewClient[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse](
+			httpClient,
+			baseURL+V2GetFunctionTraceProcedure,
+			connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
+			connect.WithClientOptions(opts...),
+		),
+		invokeFunction: connect.NewClient[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse](
+			httpClient,
+			baseURL+V2InvokeFunctionProcedure,
+			connect.WithSchema(v2Methods.ByName("InvokeFunction")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -148,6 +213,13 @@ type v2Client struct {
 	fetchAccountEnvs        *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
 	fetchAccountEventKeys   *connect.Client[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse]
 	fetchAccountSigningKeys *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
+	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
+	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
+	patchEnv                *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
+	getFunctionRun          *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
+	syncApp                 *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
+	getFunctionTrace        *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
+	invokeFunction          *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -195,10 +267,47 @@ func (c *v2Client) FetchAccountSigningKeys(ctx context.Context, req *connect.Req
 	return c.fetchAccountSigningKeys.CallUnary(ctx, req)
 }
 
+// CreateWebhook calls api.v2.V2.CreateWebhook.
+func (c *v2Client) CreateWebhook(ctx context.Context, req *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error) {
+	return c.createWebhook.CallUnary(ctx, req)
+}
+
+// ListWebhooks calls api.v2.V2.ListWebhooks.
+func (c *v2Client) ListWebhooks(ctx context.Context, req *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error) {
+	return c.listWebhooks.CallUnary(ctx, req)
+}
+
+// PatchEnv calls api.v2.V2.PatchEnv.
+func (c *v2Client) PatchEnv(ctx context.Context, req *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {
+	return c.patchEnv.CallUnary(ctx, req)
+}
+
+// GetFunctionRun calls api.v2.V2.GetFunctionRun.
+func (c *v2Client) GetFunctionRun(ctx context.Context, req *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error) {
+	return c.getFunctionRun.CallUnary(ctx, req)
+}
+
+// SyncApp calls api.v2.V2.SyncApp.
+func (c *v2Client) SyncApp(ctx context.Context, req *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error) {
+	return c.syncApp.CallUnary(ctx, req)
+}
+
+// GetFunctionTrace calls api.v2.V2.GetFunctionTrace.
+func (c *v2Client) GetFunctionTrace(ctx context.Context, req *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
+	return c.getFunctionTrace.CallUnary(ctx, req)
+}
+
+// InvokeFunction calls api.v2.V2.InvokeFunction.
+func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
+	return c.invokeFunction.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
-	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
+	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
+	// in the swagger definitions. This path is stripped by the convert-openapi tool.
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
@@ -207,6 +316,13 @@ type V2Handler interface {
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
+	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
+	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
+	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
+	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
+	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
+	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -270,6 +386,48 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateWebhookHandler := connect.NewUnaryHandler(
+		V2CreateWebhookProcedure,
+		svc.CreateWebhook,
+		connect.WithSchema(v2Methods.ByName("CreateWebhook")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListWebhooksHandler := connect.NewUnaryHandler(
+		V2ListWebhooksProcedure,
+		svc.ListWebhooks,
+		connect.WithSchema(v2Methods.ByName("ListWebhooks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2PatchEnvHandler := connect.NewUnaryHandler(
+		V2PatchEnvProcedure,
+		svc.PatchEnv,
+		connect.WithSchema(v2Methods.ByName("PatchEnv")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetFunctionRunHandler := connect.NewUnaryHandler(
+		V2GetFunctionRunProcedure,
+		svc.GetFunctionRun,
+		connect.WithSchema(v2Methods.ByName("GetFunctionRun")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2SyncAppHandler := connect.NewUnaryHandler(
+		V2SyncAppProcedure,
+		svc.SyncApp,
+		connect.WithSchema(v2Methods.ByName("SyncApp")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetFunctionTraceHandler := connect.NewUnaryHandler(
+		V2GetFunctionTraceProcedure,
+		svc.GetFunctionTrace,
+		connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2InvokeFunctionHandler := connect.NewUnaryHandler(
+		V2InvokeFunctionProcedure,
+		svc.InvokeFunction,
+		connect.WithSchema(v2Methods.ByName("InvokeFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -290,6 +448,20 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2FetchAccountEventKeysHandler.ServeHTTP(w, r)
 		case V2FetchAccountSigningKeysProcedure:
 			v2FetchAccountSigningKeysHandler.ServeHTTP(w, r)
+		case V2CreateWebhookProcedure:
+			v2CreateWebhookHandler.ServeHTTP(w, r)
+		case V2ListWebhooksProcedure:
+			v2ListWebhooksHandler.ServeHTTP(w, r)
+		case V2PatchEnvProcedure:
+			v2PatchEnvHandler.ServeHTTP(w, r)
+		case V2GetFunctionRunProcedure:
+			v2GetFunctionRunHandler.ServeHTTP(w, r)
+		case V2SyncAppProcedure:
+			v2SyncAppHandler.ServeHTTP(w, r)
+		case V2GetFunctionTraceProcedure:
+			v2GetFunctionTraceHandler.ServeHTTP(w, r)
+		case V2InvokeFunctionProcedure:
+			v2InvokeFunctionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -333,4 +505,32 @@ func (UnimplementedV2Handler) FetchAccountEventKeys(context.Context, *connect.Re
 
 func (UnimplementedV2Handler) FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountSigningKeys is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateWebhook is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListWebhooks is not implemented"))
+}
+
+func (UnimplementedV2Handler) PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PatchEnv is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionRun is not implemented"))
+}
+
+func (UnimplementedV2Handler) SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.SyncApp is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionTrace is not implemented"))
+}
+
+func (UnimplementedV2Handler) InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.InvokeFunction is not implemented"))
 }

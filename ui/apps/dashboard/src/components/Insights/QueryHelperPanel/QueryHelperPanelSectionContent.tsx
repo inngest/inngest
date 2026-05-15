@@ -1,23 +1,22 @@
-'use client';
-
-import type { Query, QuerySnapshot } from '../types';
+import type { InsightsQueryStatement } from '@/gql/graphql';
+import type { QuerySnapshot } from '../types';
 import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionContentNoData';
 import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
 
 export interface QueryHelperPanelSectionContentProps {
-  activeTabId: string;
+  activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
-  onQuerySelect: (query: Query | QuerySnapshot) => void;
+  onQuerySelect: (query: InsightsQueryStatement | QuerySnapshot) => void;
   queries: {
-    data: undefined | Array<Query | QuerySnapshot>;
+    data: undefined | Array<InsightsQueryStatement | QuerySnapshot>;
     error: undefined | string;
     isLoading: boolean;
   };
-  sectionType: 'history' | 'saved';
+  sectionType: 'history' | 'saved' | 'shared';
 }
 
 export function QueryHelperPanelSectionContent({
-  activeTabId,
+  activeSavedQueryId,
   onQueryDelete,
   onQuerySelect,
   queries,
@@ -25,22 +24,37 @@ export function QueryHelperPanelSectionContent({
 }: QueryHelperPanelSectionContentProps) {
   const { data, error, isLoading } = queries;
 
-  if (isLoading) {
-    return <QueryHelperPanelStaticMessage>Loading...</QueryHelperPanelStaticMessage>;
+  if (isLoading && !data?.length) {
+    return (
+      <QueryHelperPanelStaticMessage>Loading...</QueryHelperPanelStaticMessage>
+    );
   }
 
-  if (error) {
-    return <QueryHelperPanelStaticMessage>{error}</QueryHelperPanelStaticMessage>;
+  if (error && !data?.length) {
+    return (
+      <QueryHelperPanelStaticMessage>
+        Failed to load queries
+      </QueryHelperPanelStaticMessage>
+    );
   }
 
+  // TODO: Update message for shared queries to reference right-clicking on query when implemented.
   if (!data?.length) {
     return (
       <QueryHelperPanelSectionContentNoData
-        primary={sectionType === 'history' ? 'No query history' : 'No saved queries'}
+        primary={
+          sectionType === 'history'
+            ? 'No query history'
+            : sectionType === 'saved'
+            ? 'No saved queries'
+            : 'No shared queries'
+        }
         secondary={
           sectionType === 'history'
             ? 'You will find the last 10 queries that ran successfully here.'
-            : 'Click the save query button to easily access your queries later.'
+            : sectionType === 'saved'
+            ? 'Click the save query button to easily access your queries later.'
+            : 'Share queries with your org by right-clicking on the query.'
         }
         sectionType={sectionType}
       />
@@ -51,7 +65,7 @@ export function QueryHelperPanelSectionContent({
     <div className="flex flex-col gap-1">
       {data.map((query) => (
         <QueryHelperPanelSectionItem
-          activeTabId={activeTabId}
+          activeSavedQueryId={activeSavedQueryId}
           key={query.id}
           onQueryDelete={onQueryDelete}
           onQuerySelect={onQuerySelect}

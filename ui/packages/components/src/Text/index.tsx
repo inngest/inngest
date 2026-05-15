@@ -1,0 +1,1 @@
+export { TextClickToCopy } from './TextClickToCopy';

@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +23,13 @@ import (
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/pbnjay/memory"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	defaultMaxWorkerConcurrency = int64(0)
+	defaultWorkerPoolSize       = 1_000
+	maxWorkerPoolSize           = 100_000_000
+	maxWorkerConcurrencyEnvKey  = "INNGEST_CONNECT_MAX_WORKER_CONCURRENCY"
 )
 
 type ConnectionState string
@@ -42,14 +51,17 @@ type WorkerConnection interface {
 	Close() error
 }
 
+// Connect
 func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker, logger *slog.Logger) (WorkerConnection, error) {
-	apiClient := newWorkerApiClient(opts.APIBaseUrl, opts.Env)
+	apiClient := newWorkerApiClient(opts.APIBaseURL, opts.Env)
 
 	// Once the worker is running, it can only be stopped by calling Close()
 	doneCtx, cancelDone := context.WithCancel(context.Background())
 
+	l := logger.With("mode", "connect")
+
 	ch := &connectHandler{
-		logger:                 logger,
+		logger:                 l,
 		invokers:               invokers,
 		opts:                   opts,
 		notifyConnectDoneChan:  make(chan connectReport),
@@ -63,15 +75,18 @@ func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker
 		cancelWorkerCtx: cancelDone,
 	}
 
-	wp := NewWorkerPool(ctx, opts.MaxConcurrency, ch.processExecutorRequest)
-	ch.workerPool = wp
+	// define a worker pool size based on the max worker concurrency
+	workerPoolSize := defaultWorkerPoolSize
+	if opts.MaxWorkerConcurrency != nil && *opts.MaxWorkerConcurrency > 0 {
+		workerPoolSize = min(int(*opts.MaxWorkerConcurrency), maxWorkerPoolSize)
+	}
 
-	defer func() {
-		// TODO Push remaining messages to another destination for processing?
-	}()
+	wp := NewWorkerPool(ctx, workerPoolSize, ch.processExecutorRequest)
+	ch.workerPool = wp
 
 	conn, err := ch.Connect(ctx)
 	if err != nil {
+		l.Error("could not establish connection", "error", err)
 		return nil, fmt.Errorf("could not establish connection: %w", err)
 	}
 
@@ -88,6 +103,8 @@ type ConnectApp struct {
 	AppVersion *string
 }
 
+// Opts represents required options for creating a persistent connection for communicating
+// with an Inngest server.
 type Opts struct {
 	Env  *string
 	Apps []ConnectApp
@@ -97,11 +114,16 @@ type Opts struct {
 	HashedSigningKey         []byte
 	HashedSigningKeyFallback []byte
 
-	MaxConcurrency int
+	MaxWorkerConcurrency *int64
 
-	APIBaseUrl   string
-	IsDev        bool
-	DevServerUrl string
+	// MessageReadLimit sets the max number of bytes to read for a single WebSocket message.
+	// By default (nil or 0), the connection has a message read limit of 10MB.
+	// Set to -1 to disable the limit.
+	// Set to any positive value to use a custom limit.
+	MessageReadLimit *int64
+
+	APIBaseURL string
+	IsDev      bool
 
 	InstanceID *string
 
@@ -136,7 +158,9 @@ type connectHandler struct {
 
 	// Global connection state
 
-	state           ConnectionState
+	stateLock sync.RWMutex
+	state     ConnectionState
+
 	workerCtx       context.Context
 	cancelWorkerCtx context.CancelFunc
 	gracefulCloseEg errgroup.Group
@@ -154,6 +178,8 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 	// While the worker is starting, it can be canceled using the passed context
 	startCtx, cancelStart := context.WithTimeout(ctx, time.Second*30)
 	defer cancelStart()
+
+	l := h.logger
 
 	signingKey := h.opts.HashedSigningKey
 	if len(signingKey) == 0 && !h.opts.IsDev {
@@ -193,7 +219,7 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 		}
 	}
 
-	h.logger.Debug("using provided functions", "slugs", appSlugs)
+	l.Debug("using provided functions", "slugs", appSlugs)
 
 	marshaledCapabilities, err := json.Marshal(h.opts.Capabilities)
 	if err != nil {
@@ -219,21 +245,29 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 
 			// Reset attempts when connection succeeded
 			case <-h.notifyConnectedChan:
-				h.logger.Debug("connected")
+				l.Debug("connected")
 				if isInitialConnection {
 					isInitialConnection = false
 					initialConnectionDone <- nil
 				}
-				h.state = ConnectionStateActive
+				h.setState(ConnectionStateActive, "connection established", "attempt", attempts)
 				attempts = 0
 				continue
 
 			// Handle connection done events
 			case msg := <-h.notifyConnectDoneChan:
-				h.logger.Error("connect failed", "err", err, "reconnect", msg.reconnect)
+				if msg.err != nil {
+					l.Error("connection ended with error", "err", msg.err, "reconnect", msg.reconnect)
+				} else {
+					l.Debug("connection ended", "reconnect", msg.reconnect)
+				}
 
 				if !msg.reconnect {
-					h.state = ConnectionStateClosed
+					h.setState(ConnectionStateClosed, "connection ended without reconnect", "err", msg.err)
+					err := msg.err
+					if err == nil {
+						err = fmt.Errorf("connection ended without reconnect")
+					}
 
 					if isInitialConnection {
 						isInitialConnection = false
@@ -243,15 +277,16 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 					return err
 				}
 
-				h.state = ConnectionStateReconnecting
+				h.setState(ConnectionStateReconnecting, "connection ended with reconnect", "err", msg.err, "attempt", attempts)
 
 				// Some errors should be handled differently (e.g. auth failed)
 				if msg.err != nil {
 					if errors.Is(msg.err, ErrTooManyConnections) {
 						// If limits are exceed in initial connection, return immediately
 						if isInitialConnection {
+							err := fmt.Errorf("too many connections, please disconnect other workers or upgrade your billing plan for more concurrent connections")
 							isInitialConnection = false
-							initialConnectionDone <- fmt.Errorf("too many connections, please disconnect other workers or upgrade your billing plan for more concurrent connections")
+							initialConnectionDone <- err
 							return err
 						}
 					}
@@ -311,14 +346,14 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 				if h.messageBuffer.hasMessages() {
 					err := h.messageBuffer.flush(h.auth.hashedSigningKey)
 					if err != nil {
-						h.logger.Error("could not send buffered messages", "err", err)
+						l.Error("could not send buffered messages", "err", err)
 					}
 				}
 
 				// continue to reconnect logic
 				delay := expBackoff(attempts)
 
-				h.logger.Debug("reconnecting", "delay", delay.String(), "attempts", attempts)
+				l.Debug("reconnecting", "delay", delay.String(), "attempts", attempts)
 
 				select {
 				case <-time.After(delay):
@@ -329,7 +364,7 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 						initialConnectionDone <- nil
 					}
 
-					h.logger.Info("canceled context while waiting to reconnect")
+					l.Info("canceled context while waiting to reconnect")
 					return nil
 				}
 
@@ -370,18 +405,18 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 		// Wait for run loop to complete (maximum attempts reached, context canceled)
 		runLoopErr := runLoop.Wait()
 		if runLoopErr != nil {
-			h.logger.Error("could not connect", "err", runLoopErr)
+			l.Error("could not connect", "err", runLoopErr)
 		}
 
-		h.logger.Debug("run loop ended")
+		l.Debug("run loop ended")
 
 		// Wait until current connection is fully terminated
 		select {
 		case <-ctx.Done():
 		case <-time.After(5 * time.Second):
-			h.logger.Warn("shutting down without final signal")
+			l.Warn("shutting down without final signal")
 		case <-h.notifyConnectDoneChan:
-			h.logger.Debug("got connection done signal")
+			l.Debug("got connection done signal")
 		}
 
 		// Always send out buffered messages using API
@@ -389,13 +424,13 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 			// Send buffered messages
 			err := h.messageBuffer.flush(h.auth.hashedSigningKey)
 			if err != nil {
-				h.logger.Error("could not send buffered messages", "err", err)
+				l.Error("could not send buffered messages", "err", err)
 			}
 
 			// TODO Push remaining messages to another destination for processing?
 		}
 
-		h.logger.Debug("connect handler done")
+		l.Debug("connect handler done")
 		return nil
 	})
 
@@ -420,13 +455,17 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 func (h *connectHandler) Close() error {
 	// If connection was already closed, this is a no-op.
 	if h.closed.Swap(true) {
+		h.logger.Debug("close ignored; connection already closed", "state", h.State())
 		return nil
 	}
 
 	if h.cancelWorkerCtx == nil {
-		return fmt.Errorf("connection was not fully set up")
+		err := fmt.Errorf("connection was not fully set up")
+		h.logger.Error("could not close connection", "err", err, "state", h.State())
+		return err
 	}
 
+	h.setState(ConnectionStateClosing, "close requested")
 	h.cancelWorkerCtx()
 
 	// Wait until connection loop finishes
@@ -435,13 +474,30 @@ func (h *connectHandler) Close() error {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 
-	h.state = ConnectionStateClosed
+	h.setState(ConnectionStateClosed, "close complete")
 
 	return nil
 }
 
 func (h *connectHandler) State() ConnectionState {
+	h.stateLock.RLock()
+	defer h.stateLock.RUnlock()
 	return h.state
+}
+
+func (h *connectHandler) setState(state ConnectionState, reason string, attrs ...any) {
+	h.stateLock.Lock()
+	previous := h.state
+	h.state = state
+	h.stateLock.Unlock()
+
+	logAttrs := []any{
+		"from", previous,
+		"to", state,
+		"reason", reason,
+	}
+	logAttrs = append(logAttrs, attrs...)
+	h.logger.Debug("worker connection state transition", logAttrs...)
 }
 
 var errGatewayDraining = errors.New("gateway is draining")
@@ -484,6 +540,27 @@ func (h *connectHandler) instanceId() string {
 
 	// TODO Is there any stable identifier that can be used as a fallback?
 	return "<missing-instance-id>"
+}
+
+// maxWorkerConcurrency returns the maximum number of worker concurrency to use.
+func (h *connectHandler) maxWorkerConcurrency() *int64 {
+	// user provided max worker concurrency
+	if h.opts.MaxWorkerConcurrency != nil {
+		return h.opts.MaxWorkerConcurrency
+	}
+
+	// environment variable
+	envValue := os.Getenv(maxWorkerConcurrencyEnvKey)
+	if envValue != "" {
+		if concurrency, err := strconv.ParseInt(envValue, 10, 64); err == nil {
+			return &concurrency
+		}
+		// ignore error
+	}
+
+	// default max worker concurrency
+	concurrency := defaultMaxWorkerConcurrency
+	return &concurrency
 }
 
 func expBackoff(attempt int) time.Duration {

@@ -47,6 +47,7 @@ package v1
 
 #CronTrigger: {
 	cron: string
+	jitter?: string
 }
 
 #Trigger: #EventTrigger | #CronTrigger

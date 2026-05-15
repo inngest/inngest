@@ -33,6 +33,9 @@ type RangePickerProps = Omit<DateButtonProps, 'defaultValue' | 'onChange'> & {
   onChange: (args: RangeChangeProps) => void;
   defaultValue?: RangeChangeProps;
   upgradeCutoff?: Date;
+  daysAgoMax?: number;
+  // Hides relative presets (and rejects free-form input) shorter than this.
+  minDuration?: Duration;
   triggerComponent?: React.ComponentType<DateButtonProps>;
   allowFuture?: boolean;
 };
@@ -48,6 +51,38 @@ const RELATIVES = {
   '3d': 'Last 3 days',
   '7d': 'Last 7 days',
   '30d': 'Last 30 days',
+};
+
+// planRelatives returns the list of relative time options,
+// adding an option for the max account limit if it's not already
+// included and less than 30 days. When minDuration is set, presets
+// shorter than that duration are filtered out.
+const planRelatives = (daysAgoMax?: number, minDuration?: Duration) => {
+  const now = new Date();
+  const minTime = minDuration ? subtractDuration(now, minDuration).getTime() : null;
+  const passesMin = (key: string) =>
+    minTime === null || subtractDuration(now, parseDuration(key)).getTime() <= minTime;
+
+  const filterMin = (entries: [string, string][]) => entries.filter(([k]) => passesMin(k));
+
+  if (!daysAgoMax || daysAgoMax > 30) {
+    return Object.fromEntries(filterMin(Object.entries(RELATIVES)));
+  }
+
+  const dayKey = `${daysAgoMax}d`;
+  if (dayKey in RELATIVES) {
+    return Object.fromEntries(filterMin(Object.entries(RELATIVES)));
+  }
+
+  const unsorted = { ...RELATIVES, [`${daysAgoMax}d`]: `Last ${daysAgoMax} days` };
+
+  return Object.fromEntries(
+    filterMin(Object.entries(unsorted)).sort(([a], [b]) => {
+      const aTime = subtractDuration(now, parseDuration(a));
+      const bTime = subtractDuration(now, parseDuration(b));
+      return bTime.getTime() - aTime.getTime();
+    })
+  );
 };
 
 export type AbsoluteRange = {
@@ -80,6 +115,8 @@ export const RangePicker = ({
   onChange,
   defaultValue,
   upgradeCutoff,
+  daysAgoMax,
+  minDuration,
   triggerComponent: TriggerComponent = DateInputButton,
   allowFuture = false,
   ...props
@@ -111,13 +148,20 @@ export const RangePicker = ({
   const [startError, setStartError] = useState('');
   const [endError, setEndError] = useState('');
 
-  const validateDuration = (duration: string, upgradeCutoff?: Date): boolean => {
-    if (!upgradeCutoff) {
-      return true;
-    }
+  const validateDuration = (
+    duration: string,
+    upgradeCutoff?: Date
+  ): { valid: true } | { valid: false; reason: 'upgrade' | 'tooShort' } => {
+    const now = new Date();
+    const request = subtractDuration(now, parseDuration(duration));
 
-    const request = subtractDuration(new Date(), parseDuration(duration));
-    return !isBefore(request, upgradeCutoff);
+    if (upgradeCutoff && isBefore(request, upgradeCutoff)) {
+      return { valid: false, reason: 'upgrade' };
+    }
+    if (minDuration && request.getTime() > subtractDuration(now, minDuration).getTime()) {
+      return { valid: false, reason: 'tooShort' };
+    }
+    return { valid: true };
   };
 
   const validateRange = () => {
@@ -170,8 +214,9 @@ export const RangePicker = ({
       return;
     }
 
-    if (!validateDuration(e.target.value, upgradeCutoff)) {
-      setDurationError('Upgrade plan');
+    const result = validateDuration(e.target.value, upgradeCutoff);
+    if (!result.valid) {
+      setDurationError(result.reason === 'upgrade' ? 'Upgrade plan' : 'Duration too short');
       return;
     }
 
@@ -183,13 +228,15 @@ export const RangePicker = ({
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <TriggerComponent {...props}>
-          {displayValue ? (
-            displayValue
-          ) : (
-            <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
-          )}
-        </TriggerComponent>
+        <div>
+          <TriggerComponent {...props}>
+            {displayValue ? (
+              displayValue
+            ) : (
+              <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
+            )}
+          </TriggerComponent>
+        </div>
       </PopoverTrigger>
       <PopoverContent align="start" className="border-subtle shadow-primary">
         <div className="bg-canvasBase flex flex-row">
@@ -205,8 +252,8 @@ export const RangePicker = ({
                 onKeyDown={processDuration}
               />
             </div>
-            {Object.entries(RELATIVES).map(([k, v], i) => {
-              const planValid = validateDuration(k, upgradeCutoff);
+            {Object.entries(planRelatives(daysAgoMax, minDuration)).map(([k, v], i) => {
+              const planValid = validateDuration(k, upgradeCutoff).valid;
               return (
                 <div
                   key={`duration-${i}`}

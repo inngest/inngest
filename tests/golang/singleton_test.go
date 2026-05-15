@@ -3,15 +3,16 @@ package golang
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 func TestSingletonFunction(t *testing.T) {
@@ -208,7 +209,17 @@ func TestSingletonCancelMode(t *testing.T) {
 
 	numEvents := 50
 
-	for i := 0; i < numEvents; i++ {
+	// send an event immediately prior to the goroutine to ensure one func is cancelled.
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
+		Name: trigger,
+		Data: map[string]any{
+			"user": map[string]any{"id": 42},
+		},
+	})
+	require.NoError(t, err)
+	<-time.After(5 * time.Millisecond)
+
+	for i := 0; i < (numEvents - 1); i++ {
 		go func() {
 			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
@@ -220,10 +231,14 @@ func TestSingletonCancelMode(t *testing.T) {
 		}()
 	}
 
+	<-time.After(time.Second)
+
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		// Only the last one should have finished executing successfully, the rest should have been cancelled
-		require.Equal(c, int32(numEvents-1), atomic.LoadInt32(&cancelCounter), "cancel counter should be 1")
 		require.Equal(c, int32(1), atomic.LoadInt32(&successCounter), "success counter should be 1")
+		// We run events in a goroutine, meaning many funcs can be running then cancelled.
+		// there must be at least one cancel func.
+		loaded := atomic.LoadInt32(&cancelCounter)
+		require.GreaterOrEqual(c, loaded, int32(1), "cancel counter should be at least 1, got %d", loaded)
 	}, 15*time.Second, 100*time.Millisecond)
 }
 

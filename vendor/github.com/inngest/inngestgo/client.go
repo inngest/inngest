@@ -16,7 +16,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/inngest/inngestgo/internal/logger"
 	"github.com/inngest/inngestgo/internal/middleware"
+	"github.com/inngest/inngestgo/pkg/checkpoint"
+	"github.com/inngest/inngestgo/pkg/env"
 )
 
 const (
@@ -33,6 +36,8 @@ type Client interface {
 	Send(ctx context.Context, evt any) (string, error)
 	// Send sends a batch of events to the ingest API.
 	SendMany(ctx context.Context, evt []any) ([]string, error)
+	// Options returns the cleint options set during initialization.
+	Options() ClientOpts
 
 	Serve() http.Handler
 	ServeWithOpts(opts ServeOpts) http.Handler
@@ -42,6 +47,10 @@ type Client interface {
 
 type ClientOpts struct {
 	AppID string
+
+	// Checkpoint is the default checkpoint configuration for all functions
+	// created with this client.
+	Checkpoint *checkpoint.Config
 
 	// HTTPClient is the HTTP client used to send events.
 	HTTPClient *http.Client
@@ -130,7 +139,7 @@ func NewClient(opts ClientOpts) (Client, error) {
 	}
 
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
 
 	// Add the default log middleware as the first middleware.
@@ -174,6 +183,10 @@ type apiClient struct {
 	h *handler
 }
 
+func (a apiClient) Options() ClientOpts {
+	return a.ClientOpts
+}
+
 func (a apiClient) AppID() string {
 	return a.ClientOpts.AppID
 }
@@ -206,7 +219,7 @@ func (a apiClient) IsDev() bool {
 	if a.Dev != nil {
 		return *a.Dev
 	}
-	return IsDev()
+	return env.IsDev()
 }
 
 type ServeOpts struct {
@@ -368,7 +381,7 @@ func (a apiClient) eventAPIBaseURL() string {
 	}
 
 	if a.IsDev() {
-		return DevServerURL()
+		return env.DevServerURL()
 	}
 
 	return defaultEventAPIOrigin

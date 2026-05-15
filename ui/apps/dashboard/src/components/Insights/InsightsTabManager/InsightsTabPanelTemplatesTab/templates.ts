@@ -1,48 +1,110 @@
 import type { QueryTemplate } from '@/components/Insights/types';
 
-// TODO: Update templates.
-
 export const TEMPLATES: QueryTemplate[] = [
   {
-    id: 'event-volume-trends',
-    name: 'Event volume trends',
-    query: `<Query text from "Event volume trends">`,
-    explanation: 'Track hourly event volume by type',
+    id: 'recent-events',
+    name: 'Recent events',
+    query: 'SELECT * FROM events',
+    explanation:
+      'View recents events subject to row and plan history limit restrictions.',
     templateKind: 'time',
   },
   {
-    id: 'event-frequency-analysis',
-    name: 'Event frequency analysis',
-    query: `<Query text from "Event frequency analysis">`,
-    explanation: 'Examine frequency patterns over time',
+    id: 'event-type-volume-per-hour',
+    name: 'Events by type per hour',
+    query: `SELECT
+    toStartOfHour(fromUnixTimestamp64Milli(ts)) AS hour_bucket,
+    name,
+    COUNT(*) AS event_count
+FROM
+    events
+WHERE
+    ts > toUnixTimestamp64Milli(subtractDays(now64(), 3))
+GROUP BY
+    hour_bucket,
+    name
+ORDER BY
+    hour_bucket,
+    name DESC`,
+    explanation: 'Examine hourly volume by event type.',
     templateKind: 'time',
   },
   {
-    id: 'recent-event-errors',
-    name: 'Recent event errors',
-    query: `<Query text from "Recent event errors">`,
-    explanation: 'Find events with errors from the last day',
+    id: 'specific-event-per-hour',
+    name: 'Specific event per hour',
+    query: `SELECT
+    toStartOfHour(fromUnixTimestamp64Milli(ts)) AS hour_bucket,
+    name,
+    COUNT(*) AS event_count
+FROM
+    events
+WHERE
+    ts > toUnixTimestamp64Milli(subtractDays(now64(), 3))
+    AND name = '{{ event_name }}'
+GROUP BY
+    hour_bucket,
+    name
+ORDER BY
+    hour_bucket,
+    name DESC`,
+    explanation: 'View hourly volume of a specific event.',
+    templateKind: 'time',
+  },
+  {
+    id: 'recent-function-failures',
+    name: 'Recent function failures',
+    query: `SELECT
+    data.function_id AS function_id,
+    COUNT(*) as failed_count
+FROM
+    events
+WHERE
+    name = 'inngest/function.failed'
+    AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
+GROUP BY
+    function_id
+ORDER BY
+    failed_count DESC`,
+    explanation: 'View failed function runs within the past 24 hours.',
     templateKind: 'error',
   },
   {
-    id: 'event-error-patterns',
-    name: 'Event error patterns',
-    query: `<Query text from "Event error patterns">`,
-    explanation: 'Calculate error rates by event type',
-    templateKind: 'error',
-  },
-  {
-    id: 'large-event-payloads',
-    name: 'Large event payloads',
-    query: `<Query text from "Large event payloads">`,
-    explanation: 'Identify unusually large event payloads',
+    id: 'recent-function-cancellations',
+    name: 'Recent function cancellations',
+    query: `SELECT
+    data.function_id AS function_id,
+    COUNT(*) as cancelled_count
+FROM
+    events
+WHERE
+    name = 'inngest/function.cancelled'
+    AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
+GROUP BY
+    function_id
+ORDER BY
+    cancelled_count DESC`,
+    explanation: 'View cancelled function runs within the past 24 hours.',
     templateKind: 'warning',
   },
+  /*
   {
-    id: 'suspicious-event-patterns',
-    name: 'Suspicious event patterns',
-    query: `<Query text from "Suspicious event patterns">`,
-    explanation: 'Detect abnormally high event rates',
-    templateKind: 'warning',
+    id: 'recent-function-successes',
+    name: 'Recent function successes',
+    query: `SELECT
+    data.function_id AS function_id,
+    COUNT(*) as success_count
+FROM
+    events
+WHERE
+    name = 'inngest/function.finished'
+    AND JSONExtractBool(data, 'result', 'success') = true
+    AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
+GROUP BY
+    function_id
+ORDER BY
+    success_count DESC`,
+    explanation: 'View successful function runs within the past 24 hours.',
+    templateKind: 'success',
   },
+  */
 ];

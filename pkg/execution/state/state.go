@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
@@ -28,6 +29,7 @@ var (
 	// that doesn't exist within the backing state store.
 	ErrPauseNotFound       = fmt.Errorf("pause not found")
 	ErrInvokePauseNotFound = fmt.Errorf("invoke pause not found")
+	ErrPauseNotInBuffer    = fmt.Errorf("pause not in buffer")
 	ErrRunNotFound         = fmt.Errorf("run not found in state store")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
@@ -35,7 +37,7 @@ var (
 	ErrPauseAlreadyExists  = fmt.Errorf("pause already exists")
 	ErrSignalConflict      = fmt.Errorf("signal wait already exists for another run")
 	ErrIdentifierExists    = fmt.Errorf("identifier already exists")
-	ErrIdentifierTomestone = fmt.Errorf("run for idempotency key is done")
+	ErrIdentifierTombstone = fmt.Errorf("run for idempotency key is done")
 	ErrInvalidIdentifier   = fmt.Errorf("identifier is not a valid ULID")
 	ErrFunctionCancelled   = fmt.Errorf("function cancelled")
 	ErrFunctionComplete    = fmt.Errorf("function completed")
@@ -49,6 +51,8 @@ var (
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
 	ErrFunctionPaused     = fmt.Errorf("function is paused")
 	ErrStateOverflowed    = fmt.Errorf("state is too large")
+	// Error Connect Retry Errors
+	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
 
 const (
@@ -99,6 +103,9 @@ type Identifier struct {
 	// the function, with cached expression results.
 	// Deprecated: use CustomConcurrencyKeys on item instead
 	CustomConcurrencyKeys []CustomConcurrency `json:"cck,omitempty"`
+	// Semaphores stores the semaphore constraints acquired by the start job.
+	// Persisted so that Finalize() can release manual-release semaphores.
+	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
 }
 
 type CustomConcurrency struct {
@@ -319,14 +326,15 @@ type State interface {
 	IsCron() bool
 }
 
+// PauseDeleter manages pause deletion for runs.
+type PauseDeleter interface {
+	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
+}
+
 // Manager represents a state manager which can both load and mutate state.
 type Manager interface {
 	StateLoader
 	Mutater
-
-	// PauseManager embeds buffering pause services.  Note that this is
-	// superseded by pauses.Manager.
-	PauseManager
 }
 
 // FunctionNotifier is an optional interface that state stores can fulfil,
@@ -360,14 +368,6 @@ type StateLoader interface {
 
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (State, error)
-
-	// IsComplete returns whether the given identifier is complete, ie. the
-	// pending count in the identifier's metadata is zero.
-	IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (complete bool, err error)
-
-	// StackIndex returns the index for the given step ID within the function stack of
-	// a given run.
-	StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error)
 }
 
 // FunctionLoader loads function definitions based off of an identifier.
@@ -397,11 +397,7 @@ type Mutater interface {
 	UpdateMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
-	Delete(ctx context.Context, i Identifier) (bool, error)
-
-	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
-	// future execution of steps.
-	Cancel(ctx context.Context, i Identifier) error
+	Delete(ctx context.Context, i Identifier) error
 
 	// SetStatus sets a status specifically.
 	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error
@@ -416,6 +412,9 @@ type Mutater interface {
 		stepID string,
 		marshalledOutput string,
 	) (hasPending bool, err error)
+
+	// ConsumePause consumes a pause, writing the consumed data to state.
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, error)
 }
 
 type MemoizedStep struct {
@@ -459,4 +458,8 @@ type Input struct {
 
 	// SpanID is the id used for the new function run
 	SpanID string
+
+	// RequestVersion represents the executor request versioning/hashing style
+	// used to manage state.
+	RequestVersion *int
 }

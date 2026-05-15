@@ -1,5 +1,3 @@
-import type { Route } from 'next';
-
 export const WEBSITE_PRICING_URL = 'https://www.inngest.com/pricing';
 export const WEBSITE_CONTACT_URL = 'https://www.inngest.com/contact';
 export const DISCORD_URL = 'https://www.inngest.com/discord';
@@ -37,16 +35,30 @@ export function getManageKey(pathname: string) {
 }
 
 export const pathCreator = {
-  apps({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/apps` as Route;
+  apps({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/apps`;
   },
-  app({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
-    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}` as Route;
+  app({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }) {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}`;
   },
-  appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
-    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
+  appSyncs({
+    envSlug,
+    externalAppID,
+  }: {
+    envSlug: string;
+    externalAppID: string;
+  }) {
+    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs`;
   },
-  billing({ ref, tab, highlight }: { ref?: string; tab?: string; highlight?: string } = {}): Route {
+  billing({
+    ref,
+    tab,
+    highlight,
+  }: {
+    ref?: string;
+    tab?: string;
+    highlight?: string;
+  } = {}) {
     let path = '/billing';
     if (tab) {
       path += `/${tab}`;
@@ -63,31 +75,89 @@ export const pathCreator = {
       path += `?${query.toString()}`;
     }
 
-    return path as Route;
+    return path;
   },
-  createApp({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/apps/sync-new` as Route;
+  billingUsage({
+    dimension,
+    previous,
+  }: {
+    dimension?: string;
+    previous?: boolean;
+  } = {}) {
+    let path = '/billing/usage';
+    const query = new URLSearchParams();
+    if (dimension) {
+      query.set('dimension', dimension);
+    }
+    if (previous) {
+      query.set('previous', previous.toString());
+    }
+    if (query.toString()) {
+      path += `?${query.toString()}`;
+    }
+    return path;
   },
-  eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }): Route {
-    return `/env/${envSlug}/events/${eventID}` as Route;
+  createApp({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/apps/sync-new`;
   },
-  eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}` as Route;
+  eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }) {
+    return `/env/${envSlug}/events/${eventID}`;
   },
-  eventTypes({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/event-types` as Route;
+  eventType({ envSlug, eventName }: { envSlug: string; eventName: string }) {
+    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}`;
   },
-  eventTypeEvents({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}/events` as Route;
+  eventTypes({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/event-types`;
   },
-  envs(): Route {
-    return '/env' as Route;
+  eventTypeEvents({
+    envSlug,
+    eventName,
+  }: {
+    envSlug: string;
+    eventName: string;
+  }) {
+    return `/env/${envSlug}/event-types/${encodeURIComponent(
+      eventName,
+    )}/events`;
   },
-  functions({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/functions` as Route;
+  envs() {
+    return '/env';
   },
-  function({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}` as Route;
+  functions({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/functions`;
+  },
+  function({
+    envSlug,
+    functionSlug,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+  }) {
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}`;
+  },
+  functionReplays({
+    envSlug,
+    functionSlug,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+  }) {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug,
+    )}/replays`;
+  },
+  functionReplay({
+    envSlug,
+    functionSlug,
+    replayID,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+    replayID: string;
+  }) {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug,
+    )}/replays/${replayID}`;
   },
   functionCancellations({
     envSlug,
@@ -95,20 +165,49 @@ export const pathCreator = {
   }: {
     envSlug: string;
     functionSlug: string;
-  }): Route {
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
+  }) {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug,
+    )}/cancellations`;
   },
-  integrations(): Route {
-    return `/settings/integrations` as Route;
+  // The function slug is part of the URL so two functions sharing an
+  // experiment name don't collide.
+  functionExperiment({
+    envSlug,
+    functionSlug,
+    experimentName,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+    experimentName: string;
+  }) {
+    return `/env/${envSlug}/experiments/${encodeURIComponent(
+      functionSlug,
+    )}/${encodeURIComponent(experimentName)}`;
   },
-  keys({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/manage/keys` as Route;
+  experiments({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/experiments`;
   },
-  pgIntegrationStep({ integration, step }: { integration: string; step?: string }): Route {
-    return `/settings/integrations/${integration}${step ? `/${step}` : ''}` as Route;
+  insights({ envSlug, ref }: { envSlug: string; ref?: string }) {
+    return `/env/${envSlug}/insights${ref ? `?ref=${ref}` : ''}`;
   },
-  onboarding({ envSlug = 'production' }: { envSlug?: string } = {}): Route {
-    return `/env/${envSlug}/onboarding` as Route;
+  integrations() {
+    return `/settings/integrations`;
+  },
+  keys({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/manage/keys`;
+  },
+  pgIntegrationStep({
+    integration,
+    step,
+  }: {
+    integration: string;
+    step?: string;
+  }) {
+    return `/settings/integrations/${integration}${step ? `/${step}` : ''}`;
+  },
+  onboarding({ envSlug = 'production' }: { envSlug?: string } = {}) {
+    return `/env/${envSlug}/onboarding`;
   },
   onboardingSteps({
     envSlug = 'production',
@@ -118,13 +217,13 @@ export const pathCreator = {
     envSlug?: string;
     step?: string;
     ref?: string;
-  }): Route {
+  }) {
     return `/env/${envSlug}/onboarding${step ? `/${step}` : ''}${
       ref ? `?ref=${ref}` : ''
-    }` as Route;
+    }`;
   },
-  runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
-    return `/env/${envSlug}/runs/${runID}` as Route;
+  runPopout({ envSlug, runID }: { envSlug: string; runID: string }) {
+    return `/env/${envSlug}/runs/${runID}`;
   },
   debugger({
     envSlug,
@@ -134,28 +233,30 @@ export const pathCreator = {
     envSlug: string;
     functionSlug: string;
     runID?: string;
-  }): Route {
-    return `/env/${envSlug}/debugger/${functionSlug}${runID ? `?runID=${runID}` : ''}` as Route;
+  }) {
+    return `/env/${envSlug}/debugger/${functionSlug}${
+      runID ? `?runID=${runID}` : ''
+    }`;
   },
-  runs({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/runs` as Route;
+  runs({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/runs`;
   },
-  signingKeys({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/manage/signing-key` as Route;
+  signingKeys({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/manage/signing-key`;
   },
-  support({ ref }: { ref?: string } = {}): Route {
-    return `/support${ref ? `?ref=${ref}` : ''}` as Route;
+  support({ ref }: { ref?: string } = {}) {
+    return `https://support.inngest.com/${ref ? `?ref=${ref}` : ''}`;
   },
-  unattachedSyncs({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/unattached-syncs` as Route;
+  unattachedSyncs({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/unattached-syncs`;
   },
-  vercel(): Route {
-    return `/settings/integrations/vercel` as Route;
+  vercel() {
+    return `/settings/integrations/vercel`;
   },
-  vercelSetup(): Route {
-    return `/settings/integrations/vercel/connect` as Route;
+  vercelSetup() {
+    return `/settings/integrations/vercel/connect`;
   },
-  neon(): Route {
-    return `/settings/integrations/neon` as Route;
+  neon() {
+    return `/settings/integrations/neon`;
   },
 };

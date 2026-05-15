@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
@@ -73,6 +74,12 @@ type parser struct {
 	rander RandomReader
 }
 
+var randPool = sync.Pool{
+	New: func() any {
+		return rand.New(rand.NewSource(0))
+	},
+}
+
 func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, error) {
 	expression := eval.GetExpression() // "event.data.id == '1'"
 	if expression == "" {
@@ -87,6 +94,7 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 	}
 
 	r := p.rander
+	var pooled *rand.Rand
 	if r == nil {
 		// Create a new deterministic random reader based off of the evaluable's identifier.
 		// This means that every time we parse an expression with the given identifier, the
@@ -95,7 +103,10 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		// We only overwrite this if rander is not nil so that we can inject rander during tests.
 		id := eval.GetID()
 		seed := int64(binary.NativeEndian.Uint64(id[:8]))
-		r = rand.New(rand.NewSource(seed)).Read
+		pooled = randPool.Get().(*rand.Rand)
+
+		pooled.Seed(seed)
+		r = pooled.Read
 	}
 
 	node := newNode()
@@ -107,16 +118,35 @@ func (p *parser) Parse(ctx context.Context, eval Evaluable) (*ParsedExpression, 
 		vars,
 		r,
 	)
+	if pooled != nil {
+		randPool.Put(pooled)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	node.normalize()
+
+	// Check if the expression is a constant boolean literal (true or false).
+	// A bare literal has no predicates, no ands, no ors after normalization.
+	var literalBool *bool
+	if !node.HasPredicate() && len(node.Ands) == 0 && len(node.Ors) == 0 && !hasMacros {
+		nativeExpr := ast.NativeRep().Expr()
+		if nativeExpr.Kind() == celast.LiteralKind {
+			if val := nativeExpr.AsLiteral(); val != nil {
+				if boolVal, ok := val.Value().(bool); ok {
+					literalBool = &boolVal
+				}
+			}
+		}
+	}
+
 	return &ParsedExpression{
 		Root:        *node,
 		Vars:        vars,
 		EvaluableID: eval.GetID(),
 		HasMacros:   hasMacros,
+		LiteralBool: literalBool,
 	}, nil
 }
 
@@ -140,6 +170,11 @@ type ParsedExpression struct {
 	EvaluableID uuid.UUID
 
 	HasMacros bool
+
+	// LiteralBool is non-nil when the expression is a constant boolean literal.
+	// When false, the expression never matches any input.
+	// When true, the expression always matches any input.
+	LiteralBool *bool
 }
 
 // RootGroups returns the top-level matching groups within an expression.  This is a small
@@ -797,6 +832,12 @@ func parseArrayAccess(item celast.Expr) string {
 		return ""
 	}
 	args := item.AsCall().Args()
+	if len(args) < 2 {
+		return ""
+	}
+	if args[1].Kind() != celast.LiteralKind {
+		return ""
+	}
 	return fmt.Sprintf("%s[%v]", walkSelect(args[0]), args[1].AsLiteral().Value())
 }
 

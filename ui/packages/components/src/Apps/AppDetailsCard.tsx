@@ -1,5 +1,3 @@
-'use client';
-
 import DescriptionListItem from '@inngest/components/Apps/DescriptionListItem';
 import { cn } from '@inngest/components/utils/classNames';
 

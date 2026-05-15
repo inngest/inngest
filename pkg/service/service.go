@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/sourcegraph/conc"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -18,20 +18,16 @@ var (
 	defaultTimeout = 30 * time.Second
 
 	ErrPreTimeout = fmt.Errorf("service.Pre did not end within the given timeout")
-	ErrRunTimeout = fmt.Errorf("service.Run did not end within the given timeout")
-
-	wgctxVal = wgctx{}
 )
 
-type wgctx struct{}
+var wg conc.WaitGroup
 
-// GetWaitgroup returns a waitgroup from the top-level service context
-func GetWaitgroup(ctx context.Context) *sync.WaitGroup {
-	wg, _ := ctx.Value(wgctxVal).(*sync.WaitGroup)
-	if wg == nil {
-		wg = &sync.WaitGroup{}
-	}
-	return wg
+func Go(f func()) {
+	wg.Go(f)
+}
+
+func Wait() {
+	wg.Wait()
 }
 
 // Service represents a basic interface for a long-running service.  By invoking
@@ -64,21 +60,6 @@ type StartTimeouter interface {
 func startTimeout(s Service) time.Duration {
 	if t, ok := s.(StartTimeouter); ok {
 		return t.StartTimeout()
-	}
-	return defaultTimeout
-}
-
-// RunTimeouter lets a Service define how long the Run method can block for prior
-// to starting cleanup.
-type RunTimeouter interface {
-	Service
-	RunTimeout() time.Duration
-}
-
-// runTimeout returns the timeout duration used when an interrupt is received.
-func runTimeout(s Service) time.Duration {
-	if t, ok := s.(RunTimeouter); ok {
-		return t.RunTimeout()
 	}
 	return defaultTimeout
 }
@@ -133,11 +114,6 @@ func Start(ctx context.Context, s Service) (err error) {
 	ctx, cleanup := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cleanup()
 
-	// Create a new parent waitgroup which can be used to prevent stopping
-	// until the WG reaches 0.  This can be used for ephemeral goroutines.
-	wg := &sync.WaitGroup{}
-	ctx = context.WithValue(ctx, wgctxVal, wg)
-
 	defer func() {
 		if r := recover(); r != nil {
 			l.Error("service panicked", "recover", r)
@@ -156,6 +132,7 @@ func Start(ctx context.Context, s Service) (err error) {
 		l.Error("service cleanup errored", "error", stopErr)
 		err = errors.Join(err, stopErr)
 	}
+	l.Info("service run finished", "err", err)
 
 	return err
 }
@@ -205,27 +182,16 @@ func run(ctx context.Context, stop func(), s Service) error {
 		// We received a cancellation signal.  Allow Run to continue for up
 		// to RunTimoeut period before quitting and cleaning up.
 
-		// Ensure that we prevent the paretn context from capturing signals again.
-		stop()
-		// And set up a new context to quit if we receive the same signal again.
-		repeat, cleanup := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-		defer cleanup()
-
-		timeout := runTimeout(s)
-		l.Info("signal received, service stopping",
-			"signal", ctx.Err(),
-			"seconds", timeout.Seconds(),
-		)
-
-		select {
-		case <-repeat.Done():
-			return fmt.Errorf("repeated signal received")
-		case <-time.After(timeout):
-			return ErrRunTimeout
-		case err := <-runErr:
+		// Wait for Run to finish draining in-progress work (e.g. queue
+		// jobs) before proceeding to Stop. This ensures graceful
+		// shutdown completes before the stop timeout begins.
+		l.Info("waiting for service run to finish")
+		if err := <-runErr; err != nil && err != context.Canceled {
 			return err
 		}
+		l.Info("service run finished")
 
+		stop()
 	}
 	return nil
 }
@@ -234,14 +200,22 @@ func stop(ctx context.Context, s Service) error {
 	l := logger.StdlibLogger(ctx).With("service", s.Name())
 	stopCh := make(chan error)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				l.Error("panic waiting for service to stop", "error", r)
+			}
+		}()
+
 		l.Info("service cleaning up")
 		// Create a new context that's not cancelled.
 		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
 			stopCh <- err
 			return
 		}
-		// Wait for everything in the run waitgroup
-		GetWaitgroup(ctx).Wait()
+		// Wait for everything in the global waitgroup.
+		if recovered := wg.WaitAndRecover(); recovered != nil {
+			l.Error("global goroutine panic waiting for service to stop", "error", recovered.Value, "stack", recovered.Stack)
+		}
 		stopCh <- nil
 	}()
 

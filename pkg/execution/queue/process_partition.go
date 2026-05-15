@@ -1,0 +1,323 @@
+package queue
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/rand"
+	"time"
+
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+// ProcessPartition processes a given partition, peeking jobs from the partition to run.
+//
+// It accepts a uint continuationCount which represents the number of times that the partition
+// has been continued;  this occurs when a job enqueues another job to the same partition and
+// hints that we have more work to do, which lowers inter-step latency on job-per-step execution
+// models.
+//
+// randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
+// such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
+func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+	l := logger.StdlibLogger(ctx)
+	shard := q.Shard()
+
+	partitionIdentifier := p.Identifier()
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
+	defer span.End()
+	span.SetAttributes(attribute.String("queue_shard", shard.Name()))
+
+	// Attempt to lease items
+	//
+	// For optimization, because this is the only thread that can be leasing
+	// jobs for this partition, we store the partition limit and current count
+	// as a variable and iterate in the loop without loading keys from the state
+	// store.
+	//
+	// There's no way to know when queue items finish processing;  we don't
+	// store average runtimes for queue items (and we don't know because
+	// items are dynamic generators).  This means that we have to delay
+	// processing the partition by N seconds, meaning the latency is increased by
+	// up to this period for scheduled items behind the concurrency limits.
+	_, err := Duration(ctx, shard.Name(), "partition_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
+		l, err := shard.PartitionLease(ctx, p, PartitionLeaseDuration)
+		p.LeaseID = l
+		return nil, err
+	})
+	if errors.Is(err, ErrPartitionAlreadyLeased) {
+		metrics.IncrQueuePartitionLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
+		// If this is a continuation, remove it from the continuation counter.
+		// This prevents us from keeping partitions as continuations forever until
+		// we hit the max limit.
+		q.removeContinue(ctx, p, false)
+		span.SetAttributes(attribute.String("status", "already_leased"))
+		return nil
+	}
+	if errors.Is(err, ErrPartitionNotFound) || errors.Is(err, ErrPartitionGarbageCollected) {
+		// Another worker must have processed this partition between
+		// this worker's peek and process.  Increase partition
+		// contention metric and continue.  This is unsolvable.
+
+		// If this is a continuation, remove it from the continuation counter.
+		// This prevents us from keeping partitions as continuations forever until
+		// we hit the max limit.
+		q.removeContinue(ctx, p, false)
+
+		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
+		span.SetAttributes(attribute.String("status", "partition_gone"))
+		return nil
+	}
+	if errors.Is(err, ErrPartitionPaused) {
+		// Don't return an error and remove continuations;  this isn't workable.
+		q.removeContinue(ctx, p, false)
+		span.SetAttributes(attribute.String("status", "partition_paused"))
+		return nil
+	}
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error leasing partition: %w", err)
+	}
+
+	begin := q.Clock().Now()
+	defer func() {
+		metrics.HistogramProcessPartitionDuration(ctx, q.Clock().Since(begin).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard":     shard.Name(),
+				"is_continuation": continuationCount > 0,
+			},
+		})
+	}()
+
+	// Ensure that peek doesn't take longer than the partition lease, to
+	// reduce contention.
+	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
+	defer cancel()
+
+	// We need to round ourselves up to the nearest second, then add another second
+	// to peek for jobs in the next <= 1999 milliseconds.
+	//
+	// There's a really subtle issue:  if two jobs contend for a pause and are scheduled
+	// within 5ms of each other, we fetch them in order but we may process them out of
+	// order, depending on how long it takes for the item to pass through the channel
+	// to the worker, how long Redis takes to lease the item, etc.
+	fetch := q.Clock().Now().Truncate(time.Second).Add(PartitionLookahead)
+
+	peek, _ := Duration(peekCtx, shard.Name(), "peek-size", q.Clock().Now(), func(ctx context.Context) (int64, error) {
+		peek := q.peekSize(ctx, p)
+		return peek, nil
+	})
+
+	queue, err := Duration(peekCtx, shard.Name(), "peek", q.Clock().Now(), func(ctx context.Context) ([]*QueueItem, error) {
+		// NOTE: would love to instrument this value to see it over time per function but
+		// it's likely too high of a cardinality
+		go metrics.HistogramQueuePeekEWMA(ctx, peek, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
+
+		l.Optional(p.AccountID, "queue").Debug(
+			"peeking",
+			"limit", peek,
+			"randomize", randomOffset,
+			"until", fetch,
+		)
+
+		if randomOffset {
+			return shard.PeekRandom(peekCtx, p, fetch, peek)
+		}
+		return shard.Peek(peekCtx, p, fetch, peek)
+	})
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+
+	l.Optional(p.AccountID, "queue").Debug(
+		"peeked",
+		"limit", peek,
+		"randomize", randomOffset,
+		"until", fetch,
+		"results", len(queue),
+	)
+
+	metrics.HistogramQueuePeekSize(ctx, int64(len(queue)), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard":     shard.Name(),
+			"is_continuation": continuationCount > 0,
+		},
+	})
+
+	// Record the number of partitions we're leasing.
+	metrics.IncrQueuePartitionLeasedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard":     shard.Name(),
+			"is_continuation": continuationCount > 0,
+		},
+	})
+
+	if len(queue) > 0 && rand.Float64() < 0.05 {
+		// Group items by backlogs
+		backlogs := make(map[string][]*QueueItem)
+
+		var (
+			lastBacklogID          string
+			successiveBacklogCount int
+		)
+
+		start := q.Clock().Now()
+		for _, qi := range queue {
+			b := ItemBacklog(ctx, *qi)
+
+			// Append to grouped items
+			backlogs[b.BacklogID] = append(backlogs[b.BacklogID], qi)
+
+			// If backlog is different than previous item, emit and reset counter
+			if b.BacklogID != lastBacklogID {
+				if successiveBacklogCount > 0 {
+					metrics.HistogramQueueSuccessivePeekedItems(ctx, int64(successiveBacklogCount), metrics.HistogramOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"queue_shard": shard.Name(),
+						},
+					})
+				}
+				successiveBacklogCount = 0
+				lastBacklogID = b.BacklogID
+				continue
+			}
+
+			successiveBacklogCount++
+		}
+
+		// Emit the final successive run
+		if successiveBacklogCount > 0 {
+			metrics.HistogramQueueSuccessivePeekedItems(ctx, int64(successiveBacklogCount), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": shard.Name(),
+				},
+			})
+		}
+
+		// Measure time it took to group by backlog
+		metrics.HistogramQueueBacklogGroupingDuration(ctx, q.Clock().Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": shard.Name(),
+			},
+		})
+
+		ratioBacklogsToPeeked := (float64(len(backlogs)) / float64(len(queue))) * 100
+		metrics.HistogramQueueRatioBacklogsToPeekedItems(ctx, int64(ratioBacklogsToPeeked), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": shard.Name(),
+			},
+		})
+	}
+
+	// parallel all queue names with internal mappings for now.
+	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
+	_, isSystemFn := q.queueKindMapping[p.Queue()]
+	_, parallelFn := q.disableFifoForFunctions[p.Queue()]
+	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
+
+	parallel := parallelFn || parallelAccount || isSystemFn
+
+	iter := ProcessorIterator{
+		Partition:            p,
+		Items:                queue,
+		PartitionContinueCtr: continuationCount,
+		Queue:                q,
+		StaticTime:           q.Clock().Now(),
+		Parallel:             parallel,
+	}
+
+	if err := iter.Iterate(ctx); err != nil {
+		// Report the eerror.
+		l.Error("error iterating queue items", "error", err, "partition", p)
+		span.RecordError(err)
+		return err
+	}
+
+	if q.usePeekEWMA {
+		if err := shard.SetPeekEWMA(ctx, p.FunctionID, int64(iter.CtrConcurrency.Load()+iter.CtrRateLimit.Load())); err != nil {
+			l.Warn("error recording concurrency limit for EWMA", "error", err)
+		}
+	}
+
+	if iter.IsRequeuable() && iter.IsCustomKeyLimitOnly.Load() && !randomOffset && parallel {
+		// We hit custom concurrency key issues.  Re-process this partition at a random offset, as long
+		// as random offset is currently false (so we don't loop forever)
+
+		// Note: we must requeue the partition to remove the lease.
+		err := shard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		if err != nil {
+			l.Warn("error requeuieng partition for random peek", "error", err)
+		}
+
+		return q.ProcessPartition(ctx, p, continuationCount, true)
+	}
+
+	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
+	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
+	if iter.IsRequeuable() {
+		requeue := PartitionConcurrencyLimitRequeueExtension
+		if iter.CtrConcurrency.Load() == 0 {
+			// This has been throttled only.  Don't requeue so far ahead, otherwise we'll be waiting longer
+			// than the minimum throttle.
+			//
+			// TODO: When we create throttle queues, requeue this appropriately depending on the throttle
+			//       period.
+			requeue = PartitionThrottleLimitRequeueExtension
+		} else if iter.IsSemaphoreLimitOnly.Load() {
+			// Semaphore-blocked items stay in the ready queue and can be picked up
+			// quickly once capacity is freed. Use a shorter requeue to reduce latency
+			// between run completion and the next run starting.
+			requeue = PartitionSemaphoreLimitRequeueExtension
+		}
+
+		// Requeue this partition as we hit concurrency limits.
+		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
+		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(requeue), true)
+		if errors.Is(err, ErrPartitionGarbageCollected) {
+			q.removeContinue(ctx, p, false)
+		}
+		if err != nil {
+			span.RecordError(err)
+			return err
+		}
+
+		span.SetAttributes(attribute.String("status", "requeue_constrained"))
+		span.SetAttributes(attribute.Int64("requeue_ms", requeue.Milliseconds()))
+		return nil
+	}
+
+	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
+	// for a minimum of 5 seconds.
+
+	// Requeue the partition, which reads the next unleased job or sets a time of
+	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
+	// about to be leased and processed by the worker.
+	_, err = Duration(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
+		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(PartitionRequeueExtension), false)
+		return nil, err
+	})
+	if err == ErrPartitionGarbageCollected {
+		q.removeContinue(ctx, p, false)
+		// Safe;  we're preventing this from wasting cycles in the future.
+		return nil
+	}
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	span.SetAttributes(attribute.String("status", "requeue_default"))
+	span.SetAttributes(attribute.Int64("requeue_ms", PartitionRequeueExtension.Milliseconds()))
+	return nil
+}

@@ -183,6 +183,7 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect")
 			er.Event.Timestamp = ts
 			er.Event.ID = evtID
+			er.Ctx.MaxAttempts = 0
 
 			for _, m := range modifiers {
 				m(&t.requestCtx)
@@ -192,6 +193,11 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			t.requestCtx.RunID = er.Ctx.RunID
 			t.requestCtx.FunctionID = uuid.UUID{}
 			er.Ctx.FunctionID = uuid.UUID{}
+			// Unset the queue ref, too
+			t.requestCtx.QueueItemRef = ""
+			er.Ctx.QueueItemRef = ""
+			copyRequestContextFieldIfPresent(&t.requestCtx, er.Ctx, "RequestID")
+			copyRequestContextFieldIfPresent(&t.requestCtx, er.Ctx, "JobID")
 
 			// For each error, remove the stack from our tests.
 			for _, v := range er.Steps {
@@ -212,6 +218,18 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			require.Failf(t.test, "Expected executor request but timed out", name)
 		}
 	}
+}
+
+func copyRequestContextFieldIfPresent(expected *driver.SDKRequestContext, actual driver.SDKRequestContext, name string) {
+	expectedValue := reflect.ValueOf(expected).Elem().FieldByName(name)
+	actualValue := reflect.ValueOf(actual).FieldByName(name)
+	if !expectedValue.IsValid() || !actualValue.IsValid() || !expectedValue.CanSet() {
+		return
+	}
+	if expectedValue.Type() != actualValue.Type() {
+		return
+	}
+	expectedValue.Set(actualValue)
 }
 
 func (t *Test) ExpectResponse(status int, body []byte) func() {

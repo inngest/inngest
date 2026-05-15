@@ -94,6 +94,12 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 	kclopts := []kgo.Opt{
 		kgo.SeedBrokers(conf.addrs...),
 		kgo.DefaultProduceTopic(conf.topic),
+		kgo.ProducerBatchCompression(
+			kgo.ZstdCompression(),
+			kgo.Lz4Compression(),
+			kgo.GzipCompression(),
+			kgo.NoCompression(),
+		),
 		kgo.RequiredAcks(kgo.AllISRAcks()), // Most durable with some perf hits
 
 		kgo.ProducerBatchMaxBytes(int32(conf.maxProduceMB * 1024 * 1024)),
@@ -173,28 +179,50 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 
 		rec := &kgo.Record{Value: byt}
 		switch e.key {
+		case "workflow_id", "wf_id", "function_id", "fn_id":
+			if id.GetFunctionId() != "" {
+				rec.Key = []byte(id.GetFunctionId())
+				break
+			}
+			fallthrough
+		case "workspace_id", "ws_id", "env_id":
+			if id.GetEnvId() != "" {
+				rec.Key = []byte(id.GetEnvId())
+				break
+			}
+			fallthrough
 		case "account_id", "acct_id":
 			rec.Key = []byte(id.GetAccountId())
-		case "workspace_id", "ws_id", "env_id":
-			rec.Key = []byte(id.GetEnvId())
-		case "workflow_id", "wf_id", "function_id", "fn_id":
-			rec.Key = []byte(id.GetFunctionId())
 		case "run_id":
 			switch {
 			case id.GetRunId() != "":
 				rec.Key = []byte(id.GetRunId())
 			case id.GetFunctionId() != "":
 				l.Warn("missing run_id, falling back to function_id", "span", sp)
+				metrics.IncrSpanExportMissingRunID(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"fallback": "function_id"},
+				})
 				rec.Key = []byte(id.GetFunctionId())
 			case id.GetEnvId() != "":
-				l.Warn("missing run_id, falling back to env_id", "span", sp)
+				// No logging as it's expected to happen with some of the v1 traces
+				// not having run ids.
+				metrics.IncrSpanExportMissingRunID(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"fallback": "env_id"},
+				})
 				rec.Key = []byte(id.GetEnvId())
 			case id.GetAccountId() != "":
 				l.Warn("missing run_id, falling back to acct_id", "span", sp)
+				metrics.IncrSpanExportMissingRunID(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"fallback": "acct_id"},
+				})
 				rec.Key = []byte(id.GetAccountId())
 			default:
 				l.Error("missing run_id, no other identifier to fallback to", "span", sp)
 			}
+
 		}
 
 		e.client.Produce(ctx, rec, func(r *kgo.Record, err error) {
@@ -212,7 +240,12 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 				status = "error"
 
 				if strings.Contains(err.Error(), consts.KafkaMsgTooLargeError) {
-					l.Error("error", err, "span proto size", proto.Size(span), "marhsalled span proto size", len(byt), "span.output size", len(span.Output))
+					batchSize := len(span.Events)
+					evtPayloadSizes := make([]int, len(span.Events))
+					for i, evt := range span.Events {
+						evtPayloadSizes[i] = len(evt.Name)
+					}
+					l.Error("error on producing span MESSAGE_TOO_LARGE", "error", err, "span proto size", proto.Size(span), "marhsalled span proto size", len(byt), "span.output size", len(span.Output), "batchSize", batchSize, "evt payload sizes:", evtPayloadSizes)
 				}
 			}
 

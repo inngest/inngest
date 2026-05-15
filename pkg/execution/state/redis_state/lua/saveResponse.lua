@@ -18,6 +18,7 @@ local keyStepsPending = KEYS[5]
 
 local stepID = ARGV[1]
 local outputData = ARGV[2]
+local metadataSizeDelta = tonumber(ARGV[3]) or 0
 
 if redis.call("HEXISTS", keyStep, stepID) == 1 then
 	-- If the data is exactly the same, return -2, indicating an idempotent save req.
@@ -39,6 +40,9 @@ if inputData then
 end
 redis.call("HINCRBY", keyMetadata, "state_size", stateSizeDelta)
 redis.call("HINCRBY", keyMetadata, "step_count", 1)
+if metadataSizeDelta > 0 then
+	redis.call("HINCRBY", keyMetadata, "metadata_size", metadataSizeDelta)
+end
 
 redis.call("HSET", keyStep, stepID, outputData)
 redis.call("RPUSH", keyStack, stepID)

@@ -13,3 +13,17 @@ node_modules/
 
 # Builds
 .turbo/
+
+# tanstack
+.nitro
+.tanstack
+.output
+.vinxi
+
+# fumadocs - generated at build time
+.source
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local

@@ -8,7 +8,10 @@ import type {
 } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
-export type Plan = Omit<BillingPlan, 'entitlements' | 'features' | 'availableAddons' | 'addons'> & {
+export type Plan = Omit<
+  BillingPlan,
+  'entitlements' | 'features' | 'availableAddons' | 'addons'
+> & {
   entitlements: {
     concurrency: Pick<EntitlementConcurrency, 'limit'>;
     runCount: Pick<EntitlementRunCount, 'limit'>;
@@ -41,7 +44,10 @@ export function processPlan(plan: Plan) {
   return {
     name,
     price: priceLabel,
-    billingPeriod: typeof billingPeriod === 'string' ? getPeriodAbbreviation(billingPeriod) : 'mo',
+    billingPeriod:
+      typeof billingPeriod === 'string'
+        ? getPeriodAbbreviation(billingPeriod)
+        : 'mo',
     features: featureDescriptions,
     slug,
   };
@@ -49,7 +55,7 @@ export function processPlan(plan: Plan) {
 
 function getFeatureDescriptions(
   planName: string,
-  entitlements: Plan['entitlements']
+  entitlements: Plan['entitlements'],
 ): (string | React.ReactNode)[] {
   const numberFormatter = new Intl.NumberFormat('en-US', {
     notation: 'compact',
@@ -62,7 +68,9 @@ function getFeatureDescriptions(
         ...(entitlements.runCount.limit
           ? [`${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
           : []),
-        `${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
+        `${numberFormatter.format(
+          entitlements.concurrency.limit,
+        )} concurrent steps`,
         'Unlimited branch and staging envs',
         'Logs, traces, and observability',
         'Basic alerting',
@@ -72,9 +80,15 @@ function getFeatureDescriptions(
     case PlanNames.Basic:
       return [
         ...(entitlements.runCount.limit
-          ? [`Starts at ${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
+          ? [
+              `Starts at ${numberFormatter.format(
+                entitlements.runCount.limit,
+              )} runs/mo`,
+            ]
           : []),
-        `Starts at ${numberFormatter.format(entitlements.concurrency.limit)} concurrent steps`,
+        `Starts at ${numberFormatter.format(
+          entitlements.concurrency.limit,
+        )} concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
         'Unlimited functions and apps',
         'No event rate limit',
@@ -90,7 +104,10 @@ function getFeatureDescriptions(
           10 users included
           <a
             className="hover:underline"
-            href={pathCreator.billing({ ref: 'app-billing-plans-pro-addons', highlight: 'users' })}
+            href={pathCreator.billing({
+              ref: 'app-billing-plans-pro-addons',
+              highlight: 'users',
+            })}
           >
             (add-ons available)
           </a>
@@ -125,7 +142,9 @@ function getFeatureDescriptions(
         ...(entitlements.runCount.limit
           ? [`${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
           : []),
-        `${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
+        `${numberFormatter.format(
+          entitlements.concurrency.limit,
+        )}  concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
       ];
   }
@@ -133,7 +152,7 @@ function getFeatureDescriptions(
 
 export function isActive(
   currentPlan: Plan | (Partial<BillingPlan> & { name: string }),
-  cardPlan: Plan | (Partial<BillingPlan> & { name: string })
+  cardPlan: Plan | (Partial<BillingPlan> & { name: string }),
 ): boolean {
   return (
     currentPlan.name === cardPlan.name ||
@@ -142,19 +161,27 @@ export function isActive(
 }
 
 // TODO: Return these from the API
-export function isEnterprisePlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+export function isEnterprisePlan(
+  plan: Plan | (Partial<BillingPlan> & { name: string }),
+): boolean {
   return Boolean(plan.name.match(/^Enterprise/i));
 }
 
-export function isTrialPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+export function isTrialPlan(
+  plan: Plan | (Partial<BillingPlan> & { name: string }),
+): boolean {
   return Boolean(plan.name.match(/Trial/i));
 }
 
-export function isHobbyFreePlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+export function isHobbyFreePlan(
+  plan: Plan | (Partial<BillingPlan> & { name: string }),
+): boolean {
   if (!plan.slug) return false;
   return plan.slug.startsWith('hobby-free-');
 }
 
-export function isHobbyPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+export function isHobbyPlan(
+  plan: Plan | (Partial<BillingPlan> & { name: string }),
+): boolean {
   return isHobbyFreePlan(plan);
 }

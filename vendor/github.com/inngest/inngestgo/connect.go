@@ -11,11 +11,10 @@ import (
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
-const (
-	defaultMaxWorkerConcurrency = 1_000
-)
-
+// ConnectOpts
 type ConnectOpts struct {
+	// Apps represents the apps being served by Connect.  Each app is defined by clients;
+	// to create an app, create a new Client via [NewClient].
 	Apps []Client
 
 	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
@@ -26,25 +25,23 @@ type ConnectOpts struct {
 
 	RewriteGatewayEndpoint func(endpoint url.URL) (url.URL, error)
 
-	// MaxConcurrency defines the maximum number of requests the worker can process at once.
+	// MaxWorkerConcurrency defines the maximum number of requests the worker can process at once.
 	// This affects goroutines available to handle connnect workloads, as well as flow control.
-	// Defaults to 1000.
-	MaxConcurrency int
+	// If this value is not set we use the environment variable "INNGEST_CONNECT_MAX_WORKER_CONCURRENCY".
+	// Defaults to 0. There is no limit if this is 0.
+	MaxWorkerConcurrency *int64
+
+	// MessageReadLimit sets the max number of bytes to read for a single WebSocket message.
+	// By default (nil or 0), the connection has a message read limit of 32768 bytes (32KB).
+	// Set to -1 to disable the limit.
+	// Set to any positive value to use a custom limit.
+	MessageReadLimit *int64
 }
 
 func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
-	concurrency := opts.MaxConcurrency
-	if concurrency < 1 {
-		concurrency = defaultMaxWorkerConcurrency
-	}
-
 	connectPlaceholder := url.URL{
 		Scheme: "ws",
 		Host:   "connect",
-	}
-
-	if opts.InstanceID == nil {
-		return nil, fmt.Errorf("missing required Instance ID")
 	}
 
 	apps := make([]connect.ConnectApp, len(opts.Apps))
@@ -108,10 +105,10 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 		Capabilities:             capabilities,
 		HashedSigningKey:         hashedKey,
 		HashedSigningKeyFallback: hashedFallbackKey,
-		MaxConcurrency:           concurrency,
-		APIBaseUrl:               defaultClient.h.GetAPIBaseURL(),
+		MaxWorkerConcurrency:     opts.MaxWorkerConcurrency,
+		MessageReadLimit:         opts.MessageReadLimit,
+		APIBaseURL:               defaultClient.h.GetAPIBaseURL(),
 		IsDev:                    defaultClient.h.isDev(),
-		DevServerUrl:             DevServerURL(),
 		InstanceID:               opts.InstanceID,
 		Platform:                 Ptr(platform()),
 		SDKVersion:               SDKVersion,
@@ -151,7 +148,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid client")
 	}
-	mw := middleware.NewMiddlewareManager().Add(cImpl.Middleware...)
+	mw := middleware.New().Add(cImpl.Middleware...)
 
 	// Invoke function, always complete regardless of
 	resp, ops, err := invoke(
@@ -160,6 +157,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 		mw,
 		fn,
 		h.GetSigningKey(),
+		h.GetSigningKeyFallback(),
 		&request,
 		stepId,
 	)

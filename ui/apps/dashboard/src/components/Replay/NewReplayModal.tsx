@@ -1,14 +1,12 @@
-'use client';
-
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
-import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import { subtractDuration } from '@inngest/components/utils/date';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -20,7 +18,9 @@ import { useMutation, useQuery } from 'urql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { ReplayRunStatus } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useNavigate } from '@tanstack/react-router';
 
 const GetAccountEntitlementsDocument = graphql(`
   query GetAccountEntitlements {
@@ -92,13 +92,17 @@ export type DateRange = {
   key?: string;
 };
 
-export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewReplayModalProps) {
-  const router = useRouter();
+export default function NewReplayModal({
+  functionSlug,
+  isOpen,
+  onClose,
+}: NewReplayModalProps) {
+  const navigate = useNavigate();
   const [name, setName] = useState<string>('');
   const [timeRange, setTimeRange] = useState<DateRange>();
-  const [selectedStatuses, setSelectedStatuses] = useState<SelectableStatuses[]>([
-    ReplayRunStatus.Failed,
-  ]);
+  const [selectedStatuses, setSelectedStatuses] = useState<
+    SelectableStatuses[]
+  >([ReplayRunStatus.Failed]);
   const environment = useEnvironment();
 
   const [{ data: planData }] = useQuery({
@@ -118,14 +122,17 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     },
     skip: !timeRange || !timeRange.start || !timeRange.end,
   });
-  const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] = useMutation(
-    CreateFunctionReplayDocument
-  );
+  const [{ fetching: isCreatingFunctionReplay }, createFunctionReplayMutation] =
+    useMutation(CreateFunctionReplayDocument);
 
-  const failedRunsCount = data?.environment.function?.replayCounts.failedCount ?? 0;
-  const cancelledRunsCount = data?.environment.function?.replayCounts.cancelledCount ?? 0;
-  const succeededRunsCount = data?.environment.function?.replayCounts.completedCount ?? 0;
-  const pausedRunsCount = data?.environment.function?.replayCounts.skippedPausedCount ?? 0;
+  const failedRunsCount =
+    data?.environment.function?.replayCounts.failedCount ?? 0;
+  const cancelledRunsCount =
+    data?.environment.function?.replayCounts.cancelledCount ?? 0;
+  const succeededRunsCount =
+    data?.environment.function?.replayCounts.completedCount ?? 0;
+  const pausedRunsCount =
+    data?.environment.function?.replayCounts.skippedPausedCount ?? 0;
 
   const statusCounts: Record<SelectableStatuses, number> = {
     [ReplayRunStatus.Failed]: failedRunsCount,
@@ -134,7 +141,10 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     [ReplayRunStatus.SkippedPaused]: pausedRunsCount,
   } as const;
 
-  const selectedRunsCount = selectedStatuses.reduce((acc, status) => acc + statusCounts[status], 0);
+  const selectedRunsCount = selectedStatuses.reduce(
+    (acc, status) => acc + statusCounts[status],
+    0,
+  );
 
   async function createFunctionReplay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -144,7 +154,9 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
     }
 
     if (selectedRunsCount === 0) {
-      toast.error('No runs selected. Please specify a filter with at least one run.');
+      toast.error(
+        'No runs selected. Please specify a filter with at least one run.',
+      );
       return;
     }
 
@@ -168,9 +180,13 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
       loading: 'Loading...',
       success: () => {
         onClose();
-        router.push(
-          `/env/${environment.slug}/functions/${encodeURIComponent(functionSlug)}/replay`
-        );
+        navigate({
+          to: pathCreator.functionReplays({
+            envSlug: environment.slug,
+            functionSlug: functionSlug,
+          }),
+        });
+
         return 'Replay created!';
       },
       error: 'Could not replay function runs. Please try again later.',
@@ -179,9 +195,21 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
 
   const statusOptions = [
     { label: 'Failed', value: ReplayRunStatus.Failed, count: failedRunsCount },
-    { label: 'Canceled', value: ReplayRunStatus.Cancelled, count: cancelledRunsCount },
-    { label: 'Succeeded', value: ReplayRunStatus.Completed, count: succeededRunsCount },
-    { label: 'Skipped', value: ReplayRunStatus.SkippedPaused, count: pausedRunsCount },
+    {
+      label: 'Canceled',
+      value: ReplayRunStatus.Cancelled,
+      count: cancelledRunsCount,
+    },
+    {
+      label: 'Succeeded',
+      value: ReplayRunStatus.Completed,
+      count: succeededRunsCount,
+    },
+    {
+      label: 'Skipped',
+      value: ReplayRunStatus.SkippedPaused,
+      count: pausedRunsCount,
+    },
   ];
 
   return (
@@ -200,10 +228,12 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
         <div>
           <div className="flex flex-col items-start justify-between gap-2 px-6 py-4">
             <label htmlFor="replayName">
-              <span className="text-basis text-sm font-semibold">Replay Name</span>
+              <span className="text-basis text-sm font-semibold">
+                Replay Name
+              </span>
               <p className="text-muted text-sm">
-                Provide a unique name for this replay group to easily identify the runs being
-                replayed.
+                Provide a unique name for this replay group to easily identify
+                the runs being replayed.
               </p>
             </label>
             <div className="w-full">
@@ -221,7 +251,9 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
           </div>
           <div className="flex flex-col justify-between gap-2 px-6 py-4">
             <div>
-              <span className="text-basis text-sm font-semibold">Date Range</span>
+              <span className="text-basis text-sm font-semibold">
+                Date Range
+              </span>
               <p className="text-muted text-sm">
                 Choose the time range for when the runs were queued.
               </p>
@@ -229,14 +261,19 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
             <div className="w-full">
               <RangePicker
                 upgradeCutoff={upgradeCutoff}
+                daysAgoMax={logRetention}
                 onChange={(range) =>
                   setTimeRange(
                     range.type === 'relative'
-                      ? { start: subtractDuration(new Date(), range.duration), end: new Date() }
-                      : { start: range.start, end: range.end }
+                      ? {
+                          start: subtractDuration(new Date(), range.duration),
+                          end: new Date(),
+                        }
+                      : { start: range.start, end: range.end },
                   )
                 }
                 className="w-full"
+                type="button"
               />
             </div>
           </div>
@@ -244,7 +281,9 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
         <div className="space-y-5 px-6 py-4">
           <div>
             <span className="text-basis text-sm font-semibold">Statuses</span>
-            <p className="text-muted text-sm">Select the statuses you wish to replay.</p>
+            <p className="text-muted text-sm">
+              Select the statuses you wish to replay.
+            </p>
           </div>
           <ToggleGroup.Root
             type="multiple"
@@ -261,11 +300,14 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   className="focus:ring-primary-moderate data-[state=on]:bg-success text-basis border-subtle hover:bg-canvasSubtle data-[state=on]:border-primary-moderate items-left flex w-full flex-col gap-1 rounded-md border p-3 text-sm"
                   value={value}
                 >
-                  <RunStatusIcon status={value} className="mx-auto h-8" />
+                  <StatusDot status={value} className="mx-auto" />
                   {label}
                   {!timeRange && <p className="text-muted text-sm">-- runs</p>}
                   {timeRange && (
-                    <p aria-label={`Number of ${label} runs`} className="text-muted text-sm">
+                    <p
+                      aria-label={`Number of ${label} runs`}
+                      className="text-muted text-sm"
+                    >
                       {isLoading ? (
                         <span>Loading</span>
                       ) : (
@@ -285,11 +327,15 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
         <div className="px-6 py-4">
           <div className="text-muted bg-canvasSubtle rounded-md px-6 py-4 text-sm">
             <p>
-              Note: Replayed functions are re-run from the beginning. Previously run steps and
-              function states will not be reused during the replay. The{' '}
-              <InlineCode>event.user</InlineCode> object will be empty for all runs in the replay.
+              Note: Replayed functions are re-run from the beginning. Previously
+              run steps and function states will not be reused during the
+              replay. The <InlineCode>event.user</InlineCode> object will be
+              empty for all runs in the replay.
             </p>
-            <Link target="_blank" href="https://inngest.com/docs/platform/replay">
+            <Link
+              target="_blank"
+              href="https://inngest.com/docs/platform/replay"
+            >
               Learn more about replay
             </Link>
           </div>

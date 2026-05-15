@@ -1,6 +1,6 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
@@ -13,7 +13,8 @@ export const StepsThroughput = ({
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
 }) => {
-  const metrics = workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
+  const metrics =
+    workspace && mapEntityLines(workspace.stepThroughput.metrics, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">
@@ -24,7 +25,6 @@ export const StepsThroughput = ({
             text="Total number of steps processed your env, app or function."
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-steps-throughput"
                 target="_new"

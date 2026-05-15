@@ -151,6 +151,16 @@ func (s SerializableRequest) HTTPRequest() (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Set GetBody so that CheckRedirect can re-read the body on redirects.
+	// Without this, the body is lost when following redirects (e.g. on Modal).
+	if len(s.Body) > 0 {
+		bodyBytes := s.Body
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewBuffer(bodyBytes)), nil
+		}
+	}
+
 	req.Header = s.Header
 	// Always close the request after reading the body, ensuring the connection is not recycled.
 	req.Close = true

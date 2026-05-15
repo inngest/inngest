@@ -1,7 +1,5 @@
-'use client';
-
-import React from 'react';
-
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import { MCPIcon } from '@inngest/components/icons/sections/AI';
 import { EnvironmentMenu } from '../Navigation/Environments';
 import { Help } from '../Navigation/Help';
 import Manage from '../Navigation/Manage';
@@ -32,6 +30,12 @@ export default function SideBar({ collapsed, setCollapsed }: SideBarProps) {
 
         <div>
           <div className="mx-4">
+            <MenuItem
+              href="/mcp"
+              collapsed={collapsed}
+              text="MCP"
+              icon={<MCPIcon className="h-[18px] w-[18px]" />}
+            />
             <Help collapsed={collapsed} />
           </div>
           <Profile collapsed={collapsed} />

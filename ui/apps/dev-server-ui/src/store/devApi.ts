@@ -3,12 +3,17 @@ import { z } from 'zod';
 
 import { api } from './generated';
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
-  ? new URL('/', process.env.NEXT_PUBLIC_API_BASE_URL)
+const baseURL = import.meta.env.VITE_PUBLIC_API_BASE_URL
+  ? new URL('/', import.meta.env.VITE_PUBLIC_API_BASE_URL)
   : '/';
 
 export interface EventPayload {
+  id?: string;
   name: string;
+  ts?: number;
+  data?: object;
+  user?: object;
+  functionId?: string;
 }
 
 const serverInfoSchema = z.object({
@@ -42,19 +47,34 @@ export const devApi = createApi({
         return info;
       },
     }),
-    sendEvent: builder.mutation<
-      void,
-      { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
-    >({
-      query: ({ functionId, ...event }) => ({
-        url: functionId ? `/invoke/${encodeURIComponent(functionId)}` : '/e/dev_key',
-        method: 'POST',
-        body: event,
-      }),
+    sendEvent: builder.mutation<void, EventPayload | EventPayload[]>({
+      query: (payload) => {
+        const isArray = Array.isArray(payload);
+        const firstItem = isArray ? payload[0] : payload;
+        const { functionId, ...body } = firstItem || {};
+
+        return {
+          url: functionId
+            ? `/invoke/${encodeURIComponent(functionId)}`
+            : '/e/dev_key',
+          method: 'POST',
+          body: isArray ? payload : body,
+        };
+      },
       onQueryStarted(event, { dispatch, queryFulfilled }) {
+        // Don't optimistically update for arrays of events
+        if (Array.isArray(event)) {
+          return;
+        }
+
         // Don't optimistically update if this is a function invocation, as the
         // shape of the payload will be different when sending vs receiving.
         if (event.functionId) {
+          return;
+        }
+
+        // Don't optimistically update if the event doesn't have an ID
+        if (!event.id) {
           return;
         }
 
@@ -76,8 +96,8 @@ export const devApi = createApi({
                 createdAt: event.ts,
                 status: null,
               },
-            }
-          )
+            },
+          ),
         );
       },
     }),

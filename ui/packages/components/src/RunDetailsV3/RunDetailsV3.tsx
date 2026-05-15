@@ -1,24 +1,25 @@
-'use client';
-
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { useShared } from '../SharedContext/SharedContext';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
-import { Skeleton } from '../Skeleton';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { RunInfo } from './RunInfo';
+import { RunInfo as NewRunInfo, RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
-import { useStepSelection } from './utils';
+import { useDynamicRunData, useStepSelection } from './utils';
+
+//
+// userland traces can land after the run is completed
+const RESIDUAL_POLL_INTERVAL = 6000;
 
 type Props = {
   standalone: boolean;
@@ -26,7 +27,7 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
-  tracesPreviewEnabled: boolean;
+  newStack?: boolean;
 };
 
 const MIN_HEIGHT = 586;
@@ -50,11 +51,18 @@ export const RunDetailsV3 = ({
   getTrigger,
   runID,
   standalone,
-  tracesPreviewEnabled,
   pollInterval: initialPollInterval,
   initialRunData,
+  newStack = false,
 }: Props) => {
-  const { cloud } = useShared();
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
+  const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { updateDynamicRunData } = useDynamicRunData({ runID });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
@@ -64,7 +72,7 @@ export const RunDetailsV3 = ({
   const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
   const [windowHeight, setWindowHeight] = useState(0);
-  const { selectedStep } = useStepSelection(runID);
+  const { selectedStep } = useStepSelection({ runID });
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -145,7 +153,7 @@ export const RunDetailsV3 = ({
     preview: tracesPreviewEnabled,
     //
     // TODO: enable this for cloud once we're sure we can handle the load
-    refetchInterval: cloud ? 0 : pollInterval,
+    refetchInterval: pollInterval,
   });
 
   const outputID = runData?.trace?.outputID;
@@ -160,20 +168,36 @@ export const RunDetailsV3 = ({
     enabled: Boolean(outputID),
   });
 
+  useEffect(() => {
+    if (pollingFlagReady && pollingDisabled) {
+      setPollInterval(undefined);
+    }
+  }, [pollingFlagReady, pollingDisabled]);
+
   if (runData?.trace.endedAt && pollInterval) {
     //
     // Stop polling for ended runs, but still give it
     // a few seconds for any lingering userland traces.
     setTimeout(() => {
       setPollInterval(undefined);
-    }, 6000);
+    }, RESIDUAL_POLL_INTERVAL);
   }
 
-  const waiting = isWaiting(
-    initialRunData?.status || runData?.trace?.status,
-    runError,
-    resultError
-  );
+  const traceStatus = runData?.trace?.status;
+
+  useEffect(() => {
+    if (!traceStatus || traceStatus === initialRunData?.status) {
+      return;
+    }
+
+    updateDynamicRunData({
+      runID,
+      status: traceStatus,
+      endedAt: runData?.trace.endedAt ?? undefined,
+    });
+  }, [runData?.trace.endedAt, traceStatus]);
+
+  const waiting = isWaiting(initialRunData?.status || traceStatus, runError, resultError);
   const showError = waiting ? false : runError || resultError;
 
   //
@@ -185,7 +209,7 @@ export const RunDetailsV3 = ({
       {standalone && runData && (
         <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
           <div className="flex flex-col gap-1">
-            <StatusCell status={runData.trace.status} />
+            <StatusCell status={traceStatus || runData.status} />
             <p className="text-basis text-2xl font-medium">{runData.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
@@ -194,14 +218,25 @@ export const RunDetailsV3 = ({
       <div ref={containerRef} className="flex flex-row">
         <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
           <div ref={runInfoRef} className="px-4">
-            <RunInfo
-              className="mb-4"
-              initialRunData={initialRunData}
-              run={nullishToLazy(runData)}
-              runID={runID}
-              standalone={standalone}
-              result={resultData}
-            />
+            {newStack ? (
+              <NewRunInfo
+                className="mb-4"
+                initialRunData={initialRunData}
+                run={nullishToLazy(runData)}
+                runID={runID}
+                standalone={standalone}
+                result={resultData}
+              />
+            ) : (
+              <RunInfo
+                className="mb-4"
+                initialRunData={initialRunData}
+                run={nullishToLazy(runData)}
+                runID={runID}
+                standalone={standalone}
+                result={resultData}
+              />
+            )}
             {showError && (
               <ErrorCard
                 error={runError || resultError}
@@ -251,6 +286,7 @@ export const RunDetailsV3 = ({
               selectedStep={selectedStep}
               pollInterval={pollInterval}
               tracesPreviewEnabled={tracesPreviewEnabled}
+              newStack={newStack}
             />
           ) : (
             <TopInfo
@@ -258,6 +294,7 @@ export const RunDetailsV3 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
+              trace={runData?.trace}
             />
           )}
         </div>

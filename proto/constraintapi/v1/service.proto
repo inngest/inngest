@@ -1,0 +1,305 @@
+syntax = "proto3";
+package constraintapi.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/constraintapi/v1;constraintapi";
+
+// Enums with CONSTRAINT_API_ prefix for global uniqueness
+enum ConstraintApiRateLimitScope {
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_ENV = 2;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiConcurrencyScope {
+  CONSTRAINT_API_CONCURRENCY_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_ENV = 2;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiThrottleScope {
+  CONSTRAINT_API_THROTTLE_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_THROTTLE_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_THROTTLE_SCOPE_ENV = 2;
+  CONSTRAINT_API_THROTTLE_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiConcurrencyMode {
+  CONSTRAINT_API_CONCURRENCY_MODE_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONCURRENCY_MODE_STEP = 1;
+  CONSTRAINT_API_CONCURRENCY_MODE_RUN = 2;
+}
+
+enum ConstraintApiConstraintKind {
+  CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT = 1;
+  CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY = 2;
+  CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE = 3;
+  CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE = 4;
+}
+
+enum ConstraintApiSemaphoreReleaseMode {
+  CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_UNSPECIFIED = 0;
+  CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_AUTO = 1;
+  CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_MANUAL = 2;
+}
+
+enum ConstraintApiRunProcessingMode {
+  CONSTRAINT_API_RUN_PROCESSING_MODE_UNSPECIFIED = 0;
+  CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND = 1;
+  CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT = 2;
+}
+
+enum ConstraintApiCallerLocation {
+  CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED = 0;
+  CONSTRAINT_API_CALLER_LOCATION_SCHEDULE = 1;
+  CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL = 2;
+  CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE = 3;
+  CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT = 4;
+  CONSTRAINT_API_CALLER_LOCATION_LEASE_SCAVENGE = 5;
+}
+
+enum ConstraintApiLeaseService {
+  CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED = 0;
+  CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS = 1;
+  CONSTRAINT_API_LEASE_SERVICE_EXECUTOR = 2;
+  CONSTRAINT_API_LEASE_SERVICE_API = 3;
+  CONSTRAINT_API_LEASE_CONSTRAINT_SCAVENGER = 4;
+}
+
+// Message definitions
+message RateLimitConfig {
+  ConstraintApiRateLimitScope scope = 1;
+  int32 limit = 2;
+  int32 period = 3;
+  string key_expression_hash = 4;
+}
+
+message CustomConcurrencyLimit {
+  ConstraintApiConcurrencyMode mode = 1;
+  ConstraintApiConcurrencyScope scope = 2;
+  int32 limit = 3;
+  string key_expression_hash = 4;
+}
+
+message ConcurrencyConfig {
+  int32 account_concurrency = 1;
+  int32 function_concurrency = 2;
+  int32 account_run_concurrency = 3;
+  int32 function_run_concurrency = 4;
+  repeated CustomConcurrencyLimit custom_concurrency_keys = 5;
+}
+
+message ThrottleConfig {
+  ConstraintApiThrottleScope scope = 1;
+  string key_expression_hash = 2;
+  int32 limit = 3;
+  int32 burst = 4;
+  int32 period = 5;
+}
+
+message Semaphore {
+  string id = 1;
+  string usage_value = 2;
+  int64 weight = 3;
+  ConstraintApiSemaphoreReleaseMode release = 4;
+}
+
+message ConstraintConfig {
+  int32 function_version = 1;
+  repeated RateLimitConfig rate_limit = 2;
+  ConcurrencyConfig concurrency = 3;
+  repeated ThrottleConfig throttle = 4;
+  repeated Semaphore semaphores = 5;
+}
+
+// Individual constraint types
+message RateLimitConstraint {
+  ConstraintApiRateLimitScope scope = 1;
+  string key_expression_hash = 2;
+  string evaluated_key_hash = 3;
+}
+
+message ConcurrencyConstraint {
+  ConstraintApiConcurrencyMode mode = 1;
+  ConstraintApiConcurrencyScope scope = 2;
+  string key_expression_hash = 3;
+  string evaluated_key_hash = 4;
+}
+
+message ThrottleConstraint {
+  ConstraintApiThrottleScope scope = 1;
+  string key_expression_hash = 2;
+  string evaluated_key_hash = 3;
+}
+
+message SemaphoreConstraint {
+  string id = 1;
+  string usage_value = 2;
+  int64 weight = 3;
+  ConstraintApiSemaphoreReleaseMode release = 4;
+}
+
+// Constraint item that matches Go's ConstraintItem struct
+message ConstraintItem {
+  ConstraintApiConstraintKind kind = 1;
+  optional ConcurrencyConstraint concurrency = 2;
+  optional ThrottleConstraint throttle = 3;
+  optional RateLimitConstraint rate_limit = 4;
+  optional SemaphoreConstraint semaphore = 5;
+}
+
+// Constraint usage information
+message ConstraintUsage {
+  ConstraintItem constraint = 1;
+  int32 used = 2;
+  int32 limit = 3;
+}
+
+// Capacity lease information
+message CapacityLease {
+  string lease_id = 1;  // ULID string
+  string idempotency_key = 2;
+}
+
+message LeaseSource {
+  ConstraintApiLeaseService service = 1;
+  ConstraintApiCallerLocation location = 2;
+  ConstraintApiRunProcessingMode run_processing_mode = 3;
+}
+
+// Request/Response messages
+message CapacityCheckRequest {
+  string account_id = 1;
+  string env_id = 2;
+  string function_id = 3;
+  ConstraintConfig configuration = 4;
+  repeated ConstraintItem constraints = 5;
+}
+
+message CapacityCheckResponse {
+  int32 available_capacity = 1;
+  repeated ConstraintItem limiting_constraints = 2;
+  repeated ConstraintUsage usage = 3;
+  int32 fairness_reduction = 4;
+  google.protobuf.Timestamp retry_after = 5;
+  repeated ConstraintItem exhausted_constraints = 6;
+}
+
+message CapacityAcquireRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string app_id = 16;
+  string function_id = 4;
+  ConstraintConfig configuration = 5;
+  repeated ConstraintItem constraints = 6;
+  int32 amount = 7;
+  repeated string lease_idempotency_keys = 8;
+  map<string, string> lease_run_ids = 9;
+  google.protobuf.Timestamp current_time = 10;
+  google.protobuf.Duration duration = 11;
+  google.protobuf.Duration maximum_lifetime = 12;
+  google.protobuf.Duration blocking_threshold = 13;
+  LeaseSource source = 14;
+  uint32 request_attempt = 15;
+  google.protobuf.Timestamp request_time = 17;
+}
+
+message CapacityAcquireResponse {
+  repeated CapacityLease leases = 1;
+  repeated ConstraintItem limiting_constraints = 2;
+  int32 fairness_reduction = 3;
+  google.protobuf.Timestamp retry_after = 4;
+  repeated ConstraintItem exhausted_constraints = 5;
+  repeated ConstraintUsage usage = 6;
+}
+
+message CapacityExtendLeaseRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string lease_id = 3;
+  google.protobuf.Duration duration = 4;
+  LeaseSource source = 5;
+  uint32 request_attempt = 6;
+  google.protobuf.Timestamp lease_issued_at = 7;
+}
+
+message CapacityExtendLeaseResponse {
+  optional string lease_id = 1;
+}
+
+message CapacityReleaseRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string lease_id = 3;
+  LeaseSource source = 4;
+  uint32 request_attempt = 5;
+  google.protobuf.Timestamp lease_issued_at = 6;
+}
+
+message CapacityReleaseResponse {
+}
+
+// Semaphore management messages
+
+message SemaphoreSetCapacityRequest {
+  string account_id = 1;
+  string name = 2;
+  string idempotency_key = 3;
+  int64 capacity = 4;
+}
+
+message SemaphoreAdjustCapacityRequest {
+  string account_id = 1;
+  string name = 2;
+  string idempotency_key = 3;
+  int64 delta = 4;
+}
+
+message SemaphoreGetCapacityRequest {
+  string account_id = 1;
+  string name = 2;
+  string usage_value = 3;
+}
+
+message SemaphoreGetCapacityResponse {
+  int64 capacity = 1;
+  int64 usage = 2;
+}
+
+message SemaphoreReleaseRequest {
+  string account_id = 1;
+  string name = 2;
+  string usage_value = 3;
+  string idempotency_key = 4;
+  int64 weight = 5;
+}
+
+message SemaphoreResponse {
+  // applied is false when the call was an idempotent replay of a previously
+  // seen idempotency key. Callers emitting side effects (audit events) should
+  // gate on this field.
+  bool applied = 1;
+  // capacity is the resulting semaphore capacity after the call. For replays,
+  // it is the cached capacity value from the original applied call.
+  int64 capacity = 2;
+}
+
+service ConstraintAPI {
+  rpc Check(CapacityCheckRequest) returns (CapacityCheckResponse);
+  rpc Acquire(CapacityAcquireRequest) returns (CapacityAcquireResponse);
+  rpc ExtendLease(CapacityExtendLeaseRequest) returns (CapacityExtendLeaseResponse);
+  rpc Release(CapacityReleaseRequest) returns (CapacityReleaseResponse);
+
+  // Semaphore management
+  rpc SetSemaphoreCapacity(SemaphoreSetCapacityRequest) returns (SemaphoreResponse);
+  rpc AdjustSemaphoreCapacity(SemaphoreAdjustCapacityRequest) returns (SemaphoreResponse);
+  rpc GetSemaphoreCapacity(SemaphoreGetCapacityRequest) returns (SemaphoreGetCapacityResponse);
+  rpc ReleaseSemaphore(SemaphoreReleaseRequest) returns (SemaphoreResponse);
+}
+

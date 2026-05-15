@@ -3,7 +3,8 @@
   "extends": "@inngest/tsconfig/react-library.json",
   "compilerOptions": {
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
-    "rootDirs": ["./src/", "./.storybook/", "./"]
+    "rootDirs": ["./src/", "./.storybook/", "./"],
+    "target": "ES2017"
   },
   "include": [
     "./src/**/*",

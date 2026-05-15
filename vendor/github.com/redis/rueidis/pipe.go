@@ -21,9 +21,22 @@ import (
 )
 
 const LibName = "rueidis"
-const LibVer = "1.0.51"
+const LibVer = "1.0.68"
 
 var noHello = regexp.MustCompile("unknown command .?(HELLO|hello).?")
+
+// See https://github.com/redis/rueidis/pull/691
+func isUnsubReply(msg *RedisMessage) bool {
+	// ex. NOPERM User limited-user has no permissions to run the 'ping' command
+	// ex. LOADING server is loading the dataset in memory
+	// ex. BUSY
+	if msg.typ == '-' && (strings.HasPrefix(msg.string(), "LOADING") || strings.HasPrefix(msg.string(), "BUSY") || strings.Contains(msg.string(), "'ping'")) {
+		msg.typ = '+'
+		msg.setString("PONG")
+		return true
+	}
+	return msg.string() == "PONG" || (len(msg.values()) != 0 && msg.values()[0].string() == "pong")
+}
 
 type wire interface {
 	Do(ctx context.Context, cmd Completed) RedisResult
@@ -35,60 +48,63 @@ type wire interface {
 	DoMultiStream(ctx context.Context, pool *pool, multi ...Completed) MultiRedisResultStream
 	Info() map[string]RedisMessage
 	Version() int
+	AZ() string
 	Error() error
 	Close()
 
 	CleanSubscriptions()
 	SetPubSubHooks(hooks PubSubHooks) <-chan error
 	SetOnCloseHook(fn func(error))
+	StopTimer() bool
+	ResetTimer() bool
 }
 
 var _ wire = (*pipe)(nil)
 
 type pipe struct {
 	conn            net.Conn
-	error           atomic.Value
 	clhks           atomic.Value // closed hook, invoked after the conn is closed
-	pshks           atomic.Value // pubsub hook, registered by the SetPubSubHooks
 	queue           queue
 	cache           CacheStore
+	pshks           atomic.Pointer[pshks] // pubsub hook, registered by the SetPubSubHooks
+	error           atomic.Pointer[errs]
 	r               *bufio.Reader
 	w               *bufio.Writer
 	close           chan struct{}
 	onInvalidations func([]RedisMessage)
-	r2psFn          func() (p *pipe, err error) // func to build pipe for resp2 pubsub
-	r2pipe          *pipe                       // internal pipe for resp2 pubsub only
-	ssubs           *subs                       // pubsub smessage subscriptions
-	nsubs           *subs                       // pubsub  message subscriptions
-	psubs           *subs                       // pubsub pmessage subscriptions
+	ssubs           *subs // pubsub smessage subscriptions
+	nsubs           *subs // pubsub  message subscriptions
+	psubs           *subs // pubsub pmessage subscriptions
+	r2p             *r2p
+	pingTimer       *time.Timer // timer for background ping
+	lftmTimer       *time.Timer // lifetime timer
 	info            map[string]RedisMessage
 	timeout         time.Duration
 	pinggap         time.Duration
 	maxFlushDelay   time.Duration
-	once            sync.Once
-	r2mu            sync.Mutex
+	lftm            time.Duration // lifetime
+	wrCounter       atomic.Uint64
 	version         int32
-	_               [10]int32
 	blcksig         int32
 	state           int32
-	waits           int32
-	recvs           int32
+	bgState         int32
 	r2ps            bool // identify this pipe is used for resp2 pubsub or not
 	noNoDelay       bool
+	optIn           bool
 }
 
-type pipeFn func(connFn func() (net.Conn, error), option *ClientOption) (p *pipe, err error)
+type pipeFn func(ctx context.Context, connFn func(ctx context.Context) (net.Conn, error), option *ClientOption) (p *pipe, err error)
 
-func newPipe(connFn func() (net.Conn, error), option *ClientOption) (p *pipe, err error) {
-	return _newPipe(connFn, option, false, false)
+func newPipe(ctx context.Context, connFn func(ctx context.Context) (net.Conn, error), option *ClientOption) (p *pipe, err error) {
+	return _newPipe(ctx, connFn, option, false, false)
 }
 
-func newPipeNoBg(connFn func() (net.Conn, error), option *ClientOption) (p *pipe, err error) {
-	return _newPipe(connFn, option, false, true)
+func newPipeNoBg(ctx context.Context, connFn func(context.Context) (net.Conn, error), option *ClientOption) (p *pipe, err error) {
+	return _newPipe(ctx, connFn, option, false, true)
 }
 
-func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg bool) (p *pipe, err error) {
-	conn, err := connFn()
+func _newPipe(ctx context.Context, connFn func(context.Context) (net.Conn, error), option *ClientOption, r2ps, nobg bool) (p *pipe, err error) {
+	conn, err := connFn(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -102,19 +118,20 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 		maxFlushDelay: option.MaxFlushDelay,
 		noNoDelay:     option.DisableTCPNoDelay,
 
-		r2ps: r2ps,
+		r2ps:  r2ps,
+		optIn: isOptIn(option.ClientTrackingOptions),
 	}
 	if !nobg {
-		p.queue = newRing(option.RingScaleEachConn)
+		switch queueTypeFromEnv {
+		case queueTypeFlowBuffer:
+			p.queue = newFlowBuffer(option.RingScaleEachConn)
+		default:
+			p.queue = newRing(option.RingScaleEachConn)
+		}
 		p.nsubs = newSubs()
 		p.psubs = newSubs()
 		p.ssubs = newSubs()
 		p.close = make(chan struct{})
-	}
-	if !r2ps {
-		p.r2psFn = func() (p *pipe, err error) {
-			return _newPipe(connFn, option, true, nobg)
-		}
 	}
 	if !nobg && !option.DisableCache {
 		cacheStoreFn := option.NewCacheStoreFn
@@ -172,6 +189,9 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 	if option.ClientNoEvict {
 		init = append(init, []string{"CLIENT", "NO-EVICT", "ON"})
 	}
+	if option.Standalone.EnableRedirect {
+		init = append(init, []string{"CLIENT", "CAPA", "redirect"})
+	}
 
 	addClientSetInfoCmds := true
 	if len(option.ClientSetInfo) == 2 {
@@ -187,7 +207,7 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 		timeout = DefaultDialTimeout
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	r2 := option.AlwaysRESP2
@@ -213,11 +233,11 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 					continue
 				}
 				if re, ok := err.(*RedisError); ok {
-					if !r2 && noHello.MatchString(re.string) {
+					if !r2 && noHello.MatchString(re.string()) {
 						r2 = true
 						continue
 					} else if init[i][0] == "CLIENT" {
-						err = fmt.Errorf("%s: %v\n%w", re.string, init[i], ErrNoCache)
+						err = fmt.Errorf("%s: %v\n%w", re.string(), init[i], ErrNoCache)
 					} else if r2 {
 						continue
 					}
@@ -227,12 +247,12 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 			}
 		}
 	}
-	if proto := p.info["proto"]; proto.integer < 3 {
+	if proto := p.info["proto"]; proto.intlen < 3 {
 		r2 = true
 	}
 	if !r2 && !r2ps {
 		if ver, ok := p.info["version"]; ok {
-			if v := strings.Split(ver.string, "."); len(v) != 0 {
+			if v := strings.Split(ver.string(), "."); len(v) != 0 {
 				vv, _ := strconv.ParseInt(v[0], 10, 32)
 				p.version = int32(vv)
 			}
@@ -249,6 +269,8 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 		} else if username != "" {
 			init = append(init, []string{"AUTH", username, password})
 		}
+		helloIndex := len(init)
+		init = append(init, []string{"HELLO", "2"})
 		if option.ClientName != "" {
 			init = append(init, []string{"CLIENT", "SETNAME", option.ClientName})
 		}
@@ -263,6 +285,9 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 		}
 		if option.ClientNoEvict {
 			init = append(init, []string{"CLIENT", "NO-EVICT", "ON"})
+		}
+		if option.Standalone.EnableRedirect {
+			init = append(init, []string{"CLIENT", "CAPA", "redirect"})
 		}
 
 		addClientSetInfoCmds := true
@@ -291,9 +316,22 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 					continue
 				}
 				if err = r.Error(); err != nil {
+					if re, ok := err.(*RedisError); ok && noHello.MatchString(re.string()) {
+						continue
+					}
 					p.Close()
 					return nil, err
 				}
+				if i == helloIndex {
+					p.info, err = r.AsMap()
+				}
+			}
+		}
+		if !r2ps {
+			p.r2p = &r2p{
+				f: func(ctx context.Context) (p *pipe, err error) {
+					return _newPipe(ctx, connFn, option, true, nobg)
+				},
 			}
 		}
 	}
@@ -302,8 +340,12 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 			p.background()
 		}
 		if p.timeout > 0 && p.pinggap > 0 {
-			go p.backgroundPing()
+			p.backgroundPing()
 		}
+	}
+	if option.ConnLifetime > 0 {
+		p.lftm = option.ConnLifetime
+		p.lftmTimer = time.AfterFunc(option.ConnLifetime, p.expired)
 	}
 	return p, nil
 }
@@ -311,7 +353,9 @@ func _newPipe(connFn func() (net.Conn, error), option *ClientOption, r2ps, nobg 
 func (p *pipe) background() {
 	if p.queue != nil {
 		atomic.CompareAndSwapInt32(&p.state, 0, 1)
-		p.once.Do(func() { go p._background() })
+		if atomic.CompareAndSwapInt32(&p.bgState, 0, 1) {
+			go p._background()
+		}
 	}
 }
 
@@ -319,6 +363,7 @@ func (p *pipe) _exit(err error) {
 	p.error.CompareAndSwap(nil, &errs{error: err})
 	atomic.CompareAndSwapInt32(&p.state, 1, 2) // stop accepting new requests
 	_ = p.conn.Close()                         // force both read & write goroutine to exit
+	p.StopTimer()
 	p.clhks.Load().(func(error))(err)
 }
 
@@ -345,18 +390,22 @@ func (p *pipe) _background() {
 		select {
 		case <-p.close:
 		default:
-			atomic.AddInt32(&p.waits, 1)
+			p.incrWaits()
 			go func() {
-				<-p.queue.PutOne(cmds.PingCmd) // avoid _backgroundWrite hanging at p.queue.WaitForWrite()
-				atomic.AddInt32(&p.waits, -1)
+				ch, _ := p.queue.PutOne(context.Background(), cmds.PingCmd) // avoid _backgroundWrite hanging at p.queue.WaitForWrite()
+				<-ch
+				p.decrWaits()
 			}()
 		}
+	}
+	if p.pingTimer != nil {
+		p.pingTimer.Stop()
 	}
 	err := p.Error()
 	p.nsubs.Close()
 	p.psubs.Close()
 	p.ssubs.Close()
-	if old := p.pshks.Swap(emptypshks).(*pshks); old.close != nil {
+	if old := p.pshks.Swap(emptypshks); old.close != nil {
 		old.close <- err
 		close(old.close)
 	}
@@ -364,7 +413,6 @@ func (p *pipe) _background() {
 	var (
 		resps []RedisResult
 		ch    chan RedisResult
-		cond  *sync.Cond
 	)
 
 	// clean up cache and free pending calls
@@ -376,22 +424,20 @@ func (p *pipe) _background() {
 	}
 
 	resp := newErrResult(err)
-	for atomic.LoadInt32(&p.waits) != 0 {
+	for p.loadWaits() != 0 {
 		select {
 		case <-p.close: // p.queue.NextWriteCmd() can only be called after _backgroundWrite
 			_, _, _ = p.queue.NextWriteCmd()
 		default:
 		}
-		if _, _, ch, resps, cond = p.queue.NextResultCh(); ch != nil {
+		if _, _, ch, resps = p.queue.NextResultCh(); ch != nil {
 			for i := range resps {
 				resps[i] = resp
 			}
 			ch <- resp
-			cond.L.Unlock()
-			cond.Signal()
+			p.queue.FinishResult()
 		} else {
-			cond.L.Unlock()
-			cond.Signal()
+			p.queue.FinishResult()
 			runtime.Gosched()
 		}
 	}
@@ -420,9 +466,9 @@ func (p *pipe) _backgroundWrite() (err error) {
 				}
 			}
 			ones[0], multi, ch = p.queue.WaitForWrite()
-			if flushDelay != 0 && atomic.LoadInt32(&p.waits) > 1 { // do not delay for sequential usage
-				// Blocking commands are executed in dedicated client which is acquired from pool.
-				// So, there is no sense to wait other commands to be written.
+			if flushDelay != 0 && p.loadWaits() > 1 { // do not delay for sequential usage
+				// Blocking commands are executed in a dedicated client which is acquired from the pool.
+				// So, there is no sense to wait for other commands to be written.
 				// https://github.com/redis/rueidis/issues/379
 				var blocked bool
 				for i := 0; i < len(multi) && !blocked; i++ {
@@ -438,6 +484,9 @@ func (p *pipe) _backgroundWrite() (err error) {
 		}
 		for _, cmd := range multi {
 			err = writeCmd(p.w, cmd.Commands())
+			if cmd.IsUnsub() { // See https://github.com/redis/rueidis/pull/691
+				err = writeCmd(p.w, cmds.PingCmd.Commands())
+			}
 		}
 	}
 	return
@@ -446,28 +495,32 @@ func (p *pipe) _backgroundWrite() (err error) {
 func (p *pipe) _backgroundRead() (err error) {
 	var (
 		msg   RedisMessage
-		cond  *sync.Cond
 		ones  = make([]Completed, 1)
 		multi []Completed
 		resps []RedisResult
 		ch    chan RedisResult
 		ff    int // fulfilled count
-		skip  int // skip rest push messages
+		skip  int // skip the rest push messages
 		ver   = p.version
 		prply bool // push reply
 		unsub bool // unsubscribe notification
-		r2ps  = p.r2ps
+
+		skipUnsubReply bool // if unsubscribe is replied
+
+		r2ps = p.r2ps
 	)
 
 	defer func() {
 		resp := newErrResult(err)
+		if e := p.Error(); e == errConnExpired {
+			resp = newErrResult(e)
+		}
 		if err != nil && ff < len(multi) {
 			for ; ff < len(resps); ff++ {
 				resps[ff] = resp
 			}
 			ch <- resp
-			cond.L.Unlock()
-			cond.Signal()
+			p.queue.FinishResult()
 		}
 	}()
 
@@ -475,8 +528,8 @@ func (p *pipe) _backgroundRead() (err error) {
 		if msg, err = readNextMessage(p.r); err != nil {
 			return
 		}
-		if msg.typ == '>' || (r2ps && len(msg.values) != 0 && msg.values[0].string != "pong") {
-			if prply, unsub = p.handlePush(msg.values); !prply {
+		if msg.typ == '>' || (r2ps && len(msg.values()) != 0 && msg.values()[0].string() != "pong") {
+			if prply, unsub = p.handlePush(msg.values()); !prply {
 				continue
 			}
 			if skip > 0 {
@@ -485,40 +538,45 @@ func (p *pipe) _backgroundRead() (err error) {
 				unsub = false
 				continue
 			}
-		} else if ver == 6 && len(msg.values) != 0 {
+		} else if ver == 6 && len(msg.values()) != 0 {
 			// This is a workaround for Redis 6's broken invalidation protocol: https://github.com/redis/redis/issues/8935
 			// When Redis 6 handles MULTI, MGET, or other multi-keys command,
-			// it will send invalidation message immediately if it finds the keys are expired, thus causing the multi-keys command response to be broken.
-			// We fix this by fetching the next message and patch it back to the response.
+			// it will send invalidation messages immediately if it finds the keys are expired, thus causing the multi-keys command response to be broken.
+			// We fix this by fetching the next message and patching it back to the response.
 			i := 0
-			for j, v := range msg.values {
+			for j, v := range msg.values() {
 				if v.typ == '>' {
-					p.handlePush(v.values)
+					p.handlePush(v.values())
 				} else {
 					if i != j {
-						msg.values[i] = v
+						msg.values()[i] = v
 					}
 					i++
 				}
 			}
-			for ; i < len(msg.values); i++ {
-				if msg.values[i], err = readNextMessage(p.r); err != nil {
+			for ; i < len(msg.values()); i++ {
+				if msg.values()[i], err = readNextMessage(p.r); err != nil {
 					return
 				}
 			}
 		}
 		if ff == len(multi) {
 			ff = 0
-			ones[0], multi, ch, resps, cond = p.queue.NextResultCh() // ch should not be nil, otherwise it must be a protocol bug
+			ones[0], multi, ch, resps = p.queue.NextResultCh() // ch should not be nil; otherwise, it must be a protocol bug
 			if ch == nil {
-				cond.L.Unlock()
+				p.queue.FinishResult()
 				// Redis will send sunsubscribe notification proactively in the event of slot migration.
-				// We should ignore them and go fetch next message.
+				// We should ignore them and go fetch the next message.
 				// We also treat all the other unsubscribe notifications just like sunsubscribe,
 				// so that we don't need to track how many channels we have subscribed to deal with wildcard unsubscribe command
+				// See https://github.com/redis/rueidis/pull/691
 				if unsub {
 					prply = false
 					unsub = false
+					continue
+				}
+				if skipUnsubReply && isUnsubReply(&msg) {
+					skipUnsubReply = false
 					continue
 				}
 				panic(protocolbug)
@@ -526,36 +584,37 @@ func (p *pipe) _backgroundRead() (err error) {
 			if multi == nil {
 				multi = ones
 			}
-		} else if ff >= 4 && len(msg.values) >= 2 && multi[0].IsOptIn() { // if unfulfilled multi commands are lead by opt-in and get success response
+		} else if ff >= 4 && len(msg.values()) >= 2 && multi[0].IsOptIn() { // if unfulfilled multi commands are lead by opt-in and get a success response
 			now := time.Now()
 			if cacheable := Cacheable(multi[ff-1]); cacheable.IsMGet() {
 				cc := cmds.MGetCacheCmd(cacheable)
-				msgs := msg.values[len(msg.values)-1].values
+				msgs := msg.values()[len(msg.values())-1].values()
 				for i, cp := range msgs {
 					ck := cmds.MGetCacheKey(cacheable, i)
 					cp.attrs = cacheMark
-					if pttl := msg.values[i].integer; pttl >= 0 {
+					if pttl := msg.values()[i].intlen; pttl >= 0 {
 						cp.setExpireAt(now.Add(time.Duration(pttl) * time.Millisecond).UnixMilli())
 					}
 					msgs[i].setExpireAt(p.cache.Update(ck, cc, cp))
 				}
 			} else {
 				ck, cc := cmds.CacheKey(cacheable)
-				ci := len(msg.values) - 1
-				cp := msg.values[ci]
+				ci := len(msg.values()) - 1
+				cp := msg.values()[ci]
 				cp.attrs = cacheMark
-				if pttl := msg.values[ci-1].integer; pttl >= 0 {
+				if pttl := msg.values()[ci-1].intlen; pttl >= 0 {
 					cp.setExpireAt(now.Add(time.Duration(pttl) * time.Millisecond).UnixMilli())
 				}
-				msg.values[ci].setExpireAt(p.cache.Update(ck, cc, cp))
+				msg.values()[ci].setExpireAt(p.cache.Update(ck, cc, cp))
 			}
 		}
 		if prply {
 			// Redis will send sunsubscribe notification proactively in the event of slot migration.
-			// We should ignore them and go fetch next message.
+			// We should ignore them and go fetch the next message.
 			// We also treat all the other unsubscribe notifications just like sunsubscribe,
 			// so that we don't need to track how many channels we have subscribed to deal with wildcard unsubscribe command
-			if unsub && (!multi[ff].NoReply() || !strings.HasSuffix(multi[ff].Commands()[0], "UNSUBSCRIBE")) {
+			// See https://github.com/redis/rueidis/pull/691
+			if unsub {
 				prply = false
 				unsub = false
 				continue
@@ -567,8 +626,18 @@ func (p *pipe) _backgroundRead() (err error) {
 			}
 			skip = len(multi[ff].Commands()) - 2
 			msg = RedisMessage{} // override successful subscribe/unsubscribe response to empty
-		} else if multi[ff].NoReply() && msg.string == "QUEUED" {
+		} else if multi[ff].NoReply() && msg.string() == "QUEUED" {
 			panic(multiexecsub)
+		} else if multi[ff].IsUnsub() && !isUnsubReply(&msg) {
+			// See https://github.com/redis/rueidis/pull/691
+			skipUnsubReply = true
+		} else if skipUnsubReply {
+			// See https://github.com/redis/rueidis/pull/691
+			if !isUnsubReply(&msg) {
+				panic(protocolbug)
+			}
+			skipUnsubReply = false
+			continue
 		}
 		resp := newResult(msg, err)
 		if resps != nil {
@@ -576,44 +645,43 @@ func (p *pipe) _backgroundRead() (err error) {
 		}
 		if ff++; ff == len(multi) {
 			ch <- resp
-			cond.L.Unlock()
-			cond.Signal()
+			p.queue.FinishResult()
 		}
 	}
 }
 
 func (p *pipe) backgroundPing() {
-	var err error
 	var prev, recv int32
 
-	ticker := time.NewTicker(p.pinggap)
-	defer ticker.Stop()
-	for ; err == nil; prev = recv {
-		select {
-		case <-ticker.C:
-			recv = atomic.LoadInt32(&p.recvs)
-			if recv != prev || atomic.LoadInt32(&p.blcksig) != 0 || (atomic.LoadInt32(&p.state) == 0 && atomic.LoadInt32(&p.waits) != 0) {
-				continue
+	prev = p.loadRecvs()
+	p.pingTimer = time.AfterFunc(p.pinggap, func() {
+		var err error
+		recv = p.loadRecvs()
+		defer func() {
+			if err == nil && p.Error() == nil {
+				prev = p.loadRecvs()
+				p.pingTimer.Reset(p.pinggap)
 			}
-			ch := make(chan error, 1)
-			tm := time.NewTimer(p.timeout)
-			go func() { ch <- p.Do(context.Background(), cmds.PingCmd).NonRedisError() }()
-			select {
-			case <-tm.C:
-				err = os.ErrDeadlineExceeded
-			case err = <-ch:
-				tm.Stop()
-			}
-			if err != nil && atomic.LoadInt32(&p.blcksig) != 0 {
-				err = nil
-			}
-		case <-p.close:
+		}()
+		if recv != prev || atomic.LoadInt32(&p.blcksig) != 0 || (atomic.LoadInt32(&p.state) == 0 && p.loadWaits() != 0) {
 			return
 		}
-	}
-	if err != ErrClosing {
-		p._exit(err)
-	}
+		ch := make(chan error, 1)
+		tm := time.NewTimer(p.timeout)
+		go func() { ch <- p.Do(context.Background(), cmds.PingCmd).NonRedisError() }()
+		select {
+		case <-tm.C:
+			err = os.ErrDeadlineExceeded
+		case err = <-ch:
+			tm.Stop()
+		}
+		if err != nil && atomic.LoadInt32(&p.blcksig) != 0 {
+			err = nil
+		}
+		if err != nil && err != ErrClosing {
+			p._exit(err)
+		}
+	})
 }
 
 func (p *pipe) handlePush(values []RedisMessage) (reply bool, unsubscribe bool) {
@@ -623,81 +691,103 @@ func (p *pipe) handlePush(values []RedisMessage) (reply bool, unsubscribe bool) 
 	// TODO: handle other push data
 	// tracking-redir-broken
 	// server-cpu-usage
-	switch values[0].string {
+	switch values[0].string() {
 	case "invalidate":
 		if p.cache != nil {
 			if values[1].IsNil() {
 				p.cache.Delete(nil)
 			} else {
-				p.cache.Delete(values[1].values)
+				p.cache.Delete(values[1].values())
 			}
 		}
 		if p.onInvalidations != nil {
 			if values[1].IsNil() {
 				p.onInvalidations(nil)
 			} else {
-				p.onInvalidations(values[1].values)
+				p.onInvalidations(values[1].values())
 			}
 		}
 	case "message":
 		if len(values) >= 3 {
-			m := PubSubMessage{Channel: values[1].string, Message: values[2].string}
-			p.nsubs.Publish(values[1].string, m)
-			p.pshks.Load().(*pshks).hooks.OnMessage(m)
+			m := PubSubMessage{Channel: values[1].string(), Message: values[2].string()}
+			p.nsubs.Publish(values[1].string(), m)
+			p.pshks.Load().hooks.OnMessage(m)
 		}
 	case "pmessage":
 		if len(values) >= 4 {
-			m := PubSubMessage{Pattern: values[1].string, Channel: values[2].string, Message: values[3].string}
-			p.psubs.Publish(values[1].string, m)
-			p.pshks.Load().(*pshks).hooks.OnMessage(m)
+			m := PubSubMessage{Pattern: values[1].string(), Channel: values[2].string(), Message: values[3].string()}
+			p.psubs.Publish(values[1].string(), m)
+			p.pshks.Load().hooks.OnMessage(m)
 		}
 	case "smessage":
 		if len(values) >= 3 {
-			m := PubSubMessage{Channel: values[1].string, Message: values[2].string}
-			p.ssubs.Publish(values[1].string, m)
-			p.pshks.Load().(*pshks).hooks.OnMessage(m)
+			m := PubSubMessage{Channel: values[1].string(), Message: values[2].string()}
+			p.ssubs.Publish(values[1].string(), m)
+			p.pshks.Load().hooks.OnMessage(m)
 		}
 	case "unsubscribe":
-		p.nsubs.Unsubscribe(values[1].string)
 		if len(values) >= 3 {
-			p.pshks.Load().(*pshks).hooks.OnSubscription(PubSubSubscription{Kind: values[0].string, Channel: values[1].string, Count: values[2].integer})
+			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
+			p.nsubs.Unsubscribe(s)
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, true
 	case "punsubscribe":
-		p.psubs.Unsubscribe(values[1].string)
 		if len(values) >= 3 {
-			p.pshks.Load().(*pshks).hooks.OnSubscription(PubSubSubscription{Kind: values[0].string, Channel: values[1].string, Count: values[2].integer})
+			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
+			p.psubs.Unsubscribe(s)
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, true
 	case "sunsubscribe":
-		p.ssubs.Unsubscribe(values[1].string)
 		if len(values) >= 3 {
-			p.pshks.Load().(*pshks).hooks.OnSubscription(PubSubSubscription{Kind: values[0].string, Channel: values[1].string, Count: values[2].integer})
+			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
+			p.ssubs.Unsubscribe(s)
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, true
-	case "subscribe", "psubscribe", "ssubscribe":
+	case "subscribe":
 		if len(values) >= 3 {
-			p.pshks.Load().(*pshks).hooks.OnSubscription(PubSubSubscription{Kind: values[0].string, Channel: values[1].string, Count: values[2].integer})
+			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
+			p.nsubs.Confirm(s)
+			p.pshks.Load().hooks.OnSubscription(s)
+		}
+		return true, false
+	case "psubscribe":
+		if len(values) >= 3 {
+			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
+			p.psubs.Confirm(s)
+			p.pshks.Load().hooks.OnSubscription(s)
+		}
+		return true, false
+	case "ssubscribe":
+		if len(values) >= 3 {
+			s := PubSubSubscription{Kind: values[0].string(), Channel: values[1].string(), Count: values[2].intlen}
+			p.ssubs.Confirm(s)
+			p.pshks.Load().hooks.OnSubscription(s)
 		}
 		return true, false
 	}
 	return false, false
 }
 
-func (p *pipe) _r2pipe() (r2p *pipe) {
-	p.r2mu.Lock()
-	if p.r2pipe != nil {
-		r2p = p.r2pipe
-	} else {
-		var err error
-		if r2p, err = p.r2psFn(); err != nil {
-			r2p = epipeFn(err)
-		} else {
-			p.r2pipe = r2p
-		}
-	}
-	p.r2mu.Unlock()
-	return r2p
+type recvCtxKey int
+
+const hookKey recvCtxKey = 0
+
+// WithOnSubscriptionHook attaches a subscription confirmation hook to the provided
+// context and returns a new context for the Receive method.
+//
+// The hook is invoked each time the server sends a subscribe or
+// unsubscribe confirmation, allowing callers to observe the state of a Pub/Sub
+// subscription during the lifetime of a Receive invocation.
+//
+// The hook may be called multiple times because the client can resubscribe after a
+// reconnection. Therefore, the hook implementation must be safe to run more than once.
+// Also, there should not be any blocking operations or another `client.Do()` in the hook
+// since it runs in the same goroutine as the pipeline. Otherwise, the pipeline will be blocked.
+func WithOnSubscriptionHook(ctx context.Context, hook func(PubSubSubscription)) context.Context {
+	return context.WithValue(ctx, hookKey, hook)
 }
 
 func (p *pipe) Receive(ctx context.Context, subscribe Completed, fn func(message PubSubMessage)) error {
@@ -705,8 +795,8 @@ func (p *pipe) Receive(ctx context.Context, subscribe Completed, fn func(message
 		return p.Error()
 	}
 
-	if p.version < 6 && p.r2psFn != nil {
-		return p._r2pipe().Receive(ctx, subscribe, fn)
+	if p.r2p != nil {
+		return p.r2p.pipe(ctx).Receive(ctx, subscribe, fn)
 	}
 
 	cmds.CompletedCS(subscribe).Verify()
@@ -725,7 +815,11 @@ func (p *pipe) Receive(ctx context.Context, subscribe Completed, fn func(message
 		panic(wrongreceive)
 	}
 
-	if ch, cancel := sb.Subscribe(args); ch != nil {
+	var hook func(PubSubSubscription)
+	if v := ctx.Value(hookKey); v != nil {
+		hook = v.(func(PubSubSubscription))
+	}
+	if ch, cancel := sb.Subscribe(args, hook); ch != nil {
 		defer cancel()
 		if err := p.Do(ctx, subscribe).Error(); err != nil {
 			return err
@@ -763,11 +857,11 @@ func (p *pipe) CleanSubscriptions() {
 }
 
 func (p *pipe) SetPubSubHooks(hooks PubSubHooks) <-chan error {
-	if p.version < 6 && p.r2psFn != nil {
-		return p._r2pipe().SetPubSubHooks(hooks)
+	if p.r2p != nil {
+		return p.r2p.pipe(context.Background()).SetPubSubHooks(hooks)
 	}
 	if hooks.isZero() {
-		if old := p.pshks.Swap(emptypshks).(*pshks); old.close != nil {
+		if old := p.pshks.Swap(emptypshks); old.close != nil {
 			close(old.close)
 		}
 		return nil
@@ -779,19 +873,19 @@ func (p *pipe) SetPubSubHooks(hooks PubSubHooks) <-chan error {
 		hooks.OnSubscription = func(s PubSubSubscription) {}
 	}
 	ch := make(chan error, 1)
-	if old := p.pshks.Swap(&pshks{hooks: hooks, close: ch}).(*pshks); old.close != nil {
+	if old := p.pshks.Swap(&pshks{hooks: hooks, close: ch}); old.close != nil {
 		close(old.close)
 	}
 	if err := p.Error(); err != nil {
-		if old := p.pshks.Swap(emptypshks).(*pshks); old.close != nil {
+		if old := p.pshks.Swap(emptypshks); old.close != nil {
 			old.close <- err
 			close(old.close)
 		}
 	}
-	if atomic.AddInt32(&p.waits, 1) == 1 && atomic.LoadInt32(&p.state) == 0 {
+	if p.incrWaits() == 1 && atomic.LoadInt32(&p.state) == 0 {
 		p.background()
 	}
-	atomic.AddInt32(&p.waits, -1)
+	p.decrWaits()
 	return ch
 }
 
@@ -807,13 +901,17 @@ func (p *pipe) Version() int {
 	return int(p.version)
 }
 
+func (p *pipe) AZ() string {
+	infoAvailabilityZone := p.info["availability_zone"]
+	return infoAvailabilityZone.string()
+}
+
 func (p *pipe) Do(ctx context.Context, cmd Completed) (resp RedisResult) {
 	if err := ctx.Err(); err != nil {
 		return newErrResult(err)
 	}
 
 	cmds.CompletedCS(cmd).Verify()
-
 	if cmd.IsBlock() {
 		atomic.AddInt32(&p.blcksig, 1)
 		defer func() {
@@ -824,12 +922,11 @@ func (p *pipe) Do(ctx context.Context, cmd Completed) (resp RedisResult) {
 	}
 
 	if cmd.NoReply() {
-		if p.version < 6 && p.r2psFn != nil {
-			return p._r2pipe().Do(ctx, cmd)
+		if p.r2p != nil {
+			return p.r2p.pipe(ctx).Do(ctx, cmd)
 		}
 	}
-
-	waits := atomic.AddInt32(&p.waits, 1) // if this is 1, and background worker is not started, no need to queue
+	waits := p.incrWaits() // if this is 1, and the background worker is not started, no need to queue
 	state := atomic.LoadInt32(&p.state)
 
 	if state == 1 {
@@ -853,14 +950,19 @@ func (p *pipe) Do(ctx context.Context, cmd Completed) (resp RedisResult) {
 	} else {
 		resp = newErrResult(p.Error())
 	}
-	if left := atomic.AddInt32(&p.waits, -1); state == 0 && left != 0 {
+
+	if left := p.decrWaitsAndIncrRecvs(); state == 0 && left != 0 {
 		p.background()
 	}
-	atomic.AddInt32(&p.recvs, 1)
 	return resp
 
 queue:
-	ch := p.queue.PutOne(cmd)
+	ch, err := p.queue.PutOne(ctx, cmd)
+	if err != nil {
+		p.decrWaits()
+		return newErrResult(err)
+	}
+
 	if ctxCh := ctx.Done(); ctxCh == nil {
 		resp = <-ch
 	} else {
@@ -870,14 +972,12 @@ queue:
 			goto abort
 		}
 	}
-	atomic.AddInt32(&p.waits, -1)
-	atomic.AddInt32(&p.recvs, 1)
+	p.decrWaitsAndIncrRecvs()
 	return resp
 abort:
 	go func(ch chan RedisResult) {
 		<-ch
-		atomic.AddInt32(&p.waits, -1)
-		atomic.AddInt32(&p.recvs, 1)
+		p.decrWaitsAndIncrRecvs()
 	}(ch)
 	return newErrResult(ctx.Err())
 }
@@ -893,7 +993,7 @@ func (p *pipe) DoMulti(ctx context.Context, multi ...Completed) *redisresults {
 
 	cmds.CompletedCS(multi[0]).Verify()
 
-	isOptIn := multi[0].IsOptIn() // len(multi) > 0 should have already been checked by upper layer
+	isOptIn := multi[0].IsOptIn() // len(multi) > 0 should have already been checked by the upper layer
 	noReply := 0
 
 	for _, cmd := range multi {
@@ -908,9 +1008,9 @@ func (p *pipe) DoMulti(ctx context.Context, multi ...Completed) *redisresults {
 				resp.s[i] = newErrResult(ErrRESP2PubSubMixed)
 			}
 			return resp
-		} else if p.r2psFn != nil {
+		} else if p.r2p != nil {
 			resultsp.Put(resp)
-			return p._r2pipe().DoMulti(ctx, multi...)
+			return p.r2p.pipe(ctx).DoMulti(ctx, multi...)
 		}
 	}
 
@@ -935,7 +1035,7 @@ func (p *pipe) DoMulti(ctx context.Context, multi ...Completed) *redisresults {
 		}
 	}
 
-	waits := atomic.AddInt32(&p.waits, 1) // if this is 1, and background worker is not started, no need to queue
+	waits := p.incrWaits() // if this is 1, and the background worker is not started, no need to queue
 	state := atomic.LoadInt32(&p.state)
 
 	if state == 1 {
@@ -962,14 +1062,22 @@ func (p *pipe) DoMulti(ctx context.Context, multi ...Completed) *redisresults {
 			resp.s[i] = err
 		}
 	}
-	if left := atomic.AddInt32(&p.waits, -1); state == 0 && left != 0 {
+	if left := p.decrWaitsAndIncrRecvs(); state == 0 && left != 0 {
 		p.background()
 	}
-	atomic.AddInt32(&p.recvs, 1)
 	return resp
 
 queue:
-	ch := p.queue.PutMulti(multi, resp.s)
+	ch, err := p.queue.PutMulti(ctx, multi, resp.s)
+	if err != nil {
+		p.decrWaits()
+		errResult := newErrResult(err)
+		for i := 0; i < len(resp.s); i++ {
+			resp.s[i] = errResult
+		}
+		return resp
+	}
+
 	if ctxCh := ctx.Done(); ctxCh == nil {
 		<-ch
 	} else {
@@ -979,20 +1087,18 @@ queue:
 			goto abort
 		}
 	}
-	atomic.AddInt32(&p.waits, -1)
-	atomic.AddInt32(&p.recvs, 1)
+	p.decrWaitsAndIncrRecvs()
 	return resp
 abort:
 	go func(resp *redisresults, ch chan RedisResult) {
 		<-ch
 		resultsp.Put(resp)
-		atomic.AddInt32(&p.waits, -1)
-		atomic.AddInt32(&p.recvs, 1)
+		p.decrWaitsAndIncrRecvs()
 	}(resp, ch)
 	resp = resultsp.Get(len(multi), len(multi))
-	err := newErrResult(ctx.Err())
+	errResult := newErrResult(ctx.Err())
 	for i := 0; i < len(resp.s); i++ {
-		resp.s[i] = err
+		resp.s[i] = errResult
 	}
 	return resp
 }
@@ -1018,7 +1124,7 @@ func (s *RedisResultStream) Error() error {
 }
 
 // WriteTo reads a redis response from redis and then write it to the given writer.
-// This function is not thread safe and should be called sequentially to read multiple responses.
+// This function is not thread-safe and should be called sequentially to read multiple responses.
 // An io.EOF error will be reported if all responses are read.
 func (s *RedisResultStream) WriteTo(w io.Writer) (n int64, err error) {
 	if err = s.e; err == nil && s.n > 0 {
@@ -1029,7 +1135,7 @@ func (s *RedisResultStream) WriteTo(w io.Writer) (n int64, err error) {
 		}
 		if s.n--; s.n == 0 {
 			atomic.AddInt32(&s.w.blcksig, -1)
-			atomic.AddInt32(&s.w.waits, -1)
+			s.w.decrWaits()
 			if s.e == nil {
 				s.e = io.EOF
 			} else {
@@ -1056,7 +1162,7 @@ func (p *pipe) DoStream(ctx context.Context, pool *pool, cmd Completed) RedisRes
 
 	if state == 0 {
 		atomic.AddInt32(&p.blcksig, 1)
-		waits := atomic.AddInt32(&p.waits, 1)
+		waits := p.incrWaits()
 		if waits != 1 {
 			panic("DoStream with racing is a bug")
 		}
@@ -1084,7 +1190,7 @@ func (p *pipe) DoStream(ctx context.Context, pool *pool, cmd Completed) RedisRes
 		}
 	}
 	atomic.AddInt32(&p.blcksig, -1)
-	atomic.AddInt32(&p.waits, -1)
+	p.decrWaits()
 	pool.Store(p)
 	return RedisResultStream{e: p.Error()}
 }
@@ -1106,7 +1212,7 @@ func (p *pipe) DoMultiStream(ctx context.Context, pool *pool, multi ...Completed
 
 	if state == 0 {
 		atomic.AddInt32(&p.blcksig, 1)
-		waits := atomic.AddInt32(&p.waits, 1)
+		waits := p.incrWaits()
 		if waits != 1 {
 			panic("DoMultiStream with racing is a bug")
 		}
@@ -1149,7 +1255,7 @@ func (p *pipe) DoMultiStream(ctx context.Context, pool *pool, multi ...Completed
 		}
 	}
 	atomic.AddInt32(&p.blcksig, -1)
-	atomic.AddInt32(&p.waits, -1)
+	p.decrWaits()
 	pool.Store(p)
 	return RedisResultStream{e: p.Error()}
 }
@@ -1252,6 +1358,13 @@ next:
 	return m, nil
 }
 
+func (p *pipe) optInCmd() cmds.Completed {
+	if p.optIn {
+		return cmds.OptInCmd
+	}
+	return cmds.OptInNopCmd
+}
+
 func (p *pipe) DoCache(ctx context.Context, cmd Cacheable, ttl time.Duration) RedisResult {
 	if p.cache == nil {
 		return p.Do(ctx, Completed(cmd))
@@ -1271,7 +1384,7 @@ func (p *pipe) DoCache(ctx context.Context, cmd Cacheable, ttl time.Duration) Re
 	}
 	resp := p.DoMulti(
 		ctx,
-		cmds.OptInCmd,
+		p.optInCmd(),
 		cmds.MultiCmd,
 		cmds.NewCompleted([]string{"PTTL", ck}),
 		Completed(cmd),
@@ -1282,6 +1395,11 @@ func (p *pipe) DoCache(ctx context.Context, cmd Cacheable, ttl time.Duration) Re
 	if err != nil {
 		if _, ok := err.(*RedisError); ok {
 			err = ErrDoCacheAborted
+			if preErr := resp.s[3].Error(); preErr != nil { // if {cmd} get a RedisError
+				if _, ok := preErr.(*RedisError); ok {
+					err = preErr
+				}
+			}
 		}
 		p.cache.Cancel(ck, cc, err)
 		return newErrResult(err)
@@ -1293,7 +1411,7 @@ func (p *pipe) doCacheMGet(ctx context.Context, cmd Cacheable, ttl time.Duration
 	commands := cmd.Commands()
 	keys := len(commands) - 1
 	builder := cmds.NewBuilder(cmds.InitSlot)
-	result := RedisResult{val: RedisMessage{typ: '*', values: nil}}
+	result := RedisResult{val: RedisMessage{typ: '*'}}
 	mgetcc := cmds.MGetCacheCmd(cmd)
 	if mgetcc[0] == 'J' {
 		keys-- // the last one of JSON.MGET is a path, not a key
@@ -1305,10 +1423,11 @@ func (p *pipe) doCacheMGet(ctx context.Context, cmd Cacheable, ttl time.Duration
 	for i, key := range commands[1 : keys+1] {
 		v, entry := p.cache.Flight(key, mgetcc, ttl, now)
 		if v.typ != 0 { // cache hit for one key
-			if len(result.val.values) == 0 {
-				result.val.values = make([]RedisMessage, keys)
+			if len(result.val.values()) == 0 {
+				result.val.setValues(make([]RedisMessage, keys))
+
 			}
-			result.val.values[i] = v
+			result.val.values()[i] = v
 			continue
 		}
 		if entry != nil {
@@ -1334,7 +1453,7 @@ func (p *pipe) doCacheMGet(ctx context.Context, cmd Cacheable, ttl time.Duration
 		}
 
 		multi := make([]Completed, 0, keys+4)
-		multi = append(multi, cmds.OptInCmd, cmds.MultiCmd)
+		multi = append(multi, p.optInCmd(), cmds.MultiCmd)
 		for _, key := range rewritten.Commands()[1 : keys+1] {
 			multi = append(multi, builder.Pttl().Key(key).Build())
 		}
@@ -1346,6 +1465,11 @@ func (p *pipe) doCacheMGet(ctx context.Context, cmd Cacheable, ttl time.Duration
 		if err != nil {
 			if _, ok := err.(*RedisError); ok {
 				err = ErrDoCacheAborted
+				if preErr := resp.s[len(multi)-2].Error(); preErr != nil { // if {rewritten} get a RedisError
+					if _, ok := preErr.(*RedisError); ok {
+						err = preErr
+					}
+				}
 			}
 			for _, key := range rewritten.Commands()[1 : keys+1] {
 				p.cache.Cancel(key, mgetcc, err)
@@ -1358,30 +1482,30 @@ func (p *pipe) doCacheMGet(ctx context.Context, cmd Cacheable, ttl time.Duration
 			}
 		}()
 		last := len(exec) - 1
-		if len(rewritten.Commands()) == len(commands) { // all cache miss
+		if len(rewritten.Commands()) == len(commands) { // all cache misses
 			return newResult(exec[last], nil)
 		}
-		partial = exec[last].values
+		partial = exec[last].values()
 	} else { // all cache hit
 		result.val.attrs = cacheMark
 	}
 
-	if len(result.val.values) == 0 {
-		result.val.values = make([]RedisMessage, keys)
+	if len(result.val.values()) == 0 {
+		result.val.setValues(make([]RedisMessage, keys))
 	}
 	for i, entry := range entries.e {
 		v, err := entry.Wait(ctx)
 		if err != nil {
 			return newErrResult(err)
 		}
-		result.val.values[i] = v
+		result.val.values()[i] = v
 	}
 
 	j := 0
 	for _, ret := range partial {
-		for ; j < len(result.val.values); j++ {
-			if result.val.values[j].typ == 0 {
-				result.val.values[j] = ret
+		for ; j < len(result.val.values()); j++ {
+			if result.val.values()[j].typ == 0 {
+				result.val.values()[j] = ret
 				break
 			}
 		}
@@ -1415,7 +1539,7 @@ func (p *pipe) DoMultiCache(ctx context.Context, multi ...CacheableTTL) *redisre
 		for _, i := range missed {
 			ct := multi[i]
 			ck, _ := cmds.CacheKey(ct.Cmd)
-			missing = append(missing, cmds.OptInCmd, cmds.MultiCmd, cmds.NewCompleted([]string{"PTTL", ck}), Completed(ct.Cmd), cmds.ExecCmd)
+			missing = append(missing, p.optInCmd(), cmds.MultiCmd, cmds.NewCompleted([]string{"PTTL", ck}), Completed(ct.Cmd), cmds.ExecCmd)
 		}
 	} else {
 		for i, ct := range multi {
@@ -1429,7 +1553,7 @@ func (p *pipe) DoMultiCache(ctx context.Context, multi ...CacheableTTL) *redisre
 				entries.e[i] = entry // store entries for later entry.Wait() to avoid MGET deadlock each others.
 				continue
 			}
-			missing = append(missing, cmds.OptInCmd, cmds.MultiCmd, cmds.NewCompleted([]string{"PTTL", ck}), Completed(ct.Cmd), cmds.ExecCmd)
+			missing = append(missing, p.optInCmd(), cmds.MultiCmd, cmds.NewCompleted([]string{"PTTL", ck}), Completed(ct.Cmd), cmds.ExecCmd)
 		}
 	}
 
@@ -1441,6 +1565,11 @@ func (p *pipe) DoMultiCache(ctx context.Context, multi ...CacheableTTL) *redisre
 			if err := resp.s[i].Error(); err != nil {
 				if _, ok := err.(*RedisError); ok {
 					err = ErrDoCacheAborted
+					if preErr := resp.s[i-1].Error(); preErr != nil { // if {cmd} get a RedisError
+						if _, ok := preErr.(*RedisError); ok {
+							err = preErr
+						}
+					}
 				}
 				ck, cc := cmds.CacheKey(Cacheable(missing[i-1]))
 				p.cache.Cancel(ck, cc, err)
@@ -1464,6 +1593,11 @@ func (p *pipe) DoMultiCache(ctx context.Context, multi ...CacheableTTL) *redisre
 				if err != nil {
 					if _, ok := err.(*RedisError); ok {
 						err = ErrDoCacheAborted
+						if preErr := resp.s[i-1].Error(); preErr != nil { // if {cmd} get a RedisError
+							if _, ok := preErr.(*RedisError); ok {
+								err = preErr
+							}
+						}
 					}
 					results.s[j] = newErrResult(err)
 				} else {
@@ -1476,8 +1610,43 @@ func (p *pipe) DoMultiCache(ctx context.Context, multi ...CacheableTTL) *redisre
 	return results
 }
 
+// incrWaits increments the lower 32 bits (waits).
+func (p *pipe) incrWaits() uint32 {
+	// Increment the lower 32 bits (waits)
+	return uint32(p.wrCounter.Add(1))
+}
+
+const (
+	decrLo       = ^uint64(0)
+	decrLoIncrHi = uint64(1<<32) - 1
+)
+
+// decrWaits decrements the lower 32 bits (waits).
+func (p *pipe) decrWaits() uint32 {
+	// Decrement the lower 32 bits (waits)
+	return uint32(p.wrCounter.Add(decrLo))
+}
+
+// decrWaitsAndIncrRecvs decrements the lower 32 bits (waits) and increments the upper 32 bits (recvs).
+func (p *pipe) decrWaitsAndIncrRecvs() uint32 {
+	newValue := p.wrCounter.Add(decrLoIncrHi)
+	return uint32(newValue)
+}
+
+// loadRecvs loads the upper 32 bits (recvs).
+func (p *pipe) loadRecvs() int32 {
+	// Load the upper 32 bits (recvs)
+	return int32(p.wrCounter.Load() >> 32)
+}
+
+// loadWaits loads the lower 32 bits (waits).
+func (p *pipe) loadWaits() uint32 {
+	// Load the lower 32 bits (waits)
+	return uint32(p.wrCounter.Load())
+}
+
 func (p *pipe) Error() error {
-	if err, ok := p.error.Load().(*errs); ok {
+	if err := p.error.Load(); err != nil {
 		return err.error
 	}
 	return nil
@@ -1486,7 +1655,7 @@ func (p *pipe) Error() error {
 func (p *pipe) Close() {
 	p.error.CompareAndSwap(nil, errClosing)
 	block := atomic.AddInt32(&p.blcksig, 1)
-	waits := atomic.AddInt32(&p.waits, 1)
+	waits := p.incrWaits()
 	stopping1 := atomic.CompareAndSwapInt32(&p.state, 0, 2)
 	stopping2 := atomic.CompareAndSwapInt32(&p.state, 1, 2)
 	if p.queue != nil {
@@ -1494,29 +1663,84 @@ func (p *pipe) Close() {
 			p.background()
 		}
 		if block == 1 && (stopping1 || stopping2) { // make sure there is no block cmd
-			atomic.AddInt32(&p.waits, 1)
-			ch := p.queue.PutOne(cmds.PingCmd)
+			p.incrWaits()
+			ch, _ := p.queue.PutOne(context.Background(), cmds.PingCmd)
 			select {
 			case <-ch:
-				atomic.AddInt32(&p.waits, -1)
+				p.decrWaits()
 			case <-time.After(time.Second):
 				go func(ch chan RedisResult) {
 					<-ch
-					atomic.AddInt32(&p.waits, -1)
+					p.decrWaits()
 				}(ch)
 			}
 		}
 	}
-	atomic.AddInt32(&p.waits, -1)
+	p.decrWaits()
 	atomic.AddInt32(&p.blcksig, -1)
+	if p.pingTimer != nil {
+		p.pingTimer.Stop()
+	}
 	if p.conn != nil {
 		p.conn.Close()
 	}
-	p.r2mu.Lock()
-	if p.r2pipe != nil {
-		p.r2pipe.Close()
+	if p.r2p != nil {
+		p.r2p.Close()
 	}
-	p.r2mu.Unlock()
+}
+
+func (p *pipe) StopTimer() bool {
+	if p.lftmTimer == nil {
+		return true
+	}
+	return p.lftmTimer.Stop()
+}
+
+func (p *pipe) ResetTimer() bool {
+	if p.lftmTimer == nil || p.Error() != nil {
+		return true
+	}
+	return p.lftmTimer.Reset(p.lftm)
+}
+
+func (p *pipe) expired() {
+	p.error.CompareAndSwap(nil, errExpired)
+	p.Close()
+}
+
+type r2p struct {
+	f func(context.Context) (p *pipe, err error) // func to build pipe for resp2 pubsub
+	p *pipe                                      // internal pipe for resp2 pubsub only
+	m sync.RWMutex
+}
+
+func (r *r2p) pipe(ctx context.Context) (r2p *pipe) {
+	r.m.RLock()
+	r2p = r.p
+	r.m.RUnlock()
+	if r2p == nil {
+		r.m.Lock()
+		if r.p != nil {
+			r2p = r.p
+		} else {
+			var err error
+			if r2p, err = r.f(ctx); err != nil {
+				r2p = epipeFn(err)
+			} else {
+				r.p = r2p
+			}
+		}
+		r.m.Unlock()
+	}
+	return r2p
+}
+
+func (r *r2p) Close() {
+	r.m.RLock()
+	if r.p != nil {
+		r.p.Close()
+	}
+	r.m.RUnlock()
 }
 
 type pshks struct {
@@ -1558,6 +1782,9 @@ const (
 )
 
 var cacheMark = &(RedisMessage{})
-var errClosing = &errs{error: ErrClosing}
+var (
+	errClosing = &errs{error: ErrClosing}
+	errExpired = &errs{error: errConnExpired}
+)
 
 type errs struct{ error }

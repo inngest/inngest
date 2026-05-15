@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/tests/client"
@@ -73,7 +74,10 @@ func TestStepPauseDeadlockRegression(t *testing.T) {
 	// Trigger the main function and successfully invoke the other function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
-	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+
+	// Wait a moment for runID to be populated
+	<-time.After(2 * time.Second)
+	c.WaitForRunStatus(ctx, t, "FAILED", runID)
 	r.Exactly(int32(1), afterStepAttempts, "after step should have been attempted exactly once")
 	r.True(reachedAfter)
 }

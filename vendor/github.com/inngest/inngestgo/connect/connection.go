@@ -14,7 +14,12 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"sync/atomic"
 	"time"
+)
+
+var (
+	defaultWSReadLimit int64 = 10 * 1024 * 1024 // 10MB
 )
 
 type connectReport struct {
@@ -49,7 +54,7 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 	// Set up connection (including connect handshake protocol)
 	preparedConn, err := h.prepareConnection(ctx, data, o.excludeGateways)
 	if err != nil {
-		h.logger.Error("could not establish connection", "err", err)
+		h.logger.Error("could not establish connection", "err", err, "reconnect", shouldReconnect(err))
 
 		h.notifyConnectDoneChan <- connectReport{
 			reconnect: shouldReconnect(err),
@@ -57,6 +62,9 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 		}
 		return
 	}
+
+	l := h.logger.With(preparedConn.logAttrs()...)
+	l.Debug("connection established")
 
 	// Notify that the connection was established
 	h.notifyConnectedChan <- struct{}{}
@@ -70,7 +78,7 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 	// Set up connection lifecycle logic (receiving messages, handling requests, etc.)
 	err = h.handleConnection(h.workerCtx, data, preparedConn)
 	if err != nil {
-		h.logger.Error("could not handle connection", "err", err)
+		l.Error("could not handle connection", "err", err, "reconnect", shouldReconnect(err))
 
 		if errors.Is(err, errGatewayDraining) {
 			// if the gateway is draining, the original connection was closed, and we already reconnected inside handleConnection
@@ -99,10 +107,29 @@ type connectionEstablishData struct {
 type connection struct {
 	ws               *websocket.Conn
 	gatewayGroupName string
+	gatewayEndpoint  string
 	connectionId     string
 
 	heartbeatInterval   time.Duration
 	extendLeaseInterval time.Duration
+
+	retired atomic.Bool
+}
+
+func (c *connection) logAttrs() []any {
+	return []any{
+		"connection_id", c.connectionId,
+		"gateway_group", c.gatewayGroupName,
+		"gateway_endpoint", c.gatewayEndpoint,
+	}
+}
+
+func (c *connection) retire() {
+	c.retired.Store(true)
+}
+
+func (c *connection) isRetired() bool {
+	return c.retired.Load()
 }
 
 func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData, excludeGateways []string) (*connection, error) {
@@ -143,6 +170,13 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		return nil, newReconnectErr(fmt.Errorf("could not connect to gateway: %w", err))
 	}
 
+	// Set message read limit if configured (skip if nil or 0 to use default)
+	readLimit := defaultWSReadLimit
+	if h.opts.MessageReadLimit != nil && *h.opts.MessageReadLimit != 0 {
+		readLimit = *h.opts.MessageReadLimit
+	}
+	ws.SetReadLimit(readLimit)
+
 	connectionId, err := ulid.Parse(startRes.GetConnectionId())
 	if err != nil {
 		return nil, newReconnectErr(fmt.Errorf("could not parse connection ID: %w", err))
@@ -168,6 +202,7 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 	return &connection{
 		ws:                  ws,
 		gatewayGroupName:    startRes.GetGatewayGroup(),
+		gatewayEndpoint:     gatewayHost.String(),
 		connectionId:        connectionId.String(),
 		heartbeatInterval:   heartbeatInterval,
 		extendLeaseInterval: extendLeaseInterval,
@@ -177,6 +212,8 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, preparedConn *connection) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	l := h.logger.With(preparedConn.logAttrs()...)
 
 	defer func() {
 		// This is a fallback safeguard to always close the WebSocket connection at the end of the function
@@ -204,9 +241,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 					Kind: connectproto.GatewayMessageType_WORKER_HEARTBEAT,
 				})
 				if err != nil {
-					h.logger.Error("failed to send worker heartbeat", "err", err)
+					l.Error("failed to send worker heartbeat", "err", err, "heartbeat_interval", preparedConn.heartbeatInterval.String())
 				}
-				h.logger.Debug("sent worker heartbeat")
+				l.Debug("sent worker heartbeat", "heartbeat_interval", preparedConn.heartbeatInterval.String())
 			}
 
 		}
@@ -215,24 +252,35 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	readerLifetimeContext, cancelReaderLifetimeContext := context.WithCancel(ctx)
 	defer cancelReaderLifetimeContext()
 
-	var lastGatewayHeartbeatReceived time.Time
+	heartbeatReceived := make(chan struct{}, 1)
 	go func() {
 		// Wait until initial heartbeat was sent out
-		<-time.After(preparedConn.heartbeatInterval)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(preparedConn.heartbeatInterval):
+		}
 
-		heartbeatReplyTicker := time.NewTicker(preparedConn.heartbeatInterval)
-		defer heartbeatReplyTicker.Stop()
+		heartbeatTimeout := 2 * preparedConn.heartbeatInterval
+		heartbeatReplyTimer := time.NewTimer(heartbeatTimeout)
+		defer heartbeatReplyTimer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-heartbeatReplyTicker.C:
-				gracePeriod := 2 * preparedConn.heartbeatInterval
-				if lastGatewayHeartbeatReceived.Before(time.Now().Add(-gracePeriod)) {
-					// No heartbeat received in time!
-					h.logger.Error("did not receive gateway heartbeat in time")
-					cancelReaderLifetimeContext()
+			case <-heartbeatReceived:
+				if !heartbeatReplyTimer.Stop() {
+					select {
+					case <-heartbeatReplyTimer.C:
+					default:
+					}
 				}
+				heartbeatReplyTimer.Reset(heartbeatTimeout)
+			case <-heartbeatReplyTimer.C:
+				// No heartbeat received in time!
+				l.Error("did not receive gateway heartbeat in time", "heartbeat_interval", preparedConn.heartbeatInterval.String(), "heartbeat_timeout", heartbeatTimeout.String())
+				cancelReaderLifetimeContext()
+				return
 			}
 		}
 	}()
@@ -247,57 +295,55 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			// - Gateway heartbeat was missed (unexpected connection loss)
 			err := wsproto.Read(readerLifetimeContext, preparedConn.ws, &msg)
 			if err != nil {
-				h.logger.Error("failed to read message", "err", err)
+				l.Error("failed to read message", "err", err, "reader_context_error", readerLifetimeContext.Err())
 
 				// The connection may still be active, but for some reason we couldn't read the message
 				return err
 			}
 
-			h.logger.Debug("received gateway request", "kind", msg.Kind.String())
+			l.Debug("received gateway request", "kind", msg.Kind.String())
 
 			switch msg.Kind {
 			case connectproto.GatewayMessageType_GATEWAY_CLOSING:
 				// Stop the read loop: We will not receive any further messages and should establish a new connection
 				// We can still use the old connection to send replies to the gateway
+				l.Info("gateway requested connection drain")
 				return errGatewayDraining
 			case connectproto.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
 				// Handle invoke in a non-blocking way to allow for other messages to be processed
+				msgCopy := connectproto.ConnectMessage{
+					Kind: msg.Kind,
+				}
+				if len(msg.Payload) > 0 {
+					msgCopy.Payload = append([]byte(nil), msg.Payload...)
+				}
 				h.workerPool.Add(workerPoolMsg{
-					msg:          &msg,
+					msg:          &msgCopy,
 					preparedConn: preparedConn,
 				})
 			case connectproto.GatewayMessageType_GATEWAY_HEARTBEAT:
-				lastGatewayHeartbeatReceived = time.Now()
+				select {
+				case heartbeatReceived <- struct{}{}:
+				default:
+				}
 			case connectproto.GatewayMessageType_WORKER_REPLY_ACK:
 				if err := h.handleMessageReplyAck(&msg); err != nil {
-					h.logger.Error("could not handle message reply ack", "err", err)
+					l.Error("could not handle message reply ack", "err", err)
 					continue
 				}
 			case connectproto.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK:
-				{
-					var payload connectproto.WorkerRequestExtendLeaseAckData
-					if err := proto.Unmarshal(msg.Payload, &payload); err != nil {
-						h.logger.Error("could not parse extend lease ack", "err", err)
-						continue
-					}
-
-					h.workerPool.inProgressLeasesLock.Lock()
-					if payload.NewLeaseId != nil {
-						h.workerPool.inProgressLeases[payload.RequestId] = *payload.NewLeaseId
-					} else {
-						// remove local request lease to stop extending
-						delete(h.workerPool.inProgressLeases, payload.RequestId)
-					}
-					h.workerPool.inProgressLeasesLock.Unlock()
+				if err := h.handleWorkerRequestExtendLeaseAck(&msg); err != nil {
+					l.Error("could not handle extend lease ack", "err", err)
+					continue
 				}
 			default:
-				h.logger.Debug("got unknown gateway request", "err", err)
+				l.Debug("got unknown gateway request", "err", err)
 				continue
 			}
 		}
 	})
 
-	h.logger.Debug("waiting for read loop to end")
+	l.Debug("waiting for read loop to end")
 
 	// If read loop ends, this can be for two reasons
 	// - Connection loss (io.EOF), read loop terminated intentionally (CloseError), other error (unexpected), missed heartbeat (readerLifetimeContext canceled)
@@ -322,21 +368,23 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			// Wait until the new connection is established before closing the old one
 			<-waitUntilConnected.Done()
 			if errors.Is(waitUntilConnected.Err(), context.DeadlineExceeded) {
-				h.logger.Error("timed out waiting for new connection to be established")
+				l.Error("timed out waiting for new connection to be established")
 			}
 
 			// Send a proper close frame
+			preparedConn.retire()
 			_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 
 			return errGatewayDraining
 		}
 
-		h.logger.Debug("read loop ended with error", "err", err)
+		l.Debug("read loop ended with error", "err", err)
+		preparedConn.retire()
 
 		// In case the gateway intentionally closed the connection, we'll receive a close error
 		cerr := websocket.CloseError{}
 		if errors.As(err, &cerr) {
-			h.logger.Error("connection closed with reason", "reason", cerr.Reason)
+			l.Error("connection closed with reason", "reason", cerr.Reason)
 
 			// Reconnect!
 			return newReconnectErr(fmt.Errorf("connection closed with reason %q: %w", cerr.Reason, cerr))
@@ -344,7 +392,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 		// connection closed without reason
 		if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
-			h.logger.Error("failed to read message from gateway, lost connection unexpectedly", "err", err)
+			l.Error("failed to read message from gateway, lost connection unexpectedly", "err", err)
 			return newReconnectErr(fmt.Errorf("connection closed unexpectedly: %w", cerr))
 		}
 
@@ -361,44 +409,67 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 	// Signal gateway that we won't process additional messages!
 	{
-		h.logger.Debug("sending worker pause message")
+		l.Debug("sending worker pause message")
 		err := wsproto.Write(context.Background(), preparedConn.ws, &connectproto.ConnectMessage{
 			Kind: connectproto.GatewayMessageType_WORKER_PAUSE,
 		})
 		if err != nil {
 			// We should not exit here, as we're already in the shutdown routine
-			h.logger.Error("failed to serialize worker pause msg", "err", err)
+			l.Error("failed to serialize worker pause msg", "err", err)
 		}
 	}
 
-	h.logger.Debug("waiting for in-progress requests to finish")
+	l.Debug("waiting for in-progress requests to finish")
 
 	// Wait until all in-progress requests are completed
 	h.workerPool.Wait()
 
 	// Attempt to shut down connection if not already done
+	preparedConn.retire()
 	_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 
 	// Attempt to flush leftover messages before closing
 	if h.messageBuffer.hasMessages() {
 		err := h.messageBuffer.flush(data.hashedSigningKey)
 		if err != nil {
-			h.logger.Error("could not send buffered messages", "err", err)
+			l.Error("could not send buffered messages", "err", err)
 		}
 	}
 
-	h.logger.Debug("connection done")
+	l.Debug("connection done")
 
 	return nil
 }
 
 func (h *connectHandler) handleMessageReplyAck(msg *connectproto.ConnectMessage) error {
 	var payload connectproto.WorkerReplyAckData
-	if err := proto.Unmarshal(msg.Payload, msg); err != nil {
+	if err := proto.Unmarshal(msg.Payload, &payload); err != nil {
 		return fmt.Errorf("could not unmarshal reply ack data: %w", err)
 	}
 
 	h.messageBuffer.acknowledge(payload.RequestId)
+
+	return nil
+}
+
+func (h *connectHandler) handleWorkerRequestExtendLeaseAck(msg *connectproto.ConnectMessage) error {
+	var payload connectproto.WorkerRequestExtendLeaseAckData
+	if err := proto.Unmarshal(msg.Payload, &payload); err != nil {
+		return fmt.Errorf("could not unmarshal extend lease ack data: %w", err)
+	}
+
+	h.workerPool.inProgressLeasesLock.Lock()
+	defer h.workerPool.inProgressLeasesLock.Unlock()
+
+	if payload.NewLeaseId != nil {
+		if _, ok := h.workerPool.inProgressLeases[payload.RequestId]; !ok {
+			return nil
+		}
+		h.workerPool.inProgressLeases[payload.RequestId] = *payload.NewLeaseId
+	} else {
+		// remove local request lease to stop extending
+		delete(h.workerPool.inProgressLeases, payload.RequestId)
+	}
 
 	return nil
 }

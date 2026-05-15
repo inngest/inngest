@@ -8,13 +8,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -27,43 +27,63 @@ type Opts struct {
 	// CachingMiddleware caches API responses, if the handler specifies
 	// a max-age.
 	CachingMiddleware CachingMiddleware[[]byte]
+	// RateLimiter is called within an API endpoint with a route to determine whether
+	// the route is rate limited.  If so, this should write a rate limit response
+	// via publicerr.
+	RateLimited func(r *http.Request, w http.ResponseWriter, route string) bool
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
+
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
+	// Queue allows the checkppinting API to continue by enqueueing new queue items.
+	Queue queue.Queue
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
-	// FunctionRunReader reads function runs, history, etc. from backing storage
-	FunctionRunReader cqrs.APIV1FunctionRunReader
 	// JobQueueReader reads information around a function run's job queues.
 	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
-	// QueueShardSelector determines the queue shard to use
-	QueueShardSelector redis_state.ShardSelector
+	// QueueShards exposes the shard topology and selector for the API.
+	QueueShards queue.ShardRegistry
 	// Broadcaster is used to handle realtime via APIv1
 	Broadcaster realtime.Broadcaster
-	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
-	RealtimeJWTSecret []byte
 	// TraceReader reads traces from a backing store.
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
-	MetricsMiddleware MetricsMiddleware
+	MetricsMiddleware api.MetricsMiddleware
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator
-	// AppCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.
+	// FunctionCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.
 	FunctionCreator cqrs.FunctionCreator
 	// EventPublisher publishes events via HTTP/API-based functions
 	EventPublisher event.Publisher
-	// TracerProvider allows the checkpointing API to write traces.
+	// TracerProvider is used to create spans within the APIv1 endpoints and allows the checkpointing API to write traces.
 	TracerProvider tracing.TracerProvider
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
+
+	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
+	RealtimeJWTSecret []byte
+
+	// CheckpointOpts represents required opts for the checkpoint API
+	CheckpointOpts CheckpointAPIOpts
+
+	// MetadataOpts represents the required opts for the metadadata API
+	MetadataOpts MetadataOpts
+}
+
+func noopRateChecker(r *http.Request, w http.ResponseWriter, route string) bool {
+	return false
 }
 
 // AddRoutes adds a new API handler to the given router.
 func AddRoutes(r chi.Router, o Opts) http.Handler {
+	if o.RateLimited == nil {
+		o.RateLimited = noopRateChecker
+	}
+
 	if o.AuthFinder == nil {
 		o.AuthFinder = apiv1auth.NilAuthFinder
 	}
@@ -107,6 +127,15 @@ func (a *router) setup() {
 			})
 		}
 
+		// Checkpoint output API does its own auth (using query params), so
+		// should not be wrapped with the general auth middleware.
+		{
+			api := NewCheckpointAPI(a.opts)
+			for _, prefix := range CheckpointRoutePrefixes {
+				r.Get(prefix+"/{runID}/output", api.Output)
+			}
+		}
+
 		r.Group(func(r chi.Router) {
 			if a.opts.AuthMiddleware != nil {
 				r.Use(a.opts.AuthMiddleware)
@@ -122,10 +151,16 @@ func (a *router) setup() {
 
 			r.Use(headers.ContentTypeJsonResponse())
 
-			// Add the HTTP-based checkpointing API
-			r.Route(CheckpointRoutePrefix, func(sub chi.Router) {
-				sub.Mount("/", NewCheckpointAPI(a.opts))
-			})
+			// Add the HTTP-based checkpointing API.  Note that for backcompat,
+			// this exists at two URLs.
+			{
+				api := NewCheckpointAPI(a.opts)
+				for _, prefix := range CheckpointRoutePrefixes {
+					r.Route(prefix, func(sub chi.Router) {
+						sub.Mount("/", api)
+					})
+				}
+			}
 
 			r.Post("/signals", a.receiveSignal)
 
@@ -135,6 +170,7 @@ func (a *router) setup() {
 			r.Get("/runs/{runID}", a.GetFunctionRun)
 			r.Delete("/runs/{runID}", a.cancelFunctionRun)
 			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+			r.Post("/runs/{runID}/metadata", a.addRunMetadata)
 
 			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
 

@@ -1,7 +1,4 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from '@inngest/components/Button';
 import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
@@ -14,8 +11,14 @@ import { EventInfo } from '@/components/Events/EventInfo';
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
-import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+import {
+  useEventDetails,
+  useEventPayload,
+  useEventRuns,
+  useEvents,
+} from '@/components/Events/useEvents';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { useRouter, ClientOnly } from '@tanstack/react-router';
 
 export default function EventsPage({
   environmentSlug: envSlug,
@@ -29,11 +32,13 @@ export default function EventsPage({
   singleEventTypePage?: boolean;
 }) {
   const router = useRouter();
-  const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
+  const { isModalVisible, selectedEvent, openModal, closeModal } =
+    useReplayModal();
 
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
+  const getEventRuns = useEventRuns();
   const getEventTypes = useAllEventTypes();
   const features = useAccountFeatures();
 
@@ -56,6 +61,7 @@ export default function EventsPage({
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
+        getEventRuns={getEventRuns}
         getEventTypes={getEventTypes}
         eventNames={eventTypeNames}
         singleEventTypePage={singleEventTypePage}
@@ -67,7 +73,7 @@ export default function EventsPage({
             <Button
               appearance="outlined"
               label="Refresh"
-              onClick={() => router.refresh()}
+              onClick={() => router.invalidate()}
               icon={<RiRefreshLine />}
               iconSide="left"
             />
@@ -90,12 +96,14 @@ export default function EventsPage({
         )}
       />
       {selectedEvent && (
-        <SendEventModal
-          isOpen={isModalVisible}
-          eventName={selectedEvent.name}
-          onClose={closeModal}
-          initialData={selectedEvent.data}
-        />
+        <ClientOnly>
+          <SendEventModal
+            isOpen={isModalVisible}
+            eventName={selectedEvent.name}
+            onClose={closeModal}
+            initialData={selectedEvent.data}
+          />
+        </ClientOnly>
       )}
     </>
   );

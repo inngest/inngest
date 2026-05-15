@@ -155,6 +155,7 @@ export function useColumns({
     columnHelper.accessor('app', {
       cell: (info) => {
         const appExternalID = info.getValue()?.externalID;
+        const appName = info.getValue()?.name;
         if (!appExternalID) {
           return null;
         }
@@ -167,7 +168,7 @@ export function useColumns({
                 externalAppID: appExternalID,
               })}
             >
-              <PillContent type="APP">{appExternalID}</PillContent>
+              <PillContent type="APP">{appName || appExternalID}</PillContent>
             </Pill>
           </div>
         );

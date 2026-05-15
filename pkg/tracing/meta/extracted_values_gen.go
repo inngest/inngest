@@ -3,11 +3,13 @@
 package meta
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -25,24 +27,41 @@ type ExtractedValues struct {
 	DropSpan *bool
 	EnvID *uuid.UUID
 	EventIDs *[]string
+	EventsInput *string
+	TriggeringEventName *string
 	FunctionID *uuid.UUID
 	FunctionVersion *int
 	RunID *ulid.ULID
+	ReplayOriginalRunID *ulid.ULID
+	RunScheduleType *enums.ScheduleType
+	SkipReason *enums.SkipReason
+	SkipExistingRunID *string
+	IsDurableEndpointRun *bool
+	DurableEndpointModeChangedAt *time.Time
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
+	DynamicTraceID *string
 	InternalLocation *string
 	internalError *string
 	IsFunctionOutput *bool
+	Retryable *bool
 	StepID *string
 	StepName *string
 	StepOp *enums.Opcode
 	StepAttempt *int
 	StepMaxAttempts *int
 	StepCodeLocation *string
+	StepType *enums.StepType
+	StepInput *string
 	StepOutput *string
 	StepOutputRef *string
 	StepHasOutput *bool
+	StepUserlandID *string
+	StepUserlandIndex *int
 	StepRunType *string
+	ExperimentName *string
+	ExperimentStepID *string
+	ExperimentVariant *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time
 	StepInvokeFunctionID *string
@@ -56,10 +75,28 @@ type ExtractedValues struct {
 	StepSignalName *string
 	StepGatewayResponseStatusCode *int
 	StepGatewayResponseOutputSizeBytes *int
+	RequestID *string
+	JobID *string
 	RequestURL *string
-	ResponseHeaders *http.Header
+	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	ResponseSteps *ResponseOps
+	IsCheckpoint *bool
+	IsUserland *bool
+	UserlandSpanID *string
+	UserlandName *string
+	UserlandKind *string
+	UserlandServiceName *string
+	UserlandScopeName *string
+	UserlandScopeVersion *string
+	UserlandResourceAttributes *string
 	DebugSessionID *ulid.ULID
 	DebugRunID *ulid.ULID
+	AIRequestMetadata *aigateway.ParsedInferenceRequest
+	AIResponseMetadata *aigateway.ParsedInferenceResponse
+	Metadata *metadata.Values
+	MetadataKind *metadata.Kind
+	MetadataOp *metadata.Opcode
+	MetadataScope *metadata.Scope
 }

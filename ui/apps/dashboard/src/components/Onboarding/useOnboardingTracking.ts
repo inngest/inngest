@@ -1,5 +1,3 @@
-'use client';
-
 import { trackEvent, useTrackingUser } from '@/utils/tracking';
 import { OnboardingSteps, steps, type OnboardingStep } from './types';
 import useOnboardingStep from './useOnboardingStep';
@@ -10,7 +8,7 @@ export function useOnboardingStepCompletedTracking() {
 
   const trackOnboardingStepCompleted = (
     step: OnboardingStep,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
   ) => {
     trackEvent({
       name: 'app/onboarding.step.completed',
@@ -33,7 +31,7 @@ export function useOnboardingTracking() {
 
   const trackOnboardingAction = (
     stepName?: OnboardingSteps,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
   ) => {
     const step = steps.find((s) => s.name === stepName);
 

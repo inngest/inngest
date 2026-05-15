@@ -1,0 +1,22 @@
+name: PR Conventional Commit Validation
+
+on:
+  # Use pull_request_target so fork PRs can be labeled with the base repo token.
+  # This workflow must not checkout or run untrusted PR code.
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  validate-pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR Conventional Commit Validation
+        uses: ytanikin/pr-conventional-commits@639145d78959c53c43112365837e3abd21ed67c1 # 1.5.2
+        with:
+          # Keep this list aligned with cliff.toml.
+          task_types: '["feat","fix","doc","docs","test","ci","refactor","perf","chore","revert","style","security","cloud","internal","noop"]'

@@ -12,18 +12,55 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
+type _spanCtxKeyT struct{}
+
+var _spanCtxKeyV _spanCtxKeyT
+
+type ExecutionContext struct {
+	Identifier  statev2.ID
+	Attempt     int
+	MaxAttempts *int
+	// QueueKind is the queue kind string, eg. "sleep" - the type of job enqueued in our system.
+	QueueKind string
+}
+
+// WithExecutionContext stores data for spans in context.
+func WithExecutionContext(ctx context.Context, e ExecutionContext) context.Context {
+	return context.WithValue(ctx, _spanCtxKeyV, &e)
+}
+
+func mixinExecutonContext(input context.Context, with context.Context) context.Context {
+	ec := getExecutionContext(input)
+	return context.WithValue(with, _spanCtxKeyV, ec)
+}
+
 type executionProcessor struct {
 	md   *statev2.Metadata
-	qi   *queue.Item
 	next sdktrace.SpanProcessor
 }
 
-func newExecutionProcessor(md *statev2.Metadata, qi *queue.Item, next sdktrace.SpanProcessor) sdktrace.SpanProcessor {
+func newExecutionProcessor(md *statev2.Metadata, next sdktrace.SpanProcessor) sdktrace.SpanProcessor {
 	return &executionProcessor{
 		md:   md,
-		qi:   qi,
 		next: next,
 	}
+}
+
+// AddMetadataTenantAttrs adds all attrs  from the metadata ID to the trace.
+func AddMetadataTenantAttrs(rawAttrs *meta.SerializableAttrs, id statev2.ID) {
+	meta.AddAttr(rawAttrs, meta.Attrs.RunID, &id.RunID)
+	meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &id.FunctionID)
+	meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &id.Tenant.AccountID)
+	meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &id.Tenant.EnvID)
+	meta.AddAttr(rawAttrs, meta.Attrs.AppID, &id.Tenant.AppID)
+}
+
+func getExecutionContext(ctx context.Context) *ExecutionContext {
+	ec, ok := ctx.Value(_spanCtxKeyV).(*ExecutionContext)
+	if ok {
+		return ec
+	}
+	return nil
 }
 
 func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
@@ -31,17 +68,19 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	now := s.StartTime()
 
 	if p.md != nil {
-		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.md.ID.RunID)
-		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.md.ID.FunctionID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &p.md.ID.Tenant.AccountID)
-		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &p.md.ID.Tenant.EnvID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &p.md.ID.Tenant.AppID)
-	} else if p.qi != nil {
-		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.qi.Identifier.RunID)
-		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.qi.Identifier.WorkflowID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &p.qi.Identifier.AccountID)
-		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &p.qi.Identifier.WorkspaceID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &p.qi.Identifier.AppID)
+		AddMetadataTenantAttrs(rawAttrs, p.md.ID)
+		meta.AddAttr(rawAttrs, meta.Attrs.DebugRunID, p.md.Config.DebugRunID())
+		meta.AddAttr(rawAttrs, meta.Attrs.DebugSessionID, p.md.Config.DebugSessionID())
+	}
+
+	ec := getExecutionContext(parent)
+
+	if ec != nil {
+		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &ec.Identifier.RunID)
+		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &ec.Identifier.FunctionID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &ec.Identifier.Tenant.AccountID)
+		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &ec.Identifier.Tenant.EnvID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &ec.Identifier.Tenant.AppID)
 	}
 
 	// Do not set extra contextual data on extension spans
@@ -84,7 +123,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStepDiscovery:
 		{
-			meta.AddAttr(rawAttrs, meta.Attrs.QueuedAt, &now)
+			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			break
 		}
@@ -93,12 +132,12 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 		{
 			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
 
-			if p.qi != nil {
-				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, p.qi.MaxAttempts)
-				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
+			if ec != nil {
+				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, ec.MaxAttempts)
+				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
 
 				// Some steps "start" as soon as they are queued
-				startWhenQueued := p.qi.Kind == queue.KindSleep
+				startWhenQueued := ec.QueueKind == queue.KindSleep
 				if !startWhenQueued {
 					for _, attr := range s.Attributes() {
 						if string(attr.Key) == meta.Attrs.StepOp.Key() {
@@ -122,8 +161,8 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 		{
 			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.StartedAt, &now)
 
-			if p.qi != nil {
-				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
+			if ec != nil {
+				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
 			}
 
 			break

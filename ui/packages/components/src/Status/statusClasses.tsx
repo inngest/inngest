@@ -5,6 +5,7 @@ import {
   type FunctionRunStatus,
   type ReplayRunStatus,
 } from '../types/functionRun';
+import { isReplayStatus, type ReplayStatus } from '../types/replay';
 import { isWorkerStatus, type GroupedWorkerStatus } from '../types/workers';
 import { cn } from '../utils/classNames';
 
@@ -14,6 +15,7 @@ const backgroundClasses: {
     | ReplayRunStatus
     | GroupedWorkerStatus
     | AppStatus
+    | ReplayStatus
     | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'bg-status-cancelled',
@@ -30,11 +32,18 @@ const backgroundClasses: {
   ACTIVE: 'bg-status-completed',
   ARCHIVED: 'bg-status-cancelled',
   DISCONNECTED: 'bg-status-cancelled',
+  CREATED: 'bg-status-runningSubtle',
+  ENDED: 'bg-status-completed',
 };
 
 export function getStatusBackgroundClass(status: string): string {
-  if (!isFunctionRunStatus(status) && !isReplayRunStatus(status) && !isWorkerStatus(status)) {
-    console.error(`unexpected status: ${status}`);
+  if (
+    !isFunctionRunStatus(status) &&
+    !isReplayRunStatus(status) &&
+    !isWorkerStatus(status) &&
+    !isAppStatus(status) &&
+    !isReplayStatus(status)
+  ) {
     return backgroundClasses['UNKNOWN'];
   }
   return backgroundClasses[status];
@@ -46,6 +55,7 @@ const borderClasses: {
     | ReplayRunStatus
     | GroupedWorkerStatus
     | AppStatus
+    | ReplayStatus
     | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'border-status-cancelled',
@@ -62,6 +72,8 @@ const borderClasses: {
   ACTIVE: 'border-status-completed',
   ARCHIVED: 'border-status-cancelled',
   DISCONNECTED: 'border-status-cancelled',
+  CREATED: 'border-status-running',
+  ENDED: 'border-status-completed',
 };
 
 export function getStatusBorderClass(status: string): string {
@@ -69,9 +81,9 @@ export function getStatusBorderClass(status: string): string {
     !isFunctionRunStatus(status) &&
     !isReplayRunStatus(status) &&
     !isWorkerStatus(status) &&
-    !isAppStatus(status)
+    !isAppStatus(status) &&
+    !isReplayStatus(status)
   ) {
-    console.error(`unexpected status: ${status}`);
     return cn('border', borderClasses['UNKNOWN']);
   }
   return cn('border', borderClasses[status]);
@@ -83,6 +95,7 @@ const textClasses: {
     | ReplayRunStatus
     | GroupedWorkerStatus
     | AppStatus
+    | ReplayStatus
     | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'text-status-cancelledText',
@@ -99,6 +112,8 @@ const textClasses: {
   ACTIVE: 'text-status-completedText',
   ARCHIVED: 'text-status-cancelledText',
   DISCONNECTED: 'text-status-cancelledText',
+  CREATED: 'text-status-runningText',
+  ENDED: 'text-status-completedText',
 };
 
 export function getStatusTextClass(status: string): string {
@@ -106,9 +121,9 @@ export function getStatusTextClass(status: string): string {
     !isFunctionRunStatus(status) &&
     !isReplayRunStatus(status) &&
     !isWorkerStatus(status) &&
-    !isAppStatus(status)
+    !isAppStatus(status) &&
+    !isReplayStatus(status)
   ) {
-    console.error(`unexpected status: ${status}`);
     return textClasses['UNKNOWN'];
   }
   return textClasses[status];

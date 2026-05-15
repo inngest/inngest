@@ -1,28 +1,29 @@
-'use client';
-
 import { useMemo } from 'react';
 import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
 import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
-import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
 import { useStoredQueries } from './StoredQueriesContext';
 
 interface QueryHelperPanelProps {
-  activeTabId: string;
+  activeSavedQueryId?: string;
 }
 
-export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
+export function QueryHelperPanel({
+  activeSavedQueryId,
+}: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
-  const { deleteQuery, deleteQuerySnapshot, queries, querySnapshots } = useStoredQueries();
+  const { deleteQuery, queries } = useStoredQueries();
 
-  const savedQueries = useMemo(() => {
-    return temporarilyWrapData(getOrderedSavedQueries(queries));
-  }, [queries]);
-
-  const orderedQuerySnapshots = useMemo(() => {
-    return temporarilyWrapData(getOrderedQuerySnapshots(querySnapshots));
-  }, [querySnapshots]);
+  const sharedQueries = useMemo(
+    () => limitQueriesByType('shared', queries),
+    [queries],
+  );
+  const savedQueries = useMemo(
+    () => limitQueriesByType('saved', queries),
+    [queries],
+  );
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
@@ -35,7 +36,7 @@ export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
           >
             <RiAddCircleFill className="text-primary-intense h-4 w-4" />
             <span className="text-primary-intense ml-2.5 text-sm font-medium leading-tight">
-              New insight
+              New query
             </span>
           </button>
           <button
@@ -43,37 +44,48 @@ export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
             onClick={tabManagerActions.openTemplatesTab}
           >
             <RiBookReadLine className="h-4 w-4" />
-            <span className="ml-2.5 text-sm font-medium leading-tight">Browse templates</span>
+            <span className="ml-2.5 text-sm font-medium leading-tight">
+              Browse templates
+            </span>
           </button>
         </div>
       </div>
       <div className="no-scrollbar flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
         <QueryHelperPanelCollapsibleSection
-          activeTabId={activeTabId}
+          activeSavedQueryId={activeSavedQueryId}
+          onQueryDelete={deleteQuery}
+          onQuerySelect={tabManagerActions.createTabFromQuery}
+          queries={sharedQueries}
+          title="Shared queries"
+          sectionType="shared"
+        />
+        <QueryHelperPanelCollapsibleSection
+          activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={deleteQuery}
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={savedQueries}
           title="Saved queries"
           sectionType="saved"
         />
-        <QueryHelperPanelCollapsibleSection
-          activeTabId={activeTabId}
-          onQueryDelete={deleteQuerySnapshot}
-          onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={orderedQuerySnapshots}
-          title="Query history"
-          sectionType="history"
-        />
       </div>
     </div>
   );
 }
 
-// TODO: Use real error, loading values when data is fetched from the server.
-function temporarilyWrapData<T>(data: T): {
-  data: T;
-  error: undefined;
+type QueriesResponse = {
+  data: undefined | Array<InsightsQueryStatement>;
+  error: undefined | string;
   isLoading: boolean;
-} {
-  return { data, error: undefined, isLoading: false };
+};
+
+function limitQueriesByType(
+  type: 'shared' | 'saved',
+  queries: QueriesResponse,
+) {
+  return {
+    ...queries,
+    data: queries.data?.filter((query) =>
+      type === 'shared' ? query.shared : !query.shared,
+    ),
+  };
 }

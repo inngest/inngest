@@ -31,9 +31,11 @@ var (
 
 // TrackedEvent represents an event created for a specific workspace.
 type TrackedEvent interface {
+	GetAccountID() uuid.UUID
 	GetWorkspaceID() uuid.UUID
 	GetInternalID() ulid.ULID
 	GetEvent() Event
+	GetReceivedAt() time.Time
 }
 
 // NewEvent unmarshals a byte slice into a concrete event type.
@@ -64,6 +66,37 @@ type Event struct {
 	//
 	// Deprecated:  this will be removed in favour of storing everything within data.
 	User map[string]any `json:"user,omitempty"`
+
+	// size represents the size of the event in bytes, set during
+	// the UnmarshalJSON call.
+	size int
+}
+
+func (e *Event) UnmarshalJSON(data []byte) error {
+	type raw Event
+	if err := json.Unmarshal(data, (*raw)(e)); err != nil {
+		return err
+	}
+	e.size = len(data)
+	return nil
+}
+
+// Size returns the size of the event in bytes, as a JSON-encoded string.
+//
+// If UnmarshalJSON is called to create the event, this returns the size
+// of the unmarshalled JSON payload in bytes.  Oherwise, this calls
+// MarshalJSON to get the size.
+func (e Event) Size() int {
+	if e.size > 0 {
+		return e.size
+	}
+	byt, _ := json.Marshal(e)
+	return len(byt)
+}
+
+// ClearSize clears the internal memoized size field.
+func (e *Event) ClearSize() {
+	e.size = 0
 }
 
 func (e Event) Time() time.Time {
@@ -167,6 +200,13 @@ type InternalEvent struct {
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 	// Event is the underlying event received.
 	Event Event `json:"event"`
+
+	// ReceivedAt is the time that our system received the event.
+	ReceivedAt time.Time `json:"received_at"`
+}
+
+func (i InternalEvent) GetAccountID() uuid.UUID {
+	return i.AccountID
 }
 
 func (i InternalEvent) GetWorkspaceID() uuid.UUID {
@@ -179,6 +219,10 @@ func (i InternalEvent) GetInternalID() ulid.ULID {
 
 func (i InternalEvent) GetEvent() Event {
 	return i.Event
+}
+
+func (i InternalEvent) GetReceivedAt() time.Time {
+	return i.ReceivedAt
 }
 
 func IsCron(evtName string) bool {

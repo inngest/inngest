@@ -10,7 +10,7 @@ import (
 type noopTracerProvider struct{}
 
 // CreateDroppableSpan implements TracerProvider.
-func (n *noopTracerProvider) CreateDroppableSpan(name string, opts *CreateSpanOptions) (*DroppableSpan, error) {
+func (n *noopTracerProvider) CreateDroppableSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*DroppableSpan, error) {
 	_, span := sdktrace.NewTracerProvider().Tracer("inngest").Start(context.Background(), "noop")
 
 	return &DroppableSpan{
@@ -20,8 +20,8 @@ func (n *noopTracerProvider) CreateDroppableSpan(name string, opts *CreateSpanOp
 }
 
 // CreateSpan implements TracerProvider.
-func (n *noopTracerProvider) CreateSpan(name string, opts *CreateSpanOptions) (*meta.SpanReference, error) {
-	span, err := n.CreateDroppableSpan(name, opts)
+func (n *noopTracerProvider) CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error) {
+	span, err := n.CreateDroppableSpan(ctx, name, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (n *noopTracerProvider) CreateSpan(name string, opts *CreateSpanOptions) (*
 }
 
 // UpdateSpan implements TracerProvider.
-func (n *noopTracerProvider) UpdateSpan(opts *UpdateSpanOptions) error {
+func (n *noopTracerProvider) UpdateSpan(ctx context.Context, opts *UpdateSpanOptions) error {
 	return nil
 }
 

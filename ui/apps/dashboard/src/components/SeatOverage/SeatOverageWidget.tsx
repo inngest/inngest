@@ -1,16 +1,22 @@
-'use client';
-
-import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip/Tooltip';
 import { RiCloseLine, RiErrorWarningFill } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
 import { useSeatOverage } from './useSeatOverage';
+import { Link } from '@tanstack/react-router';
 
 // TODO: turn into a component for all other upsell widgets
-export default function SeatOverageWidget({ collapsed }: { collapsed: boolean }) {
+export default function SeatOverageWidget({
+  collapsed,
+}: {
+  collapsed: boolean;
+}) {
   const { isWidgetVisible, seatOverageData, dismiss } = useSeatOverage();
 
   // Track CTA viewed when widget becomes visible (temporarily disabled)
@@ -43,7 +49,9 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
           className="border border-amber-200 bg-amber-50"
           collapsed={collapsed}
           text="Upgrade plan"
-          icon={<RiErrorWarningFill className="h-[18px] w-[18px] text-amber-600" />}
+          icon={
+            <RiErrorWarningFill className="h-[18px] w-[18px] text-amber-600" />
+          }
         />
       )}
 
@@ -72,14 +80,16 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <p className="flex items-center gap-1.5 text-amber-800">Seat limit exceeded</p>
+              <p className="flex items-center gap-1.5 text-amber-800">
+                Seat limit exceeded
+              </p>
               <p className="text-sm text-amber-700">
-                You&apos;re using {seatOverageData.userCount} seats but your plan includes{' '}
-                {seatOverageData.userLimit}.
+                You&apos;re using {seatOverageData.userCount} seats but your
+                plan includes {seatOverageData.userLimit}.
               </p>
             </div>
             <Link
-              href={pathCreator.billing({
+              to={pathCreator.billing({
                 ref: 'seat-overage-widget-expanded',
               })}
               className="text-sm text-amber-800 hover:text-amber-900 hover:underline"

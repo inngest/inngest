@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -47,10 +48,16 @@ type FunctionOpts struct {
 	ID string
 	// Name represents a human-readable function name.
 	Name string
+
+	// Checkpoint configues checkpointing for the current function.  Checkpointing
+	// allows each step.Run result to be stored via an API call, lowering latency between
+	// steps.
+	Checkpoint *checkpoint.Config
+
 	// Priority allows you to specify priority options for the function.
 	Priority *Priority
 	// Concurrency allows you to specify concurrency options.
-	Concurrency []Concurrency
+	Concurrency *ConcurrencyLimits
 	// Idempotency allows you to specify a custom idempotency key - evaluated as a CEL expression
 	// using the run's triggering event.
 	Idempotency *string
@@ -73,7 +80,6 @@ type FunctionOpts struct {
 	RateLimit *RateLimit
 	// BatchEvents represents batching
 	BatchEvents *EventBatchConfig
-
 	// Singleton ensures only one active function run per key.
 	Singleton *Singleton
 }
@@ -112,6 +118,20 @@ func (t Trigger) Triggers() []Trigger {
 	return []Trigger{t}
 }
 
+// MarshalJSON serializes a Trigger, handling the case where either
+// EventTrigger or CronTrigger is nil (only one is set at a time).
+// This explicit method prevents Go from promoting a MarshalJSON defined
+// on *CronTrigger, which would panic when CronTrigger is nil.
+func (t Trigger) MarshalJSON() ([]byte, error) {
+	if t.CronTrigger != nil {
+		return json.Marshal(t.CronTrigger)
+	}
+	if t.EventTrigger != nil {
+		return json.Marshal(t.EventTrigger)
+	}
+	return []byte(`{}`), nil
+}
+
 // EventTrigger is a trigger which invokes the function each time a specific event is received.
 type EventTrigger struct {
 	// Event is the event name which triggers the function.
@@ -124,35 +144,50 @@ type EventTrigger struct {
 
 // CronTrigger is a trigger which invokes the function on a CRON schedule.
 type CronTrigger struct {
-	Cron string `json:"cron"`
+	Cron   string  `json:"cron"`
+	Jitter *string `json:"jitter,omitempty"`
 }
 
 type Priority struct {
 	Run *string `json:"run"`
 }
 
-// Concurrency represents a single concurrency limit for a function.  Concurrency limits
-// the number of running steps for a given key at a time.  Other steps will be enqueued
-// for the future and executed as soon as there's capacity.
+// ConcurrencyLimits represents all concurrency limits for a function.
+type ConcurrencyLimits struct {
+	// Fn specifies function-level concurrency limits.  The semaphore is held
+	// for the entire run (manual release on finalization).
+	Fn []FnConcurrency `json:"fn,omitempty"`
+
+	// Step specifies step-level concurrency limits.  Each step independently
+	// acquires and releases capacity.
+	Step []StepConcurrency `json:"step,omitempty"`
+}
+
+// FnConcurrency represents a function-level concurrency limit.  The limit is
+// held for the entire run lifetime and released on finalization.
+type FnConcurrency struct {
+	Limit int     `json:"limit"`
+	Key   *string `json:"key,omitempty"`
+	Hash  string  `json:"hash"`
+}
+
+// StepConcurrency represents a single step-level concurrency limit.
+// Concurrency limits the number of running steps for a given key at a time.
 //
 // # Concurrency keys: virtual queues.
 //
 // The `Key` parameter is an optional CEL expression evaluated using the run's events.
 // The output from the expression is used to create new virtual queues, which limits
 // the number of runs for each virtual queue.
-//
-// For example, to limit the number of running steps for every account in your system,
-// you can send the `account_id` in the triggering event and use the following key:
-//
-//	event.data.account_id
-//
-// Concurrency is then limited for each unique account_id field in parent events.
-type Concurrency struct {
+type StepConcurrency struct {
 	Limit int                    `json:"limit"`
 	Key   *string                `json:"key,omitempty"`
 	Scope enums.ConcurrencyScope `json:"scope"`
 	Hash  string                 `json:"hash"`
 }
+
+// Concurrency is an alias for StepConcurrency for backward compatibility.
+type Concurrency = StepConcurrency
 
 // Cancel represents a cancellation signal for a function.  When specified, this
 // will set up pauses which automatically cancel the function based off of matching

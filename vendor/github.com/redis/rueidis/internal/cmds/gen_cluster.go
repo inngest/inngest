@@ -700,7 +700,7 @@ func (c ClusterSlotStatsFilterOrderbyLimit) Build() Completed {
 type ClusterSlotStatsFilterOrderbyMetric Incomplete
 
 func (c ClusterSlotStatsFilterOrderbyMetric) Limit(limit int64) ClusterSlotStatsFilterOrderbyLimit {
-	c.cs.s = append(c.cs.s, strconv.FormatInt(limit, 10))
+	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(limit, 10))
 	return (ClusterSlotStatsFilterOrderbyLimit)(c)
 }
 

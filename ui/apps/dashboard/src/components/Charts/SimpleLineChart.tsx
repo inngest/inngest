@@ -1,8 +1,10 @@
-'use client';
-
 import { useMemo } from 'react';
 import { Error } from '@inngest/components/Error/Error';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { minuteTime } from '@inngest/components/utils/date';
 import { RiInformationLine } from '@remixicon/react';
@@ -17,7 +19,7 @@ import {
   YAxis,
 } from 'recharts';
 
-import LoadingIcon from '@/icons/LoadingIcon';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
 
 type SimpleLineChartProps = {
   className?: string;
@@ -52,7 +54,14 @@ type AxisProps = {
 
 function CustomizedXAxisTick(props: AxisProps) {
   return (
-    <text x={props.x} y={props.y} dy={16} fontSize={12} className="fill-muted" textAnchor="middle">
+    <text
+      x={props.x}
+      y={props.y}
+      dy={16}
+      fontSize={12}
+      className="fill-muted"
+      textAnchor="middle"
+    >
       {minuteTime(new Date(props.payload.value))}
     </text>
   );
@@ -82,7 +91,10 @@ export default function SimpleLineChart({
   isLoading,
   error,
 }: SimpleLineChartProps) {
-  const referenceAreas = useMemo(() => legend.filter((k) => k.referenceArea), [legend]);
+  const referenceAreas = useMemo(
+    () => legend.filter((k) => k.referenceArea),
+    [legend],
+  );
   const referenceAreaKeys = referenceAreas.map((k) => k.dataKey);
   const flattenData = useMemo(() => {
     return data.map((d) => {
@@ -92,10 +104,17 @@ export default function SimpleLineChart({
   }, [data, referenceAreaKeys]);
 
   return (
-    <div className={cn('border-subtle bg-canvasBase border-b px-6 py-4', className)}>
+    <div
+      className={cn(
+        'border-subtle bg-canvasBase border-b px-6 py-4',
+        className,
+      )}
+    >
       <header className="mb-2 flex items-center justify-between">
         <div className="flex gap-2">
-          <h3 className="flex flex-row items-center gap-1.5 text-base">{title}</h3>
+          <h3 className="flex flex-row items-center gap-1.5 text-base">
+            {title}
+          </h3>
           {desc && (
             <Tooltip>
               <TooltipTrigger>
@@ -128,8 +147,16 @@ export default function SimpleLineChart({
               <Error message="Failed to load chart" />
             </div>
           ) : (
-            <LineChart data={flattenData} margin={{ top: 16, bottom: 16 }} barCategoryGap={8}>
-              <CartesianGrid strokeDasharray="0" vertical={false} className="stroke-disabled" />
+            <LineChart
+              data={flattenData}
+              margin={{ top: 16, bottom: 16 }}
+              barCategoryGap={8}
+            >
+              <CartesianGrid
+                strokeDasharray="0"
+                vertical={false}
+                className="stroke-disabled"
+              />
               <XAxis
                 allowDecimals={false}
                 dataKey="name"
@@ -163,19 +190,21 @@ export default function SimpleLineChart({
                     <ReferenceArea
                       key={`${name}+${k.dataKey}`}
                       x1={name}
-                      x2={index < data.length - 1 ? data[index + 1]!.name : name}
+                      x2={index < data.length - 1 ? data[index + 1].name : name}
                       fill={k.color}
                       fillOpacity={0.15}
                     />
                   );
-                })
+                }),
               )}
               <ChartTooltip
                 content={(props) => {
                   const { label, payload } = props;
                   return (
                     <div className="shadow-tooltip bg-canvasBase rounded-md px-3 pb-2 pt-1 text-sm shadow-md">
-                      <div className="text-muted pb-2">{new Date(label).toLocaleString()}</div>
+                      <div className="text-muted pb-2">
+                        {new Date(label).toLocaleString()}
+                      </div>
                       {payload?.map((p, idx) => {
                         // @ts-ignore
                         if (p.value === false) return;
