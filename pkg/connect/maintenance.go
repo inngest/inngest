@@ -42,7 +42,7 @@ func (m *maintenanceApi) setup() {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("."))
 		})
-		r.Get("/ready", func(w http.ResponseWriter, req *http.Request) {
+		r.Get(ReadyPath, func(w http.ResponseWriter, req *http.Request) {
 			if m.GatewayMaintenance.IsDraining() {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return
@@ -59,7 +59,7 @@ func (m *maintenanceApi) setup() {
 			}
 			w.WriteHeader(http.StatusTooEarly)
 		})
-		
+
 		r.Post("/activate", m.activateGateway)
 	})
 }

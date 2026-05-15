@@ -2,13 +2,14 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"testing"
 	"time"
 
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -22,23 +23,19 @@ func TestBacklogNormalizationLease(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
 
 	enqueueToBacklog := false
-	q := NewQueue(
-		defaultShard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
 		}),
 	)
 
 	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
-	shadowPart := &QueueShadowPartition{
+	shadowPart := &osqueue.QueueShadowPartition{
 		PartitionID: fnID.String(),
 		LeaseID:     nil,
 		FunctionID:  &fnID,
@@ -46,10 +43,10 @@ func TestBacklogNormalizationLease(t *testing.T) {
 		AccountID:   &accountID,
 	}
 
-	backlog := &QueueBacklog{
+	backlog := &osqueue.QueueBacklog{
 		BacklogID:         "yolo",
 		ShadowPartitionID: shadowPart.PartitionID,
-		Throttle: &BacklogThrottle{
+		Throttle: &osqueue.BacklogThrottle{
 			ThrottleKey:               "something",
 			ThrottleKeyRawValue:       "somethingelse",
 			ThrottleKeyExpressionHash: "hash",
@@ -57,12 +54,12 @@ func TestBacklogNormalizationLease(t *testing.T) {
 	}
 
 	// should lease successfully
-	err := q.leaseBacklogForNormalization(ctx, backlog)
+	err := shard.LeaseBacklogForNormalization(ctx, backlog)
 	require.NoError(t, err)
 
 	// another attempt should fail
-	err = q.leaseBacklogForNormalization(ctx, backlog)
-	require.ErrorIs(t, err, errBacklogAlreadyLeasedForNormalization)
+	err = shard.LeaseBacklogForNormalization(ctx, backlog)
+	require.ErrorIs(t, err, osqueue.ErrBacklogAlreadyLeasedForNormalization)
 }
 
 func TestExtendBacklogNormalizationLease(t *testing.T) {
@@ -71,23 +68,19 @@ func TestExtendBacklogNormalizationLease(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
 
 	enqueueToBacklog := false
-	q := NewQueue(
-		defaultShard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return enqueueToBacklog
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
 		}),
 	)
 
 	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
-	shadowPart := &QueueShadowPartition{
+	shadowPart := &osqueue.QueueShadowPartition{
 		PartitionID: fnID.String(),
 		LeaseID:     nil,
 		FunctionID:  &fnID,
@@ -95,10 +88,10 @@ func TestExtendBacklogNormalizationLease(t *testing.T) {
 		AccountID:   &accountID,
 	}
 
-	backlog := &QueueBacklog{
+	backlog := &osqueue.QueueBacklog{
 		BacklogID:         "yolo",
 		ShadowPartitionID: shadowPart.PartitionID,
-		Throttle: &BacklogThrottle{
+		Throttle: &osqueue.BacklogThrottle{
 			ThrottleKey:               "something",
 			ThrottleKeyRawValue:       "somethingelse",
 			ThrottleKeyExpressionHash: "hash",
@@ -106,23 +99,23 @@ func TestExtendBacklogNormalizationLease(t *testing.T) {
 	}
 
 	// attempt to extend without a lease will fail
-	err := q.extendBacklogNormalizationLease(ctx, clock.Now(), backlog)
-	require.ErrorIs(t, err, errBacklogNormalizationLeaseExpired)
+	err := shard.ExtendBacklogNormalizationLease(ctx, clock.Now(), backlog)
+	require.ErrorIs(t, err, osqueue.ErrBacklogNormalizationLeaseExpired)
 
 	// lease the backlog first
-	err = q.leaseBacklogForNormalization(ctx, backlog)
+	err = shard.LeaseBacklogForNormalization(ctx, backlog)
 	require.NoError(t, err)
 
 	// should succeed
-	err = q.extendBacklogNormalizationLease(ctx, clock.Now(), backlog)
+	err = shard.ExtendBacklogNormalizationLease(ctx, clock.Now(), backlog)
 	require.NoError(t, err)
 
-	clock.Advance(2 * BacklogNormalizeLeaseDuration)
-	r.FastForward(2 * BacklogNormalizeLeaseDuration)
+	clock.Advance(2 * osqueue.BacklogNormalizeLeaseDuration)
+	r.FastForward(2 * osqueue.BacklogNormalizeLeaseDuration)
 
 	// expect lease to be expired again
-	err = q.extendBacklogNormalizationLease(ctx, clock.Now(), backlog)
-	require.ErrorIs(t, err, errBacklogNormalizationLeaseExpired)
+	err = shard.ExtendBacklogNormalizationLease(ctx, clock.Now(), backlog)
+	require.ErrorIs(t, err, osqueue.ErrBacklogNormalizationLeaseExpired)
 }
 
 func TestQueueBacklogPrepareNormalize(t *testing.T) {
@@ -131,19 +124,14 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
-
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	_, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
+	kg := shard.Client().kg
 	ctx := context.Background()
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -175,14 +163,14 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 	t.Run("should garbage-collect empty backlog pointer", func(t *testing.T) {
 		r.FlushAll()
 
-		qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		qi, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		expectedBacklog := q.ItemBacklog(ctx, item)
+		expectedBacklog := osqueue.ItemBacklog(ctx, item)
 		require.NotEmpty(t, expectedBacklog.BacklogID)
 		require.NotEmpty(t, r.HGet(kg.BacklogMeta(), expectedBacklog.BacklogID))
 
-		shadowPartition := q.ItemShadowPartition(ctx, item)
+		shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 		require.NotEmpty(t, shadowPartition.PartitionID)
 
 		// expect backlog in shadow partition
@@ -196,9 +184,9 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 		// still expect backlog in shadow partition
 		require.True(t, hasMember(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), expectedBacklog.BacklogID))
 
-		err = q.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition)
+		err = shard.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition)
 		require.Error(t, err)
-		require.ErrorIs(t, err, ErrBacklogGarbageCollected)
+		require.ErrorIs(t, err, osqueue.ErrBacklogGarbageCollected)
 
 		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
 		require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
@@ -214,15 +202,15 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 	t.Run("should move backlog to normalization set", func(t *testing.T) {
 		r.FlushAll()
 
-		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		expectedBacklog := q.ItemBacklog(ctx, item)
+		expectedBacklog := osqueue.ItemBacklog(ctx, item)
 		require.NotEmpty(t, expectedBacklog.BacklogID)
 
-		shadowPartition := q.ItemShadowPartition(ctx, item)
+		shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 		require.NotEmpty(t, shadowPartition.PartitionID)
-		err = q.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition)
+		err = shard.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition)
 		require.NoError(t, err)
 
 		require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
@@ -244,19 +232,14 @@ func TestQueueBacklogNormalization(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
-
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
+	kg := shard.Client().kg
 	ctx := context.Background()
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
@@ -284,7 +267,7 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	// Create backlog
 	for i := range 10 {
 		at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
-		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -293,16 +276,16 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	//
 
 	// Verify backlog is created as expected
-	backlog := q.ItemBacklog(ctx, item)
+	backlog := osqueue.ItemBacklog(ctx, item)
 	require.NotEmpty(t, backlog.BacklogID)
 
-	shadowPartition := q.ItemShadowPartition(ctx, item)
+	shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 	require.NotEmpty(t, shadowPartition.PartitionID)
 
-	constraints := PartitionConstraintConfig{}
+	constraints := osqueue.PartitionConstraintConfig{}
 
 	// Mark backlog for normalization
-	err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition)
+	err := shard.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition)
 	require.NoError(t, err)
 	require.Equal(t, 10, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
 	require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
@@ -310,9 +293,9 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
 
 	// Verify normalization
-	require.NoError(t, q.leaseBacklogForNormalization(ctx, &backlog)) // lease it first
+	require.NoError(t, shard.LeaseBacklogForNormalization(ctx, &backlog)) // lease it first
 
-	require.NoError(t, q.normalizeBacklog(ctx, &backlog, &shadowPartition, constraints))
+	require.NoError(t, q.NormalizeBacklog(ctx, &backlog, &shadowPartition, constraints))
 	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
 	require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
 	require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
@@ -324,13 +307,6 @@ func TestBacklogNormalizeItem(t *testing.T) {
 	defer r.Close()
 
 	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{
-		Kind:        string(enums.QueueShardKindRedis),
-		RedisClient: NewQueueClient(rc, QueueDefaultKey),
-		Name:        consts.DefaultQueueShardName,
-	}
-
-	kg := defaultShard.RedisClient.kg
 
 	accountID, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -361,28 +337,26 @@ func TestBacklogNormalizeItem(t *testing.T) {
 		KeyExpressionHash:   throttleKeyExpr,
 	}
 
-	latestConstraints := PartitionConstraintConfig{}
+	latestConstraints := osqueue.PartitionConstraintConfig{}
 
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
+		osqueue.WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *osqueue.QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return customConc, nil
 		}),
-		WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
+		osqueue.WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 			return throttle, nil
 		}),
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 			return latestConstraints
 		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
 	ctx := context.Background()
+	kg := shard.Client().kg
 
 	require.Len(t, r.Keys(), 0)
 
@@ -404,26 +378,26 @@ func TestBacklogNormalizeItem(t *testing.T) {
 		QueueName: nil,
 	}
 
-	sp := q.ItemShadowPartition(ctx, item)
-	sourceBacklog := q.ItemBacklog(ctx, item)
+	sp := osqueue.ItemShadowPartition(ctx, item)
+	sourceBacklog := osqueue.ItemBacklog(ctx, item)
 
-	qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+	qi, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
 	require.True(t, r.Exists(kg.BacklogSet(sourceBacklog.BacklogID)))
 	require.True(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), sourceBacklog.BacklogID))
 	require.True(t, hasMember(t, r, kg.BacklogSet(sourceBacklog.BacklogID), qi.ID))
 
-	normalizedItem, err := q.normalizeItem(ctx, defaultShard, &sp, latestConstraints, &sourceBacklog, qi)
+	normalizedItem, err := q.NormalizeItem(ctx, &sp, latestConstraints, &sourceBacklog, qi)
 	require.NoError(t, err)
 
 	qi.Data.CustomConcurrencyKeys = customConc
 	qi.Data.Throttle = throttle
 
 	require.Equal(t, qi, normalizedItem)
-	targetBacklog := q.ItemBacklog(ctx, qi)
+	targetBacklog := osqueue.ItemBacklog(ctx, qi)
 
-	actualBacklog := q.ItemBacklog(ctx, normalizedItem)
+	actualBacklog := osqueue.ItemBacklog(ctx, normalizedItem)
 
 	require.Equal(t, targetBacklog, actualBacklog)
 
@@ -442,9 +416,6 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 	defer rc.Close()
 
 	clock := clockwork.NewFakeClock()
-
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -475,22 +446,20 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 		KeyExpressionHash:   throttleKeyExpr,
 	}
 
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
+		osqueue.WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *osqueue.QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return customConc, nil
 		}),
-		WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
+		osqueue.WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 			return throttle, nil
 		}),
-		WithClock(clock),
+		osqueue.WithClock(clock),
 	)
+	kg := shard.Client().kg
 	ctx := context.Background()
 
 	require.Len(t, r.Keys(), 0)
@@ -534,7 +503,7 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 	// Create backlog
 	for i := range 10 {
 		at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
-		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -543,21 +512,21 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 	//
 
 	// Verify backlog is created as expected
-	initialBacklog := q.ItemBacklog(ctx, item)
+	initialBacklog := osqueue.ItemBacklog(ctx, item)
 	require.NotEmpty(t, initialBacklog.BacklogID)
 	require.Nil(t, initialBacklog.ConcurrencyKeys)
 	require.Nil(t, initialBacklog.Throttle)
 
-	targetBacklog := q.ItemBacklog(ctx, item2)
+	targetBacklog := osqueue.ItemBacklog(ctx, item2)
 	require.NotEmpty(t, targetBacklog.BacklogID)
 	require.NotNil(t, targetBacklog.ConcurrencyKeys)
 	require.NotNil(t, targetBacklog.Throttle)
 
-	shadowPartition := q.ItemShadowPartition(ctx, item)
+	shadowPartition := osqueue.ItemShadowPartition(ctx, item)
 	require.NotEmpty(t, shadowPartition.PartitionID)
 
 	// Mark backlog for normalization
-	err := q.BacklogPrepareNormalize(ctx, &initialBacklog, &shadowPartition)
+	err := shard.BacklogPrepareNormalize(ctx, &initialBacklog, &shadowPartition)
 	require.NoError(t, err)
 	require.Equal(t, 10, zcard(t, rc, kg.BacklogSet(initialBacklog.BacklogID)))
 	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(targetBacklog.BacklogID)))
@@ -566,11 +535,11 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 	require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), initialBacklog.BacklogID))
 
 	// Verify normalization
-	require.NoError(t, q.leaseBacklogForNormalization(ctx, &initialBacklog)) // lease it first
+	require.NoError(t, shard.LeaseBacklogForNormalization(ctx, &initialBacklog)) // lease it first
 
-	constraints := PartitionConstraintConfig{}
+	constraints := osqueue.PartitionConstraintConfig{}
 
-	require.NoError(t, q.normalizeBacklog(ctx, &initialBacklog, &shadowPartition, constraints))
+	require.NoError(t, q.NormalizeBacklog(ctx, &initialBacklog, &shadowPartition, constraints))
 
 	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(initialBacklog.BacklogID)))
 	require.Equal(t, 10, zcard(t, rc, kg.BacklogSet(targetBacklog.BacklogID)))
@@ -580,41 +549,81 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 	require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), initialBacklog.BacklogID))
 }
 
-func TestBacklogNormalizationScanner(t *testing.T) {
+func TestBacklogNormalizeItemWithSingleton(t *testing.T) {
 	r, rc := initRedis(t)
-	defer rc.Close()
+	defer r.Close()
 
 	clock := clockwork.NewFakeClock()
 
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
+	accountID, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+	hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+	unhashedValue := "customer1"
+	scope := enums.ConcurrencyScopeFn
+	entity := fnID
+	fullKey := util.ConcurrencyKey(scope, entity, unhashedValue)
+
+	customConc := []state.CustomConcurrency{
+		{
+			Key:                       fullKey,
+			Hash:                      hashedConcurrencyKeyExpr,
+			Limit:                     123,
+			UnhashedEvaluatedKeyValue: unhashedValue,
+		},
+	}
+
+	throttleKey := util.XXHash("customer1")
+	throttleKeyExpr := util.XXHash("event.data.customerId")
+
+	throttle := &osqueue.Throttle{
+		Key:                 throttleKey,
+		Limit:               100,
+		Burst:               10,
+		Period:              int(time.Hour.Seconds()),
+		UnhashedThrottleKey: unhashedValue,
+		KeyExpressionHash:   throttleKeyExpr,
+	}
+
+	latestConstraints := osqueue.PartitionConstraintConfig{}
+
+	q, shard := newQueue(
+		t, rc,
+		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
+		osqueue.WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *osqueue.QueueShadowPartition) ([]state.CustomConcurrency, error) {
+			return customConc, nil
 		}),
-		WithClock(clock),
+		osqueue.WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
+			return throttle, nil
+		}),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return latestConstraints
+		}),
+		osqueue.WithClock(clock),
 	)
+	kg := shard.Client().kg
 	ctx := context.Background()
 
-	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
-
 	require.Len(t, r.Keys(), 0)
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	item := osqueue.QueueItem{
 		FunctionID:  fnID,
 		WorkspaceID: wsID,
 		Data: osqueue.Item{
 			WorkspaceID: wsID,
-			Kind:        osqueue.KindEdge,
+			Kind:        osqueue.KindStart,
 			Identifier: state.Identifier{
 				WorkflowID:  fnID,
-				AccountID:   accountId,
+				AccountID:   accountID,
 				WorkspaceID: wsID,
+				RunID:       runID,
+			},
+			Singleton: &osqueue.Singleton{
+				Mode: enums.SingletonModeCancel,
+				Key:  "singleton-key",
 			},
 			QueueName:             nil,
 			Throttle:              nil,
@@ -623,50 +632,34 @@ func TestBacklogNormalizationScanner(t *testing.T) {
 		QueueName: nil,
 	}
 
-	t.Run("async normalization", func(t *testing.T) {
-		r.FlushAll()
+	sp := osqueue.ItemShadowPartition(ctx, item)
+	sourceBacklog := osqueue.ItemBacklog(ctx, item)
 
-		// Create backlog
-		for i := range 100 {
-			at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
-			_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-		}
+	qi, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
 
-		// Verify backlog is created as expected
-		backlog := q.ItemBacklog(ctx, item)
-		require.NotEmpty(t, backlog.BacklogID)
+	require.True(t, r.Exists(kg.BacklogSet(sourceBacklog.BacklogID)))
+	require.True(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), sourceBacklog.BacklogID))
+	require.True(t, hasMember(t, r, kg.BacklogSet(sourceBacklog.BacklogID), qi.ID))
 
-		shadowPartition := q.ItemShadowPartition(ctx, item)
-		require.NotEmpty(t, shadowPartition.PartitionID)
+	normalizedItem, err := q.NormalizeItem(ctx, &sp, latestConstraints, &sourceBacklog, qi)
+	require.NoError(t, err)
 
-		err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition)
-		require.NoError(t, err)
-		require.Equal(t, 100, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
-		require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
-		require.True(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
-		require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+	qi.Data.CustomConcurrencyKeys = customConc
+	qi.Data.Throttle = throttle
 
-		bc := make(chan normalizeWorkerChanMsg, 1)
+	require.Equal(t, qi, normalizedItem)
+	targetBacklog := osqueue.ItemBacklog(ctx, qi)
 
-		err = q.iterateNormalizationPartition(ctx, clock.Now().Add(time.Hour), bc)
-		require.NoError(t, err)
+	actualBacklog := osqueue.ItemBacklog(ctx, normalizedItem)
 
-		select {
-		case msg := <-bc:
-			require.Equal(t, backlog, *msg.b)
-		default:
-			require.Fail(t, "did not push backlog into channel")
-			return
-		}
+	require.Equal(t, targetBacklog, actualBacklog)
 
-		constraints := PartitionConstraintConfig{}
+	require.True(t, r.Exists(kg.BacklogSet(targetBacklog.BacklogID)))
+	require.True(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), targetBacklog.BacklogID))
+	require.True(t, hasMember(t, r, kg.BacklogSet(targetBacklog.BacklogID), qi.ID))
 
-		err = q.normalizeBacklog(ctx, &backlog, &shadowPartition, constraints)
-		require.NoError(t, err)
-		require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
-		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
-		require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
-		require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
-	})
+	require.False(t, r.Exists(kg.BacklogSet(sourceBacklog.BacklogID)))
+	require.False(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), sourceBacklog.BacklogID), "backlog %s is in shadow partition", sourceBacklog.BacklogID, r.Dump())
+	require.False(t, hasMember(t, r, kg.BacklogSet(sourceBacklog.BacklogID), qi.ID))
 }

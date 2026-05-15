@@ -78,7 +78,7 @@ func WithChannelSendTimeout(_ time.Duration) ChannelOption {
 	return func(c *chopt) {}
 }
 
-// Subscription received after a successful subscription to channel.
+// Subscription received after a successful subscription to a channel.
 type Subscription struct {
 	// Can be "subscribe", "unsubscribe", "psubscribe" or "punsubscribe".
 	Kind string
@@ -92,7 +92,7 @@ func (m *Subscription) String() string {
 	return fmt.Sprintf("%s: %s", m.Kind, m.Channel)
 }
 
-// Message received as result of a PUBLISH command issued by another client.
+// Message received as a result of a PUBLISH command issued by another client.
 type Message struct {
 	Channel      string
 	Pattern      string
@@ -114,8 +114,6 @@ func newPubSub(client rueidis.Client) *pubsub {
 }
 
 type pubsub struct {
-	mu sync.Mutex
-
 	rc      rueidis.Client
 	mc      rueidis.DedicatedClient
 	mcancel func()
@@ -126,6 +124,7 @@ type pubsub struct {
 
 	allCh chan any
 	msgCh chan *Message
+	mu    sync.Mutex
 }
 
 func (p *pubsub) mconn() rueidis.DedicatedClient {

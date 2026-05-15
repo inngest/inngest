@@ -41,11 +41,17 @@ type LifecycleListener interface {
 	)
 
 	// OnFunctionSkipped is called when a function run is skipped.
-	// Currently, this happens iff the function is paused.
+	// Currently, this happens if the function is paused, draining, or the backlog size limit was hit.
 	OnFunctionSkipped(
 		context.Context,
 		statev2.Metadata,
 		SkipState,
+	)
+
+	// OnFunctionBacklogSizeLimitReached is called when a function backlog size limit is hit
+	OnFunctionBacklogSizeLimitReached(
+		context.Context,
+		statev2.ID,
 	)
 
 	// OnFunctionStarted is called when the function starts.  This may be
@@ -224,6 +230,10 @@ func (NoopLifecyceListener) OnFunctionSkipped(
 	statev2.Metadata,
 	SkipState,
 ) {
+}
+
+// OnFunctionBacklogSizeLimitReached is called when a function backlog size limit is hit
+func (NoopLifecyceListener) OnFunctionBacklogSizeLimitReached(context.Context, statev2.ID) {
 }
 
 // OnFunctionStarted is called when the function starts.  This may be

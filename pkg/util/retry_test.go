@@ -60,4 +60,27 @@ func TestWithRetry(t *testing.T) {
 		require.ErrorIs(t, err, notCoveredErr)
 		require.Equal(t, 3, attempt)
 	})
+
+	t.Run("does not retry when max attempts is 1 and returns unwrapped error", func(t *testing.T) {
+		idemErr := errors.New("idempotent error")
+
+		_, err := WithRetry(
+			ctx,
+			"test",
+			func(ctx context.Context) (bool, error) {
+				return false, idemErr
+			},
+			NewRetryConf(
+				WithRetryConfRetryableErrors(func(err error) bool {
+					return false
+				}),
+				WithRetryConfMaxAttempts(1),
+			),
+		)
+
+		require.Error(t, err)
+
+		// It should be exactly equal
+		require.Equal(t, idemErr, err)
+	})
 }

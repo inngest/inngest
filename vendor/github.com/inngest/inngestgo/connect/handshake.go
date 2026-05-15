@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
+	"time"
+
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"runtime"
-	"time"
 )
 
 type reconnectError struct {
@@ -59,8 +60,9 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 	// Send connect message
 	{
 		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
-			ConnectionId: startResponse.ConnectionId,
-			InstanceId:   h.instanceId(),
+			ConnectionId:         startResponse.ConnectionId,
+			InstanceId:           h.instanceId(),
+			MaxWorkerConcurrency: h.maxWorkerConcurrency(),
 			AuthData: &connectproto.AuthData{
 				SessionToken: startResponse.GetSessionToken(),
 				SyncToken:    startResponse.GetSyncToken(),

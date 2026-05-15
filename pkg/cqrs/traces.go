@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -25,7 +26,6 @@ const (
 	SpanStatusError
 )
 
-// Raw otel span
 type RawOtelSpan struct {
 	Name         string         `json:"name"`
 	SpanID       string         `json:"span_id"`
@@ -53,7 +53,12 @@ type OtelSpan struct {
 	AppID      uuid.UUID `json:"app_id,omitempty,omitzero"`
 	FunctionID uuid.UUID `json:"function_id,omitempty,omitzero"`
 
+	DebugRunID     ulid.ULID `json:"debug_run_id,omitempty,omitzero"`
+	DebugSessionID ulid.ULID `json:"debug_session_id,omitempty,omitzero"`
+
 	Children []*OtelSpan `json:"children,omitempty,omitzero"`
+
+	Metadata []*SpanMetadata `json:"metadata,omitempty,omitzero"`
 }
 
 func (s *OtelSpan) GetAppID() uuid.UUID {
@@ -66,6 +71,20 @@ func (s *OtelSpan) GetFunctionID() uuid.UUID {
 
 func (s *OtelSpan) GetRunID() ulid.ULID {
 	return s.RunID
+}
+
+func (s *OtelSpan) GetDebugRunID() *ulid.ULID {
+	if s.DebugRunID.IsZero() {
+		return nil
+	}
+	return &s.DebugRunID
+}
+
+func (s *OtelSpan) GetDebugSessionID() *ulid.ULID {
+	if s.DebugSessionID.IsZero() {
+		return nil
+	}
+	return &s.DebugSessionID
 }
 
 func (s *OtelSpan) GetSpanID() string {
@@ -115,13 +134,13 @@ func (s *OtelSpan) GetIsRoot() bool {
 	return parentSpanID == nil || *parentSpanID == "" || *parentSpanID == "0000000000000000"
 }
 
-// Get the time that the span was "queued". This will always be present. If a
-// value cannot be found internally (i.e. we haven't explicitly set the moment
+// GetQueuedAtTime gets the time that the span was "queued". This will always be present.
+// If a value cannot be found internally (i.e. we haven't explicitly set the moment
 // this span was queued), then the time will match the span's start time in
 // order to show no queued time in the UI.
 func (s *OtelSpan) GetQueuedAtTime() time.Time {
-	if q := s.Attributes.QueuedAt; q != nil {
-		return *q
+	if s.Attributes != nil && s.Attributes.QueuedAt != nil {
+		return *s.Attributes.QueuedAt
 	}
 
 	// This should always be a value, so if we don't have one, just use when
@@ -129,16 +148,22 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 	return s.StartTime
 }
 
-// Get the time that the span started. Note that this is not necessarily when
-// the span created, as it may be dynamic.
+// GetStartedAtTime gets the time that the span started. Note that this is not necessarily
+// when the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {
-	return s.Attributes.StartedAt
+	if s.Attributes != nil && s.Attributes.StartedAt != nil {
+		return s.Attributes.StartedAt
+	}
+	return nil
 }
 
-// Get the time that the span ended. Note that this is not necessarily when the
-// span was persisted, as it may be dynamic.
+// GetEndedAtTime gets the time that the span ended. Note that this is not necessarily
+// when the span was persisted, as it may be dynamic.
 func (s *OtelSpan) GetEndedAtTime() *time.Time {
-	return s.Attributes.EndedAt
+	if s.Attributes != nil && s.Attributes.EndedAt != nil {
+		return s.Attributes.EndedAt
+	}
+	return nil
 }
 
 // Span represents an distributed span in a function execution flow
@@ -162,6 +187,8 @@ type Span struct {
 	Links              []SpanLink        `json:"links"`
 	RunID              *ulid.ULID        `json:"run_id"`
 
+	Metadata []SpanMetadata `json:"metadata"`
+
 	// Children is a virtual field used for reconstructing the trace tree.
 	// This field is not expected to be stored in the DB
 	Children []*Span `json:"spans"`
@@ -183,18 +210,21 @@ func (s *Span) UserlandChildren() []*Span {
 		return s.Children
 	}
 
-	// If we're not a userland span, but our first child is, return its
-	// children.
+	// If we're not a userland span, but our first child is the SDK's
+	// `"inngest.execution"` wrapper, return its children.
 	//
 	// We do this because userland spans are always underneath an
 	// `"inngest.execution"` span created by an SDK. So in this case, we're
-	// checking that we have `Executor span -> inngest.exection span ->
+	// checking that we have `Executor span -> inngest.execution span ->
 	// userland`.
 	//
 	// Critically, this means we're also completely ignoring the
 	// `"inngest.execution"` span itself, since we never want to display it to
 	// the user.
-	if len(s.Children) > 0 && s.Children[0].IsUserland() && len(s.Children[0].Children) > 0 {
+	//
+	// We only collapse the SDK execution wrapper; other userland spans
+	// with children (e.g., from checkpointed steps) must be preserved.
+	if len(s.Children) > 0 && s.Children[0].IsUserland() && s.Children[0].SpanName == meta.SDKExecutionSpanName {
 		return s.Children[0].Children
 	}
 
@@ -313,6 +343,13 @@ type SpanLink struct {
 	Attributes map[string]string `json:"attr"`
 }
 
+type SpanMetadata struct {
+	Scope     metadata.Scope  `json:"scope"`
+	Kind      metadata.Kind   `json:"kind"`
+	Values    metadata.Values `json:"values"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
 // TraceRun represents a function run backed by a trace
 type TraceRun struct {
 	AccountID    uuid.UUID       `json:"account_id"`
@@ -383,7 +420,16 @@ type TraceReader interface {
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
 	// GetSpansByRunID retrieves all spans related to the specified run
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
+	// GetSpansByDebugRunID retrieves all spans related to the specified debug run
+	GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*OtelSpan, error)
+	// GetSpansByDebugSessionID retrieves all spans related to the specified debug session
+	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
+	GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
@@ -402,6 +448,8 @@ type GetTraceRunOpt struct {
 	Order  []GetTraceRunOrder
 	Cursor string
 	Items  uint
+	// Whether the run list should use the tracing preview stores
+	Preview bool
 }
 
 type FindOrCreateTraceRunOpt struct {
@@ -413,6 +461,25 @@ type FindOrCreateTraceRunOpt struct {
 	AppID       uuid.UUID
 	FunctionID  uuid.UUID
 	TraceID     string
+}
+
+type getRunContextKey struct{}
+
+type GetRunOpt struct {
+	IncludeOutput bool
+}
+
+func WithGetRunOpt(ctx context.Context, opt GetRunOpt) context.Context {
+	return context.WithValue(ctx, getRunContextKey{}, opt)
+}
+
+func GetRunOptFromContext(ctx context.Context) GetRunOpt {
+	opt, ok := ctx.Value(getRunContextKey{}).(GetRunOpt)
+	if !ok {
+		return GetRunOpt{}
+	}
+
+	return opt
 }
 
 type GetTraceRunFilter struct {
@@ -451,6 +518,10 @@ type SpanIdentifier struct {
 
 	// Whether the output should direct to the tracing preview stores
 	Preview *bool `json:"preview,omitempty,omitzero"`
+
+	// InputSpanID is the span ID of the span that produced the input for the
+	// span.
+	InputSpanID *string `json:"in_sid,omitempty,omitzero"`
 }
 
 func (si *SpanIdentifier) Encode() (string, error) {

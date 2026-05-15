@@ -30,7 +30,11 @@ export function useGetTrigger(): (runID: string) => Promise<Trigger> {
       let res;
       try {
         res = await client
-          .query(query, { envID: envID, runID }, { requestPolicy: 'network-only' })
+          .query(
+            query,
+            { envID: envID, runID },
+            { requestPolicy: 'network-only' },
+          )
           .toPromise();
       } catch (e) {
         if (e instanceof Error) {
@@ -46,6 +50,6 @@ export function useGetTrigger(): (runID: string) => Promise<Trigger> {
       }
       return res.data.workspace.runTrigger;
     },
-    [client, envID]
+    [client, envID],
   );
 }

@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngestgo/internal/logger"
 )
 
 var (
@@ -33,7 +33,7 @@ func Sign(ctx context.Context, at time.Time, key, body []byte) (string, error) {
 	if len(body) > 0 {
 		body, err = jcs.Transform(body)
 		if err != nil {
-			slog.Default().Warn("failed to canonicalize body", "error", err)
+			logger.Default().Warn("failed to canonicalize body", "error", err)
 		}
 	}
 

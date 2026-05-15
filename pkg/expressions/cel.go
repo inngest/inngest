@@ -3,7 +3,6 @@ package expressions
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -16,20 +15,39 @@ import (
 // the earliest time >= now().
 type celProgram struct {
 	cel.Program
-	*timeRefs
 }
 
-// EarliestTimeReference returns the earliest time referenced in the
-// expression that is >= now().
-func (c celProgram) EarliestTimeReference() *time.Time {
-	if c.timeRefs == nil {
-		return nil
+// buildProgram creates a reusable cel.Program from the AST.  It is data-independent:
+// when evalUnknowns is true the unknownDecorator is attached (as a stateless wrapper),
+// making the program safe to cache for the lifetime of the expression.
+//
+// evalUnknowns controls whether unknowns are treated as nulls (true, event matching)
+// or left in the eval state (false, residual/interpolation via ResidualAst).
+func buildProgram(ast *cel.Ast, env *cel.Env, evalUnknowns bool) (*celProgram, error) {
+	var opts []cel.ProgramOption
+	if evalUnknowns {
+		// Event-matching path: OptTrackState/OptExhaustiveEval only needed for ResidualAst.
+		opts = []cel.ProgramOption{
+			cel.EvalOptions(cel.OptPartialEval),
+			cel.CustomDecorator(unknownDecorator()),
+		}
+	} else {
+		// Residual/interpolation path: OptTrackState for ResidualAst, OptExhaustiveEval so
+		// unknowns in both branches of &&/|| are recorded.
+		opts = []cel.ProgramOption{
+			cel.EvalOptions(cel.OptExhaustiveEval, cel.OptTrackState, cel.OptPartialEval),
+		}
 	}
-	return c.timeRefs.Next()
+	prog, err := env.Program(ast, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &celProgram{Program: prog}, nil
 }
 
-// program takes a compiled AST, a cel.Env, and the data that's used in the expression and
-// returns a program and partial that's used as input to evaluate the expression.
+// program builds a one-shot program+activation pair.  Used by the residual/interpolation
+// path (evalUnknowns=false) where the program is not cached and unknowns must survive into
+// the eval state so that ResidualAst can reduce the expression.
 func program(
 	ctx context.Context,
 	ast *cel.Ast,
@@ -40,7 +58,7 @@ func program(
 	// trying to evaluate unknowns: we're trying to leave them in so that we can compute
 	// the interpolated expression.
 	//
-	// However, when we're ACTAULLY matching events, we want to evaluate any unknows as if
+	// However, when we're ACTUALLY matching events, we want to evaluate any unknowns as if
 	// the value was `null`.  Setting this to true forces the evaluation of unknown vars in
 	// the program.
 	evalUnknowns bool,
@@ -59,44 +77,29 @@ func program(
 		return nil, nil, err
 	}
 
-	// We want to perform an exhaustive search and track the state of the search
-	// to see if dates are compared, then return the minimum date compared.
-	tr, td := timeDecorator(act)
-
-	opts := []cel.ProgramOption{
-		cel.EvalOptions(cel.OptExhaustiveEval, cel.OptTrackState, cel.OptPartialEval), // Exhaustive, always, right now.
-		cel.CustomDecorator(td),
+	prog, err := buildProgram(ast, env, evalUnknowns)
+	if err != nil {
+		return nil, nil, err
 	}
-
-	if evalUnknowns {
-		opts = append(opts, cel.CustomDecorator(unknownDecorator(act)))
-	}
-
-	// Create the program, refusing to short circuit if a match is found.
-	//
-	// This will add all functions from functions.StandardOverloads as we
-	// created the environment with our custom library.
-	prog, err := env.Program(ast, opts...)
-
-	return &celProgram{Program: prog, timeRefs: tr}, act, err
+	return prog, act, nil
 }
 
-func eval(program *celProgram, activation interpreter.PartialActivation) (interface{}, *time.Time, error) {
+func eval(program *celProgram, activation interpreter.PartialActivation) (interface{}, error) {
 	result, _, err := program.Eval(activation)
 	if result == nil {
-		return false, nil, ErrNoResult
+		return false, ErrNoResult
 	}
 	if types.IsUnknown(result) {
 		// When evaluating to a strict result this should never happen.  We inject a decorator
 		// to handle unknowns as values similar to null, and should always get a value.
-		return false, nil, nil
+		return false, nil
 	}
 	if types.IsError(result) {
-		return false, nil, errors.Wrapf(ErrInvalidResult, "invalid type comparison: %s", err.Error())
+		return false, errors.Wrapf(ErrInvalidResult, "invalid type comparison: %s", err.Error())
 	}
 	if err != nil {
 		// This shouldn't be handled, as we should get an Error type in result above.
-		return false, nil, fmt.Errorf("error evaluating expression: %w", err)
+		return false, fmt.Errorf("error evaluating expression: %w", err)
 	}
-	return result.Value(), program.EarliestTimeReference(), nil
+	return result.Value(), nil
 }

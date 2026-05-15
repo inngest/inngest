@@ -28,9 +28,14 @@ type BaseTableProps<T> = {
   isLoading?: boolean;
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
+  onCellClick?: (rowIndex: number, columnId: string, value: unknown) => void;
   getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
   cellClassName?: string;
+  enableColumnSizing?: boolean;
+  enableColumnDynamicSizing?: boolean;
+  selectedCell?: { rowIndex: number; columnId: string } | null;
+  noHeader?: boolean;
 };
 
 type TableProps<T> = BaseTableProps<T> &
@@ -45,11 +50,16 @@ export function Table<T>({
   setSorting,
   renderSubComponent,
   onRowClick,
+  onCellClick,
   getRowHref,
   blankState,
   columns,
   expandedIDs = [],
   cellClassName,
+  selectedCell,
+  enableColumnSizing = false,
+  enableColumnDynamicSizing = false,
+  noHeader = false,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -77,7 +87,7 @@ export function Table<T>({
             cell: () => <Skeleton className="my-2 block h-3" />,
           }))
         : columns,
-    [isLoading]
+    [isLoading, columns]
   );
 
   const table = useReactTable({
@@ -91,7 +101,7 @@ export function Table<T>({
     },
   });
 
-  const tableStyles = 'w-full';
+  const tableStyles = enableColumnSizing ? 'table-fixed' : 'w-full';
   const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
   const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
@@ -107,43 +117,66 @@ export function Table<T>({
   return (
     <div className="">
       <table className={cn(tableStyles)}>
-        <thead className={tableHeadStyles}>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="h-9">
-              {headerGroup.headers.map((header) => {
-                const isIconOnlyColumn = header.column.columnDef.header === undefined;
-                return (
-                  <th
-                    key={header.id}
-                    className={cn(
-                      isIconOnlyColumn ? '' : tableColumnStyles,
-                      'text-muted text-nowrap text-left text-xs font-medium'
-                    )}
-                  >
-                    {header.isPlaceholder ? null : (
-                      <div
-                        className={cn(
-                          header.column.getCanSort()
-                            ? 'flex cursor-pointer select-none items-center gap-1'
-                            : header.column.getIsSorted()
-                            ? 'flex items-center gap-1'
-                            : ''
-                        )}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {{
-                          asc: <RiSortAsc className="text-light h-4 w-4" />,
-                          desc: <RiSortDesc className="text-light h-4 w-4" />,
-                        }[header.column.getIsSorted() as string] ?? null}
-                      </div>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          ))}
-        </thead>
+        {!noHeader && (
+          <thead className={tableHeadStyles}>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id} className="h-9">
+                {headerGroup.headers.map((header) => {
+                  const isIconOnlyColumn = header.column.columnDef.header === undefined;
+                  return (
+                    <th
+                      key={header.id}
+                      className={cn(
+                        isIconOnlyColumn ? '' : tableColumnStyles,
+                        'text-muted text-nowrap text-left text-xs font-medium',
+                        enableColumnSizing ? 'overflow-hidden text-ellipsis' : ''
+                      )}
+                      style={
+                        enableColumnSizing
+                          ? {
+                              width: header.getSize(),
+                              minWidth: header.getSize(),
+                              maxWidth: header.getSize(),
+                            }
+                          : enableColumnDynamicSizing
+                          ? {
+                              minWidth: header.column.columnDef.minSize,
+                              maxWidth:
+                                table.getTotalSize() -
+                                header.column.getStart() -
+                                header.column.getAfter(),
+                            }
+                          : undefined
+                      }
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div
+                          className={cn(
+                            header.column.getCanSort()
+                              ? 'flex cursor-pointer select-none items-center gap-1'
+                              : header.column.getIsSorted()
+                              ? 'flex items-center gap-1'
+                              : '',
+                            enableColumnSizing ? 'min-w-0 overflow-hidden text-ellipsis' : ''
+                          )}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          <span className={enableColumnSizing ? 'min-w-0 truncate' : ''}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
+                          {{
+                            asc: <RiSortAsc className="text-light h-4 w-4 shrink-0" />,
+                            desc: <RiSortDesc className="text-light h-4 w-4 shrink-0" />,
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+        )}
         <tbody>
           {isEmpty && (
             <tr>
@@ -187,13 +220,48 @@ export function Table<T>({
                     return (
                       <td
                         key={cell.id}
+                        data-selected={
+                          selectedCell &&
+                          row.index === selectedCell.rowIndex &&
+                          cell.column.id === selectedCell.columnId
+                            ? 'true'
+                            : undefined
+                        }
                         className={cn(
                           i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
                             ? expandedRowSideBorder
                             : '',
                           isIconOnlyColumn ? '' : tableColumnStyles,
-                          cellClassName ?? ''
+                          cellClassName ?? '',
+                          onCellClick && !onRowClick ? 'cursor-pointer' : '',
+                          selectedCell &&
+                            row.index === selectedCell.rowIndex &&
+                            cell.column.id === selectedCell.columnId
+                            ? 'ring-2 ring-inset ring-[rgb(var(--color-border-active))]'
+                            : ''
                         )}
+                        style={
+                          enableColumnSizing
+                            ? {
+                                width: cell.column.getSize(),
+                                minWidth: cell.column.getSize(),
+                                maxWidth: cell.column.getSize(),
+                              }
+                            : enableColumnDynamicSizing
+                            ? {
+                                minWidth: cell.column.columnDef.minSize,
+                                maxWidth:
+                                  table.getTotalSize() -
+                                  cell.column.getStart() -
+                                  cell.column.getAfter(),
+                              }
+                            : undefined
+                        }
+                        onClick={
+                          onCellClick && !onRowClick
+                            ? () => onCellClick(row.index, cell.column.id, cell.getValue())
+                            : undefined
+                        }
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
@@ -204,22 +272,14 @@ export function Table<T>({
                   expandedIDs.includes(row.original.id) &&
                   renderSubComponent &&
                   !isLoading && (
-                    <>
-                      <tr>
-                        <td
-                          colSpan={row.getVisibleCells().length}
-                          className={expandedRowSideBorder}
-                        >
-                          {renderSubComponent({ row })}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td
-                          colSpan={row.getVisibleCells().length}
-                          className="border-light border-b pb-6"
-                        ></td>
-                      </tr>
-                    </>
+                    <tr>
+                      <td
+                        colSpan={row.getVisibleCells().length}
+                        className={cn(expandedRowSideBorder, 'border-light border-b')}
+                      >
+                        {renderSubComponent({ row })}
+                      </td>
+                    </tr>
                   )}
               </Fragment>
             ))}

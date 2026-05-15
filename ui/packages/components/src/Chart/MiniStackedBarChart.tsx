@@ -1,5 +1,3 @@
-'use client';
-
 import { cn } from '@inngest/components/utils/classNames';
 import { Bar, BarChart, ResponsiveContainer } from 'recharts';
 

@@ -8,16 +8,24 @@ export default function CommonVercelErrors() {
         {' '}
         Why might the syncs fail, and how can I resolve it?
       </p>
-      <AccordionList type="multiple" defaultValue={[]} className="rounded-t-none">
-        <AccordionList.Item value="protection-key" className="first:rounded-t-none">
+      <AccordionList
+        type="multiple"
+        defaultValue={[]}
+        className="rounded-t-none"
+      >
+        <AccordionList.Item
+          value="protection-key"
+          className="first:rounded-t-none"
+        >
           <AccordionList.Trigger className="text-subtle text-sm">
             Deployment protection key is enabled
           </AccordionList.Trigger>
 
           <AccordionList.Content className="text-subtle">
             <p>
-              Inngest may not be able to communicate with your application by default. The sync can
-              fail if the deployment protection key isn&apos;t bypassed.{' '}
+              Inngest may not be able to communicate with your application by
+              default. The sync can fail if the deployment protection key
+              isn&apos;t bypassed.{' '}
               <Link
                 className="inline"
                 size="small"
@@ -36,9 +44,10 @@ export default function CommonVercelErrors() {
 
           <AccordionList.Content className="text-subtle">
             <p>
-              Only Vercel production deploys will show up in your Inngest production environment. If
-              your Inngest app is only set up on a Vercel preview, it will appear as an Inngest
-              branch preview. You can open a branch environment using the environment dropdown at
+              Only Vercel production deploys will show up in your Inngest
+              production environment. If your Inngest app is only set up on a
+              Vercel preview, it will appear as an Inngest branch preview. You
+              can open a branch environment using the environment dropdown at
               the top left of the dashboard.
             </p>
           </AccordionList.Content>

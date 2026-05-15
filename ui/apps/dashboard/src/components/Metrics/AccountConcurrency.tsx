@@ -1,25 +1,29 @@
 import { Button } from '@inngest/components/Button';
 import { Chart, type LineSeriesOption } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
 
-import type { MetricsResponse } from '@/gql/graphql';
+import type { VolumeMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import tailwindConfig from '../../../tailwind.config';
-import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
+import { borderColor } from '@/utils/tailwind';
+import { getLineChartOptions, lineColors, seriesOptions } from './utils';
 
 type Props = {
-  data: MetricsResponse | undefined;
+  accountConcurrency: VolumeMetricsQuery['accountConcurrency'] | undefined;
   limit?: number;
+  isMarketplace: boolean;
 };
 
-export function AccountConcurrency({ data, limit }: Props) {
+export function AccountConcurrency({
+  accountConcurrency,
+  limit,
+  isMarketplace = false,
+}: Props) {
   let option = {};
-  if (data) {
-    option = createChartOption({ limit, resp: data });
+  if (accountConcurrency) {
+    option = createChartOption({ limit, accountConcurrency });
   }
 
   return (
@@ -30,7 +34,6 @@ export function AccountConcurrency({ data, limit }: Props) {
           <Info
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/guides/concurrency#concurrency-use-cases"
               >
@@ -40,39 +43,47 @@ export function AccountConcurrency({ data, limit }: Props) {
             text="The number of concurrently running steps across all environments"
           />
         </div>
-        <Button
-          appearance="outlined"
-          href={pathCreator.billing({ highlight: 'concurrency', ref: 'app-concurrency-chart' })}
-          kind="secondary"
-          label="Increase Concurrency"
-        />
+        {!isMarketplace && (
+          <Button
+            appearance="outlined"
+            href={pathCreator.billing({
+              highlight: 'concurrency',
+              ref: 'app-concurrency-chart',
+            })}
+            kind="secondary"
+            label="Increase Concurrency"
+          />
+        )}
       </div>
       <div className="flex h-full flex-row items-center">
-        <Chart className="h-full w-full" group="metricsDashboard" option={option} />
+        <Chart
+          className="h-full w-full"
+          group="metricsDashboard"
+          option={option}
+        />
       </div>
     </div>
   );
 }
-const {
-  theme: { borderColor },
-} = resolveConfig(tailwindConfig);
 
 function createChartOption({
   limit,
-  resp,
+  accountConcurrency,
 }: {
   limit: number | undefined;
-  resp: MetricsResponse;
+  accountConcurrency: VolumeMetricsQuery['accountConcurrency'];
 }): React.ComponentProps<typeof Chart>['option'] {
   const dark = isDark();
 
-  let series: LineSeriesOption[] = [
+  const series: LineSeriesOption[] = [
     {
       ...seriesOptions,
-      data: resp.data.map(({ value }) => value),
+      name: 'Account Concurrency',
+      data: accountConcurrency.data.map(({ value }) => value),
       itemStyle: {
-        color: resolveColor(lineColors[1]?.[0]!, dark, lineColors[1]?.[1]),
+        color: resolveColor(lineColors[0][0], dark, lineColors[0]?.[1]),
       },
+      areaStyle: { opacity: 0.3 },
     },
   ];
 
@@ -94,7 +105,7 @@ function createChartOption({
         },
         lineStyle: {
           type: 'solid' as any,
-          color: resolveColor(lineColors[3]?.[0]!, dark, lineColors[3]?.[1]),
+          color: resolveColor(lineColors[3][0], dark, lineColors[3][1]),
         },
         symbol: 'none',
         tooltip: {
@@ -104,19 +115,28 @@ function createChartOption({
     });
   }
 
-  return getLineChartOptions({
-    series,
-    xAxis: getXAxis(resp),
-    yAxis: {
-      max: ({ max }: { max: number }) => {
-        if (limit && max < limit) {
-          return Math.round(limit * 1.1);
-        }
-        return max;
+  const xAxisData = accountConcurrency.data.map(({ bucket }) => bucket);
+
+  return getLineChartOptions(
+    {
+      series,
+      xAxis: {
+        data: xAxisData,
       },
-      splitLine: {
-        lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
+      yAxis: {
+        max: ({ max }: { max: number }) => {
+          if (limit && max < limit) {
+            return Math.round(limit * 1.1);
+          }
+          return max;
+        },
+        splitLine: {
+          lineStyle: {
+            color: resolveColor(borderColor.subtle, dark, '#E2E2E2'),
+          },
+        },
       },
     },
-  });
+    [{ name: 'Account Concurrency' }],
+  );
 }

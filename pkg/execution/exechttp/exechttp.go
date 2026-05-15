@@ -2,7 +2,10 @@
 package exechttp
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -13,10 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
 const (
@@ -28,7 +33,7 @@ const (
 
 var (
 	ErrUnableToReach       = fmt.Errorf("Unable to reach SDK URL")
-	ErrDenied              = fmt.Errorf("Your server blocked the connection") // "connection timed out"
+	ErrDenied              = fmt.Errorf("Your server connection experienced a timeout or was blocked") // "connection timed out"
 	ErrServerClosed        = fmt.Errorf("Your server closed the request before finishing.")
 	ErrConnectionReset     = fmt.Errorf("Your server reset the connection while we were sending the request.")
 	ErrUnexpectedEnd       = fmt.Errorf("Your server reset the connection while we were reading the reply: Unexpected ending response")
@@ -128,10 +133,26 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 		return nil, fmt.Errorf("nil response received from URL: %s", r.URL)
 	}
 
+	body, bodyEncoding, bodyCloser, err := decodeResponseBody(resp)
+	if err != nil {
+		return nil, err
+	}
+	if bodyEncoding != "" {
+		// Clear the Content-Encoding header after decompression so that
+		// downstream consumers (e.g. HandleHttpResponse) know the body is
+		// already decoded and don't attempt to decompress again.
+		resp.Header.Del("Content-Encoding")
+	}
+	if bodyCloser != nil {
+		defer func() {
+			_ = bodyCloser.Close()
+		}()
+	}
+
 	// We're going to reassign this to use a LimitReader, ensuring we don't read an infinite amount
 	// of data from the request.  We need to do this so that we can continue to close resp.Body to
 	// release the underlying conn in the above dever.
-	body := io.LimitReader(resp.Body, consts.MaxSDKResponseBodySize+1)
+	body = io.LimitReader(body, consts.MaxSDKResponseBodySize+1)
 
 	if e.publish && r.Publish.ShouldPublish() {
 		rdr, err := realtime.TeeStreamReaderToAPI(body, r.Publish.PublishURL, realtime.TeeStreamOptions{
@@ -144,7 +165,13 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 				"request_id":   r.Publish.RequestID,
 			},
 		})
-		if err == nil {
+
+		// Always use rdr if non-nil, even on error. TeeStreamReaderToAPI
+		// consumes the original body via io.TeeReader while posting to the
+		// publish endpoint. If publishing fails (e.g. a 401), the returned
+		// reader still holds the data that was read. Discarding it would leave
+		// the original reader exhausted and cause an empty body.
+		if rdr != nil {
 			body = rdr
 		}
 		if err != nil {
@@ -162,6 +189,9 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	// Read 1 extra byte above the max so that we can check if the response is too large
 	byt, err := io.ReadAll(body)
 	if err != nil {
+		if bodyEncoding != "" {
+			return nil, fmt.Errorf("error decoding %s response body: %w", bodyEncoding, err)
+		}
 		return nil, ErrUnexpectedEnd
 	}
 
@@ -185,6 +215,77 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	return out, err
 }
 
+// normalizeEncoding validates and normalizes a Content-Encoding header value.
+// Returns the lowercase encoding name, or an error for unsupported/multi-valued encodings.
+// An empty input returns "" with no error.
+func normalizeEncoding(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	normalized := strings.ToLower(trimmed)
+	if strings.Contains(normalized, ",") {
+		return "", fmt.Errorf("unsupported content encoding: %q", raw)
+	}
+
+	switch normalized {
+	case "gzip", "br":
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("unsupported content encoding: %q", raw)
+	}
+}
+
+// DecompressBody decompresses body bytes based on a Content-Encoding value.
+// Returns the bytes unchanged if contentEncoding is empty.
+func DecompressBody(data []byte, contentEncoding string) ([]byte, error) {
+	enc, err := normalizeEncoding(contentEncoding)
+	if err != nil {
+		return nil, err
+	}
+	if enc == "" {
+		return data, nil
+	}
+
+	switch enc {
+	case "gzip":
+		reader, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("error creating gzip decoder: %w", err)
+		}
+		defer reader.Close()
+		return io.ReadAll(reader)
+	case "br":
+		return io.ReadAll(brotli.NewReader(bytes.NewReader(data)))
+	default:
+		return nil, fmt.Errorf("unsupported content encoding: %q", contentEncoding)
+	}
+}
+
+func decodeResponseBody(resp *http.Response) (io.Reader, string, io.Closer, error) {
+	enc, err := normalizeEncoding(resp.Header.Get("Content-Encoding"))
+	if err != nil {
+		return nil, "", nil, err
+	}
+	if enc == "" {
+		return resp.Body, "", nil, nil
+	}
+
+	switch enc {
+	case "gzip":
+		reader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("error creating gzip decoder: %w", err)
+		}
+		return reader, enc, reader, nil
+	case "br":
+		return brotli.NewReader(resp.Body), enc, nil, nil
+	default:
+		return nil, "", nil, fmt.Errorf("unsupported content encoding: %q", enc)
+	}
+}
+
 type Response struct {
 	Body       []byte
 	Header     http.Header
@@ -206,14 +307,41 @@ func Transport(opts SecureDialerOpts) *http.Transport {
 		IdleConnTimeout:       2 * time.Second,
 		TLSHandshakeTimeout:   15 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		DisableKeepAlives:     true,
+		DisableKeepAlives:     true, // one conn per request, only, ever.
 		// New, ensuring that services can take their time before
 		// responding with headers as they process long running
 		// jobs.
 		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
+		TLSClientConfig: &tls.Config{
+			ClientSessionCache: &instrumentedSessionCache{
+				cache: tls.NewLRUClientSessionCache(8_192),
+			},
+		},
 	}
 
 	return t
+}
+
+// instrumentedSessionCache wraps a tls.ClientSessionCache to record hit/miss metrics.
+type instrumentedSessionCache struct {
+	cache tls.ClientSessionCache
+}
+
+func (c *instrumentedSessionCache) Get(sessionKey string) (*tls.ClientSessionState, bool) {
+	cs, ok := c.cache.Get(sessionKey)
+	status := "miss"
+	if ok {
+		status = "hit"
+	}
+	go metrics.IncrTLSSessionCacheLookup(context.Background(), metrics.CounterOpt{
+		PkgName: "exechttp",
+		Tags:    map[string]any{"status": status},
+	})
+	return cs, ok
+}
+
+func (c *instrumentedSessionCache) Put(sessionKey string, cs *tls.ClientSessionState) {
+	c.cache.Put(sessionKey, cs)
 }
 
 // CheckRedirect is an http client utility to follow redirects in outgoing requests.

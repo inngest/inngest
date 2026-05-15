@@ -1,13 +1,11 @@
-'use client';
-
-import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
-import dynamic from 'next/dynamic';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
@@ -19,42 +17,35 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
-import { useLocalStorage } from 'react-use';
+import useLocalStorage from 'react-use/lib/useLocalStorage';
 
+import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
+import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
   useSearchParam,
   useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
-} from '../hooks/useSearchParam';
+} from '../hooks/useSearchParams';
 import type { Features } from '../types/features';
 import RunsStatusFilter from './RunsStatusFilter';
+import RunsTable from './RunsTable';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
-
-// Disable SSR in Runs Table, to prevent hydration errors. It requires windows info on visibility columns
-const RunsTable = dynamic(() => import('@inngest/components/RunsPage/RunsTable'), {
-  ssr: false,
-});
-
-const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
-  ssr: false,
-});
 
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
-  onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pollInterval?: number;
   apps?: Option[];
@@ -63,6 +54,14 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   searchError?: Error;
+  error?: Error | null;
+  infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
+  // When set, the CEL search button is hidden once `totalCount` reaches this
+  // threshold (unless the user already has an active query, so they're not
+  // stranded without a "Hide search" toggle). Used by self-hosted deployments
+  // where CEL search against large result sets is prohibitively slow. Leave
+  // undefined to always show the button (cloud default).
+  searchLimit?: number;
 };
 
 export function RunsPage({
@@ -74,7 +73,6 @@ export function RunsPage({
   isLoadingInitial,
   isLoadingMore,
   onRefresh,
-  onScroll,
   onScrollToTop,
   apps,
   functions,
@@ -83,6 +81,9 @@ export function RunsPage({
   scope,
   totalCount,
   searchError,
+  error,
+  infiniteScrollTrigger,
+  searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -229,18 +230,28 @@ export function RunsPage({
     (rowData: Run) => {
       return (
         <div className={`border-subtle `}>
-          <RunDetailsV3
-            initialRunData={rowData}
-            getTrigger={getTrigger}
-            pollInterval={pollInterval}
-            runID={rowData.id}
-            standalone={false}
-            tracesPreviewEnabled={features.tracesPreview ?? false}
-          />
+          {features.runDetailsV4 ? (
+            <RunDetailsV4
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pollInterval={pollInterval}
+              runID={rowData.id}
+              standalone={false}
+            />
+          ) : (
+            <RunDetailsV3
+              initialRunData={rowData}
+              getTrigger={getTrigger}
+              pollInterval={pollInterval}
+              runID={rowData.id}
+              standalone={false}
+              newStack={true}
+            />
+          )}
         </div>
       );
     },
-    [getTrigger, pollInterval, features.tracesPreview]
+    [getTrigger, pollInterval, features.tracesPreview, features.runDetailsV4]
   );
 
   const options = useMemo(() => {
@@ -264,25 +275,40 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+    <main className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
         <div className="flex h-11 items-center justify-between gap-1.5 px-3">
           <div className="flex items-center gap-1.5">
-            <Button
-              icon={<RiSearchLine />}
-              size="small"
-              kind="secondary"
-              iconSide="left"
-              appearance="outlined"
-              label={showSearch ? 'Hide search' : 'Show search'}
-              onClick={() => setShowSearch((prev) => !prev)}
-              className={cn(
-                search
-                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                  : '',
-                'h-[26px] w-[103px] rounded'
-              )}
-            />
+            {/* CEL search scans the returned run set and gets prohibitively slow on large pages.
+                Callers can pass `searchLimit` to disable the button above that count. An active
+                query keeps the button enabled so users are never stranded without a "Hide search"
+                toggle. */}
+            <OptionalTooltip
+              tooltip={
+                !!searchLimit && totalCount !== undefined && totalCount >= searchLimit && !search
+                  ? `Search is limited to ${searchLimit} results`
+                  : undefined
+              }
+            >
+              <Button
+                icon={<RiSearchLine />}
+                size="small"
+                kind="secondary"
+                iconSide="left"
+                appearance="outlined"
+                disabled={
+                  !!searchLimit && totalCount !== undefined && totalCount >= searchLimit && !search
+                }
+                label={showSearch ? 'Hide search' : 'Show search'}
+                onClick={() => setShowSearch((prev) => !prev)}
+                className={cn(
+                  search
+                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                    : '',
+                  'h-[26px] w-[103px] rounded'
+                )}
+              />
+            </OptionalTooltip>
             <SelectGroup>
               <TimeFieldFilter
                 selectedTimeField={timeField}
@@ -371,19 +397,18 @@ export function RunsPage({
         )}
       </div>
 
-      <div
-        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
-        onScroll={onScroll}
-        ref={containerRef}
-      >
+      <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
+          error={error}
+          onRefresh={onRefresh}
           renderSubComponent={renderSubComponent}
           getRowCanExpand={() => true}
           visibleColumns={columnVisibility}
           scope={scope}
         />
+        {infiniteScrollTrigger?.(containerRef.current)}
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
@@ -395,7 +420,7 @@ export function RunsPage({
             />
           </div>
         )}
-        {onRefresh && (
+        {onRefresh && !error && (
           <div className="flex flex-col items-center pt-2">
             <Button
               kind="secondary"

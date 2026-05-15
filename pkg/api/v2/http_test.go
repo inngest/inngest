@@ -10,8 +10,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// Helper function for tests
+func newTestHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HTTPHandlerOptions) (http.Handler, error) {
+	base := apiv2base.NewBase()
+	return NewHTTPHandler(ctx, serviceOpts, httpOpts, base)
+}
 
 type healthResponse struct {
 	Data     healthData       `json:"data"`
@@ -27,10 +40,19 @@ type responseMetadata struct {
 	CachedUntil *string `json:"cachedUntil"`
 }
 
+type errorResponse struct {
+	Errors []errorItem `json:"errors"`
+}
+
+type errorItem struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 func TestHTTPGateway_Health(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("GET /api/v2/health returns success", func(t *testing.T) {
@@ -75,6 +97,59 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+
+	fn := inngest.DeployedFunction{
+		ID:      functionID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+		},
+	}
+	functionRun := &cqrs.FunctionRun{
+		RunID:        runID,
+		RunStartedAt: startedAt,
+		FunctionID:   functionID,
+		EventID:      runID,
+		Status:       enums.RunStatusCompleted,
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+	runs := &mockFunctionRunReader{}
+	runs.On("GetFunctionRun", mock.Anything, runID).Return(functionRun, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{
+		Functions:    functions,
+		FunctionRuns: runs,
+	}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+		runs.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/runs/"+runID.String(), nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	run := body["data"].(map[string]any)
+	require.Equal(t, "COMPLETED", run["status"])
+}
+
 func TestHTTPGateway_Middleware(t *testing.T) {
 	ctx := context.Background()
 
@@ -91,7 +166,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
@@ -114,7 +189,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
@@ -139,7 +214,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthzMiddleware: authzMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		// Test protected endpoint (CreatePartnerAccount)
@@ -166,7 +241,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthzMiddleware: authzMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		// Test health endpoint (should not trigger authz middleware)
@@ -203,7 +278,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 			AuthnMiddleware: authnMiddleware,
 			AuthzMiddleware: authzMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		// Test protected endpoint (CreatePartnerAccount) - should hit both middlewares
@@ -222,7 +297,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 func TestHTTPGateway_Routing(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("routes without /api/v2 prefix return 404", func(t *testing.T) {
@@ -263,7 +338,7 @@ func TestHTTPGateway_Routing(t *testing.T) {
 func TestHTTPGateway_ContentTypes(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("accepts application/json content type for valid methods", func(t *testing.T) {
@@ -303,7 +378,7 @@ func TestHTTPGateway_ErrorHandling(t *testing.T) {
 		cancel()
 
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(cancelledCtx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(cancelledCtx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -313,7 +388,7 @@ func TestHTTPGateway_ErrorHandling(t *testing.T) {
 func TestHTTPGateway_ResponseFormat(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("response format matches expected schema", func(t *testing.T) {
@@ -362,7 +437,7 @@ func TestHTTPGateway_ResponseFormat(t *testing.T) {
 func TestHTTPGateway_ConcurrentRequests(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("handles concurrent requests", func(t *testing.T) {
@@ -390,10 +465,81 @@ func TestHTTPGateway_ConcurrentRequests(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_InvokeFunction(t *testing.T) {
+	ctx := context.Background()
+	opts := HTTPHandlerOptions{}
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
+	require.NoError(t, err)
+
+	t.Run("POST invoke with valid data returns not implemented", func(t *testing.T) {
+		body := `{"data": {"message": "Hello, World!"}, "idempotencyKey": "test-123"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/apps/my-app/functions/hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Code, "not_implemented")
+	})
+
+	t.Run("POST invoke with missing data", func(t *testing.T) {
+		body := `{"idempotencyKey": "test-789"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/apps/my-app/functions/hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Message, "Input data is required")
+	})
+
+	t.Run("POST invoke with complex nested data object", func(t *testing.T) {
+		body := `{"data": {"user": {"id": 123, "name": "John"}, "items": [{"id": 1, "name": "Item1"}]}, "idempotencyKey": "test-complex"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/apps/my-app/functions/hello-world/invoke", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+
+		var response errorResponse
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.Len(t, response.Errors, 1)
+		require.Contains(t, response.Errors[0].Code, "not_implemented")
+	})
+
+	t.Run("GET invoke returns not implemented", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/hello-world/invoke", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		// grpc-gateway returns 501 for unsupported HTTP methods on valid endpoints
+		require.Equal(t, http.StatusNotImplemented, rec.Code)
+	})
+}
+
 func BenchmarkHTTPGateway_Health(b *testing.B) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(b, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)

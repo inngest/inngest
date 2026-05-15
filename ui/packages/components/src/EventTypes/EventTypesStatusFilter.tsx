@@ -1,5 +1,3 @@
-'use client';
-
 import { Select } from '@inngest/components/Select/Select';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 

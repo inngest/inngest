@@ -27,13 +27,6 @@ type Tridiagonal struct {
 	DU []float64
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // Potrf computes the Cholesky factorization of a.
 // The factorization has the form
 //
@@ -222,11 +215,52 @@ func Gels(trans blas.Transpose, a blas64.General, b blas64.General, work []float
 	return lapack64.Dgels(trans, a.Rows, a.Cols, b.Cols, a.Data, max(1, a.Stride), b.Data, max(1, b.Stride), work, lwork)
 }
 
+// Geqp3 computes a QR factorization with column pivoting of the m×n matrix A:
+//
+//	A*P = Q*R
+//
+// where P is a permutation matrix, Q is an orthogonal matrix and R is a
+// min(m,n)×n upper trapezoidal matrix.
+//
+// On return, the upper triangle of A contains the matrix R. The elements below
+// the diagonal together with tau represent the matrix Q as a product of
+// elementary reflectors
+//
+//	Q = H_0 * H_1 * ... * H_{k-1}, where k = min(m,n).
+//
+// Each H_i has the form
+//
+//	H_i = I - tau * v * vᵀ
+//
+// where tau is a scalar and v is a vector with v[0:i] = 0 and v[i] = 1;
+// v[i+1:m] is stored on exit in A[i+1:m,i], and tau in tau[i].
+//
+// jpvt specifies a column pivot to be applied to A. On entry, if jpvt[j] is at
+// least zero, the jth column of A is permuted to the front of A*P (a leading
+// column), if jpvt[j] is -1 the jth column of A is a free column. If jpvt[j] <
+// -1, Geqp3 will panic. On return, jpvt holds the permutation that was applied;
+// the jth column of A*P was the jpvt[j] column of A. jpvt must have length n or
+// Geqp3 will panic.
+//
+// tau holds the scalar factors of the elementary reflectors. It must have
+// length min(m,n), otherwise Geqp3 will panic.
+//
+// work must have length at least max(1,lwork), and lwork must be at least
+// 3*n+1, otherwise Geqp3 will panic. For optimal performance lwork must be at
+// least 2*n+(n+1)*nb, where nb is the optimal blocksize. On return, work[0]
+// will contain the optimal value of lwork.
+//
+// If lwork == -1, instead of performing Geqp3, only the optimal value of lwork
+// will be stored in work[0].
+func Geqp3(a blas64.General, jpvt []int, tau, work []float64, lwork int) {
+	lapack64.Dgeqp3(a.Rows, a.Cols, a.Data, max(1, a.Stride), jpvt, tau, work, lwork)
+}
+
 // Geqrf computes the QR factorization of the m×n matrix A using a blocked
 // algorithm. A is modified to contain the information to construct Q and R.
 // The upper triangle of a contains the matrix R. The lower triangular elements
 // (not including the diagonal) contain the elementary reflectors. tau is modified
-// to contain the reflector scales. tau must have length at least min(m,n), and
+// to contain the reflector scales. tau must have length min(m,n), and
 // this function will panic otherwise.
 //
 // The ith elementary reflector can be explicitly constructed by first extracting
@@ -238,7 +272,7 @@ func Gels(trans blas.Transpose, a blas64.General, b blas64.General, work []float
 //
 // and computing H_i = I - tau[i] * v * vᵀ.
 //
-// The orthonormal matrix Q can be constucted from a product of these elementary
+// The orthonormal matrix Q can be constructed from a product of these elementary
 // reflectors, Q = H_0 * H_1 * ... * H_{k-1}, where k = min(m,n).
 //
 // Work is temporary storage, and lwork specifies the usable memory length.
@@ -320,25 +354,27 @@ func Gesvd(jobU, jobVT lapack.SVDJob, a, u, vt blas64.General, s, work []float64
 	return lapack64.Dgesvd(jobU, jobVT, a.Rows, a.Cols, a.Data, max(1, a.Stride), s, u.Data, max(1, u.Stride), vt.Data, max(1, vt.Stride), work, lwork)
 }
 
-// Getrf computes the LU decomposition of the m×n matrix A.
+// Getrf computes the LU decomposition of an m×n matrix A using partial
+// pivoting with row interchanges.
+//
 // The LU decomposition is a factorization of A into
 //
 //	A = P * L * U
 //
-// where P is a permutation matrix, L is a unit lower triangular matrix, and
-// U is a (usually) non-unit upper triangular matrix. On exit, L and U are stored
-// in place into a.
+// where P is a permutation matrix, L is a lower triangular with unit diagonal
+// elements (lower trapezoidal if m > n), and U is upper triangular (upper
+// trapezoidal if m < n).
 //
-// ipiv is a permutation vector. It indicates that row i of the matrix was
-// changed with ipiv[i]. ipiv must have length at least min(m,n), and will panic
-// otherwise. ipiv is zero-indexed.
+// On entry, a contains the matrix A. On return, L and U are stored in place
+// into a, and P is represented by ipiv.
 //
-// Getrf is the blocked version of the algorithm.
+// ipiv contains a sequence of row swaps. It indicates that row i of the matrix
+// was interchanged with ipiv[i]. ipiv must have length min(m,n), and Getrf will
+// panic otherwise. ipiv is zero-indexed.
 //
-// Getrf returns whether the matrix A is singular. The LU decomposition will
-// be computed regardless of the singularity of A, but division by zero
-// will occur if the false is returned and the result is used to solve a
-// system of equations.
+// Getrf returns whether the matrix A is nonsingular. The LU decomposition will
+// be computed regardless of the singularity of A, but the result should not be
+// used to solve a system of equation.
 func Getrf(a blas64.General, ipiv []int) bool {
 	return lapack64.Dgetrf(a.Rows, a.Cols, a.Data, max(1, a.Stride), ipiv)
 }
@@ -606,25 +642,48 @@ func Lantb(norm lapack.MatrixNorm, a blas64.TriangularBand, work []float64) floa
 //
 //	X[i,0:n] is moved to X[k[i],0:n] for i=0,1,...,m-1.
 //
-// k must have length m, otherwise Lapmr will panic.
+// k must have length m, otherwise Lapmr will panic. k is zero-indexed.
 func Lapmr(forward bool, x blas64.General, k []int) {
 	lapack64.Dlapmr(forward, x.Rows, x.Cols, x.Data, max(1, x.Stride), k)
 }
 
 // Lapmt rearranges the columns of the m×n matrix X as specified by the
-// permutation k_0, k_1, ..., k_{n-1} of the integers 0, ..., n-1.
+// permutation k[0],k[1],...,k[n-1] of the integers 0,...,n-1.
 //
-// If forward is true a forward permutation is performed:
+// If forward is true, a forward permutation is applied:
 //
-//	X[0:m, k[j]] is moved to X[0:m, j] for j = 0, 1, ..., n-1.
+//	X[0:m,k[j]] is moved to X[0:m,j] for j=0,1,...,n-1.
 //
-// otherwise a backward permutation is performed:
+// If forward is false, a backward permutation is applied:
 //
-//	X[0:m, j] is moved to X[0:m, k[j]] for j = 0, 1, ..., n-1.
+//	X[0:m,j] is moved to X[0:m,k[j]] for j=0,1,...,n-1.
 //
 // k must have length n, otherwise Lapmt will panic. k is zero-indexed.
 func Lapmt(forward bool, x blas64.General, k []int) {
 	lapack64.Dlapmt(forward, x.Rows, x.Cols, x.Data, max(1, x.Stride), k)
+}
+
+// Orglq generates an m×n matrix Q with orthonormal rows defined as the first m
+// rows of a product of k elementary reflectors of order n
+//
+//	Q = H_{k-1} * ... * H_0
+//
+// as returned by Dgelqf.
+//
+// k is determined by the length of tau.
+//
+// On entry, tau and the first k rows of A must contain the scalar factors and
+// the vectors, respectively, which define the elementary reflectors H_i,
+// i=0,...,k-1, as returned by Dgelqf. On return, A contains the matrix Q.
+//
+// work must have length at least lwork and lwork must be at least max(1,m). On
+// return, optimal value of lwork will be stored in work[0]. It must also hold
+// that 0 <= k <= m <= n, otherwise Orglq will panic.
+//
+// If lwork == -1, instead of performing Orglq, the function only calculates the
+// optimal value of lwork and stores it into work[0].
+func Orglq(a blas64.General, tau, work []float64, lwork int) {
+	lapack64.Dorglq(a.Rows, a.Cols, len(tau), a.Data, a.Stride, tau, work, lwork)
 }
 
 // Ormlq multiplies the matrix C by the othogonal matrix Q defined by
@@ -651,6 +710,28 @@ func Ormlq(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64
 	lapack64.Dormlq(side, trans, c.Rows, c.Cols, a.Rows, a.Data, max(1, a.Stride), tau, c.Data, max(1, c.Stride), work, lwork)
 }
 
+// Orgqr generates an m×n matrix Q with orthonormal columns defined by the
+// product of elementary reflectors
+//
+//	Q = H_0 * H_1 * ... * H_{k-1}
+//
+// as computed by Geqrf.
+//
+// k is determined by the length of tau.
+//
+// The length of work must be at least n and it also must be that 0 <= k <= n
+// and 0 <= n <= m.
+//
+// work is temporary storage, and lwork specifies the usable memory length. At
+// minimum, lwork >= n, and the amount of blocking is limited by the usable
+// length. If lwork == -1, instead of computing Orgqr the optimal work length
+// is stored into work[0].
+//
+// Orgqr will panic if the conditions on input values are not met.
+func Orgqr(a blas64.General, tau []float64, work []float64, lwork int) {
+	lapack64.Dorgqr(a.Rows, a.Cols, len(tau), a.Data, a.Stride, tau, work, lwork)
+}
+
 // Ormqr multiplies an m×n matrix C by an orthogonal matrix Q as
 //
 //	C = Q * C   if side == blas.Left  and trans == blas.NoTrans,
@@ -662,12 +743,13 @@ func Ormlq(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64
 //
 //	Q = H_0 * H_1 * ... * H_{k-1}.
 //
+// k is determined by the length of tau.
+//
 // If side == blas.Left, A is an m×k matrix and 0 <= k <= m.
 // If side == blas.Right, A is an n×k matrix and 0 <= k <= n.
 // The ith column of A contains the vector which defines the elementary
-// reflector H_i and tau[i] contains its scalar factor. tau must have length k
-// and Ormqr will panic otherwise. Geqrf returns A and tau in the required
-// form.
+// reflector H_i and tau[i] contains its scalar factor. Geqrf returns A and tau
+// in the required form.
 //
 // work must have length at least max(1,lwork), and lwork must be at least n if
 // side == blas.Left and at least m if side == blas.Right, otherwise Ormqr will
@@ -682,7 +764,7 @@ func Ormlq(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64
 // If lwork is -1, instead of performing Ormqr, the optimal workspace size will
 // be stored into work[0].
 func Ormqr(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64, c blas64.General, work []float64, lwork int) {
-	lapack64.Dormqr(side, trans, c.Rows, c.Cols, a.Cols, a.Data, max(1, a.Stride), tau, c.Data, max(1, c.Stride), work, lwork)
+	lapack64.Dormqr(side, trans, c.Rows, c.Cols, len(tau), a.Data, max(1, a.Stride), tau, c.Data, max(1, c.Stride), work, lwork)
 }
 
 // Pocon estimates the reciprocal of the condition number of a positive-definite
@@ -804,7 +886,7 @@ func Trtrs(trans blas.Transpose, a blas64.Triangular, b blas64.General) (ok bool
 // larger. On return, optimal value of lwork will be stored in work[0].
 //
 // If lwork == -1, instead of performing Geev, the function only calculates the
-// optimal vaule of lwork and stores it into work[0].
+// optimal value of lwork and stores it into work[0].
 //
 // On return, first will be the index of the first valid eigenvalue.
 // If first == 0, all eigenvalues and eigenvectors have been computed.

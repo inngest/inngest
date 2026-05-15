@@ -1,5 +1,5 @@
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link';
 
 export const FunctionInfo = () => (
   <Info

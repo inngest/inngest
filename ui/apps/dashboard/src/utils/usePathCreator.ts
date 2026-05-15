@@ -10,15 +10,36 @@ export const usePathCreator = () => {
   const pathCreator = useMemo((): PathCreator => {
     return {
       app: (params: { externalAppID: string }) =>
-        internalPathCreator.app({ envSlug: env.slug, externalAppID: params.externalAppID }),
+        internalPathCreator.app({
+          envSlug: env.slug,
+          externalAppID: params.externalAppID,
+        }),
       eventPopout: ({ eventID }: { eventID: string }) =>
         internalPathCreator.eventPopout({ envSlug: env.slug, eventID }),
       eventType: ({ eventName }: { eventName: string }) =>
         internalPathCreator.eventType({ envSlug: env.slug, eventName }),
+      experiment: ({
+        experimentName,
+        functionSlug,
+      }: {
+        experimentName: string;
+        functionSlug: string;
+      }) =>
+        internalPathCreator.functionExperiment({
+          envSlug: env.slug,
+          functionSlug,
+          experimentName,
+        }),
       function: (params: { functionSlug: string }) =>
-        internalPathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
+        internalPathCreator.function({
+          envSlug: env.slug,
+          functionSlug: params.functionSlug,
+        }),
       runPopout: (params: { runID: string }) =>
-        internalPathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
+        internalPathCreator.runPopout({
+          envSlug: env.slug,
+          runID: params.runID,
+        }),
       debugger: (params: { functionSlug: string; runID?: string }) =>
         internalPathCreator.debugger({
           envSlug: env.slug,

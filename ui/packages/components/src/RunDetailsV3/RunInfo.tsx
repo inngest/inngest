@@ -11,7 +11,7 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
+} from '../DetailsCard/Element';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -49,6 +49,7 @@ type Run = {
     startedAt: string | null;
     status: string;
     stepID?: string | null;
+    debugSessionID?: string | null;
   };
   hasAI: boolean;
 };
@@ -80,7 +81,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
           </div>
 
           {isLazyDone(run) && (
-            <Nav standalone={standalone} functionSlug={run.fn.name} runID={runID} />
+            <Nav standalone={standalone} functionSlug={run.fn.slug} runID={runID} />
           )}
         </div>
 
@@ -133,7 +134,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
             label="Duration"
             lazy={run}
             initial={initialRunData}
-            optimisticChildren={(initialRun: InitialRunData) => <TextElement>-</TextElement>}
+            optimisticChildren={() => <TextElement>-</TextElement>}
           >
             {(run: Run) => {
               let durationText = '-';

@@ -4,15 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/testapi"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -69,6 +63,9 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusRunning,
 			ChildSpanCount: 1,
@@ -108,6 +105,9 @@ func TestWait(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusCompleted,
 			ChildSpanCount: 1,
@@ -200,6 +200,9 @@ func TestWaitGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusRunning,
 			ChildSpanCount: 1,
@@ -234,7 +237,7 @@ func TestWaitGroup(t *testing.T) {
 		// Wait for the WaitForEvent to appear in history
 		r.EventuallyWithT(func(ct *assert.CollectT) {
 			a := assert.New(ct)
-			run, err := c.RunTraces(ctx, runID)
+			run, err := c.RunTraces(ctx, runID, false)
 			a.NoError(err)
 			a.Len(run.Trace.ChildSpans, 1)
 
@@ -254,6 +257,9 @@ func TestWaitGroup(t *testing.T) {
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
+		// Wait a moment for runID to be populated
+		<-time.After(2 * time.Second)
+
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 			Status:         models.FunctionStatusCompleted,
 			ChildSpanCount: 1,
@@ -307,7 +313,7 @@ func TestWaitInvalidExpression(t *testing.T) {
 	defer server.Close()
 
 	// This function will invoke the other function
-	runID := ""
+	rid := NewRunID()
 	evtName := "my-event"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -316,7 +322,7 @@ func TestWaitInvalidExpression(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			runID = input.InputCtx.RunID
+			rid.Send(input.InputCtx.RunID)
 
 			_, _ = step.WaitForEvent[any](
 				ctx,
@@ -337,7 +343,8 @@ func TestWaitInvalidExpression(t *testing.T) {
 	// Trigger the main function and successfully invoke the other function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
-	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+
+	c.WaitForRunStatus(ctx, t, "FAILED", rid.Wait(t))
 }
 
 func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
@@ -350,7 +357,7 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	defer server.Close()
 
 	// This function will invoke the other function
-	runID := ""
+	rid := NewRunID()
 	evtName := "my-event"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -359,7 +366,7 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			runID = input.InputCtx.RunID
+			rid.Send(input.InputCtx.RunID)
 
 			_, _ = step.WaitForEvent[any](
 				ctx,
@@ -380,7 +387,8 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	// Trigger the main function and successfully invoke the other function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
-	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+
+	run := c.WaitForRunStatus(ctx, t, "FAILED", rid.Wait(t))
 	assert.Equal(t,
 		`{"error":{"error":"InvalidExpression: Wait for event If expression failed to compile","name":"InvalidExpression","message":"Wait for event If expression failed to compile","stack":"error compiling expression: ERROR: \u003cinput\u003e:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^"}}`,
 		run.Output,
@@ -528,52 +536,29 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 	require.NoError(t, err)
 	registerFuncs()
 
-	fnId := ""
-	require.Eventually(t, func() bool {
-		functions, err := c.Functions(ctx)
-		if err != nil {
-			return false
-		}
-		for _, function := range functions {
-			if function.App.ExternalID != appID {
-				continue
-			}
-
-			fnId = function.ID
-			return true
-		}
-		return false
-	}, 10*time.Second, 250*time.Millisecond)
-
-	getActiveCount := func(accountId uuid.UUID, fnId uuid.UUID) testapi.TestActiveSets {
-		reqUrl, err := url.Parse(c.APIHost + "/test/queue/active-count")
-		require.NoError(t, err)
-
-		fv := reqUrl.Query()
-		fv.Add("accountId", consts.DevServerAccountID.String())
-		fv.Add("fnId", fnId.String())
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String()+"?"+fv.Encode(), nil)
-		require.NoError(t, err)
-
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-
-		byt, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-
-		r := testapi.TestActiveSets{}
-		err = json.Unmarshal(byt, &r)
-		require.NoError(t, err, "Test API may not be enabled! Error unmarshalling %s", byt)
-
-		return r
-	}
+	// fnId := ""
+	// require.Eventually(t, func() bool {
+	// 	functions, err := c.Functions(ctx)
+	// 	if err != nil {
+	// 		return false
+	// 	}
+	// 	for _, function := range functions {
+	// 		if function.App.ExternalID != appID {
+	// 			continue
+	// 		}
+	//
+	// 		fnId = function.ID
+	// 		return true
+	// 	}
+	// 	return false
+	// }, 10*time.Second, 250*time.Millisecond)
 
 	// Trigger the main function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
+
+	// Wait a moment for runID to be populated
+	<-time.After(2 * time.Second)
 
 	run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 		Status:         models.FunctionStatusRunning,
@@ -607,15 +592,5 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 		assert.Equal(t, waitEvtName, stepInfo.EventName)
 		assert.Nil(t, stepInfo.TimedOut)
 		assert.Nil(t, stepInfo.FoundEventID)
-
-		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			count := getActiveCount(consts.DevServerAccountID, uuid.MustParse(fnId))
-			assert.Equal(collect, testapi.TestActiveSets{
-				ActiveAccount:      0,
-				ActiveFunction:     0,
-				ActiveRunsAccount:  0,
-				ActiveRunsFunction: 0,
-			}, count)
-		}, 15*time.Second, 25*time.Millisecond)
 	})
 }

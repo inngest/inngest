@@ -1,10 +1,10 @@
-const regex = /postgresq?l?:\/\/([\w-]+):([^@]+)@([^/]+)/;
+const regex = /postgresq?l?:\/\/([\w.\-]+):([^@]+)@([^/]+)/;
 
 export function parseConnectionString(integration: string, connectionString: string) {
   const match = connectionString.match(regex);
 
   if (match) {
-    const [, username, password, host] = match;
+    const [, _username, _password, host] = match;
     return {
       name: `${integration}-${host}`,
       engine: 'postgresql',

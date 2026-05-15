@@ -17,9 +17,10 @@ package types
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
+	"unicode"
 
-	"github.com/stoewer/go-strcase"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
@@ -94,6 +95,24 @@ func NewProtoMap(adapter Adapter, value *pb.Map) traits.Mapper {
 	}
 }
 
+// NewMutableMap constructs a mutable map from an adapter and a set of map values.
+func NewMutableMap(adapter Adapter, mutableValues map[ref.Val]ref.Val) traits.MutableMapper {
+	mutableCopy := make(map[ref.Val]ref.Val, len(mutableValues))
+	for k, v := range mutableValues {
+		mutableCopy[k] = v
+	}
+	m := &mutableMap{
+		baseMap: &baseMap{
+			Adapter:     adapter,
+			mapAccessor: newRefValMapAccessor(mutableCopy),
+			value:       mutableCopy,
+			size:        len(mutableCopy),
+		},
+		mutableValues: mutableCopy,
+	}
+	return m
+}
+
 // mapAccessor is a private interface for finding values within a map and iterating over the keys.
 // This interface implements portions of the API surface area required by the traits.Mapper
 // interface.
@@ -105,6 +124,9 @@ type mapAccessor interface {
 
 	// Iterator returns an Iterator over the map key set.
 	Iterator() traits.Iterator
+
+	// Fold calls the FoldEntry method for each (key, value) pair in the map.
+	Fold(traits.Folder)
 }
 
 // baseMap is a reflection based map implementation designed to handle a variety of map-like types.
@@ -134,6 +156,9 @@ func (m *baseMap) Contains(index ref.Val) ref.Val {
 func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// If the map is already assignable to the desired type return it, e.g. interfaces and
 	// maps with the same key value types.
+	if typeDesc == reflect.TypeFor[any]() {
+		typeDesc = reflect.TypeFor[map[any]any]()
+	}
 	if reflect.TypeOf(m.value).AssignableTo(typeDesc) {
 		return m.value, nil
 	}
@@ -142,19 +167,19 @@ func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	}
 	switch typeDesc {
 	case anyValueType:
-		json, err := m.ConvertToNative(jsonStructType)
+		json, err := m.ConvertToNative(JSONStructType)
 		if err != nil {
 			return nil, err
 		}
 		return anypb.New(json.(proto.Message))
-	case jsonValueType, jsonStructType:
+	case JSONValueType, JSONStructType:
 		jsonEntries, err :=
 			m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
 		if err != nil {
 			return nil, err
 		}
 		jsonMap := &structpb.Struct{Fields: jsonEntries.(map[string]*structpb.Value)}
-		if typeDesc == jsonStructType {
+		if typeDesc == JSONStructType {
 			return jsonMap, nil
 		}
 		return structpb.NewStructValue(jsonMap), nil
@@ -204,7 +229,7 @@ func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 				return nil, fieldName.(*Err)
 			}
 			name := string(fieldName.(String))
-			name = strcase.UpperCamelCase(name)
+			name = upperCamelCase(name)
 			fieldRef := nativeStruct.FieldByName(name)
 			if !fieldRef.IsValid() {
 				return nil, fmt.Errorf("type conversion error, no such field '%s' in type '%v'", name, typeDesc)
@@ -297,6 +322,41 @@ func (m *baseMap) String() string {
 	return sb.String()
 }
 
+type baseMapEntry struct {
+	key string
+	val string
+}
+
+func formatMap(m traits.Mapper, sb *strings.Builder) {
+	it := m.Iterator()
+	var ents []baseMapEntry
+	if s, ok := m.Size().(Int); ok {
+		ents = make([]baseMapEntry, 0, int(s))
+	}
+	for it.HasNext() == True {
+		k := it.Next()
+		v, _ := m.Find(k)
+		ents = append(ents, baseMapEntry{Format(k), Format(v)})
+	}
+	sort.SliceStable(ents, func(i, j int) bool {
+		return ents[i].key < ents[j].key
+	})
+	sb.WriteString("{")
+	for i, ent := range ents {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(ent.key)
+		sb.WriteString(": ")
+		sb.WriteString(ent.val)
+	}
+	sb.WriteString("}")
+}
+
+func (m *baseMap) format(sb *strings.Builder) {
+	formatMap(m, sb)
+}
+
 // Type implements the ref.Val interface method.
 func (m *baseMap) Type() ref.Type {
 	return MapType
@@ -305,6 +365,28 @@ func (m *baseMap) Type() ref.Type {
 // Value implements the ref.Val interface method.
 func (m *baseMap) Value() any {
 	return m.value
+}
+
+// mutableMap holds onto a set of mutable values which are used for intermediate computations.
+type mutableMap struct {
+	*baseMap
+	mutableValues map[ref.Val]ref.Val
+}
+
+// Insert implements the traits.MutableMapper interface method, returning true if the key insertion
+// succeeds.
+func (m *mutableMap) Insert(k, v ref.Val) ref.Val {
+	if _, found := m.Find(k); found {
+		return NewErr("insert failed: key %v already exists", k)
+	}
+	m.mutableValues[k] = v
+	return m
+}
+
+// ToImmutableMap implements the traits.MutableMapper interface method, converting a mutable map
+// an immutable map implementation.
+func (m *mutableMap) ToImmutableMap() traits.Mapper {
+	return NewRefValMap(m.Adapter, m.mutableValues)
 }
 
 func newJSONStructAccessor(adapter Adapter, st map[string]*structpb.Value) mapAccessor {
@@ -347,6 +429,15 @@ func (a *jsonStructAccessor) Iterator() traits.Iterator {
 	return &stringKeyIterator{
 		mapKeys: mapKeys,
 		len:     len(mapKeys),
+	}
+}
+
+// Fold calls the FoldEntry method for each (key, value) pair in the map.
+func (a *jsonStructAccessor) Fold(f traits.Folder) {
+	for k, v := range a.st {
+		if !f.FoldEntry(k, v) {
+			break
+		}
 	}
 }
 
@@ -424,6 +515,16 @@ func (m *reflectMapAccessor) Iterator() traits.Iterator {
 	}
 }
 
+// Fold calls the FoldEntry method for each (key, value) pair in the map.
+func (m *reflectMapAccessor) Fold(f traits.Folder) {
+	mapRange := m.refValue.MapRange()
+	for mapRange.Next() {
+		if !f.FoldEntry(mapRange.Key().Interface(), mapRange.Value().Interface()) {
+			break
+		}
+	}
+}
+
 func newRefValMapAccessor(mapVal map[ref.Val]ref.Val) mapAccessor {
 	return &refValMapAccessor{mapVal: mapVal}
 }
@@ -477,6 +578,15 @@ func (a *refValMapAccessor) Iterator() traits.Iterator {
 	}
 }
 
+// Fold calls the FoldEntry method for each (key, value) pair in the map.
+func (a *refValMapAccessor) Fold(f traits.Folder) {
+	for k, v := range a.mapVal {
+		if !f.FoldEntry(k, v) {
+			break
+		}
+	}
+}
+
 func newStringMapAccessor(strMap map[string]string) mapAccessor {
 	return &stringMapAccessor{mapVal: strMap}
 }
@@ -512,6 +622,15 @@ func (a *stringMapAccessor) Iterator() traits.Iterator {
 	return &stringKeyIterator{
 		mapKeys: mapKeys,
 		len:     len(mapKeys),
+	}
+}
+
+// Fold calls the FoldEntry method for each (key, value) pair in the map.
+func (a *stringMapAccessor) Fold(f traits.Folder) {
+	for k, v := range a.mapVal {
+		if !f.FoldEntry(k, v) {
+			break
+		}
 	}
 }
 
@@ -557,6 +676,15 @@ func (a *stringIfaceMapAccessor) Iterator() traits.Iterator {
 	}
 }
 
+// Fold calls the FoldEntry method for each (key, value) pair in the map.
+func (a *stringIfaceMapAccessor) Fold(f traits.Folder) {
+	for k, v := range a.mapVal {
+		if !f.FoldEntry(k, v) {
+			break
+		}
+	}
+}
+
 // protoMap is a specialized, separate implementation of the traits.Mapper interfaces tailored to
 // accessing protoreflect.Map values.
 type protoMap struct {
@@ -578,12 +706,12 @@ func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// maps with the same key value types.
 	switch typeDesc {
 	case anyValueType:
-		json, err := m.ConvertToNative(jsonStructType)
+		json, err := m.ConvertToNative(JSONStructType)
 		if err != nil {
 			return nil, err
 		}
 		return anypb.New(json.(proto.Message))
-	case jsonValueType, jsonStructType:
+	case JSONValueType, JSONStructType:
 		jsonEntries, err :=
 			m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
 		if err != nil {
@@ -591,7 +719,7 @@ func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		}
 		jsonMap := &structpb.Struct{
 			Fields: jsonEntries.(map[string]*structpb.Value)}
-		if typeDesc == jsonStructType {
+		if typeDesc == JSONStructType {
 			return jsonMap, nil
 		}
 		return structpb.NewStructValue(jsonMap), nil
@@ -769,6 +897,13 @@ func (m *protoMap) Iterator() traits.Iterator {
 	}
 }
 
+// Fold calls the FoldEntry method for each (key, value) pair in the map.
+func (m *protoMap) Fold(f traits.Folder) {
+	m.value.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+		return f.FoldEntry(k.Interface(), v.Interface())
+	})
+}
+
 // Size returns the number of entries in the protoreflect.Map.
 func (m *protoMap) Size() ref.Val {
 	return Int(m.value.Len())
@@ -851,4 +986,85 @@ func (it *stringKeyIterator) Next() ref.Val {
 		return String(it.mapKeys[index])
 	}
 	return nil
+}
+
+// ToFoldableMap will create a Foldable version of a map suitable for key-value pair iteration.
+//
+// For values which are already Foldable, this call is a no-op. For all other values, the fold
+// is driven via the Iterator HasNext() and Next() calls as well as the map's Get() method
+// which means that the folding will function, but take a performance hit.
+func ToFoldableMap(m traits.Mapper) traits.Foldable {
+	if f, ok := m.(traits.Foldable); ok {
+		return f
+	}
+	return interopFoldableMap{Mapper: m}
+}
+
+type interopFoldableMap struct {
+	traits.Mapper
+}
+
+func (m interopFoldableMap) Fold(f traits.Folder) {
+	it := m.Iterator()
+	for it.HasNext() == True {
+		k := it.Next()
+		if !f.FoldEntry(k, m.Get(k)) {
+			break
+		}
+	}
+}
+
+// InsertMapKeyValue inserts a key, value pair into the target map if the target map does not
+// already contain the given key.
+//
+// If the map is mutable, it is modified in-place per the MutableMapper contract.
+// If the map is not mutable, a copy containing the new key, value pair is made.
+func InsertMapKeyValue(m traits.Mapper, k, v ref.Val) ref.Val {
+	if mutable, ok := m.(traits.MutableMapper); ok {
+		return mutable.Insert(k, v)
+	}
+
+	// Otherwise perform the slow version of the insertion which makes a copy of the incoming map.
+	if _, found := m.Find(k); !found {
+		size := m.Size().(Int)
+		copy := make(map[ref.Val]ref.Val, size+1)
+		copy[k] = v
+		it := m.Iterator()
+		for it.HasNext() == True {
+			nextK := it.Next()
+			nextV := m.Get(nextK)
+			copy[nextK] = nextV
+		}
+		return DefaultTypeAdapter.NativeToValue(copy)
+	}
+	return NewErr("insert failed: key %v already exists", k)
+}
+
+func upperCamelCase(s string) string {
+	var newStr strings.Builder
+	s = strings.TrimSpace(s)
+	var prev rune
+	for _, curr := range s {
+		if prev == 0 || isDelim(prev) {
+			if !isDelim(curr) {
+				newStr.WriteRune(unicode.ToUpper(curr))
+			}
+		} else if !isDelim(curr) {
+			if isLower(prev) {
+				newStr.WriteRune(curr)
+			} else {
+				newStr.WriteRune(unicode.ToLower(curr))
+			}
+		}
+		prev = curr
+	}
+	return newStr.String()
+}
+
+func isDelim(r rune) bool {
+	return r == '_' || r == '-'
+}
+
+func isLower(r rune) bool {
+	return r >= 'a' && r <= 'z'
 }

@@ -1,0 +1,12 @@
+//go:generate go run github.com/dmarkham/enumer -trimprefix=BacklogRefillConstraintCheckReason -type=BacklogRefillConstraintCheckReason -transform=snake -json -text
+
+package enums
+
+type BacklogRefillConstraintCheckReason int
+
+const (
+	BacklogRefillConstraintCheckReasonConstraintAPIUninitialized BacklogRefillConstraintCheckReason = iota
+	BacklogRefillConstraintCheckReasonIDNil
+	BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled
+	BacklogRefillConstraintCheckReasonConstraintAPIError
+)

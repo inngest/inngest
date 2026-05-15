@@ -48,7 +48,8 @@ type AppReader interface {
 }
 
 type AppCreator interface {
-	// UpsertApp creates or updates an app.
+	// UpsertApp creates or updates an app. The conflict key is the ID, which
+	// must always exist.
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
 }
 

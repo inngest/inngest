@@ -40,6 +40,7 @@ export const FUNCTIONS = gql`
       }
       app {
         name
+        method
       }
       url
     }
@@ -108,6 +109,7 @@ export const FUNCTION = gql`
       }
       app {
         name
+        method
       }
       url
     }
@@ -222,8 +224,16 @@ export const CANCEL_RUN = gql`
 `;
 
 export const RERUN = gql`
-  mutation Rerun($runID: ULID!) {
-    rerun(runID: $runID)
+  mutation Rerun(
+    $runID: ULID!
+    $debugRunID: ULID = null
+    $debugSessionID: ULID = null
+  ) {
+    rerun(
+      runID: $runID
+      debugRunID: $debugRunID
+      debugSessionID: $debugSessionID
+    )
   }
 `;
 
@@ -231,14 +241,14 @@ export const RERUN_FROM_STEP = gql`
   mutation RerunFromStep(
     $runID: ULID!
     $fromStep: RerunFromStepInput!
-    $debugSessionID: ULID = null
     $debugRunID: ULID = null
+    $debugSessionID: ULID = null
   ) {
     rerun(
       runID: $runID
       fromStep: $fromStep
-      debugSessionID: $debugSessionID
       debugRunID: $debugRunID
+      debugSessionID: $debugSessionID
     )
   }
 `;
@@ -251,6 +261,7 @@ export const GET_RUNS = gql`
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
     $celQuery: String = null
+    $preview: Boolean = false
   ) {
     runs(
       filter: {
@@ -262,6 +273,7 @@ export const GET_RUNS = gql`
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
+      preview: $preview
     ) {
       edges {
         node {
@@ -299,12 +311,14 @@ export const COUNT_RUNS = gql`
     $startTime: Time!
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
+    $preview: Boolean = false
   ) {
     runs(
       filter: { from: $startTime, status: $status, timeField: $timeField }
       orderBy: [{ field: $timeField, direction: DESC }]
+      preview: $preview
     ) {
-      totalCount
+      totalCount(preview: $preview)
     }
   }
 `;
@@ -328,10 +342,19 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       spanAttrs
       resourceAttrs
     }
+    metadata {
+      scope
+      kind
+      values
+      updatedAt
+    }
     outputID
+    debugRunID
+    debugSessionID
     spanID
     stepID
     stepOp
+    stepType
     stepInfo {
       __typename
       ... on InvokeStepInfo {
@@ -361,6 +384,10 @@ export const TRACE_DETAILS_FRAGMENT = gql`
         timedOut
       }
     }
+    response {
+      statusCode
+      headers
+    }
   }
 `;
 
@@ -370,11 +397,13 @@ export const GET_RUN = gql`
       function {
         app {
           name
+          method
         }
         id
         name
         slug
       }
+      status
       trace(preview: $preview) {
         ...TraceDetails
         childrenSpans {
@@ -391,6 +420,26 @@ export const GET_RUN = gql`
         }
       }
       hasAI
+    }
+  }
+`;
+
+export const GET_RUN_TRACE = gql`
+  query GetRunTrace($runID: String!) {
+    runTrace(runID: $runID) {
+      ...TraceDetails
+      childrenSpans {
+        ...TraceDetails
+        childrenSpans {
+          ...TraceDetails
+          childrenSpans {
+            ...TraceDetails
+            childrenSpans {
+              ...TraceDetails
+            }
+          }
+        }
+      }
     }
   }
 `;
@@ -436,7 +485,12 @@ export const GET_WORKER_CONNECTIONS = gql`
   ) {
     workerConnections(
       first: $first
-      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        appIDs: [$appID]
+        from: $startTime
+        status: $status
+        timeField: $timeField
+      }
       orderBy: $orderBy
       after: $cursor
     ) {
@@ -446,6 +500,7 @@ export const GET_WORKER_CONNECTIONS = gql`
           gatewayId
           instanceId
           workerIp
+          maxWorkerConcurrency
           app {
             id
           }
@@ -484,7 +539,12 @@ export const COUNT_WORKER_CONNECTIONS = gql`
     $status: [ConnectV1ConnectionStatus!]
   ) {
     workerConnections(
-      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: CONNECTED_AT }
+      filter: {
+        appIDs: [$appID]
+        from: $startTime
+        status: $status
+        timeField: CONNECTED_AT
+      }
       orderBy: [{ field: CONNECTED_AT, direction: DESC }]
     ) {
       totalCount
@@ -499,7 +559,7 @@ export const GET_EVENTS = gql`
     $endTime: Time
     $celQuery: String = null
     $eventNames: [String!] = null
-    $includeInternalEvents: Boolean = true
+    $includeInternalEvents: Boolean = false
   ) {
     eventsV2(
       first: 50
@@ -576,6 +636,54 @@ export const GET_EVENT_RUNS = gql`
           name
           slug
         }
+        trace(preview: true) {
+          skipReason
+          skipExistingRunID
+        }
+      }
+    }
+  }
+`;
+
+export const CREATE_DEBUG_SESSION = gql`
+  mutation CreateDebugSession($input: CreateDebugSessionInput!) {
+    createDebugSession(input: $input) {
+      debugSessionID
+      debugRunID
+    }
+  }
+`;
+
+export const DEBUG_RUN = gql`
+  query GetDebugRun($query: DebugRunQuery!) {
+    debugRun(query: $query) {
+      debugTraces {
+        ...TraceDetails
+        childrenSpans {
+          ...TraceDetails
+          childrenSpans {
+            ...TraceDetails
+            childrenSpans {
+              ...TraceDetails
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const DEBUG_SESSION = gql`
+  query GetDebugSession($query: DebugSessionQuery!) {
+    debugSession(query: $query) {
+      debugRuns {
+        status
+        queuedAt
+        startedAt
+        endedAt
+        debugRunID
+        tags
+        versions
       }
     }
   }

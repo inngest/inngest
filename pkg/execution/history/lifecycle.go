@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -110,7 +109,7 @@ func (l lifecycle) OnFunctionStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemSystemLatency(ctx)
+	latency, _ := queue.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -161,6 +160,10 @@ func (l lifecycle) OnFunctionSkipped(
 			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionSkipped", "error", err)
 		}
 	}
+}
+
+// OnFunctionBacklogSizeLimitReached implements execution.LifecycleListener.
+func (l lifecycle) OnFunctionBacklogSizeLimitReached(context.Context, sv2.ID) {
 }
 
 // OnFunctionFinished is called when a function finishes.  This will
@@ -326,7 +329,7 @@ func (l lifecycle) OnStepStarted(
 		)
 	}
 
-	latency, _ := redis_state.GetItemSystemLatency(ctx)
+	latency, _ := queue.GetItemSystemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
 	h := History{
@@ -940,7 +943,6 @@ func toUUID(id string) (*uuid.UUID, error) {
 	}
 
 	return &parsed, nil
-
 }
 
 // Returns the user-facing step type. In other words, the returned step type

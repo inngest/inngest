@@ -3,6 +3,8 @@ package lifecycles
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/aws/smithy-go/ptr"
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -10,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
-	"time"
 )
 
 type historyLifecycles struct {
@@ -56,6 +57,15 @@ func (h *historyLifecycles) OnConnected(ctx context.Context, conn *state.Connect
 	}
 }
 
+func getMaxWorkerConcurrency(conn *state.Connection) int64 {
+	maxWorkerConcurrency := int64(0)
+	if conn == nil || conn.Data == nil || conn.Data.MaxWorkerConcurrency == nil {
+		return maxWorkerConcurrency
+	}
+	maxWorkerConcurrency = *conn.Data.MaxWorkerConcurrency
+	return maxWorkerConcurrency
+}
+
 func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
 	var disconnectReason *string
 	if closeReason != "" {
@@ -71,11 +81,12 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 			AppName: group.AppName,
 			AppID:   group.AppID,
 
-			Id:         conn.ConnectionId,
-			GatewayId:  conn.GatewayId,
-			InstanceId: conn.Data.InstanceId,
-			Status:     connectpb.ConnectionStatus_DISCONNECTED,
-			WorkerIP:   conn.WorkerIP,
+			Id:                   conn.ConnectionId,
+			GatewayId:            conn.GatewayId,
+			InstanceId:           conn.Data.InstanceId,
+			Status:               connectpb.ConnectionStatus_DISCONNECTED,
+			WorkerIP:             conn.WorkerIP,
+			MaxWorkerConcurrency: getMaxWorkerConcurrency(conn),
 
 			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
 			LastHeartbeatAt: ptr.Time(time.Now()),
@@ -123,11 +134,12 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 			FunctionCount: len(group.FunctionSlugs),
 			SyncID:        group.SyncID,
 
-			Id:         conn.ConnectionId,
-			GatewayId:  conn.GatewayId,
-			InstanceId: conn.Data.InstanceId,
-			Status:     status,
-			WorkerIP:   conn.WorkerIP,
+			Id:                   conn.ConnectionId,
+			GatewayId:            conn.GatewayId,
+			InstanceId:           conn.Data.InstanceId,
+			Status:               status,
+			WorkerIP:             conn.WorkerIP,
+			MaxWorkerConcurrency: getMaxWorkerConcurrency(conn),
 
 			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
 			LastHeartbeatAt: ptr.Time(lastHeartbeatAt),

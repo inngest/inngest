@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
@@ -8,14 +6,15 @@ import {
   type QueryHelperPanelSectionContentProps,
 } from './QueryHelperPanelSectionContent';
 
-interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
-  activeTabId: string;
+interface QueryHelperPanelCollapsibleSectionProps
+  extends QueryHelperPanelSectionContentProps {
+  activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
   title: string;
 }
 
 export function QueryHelperPanelCollapsibleSection({
-  activeTabId,
+  activeSavedQueryId,
   onQueryDelete,
   onQuerySelect,
   queries,
@@ -41,7 +40,7 @@ export function QueryHelperPanelCollapsibleSection({
       </button>
       {isOpen && (
         <QueryHelperPanelSectionContent
-          activeTabId={activeTabId}
+          activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={onQueryDelete}
           onQuerySelect={onQuerySelect}
           queries={queries}

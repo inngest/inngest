@@ -2,28 +2,41 @@ package base_cqrs
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
-	sqlc_psql "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	dbpkg "github.com/inngest/inngest/pkg/db"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/tests/testutil"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+// Environment variable constants for database selection
+const (
+	// EnvTestDatabase specifies which database to use for testing ("sqlite" or "postgres")
+	EnvTestDatabase = "TEST_DATABASE"
 )
 
 //
 // App
 //
 
-func TestSQLiteCQRSGetApps(t *testing.T) {
+func TestCQRSGetApps(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test apps
@@ -88,11 +101,11 @@ func TestSQLiteCQRSGetApps(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByChecksum(t *testing.T) {
+func TestCQRSGetAppByChecksum(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -128,10 +141,10 @@ func TestSQLiteCQRSGetAppByChecksum(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByID(t *testing.T) {
+func TestCQRSGetAppByID(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -163,11 +176,11 @@ func TestSQLiteCQRSGetAppByID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByURL(t *testing.T) {
+func TestCQRSGetAppByURL(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -203,11 +216,11 @@ func TestSQLiteCQRSGetAppByURL(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAppByName(t *testing.T) {
+func TestCQRSGetAppByName(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -243,11 +256,11 @@ func TestSQLiteCQRSGetAppByName(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetAllApps(t *testing.T) {
+func TestCQRSGetAllApps(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create multiple test apps
@@ -288,10 +301,10 @@ func TestSQLiteCQRSGetAllApps(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpsertApp(t *testing.T) {
+func TestCQRSUpsertApp(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	t.Run("create new app", func(t *testing.T) {
@@ -386,13 +399,13 @@ func TestSQLiteCQRSUpsertApp(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateAppError(t *testing.T) {
+func TestCQRSUpdateAppError(t *testing.T) {
 	ctx := context.Background()
 
 	// Generate test IDs
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	t.Run("set app error", func(t *testing.T) {
@@ -472,10 +485,10 @@ func TestSQLiteCQRSUpdateAppError(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
+func TestCQRSUpdateAppURL(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app with comprehensive field data
@@ -574,10 +587,10 @@ func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteApp(t *testing.T) {
+func TestCQRSDeleteApp(t *testing.T) {
 	ctx := context.Background()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	// Create test app
@@ -669,7 +682,7 @@ func TestSQLiteCQRSDeleteApp(t *testing.T) {
 // Function
 //
 
-func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
+func TestCQRSGetFunctionByInternalUUID(t *testing.T) {
 	ctx := context.Background()
 
 	// Generate test IDs
@@ -677,7 +690,7 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 	envID := uuid.New()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	t.Run("when function is active", func(t *testing.T) {
@@ -693,7 +706,7 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Insert the function
-		_, err = cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     envID,
@@ -756,7 +769,7 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Insert the function to be archived
-		_, err = cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			AccountID: accountID,
 			EnvID:     envID,
 			AppID:     appID,
@@ -788,14 +801,14 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
+func TestCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps
 	targetAppID := uuid.New()
 	otherAppID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(targetAppID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(targetAppID))
 	defer cleanup()
 
 	// Create the other app manually
@@ -811,7 +824,7 @@ func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	targetFn1ID := uuid.New()
 	targetFn2ID := uuid.New()
 
-	targetFunctions := []cqrs.InsertFunctionParams{
+	targetFunctions := []cqrs.UpsertFunctionParams{
 		{
 			ID:        targetFn1ID,
 			AccountID: uuid.New(),
@@ -838,7 +851,7 @@ func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	otherFn1ID := uuid.New()
 	otherFn2ID := uuid.New()
 
-	otherFunctions := []cqrs.InsertFunctionParams{
+	otherFunctions := []cqrs.UpsertFunctionParams{
 		{
 			ID:        otherFn1ID,
 			AccountID: uuid.New(),
@@ -864,7 +877,7 @@ func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	// Insert ALL functions (target + other)
 	allFunctions := append(targetFunctions, otherFunctions...)
 	for _, fn := range allFunctions {
-		_, err := cm.InsertFunction(ctx, fn)
+		_, err := cm.UpsertFunction(ctx, fn)
 		require.NoError(t, err)
 	}
 
@@ -924,11 +937,11 @@ func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSInsertFunction(t *testing.T) {
+func TestCQRSInsertFunction(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	t.Run("insert new function", func(t *testing.T) {
@@ -936,7 +949,7 @@ func TestSQLiteCQRSInsertFunction(t *testing.T) {
 		accountID := uuid.New()
 		envID := uuid.New()
 
-		params := cqrs.InsertFunctionParams{
+		params := cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     envID,
@@ -947,7 +960,7 @@ func TestSQLiteCQRSInsertFunction(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 
-		fn, err := cm.InsertFunction(ctx, params)
+		fn, err := cm.UpsertFunction(ctx, params)
 		require.NoError(t, err)
 		require.NotNil(t, fn)
 
@@ -973,7 +986,7 @@ func TestSQLiteCQRSInsertFunction(t *testing.T) {
 		accountID := uuid.New()
 		envID := uuid.New()
 
-		params := cqrs.InsertFunctionParams{
+		params := cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     envID,
@@ -984,7 +997,7 @@ func TestSQLiteCQRSInsertFunction(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 
-		fn, err := cm.InsertFunction(ctx, params)
+		fn, err := cm.UpsertFunction(ctx, params)
 		require.NoError(t, err)
 		require.NotNil(t, fn)
 
@@ -994,18 +1007,18 @@ func TestSQLiteCQRSInsertFunction(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctions(t *testing.T) {
+func TestCQRSGetFunctions(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	// Create test functions
 	fnIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
 
 	for i, fnID := range fnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1035,14 +1048,14 @@ func TestSQLiteCQRSGetFunctions(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
+func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps with external IDs
 	targetAppID := uuid.New()
 	otherAppID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t)
+	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	workspaceID := uuid.New()
@@ -1073,7 +1086,7 @@ func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	// Create functions for TARGET app
 	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range targetFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     workspaceID,
@@ -1089,7 +1102,7 @@ func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	// Create functions for OTHER app (should NOT be returned)
 	otherFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range otherFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: accountID,
 			EnvID:     workspaceID,
@@ -1147,14 +1160,14 @@ func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
+func TestCQRSDeleteFunctionsByAppID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two different apps
 	targetAppID := uuid.New()
 	preserveAppID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(targetAppID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(targetAppID))
 	defer cleanup()
 
 	// Create the preserve app manually
@@ -1169,7 +1182,7 @@ func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
 	// Create functions for the TARGET app (to be deleted)
 	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range targetFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1185,7 +1198,7 @@ func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
 	// Create functions for the PRESERVE app (should NOT be deleted)
 	preserveFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
 	for i, fnID := range preserveFnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1247,18 +1260,18 @@ func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSDeleteFunctionsByIDs(t *testing.T) {
+func TestCQRSDeleteFunctionsByIDs(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	// Create test functions
 	fnIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
 
 	for i, fnID := range fnIDs {
-		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
 			AccountID: uuid.New(),
 			EnvID:     uuid.New(),
@@ -1303,17 +1316,17 @@ func TestSQLiteCQRSDeleteFunctionsByIDs(t *testing.T) {
 	})
 }
 
-func TestSQLiteCQRSUpdateFunctionConfig(t *testing.T) {
+func TestCQRSUpdateFunctionConfig(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
-	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
 	defer cleanup()
 
 	// Create test function
 	fnID := uuid.New()
 	originalConfig := `{"triggers": [{"event": "original.event"}], "concurrency": 1}`
-	_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:        fnID,
 		AccountID: uuid.New(),
 		EnvID:     uuid.New(),
@@ -1381,8 +1394,533 @@ func TestSQLiteCQRSUpdateFunctionConfig(t *testing.T) {
 //
 
 //
+// Trace Run Tests
+//
+
+func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+
+	t.Run("find trace run with single trigger ID", func(t *testing.T) {
+		// Create a trace run with a single trigger ID
+		triggerID := ulid.Make()
+		runID := ulid.Make()
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-single-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+		}
+
+		err := cm.InsertTraceRun(ctx, traceRun)
+		require.NoError(t, err)
+
+		// Search by the trigger ID
+		runs, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "Should find the trace run by its trigger ID")
+		assert.Equal(t, runID.String(), runs[0].RunID)
+	})
+
+	t.Run("find trace run by trigger ID", func(t *testing.T) {
+		// Create a trace run with multiple trigger IDs (event batching)
+		triggerID1 := ulid.Make()
+		triggerID2 := ulid.Make()
+		runID := ulid.Make()
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID1.String(), triggerID2.String()},
+			Status:      1, // Running
+		}
+
+		err := cm.InsertTraceRun(ctx, traceRun)
+		require.NoError(t, err)
+
+		// Search by the first trigger ID - should find the run
+		runs, err := cm.GetTraceRunsByTriggerID(ctx, triggerID1)
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "Should find exactly one trace run by first trigger ID")
+		assert.Equal(t, runID.String(), runs[0].RunID)
+
+		// Search by the second trigger ID - should also find the run
+		runs, err = cm.GetTraceRunsByTriggerID(ctx, triggerID2)
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "Should find exactly one trace run by second trigger ID")
+		assert.Equal(t, runID.String(), runs[0].RunID)
+
+		// Search by non-existent trigger ID - should return empty
+		nonExistentTriggerID := ulid.Make()
+		runs, err = cm.GetTraceRunsByTriggerID(ctx, nonExistentTriggerID)
+		require.NoError(t, err)
+		assert.Len(t, runs, 0, "Should return empty for non-existent trigger ID")
+	})
+
+	t.Run("different runs with same trigger ID", func(t *testing.T) {
+		// these would most likely be different functions in real use, but doesn't matter for the test
+		triggerID := ulid.Make()
+
+		run1ID := ulid.Make()
+		run2ID := ulid.Make()
+
+		traceRun1 := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-batch-1-" + run1ID.String(),
+			RunID:       run1ID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+		}
+
+		traceRun2 := &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-batch-2-" + run2ID.String(),
+			RunID:       run2ID.String(),
+			QueuedAt:    time.Now(),
+			StartedAt:   time.Now(),
+			EndedAt:     time.Now(),
+			TriggerIDs:  []string{triggerID.String()},
+			Status:      1,
+		}
+
+		err := cm.InsertTraceRun(ctx, traceRun1)
+		require.NoError(t, err)
+		err = cm.InsertTraceRun(ctx, traceRun2)
+		require.NoError(t, err)
+
+		// Search by the shared trigger ID - should find both runs
+		runs, err := cm.GetTraceRunsByTriggerID(ctx, triggerID)
+		require.NoError(t, err)
+		assert.Len(t, runs, 2, "Should find both trace runs that share the same trigger ID")
+
+		// Verify both run IDs are present
+		runIDs := make([]string, len(runs))
+		for i, r := range runs {
+			runIDs[i] = r.RunID
+		}
+		assert.Contains(t, runIDs, run1ID.String())
+		assert.Contains(t, runIDs, run2ID.String())
+	})
+}
+
+func TestCQRSGetTraceRunsPagination(t *testing.T) {
+	// This test verifies that cursor-based pagination works correctly for the GetSpanRuns
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+
+	// Create 3 spans with "executor.run" name (required for GetSpanRuns) with distinct start_time
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	runIDs := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		runIDs[i] = runID
+
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:         runID,
+			DynamicSpanID: fmt.Sprintf("dyn-%d", i),
+			Name:          "executor.run",
+			StartTime:     baseTime.Add(time.Duration(i) * time.Second),
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		})
+	}
+
+	t.Run("preview path paginate with cursor", func(t *testing.T) {
+		// Fetch a page of 1 item at a time. We'll use cursor to get 3 pages
+		getPage := func(cursor string) ([]*cqrs.TraceRun, error) {
+			return cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+				Filter: cqrs.GetTraceRunFilter{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					FunctionID:  []uuid.UUID{functionID},
+					TimeField:   enums.TraceRunTimeStartedAt,
+					From:        baseTime.Add(-time.Hour),
+					Until:       baseTime.Add(time.Hour),
+				},
+				Order: []cqrs.GetTraceRunOrder{
+					{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+				},
+				Cursor:  cursor,
+				Items:   1,
+				Preview: true,
+			})
+		}
+
+		// Fetch first page (no cursor, 1 item, ordered by started_at desc)
+		firstPage, err := getPage("")
+		require.NoError(t, err)
+		require.Len(t, firstPage, 1, "First page should have 1 item")
+		require.NotEmpty(t, firstPage[0].Cursor, "First page result should have a cursor")
+		firstRunID := firstPage[0].RunID
+
+		// Fetch second page using the cursor from first page
+		secondPage, err := getPage(firstPage[0].Cursor)
+		require.NoError(t, err)
+		require.Len(t, secondPage, 1, "Second page should have 1 item")
+		secondRunID := secondPage[0].RunID
+		assert.NotEqual(t, firstRunID, secondRunID, "Second page should return a different run than first page")
+
+		// Fetch third page
+		thirdPage, err := getPage(secondPage[0].Cursor)
+		require.NoError(t, err)
+		require.Len(t, thirdPage, 1, "Third page should have 1 item")
+		thirdRunID := thirdPage[0].RunID
+		assert.NotEqual(t, firstRunID, thirdRunID, "Third page should return a different run than first page")
+		assert.NotEqual(t, secondRunID, thirdRunID, "Third page should return a different run than second page")
+
+		// Verify we got all 3 runs
+		returnedRunIDs := []string{firstRunID, secondRunID, thirdRunID}
+		for _, id := range runIDs {
+			assert.Contains(t, returnedRunIDs, id, "All created runs should be returned through pagination")
+		}
+	})
+}
+
+func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	completedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         completedRunID,
+		DynamicSpanID: "dyn-completed",
+		Name:          "executor.run",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		DynamicSpanID: "dyn-skipped",
+		Name:          "executor.run",
+		Status:        enums.RunStatusSkipped.String(),
+		StartTime:     baseTime.Add(time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1, "Skipped runs should be excluded from the runs list")
+	assert.Equal(t, completedRunID, runs[0].RunID)
+}
+
+//
+// Span Tests
+//
+
+func TestCQRSGetSpan(t *testing.T) {
+	// These tests insert a root and child span with different dynamic_span_ids.
+	// Each test tests a different query that GROUPs BY dynamic_span_id
+
+	t.Run("by run ID", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root"})
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root"})
+
+		result, err := cm.GetSpansByRunID(t.Context(), ulid.MustParse(runID))
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "dyn-root", result.SpanID)
+		assert.Len(t, result.Children, 1, "Root should have 1 child")
+	})
+
+	t.Run("by debug run ID", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root", DebugRunID: debugRunID.String()})
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root", DebugRunID: debugRunID.String()})
+
+		result, err := cm.GetSpansByDebugRunID(t.Context(), debugRunID)
+		require.NoError(t, err)
+		require.Len(t, result, 1, "Should return 1 root span for the single run")
+		assert.Len(t, result[0].Children, 1, "Root should have 1 child")
+	})
+
+	t.Run("by debug session ID", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugSessionID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root", DebugRunID: debugRunID, DebugSessionID: debugSessionID.String()})
+		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root", DebugRunID: debugRunID, DebugSessionID: debugSessionID.String()})
+
+		result, err := cm.GetSpansByDebugSessionID(t.Context(), debugSessionID)
+		require.NoError(t, err)
+		require.Len(t, result, 1, "Should return 1 debug run group")
+		require.Len(t, result[0], 1, "Debug run group should have 1 root span")
+		assert.Len(t, result[0][0].Children, 1, "Root should have 1 child")
+	})
+
+	t.Run("by debug session ID keeps runs separate when dynamic span IDs collide", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		debugSessionID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		runIDOne := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		runIDTwo := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunIDOne := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		debugRunIDTwo := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:          runIDOne,
+			DynamicSpanID:  "dyn-root",
+			DebugRunID:     debugRunIDOne,
+			DebugSessionID: debugSessionID.String(),
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:          runIDTwo,
+			DynamicSpanID:  "dyn-root",
+			DebugRunID:     debugRunIDTwo,
+			DebugSessionID: debugSessionID.String(),
+		})
+
+		result, err := cm.GetSpansByDebugSessionID(t.Context(), debugSessionID)
+		require.NoError(t, err)
+		require.Len(t, result, 2, "separate runs in the same debug session must not collapse into one group")
+		require.Len(t, result[0], 1)
+		require.Len(t, result[1], 1)
+	})
+}
+
+// TestSpanWithAttributesAndOutput is a regression test ensuring that spans
+// with JSON attributes and output can be inserted and queried without
+// "JSON cannot hold BLOB values" errors. This catches the bug where []byte
+// fields were stored as BLOBs instead of TEXT in SQLite JSON columns.
+func TestSpanWithAttributesAndOutput(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runULID := ulid.MustNew(ulid.Now(), rand.Reader)
+	runID := runULID.String()
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-with-attrs",
+		Name:          "executor.run",
+		Attributes:    []byte(`{"sdk.language":"go","sdk.version":"0.1.0"}`),
+		Output:        []byte(`{"data":{"num":42}}`),
+	})
+
+	// GetSpansByRunID uses json_group_array(json_object('attributes', attributes, ...))
+	// which fails with "JSON cannot hold BLOB values" if attributes/output are BLOBs.
+	result, err := cm.GetSpansByRunID(t.Context(), runULID)
+	require.NoError(t, err, "query must not fail with 'JSON cannot hold BLOB values'")
+	assert.NotNil(t, result)
+}
+
+// TestSpanAttributesRoundTrip exercises the read path for stored span
+// attributes. Postgres' jsonb embeds as a nested object inside json_build_object
+// while sqlite's JSON returns a quoted string, so this regression-tests that the
+// reader handles both shapes — when broken, the entire attribute map is silently
+// empty under postgres and every downstream consumer (StepOp, RunID, etc.) sees
+// zero values.
+func TestSpanAttributesRoundTrip(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runULID := ulid.MustNew(ulid.Now(), rand.Reader)
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runULID.String(),
+		DynamicSpanID: "dyn-attrs",
+		Name:          "executor.run",
+		Attributes:    []byte(`{"sdk.language":"go","sdk.version":"0.1.0","_inngest.run.id":"` + runULID.String() + `"}`),
+	})
+
+	result, err := cm.GetSpansByRunID(t.Context(), runULID)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "go", result.RawOtelSpan.Attributes["sdk.language"])
+	assert.Equal(t, "0.1.0", result.RawOtelSpan.Attributes["sdk.version"])
+}
+
+// TestSpanOutputReadBack verifies that span output stored as []byte can be
+// read back via GetSpanOutput without corruption. This is a regression test
+// for double-encoding where json.Marshal(stringValue) would wrap the JSON
+// in extra quotes, breaking json_extract queries.
+func TestSpanOutputReadBack(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	q := cm.(wrapper).q
+	err := q.InsertSpan(t.Context(), dbpkg.InsertSpanParams{
+		SpanID:     spanID,
+		TraceID:    ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		Name:       "test-span",
+		StartTime:  time.Now(),
+		EndTime:    time.Now().Add(100 * time.Millisecond),
+		RunID:      runID,
+		AccountID:  "acct",
+		AppID:      "app",
+		FunctionID: "fn",
+		EnvID:      "env",
+		Output:     []byte(`{"data":{"num":42}}`),
+	})
+	require.NoError(t, err)
+
+	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{SpanID: spanID})
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted
+	assert.Contains(t, string(out.Data), `"num":42`, "output should contain raw JSON, not double-encoded")
+}
+
+//
 // Helpers
 //
+
+type testSpanFields struct {
+	RunID          string    // required
+	DynamicSpanID  string    // required for GROUP BY tests
+	ParentSpanID   string    // for child spans (references parent's DynamicSpanID)
+	DebugRunID     string    // for debug run tests
+	DebugSessionID string    // for debug session tests
+	Name           string    // default: "test-span"
+	Status         string    // default: "" (NULL)
+	StartTime      time.Time // default: time.Now()
+	AccountID      string    // default: "acct"
+	AppID          string    // default: "app"
+	FunctionID     string    // default: "fn"
+	EnvID          string    // default: "env"
+	Attributes     []byte    // JSON attributes (optional)
+	Output         []byte    // JSON output (optional)
+}
+
+// There aren't any functions exposed on cqrs.Manager that write to the new spans table
+// so use this test helper for now.
+func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
+	t.Helper()
+
+	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	// Apply defaults
+	if spanFields.Name == "" {
+		spanFields.Name = "test-span"
+	}
+	if spanFields.StartTime.IsZero() {
+		spanFields.StartTime = time.Now()
+	}
+	if spanFields.AccountID == "" {
+		spanFields.AccountID = "acct"
+	}
+	if spanFields.AppID == "" {
+		spanFields.AppID = "app"
+	}
+	if spanFields.FunctionID == "" {
+		spanFields.FunctionID = "fn"
+	}
+	if spanFields.EnvID == "" {
+		spanFields.EnvID = "env"
+	}
+
+	// TODO: ideally we should not have to do this type assertion to wrapper to write a span
+	q := cm.(wrapper).q
+	err := q.InsertSpan(t.Context(), dbpkg.InsertSpanParams{
+		SpanID:         spanID,
+		TraceID:        traceID,
+		ParentSpanID:   sql.NullString{String: spanFields.ParentSpanID, Valid: spanFields.ParentSpanID != ""},
+		Name:           spanFields.Name,
+		Status:         sql.NullString{String: spanFields.Status, Valid: spanFields.Status != ""},
+		StartTime:      spanFields.StartTime,
+		EndTime:        spanFields.StartTime.Add(100 * time.Millisecond),
+		RunID:          spanFields.RunID,
+		AccountID:      spanFields.AccountID,
+		AppID:          spanFields.AppID,
+		FunctionID:     spanFields.FunctionID,
+		EnvID:          spanFields.EnvID,
+		DynamicSpanID:  sql.NullString{String: spanFields.DynamicSpanID, Valid: spanFields.DynamicSpanID != ""},
+		DebugRunID:     sql.NullString{String: spanFields.DebugRunID, Valid: spanFields.DebugRunID != ""},
+		DebugSessionID: sql.NullString{String: spanFields.DebugSessionID, Valid: spanFields.DebugSessionID != ""},
+		Attributes:     spanFields.Attributes,
+		Output:         spanFields.Output,
+	})
+	require.NoError(t, err)
+}
 
 type withInitCQRSOpt func(*initCQRSOpt)
 
@@ -1396,7 +1934,10 @@ func withInitCQRSOptApp(id uuid.UUID) withInitCQRSOpt {
 	}
 }
 
-func initSQLiteCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
+// initCQRS initializes a CQRS manager based on the TEST_DATABASE environment variable.
+// When TEST_DATABASE=postgres, it starts a PostgreSQL testcontainer.
+// Otherwise, it defaults to in-memory SQLite.
+func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	ctx := context.Background()
 
 	opt := initCQRSOpt{}
@@ -1404,13 +1945,39 @@ func initSQLiteCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()
 		apply(&opt)
 	}
 
-	db, err := New(BaseCQRSOptions{InMemory: true, ForTest: true})
-	require.NoError(t, err)
+	var (
+		db  *sql.DB
+		err error
+	)
 
-	cm := NewCQRS(db, "sqlite", sqlc_psql.NewNormalizedOpts{})
+	var pc *testutil.PostgresContainer
+
+	var adapter adapterWithHelpers
+
+	testDB := os.Getenv(EnvTestDatabase)
+	if testDB == "postgres" {
+		var pgErr error
+		pc, pgErr = testutil.StartPostgres(t)
+		require.NoError(t, pgErr)
+
+		db, err = New(ctx, BaseCQRSOptions{PostgresURI: pc.URI, ForTest: true})
+		require.NoError(t, err)
+		adapter = dbpostgres.New(db)
+	} else {
+		db, err = New(ctx, BaseCQRSOptions{Persist: false, ForTest: true})
+		require.NoError(t, err)
+		adapter = dbsqlite.New(db)
+	}
+
+	cm := NewCQRS(adapter)
 
 	cleanup := func() {
 		db.Close()
+		if pc != nil {
+			if err := pc.Terminate(t.Context()); err != nil {
+				t.Logf("failed to terminate postgres container: %v", err)
+			}
+		}
 	}
 
 	if opt.appID != uuid.Nil {

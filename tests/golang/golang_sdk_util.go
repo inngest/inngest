@@ -57,7 +57,13 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 		t.Helper()
 		req, err := http.NewRequest(http.MethodPut, server.LocalURL(), nil)
 		require.NoError(t, err)
-		resp, err := http.DefaultClient.Do(req)
+		req.Close = true
+		// Registration updates are infrequent and CI occasionally reuses a stale
+		// idle connection here. Use a one-off transport to avoid surfacing that
+		// socket reuse as a flaky test failure.
+		resp, err := (&http.Client{
+			Transport: &http.Transport{DisableKeepAlives: true},
+		}).Do(req)
 		require.NoError(t, err)
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -174,4 +180,34 @@ func NewHTTPSServer(f http.Handler) *HTTPServer {
 
 func randomSuffix(s string) string {
 	return fmt.Sprintf("%s-%s", s, uuid.NewString())
+}
+
+// RunID provides a safe, one-shot mechanism for capturing a run ID from inside
+// a function handler and waiting for it in the test body with a timeout.
+type RunID struct {
+	ch chan string
+}
+
+func NewRunID() *RunID {
+	return &RunID{ch: make(chan string, 1)}
+}
+
+// Send captures the run ID. Only the first call has any effect (non-blocking).
+// Call this inside the function handler.
+func (r *RunID) Send(id string) {
+	select {
+	case r.ch <- id:
+	default:
+	}
+}
+
+// Wait blocks until the run ID is received or 20s elapses (test fails on timeout).
+func (r *RunID) Wait(t require.TestingT) string {
+	select {
+	case id := <-r.ch:
+		return id
+	case <-time.After(20 * time.Second):
+		require.Fail(t, "timed out after 20s waiting for run ID")
+		return ""
+	}
 }

@@ -1,5 +1,3 @@
-'use client';
-
 import { forwardRef, useContext } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
@@ -20,12 +18,13 @@ const SPACING_STYLES = 'gap-1.5 px-3';
 
 export interface TabProps
   extends Omit<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>, 'children'> {
+  disallowClose?: boolean;
   iconBefore?: React.ReactNode;
-  title: string;
+  title?: string;
 }
 
 export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, TabProps>(
-  ({ className, iconBefore, title, value, ...props }, ref) => {
+  ({ className, disallowClose, iconBefore, title, value, ...props }, ref) => {
     const { defaultIconBefore, onClose } = useContext(TabsContext);
 
     const finalIconBefore = iconBefore ?? defaultIconBefore;
@@ -47,10 +46,18 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
         {...props}
       >
         {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
-        <span className="flex-1 truncate text-left">{title}</span>
-        {onClose && (
+        {title !== undefined && <span className="flex-1 truncate text-left">{title}</span>}
+        {onClose && !disallowClose && (
           <span
             className="p-0.5"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

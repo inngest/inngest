@@ -1,9 +1,10 @@
+import headlessui from '@headlessui/tailwindcss';
 import type { Config } from 'tailwindcss';
 import defaultTheme from 'tailwindcss/defaultTheme';
 
-export default {
+const config = {
   content: ['./src/**/*.{ts,tsx,mdx}'],
-  darkMode: 'class',
+  darkMode: 'class' as const,
   theme: {
     extend: {
       fontFamily: {
@@ -51,6 +52,11 @@ export default {
           coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
           cool3xIntense: 'rgb(var(--color-quaternary-cool-3xIntense) / <alpha-value>)',
+          warmer3xSubtle: 'rgb(var(--color-quaternary-warmer-3xSubtle) / <alpha-value>)',
+          warmerxSubtle: 'rgb(var(--color-quaternary-warmer-xSubtle) / <alpha-value>)',
+          warmerModerate: 'rgb(var(--color-quaternary-warmer-moderate) / <alpha-value>)',
+          warmerxIntense: 'rgb(var(--color-quaternary-warmer-xIntense) / <alpha-value>)',
+          warmer3xIntense: 'rgb(var(--color-quaternary-warmer-3xIntense) / <alpha-value>)',
         },
         accent: {
           '3xSubtle': 'rgb(var(--color-accent-3xSubtle) / <alpha-value>)',
@@ -93,6 +99,7 @@ export default {
         active: 'rgb(var(--color-border-active) / <alpha-value>)',
       },
       outlineColor: {
+        subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
         error: 'rgb(var(--color-border-error) / <alpha-value>)',
       },
       divideColor: {
@@ -173,6 +180,7 @@ export default {
         canvasMuted: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
       },
       fill: {
+        //
         // temporary tooltip token
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
@@ -195,6 +203,7 @@ export default {
         dashboard: '1fr 1fr 1fr 432px',
       },
       boxShadowColor: {
+        //
         // temporary tooltip token
         tooltip: 'rgb(var(--color-background-canvas-muted) / <alpha-value>)',
         subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
@@ -211,6 +220,14 @@ export default {
         shimmer: {
           '100%': {
             transform: 'translateX(100%)',
+          },
+        },
+        'shimmer-text': {
+          '0%': {
+            backgroundPosition: '100% 0',
+          },
+          '100%': {
+            backgroundPosition: '0 0',
           },
         },
         'slide-down-and-fade': {
@@ -239,12 +256,15 @@ export default {
         'slide-up-and-fade': 'slide-up-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-right-and-fade': 'slide-right-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         underline: 'underline 2s linear infinite',
+        'shimmer-text': 'shimmer-text 1.25s linear infinite',
       },
       spacing: {
         'cmdk-margin': 'calc((100vh - (84.5px + 330px)) / 2)',
       },
     },
   },
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  plugins: [require('@headlessui/tailwindcss')],
+
+  plugins: [headlessui] as Config['plugins'],
 } satisfies Config;
+
+export default config;

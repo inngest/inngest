@@ -8,6 +8,10 @@ import type { TraceResult } from '../SharedContext/useGetTraceResult';
  */
 export const usePrettyJson = (json: string): string | null => {
   return useMemo(() => {
+    if (!json) {
+      return null;
+    }
+
     try {
       const data: unknown = JSON.parse(json);
       if (data === null) {

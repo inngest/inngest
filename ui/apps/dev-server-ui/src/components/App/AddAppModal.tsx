@@ -6,6 +6,7 @@ import useDebounce from '@inngest/components/hooks/useDebounce';
 import { toast } from 'sonner';
 
 import { useCreateAppMutation } from '@/store/generated';
+import { useInfoQuery } from '@/store/devApi';
 import isValidUrl from '@/utils/urlValidation';
 
 type AddAppModalProps = {
@@ -14,6 +15,8 @@ type AddAppModalProps = {
 };
 
 export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
+  const { data: info, isLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
   const [inputUrl, setInputUrl] = useState('');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isDisabled, setDisabled] = useState(true);
@@ -43,11 +46,11 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
         input: {
           url: inputUrl,
         },
-      });
+      }).unwrap();
       toast.success('The app was successfully added.');
       console.log('Created app:', response);
     } catch (error) {
-      toast.error('The app could not be created: ${error}.');
+      toast.error('The app could not be created.');
       console.error('Error creating app:', error);
     }
     onClose();
@@ -67,7 +70,11 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="min-w-[500px]">
-      <Modal.Header description="Sync your Inngest application to the Dev Server">
+      <Modal.Header
+        description={`Sync your Inngest application to the ${
+          isDevServer ? 'Dev Server' : 'Server'
+        }`}
+      >
         Sync App
       </Modal.Header>
       <Modal.Body>
@@ -83,13 +90,22 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
               placeholder="http://localhost:3000/api/inngest"
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              error={isUrlInvalid && inputUrl.length > 0 ? 'Please enter a valid URL' : undefined}
+              error={
+                isUrlInvalid && inputUrl.length > 0
+                  ? 'Please enter a valid URL'
+                  : undefined
+              }
             />
           </div>
         </form>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button label="Cancel" kind="secondary" appearance="outlined" onClick={onClose} />
+        <Button
+          label="Cancel"
+          kind="secondary"
+          appearance="outlined"
+          onClick={onClose}
+        />
         <Button
           disabled={isDisabled || isUrlInvalid}
           label="Sync App"

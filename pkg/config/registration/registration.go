@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util/rueidisconn"
 )
 
 var (
@@ -69,7 +70,7 @@ type NewDriverOpts struct {
 
 // DriverConfig is an interface used to determine driver config structs.
 type DriverConfig interface {
-	NewDriver(opts ...NewDriverOpts) (driver.Driver, error)
+	NewDriver(opts ...NewDriverOpts) (driver.DriverV1, error)
 
 	// DriverName returns the name of the specific driver.
 	DriverName() string
@@ -87,5 +88,5 @@ type QueueConfig interface {
 
 type StateConfig interface {
 	StateName() string
-	SingleClusterManager(context.Context) (state.Manager, error)
+	SingleClusterManager(context.Context, rueidisconn.TTFBHandler) (state.Manager, error)
 }

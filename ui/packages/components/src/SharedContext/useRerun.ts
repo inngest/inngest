@@ -6,6 +6,8 @@ export type RerunPayload = {
   // this is only required for the dashboard
   // and is validated there
   fnID?: string;
+  debugRunID?: string;
+  debugSessionID?: string;
 };
 
 export type RerunResult = {

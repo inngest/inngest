@@ -1,13 +1,9 @@
-'use client';
-
-import type { Route } from 'next';
-import NextLink from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmall } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
-
 import { QuickSearch } from './QuickSearch/QuickSearch';
+import { Link } from '@tanstack/react-router';
 
 type LogoProps = {
   collapsed: boolean;
@@ -53,26 +49,37 @@ const NavToggle = ({
   );
 };
 
-export default function Logo({ collapsed, envSlug, envName, setCollapsed }: LogoProps) {
+export default function Logo({
+  collapsed,
+  envSlug,
+  envName,
+  setCollapsed,
+}: LogoProps) {
   return (
     <div
       className={`${
         collapsed ? 'mx-auto' : 'mx-4'
       } mt-4 flex h-[28px] flex-row items-center justify-between`}
     >
-      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-1'} `}>
+      <div
+        className={`flex flex-row items-center justify-start ${
+          collapsed ? '' : 'mr-1'
+        } `}
+      >
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
             <InngestLogoSmall className="text-basis" />
           </div>
         ) : (
-          <>
-            <NextLink href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
-              <InngestLogo className="text-basis mr-2" width={96} />
-            </NextLink>
-          </>
+          <Link to={import.meta.env.VITE_HOME_PATH} preload={false}>
+            <InngestLogo className="text-basis mr-2" width={96} />
+          </Link>
         )}
-        <QuickSearch collapsed={collapsed} envSlug={envSlug} envName={envName} />
+        <QuickSearch
+          collapsed={collapsed}
+          envSlug={envSlug}
+          envName={envName}
+        />
       </div>
       <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>

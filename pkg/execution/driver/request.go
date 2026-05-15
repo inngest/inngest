@@ -1,16 +1,45 @@
 package driver
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 )
 
+type sdkRequestIDCtxKey struct{}
+
+type sdkJobIDCtxKey struct{}
+
+// WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
+// driver calls.
+func WithRequestIDs(ctx context.Context, requestID, jobID string) context.Context {
+	ctx = context.WithValue(ctx, sdkRequestIDCtxKey{}, requestID)
+	ctx = context.WithValue(ctx, sdkJobIDCtxKey{}, jobID)
+	return ctx
+}
+
+// RequestIDFromContext returns the per-outbound SDK request ID.
+func RequestIDFromContext(ctx context.Context) string {
+	id, _ := ctx.Value(sdkRequestIDCtxKey{}).(string)
+	return id
+}
+
+// JobIDFromContext returns the stable queue item ID for this SDK request.
+func JobIDFromContext(ctx context.Context) string {
+	id, _ := ctx.Value(sdkJobIDCtxKey{}).(string)
+	return id
+}
+
 type SDKRequest struct {
-	Event   map[string]any     `json:"event"`
-	Events  []map[string]any   `json:"events"`
-	Actions map[string]any     `json:"steps"`
+	Event   map[string]any   `json:"event"`
+	Events  []map[string]any `json:"events"`
+	Actions map[string]any   `json:"steps"`
+
+	// For the "defer" opcodes
+	Defers map[string]SDKDeferEntry `json:"defers"`
+
 	Context *SDKRequestContext `json:"ctx"`
 	// Version indicates the version used to manage the SDK request context.
 	//
@@ -19,6 +48,19 @@ type SDKRequest struct {
 
 	// DEPRECATED: NOTE: This is moved into SDKRequestContext for V3+/Non-TS SDKs
 	UseAPI bool `json:"use_api"`
+}
+
+// SDKDeferEntry tells the SDK that a deferred run is already registered for the
+// given hashed ID, so it should not re-report `OpcodeDeferAdd` for it.
+type SDKDeferEntry struct {
+	// Abortable indicates the SDK may emit `OpcodeDeferAbort` for this
+	// entry. It signifies that the deferred run hasn't queued yet, so it can be
+	// aborted.
+	//
+	// Note that this is different than run cancellation on an already-queued
+	// run. Aborting a deferred run simply will mean no run will ever exist
+	// (e.g. no run ID).
+	Abortable bool `json:"abortable"`
 }
 
 type SDKRequestContext struct {
@@ -41,8 +83,21 @@ type SDKRequestContext struct {
 	// Attempt is the zero-index attempt number.
 	Attempt int `json:"attempt"`
 
+	// MaxAttempts is the maximum number of attempts allowed for this function.
+	MaxAttempts int `json:"max_attempts"`
+
 	// Stack represents the function stack at the time of the step invocation.
 	Stack *FunctionStack `json:"stack"`
+
+	// QueueItemID is the ID of the queue item and shard, used when checkpointing
+	// async functions so that the API knows which queue item to reset.
+	QueueItemRef string `json:"qi_id"`
+
+	// RequestID is a unique ID generated for each outbound SDK request.
+	RequestID string `json:"request_id,omitempty"`
+
+	// JobID is the stable queue item ID for the current job.
+	JobID string `json:"job_id,omitempty"`
 
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.

@@ -373,6 +373,26 @@ func (c Bitop) Not() BitopOperationNot {
 	return (BitopOperationNot)(c)
 }
 
+func (c Bitop) Diff() BitopOperationDiff {
+	c.cs.s = append(c.cs.s, "DIFF")
+	return (BitopOperationDiff)(c)
+}
+
+func (c Bitop) Diff1() BitopOperationDiff1 {
+	c.cs.s = append(c.cs.s, "DIFF1")
+	return (BitopOperationDiff1)(c)
+}
+
+func (c Bitop) Andor() BitopOperationAndor {
+	c.cs.s = append(c.cs.s, "ANDOR")
+	return (BitopOperationAndor)(c)
+}
+
+func (c Bitop) One() BitopOperationOne {
+	c.cs.s = append(c.cs.s, "ONE")
+	return (BitopOperationOne)(c)
+}
+
 type BitopDestkey Incomplete
 
 func (c BitopDestkey) Key(key ...string) BitopKey {
@@ -424,9 +444,57 @@ func (c BitopOperationAnd) Destkey(destkey string) BitopDestkey {
 	return (BitopDestkey)(c)
 }
 
+type BitopOperationAndor Incomplete
+
+func (c BitopOperationAndor) Destkey(destkey string) BitopDestkey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(destkey)
+	} else {
+		c.ks = check(c.ks, slot(destkey))
+	}
+	c.cs.s = append(c.cs.s, destkey)
+	return (BitopDestkey)(c)
+}
+
+type BitopOperationDiff Incomplete
+
+func (c BitopOperationDiff) Destkey(destkey string) BitopDestkey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(destkey)
+	} else {
+		c.ks = check(c.ks, slot(destkey))
+	}
+	c.cs.s = append(c.cs.s, destkey)
+	return (BitopDestkey)(c)
+}
+
+type BitopOperationDiff1 Incomplete
+
+func (c BitopOperationDiff1) Destkey(destkey string) BitopDestkey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(destkey)
+	} else {
+		c.ks = check(c.ks, slot(destkey))
+	}
+	c.cs.s = append(c.cs.s, destkey)
+	return (BitopDestkey)(c)
+}
+
 type BitopOperationNot Incomplete
 
 func (c BitopOperationNot) Destkey(destkey string) BitopDestkey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(destkey)
+	} else {
+		c.ks = check(c.ks, slot(destkey))
+	}
+	c.cs.s = append(c.cs.s, destkey)
+	return (BitopDestkey)(c)
+}
+
+type BitopOperationOne Incomplete
+
+func (c BitopOperationOne) Destkey(destkey string) BitopDestkey {
 	if c.ks&NoSlot == NoSlot {
 		c.ks = NoSlot | slot(destkey)
 	} else {

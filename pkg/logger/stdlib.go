@@ -6,20 +6,27 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"math/rand"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/google/uuid"
 	"github.com/lmittmann/tint"
 )
 
-var (
-	stdlibCtxKey = stdlibKey{}
-)
+var stdlibCtxKey = stdlibKey{}
 
 type stdlibKey struct{}
 
 type handler int
+
+// noop doesn't log.
+var noop = &logger{
+	Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	level:  LevelEmergency,
+}
 
 const (
 	JSONHandler handler = iota
@@ -62,6 +69,9 @@ type Logger interface {
 	Level() slog.Level
 	With(args ...any) Logger
 
+	// Optional uses the [DefaultLogEnabler] function to only log on truthy results
+	Optional(accountID uuid.UUID, logname string) Logger
+
 	//
 	// Methods added in wrapper
 	//
@@ -72,6 +82,10 @@ type Logger interface {
 	Emergency(msg string, args ...any)
 	EmergencyContext(ctx context.Context, msg string, args ...any)
 	SLog() *slog.Logger
+
+	// DebugSample samples a % of time to produce a debug log, between 0-100.
+	// Non-sampled logs are logged as a trace.
+	DebugSample(percent int, msg string, args ...any)
 
 	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
 	ReportError(err error, msg string, opts ...ReportErrorOpt)
@@ -195,15 +209,18 @@ func newLogger(opts ...LoggerOpt) Logger {
 	}
 }
 
-// StdlibLoggger returns the stdlib logger in context, or a new logger
+// From returns the stdlib logger in context, or a new logger
 // if none stored.
-func StdlibLogger(ctx context.Context, opts ...LoggerOpt) Logger {
+func From(ctx context.Context, opts ...LoggerOpt) Logger {
 	l := ctx.Value(stdlibCtxKey)
 	if l == nil {
 		return newLogger(opts...)
 	}
 	return l.(Logger)
 }
+
+// StdlibLogger is an alternative name for From for backcompat.
+var StdlibLogger = From
 
 func VoidLogger() Logger {
 	return newLogger(WithLoggerWriter(io.Discard))
@@ -260,6 +277,14 @@ type logger struct {
 	attrs []any
 }
 
+func (l *logger) DebugSample(percent int, msg string, args ...any) {
+	if rand.Intn(100) < percent {
+		l.Debug(msg, args...)
+		return
+	}
+	l.Trace(msg, args...)
+}
+
 func (l *logger) Level() slog.Level {
 	return l.level
 }
@@ -274,6 +299,13 @@ func (l *logger) With(args ...any) Logger {
 		Logger: log,
 		attrs:  append(l.attrs, args...),
 	}
+}
+
+func (l *logger) Optional(accountID uuid.UUID, logname string) Logger {
+	if DefaultLogEnabler(accountID, logname) {
+		return l.With("logname", logname)
+	}
+	return noop
 }
 
 func (l *logger) Trace(msg string, args ...any) {
@@ -346,7 +378,7 @@ func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
 			args = append(args, k, v)
 		}
 
-		args = append(args, "err", err)
+		args = append(args, "err", err, "stack", debug.Stack())
 
 		l.Error(msg, args...)
 	}

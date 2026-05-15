@@ -23,7 +23,7 @@ func TestFunctionStepLimit(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	inngestClient, server, registerFuncs := NewSDKHandler(t, "fnrun")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
 	defer server.Close()
 
 	var (

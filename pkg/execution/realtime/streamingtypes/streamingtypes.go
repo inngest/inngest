@@ -13,6 +13,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	TopicNameStream = "$stream"
+)
+
 type (
 	// MessageKind represents the type of data in the message, eg. whether
 	// this is a step output, custom data, a run result, etc.
@@ -30,8 +34,8 @@ const (
 	MessageKindRun = MessageKind("run")
 	// MessageKindData represents misc data published on a custom run channel
 	MessageKindData = MessageKind("data")
-	// MessageKindDataStreamStart represents misc data published on a custom run channel,
-	// streamed to subscribers via multiple messages with an arbitrary prefix.
+	// MessageKindDataStreamStart represents the start of a streaming chunk block,
+	// streamed to subscribers via multiple messages with the same datastream ID.
 	MessageKindDataStreamStart = MessageKind("datastream-start")
 	// MessageKindDataStreamEnd acknowledges the end of a datastream.
 	MessageKindDataStreamEnd   = MessageKind("datastream-end")
@@ -159,7 +163,7 @@ type Message struct {
 	Channel string `json:"channel,omitempty,omitzero"`
 	// EnvID is the environment ID that the message belongs to.
 	EnvID uuid.UUID `json:"env_id,omitempty,omitzero"`
-	// TOpic represents the custom topic that this message should be broadcast
+	// Topic represents the custom topic that this message should be broadcast
 	// on.  For steps, this must include the unhashed step ID.  For custom broadcasts,
 	// this is the chosen topic name in the SDK.
 	Topic string `json:"topic"`
@@ -184,7 +188,7 @@ func (m Message) Validate() error {
 			return fmt.Errorf("datastream kinds must have a stream id set")
 		}
 		if bytes.Contains(m.Data, []byte(":")) {
-			return fmt.Errorf("datstream stream id must not contain colons (:)")
+			return fmt.Errorf("datastream stream id must not contain colons (:)")
 		}
 	}
 	return nil
@@ -250,9 +254,17 @@ func (m Message) Topics() []Topic {
 }
 
 func ChunkFromMessage(m Message, data string) Chunk {
+	// Attempt to unmarshal Data as a JSON string for the stream ID.  If it's a
+	// valid JSON string (e.g. `"abc123"`), use the unquoted value.  Otherwise
+	// fall back to the raw bytes (backward compat).
+	streamID := string(m.Data)
+	var parsed string
+	if json.Unmarshal(m.Data, &parsed) == nil {
+		streamID = parsed
+	}
 	return Chunk{
 		Kind:     string(MessageKindDataStreamChunk),
-		StreamID: string(m.Data),
+		StreamID: streamID,
 		Data:     data,
 		FnID:     m.FnID,
 		FnSlug:   m.FnSlug,

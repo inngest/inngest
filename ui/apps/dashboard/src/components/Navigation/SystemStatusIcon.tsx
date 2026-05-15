@@ -7,7 +7,10 @@ type SystemStatusIconProps = {
   status: Status;
 };
 
-export default function SystemStatusIcon({ className, status }: SystemStatusIconProps) {
+export default function SystemStatusIcon({
+  className,
+  status,
+}: SystemStatusIconProps) {
   return (
     <span
       className={cn('mx-1 inline-flex h-2 w-2 rounded-full', className)}

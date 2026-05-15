@@ -135,7 +135,7 @@ func startTestServer(t *testing.T, signingKey *string) context.CancelFunc {
 		URLs:               []string{},
 		ConnectGatewayPort: devserver.DefaultConnectGatewayPort,
 		ConnectGatewayHost: conf.CoreAPI.Addr,
-		InMemory:           true,
+		Persist:            false,
 		SigningKey:         signingKey,
 		EventKeys:          []string{},
 		RequireKeys:        false,

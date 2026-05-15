@@ -1,5 +1,8 @@
 import { useCallback } from 'react';
-import type { GetRunPayload, GetRunResult } from '@inngest/components/SharedContext/useGetRun';
+import type {
+  GetRunPayload,
+  GetRunResult,
+} from '@inngest/components/SharedContext/useGetRun';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -24,10 +27,17 @@ const traceDetailsFragment = graphql(`
       spanAttrs
       resourceAttrs
     }
+    metadata {
+      kind
+      scope
+      values
+      updatedAt
+    }
     outputID
     stepID
     spanID
     stepOp
+    stepType
     stepInfo {
       __typename
       ... on InvokeStepInfo {
@@ -49,6 +59,10 @@ const traceDetailsFragment = graphql(`
         timedOut
       }
     }
+    response {
+      statusCode
+      headers
+    }
   }
 `);
 
@@ -65,12 +79,19 @@ const query = graphql(`
           name
           slug
         }
+        status
         trace(preview: $preview) {
           ...TraceDetails
           childrenSpans {
             ...TraceDetails
             childrenSpans {
               ...TraceDetails
+              childrenSpans {
+                ...TraceDetails
+                childrenSpans {
+                  ...TraceDetails
+                }
+              }
             }
           }
         }
@@ -90,7 +111,7 @@ export function useGetRun() {
         .query(
           query,
           { envID, runID, preview: preview ?? false },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -142,6 +163,6 @@ export function useGetRun() {
         },
       };
     },
-    [envID, client]
+    [envID, client],
   );
 }

@@ -26,7 +26,7 @@ export function useFunctions() {
             archived,
             search: nameSearch,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -41,7 +41,7 @@ export function useFunctions() {
       const { page, data } = result.data.workspace.workflows;
       const flattenedFunctions = data.map((fn) => ({
         ...fn,
-        triggers: fn.current?.triggers ?? [],
+        triggers: fn.triggers,
       }));
 
       return {
@@ -52,7 +52,7 @@ export function useFunctions() {
         },
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -62,7 +62,10 @@ export function useFunctionVolume() {
 
   return useCallback(
     async ({ functionID }: { functionID: string }) => {
-      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
+      const startTime = getTimestampDaysAgo({
+        currentDate: new Date(),
+        days: 1,
+      }).toISOString();
       const endTime = new Date().toISOString();
 
       const result = await client
@@ -74,7 +77,7 @@ export function useFunctionVolume() {
             startTime,
             endTime,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -95,7 +98,9 @@ export function useFunctionVolume() {
       // Calculate totals
       const dailyFailureCount = workflow.dailyFailures.total;
       const dailyFinishedCount =
-        workflow.dailyCompleted.total + workflow.dailyCancelled.total + dailyFailureCount;
+        workflow.dailyCompleted.total +
+        workflow.dailyCancelled.total +
+        dailyFailureCount;
 
       // Calculate failure rate percentage (rounded to 2 decimal places)
       const failureRate = dailyFinishedCount
@@ -103,14 +108,16 @@ export function useFunctionVolume() {
         : 0;
 
       // Creates an array of objects containing the start and failure count for each usage slot (1 hour)
-      const dailyVolumeSlots = workflow.dailyStarts.data.map((usageSlot, index) => ({
-        startCount: usageSlot.count,
-        failureCount: workflow.dailyFailures.data[index]?.count ?? 0,
-      }));
+      const dailyVolumeSlots = workflow.dailyStarts.data.map(
+        (usageSlot, index) => ({
+          startCount: usageSlot.count,
+          failureCount: workflow.dailyFailures.data[index]?.count ?? 0,
+        }),
+      );
 
       const usage = {
         dailyVolumeSlots,
-        totalVolume: dailyFinishedCount,
+        totalVolume: workflow.dailyStarts.total,
       };
 
       return {
@@ -118,6 +125,6 @@ export function useFunctionVolume() {
         usage,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }

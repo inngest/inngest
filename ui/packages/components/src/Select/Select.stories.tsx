@@ -75,48 +75,50 @@ export const WithCheckboxOption: Story = {
   ),
 };
 
-export const SelectWithSearchInput: Story = {
-  render: () => {
-    const [selectedOption, setSelectedOption] = useState(options);
-    const [query, setQuery] = useState('');
+function SelectWithSearchInputRender() {
+  const [selectedOption, setSelectedOption] = useState(options);
+  const [query, setQuery] = useState('');
 
-    const filteredOptions =
-      query === ''
-        ? options
-        : options.filter((option) => {
-            return option.name.toLowerCase().includes(query.toLowerCase());
-          });
-    return (
-      <SelectWithSearch
-        value={selectedOption}
-        onChange={(value: Option[]) => {
-          const newValue: Option[] = [];
-          value.forEach((option) => {
-            newValue.push(option);
-          });
-          setSelectedOption(newValue);
-        }}
-        label="Status"
-        isLabelVisible={false}
-        multiple
-      >
-        <SelectWithSearch.Button>Select Options</SelectWithSearch.Button>
-        <SelectWithSearch.Options>
-          <SelectWithSearch.SearchInput
-            displayValue={(option: Option) => option?.name}
-            placeholder="Search for option"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          {filteredOptions.map((option) => (
-            <SelectWithSearch.CheckboxOption key={option.id} option={option}>
-              {option.name}
-            </SelectWithSearch.CheckboxOption>
-          ))}
-          <SelectWithSearch.Footer onReset={() => setSelectedOption([])} />
-        </SelectWithSearch.Options>
-      </SelectWithSearch>
-    );
-  },
+  const filteredOptions =
+    query === ''
+      ? options
+      : options.filter((option) => {
+          return option.name.toLowerCase().includes(query.toLowerCase());
+        });
+  return (
+    <SelectWithSearch
+      value={selectedOption}
+      onChange={(value: Option[]) => {
+        const newValue: Option[] = [];
+        value.forEach((option) => {
+          newValue.push(option);
+        });
+        setSelectedOption(newValue);
+      }}
+      label="Status"
+      isLabelVisible={false}
+      multiple
+    >
+      <SelectWithSearch.Button>Select Options</SelectWithSearch.Button>
+      <SelectWithSearch.Options>
+        <SelectWithSearch.SearchInput
+          displayValue={(option: Option) => option?.name}
+          placeholder="Search for option"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        {filteredOptions.map((option) => (
+          <SelectWithSearch.CheckboxOption key={option.id} option={option}>
+            {option.name}
+          </SelectWithSearch.CheckboxOption>
+        ))}
+        <SelectWithSearch.Footer onReset={() => setSelectedOption([])} />
+      </SelectWithSearch.Options>
+    </SelectWithSearch>
+  );
+}
+
+export const SelectWithSearchInput: Story = {
+  render: () => <SelectWithSearchInputRender />,
 };
 
 export const GroupOfSelects: Story = {

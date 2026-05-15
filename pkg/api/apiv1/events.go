@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/dateutil"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/util"
@@ -43,8 +44,11 @@ func (a API) GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*
 }
 
 func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	if a.opts.RateLimited(r, w, "/v1/events") {
+		return
+	}
 
+	ctx := r.Context()
 	opts := cqrs.WorkspaceEventsOpts{}
 
 	limit, _ := strconv.Atoi(r.FormValue("limit"))
@@ -116,6 +120,10 @@ func (a API) GetEvent(ctx context.Context, eventID ulid.ULID) (*cqrs.Event, erro
 
 // GetEvent is the HTTP implementation for retrieving events.
 func (a router) getEvent(w http.ResponseWriter, r *http.Request) {
+	if a.opts.RateLimited(r, w, "/v1/events/{eventID}") {
+		return
+	}
+
 	ctx := r.Context()
 	eventID := chi.URLParam(r, "eventID")
 	parsed, err := ulid.Parse(eventID)
@@ -146,17 +154,40 @@ func (a API) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.Funct
 }
 
 func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
+	if a.opts.RateLimited(r, w, "/v1/events/{eventID}/runs") {
+		return
+	}
+
 	ctx := r.Context()
 	eventID := chi.URLParam(r, "eventID")
+
 	parsed, err := ulid.Parse(eventID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid event ID: %s", eventID))
 		return
 	}
+
 	runs, err := a.GetEventRuns(ctx, parsed)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
+
+	// XXX (tonyhb, 2025-10-17): Moving to the new trace pipeline means that we're going to query
+	// for the runs found from each event, then fetch the status directly.
+	{
+		for _, run := range runs {
+			rootSpan, err := a.opts.TraceReader.GetSpansByRunID(ctx, run.RunID)
+			if err != nil {
+				_ = publicerr.WriteHTTP(w, err)
+				return
+			}
+			if rootSpan == nil {
+				continue
+			}
+			run.Status = enums.StepStatusToRunStatus(rootSpan.Status)
+		}
+	}
+
 	_ = WriteCachedResponse(w, runs, 15*time.Second)
 }

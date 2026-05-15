@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
-var ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
@@ -24,30 +22,20 @@ type PauseMutater interface {
 	// This returns the number of pauses in the current pause.Index.
 	SavePause(ctx context.Context, p Pause) (int64, error)
 
-	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
-	// we can 'consume' the pause to remove it.
-	//
-	// This prevents a failure mode in which we consume the pause but enqueueing the next
-	// action fails (eg. due to power loss).
-	//
-	// If the given pause has been leased within LeasePauseDuration, this should return an
-	// ErrPauseLeased error.
-	//
-	// See https://github.com/inngest/inngest/issues/123 for more info
-	LeasePause(ctx context.Context, id uuid.UUID) error
-
-	// ConsumePause consumes a pause by its ID such that it can't be used again and
-	// will not be returned from any query.
-	//
-	// Any data passed when consuming a pause will be stored within function run state
-	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
-
 	// DeletePause permanently deletes a pause.
-	DeletePause(ctx context.Context, p Pause) error
+	DeletePause(ctx context.Context, p Pause, opts ...DeletePauseOpt) error
 
-	// DeletePauseByID removes a puse by its ID.
-	DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error
+	// DeletePauseByID removes a pause by its ID.
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+
+	// PauseIDsForRun returns all pause IDs associated with a run.
+	PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error)
+
+	// DeleteRunPausesIndex deletes the index tracking pauses for a run.
+	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
+
+	// DeletePausesForRun deletes all pauses associated with a run.
+	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
@@ -62,6 +50,10 @@ type PauseGetter interface {
 
 	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
 
+	// PausesByEventSinceWithCreatedAt returns all pauses for a given event within a workspace since a given time,
+	// with createdAt timestamps populated from Redis sorted set scores.
+	PausesByEventSinceWithCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time, limit int64) (PauseIterator, error)
+
 	// EventHasPauses returns whether the event has pauses stored.
 	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
 
@@ -70,12 +62,6 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
-
-	// PauseByID returns a given pause by pause ID.  This must return expired pauses
-	// that have not yet been consumed in order to properly handle timeouts.
-	//
-	// This should not return consumed pauses.
-	PausesByID(ctx context.Context, pauseID ...uuid.UUID) ([]*Pause, error)
 
 	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
 	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.
@@ -93,8 +79,7 @@ type PauseGetter interface {
 
 // ConsumePauseOpts are the options to be passed in for consuming a pause
 type ConsumePauseOpts struct {
-	IdempotencyKey string
-	Data           any
+	Data any
 }
 
 type ConsumePauseResult struct {
@@ -103,6 +88,30 @@ type ConsumePauseResult struct {
 
 	// HasPendingSteps indicates whether the run still has pending steps.
 	HasPendingSteps bool
+}
+
+// BlockIndex contains the block ID and event name for pause block indexing
+type BlockIndex struct {
+	BlockID   string `json:"b"`
+	EventName string `json:"e"`
+}
+
+// DeletePauseOpts are the options to be passed in for deleting a pause
+type DeletePauseOpts struct {
+	// WriteBlockIndex is the block information to create a block index so the pause can still be
+	// retrieved by its ID after deletion. Empty struct means no block index.
+	WriteBlockIndex BlockIndex
+}
+
+type DeletePauseOpt func(*DeletePauseOpts)
+
+func WithWriteBlockIndex(blockID string, eventName string) DeletePauseOpt {
+	return func(opts *DeletePauseOpts) {
+		opts.WriteBlockIndex = BlockIndex{
+			BlockID:   blockID,
+			EventName: eventName,
+		}
+	}
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
@@ -243,6 +252,23 @@ type Pause struct {
 	// ParallelMode controls discovery step scheduling after a parallel step
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
+
+	// CreatedAt is the timestamp when the pause was saved. This field may
+	// be empty for older pauses created before this field was added. It's used to
+	// determine which time-based storage blocks contain this pause, as block
+	// timeframes are based on this timestamp (previously only available as the
+	// sort score in pause indexes).
+	CreatedAt time.Time `json:"ca"`
+}
+
+// CreatedAfter reports whether this pause was created after the given
+// timestamp (with a small fudge factor). It returns false if either
+// timestamp is zero, allowing older pauses through.
+func (p Pause) CreatedAfter(t time.Time) bool {
+	if p.CreatedAt.IsZero() || t.IsZero() {
+		return false
+	}
+	return p.CreatedAt.After(t.Add(5 * time.Second))
 }
 
 func (p Pause) GetOpcode() enums.Opcode {

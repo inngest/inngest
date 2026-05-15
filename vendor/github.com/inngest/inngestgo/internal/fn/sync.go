@@ -1,6 +1,10 @@
 package fn
 
-import "net/url"
+import (
+	"net/url"
+
+	"github.com/inngest/inngestgo/pkg/checkpoint"
+)
 
 func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 	config := fn.Config()
@@ -16,6 +20,7 @@ func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 		RateLimit:   config.RateLimit,
 		Throttle:    config.Throttle,
 		Debounce:    config.Debounce,
+		Checkpoint:  config.Checkpoint,
 		Timeouts:    config.Timeouts,
 		Cancel:      config.Cancel,
 		Retries:     config.Retries,
@@ -36,9 +41,7 @@ type SyncConfig struct {
 
 	// Concurrency allows limiting the concurrency of running functions, optionally constrained
 	// by an individual concurrency key.
-	//
-	// This may be an int OR a struct, for backwards compatibility.
-	Concurrency []Concurrency `json:"concurrency,omitempty"`
+	Concurrency *ConcurrencyLimits `json:"concurrency,omitempty"`
 
 	// Priority represents the priority information for this function.
 	Priority *Priority `json:"priority,omitempty"`
@@ -68,6 +71,8 @@ type SyncConfig struct {
 	Retries *int `json:"retries,omitempty"`
 
 	Debounce *Debounce `json:"debounce,omitempty"`
+
+	Checkpoint *checkpoint.Config `json:"checkpoint,omitempty"`
 
 	Timeouts *Timeouts `json:"timeouts,omitempty"`
 

@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useContext, useState } from 'react';
 import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
 
@@ -27,7 +25,12 @@ export function StepsProvider({ children }: React.PropsWithChildren) {
 
   return (
     <StepsContext.Provider
-      value={{ stepsCompleted, setStepsCompleted: addStep, credentials, setCredentials }}
+      value={{
+        stepsCompleted,
+        setStepsCompleted: addStep,
+        credentials,
+        setCredentials,
+      }}
     >
       {children}
     </StepsContext.Provider>

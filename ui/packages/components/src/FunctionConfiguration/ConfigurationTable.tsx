@@ -64,7 +64,7 @@ export default function ConfigurationTable({
                     >
                       <code className="font-mono">{entry.value}</code>
                     </TooltipTrigger>
-                    <TooltipContent className="p-3 text-sm">
+                    <TooltipContent className="max-w-md break-all p-3 text-sm">
                       <code>{entry.value}</code>
                     </TooltipContent>
                   </Tooltip>

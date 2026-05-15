@@ -98,7 +98,6 @@ func (customLibrary) CompileOptions() []cel.EnvOption {
 			func(d *decls.FunctionDecl) (*decls.FunctionDecl, error) {
 				return &copied, nil
 			},
-			decls.DisableTypeGuards(true),
 		)
 		envOpts = append(envOpts, opt)
 	}
@@ -163,11 +162,9 @@ func GetBindings(name string, existing functions.BinaryOp) functions.BinaryOp {
 
 // ProgramOptions returns function implementations for the standard CEL functions.
 func (customLibrary) ProgramOptions() []cel.ProgramOption {
-	return []cel.ProgramOption{
-		// Add our custom function implementations (overloads) into the fn.
-		cel.Functions(CELOverloads()...),
-		cel.EvalOptions(cel.OptExhaustiveEval, cel.OptTrackState, cel.OptPartialEval),
-	}
+	// Eval options (OptExhaustiveEval, OptTrackState, OptPartialEval) are set per-program
+	// in buildProgram() so the event-matching path can skip OptTrackState/OptExhaustiveEval.
+	return []cel.ProgramOption{cel.Functions(CELOverloads()...)}
 }
 
 // newFunctioEnvOption creates a new *decls.FunctionDecl and wraps this within

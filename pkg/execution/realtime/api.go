@@ -4,21 +4,37 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+)
+
+const (
+	// SSEConnectionTimeout is the maximum duration an SSE connection can remain open
+	SSEConnectionTimeout = 15 * time.Minute
+
+	// MaxDurpStreamingRun is the maximum duration that a Durable Endpoint can
+	// stream. This is specifically enforced, but is rather a rough
+	// approximation due to the SSE endpoint timeout. Technically this is
+	// actually the max streaming duration after going async mode, but we'll
+	// simplify things for the end user by just saying 15 minutes overall
+	MaxDurpStreamingRun = SSEConnectionTimeout
 )
 
 type APIOpts struct {
@@ -29,6 +45,7 @@ type APIOpts struct {
 	// AuthMiddleware authenticates the incoming API request.
 	AuthMiddleware func(http.Handler) http.Handler
 	// AuthFinder authenticates the given request, returning the env and account IDs.
+	// Used as a fallback when JWT auth fails (e.g. signing-key auth in the dev server).
 	AuthFinder apiv1auth.AuthFinder
 }
 
@@ -57,28 +74,67 @@ type api struct {
 func (a *api) setup() {
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
+		r.Use(a.metricsMiddleware)
 
 		// NOTE: We always use the realtime auth middleware which wraps the standard
 		// auth middleware with JWT validation
 		r.Use(realtimeAuthMW(a.opts.JWTSecret, a.opts.AuthMiddleware))
 
 		r.Get("/realtime/connect", a.GetWebsocketUpgrade)
+		r.Get("/realtime/sse", a.GetSSE)
 		r.Post("/realtime/token", a.PostCreateJWT)
 	})
 
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
-
+		r.Use(a.metricsMiddleware)
 		// Note that we use use realtime auth middleware and check for publishing claims manually.
 		// This also allows us to use the original auth middleware and use signing keys for publishing.
 		r.Use(realtimeAuthMW(a.opts.JWTSecret, a.opts.AuthMiddleware))
 
+		// PostPublish always publishes well formed messages that we've defined within Inngest.
 		r.Post("/realtime/publish", a.PostPublish)
+		// PostPublishTee publishes raw bytes to the subscription, teeing from the HTTP request
+		// to all subscribers.
+		r.Post("/realtime/publish/tee", a.PostPublishTee)
+	})
+}
+
+func (a *api) metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		next.ServeHTTP(ww, r)
+
+		route := chi.RouteContext(r.Context()).RoutePattern()
+
+		metrics.IncrRealtimeHTTPRequestsTotal(r.Context(), metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"method": r.Method,
+				"status": strconv.Itoa(ww.Status()),
+				"route":  route,
+			},
+		})
+		metrics.HistogramRealtimeHTTPRequestDuration(r.Context(), time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"method": r.Method,
+			},
+		})
+		if ww.Status() == 401 {
+			metrics.IncrRealtimeAuthFailuresTotal(r.Context(), metrics.CounterOpt{
+				PkgName: "realtime",
+				Tags: map[string]any{
+					"route": route,
+				},
+			})
+		}
 	})
 }
 
 func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("content-type", "application/json")
+	w.Header().Set("content-type", "application/json")
 
 	// This only uses the given auth finder, which does not accept JWT claims.
 	auth, err := a.opts.AuthFinder(r.Context())
@@ -111,21 +167,116 @@ func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	metrics.IncrRealtimeJWTTokensCreatedTotal(r.Context(), metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"token_type": "subscription",
+		},
+	})
+
 	w.WriteHeader(201)
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"jwt": jwt,
 	})
 }
 
+func (a *api) GetSSE(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	start := time.Now() // Capture connection start time
+	defer func() {
+		metrics.HistogramRealtimeConnectionDuration(r.Context(), time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"protocol": "sse",
+			},
+		})
+	}()
+
+	auth, err := realtimeAuth(ctx)
+	if err != nil {
+		w.Header().Set("content-type", "application/json")
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
+		return
+	}
+
+	sub := NewSSESubscription(ctx, w)
+	defer sub.Close()
+
+	err = a.opts.Broadcaster.Subscribe(ctx, sub, auth.Topics)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error subscribing to topics", "error", err)
+
+		// Close the subscription first to prevent the keepalive goroutine from
+		// writing to the ResponseWriter concurrently.
+		sub.Close()
+
+		http.Error(w, "error subscribing to topics", http.StatusInternalServerError)
+		return
+	}
+
+	// Write SSE headers only after a successful subscribe so that failures can
+	// still be reported with a proper HTTP error status.
+	sub.WriteHeaders()
+
+	logger.StdlibLogger(ctx).Info(
+		"new SSE connection",
+		"acct_id", auth.AccountID(),
+		"env_id", auth.Env,
+		"topics", auth.Topics,
+	)
+
+	// Wait for client disconnect or timeout
+	timeout := time.NewTimer(SSEConnectionTimeout)
+	defer timeout.Stop()
+
+	select {
+	case <-ctx.Done():
+		// Client disconnected
+		metrics.IncrRealtimeDisconnectionsTotal(ctx, metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"protocol": "sse",
+				"reason":   "client_disconnect",
+			},
+		})
+	case <-timeout.C:
+		// Connection timeout
+		logger.StdlibLogger(ctx).Info("SSE connection timeout", "acct_id", auth.AccountID(), "sse_id", sub.id)
+		metrics.IncrRealtimeDisconnectionsTotal(ctx, metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"protocol": "sse",
+				"reason":   "timeout",
+			},
+		})
+	}
+
+	// Cleanup subscription
+	if err := a.opts.Broadcaster.CloseSubscription(ctx, sub.ID()); err != nil {
+		logger.StdlibLogger(ctx).Warn("error closing SSE subscription", "error", err, "sub_id", sub.ID())
+	}
+}
+
 func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	start := time.Now() // Capture connection start time
+	defer func() {
+		metrics.HistogramRealtimeConnectionDuration(r.Context(), time.Since(start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"protocol": "websocket",
+			},
+		})
+	}()
 
 	// NOTE: Here we always use the realtime auth finder, which attempts to auth
 	// realtime connections via single-use JWTs, falling back to other auth methods
 	// as necessary.
 	auth, err := realtimeAuth(ctx)
 	if err != nil {
-		w.Header().Add("content-type", "application/json")
+		w.Header().Set("content-type", "application/json")
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
 		return
 	}
@@ -164,13 +315,25 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 
 	// Handle reading of additional messages such as subscription requests from the WS
 	pollCtx := context.Background()
+	reason := "clean"
 	if err := sub.Poll(pollCtx); err != nil {
 		logger.StdlibLogger(ctx).Warn(
-			"error reading from rt ws conn",
+			"websocket poll returned error",
 			"error", err,
+			"sub_id", sub.ID(),
 		)
+		reason = "error"
 	}
 
+	metrics.IncrRealtimeDisconnectionsTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"protocol": "websocket",
+			"reason":   reason,
+		},
+	})
+
+	logger.StdlibLogger(ctx).Debug("closing websocket conn", "sub_id", sub.ID())
 	_ = ws.CloseNow()
 }
 
@@ -186,7 +349,7 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	claims, err := realtimeAuth(r.Context())
 	if err == nil && !claims.Publish {
 		// We have claims, but not for publishing. Error out.
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "Not authenticated for publishing"))
 		return
 	}
 	if claims == nil {
@@ -235,6 +398,11 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	metrics.HistogramRealtimePayloadSizeBytes(r.Context(), int64(len(byt)), metrics.HistogramOpt{
+		PkgName: "realtime",
+		Tags:    map[string]any{},
+	})
+
 	// Is byt valid JSON?  If so, we don't want to double-encode it.
 	if json.Valid(byt) {
 		msg.Data = byt
@@ -254,6 +422,66 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	a.opts.Broadcaster.Publish(r.Context(), msg)
 }
 
+// PostPublishTee reads from the request and forwards raw bytes to all subscribers.  This allows
+// users to publish eg. SSE streams directly from a request to subscribers with minimal latency.
+func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Accept realtime JWT with publish claim, or fall back to signing key auth.
+	var envID uuid.UUID
+	claims, err := realtimeAuth(ctx)
+	if err != nil {
+		// Fallback to signing key auth. Note: signing keys are fully trusted,
+		// so this implicitly grants publish rights without a claims.Publish
+		// check (unlike JWT auth above).
+		auth, err := a.opts.AuthFinder(ctx)
+		if err != nil {
+			http.Error(w, "Not authenticated", http.StatusUnauthorized)
+			return
+		}
+		envID = auth.WorkspaceID()
+	} else if !claims.Publish {
+		http.Error(w, "Not authenticated for publishing", http.StatusUnauthorized)
+		return
+	} else {
+		envID = claims.Env
+	}
+
+	channel := r.URL.Query().Get("channel")
+	if channel == "" {
+		http.Error(w, "channel query parameter required", 400)
+		return
+	}
+
+	// Limit the request body to prevent abuse.
+	maxBytes := int64(consts.MaxStreamingChunks) * int64(consts.StreamingChunkSize)
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	defer r.Body.Close()
+
+	// straight up copy using a lil util from the r.Body to our publishers.
+	n, err := io.Copy(&channelWriter{
+		broadcaster: a.opts.Broadcaster,
+		ctx:         ctx,
+		channel:     channel,
+		envID:       envID,
+	}, r.Body)
+
+	metrics.HistogramRealtimeRawDataSizeBytes(ctx, n, metrics.HistogramOpt{
+		PkgName: "realtime",
+		Tags:    map[string]any{},
+	})
+
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn(
+			"error copying request body to subscribers",
+			"error", err,
+			"channel", util.SanitizeLogField(channel),
+		)
+		http.Error(w, "Error forwarding data", 500)
+		return
+	}
+}
+
 // publishStream handles publishing a stream of data sent to Inngest over seconds
 // to minutes.
 func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +497,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 	// We must create a new random stream ID for the data stream, allowing
 	// all published chunks to be associated with each other.
 	sID := util.XXHash(time.Now())
-	msg.Data = []byte(sID)
+	msg.Data = json.RawMessage(fmt.Sprintf("%q", sID))
 
 	if err := msg.Validate(); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -279,11 +507,17 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 	// Publish the stream start message
 	a.opts.Broadcaster.Publish(ctx, msg)
 
+	totalSize := int64(0)
 	// And always publish a stream end.
 	defer r.Body.Close()
 	defer func(msg Message) {
 		msg.Kind = streamingtypes.MessageKindDataStreamEnd
 		a.opts.Broadcaster.Publish(ctx, msg)
+
+		metrics.HistogramRealtimePayloadSizeBytes(ctx, totalSize, metrics.HistogramOpt{
+			PkgName: "realtime",
+			Tags:    map[string]any{},
+		})
 	}(msg)
 
 	// Read the body in chunks, up to X size.
@@ -292,6 +526,7 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 		n, err := r.Body.Read(buf)
 
 		if n > 0 {
+			totalSize += int64(n)
 			// Spit this chunk out!
 			a.opts.Broadcaster.PublishChunk(
 				ctx,
@@ -340,4 +575,17 @@ func (a *api) getStreamMessage(r *http.Request) (Message, error) {
 	}
 
 	return msg, nil
+}
+
+// channelWriter implements io.Writer to forward data to broadcaster
+type channelWriter struct {
+	broadcaster Broadcaster
+	ctx         context.Context
+	channel     string
+	envID       uuid.UUID
+}
+
+func (w *channelWriter) Write(p []byte) (n int, err error) {
+	w.broadcaster.Write(w.ctx, w.envID, w.channel, p)
+	return len(p), nil
 }

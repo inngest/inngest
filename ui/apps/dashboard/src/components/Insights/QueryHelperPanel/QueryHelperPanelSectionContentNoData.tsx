@@ -1,11 +1,9 @@
-'use client';
-
-import { RiBookmarkLine, RiHistoryLine } from '@remixicon/react';
+import { RiBookmarkLine, RiHistoryLine, RiTeamLine } from '@remixicon/react';
 
 type QueryHelperPanelSectionContentNoDataProps = {
   primary: string;
   secondary: string;
-  sectionType: 'history' | 'saved';
+  sectionType: 'history' | 'saved' | 'shared';
 };
 
 export function QueryHelperPanelSectionContentNoData({
@@ -13,7 +11,12 @@ export function QueryHelperPanelSectionContentNoData({
   secondary,
   sectionType,
 }: QueryHelperPanelSectionContentNoDataProps) {
-  const Icon = sectionType === 'history' ? RiHistoryLine : RiBookmarkLine;
+  const Icon =
+    sectionType === 'history'
+      ? RiHistoryLine
+      : sectionType === 'saved'
+      ? RiBookmarkLine
+      : RiTeamLine;
 
   return (
     <div className="border-subtle flex min-h-[120px] w-full flex-col items-center justify-center gap-4 rounded border border-dashed px-4 py-6">

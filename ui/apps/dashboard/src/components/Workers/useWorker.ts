@@ -35,6 +35,7 @@ const query = graphql(`
             gatewayId
             instanceID: instanceId
             workerIp
+            maxWorkerConcurrency
             app {
               id
             }
@@ -84,14 +85,17 @@ export function useWorkers() {
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
             orderBy,
-            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 30 }).toISOString(),
+            startTime: getTimestampDaysAgo({
+              currentDate: new Date(),
+              days: 30,
+            }).toISOString(),
             appID: appID,
             status,
             cursor,
             first: pageSize,
             envID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -116,7 +120,7 @@ export function useWorkers() {
         totalCount: workersData.totalCount,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -154,12 +158,15 @@ export function useWorkersCount() {
           countQuery,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 30 }).toISOString(),
+            startTime: getTimestampDaysAgo({
+              currentDate: new Date(),
+              days: 30,
+            }).toISOString(),
             appID: appID,
             envID,
             status,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -175,6 +182,6 @@ export function useWorkersCount() {
 
       return workersData.totalCount;
     },
-    [client, envID]
+    [client, envID],
   );
 }

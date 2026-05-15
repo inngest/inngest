@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -33,7 +34,7 @@ var (
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
-	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
+	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK, Message: "The response did not come from an Inngest SDK"}
 
 	defaultClient = exechttp.Client(exechttp.SecureDialerOpts{})
 )
@@ -49,8 +50,8 @@ type executor struct {
 	requireLocalSigningKey bool
 }
 
-// RuntimeType fulfiils the inngest.Runtime interface.
-func (e executor) RuntimeType() string {
+// Name fulfiils the inngest.Runtime interface.
+func (e executor) Name() string {
 	return "http"
 }
 
@@ -66,7 +67,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt)
+	jID := queueref.StringFromCtx(ctx)
+
+	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts(), jID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,17 +92,23 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		}
 	}
 
-	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
-		AccountID:  s.ID.Tenant.AccountID,
-		WorkflowID: s.ID.FunctionID,
-		RunID:      s.ID.RunID,
-		SigningKey: e.localSigningKey,
-		URL:        *uri,
-		Input:      input,
-		Edge:       edge,
-		Step:       step,
-		Headers:    headers,
+	dr, httpstatResult, err := ExecuteDriverRequest(ctx, e.Client, Request{
+		AccountID:      s.ID.Tenant.AccountID,
+		WorkflowID:     s.ID.FunctionID,
+		RunID:          s.ID.RunID,
+		RequestID:      driver.RequestIDFromContext(ctx),
+		JobID:          driver.JobIDFromContext(ctx),
+		SigningKey:     e.localSigningKey,
+		URL:            *uri,
+		Input:          input,
+		Edge:           edge,
+		Step:           step,
+		Headers:        headers,
+		RequestVersion: &s.Config.RequestVersion,
 	})
+	if dr != nil && httpstatResult != nil {
+		dr.HTTPStat = httpstatResult
+	}
 	return dr, err
 }
 
@@ -111,16 +120,21 @@ type Request struct {
 	WorkflowID uuid.UUID
 	// RunID is used for logging purposes, and is not used in the request
 	RunID ulid.ULID
+	// RequestID is the unique per-outbound SDK request ID.
+	RequestID string
+	// JobID is the stable queue item ID for this SDK request.
+	JobID string
 
 	// Signature, if set, is the signature to use for the request.  If unset,
 	// the SigningKey below will be used to sign the input.
 	Signature string
 	// SigningKey, if set, signs the input using this key.
-	SigningKey []byte
-	URL        url.URL
-	Input      []byte
-	Edge       inngest.Edge
-	Step       inngest.Step
+	SigningKey     []byte
+	URL            url.URL
+	Input          []byte
+	Edge           inngest.Edge
+	Step           inngest.Step
+	RequestVersion *int
 
 	// Headers are additional headers to add to the request.
 	Headers map[string]string
@@ -157,6 +171,19 @@ func ExecuteDriverRequest(ctx context.Context, c exechttp.RequestExecutor, r Req
 
 func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
 	l := logger.StdlibLogger(ctx)
+
+	// Decompress body if Content-Encoding is still set.  In the HTTP path,
+	// exechttp.DoRequest already decompresses and clears the header, so this
+	// is a no-op.  For other paths (e.g. gateway proxy) the body may still
+	// be compressed.
+	if enc := resp.Header.Get("Content-Encoding"); enc != "" {
+		decoded, err := exechttp.DecompressBody(resp.Body, enc)
+		if err != nil {
+			return nil, fmt.Errorf("error decompressing response body: %w", err)
+		}
+		resp.Body = decoded
+		resp.Header.Del("Content-Encoding")
+	}
 
 	var err error
 	if resp.StatusCode == 206 {
@@ -302,6 +329,22 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 
 	// Always add the run ID
 	req.Header.Add("X-Run-ID", r.RunID.String())
+	if r.RequestID != "" {
+		req.Header.Add(headerspkg.HeaderKeyRequestID, r.RequestID)
+	}
+	if r.JobID != "" {
+		req.Header.Add(headerspkg.HeaderKeyJobID, r.JobID)
+	}
+
+	if r.RequestVersion != nil {
+		req.Header.Add(headerspkg.HeaderKeyRequestVersion, fmt.Sprintf("%d", *r.RequestVersion))
+	}
+
+	if r.Edge.IncomingGeneratorStep != "" {
+		req.Header.Add(headerspkg.HeaderInngestStepID, r.Edge.IncomingGeneratorStep)
+	} else {
+		req.Header.Add(headerspkg.HeaderInngestStepID, r.Edge.Incoming)
+	}
 
 	// Perform the request.
 	resp, err := c.DoRequest(ctx, req)
@@ -321,7 +364,7 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 
 	var sysErr *syscode.Error
 	if errors.Is(err, exechttp.ErrBodyTooLarge) {
-		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
+		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge, Message: "Your function's response body exceeds the maximum size limit"}
 		//
 		// downstream executor code expects system error codes here for traces
 		// and history to work properly

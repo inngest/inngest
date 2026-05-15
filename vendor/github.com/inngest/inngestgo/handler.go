@@ -13,6 +13,7 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,9 +24,13 @@ import (
 	"github.com/inngest/inngestgo/internal"
 	"github.com/inngest/inngestgo/internal/event"
 	"github.com/inngest/inngestgo/internal/fn"
+	"github.com/inngest/inngestgo/internal/logger"
 	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
+	"github.com/inngest/inngestgo/internal/util"
+	"github.com/inngest/inngestgo/pkg/env"
+	"github.com/inngest/inngestgo/pkg/httputil"
 	"github.com/inngest/inngestgo/step"
 )
 
@@ -45,6 +50,10 @@ var (
 		TrustProbe: types.TrustProbeV1,
 		Connect:    types.ConnectV1,
 	}
+)
+
+const (
+	envKeyAllowInBandSync = "INNGEST_ALLOW_IN_BAND_SYNC"
 )
 
 type handlerOpts struct {
@@ -151,7 +160,7 @@ func (h handlerOpts) GetAPIBaseURL() string {
 	}
 
 	if h.isDev() {
-		return DevServerURL()
+		return env.DevServerURL()
 	}
 
 	return defaultAPIOrigin
@@ -174,7 +183,7 @@ func (h handlerOpts) GetEventAPIBaseURL() string {
 	}
 
 	if h.isDev() {
-		return DevServerURL()
+		return env.DevServerURL()
 	}
 
 	return defaultEventAPIOrigin
@@ -234,18 +243,20 @@ func (h handlerOpts) isDev() bool {
 		return *h.Dev
 	}
 
-	return IsDev()
+	return env.IsDev()
 }
 
 // newHandler returns a new Handler for serving Inngest functions.
 func newHandler(c Client, opts handlerOpts) *handler {
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
 
 	if opts.MaxBodySize == 0 {
 		opts.MaxBodySize = DefaultMaxBodySize
 	}
+
+	opts.Logger = opts.Logger.With("mode", "serve")
 
 	return &handler{
 		handlerOpts: opts,
@@ -278,14 +289,15 @@ func (h *handler) GetFunctions() []ServableFunction {
 }
 
 func (h *handler) SetOptions(opts handlerOpts) *handler {
-	h.handlerOpts = opts
-
 	if opts.MaxBodySize == 0 {
 		opts.MaxBodySize = DefaultMaxBodySize
 	}
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
+
+	opts.Logger = opts.Logger.With("mode", "serve")
+	h.handlerOpts = opts
 
 	return h
 }
@@ -529,8 +541,14 @@ func (h *handler) inBandSync(
 			Status: 400,
 		}
 	}
-	if h.URL != nil {
-		appURL = h.URL
+
+	appURL, err = overrideURL(appURL, h.handlerOpts)
+	if err != nil {
+		h.Logger.Error("error parsing app URL", "error", err)
+		return publicerr.Error{
+			Err:    fmt.Errorf("error parsing app URL: %w", err),
+			Status: 400,
+		}
 	}
 
 	fns, err := createFunctionConfigs(h.appName, h.funcs, *appURL, false)
@@ -548,7 +566,7 @@ func (h *handler) inBandSync(
 	if err != nil {
 		return fmt.Errorf("error creating inspection: %w", err)
 	}
-	inspectionMap, err := types.StructToMap(inspection)
+	inspectionMap, err := util.StructToMap(inspection)
 	if err != nil {
 		return fmt.Errorf("error converting inspection to map: %w", err)
 	}
@@ -589,12 +607,6 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	host := r.Host
-
 	// Get the sync ID from the URL and then remove it, since we don't want the
 	// sync ID to show in the function URLs (that would affect the checksum and
 	// is ugly in the UI)
@@ -603,7 +615,20 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	qp.Del("deployId")
 	r.URL.RawQuery = qp.Encode()
 
-	pathAndParams := r.URL.String()
+	appURL, err := url.Parse(fmt.Sprintf(
+		"%s://%s%s?%s",
+		httputil.GetScheme(r),
+		r.Host,
+		r.URL.Path,
+		r.URL.RawQuery,
+	))
+	if err != nil {
+		return fmt.Errorf("error parsing request URL: %w", err)
+	}
+	appURL, err = overrideURL(appURL, h.handlerOpts)
+	if err != nil {
+		return fmt.Errorf("error overriding request URL: %w", err)
+	}
 
 	appVersion := ""
 	if h.AppVersion != nil {
@@ -611,7 +636,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	config := types.RegisterRequest{
-		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
+		URL:        appURL.String(),
 		V:          "1",
 		DeployType: types.DeployTypePing,
 		SDK:        HeaderValueSDK,
@@ -624,7 +649,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 		AppVersion:   appVersion,
 	}
 
-	fns, err := createFunctionConfigs(h.appName, h.funcs, *h.url(r), false)
+	fns, err := createFunctionConfigs(h.appName, h.funcs, *appURL, false)
 	if err != nil {
 		return fmt.Errorf("error creating function configs: %w", err)
 	}
@@ -691,20 +716,6 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (h *handler) url(r *http.Request) *url.URL {
-	if h.URL != nil {
-		return h.URL
-	}
-
-	// Get the current URL.
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	u, _ := url.Parse(fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI))
-	return u
-}
-
 func createFunctionConfigs(
 	appName string,
 	fns []ServableFunction,
@@ -736,7 +747,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	if !ok {
 		return errors.New("invalid client type")
 	}
-	mw := middleware.NewMiddlewareManager().Add(cImpl.Middleware...)
+	mw := middleware.New().Add(cImpl.Middleware...)
 
 	var sig string
 	defer func() {
@@ -805,51 +816,94 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	l := h.Logger.With("fn", fnID, "call_ctx", request.CallCtx)
 	l.Debug("calling function")
 
-	stream, streamCancel := context.WithCancel(context.Background())
-	if h.UseStreaming {
-		w.WriteHeader(201)
-		go func() {
-			for {
-				if stream.Err() != nil {
-					return
-				}
-				_, _ = w.Write([]byte(" "))
-				<-time.After(5 * time.Second)
-			}
-		}()
-	}
-
 	var stepID *string
 	if rawStepID := r.URL.Query().Get("stepId"); rawStepID != "" && rawStepID != "step" {
 		stepID = &rawStepID
 	}
 
-	// Invoke the function, then immediately stop the streaming buffer.
-	resp, ops, err := invoke(
-		r.Context(),
-		h.client,
-		mw,
-		fn,
-		h.GetSigningKey(),
-		request,
-		stepID,
+	var (
+		resp      any
+		ops       []sdkrequest.GeneratorOpcode
+		invokeErr error
 	)
-	streamCancel()
+
+	if h.UseStreaming {
+		type invokeResult struct {
+			resp any
+			ops  []sdkrequest.GeneratorOpcode
+			err  error
+		}
+
+		w.WriteHeader(201)
+
+		results := make(chan invokeResult, 1)
+		go func() {
+			resp, ops, err := invoke(
+				r.Context(),
+				h.client,
+				mw,
+				fn,
+				h.GetSigningKey(),
+				h.GetSigningKeyFallback(),
+				request,
+				stepID,
+			)
+			results <- invokeResult{resp: resp, ops: ops, err: err}
+		}()
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		done := false
+		for !done {
+			select {
+			case result := <-results:
+				resp, ops, invokeErr = result.resp, result.ops, result.err
+				done = true
+			case <-r.Context().Done():
+				invokeErr = r.Context().Err()
+				done = true
+			case <-ticker.C:
+				_, _ = w.Write([]byte(" "))
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
+				}
+			}
+		}
+	} else {
+		resp, ops, invokeErr = invoke(
+			r.Context(),
+			h.client,
+			mw,
+			fn,
+			h.GetSigningKey(),
+			h.GetSigningKeyFallback(),
+			request,
+			stepID,
+		)
+	}
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
 	// within ops alongside an error.  We can safely ignore that error, as it's
 	// only used for checking whether the step used a NoRetryError or RetryAtError
 	//
 	// For that reason, we check those values first.
-	noRetry := sdkerrors.IsNoRetryError(err)
-	retryAt := sdkerrors.GetRetryAtTime(err)
+	noRetry := sdkerrors.IsNoRetryError(invokeErr)
+	retryAt := sdkerrors.GetRetryAtTime(invokeErr)
+
 	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepError {
 		// Now we've handled error types we can ignore step
 		// errors safely.
-		err = nil
+		invokeErr = nil
 	}
 
-	// Now that we've handled the OpcodeStepError, if we *still* ahve
+	// Handle OpcodeStepFailed for permanent step failures
+	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepFailed {
+		invokeErr = nil
+		noRetry = true
+	}
+
+	// Now that we've handled the OpcodeStepError, if we *still* have
 	// a StepError kind returned from a function we must have an unhandled
 	// step error.  This is a NonRetryableError, as the most likely code is:
 	//
@@ -857,17 +911,17 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	// 	if err != nil {
 	// 	     return err
 	// 	}
-	if sdkerrors.IsStepError(err) {
-		err = fmt.Errorf("unhandled step error: %s", err)
+	if sdkerrors.IsStepError(invokeErr) {
+		invokeErr = fmt.Errorf("unhandled step error: %s", invokeErr)
 		noRetry = true
 	}
 
 	if h.UseStreaming {
-		if err != nil {
+		if invokeErr != nil {
 			// TODO: Add retry-at.
 			return json.NewEncoder(w).Encode(StreamResponse{
 				StatusCode: 500,
-				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
+				Body:       fmt.Sprintf("error calling function: %s", invokeErr.Error()),
 				NoRetry:    noRetry,
 				RetryAt:    retryAt,
 			})
@@ -892,9 +946,9 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add(HeaderKeyRetryAfter, retryAt.Format(time.RFC3339))
 	}
 
-	if err != nil {
-		l.Error("error calling function", "error", err)
-		return err
+	if invokeErr != nil {
+		l.Error("error calling function", "error", invokeErr)
+		return invokeErr
 	}
 
 	if len(ops) > 0 {
@@ -961,8 +1015,8 @@ func (h *handler) createSecureInspection() (*secureInspection, error) {
 	apiOrigin := defaultAPIOrigin
 	eventAPIOrigin := defaultEventAPIOrigin
 	if h.isDev() {
-		apiOrigin = DevServerURL()
-		eventAPIOrigin = DevServerURL()
+		apiOrigin = env.DevServerURL()
+		eventAPIOrigin = env.DevServerURL()
 	}
 
 	var eventKeyHash *string
@@ -999,14 +1053,6 @@ func (h *handler) createSecureInspection() (*secureInspection, error) {
 		env = &val
 	}
 
-	var serveOrigin, servePath *string
-	if h.URL != nil {
-		serveOriginStr := h.URL.Scheme + "://" + h.URL.Host
-		serveOrigin = &serveOriginStr
-
-		servePath = &h.URL.Path
-	}
-
 	authenticationSucceeded = true
 	insecureInspection, err := h.createInsecureInspection(&authenticationSucceeded)
 	if err != nil {
@@ -1025,8 +1071,8 @@ func (h *handler) createSecureInspection() (*secureInspection, error) {
 		SDKVersion:             SDKVersion,
 		SigningKeyFallbackHash: signingKeyFallbackHash,
 		SigningKeyHash:         signingKeyHash,
-		ServeOrigin:            serveOrigin,
-		ServePath:              servePath,
+		ServeOrigin:            serveOriginOverride(h.handlerOpts),
+		ServePath:              servePathOverride(h.handlerOpts),
 	}, nil
 }
 
@@ -1167,6 +1213,7 @@ func invoke(
 	mw *middleware.MiddlewareManager,
 	sf ServableFunction,
 	signingKey string,
+	signingKeyFallback string,
 	input *sdkrequest.Request,
 	stepID *string,
 ) (any, []sdkrequest.GeneratorOpcode, error) {
@@ -1180,7 +1227,7 @@ func invoke(
 	// within a step.  This allows us to prevent any execution of future tools after a
 	// tool has run.
 	fCtx, cancel := context.WithCancel(
-		internal.ContextWithMiddlewareManager(
+		internal.ContextWithMiddleware(
 			internal.ContextWithEventSender(ctx, client),
 			mw,
 		),
@@ -1190,7 +1237,17 @@ func invoke(
 	}
 
 	// This must be a pointer so that it can be mutated from within function tools.
-	mgr := sdkrequest.NewManager(sf, mw, cancel, input, signingKey)
+	mgr := sdkrequest.NewManager(sdkrequest.Opts{
+		Fn:                 sf,
+		Middleware:         mw,
+		Cancel:             cancel,
+		Request:            input,
+		SigningKey:         signingKey,
+		SigningKeyFallback: signingKeyFallback,
+		Mode:               sdkrequest.StepModeYield,
+		APIBaseURL:         env.APIServerURL(client.Options().APIBaseURL),
+	})
+	defer mgr.CloseCheckpointer()
 	fCtx = sdkrequest.SetManager(fCtx, mgr)
 
 	// Create a new Input type.  We don't know ahead of time the type signature as
@@ -1199,18 +1256,20 @@ func invoke(
 	fVal := reflect.ValueOf(sf.Func())
 	inputVal := reflect.New(fVal.Type().In(1)).Elem()
 
-	updateInput(
-		mgr,
+	err := updateInput(
 		sf,
 		inputVal,
 		input.Event,
-		types.ToAnySlice(input.Events),
+		util.ToAnySlice(input.Events),
 	)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Set InputCtx
 	callCtx := InputCtx{
 		Env:        input.CallCtx.Env,
-		FunctionID: input.CallCtx.FunctionID,
+		FunctionID: input.CallCtx.FunctionID.String(),
 		RunID:      input.CallCtx.RunID,
 		StepID:     input.CallCtx.StepID,
 		Attempt:    input.CallCtx.Attempt,
@@ -1229,13 +1288,13 @@ func invoke(
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				callCtx := mgr.MiddlewareCallCtx()
+				callCtx := mgr.CallContext()
 
 				// Was this us attepmting to prevent functions from continuing, using
 				// panic as a crappy control flow because go doesn't have generators?
 				//
 				// XXX: I'm not very happy with using this;  it is dirty
-				if _, ok := r.(step.ControlHijack); ok {
+				if _, ok := r.(sdkrequest.ControlHijack); ok {
 					// Step attempt ended (completed or errored).
 					//
 					// Note that if this is a step.Run, middleware has already been invoked
@@ -1263,7 +1322,7 @@ func invoke(
 				var evt event.Event
 				if err := json.Unmarshal(rawjson, &evt); err != nil {
 					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
-					panic(step.ControlHijack{})
+					panic(sdkrequest.ControlHijack{})
 				}
 				evts[i] = &evt
 			}
@@ -1274,25 +1333,28 @@ func invoke(
 			mwInput.WithContext(fCtx)
 
 			// Run hook.
-			mw.TransformInput(ctx, mgr.MiddlewareCallCtx(), mwInput)
+			mw.TransformInput(ctx, mgr.CallContext(), mwInput)
 
 			// Update the context in case the hook changed it.
 			fCtx = mwInput.Context()
 
 			// Update the input we're passing to the Inngest function.
-			updateInput(
-				mgr,
+			err := updateInput(
 				sf,
 				inputVal,
 				mwInput.Event,
-				types.ToAnySlice(mwInput.Events),
+				util.ToAnySlice(mwInput.Events),
 			)
+			if err != nil {
+				mgr.SetErr(err)
+				panic(sdkrequest.ControlHijack{})
+			}
 		}
 
 		if len(input.Steps) == 0 {
 			// There are no memoized steps, so the start of the function is "new
 			// code".
-			mw.BeforeExecution(fCtx, mgr.MiddlewareCallCtx())
+			mw.BeforeExecution(fCtx, mgr.CallContext())
 		}
 
 		// Call the defined function with the input data.
@@ -1311,7 +1373,7 @@ func invoke(
 			fnError = res[1].Interface().(error)
 		}
 
-		mw.AfterExecution(ctx, mgr.MiddlewareCallCtx(), fnResponse, fnError)
+		mw.AfterExecution(ctx, mgr.CallContext(), fnResponse, fnError)
 
 		{
 			// Transform output via MW
@@ -1319,7 +1381,7 @@ func invoke(
 				Result: fnResponse,
 				Error:  fnError,
 			}
-			mw.TransformOutput(ctx, mgr.MiddlewareCallCtx(), out)
+			mw.TransformOutput(ctx, mgr.CallContext(), out)
 			// And update the vars
 			fnResponse = out.Result
 			fnError = out.Error
@@ -1339,13 +1401,12 @@ func invoke(
 
 // updateInput applies the middleware input to the function input.
 func updateInput(
-	mgr sdkrequest.InvocationManager,
 	fn ServableFunction,
 	fnInput reflect.Value,
 	// mwInput *middleware.TransformableInput,
 	event any,
 	events []any,
-) {
+) error {
 	// If we have an actual value to add to the event, vs `Input[any]`, set it.
 	if fn.ZeroEvent() != nil {
 		eventType := reflect.TypeOf(fn.ZeroEvent())
@@ -1355,16 +1416,14 @@ func updateInput(
 			// byt, err := json.Marshal(mwInput.Event)
 			byt, err := json.Marshal(event)
 			if err != nil {
-				mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
-				panic(step.ControlHijack{})
+				return fmt.Errorf("error marshalling event for function: %w", err)
 			}
 
 			// The same type as the event.
 			newEvent := reflect.New(eventType).Interface()
 
 			if err := json.Unmarshal(byt, newEvent); err != nil {
-				mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
-				panic(step.ControlHijack{})
+				return fmt.Errorf("error unmarshalling event for function: %w", err)
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent).Elem())
 		}
@@ -1378,15 +1437,13 @@ func updateInput(
 				// for _, evt := range mwInput.Events {
 				byt, err := json.Marshal(evt)
 				if err != nil {
-					mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
-					panic(step.ControlHijack{})
+					return fmt.Errorf("error marshalling event for function: %w", err)
 				}
 
 				// The same type as the event.
 				newEvent := reflect.New(eventType).Interface()
 				if err := json.Unmarshal(byt, newEvent); err != nil {
-					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
-					panic(step.ControlHijack{})
+					return fmt.Errorf("error unmarshalling event for function: %w", err)
 				}
 
 				newEvents = reflect.Append(newEvents, reflect.ValueOf(newEvent).Elem())
@@ -1398,14 +1455,12 @@ func updateInput(
 		{
 			byt, err := json.Marshal(event)
 			if err != nil {
-				mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
-				panic(step.ControlHijack{})
+				return fmt.Errorf("error marshalling event for function: %w", err)
 			}
 
 			newEvent := map[string]any{}
 			if err := json.Unmarshal(byt, &newEvent); err != nil {
-				mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
-				panic(step.ControlHijack{})
+				return fmt.Errorf("error unmarshalling event for function: %w", err)
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent))
 		}
@@ -1416,14 +1471,12 @@ func updateInput(
 			for i, evt := range events {
 				byt, err := json.Marshal(evt)
 				if err != nil {
-					mgr.SetErr(fmt.Errorf("error marshalling event for function: %w", err))
-					panic(step.ControlHijack{})
+					return fmt.Errorf("error marshalling event for function: %w", err)
 				}
 
 				var newEvent map[string]any
 				if err := json.Unmarshal(byt, &newEvent); err != nil {
-					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
-					panic(step.ControlHijack{})
+					return fmt.Errorf("error unmarshalling event for function: %w", err)
 				}
 
 				newEvents[i] = newEvent
@@ -1431,4 +1484,14 @@ func updateInput(
 			fnInput.FieldByName("Events").Set(reflect.ValueOf(newEvents))
 		}
 	}
+
+	return nil
+}
+
+func isTrue(val string) bool {
+	val = strings.ToLower(val)
+	if val == "true" || val == "1" {
+		return true
+	}
+	return false
 }

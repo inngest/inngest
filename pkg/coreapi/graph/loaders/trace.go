@@ -2,6 +2,7 @@ package loader
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -24,11 +25,13 @@ const (
 	DiscoveryStepSpanName    = "Discovery step"
 	GenericExecutionSpanName = "Execution"
 	FinalizationSpanName     = "Finalization"
+
+	// SDKExecutionSpanName is an alias for meta.SDKExecutionSpanName
+	// used locally for readability.
+	SDKExecutionSpanName = meta.SDKExecutionSpanName
 )
 
-var (
-	ErrSkipSuccess = fmt.Errorf("skip success span")
-)
+var ErrSkipSuccess = fmt.Errorf("skip success span")
 
 type TraceRequestKey struct {
 	*cqrs.TraceRunIdentifier
@@ -42,8 +45,32 @@ func (k *TraceRequestKey) String() string {
 	return fmt.Sprintf("%s:%s", k.TraceID, k.RunID)
 }
 
+type DebugRunRequestKey struct {
+	DebugRunID ulid.ULID
+}
+
+func (k *DebugRunRequestKey) Raw() any {
+	return k
+}
+
+func (k *DebugRunRequestKey) String() string {
+	return k.DebugRunID.String()
+}
+
+type DebugSessionRequestKey struct {
+	DebugSessionID ulid.ULID
+}
+
+func (k *DebugSessionRequestKey) Raw() any {
+	return k
+}
+
+func (k *DebugSessionRequestKey) String() string {
+	return k.DebugSessionID.String()
+}
+
 type traceReader struct {
-	loaders *loaders
+	loaders *Loaders
 	reader  cqrs.TraceReader
 }
 
@@ -134,11 +161,14 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	case enums.StepStatusCancelled:
 		s := models.RunTraceSpanStatusCancelled
 		return &s
-	case enums.StepStatusScheduled:
+	case enums.StepStatusScheduled, enums.StepStatusQueued:
 		s := models.RunTraceSpanStatusQueued
 		return &s
 	case enums.StepStatusSleeping, enums.StepStatusWaiting:
 		s := models.RunTraceSpanStatusWaiting
+		return &s
+	case enums.StepStatusSkipped:
+		s := models.RunTraceSpanStatusSkipped
 		return &s
 	}
 
@@ -146,15 +176,7 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 }
 
 func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
-	var duration *int
 	status := models.RunTraceSpanStatusRunning
-	startedAt := span.GetStartedAtTime()
-	endedAt := span.GetEndedAtTime()
-	if startedAt != nil && endedAt != nil {
-		dur := int(endedAt.Sub(*startedAt).Milliseconds())
-		duration = &dur
-		status = models.RunTraceSpanStatusCompleted
-	}
 
 	// Make sure we parse dynamic statuses from updates
 	if span.Attributes.DynamicStatus != nil {
@@ -165,29 +187,83 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	attempts := span.GetAttempts()
 
-	gqlSpan := &models.RunTraceSpan{
-		AppID:        span.GetAppID(),
-		Attempts:     &attempts,
-		Duration:     duration,
-		EndedAt:      span.GetEndedAtTime(),
-		FunctionID:   span.GetFunctionID(),
-		IsRoot:       span.GetIsRoot(),
-		Name:         span.GetStepName(),
-		OutputID:     span.GetOutputID(),
-		ParentSpanID: span.GetParentSpanID(),
-		QueuedAt:     span.GetQueuedAtTime(),
-		RunID:        span.GetRunID(),
-		SpanID:       span.GetSpanID(),
-		StartedAt:    span.GetStartedAtTime(),
-		Status:       status,
-		TraceID:      span.GetTraceID(),
+	debugRunID := span.GetDebugRunID()
+	debugSessionID := span.GetDebugSessionID()
 
-		// IsUserland: , TODO
-		// UserlandSpan: , TODO
+	isUserland := false
+	var userlandSpan *models.UserlandSpan
+
+	if span.Attributes.IsUserland != nil && *span.Attributes.IsUserland {
+		isUserland = true
+
+		filteredAttrs := make(map[string]any)
+		for k, v := range span.RawOtelSpan.Attributes {
+			if !strings.HasPrefix(k, meta.AttrKeyPrefix) {
+				filteredAttrs[k] = v
+			}
+		}
+
+		filteredAttrsByt, err := json.Marshal(filteredAttrs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling filtered attributes: %w", err)
+		}
+
+		filteredAttrsStr := string(filteredAttrsByt)
+
+		userlandSpan = &models.UserlandSpan{
+			SpanName:     span.Attributes.UserlandName,
+			SpanKind:     span.Attributes.UserlandKind,
+			ScopeName:    span.Attributes.UserlandScopeName,
+			ScopeVersion: span.Attributes.UserlandScopeVersion,
+			ServiceName:  span.Attributes.UserlandServiceName,
+			SpanAttrs:    &filteredAttrsStr,
+		}
+
+	}
+
+	name := span.GetStepName()
+	if isUserland {
+		name = *userlandSpan.SpanName
+	}
+
+	gqlSpan := &models.RunTraceSpan{
+		AppID:          span.GetAppID(),
+		Attempts:       &attempts,
+		EndedAt:        span.GetEndedAtTime(),
+		FunctionID:     span.GetFunctionID(),
+		IsRoot:         span.GetIsRoot(),
+		Name:           name,
+		OutputID:       span.GetOutputID(),
+		ParentSpanID:   span.GetParentSpanID(),
+		QueuedAt:       span.GetQueuedAtTime(),
+		RunID:          span.GetRunID(),
+		SpanID:         span.GetSpanID(),
+		StartedAt:      span.GetStartedAtTime(),
+		Status:         status,
+		TraceID:        span.GetTraceID(),
+		DebugRunID:     debugRunID,
+		DebugSessionID: debugSessionID,
+		SpanTypeName:   span.Name,
+		IsUserland:     isUserland,
+		UserlandSpan:   userlandSpan,
+	}
+
+	if span.Attributes.SkipReason != nil {
+		reason := span.Attributes.SkipReason.String()
+		gqlSpan.SkipReason = &reason
+	}
+	if span.Attributes.SkipExistingRunID != nil {
+		gqlSpan.SkipExistingRunID = span.Attributes.SkipExistingRunID
+	}
+
+	if span.Attributes.ResponseStatusCode != nil && span.Attributes.ResponseHeaders != nil {
+		gqlSpan.Response = &models.RunTraceSpanResponseInfo{
+			StatusCode: *span.Attributes.ResponseStatusCode,
+			Headers:    *span.Attributes.ResponseHeaders,
+		}
 	}
 
 	// If this was a discovery span, we may not want to show it.
-
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
 	if span.Attributes.StepOp != nil {
@@ -279,6 +355,14 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
 		lastStepQueueTime := &gqlSpan.QueuedAt
 		isFirstChild := true
+		var omittedStepMetadata []*models.SpanMetadata
+		haveSetRunStartTime := span.Name != meta.SpanNameRun
+
+		// If there's a run start time on the overall parent, use that.  Sometimes this
+		// is the case for eg. sync based runs.
+		if span.GetStartedAtTime() != nil {
+			haveSetRunStartTime = true
+		}
 
 		for i, cs := range span.Children {
 			child, err := tr.convertRunSpanToGQL(ctx, cs)
@@ -292,8 +376,44 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				continue
 			}
 
-			if !cs.MarkedAsDropped {
-				showSpan = true
+			if child.Omit {
+				// We're skipping this child, but we may still want to use
+				// its data for timings.
+				if child.SpanTypeName == meta.SpanNameStepDiscovery && !haveSetRunStartTime {
+					// Discovery spans can be used to set the start time of
+					// the step if it's the first child.
+					gqlSpan.StartedAt = child.StartedAt
+					haveSetRunStartTime = true
+				}
+
+				// Preserve metadata from omitted step discovery spans so
+				// it can be transferred to the next visible step sibling.
+				// The execution span (which holds timing metadata) is
+				// parented to the step discovery span, not the step span.
+				// When the discovery span is omitted, its metadata must
+				// be promoted to the corresponding visible step span.
+				if len(child.Metadata) > 0 && child.SpanTypeName == meta.SpanNameStepDiscovery {
+					omittedStepMetadata = append(omittedStepMetadata, child.Metadata...)
+				}
+
+				continue
+			}
+
+			if cs.MarkedAsDropped {
+				continue
+			}
+
+			showSpan = true
+
+			// Transfer any accumulated metadata from preceding omitted
+			// step discovery spans to this visible step sibling. Each
+			// discovery span precedes its corresponding step span in the
+			// child list, so we attach metadata to the next visible step
+			// we encounter rather than collecting everything for a
+			// post-loop pass.
+			if len(omittedStepMetadata) > 0 && child.SpanTypeName == meta.SpanNameStep {
+				child.Metadata = append(child.Metadata, omittedStepMetadata...)
+				omittedStepMetadata = nil
 			}
 
 			// Decide on changes to this parent span based on the children.
@@ -307,11 +427,17 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 						}
 
 						hasFinalizationChild = true
-
 					}
 				}
 			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
 				{
+					// Userland spans don't carry step execution metadata;
+					// so skip all parent-property propagation for them.
+					if child.IsUserland {
+						break
+					}
+
+					gqlSpan.EndedAt = child.EndedAt
 					gqlSpan.Status = child.Status
 
 					if isFirstChild {
@@ -322,8 +448,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					if child.OutputID != nil && *child.OutputID != "" {
 						gqlSpan.OutputID = child.OutputID
 					}
-
-					gqlSpan.EndedAt = child.EndedAt
 
 					if cs.Attributes.IsFunctionOutput != nil && *cs.Attributes.IsFunctionOutput {
 						gqlSpan.Name = FinalizationSpanName
@@ -339,6 +463,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					}
 					if child.StepInfo != nil {
 						gqlSpan.StepInfo = child.StepInfo
+					}
+					if child.StepType != "" {
+						gqlSpan.StepType = child.StepType
 					}
 					if child.Attempts != nil && *child.Attempts > *gqlSpan.Attempts {
 						gqlSpan.Attempts = child.Attempts
@@ -358,10 +485,31 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, child)
 		}
 
+		// If we only have a single child, this span isn't a userland span,
+		// but the single child is the SDK's `"inngest.execution"` wrapper,
+		// collapse it by returning its children (if any).
+		//
+		// We do this because userland spans are always underneath an
+		// `"inngest.execution"` span created by an SDK, which houses useful
+		// information about the environment, versions, scope, etc.
+		//
+		// Critically, this means we also ignore the `"inngest.execution"`
+		// span itself, as we never want to display it to the user.
+		//
+		// We only collapse when the child is specifically the SDK execution
+		// wrapper span. Other userland spans with children (e.g., spans
+		// within checkpointed steps) must be preserved in the tree.
+		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland && gqlSpan.ChildrenSpans[0].Name == SDKExecutionSpanName {
+			gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
+		}
+
 		// For the run span, the start is the first child span's start
 		if span.Name == meta.SpanNameRun && len(gqlSpan.ChildrenSpans) > 0 {
-			gqlSpan.StartedAt = &gqlSpan.ChildrenSpans[0].QueuedAt
-			if gqlSpan.EndedAt != nil {
+			if (gqlSpan.StartedAt == nil || !haveSetRunStartTime) && gqlSpan.ChildrenSpans[0].StartedAt != nil {
+				gqlSpan.StartedAt = gqlSpan.ChildrenSpans[0].StartedAt
+			}
+
+			if gqlSpan.EndedAt != nil && gqlSpan.StartedAt != nil {
 				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
 				gqlSpan.Duration = &dur
 			}
@@ -371,8 +519,12 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		if isStep {
 			// Step spans should not show attempts if they only have one and
 			// have resolved
-			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
-				gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
+			if len(gqlSpan.ChildrenSpans) == 1 && !gqlSpan.ChildrenSpans[0].IsUserland && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
+				gqlSpan.Response = gqlSpan.ChildrenSpans[0].Response
+				gqlSpan.Metadata = append(gqlSpan.Metadata, gqlSpan.ChildrenSpans[0].Metadata...)
+				// However, we preserve any userland spans from the
+				// successful execution if we have any.
+				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
 			}
 		}
 
@@ -397,10 +549,48 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				gqlSpan.Name = GenericExecutionSpanName
 			}
 		}
+
+		// Any remaining omittedStepMetadata at this point means
+		// there were trailing omitted discovery spans with no
+		// subsequent visible step child — intentionally discarded.
 	}
 
 	if !showSpan {
-		return nil, nil
+		gqlSpan.Omit = true
+	}
+
+	if gqlSpan.Name == FinalizationSpanName {
+		gqlSpan.StepType = strings.ToUpper(FinalizationSpanName)
+	} else if span.Attributes.StepRunType != nil {
+		gqlSpan.StepType = *span.Attributes.StepRunType
+	} else if gqlSpan.StepOp != nil {
+		gqlSpan.StepType = gqlSpan.StepOp.String()
+	}
+
+	if models.RunTraceEnded(gqlSpan.Status) || gqlSpan.IsUserland {
+		startedAt := span.GetStartedAtTime()
+		endedAt := span.GetEndedAtTime()
+		if startedAt != nil && endedAt != nil {
+			dur := int(endedAt.Sub(*startedAt).Milliseconds())
+			gqlSpan.Duration = &dur
+		}
+	} else {
+		// Remove ended at.  There's an issue in the data that CQRS is passed in which
+		// sometimes all spans have an EndedAt field, which actually denotes when the
+		// span was committed.
+		//
+		// EndedAt, to GQL, denotes the step ending, and we merge start and stop spans
+		// together.
+		gqlSpan.EndedAt = nil
+	}
+
+	for _, md := range span.Metadata {
+		gqlSpan.Metadata = append(gqlSpan.Metadata, &models.SpanMetadata{
+			Kind:      md.Kind,
+			Scope:     md.Scope,
+			Values:    md.Values,
+			UpdatedAt: md.UpdatedAt,
+		})
 	}
 
 	return gqlSpan, nil
@@ -572,25 +762,27 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 	}
 
 	span := &models.RunTraceSpan{
-		AppID:        uuid.MustParse(pb.GetAppId()),
-		FunctionID:   uuid.MustParse(pb.GetFunctionId()),
-		TraceID:      pb.GetTraceId(),
-		ParentSpanID: pb.ParentSpanId,
-		SpanID:       pb.GetSpanId(),
-		RunID:        ulid.MustParse(pb.GetRunId()),
-		IsRoot:       pb.GetIsRoot(),
-		IsUserland:   pb.GetIsUserland(),
-		UserlandSpan: userlandSpan,
-		Name:         pb.GetName(),
-		Status:       status,
-		Attempts:     &attempts,
-		Duration:     &duration,
-		QueuedAt:     pb.GetQueuedAt().AsTime().Truncate(time.Millisecond),
-		StartedAt:    startedAt,
-		EndedAt:      endedAt,
-		OutputID:     pb.OutputId,
-		StepOp:       stepOp,
-		StepID:       pb.StepId,
+		AppID:          uuid.MustParse(pb.GetAppId()),
+		FunctionID:     uuid.MustParse(pb.GetFunctionId()),
+		TraceID:        pb.GetTraceId(),
+		ParentSpanID:   pb.ParentSpanId,
+		SpanID:         pb.GetSpanId(),
+		RunID:          ulid.MustParse(pb.GetRunId()),
+		IsRoot:         pb.GetIsRoot(),
+		IsUserland:     pb.GetIsUserland(),
+		UserlandSpan:   userlandSpan,
+		Name:           pb.GetName(),
+		Status:         status,
+		Attempts:       &attempts,
+		Duration:       &duration,
+		QueuedAt:       pb.GetQueuedAt().AsTime().Truncate(time.Millisecond),
+		StartedAt:      startedAt,
+		EndedAt:        endedAt,
+		OutputID:       pb.OutputId,
+		StepOp:         stepOp,
+		StepID:         pb.StepId,
+		DebugRunID:     nil, // Not available in legacy protobuf format
+		DebugSessionID: nil, // Not available in legacy protobuf format
 	}
 
 	if pb.GetStepInfo() != nil {
@@ -664,7 +856,6 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 
 		for _, cp := range pb.Children {
 			cspan, err := convertRunTreeToGQLModel(cp)
-
 			if err != nil {
 				return nil, err
 			}

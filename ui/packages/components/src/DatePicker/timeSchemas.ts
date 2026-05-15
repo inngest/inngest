@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-type months = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
-
 const MIN_HOUR_AM = 1;
 const MAX_HOUR_AM = 12;
 const MIN_HOUR_24 = 0;

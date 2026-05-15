@@ -19,7 +19,10 @@ export default function AddAppButton({ secondary }: { secondary?: boolean }) {
       />
 
       {isAddAppModalVisible && (
-        <AddAppModal isOpen={isAddAppModalVisible} onClose={() => setAddAppModalVisible(false)} />
+        <AddAppModal
+          isOpen={isAddAppModalVisible}
+          onClose={() => setAddAppModalVisible(false)}
+        />
       )}
     </>
   );

@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/rueidis"
@@ -1683,10 +1684,10 @@ type Z struct {
 	Score  float64
 }
 
-// ZWithKey represents sorted set member including the name of the key where it was popped.
+// ZWithKey represents a sorted set member including the name of the key where it was popped.
 type ZWithKey struct {
-	Z
 	Key string
+	Z
 }
 
 // ZStore is used as an arg to ZInter/ZInterStore and ZUnion/ZUnionStore.
@@ -1822,7 +1823,7 @@ func (cmd *ClusterSlotsCmd) from(res rueidis.RedisResult) {
 			return
 		}
 		if len(slot) < 2 {
-			cmd.SetErr(fmt.Errorf("got %d, excpected atleast 2", len(slot)))
+			cmd.SetErr(fmt.Errorf("got %d, expected at least 2", len(slot)))
 			return
 		}
 		start, err := slot[0].AsInt64()
@@ -2152,6 +2153,45 @@ type HExpireArgs struct {
 	LT bool
 }
 
+// ExpirationType represents an expiration option for the HGETEX command.
+type HGetEXExpirationType string
+
+const (
+	HGetEXExpirationEX      HGetEXExpirationType = "EX"
+	HGetEXExpirationPX      HGetEXExpirationType = "PX"
+	HGetEXExpirationEXAT    HGetEXExpirationType = "EXAT"
+	HGetEXExpirationPXAT    HGetEXExpirationType = "PXAT"
+	HGetEXExpirationPERSIST HGetEXExpirationType = "PERSIST"
+)
+
+type HSetEXCondition string
+
+const (
+	HSetEXFNX HSetEXCondition = "FNX"
+	HSetEXFXX HSetEXCondition = "FXX"
+)
+
+type HGetEXOptions struct {
+	ExpirationType HGetEXExpirationType
+	ExpirationVal  int64
+}
+
+type HSetEXExpirationType string
+
+const (
+	HSetEXExpirationEX      HSetEXExpirationType = "EX"
+	HSetEXExpirationPX      HSetEXExpirationType = "PX"
+	HSetEXExpirationEXAT    HSetEXExpirationType = "EXAT"
+	HSetEXExpirationPXAT    HSetEXExpirationType = "PXAT"
+	HSetEXExpirationKEEPTTL HSetEXExpirationType = "KEEPTTL"
+)
+
+type HSetEXOptions struct {
+	Condition      HSetEXCondition
+	ExpirationType HSetEXExpirationType
+	ExpirationVal  int64
+}
+
 type Sort struct {
 	By     string
 	Order  string
@@ -2171,8 +2211,8 @@ type SetArgs struct {
 }
 
 type BitCount struct {
-	Start, End int64
 	Unit       string // Stores BIT or BYTE
+	Start, End int64
 }
 
 //type BitPos struct {
@@ -2891,25 +2931,25 @@ type TDigestMergeOptions struct {
 }
 
 type TSOptions struct {
-	Retention       int
-	ChunkSize       int
+	Labels          map[string]string
 	Encoding        string
 	DuplicatePolicy string
-	Labels          map[string]string
+	Retention       int
+	ChunkSize       int
 }
 type TSIncrDecrOptions struct {
+	Labels       map[string]string
 	Timestamp    int64
 	Retention    int
 	ChunkSize    int
 	Uncompressed bool
-	Labels       map[string]string
 }
 
 type TSAlterOptions struct {
+	Labels          map[string]string
+	DuplicatePolicy string
 	Retention       int
 	ChunkSize       int
-	DuplicatePolicy string
-	Labels          map[string]string
 }
 
 type TSCreateRuleOptions struct {
@@ -3127,81 +3167,81 @@ func newMapStringSliceInterfaceCmd(res rueidis.RedisResult) *MapStringSliceInter
 }
 
 type TSRangeOptions struct {
-	Latest          bool
+	Align           interface{}
+	BucketTimestamp interface{}
 	FilterByTS      []int
 	FilterByValue   []int
 	Count           int
-	Align           interface{}
 	Aggregator      Aggregator
 	BucketDuration  int
-	BucketTimestamp interface{}
+	Latest          bool
 	Empty           bool
 }
 
 type TSRevRangeOptions struct {
-	Latest          bool
+	Align           interface{}
+	BucketTimestamp interface{}
 	FilterByTS      []int
 	FilterByValue   []int
 	Count           int
-	Align           interface{}
 	Aggregator      Aggregator
 	BucketDuration  int
-	BucketTimestamp interface{}
+	Latest          bool
 	Empty           bool
 }
 
 type TSMRangeOptions struct {
-	Latest          bool
-	FilterByTS      []int
-	FilterByValue   []int
-	WithLabels      bool
-	SelectedLabels  []interface{}
-	Count           int
 	Align           interface{}
-	Aggregator      Aggregator
-	BucketDuration  int
 	BucketTimestamp interface{}
-	Empty           bool
 	GroupByLabel    interface{}
 	Reducer         interface{}
+	FilterByTS      []int
+	FilterByValue   []int
+	SelectedLabels  []interface{}
+	Count           int
+	Aggregator      Aggregator
+	BucketDuration  int
+	Latest          bool
+	WithLabels      bool
+	Empty           bool
 }
 
 type TSMRevRangeOptions struct {
-	Latest          bool
-	FilterByTS      []int
-	FilterByValue   []int
-	WithLabels      bool
-	SelectedLabels  []interface{}
-	Count           int
 	Align           interface{}
-	Aggregator      Aggregator
-	BucketDuration  int
 	BucketTimestamp interface{}
-	Empty           bool
 	GroupByLabel    interface{}
 	Reducer         interface{}
+	FilterByTS      []int
+	FilterByValue   []int
+	SelectedLabels  []interface{}
+	Count           int
+	Aggregator      Aggregator
+	BucketDuration  int
+	Latest          bool
+	WithLabels      bool
+	Empty           bool
 }
 
 type TSMGetOptions struct {
+	SelectedLabels []interface{}
 	Latest         bool
 	WithLabels     bool
-	SelectedLabels []interface{}
 }
 
 type JSONSetArgs struct {
+	Value interface{}
 	Key   string
 	Path  string
-	Value interface{}
 }
 
 type JSONArrIndexArgs struct {
-	Start int
 	Stop  *int
+	Start int
 }
 
 type JSONArrTrimArgs struct {
-	Start int
 	Stop  *int
+	Start int
 }
 
 type JSONCmd struct {
@@ -3253,7 +3293,7 @@ func (cmd *JSONCmd) from(res rueidis.RedisResult) {
 		cmd.SetVal(str)
 	// JSON.NUMINCRBY
 	case msg.IsArray():
-		// we set marshaled string to cmd.val
+		// we set the marshaled string to cmd.val
 		// which will be used at cmd.Val()
 		// and also stored parsed result to cmd.expanded,
 		// which will be used at cmd.Expanded()
@@ -3407,8 +3447,8 @@ func newMapMapStringInterfaceCmd(res rueidis.RedisResult) *MapMapStringInterface
 }
 
 type FTAggregateResult struct {
-	Total int
 	Rows  []AggregateRow
+	Total int
 }
 
 type AggregateRow struct {
@@ -3418,9 +3458,9 @@ type AggregateRow struct {
 // Each AggregateReducer have different args.
 // Please follow https://redis.io/docs/interact/search-and-query/search/aggregations/#supported-groupby-reducers for more information.
 type FTAggregateReducer struct {
-	Reducer SearchAggregator
-	Args    []interface{}
 	As      string
+	Args    []interface{}
+	Reducer SearchAggregator
 }
 
 type FTAggregateGroupBy struct {
@@ -3450,21 +3490,23 @@ type FTAggregateWithCursor struct {
 }
 
 type FTAggregateOptions struct {
-	Verbatim          bool
-	LoadAll           bool
-	Load              []FTAggregateLoad
-	Timeout           int
-	GroupBy           []FTAggregateGroupBy
-	SortBy            []FTAggregateSortBy
-	SortByMax         int
-	Apply             []FTAggregateApply
-	LimitOffset       int
-	Limit             int
-	Filter            string
-	WithCursor        bool
 	WithCursorOptions *FTAggregateWithCursor
 	Params            map[string]interface{}
+	Filter            string
+	Scorer            string
+	Load              []FTAggregateLoad
+	GroupBy           []FTAggregateGroupBy
+	SortBy            []FTAggregateSortBy
+	Apply             []FTAggregateApply
+	Timeout           int
+	SortByMax         int
+	LimitOffset       int
+	Limit             int
 	DialectVersion    int
+	Verbatim          bool
+	LoadAll           bool
+	WithCursor        bool
+	AddScores         bool
 }
 
 type AggregateCmd struct {
@@ -3574,22 +3616,22 @@ func newAggregateCmd(res rueidis.RedisResult) *AggregateCmd {
 }
 
 type FTCreateOptions struct {
-	OnHash          bool
-	OnJSON          bool
-	Prefix          []any
 	Filter          string
 	DefaultLanguage string
 	LanguageField   string
-	Score           float64
 	ScoreField      string
 	PayloadField    string
+	Prefix          []any
+	StopWords       []any
+	Score           float64
 	MaxTextFields   int
-	NoOffsets       bool
 	Temporary       int
+	OnHash          bool
+	OnJSON          bool
+	NoOffsets       bool
 	NoHL            bool
 	NoFields        bool
 	NoFreqs         bool
-	StopWords       []any
 	SkipInitialScan bool
 }
 
@@ -3678,20 +3720,20 @@ func (t SearchFieldType) String() string {
 }
 
 type FieldSchema struct {
+	VectorArgs        *FTVectorArgs
 	FieldName         string
 	As                string
+	PhoneticMatcher   string
+	Separator         string
+	GeoShapeFieldType string
 	FieldType         SearchFieldType
+	Weight            float64
 	Sortable          bool
 	UNF               bool
 	NoStem            bool
 	NoIndex           bool
-	PhoneticMatcher   string
-	Weight            float64
-	Separator         string
 	CaseSensitive     bool
 	WithSuffixtrie    bool
-	VectorArgs        *FTVectorArgs
-	GeoShapeFieldType string
 	IndexEmpty        bool
 	IndexMissing      bool
 }
@@ -3703,16 +3745,16 @@ type FTVectorArgs struct {
 
 type FTFlatOptions struct {
 	Type            string
-	Dim             int
 	DistanceMetric  string
+	Dim             int
 	InitialCapacity int
 	BlockSize       int
 }
 
 type FTHNSWOptions struct {
 	Type                   string
-	Dim                    int
 	DistanceMetric         string
+	Dim                    int
 	InitialCapacity        int
 	MaxEdgesPerNode        int
 	MaxAllowedEdgesPerNode int
@@ -3721,9 +3763,9 @@ type FTHNSWOptions struct {
 }
 
 type SpellCheckTerms struct {
+	Dictionary string
 	Include    bool
 	Exclude    bool
-	Dictionary string
 }
 
 type FTSearchFilter struct {
@@ -3734,10 +3776,10 @@ type FTSearchFilter struct {
 
 type FTSearchGeoFilter struct {
 	FieldName string
+	Unit      string
 	Longitude float64
 	Latitude  float64
 	Radius    float64
-	Unit      string
 }
 
 type FTSearchReturn struct {
@@ -3760,21 +3802,21 @@ type FTExplainOptions struct {
 }
 
 type IndexErrors struct {
-	IndexingFailures     int `redis:"indexing failures"`
 	LastIndexingError    string
 	LastIndexingErrorKey string
+	IndexingFailures     int `redis:"indexing failures"`
 }
 
 type FTAttribute struct {
 	Identifier      string
 	Attribute       string
 	Type            string
+	PhoneticMatcher string
 	Weight          float64
 	Sortable        bool
 	NoStem          bool
 	NoIndex         bool
 	UNF             bool
-	PhoneticMatcher string
 	CaseSensitive   bool
 	WithSuffixtrie  bool
 }
@@ -3793,10 +3835,10 @@ type FieldStatistic struct {
 }
 
 type GCStats struct {
+	AverageCycleTimeMs   string `redis:"average_cycle_time_ms"`
 	BytesCollected       int    `redis:"bytes_collected"`
 	TotalMsRun           int    `redis:"total_ms_run"`
 	TotalCycles          int    `redis:"total_cycles"`
-	AverageCycleTimeMs   string `redis:"average_cycle_time_ms"`
 	LastRunTimeMs        int    `redis:"last_run_time_ms"`
 	GCNumericTreesMissed int    `redis:"gc_numeric_trees_missed"`
 	GCBlocksDenied       int    `redis:"gc_blocks_denied"`
@@ -3809,20 +3851,23 @@ type IndexDefinition struct {
 }
 
 type FTInfoResult struct {
-	IndexErrors              IndexErrors      `redis:"Index Errors"`
-	Attributes               []FTAttribute    `redis:"attributes"`
-	BytesPerRecordAvg        string           `redis:"bytes_per_record_avg"`
-	Cleaning                 int              `redis:"cleaning"`
-	CursorStats              CursorStats      `redis:"cursor_stats"`
 	DialectStats             map[string]int   `redis:"dialect_stats"`
-	DocTableSizeMB           float64          `redis:"doc_table_size_mb"`
+	IndexErrors              IndexErrors      `redis:"Index Errors"`
+	BytesPerRecordAvg        string           `redis:"bytes_per_record_avg"`
+	IndexName                string           `redis:"index_name"`
+	OffsetBitsPerRecordAvg   string           `redis:"offset_bits_per_record_avg"`
+	OffsetsPerTermAvg        string           `redis:"offsets_per_term_avg"`
+	RecordsPerDocAvg         string           `redis:"records_per_doc_avg"`
+	Attributes               []FTAttribute    `redis:"attributes"`
 	FieldStatistics          []FieldStatistic `redis:"field statistics"`
+	IndexOptions             []string         `redis:"index_options"`
+	IndexDefinition          IndexDefinition  `redis:"index_definition"`
 	GCStats                  GCStats          `redis:"gc_stats"`
+	CursorStats              CursorStats      `redis:"cursor_stats"`
+	Cleaning                 int              `redis:"cleaning"`
+	DocTableSizeMB           float64          `redis:"doc_table_size_mb"`
 	GeoshapesSzMB            float64          `redis:"geoshapes_sz_mb"`
 	HashIndexingFailures     int              `redis:"hash_indexing_failures"`
-	IndexDefinition          IndexDefinition  `redis:"index_definition"`
-	IndexName                string           `redis:"index_name"`
-	IndexOptions             []string         `redis:"index_options"`
 	Indexing                 int              `redis:"indexing"`
 	InvertedSzMB             float64          `redis:"inverted_sz_mb"`
 	KeyTableSizeMB           float64          `redis:"key_table_size_mb"`
@@ -3831,11 +3876,8 @@ type FTInfoResult struct {
 	NumRecords               int              `redis:"num_records"`
 	NumTerms                 int              `redis:"num_terms"`
 	NumberOfUses             int              `redis:"number_of_uses"`
-	OffsetBitsPerRecordAvg   string           `redis:"offset_bits_per_record_avg"`
 	OffsetVectorsSzMB        float64          `redis:"offset_vectors_sz_mb"`
-	OffsetsPerTermAvg        string           `redis:"offsets_per_term_avg"`
 	PercentIndexed           float64          `redis:"percent_indexed"`
-	RecordsPerDocAvg         string           `redis:"records_per_doc_avg"`
 	SortableValuesSizeMB     float64          `redis:"sortable_values_size_mb"`
 	TagOverheadSzMB          float64          `redis:"tag_overhead_sz_mb"`
 	TextOverheadSzMB         float64          `redis:"text_overhead_sz_mb"`
@@ -4064,8 +4106,8 @@ func newFTInfoCmd(res rueidis.RedisResult) *FTInfoCmd {
 }
 
 type FTSpellCheckOptions struct {
-	Distance int
 	Terms    *FTSpellCheckTerms
+	Distance int
 	Dialect  int
 }
 
@@ -4081,8 +4123,8 @@ type SpellCheckResult struct {
 }
 
 type SpellCheckSuggestion struct {
-	Score      float64
 	Suggestion string
+	Score      float64
 }
 
 type FTSpellCheckCmd struct{ baseCmd[[]SpellCheckResult] }
@@ -4248,44 +4290,44 @@ func parseFTSpellCheck(data []interface{}) ([]SpellCheckResult, error) {
 }
 
 type Document struct {
-	ID      string
 	Score   *float64
 	Payload *string
 	SortKey *string
 	Fields  map[string]string
+	ID      string
 }
 
 type FTSearchResult struct {
-	Total int64
 	Docs  []Document
+	Total int64
 }
 
 type FTSearchOptions struct {
+	Params          map[string]interface{}
+	Language        string
+	Expander        string
+	Scorer          string
+	Payload         string
+	Filters         []FTSearchFilter
+	GeoFilter       []FTSearchGeoFilter
+	InKeys          []interface{}
+	InFields        []interface{}
+	Return          []FTSearchReturn
+	SortBy          []FTSearchSortBy
+	Slop            int
+	Timeout         int
+	LimitOffset     int
+	Limit           int
+	DialectVersion  int
 	NoContent       bool
 	Verbatim        bool
 	NoStopWords     bool
 	WithScores      bool
 	WithPayloads    bool
 	WithSortKeys    bool
-	Filters         []FTSearchFilter
-	GeoFilter       []FTSearchGeoFilter
-	InKeys          []interface{}
-	InFields        []interface{}
-	Return          []FTSearchReturn
-	Slop            int
-	Timeout         int
 	InOrder         bool
-	Language        string
-	Expander        string
-	Scorer          string
 	ExplainScore    bool
-	Payload         string
-	SortBy          []FTSearchSortBy
 	SortByWithCount bool
-	LimitOffset     int
-	Limit           int
-	Params          map[string]interface{}
-	DialectVersion  int
 }
 
 type FTSearchCmd struct {
@@ -4577,4 +4619,908 @@ func newFTSynDumpCmd(res rueidis.RedisResult) *FTSynDumpCmd {
 type FTSynDumpResult struct {
 	Term     string
 	Synonyms []string
+}
+
+// ClientFlags is redis-server client flags, copy from redis/src/server.h (redis 7.0)
+type ClientFlags uint64
+
+const (
+	ClientSlave            ClientFlags = 1 << 0  /* This client is a replica */
+	ClientMaster           ClientFlags = 1 << 1  /* This client is a master */
+	ClientMonitor          ClientFlags = 1 << 2  /* This client is a slave monitor, see MONITOR */
+	ClientMulti            ClientFlags = 1 << 3  /* This client is in a MULTI context */
+	ClientBlocked          ClientFlags = 1 << 4  /* The client is waiting in a blocking operation */
+	ClientDirtyCAS         ClientFlags = 1 << 5  /* Watched keys modified. EXEC will fail. */
+	ClientCloseAfterReply  ClientFlags = 1 << 6  /* Close after writing the entire reply. */
+	ClientUnBlocked        ClientFlags = 1 << 7  /* This client was unblocked and is stored in server.unblocked_clients */
+	ClientScript           ClientFlags = 1 << 8  /* This is a non-connected client used by Lua */
+	ClientAsking           ClientFlags = 1 << 9  /* Client issued the ASKING command */
+	ClientCloseASAP        ClientFlags = 1 << 10 /* Close this client ASAP */
+	ClientUnixSocket       ClientFlags = 1 << 11 /* Client connected via Unix domain socket */
+	ClientDirtyExec        ClientFlags = 1 << 12 /* EXEC will fail for errors while queueing */
+	ClientMasterForceReply ClientFlags = 1 << 13 /* Queue replies even if is master */
+	ClientForceAOF         ClientFlags = 1 << 14 /* Force AOF propagation of current cmd. */
+	ClientForceRepl        ClientFlags = 1 << 15 /* Force replication of the current cmd. */
+	ClientPrePSync         ClientFlags = 1 << 16 /* Instance don't understand PSYNC. */
+	ClientReadOnly         ClientFlags = 1 << 17 /* Cluster client is in the read-only state. */
+	ClientPubSub           ClientFlags = 1 << 18 /* Client is in Pub/Sub mode. */
+	ClientPreventAOFProp   ClientFlags = 1 << 19 /* Don't propagate to AOF. */
+	ClientPreventReplProp  ClientFlags = 1 << 20 /* Don't propagate to slaves. */
+	ClientPreventProp      ClientFlags = ClientPreventAOFProp | ClientPreventReplProp
+	ClientPendingWrite     ClientFlags = 1 << 21 /* Client has output to send, but a-write handler is yet not installed. */
+	ClientReplyOff         ClientFlags = 1 << 22 /* Don't send replies to a client. */
+	ClientReplySkipNext    ClientFlags = 1 << 23 /* Set ClientREPLY_SKIP for the next cmd */
+	ClientReplySkip        ClientFlags = 1 << 24 /* Don't send just this reply. */
+	ClientLuaDebug         ClientFlags = 1 << 25 /* Run EVAL in debug mode. */
+	ClientLuaDebugSync     ClientFlags = 1 << 26 /* EVAL debugging without fork() */
+	ClientModule           ClientFlags = 1 << 27 /* Non-connected client used by some module. */
+	ClientProtected        ClientFlags = 1 << 28 /* Client should not be freed for now. */
+	ClientExecutingCommand ClientFlags = 1 << 29 /* Indicates that the client is currently in the process of handling
+	   a command. usually this will be marked only during call()
+	   however, blocked clients might have this flag kept until they
+	   will try to reprocess the command. */
+	ClientPendingCommand      ClientFlags = 1 << 30 /* Indicates the client has a fully * parsed command ready for execution. */
+	ClientTracking            ClientFlags = 1 << 31 /* Client enabled key tracking in order to perform client side caching. */
+	ClientTrackingBrokenRedir ClientFlags = 1 << 32 /* Target client is invalid. */
+	ClientTrackingBCAST       ClientFlags = 1 << 33 /* Tracking in BCAST mode. */
+	ClientTrackingOptIn       ClientFlags = 1 << 34 /* Tracking in opt-in mode. */
+	ClientTrackingOptOut      ClientFlags = 1 << 35 /* Tracking in opt-out mode. */
+	ClientTrackingCaching     ClientFlags = 1 << 36 /* CACHING yes/no was given, depending on opt-in/opt-out mode. */
+	ClientTrackingNoLoop      ClientFlags = 1 << 37 /* Don't send invalidation messages about writes performed by myself.*/
+	ClientInTimeoutTable      ClientFlags = 1 << 38 /* This client is in the timeout table. */
+	ClientProtocolError       ClientFlags = 1 << 39 /* Protocol error chatting with it. */
+	ClientCloseAfterCommand   ClientFlags = 1 << 40 /* Close after executing commands * and writing the entire reply. */
+	ClientDenyBlocking        ClientFlags = 1 << 41 /* Indicate that the client should not be blocked. currently, turned on inside MULTI, Lua, RM_Call, and AOF client */
+	ClientReplRDBOnly         ClientFlags = 1 << 42 /* This client is a replica that only wants RDB without a replication buffer. */
+	ClientNoEvict             ClientFlags = 1 << 43 /* This client is protected against client memory eviction. */
+	ClientAllowOOM            ClientFlags = 1 << 44 /* Client used by RM_Call is allowed to fully execute scripts even when in OOM */
+	ClientNoTouch             ClientFlags = 1 << 45 /* This client will not touch LFU/LRU stats. */
+	ClientPushing             ClientFlags = 1 << 46 /* This client is pushing notifications. */
+)
+
+// ClientInfo is redis-server ClientInfo
+type ClientInfo struct {
+	Addr               string        // address/port of the client
+	LAddr              string        // address/port of a local address client connected to (bind address)
+	Name               string        // the name set by the client with CLIENT SETNAME
+	Events             string        // file descriptor events (see below)
+	LastCmd            string        // cmd, last command played
+	User               string        // the authenticated username of the client
+	LibName            string        // redis version 7.2, client library name
+	LibVer             string        // redis version 7.2, client library version
+	ID                 int64         // redis version 2.8.12, a unique 64-bit client ID
+	FD                 int64         // file descriptor corresponding to the socket
+	Age                time.Duration // total duration of the connection in seconds
+	Idle               time.Duration // idle time of the connection in seconds
+	Flags              ClientFlags   // client flags (see below)
+	DB                 int           // current database ID
+	Sub                int           // number of channel subscriptions
+	PSub               int           // number of pattern matching subscriptions
+	SSub               int           // redis version 7.0.3, number of shard channel subscriptions
+	Multi              int           // number of commands in a MULTI/EXEC context
+	Watch              int           // redis version 7.4 RC1, the number of keys this client is currently watching.
+	QueryBuf           int           // qbuf, query buffer length (0 means no query pending)
+	QueryBufFree       int           // qbuf-free, free space of the query buffer (0 means the buffer is full)
+	ArgvMem            int           // incomplete arguments for the next command (already extracted from query buffer)
+	MultiMem           int           // redis version 7.0, memory is used up by buffered multi commands
+	BufferSize         int           // rbs, usable size of buffer
+	BufferPeak         int           // rbp, peak used size of buffer in the last 5 sec interval
+	OutputBufferLength int           // obl, output buffer length
+	OutputListLength   int           // oll, output list length (replies are queued in this list when the buffer is full)
+	OutputMemory       int           // omem, output buffer memory usage
+	TotalMemory        int           // tot-mem, total memory consumed by this client in its various buffers
+	Redir              int64         // client id of current client tracking redirection
+	Resp               int           // redis version 7.0, client RESP protocol version
+	TotalNetIn         int64         // tot-net-in, total network bytes read from the client connection
+	TotalNetOut        int64         // tot-net-out, total network bytes sent to the client connection
+	TotalCmds          int64         // tot-cmds, number of commands executed by the client connection
+}
+
+type ClientInfoCmd struct {
+	baseCmd[*ClientInfo]
+}
+
+func newClientInfoCmd(res rueidis.RedisResult) *ClientInfoCmd {
+	cmd := &ClientInfoCmd{}
+	cmd.from(res)
+	return cmd
+}
+
+func (cmd *ClientInfoCmd) SetVal(val *ClientInfo) {
+	cmd.val = val
+}
+
+func (cmd *ClientInfoCmd) Val() *ClientInfo {
+	return cmd.val
+}
+
+func (cmd *ClientInfoCmd) Result() (*ClientInfo, error) {
+	return cmd.val, cmd.err
+}
+
+func stringToClientInfo(txt string) (*ClientInfo, error) {
+	info := &ClientInfo{}
+	var err error
+	for _, s := range strings.Split(strings.TrimPrefix(strings.TrimSpace(txt), "txt:"), " ") {
+		kv := strings.Split(s, "=")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("redis: unexpected client info data (%s)", s)
+		}
+		key, val := kv[0], kv[1]
+
+		switch key {
+		case "id":
+			info.ID, err = strconv.ParseInt(val, 10, 64)
+		case "addr":
+			info.Addr = val
+		case "laddr":
+			info.LAddr = val
+		case "fd":
+			info.FD, err = strconv.ParseInt(val, 10, 64)
+		case "name":
+			info.Name = val
+		case "age":
+			var age int
+			if age, err = strconv.Atoi(val); err == nil {
+				info.Age = time.Duration(age) * time.Second
+			}
+		case "idle":
+			var idle int
+			if idle, err = strconv.Atoi(val); err == nil {
+				info.Idle = time.Duration(idle) * time.Second
+			}
+		case "flags":
+			if val == "N" {
+				break
+			}
+
+			for i := 0; i < len(val); i++ {
+				switch val[i] {
+				case 'S':
+					info.Flags |= ClientSlave
+				case 'O':
+					info.Flags |= ClientSlave | ClientMonitor
+				case 'M':
+					info.Flags |= ClientMaster
+				case 'P':
+					info.Flags |= ClientPubSub
+				case 'x':
+					info.Flags |= ClientMulti
+				case 'b':
+					info.Flags |= ClientBlocked
+				case 't':
+					info.Flags |= ClientTracking
+				case 'R':
+					info.Flags |= ClientTrackingBrokenRedir
+				case 'B':
+					info.Flags |= ClientTrackingBCAST
+				case 'd':
+					info.Flags |= ClientDirtyCAS
+				case 'c':
+					info.Flags |= ClientCloseAfterCommand
+				case 'u':
+					info.Flags |= ClientUnBlocked
+				case 'A':
+					info.Flags |= ClientCloseASAP
+				case 'U':
+					info.Flags |= ClientUnixSocket
+				case 'r':
+					info.Flags |= ClientReadOnly
+				case 'e':
+					info.Flags |= ClientNoEvict
+				case 'T':
+					info.Flags |= ClientNoTouch
+				default:
+					return nil, fmt.Errorf("redis: unexpected client info flags(%s)", string(val[i]))
+				}
+			}
+		case "db":
+			info.DB, err = strconv.Atoi(val)
+		case "sub":
+			info.Sub, err = strconv.Atoi(val)
+		case "psub":
+			info.PSub, err = strconv.Atoi(val)
+		case "ssub":
+			info.SSub, err = strconv.Atoi(val)
+		case "multi":
+			info.Multi, err = strconv.Atoi(val)
+		case "watch":
+			info.Watch, err = strconv.Atoi(val)
+		case "qbuf":
+			info.QueryBuf, err = strconv.Atoi(val)
+		case "qbuf-free":
+			info.QueryBufFree, err = strconv.Atoi(val)
+		case "argv-mem":
+			info.ArgvMem, err = strconv.Atoi(val)
+		case "multi-mem":
+			info.MultiMem, err = strconv.Atoi(val)
+		case "rbs":
+			info.BufferSize, err = strconv.Atoi(val)
+		case "rbp":
+			info.BufferPeak, err = strconv.Atoi(val)
+		case "obl":
+			info.OutputBufferLength, err = strconv.Atoi(val)
+		case "oll":
+			info.OutputListLength, err = strconv.Atoi(val)
+		case "omem":
+			info.OutputMemory, err = strconv.Atoi(val)
+		case "tot-mem":
+			info.TotalMemory, err = strconv.Atoi(val)
+		case "events":
+			info.Events = val
+		case "cmd":
+			info.LastCmd = val
+		case "user":
+			info.User = val
+		case "redir":
+			info.Redir, err = strconv.ParseInt(val, 10, 64)
+		case "resp":
+			info.Resp, err = strconv.Atoi(val)
+		case "lib-name":
+			info.LibName = val
+		case "lib-ver":
+			info.LibVer = val
+		case "tot-net-in":
+			info.TotalNetIn, err = strconv.ParseInt(val, 10, 64)
+		case "tot-net-out":
+			info.TotalNetOut, err = strconv.ParseInt(val, 10, 64)
+		case "tot-cmds":
+			info.TotalCmds, err = strconv.ParseInt(val, 10, 64)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	}
+	return info, nil
+}
+
+// fmt.Sscanf() cannot handle null values
+func (cmd *ClientInfoCmd) from(res rueidis.RedisResult) {
+	txt, err := res.ToString()
+	if err != nil {
+		cmd.SetErr(err)
+		return
+	}
+	info, err := stringToClientInfo(txt)
+	if err != nil {
+		cmd.SetErr(err)
+		return
+	}
+
+	cmd.SetVal(info)
+}
+
+type ACLLogEntry struct {
+	Count                int64
+	Reason               string
+	Context              string
+	Object               string
+	Username             string
+	AgeSeconds           float64
+	ClientInfo           *ClientInfo
+	EntryID              int64
+	TimestampCreated     int64
+	TimestampLastUpdated int64
+}
+
+type ACLLogCmd struct {
+	baseCmd[[]*ACLLogEntry]
+}
+
+func (cmd *ACLLogCmd) from(res rueidis.RedisResult) {
+	arr, err := res.ToArray()
+	if err != nil {
+		cmd.SetErr(err)
+		return
+	}
+
+	logEntries := make([]*ACLLogEntry, 0, len(arr))
+	for _, msg := range arr {
+		log, err := msg.AsMap()
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+		entry := ACLLogEntry{}
+
+		for key, attr := range log {
+			switch key {
+			case "count":
+				entry.Count, err = attr.AsInt64()
+			case "reason":
+				entry.Reason, err = attr.ToString()
+			case "context":
+				entry.Context, err = attr.ToString()
+			case "object":
+				entry.Object, err = attr.ToString()
+			case "username":
+				entry.Username, err = attr.ToString()
+			case "age-seconds":
+				entry.AgeSeconds, err = attr.AsFloat64()
+			case "client-info":
+				txt, txtErr := attr.ToString()
+				if txtErr == nil {
+					entry.ClientInfo, err = stringToClientInfo(txt)
+				} else {
+					err = txtErr
+				}
+			case "entry-id":
+				entry.EntryID, err = attr.AsInt64()
+			case "timestamp-created":
+				entry.TimestampCreated, err = attr.AsInt64()
+			case "timestamp-last-updated":
+				entry.TimestampLastUpdated, err = attr.AsInt64()
+			}
+		}
+
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+		logEntries = append(logEntries, &entry)
+	}
+	cmd.SetVal(logEntries)
+}
+
+func newACLLogCmd(res rueidis.RedisResult) *ACLLogCmd {
+	cmd := &ACLLogCmd{}
+	cmd.from(res)
+	return cmd
+}
+
+// ModuleLoadexConfig struct is used to specify the arguments for the MODULE LOADEX command of redis.
+// `MODULE LOADEX path [CONFIG name value [CONFIG name value ...]] [ARGS args [args ...]]`
+type ModuleLoadexConfig struct {
+	Path string
+	Conf map[string]interface{}
+	Args []interface{}
+}
+
+type ClusterLink struct {
+	Direction           string
+	Node                string
+	CreateTime          int64
+	Events              string
+	SendBufferAllocated int64
+	SendBufferUsed      int64
+}
+
+// ClusterLinksCmd represents the response structure for ClusterLinks.
+type ClusterLinksCmd struct {
+	val []ClusterLink
+	err error
+}
+
+func (c *ClusterLinksCmd) SetErr(err error) {
+	c.err = err
+}
+
+func (c *ClusterLinksCmd) Err() error {
+	return c.err
+}
+
+func (cmd *ClusterLinksCmd) from(res rueidis.RedisResult) {
+	arr, err := res.ToArray()
+	if err != nil {
+		cmd.SetErr(err)
+		return
+	}
+
+	val := make([]ClusterLink, 0, len(arr))
+	for _, v := range arr {
+		dict, err := v.AsMap()
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+		link := ClusterLink{}
+
+		for k, v := range dict {
+			switch k {
+			case "direction":
+				link.Direction, _ = v.ToString()
+			case "node":
+				link.Node, _ = v.ToString()
+			case "create-time":
+				link.CreateTime, _ = v.ToInt64()
+			case "events":
+				link.Events, _ = v.ToString()
+			case "send-buffer-allocated":
+				link.SendBufferAllocated, _ = v.ToInt64()
+			case "send-buffer-used":
+				link.SendBufferUsed, _ = v.ToInt64()
+			default:
+				cmd.SetErr(fmt.Errorf("unexpected key %q in CLUSTER LINKS reply", k))
+				return
+			}
+		}
+		val = append(val, link)
+	}
+
+	cmd.val = val
+}
+
+func newClusterLinksCmd(resp rueidis.RedisResult) *ClusterLinksCmd {
+	cmd := &ClusterLinksCmd{}
+	cmd.from(resp)
+	return cmd
+}
+
+func (cmd *ClusterLinksCmd) SetVal(val []ClusterLink) {
+	cmd.val = val
+}
+
+func (cmd *ClusterLinksCmd) Val() []ClusterLink {
+	return cmd.val
+}
+
+func (cmd *ClusterLinksCmd) Result() ([]ClusterLink, error) {
+	return cmd.Val(), cmd.Err()
+}
+
+type SlowLog struct {
+	ID         int64
+	Time       time.Time
+	Duration   time.Duration
+	Args       []string
+	ClientAddr string
+	ClientName string
+}
+
+type SlowLogCmd struct {
+	baseCmd[[]*SlowLog]
+}
+
+func (cmd *SlowLogCmd) from(res rueidis.RedisResult) {
+	arr, err := res.ToArray()
+	if err != nil {
+		cmd.SetErr(err)
+		return
+	}
+
+	logEntries := make([]*SlowLog, 0, len(arr))
+	for _, msg := range arr {
+		log, err := msg.ToArray()
+
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+
+		if len(log) < 4 {
+			cmd.SetErr(fmt.Errorf("redis: got %d elements in slowlog get, expected at least 4", len(log)))
+			return
+		}
+
+		entry := SlowLog{}
+
+		entry.ID, err = log[0].AsInt64()
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+
+		createdAt, err := log[1].AsInt64()
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+		entry.Time = time.Unix(createdAt, 0)
+
+		duration, err := log[2].AsInt64()
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+		entry.Duration = time.Duration(duration) * time.Microsecond
+
+		argsArr, err := log[3].ToArray()
+		if err != nil {
+			cmd.SetErr(err)
+			return
+		}
+
+		entry.Args = make([]string, len(argsArr))
+
+		for i, arg := range argsArr {
+			entry.Args[i], err = arg.ToString()
+			if err != nil {
+				cmd.SetErr(err)
+				return
+			}
+		}
+
+		if len(log) >= 5 {
+			entry.ClientAddr, err = log[4].ToString()
+			if err != nil {
+				cmd.SetErr(err)
+				return
+			}
+		}
+
+		if len(log) >= 6 {
+			entry.ClientName, err = log[5].ToString()
+			if err != nil {
+				cmd.SetErr(err)
+				return
+			}
+		}
+
+		logEntries = append(logEntries, &entry)
+	}
+	cmd.SetVal(logEntries)
+}
+
+func newSlowLogCmd(res rueidis.RedisResult) *SlowLogCmd {
+	cmd := &SlowLogCmd{}
+	cmd.from(res)
+	return cmd
+}
+
+// LCSQuery is a parameter used for the LCS command
+type LCSQuery struct {
+	Key1         string
+	Key2         string
+	Len          bool
+	Idx          bool
+	MinMatchLen  int
+	WithMatchLen bool
+}
+
+// LCSMatch is the result set of the LCS command
+type LCSMatch struct {
+	MatchString string
+	Matches     []LCSMatchedPosition
+	Len         int64
+}
+
+type LCSMatchedPosition struct {
+	Key1 LCSPosition
+	Key2 LCSPosition
+
+	// only for withMatchLen is true
+	MatchLen int64
+}
+
+type LCSPosition struct {
+	Start int64
+	End   int64
+}
+
+type LCSCmd struct {
+	baseCmd[*LCSMatch]
+
+	// 1: match string
+	// 2: match len
+	// 3: match idx LCSMatch
+	readType uint8
+}
+
+func newLCSCmd(res rueidis.RedisResult, readType uint8) *LCSCmd {
+	cmd := &LCSCmd{readType: readType}
+	cmd.from(res)
+	return cmd
+}
+
+func (cmd *LCSCmd) SetVal(val *LCSMatch) {
+	cmd.val = val
+}
+
+func (cmd *LCSCmd) SetErr(err error) {
+	cmd.err = err
+}
+
+func (cmd *LCSCmd) Val() *LCSMatch {
+	return cmd.val
+}
+
+func (cmd *LCSCmd) Err() error {
+	return cmd.err
+}
+
+func (cmd *LCSCmd) Result() (*LCSMatch, error) {
+	return cmd.val, cmd.err
+}
+
+func (cmd *LCSCmd) from(res rueidis.RedisResult) {
+	lcs := &LCSMatch{}
+	var err error
+
+	switch cmd.readType {
+	case 1:
+		// match string
+		if lcs.MatchString, err = res.ToString(); err != nil {
+			cmd.SetErr(err)
+			return
+		}
+	case 2:
+		// match len
+		if lcs.Len, err = res.AsInt64(); err != nil {
+			cmd.SetErr(err)
+			return
+		}
+	case 3:
+		// read LCSMatch
+		if msgMap, err := res.AsMap(); err != nil {
+			cmd.SetErr(err)
+			return
+		} else {
+			// Validate length (should have exactly 2 keys: "matches" and "len")
+			if len(msgMap) != 2 {
+				cmd.SetErr(fmt.Errorf("redis: got %d elements in the map, wanted %d", len(msgMap), 2))
+				return
+			}
+
+			// read matches or len field
+			for key, value := range msgMap {
+				switch key {
+				case "matches":
+					// read an array of matched positions
+					matches, err := cmd.readMatchedPositions(value)
+					if err != nil {
+						cmd.SetErr(err)
+						return
+					}
+					lcs.Matches = matches
+
+				case "len":
+					// read match length
+					matchLen, err := value.AsInt64()
+					if err != nil {
+						cmd.SetErr(err)
+						return
+					}
+					lcs.Len = matchLen
+				}
+			}
+		}
+	}
+
+	cmd.val = lcs
+}
+
+func (cmd *LCSCmd) readMatchedPositions(res rueidis.RedisMessage) ([]LCSMatchedPosition, error) {
+	val, err := res.ToArray()
+	if err != nil {
+		return nil, err
+	}
+
+	n := len(val)
+	positions := make([]LCSMatchedPosition, n)
+
+	for i := 0; i < n; i++ {
+		pn, err := val[i].ToArray()
+		if err != nil {
+			return nil, err
+		}
+
+		if len(pn) < 2 {
+			return nil, fmt.Errorf("invalid position format")
+		}
+
+		key1, err := cmd.readPosition(pn[0])
+		if err != nil {
+			return nil, err
+		}
+
+		key2, err := cmd.readPosition(pn[1])
+		if err != nil {
+			return nil, err
+		}
+
+		pos := LCSMatchedPosition{
+			Key1: key1,
+			Key2: key2,
+		}
+
+		// Read match length if WithMatchLen is true
+		if len(pn) > 2 {
+			if pos.MatchLen, err = pn[2].AsInt64(); err != nil {
+				return nil, err
+			}
+		}
+
+		positions[i] = pos
+	}
+
+	return positions, nil
+}
+
+func (cmd *LCSCmd) readPosition(res rueidis.RedisMessage) (LCSPosition, error) {
+	posArray, err := res.ToArray()
+	if err != nil {
+		return LCSPosition{}, err
+	}
+	if len(posArray) != 2 {
+		return LCSPosition{}, fmt.Errorf("redis: got %d elements in the array, wanted %d", len(posArray), 2)
+	}
+
+	start, err := posArray[0].AsInt64()
+	if err != nil {
+		return LCSPosition{}, err
+	}
+
+	end, err := posArray[1].AsInt64()
+	if err != nil {
+		return LCSPosition{}, err
+	}
+
+	return LCSPosition{Start: start, End: end}, nil
+}
+
+type FunctionStats struct {
+	Engines   []Engine
+	isRunning bool
+	rs        RunningScript
+	allrs     []RunningScript
+}
+
+func (fs *FunctionStats) Running() bool {
+	return fs.isRunning
+}
+
+func (fs *FunctionStats) RunningScript() (RunningScript, bool) {
+	return fs.rs, fs.isRunning
+}
+
+func (fs *FunctionStats) AllRunningScripts() []RunningScript {
+	return fs.allrs
+}
+
+type FunctionStatsCmd struct {
+	baseCmd[FunctionStats]
+}
+
+func newFunctionStatsCmd(res rueidis.RedisResult) *FunctionStatsCmd {
+	cmd := &FunctionStatsCmd{}
+	cmd.from(res)
+	return cmd
+}
+
+func (cmd *FunctionStatsCmd) from(res rueidis.RedisResult) {
+	var fstats FunctionStats
+	mp, err := res.AsMap()
+	if err != nil {
+		cmd.SetErr(err)
+		return
+	}
+	for key, val := range mp {
+		switch key {
+		case "running_script":
+			fstats.rs, fstats.isRunning, err = cmd.parseRunningScript(val)
+			if err != nil {
+				cmd.SetErr(err)
+				return
+			}
+		case "engines":
+			fstats.Engines, err = cmd.parseEngines(val)
+			if err != nil {
+				cmd.SetErr(err)
+				return
+			}
+		case "all_running_scripts":
+			fstats.allrs, err = cmd.parseRunningScripts(val)
+			if err != nil {
+				cmd.SetErr(err)
+				return
+			}
+		}
+
+	}
+	cmd.SetVal(fstats)
+}
+
+type RunningScript struct {
+	Name     string
+	Command  []string
+	Duration time.Duration
+}
+
+func (cmd *FunctionStatsCmd) parseRunningScript(msg rueidis.RedisMessage) (RunningScript, bool, error) {
+	rsMap, err := msg.AsMap()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return RunningScript{}, false, nil
+		}
+		return RunningScript{}, false, err
+	}
+
+	if len(rsMap) == 0 {
+		return RunningScript{}, false, nil
+	}
+
+	val := RunningScript{}
+	for key, attr := range rsMap {
+		switch key {
+		case "name":
+			val.Name, err = attr.ToString()
+		case "command":
+			val.Command, err = attr.AsStrSlice()
+		case "duration_ms":
+			ms, err := attr.AsInt64()
+			if err != nil {
+				return RunningScript{}, false, err
+			}
+			val.Duration = time.Duration(ms) * time.Millisecond
+		}
+		if err != nil {
+			return RunningScript{}, false, err
+		}
+	}
+	return val, true, nil
+}
+
+type Engine struct {
+	Language       string
+	LibrariesCount int64
+	FunctionsCount int64
+}
+
+func (cmd *FunctionStatsCmd) parseEngines(msg rueidis.RedisMessage) ([]Engine, error) {
+
+	engineMap, err := msg.AsMap()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return []Engine{}, nil
+		}
+		return []Engine{}, err
+	}
+	vals := make([]Engine, 0, len(engineMap))
+	for key, attr := range engineMap {
+		engine := Engine{}
+		engine.Language = key
+		emap, err := attr.AsMap()
+		if err != nil {
+			return []Engine{}, err
+		}
+		for k, v := range emap {
+			switch k {
+			case "libraries_count":
+				engine.LibrariesCount, err = v.AsInt64()
+			case "functions_count":
+				engine.FunctionsCount, err = v.AsInt64()
+			}
+			if err != nil {
+				return []Engine{}, err
+			}
+		}
+		vals = append(vals, engine)
+	}
+	return vals, nil
+}
+
+func (cmd *FunctionStatsCmd) parseRunningScripts(msg rueidis.RedisMessage) ([]RunningScript, error) {
+	rScriptMap, err := msg.AsMap()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return []RunningScript{}, nil
+		}
+		return []RunningScript{}, err
+	}
+	vals := make([]RunningScript, 0, len(rScriptMap))
+	for _, attr := range rScriptMap {
+		var val RunningScript
+		attrMap, err := attr.AsMap()
+		for k, v := range attrMap {
+			switch k {
+			case "name":
+				val.Name, err = v.ToString()
+			case "duration_ms":
+				ms, err := v.AsInt64()
+				if err != nil {
+					return []RunningScript{}, err
+				}
+				val.Duration = time.Duration(ms) * time.Millisecond
+			case "command":
+				val.Command, err = v.AsStrSlice()
+			}
+			if err != nil {
+				return []RunningScript{}, err
+			}
+		}
+		vals = append(vals, val)
+
+	}
+	return vals, err
 }

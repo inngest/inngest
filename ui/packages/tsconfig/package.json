@@ -2,7 +2,6 @@
   "name": "@inngest/tsconfig",
   "files": [
     "base.json",
-    "nextjs.json",
     "react-library.json"
   ],
   "private": true

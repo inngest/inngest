@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -170,7 +169,7 @@ func (l traceLifecycle) OnFunctionStarted(
 	// reassign here to make sure we have the right traceID and such
 	ctx = l.extractTraceCtx(ctx, md, true)
 
-	start, ok := redis_state.GetItemStart(ctx)
+	start, ok := queue.GetItemStart(ctx)
 	if !ok {
 		start = time.Now()
 	}
@@ -334,7 +333,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	}
 
 	switch resp.StatusCode {
-	case 200:
+	case 200, 206:
 		span.SetStatus(codes.Ok, "success")
 		span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode()))
 	default: // everything else are errors
@@ -554,7 +553,7 @@ func (l traceLifecycle) OnStepStarted(
 		l.log.Error("error retrieving spanID", "error", err, "meta", md, "lifecycle", "OnStepStarted")
 		return
 	}
-	start, ok := redis_state.GetItemStart(ctx)
+	start, ok := queue.GetItemStart(ctx)
 	if !ok {
 		l.log.Warn("start time not available for item", "lifecycle", "OnStepStarted")
 		start = time.Now()
@@ -634,7 +633,7 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 		l.log.Error("error retrieving spanID", "meta", md, "error", err, "lifecycle", "OnStepFinished")
 		return
 	}
-	start, ok := redis_state.GetItemStart(ctx)
+	start, ok := queue.GetItemStart(ctx)
 	if !ok {
 		l.log.Warn("start time not available for item", "lifecycle", "OnStepFinished")
 		start = time.Now()
@@ -710,11 +709,11 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	case enums.OpcodeAIGateway:
 		req, _ := op.AIGatewayOpts()
 		// Parse the request
-		if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+		if parsed, err := aigateway.ParseInput(req); err == nil {
 			span.SetAIRequestMetadata(parsed)
 		}
 		// And parse the response.
-		if parsed, err := aigateway.ParseOutput(ctx, req.Format, op.Data); err == nil {
+		if parsed, err := aigateway.ParseOutput(req.Format, op.Data); err == nil {
 			span.SetAIResponseMetadata(parsed)
 		}
 	}
@@ -736,7 +735,7 @@ func (l traceLifecycle) OnStepFinished(
 		l.log.Error("error retrieving spanID", "meta", md, "error", err, "lifecycle", "OnStepFinished")
 		return
 	}
-	start, ok := redis_state.GetItemStart(ctx)
+	start, ok := queue.GetItemStart(ctx)
 	if !ok {
 		l.log.Warn("start time not available for item", "lifecycle", "OnStepFinished")
 		start = time.Now()
@@ -821,6 +820,10 @@ func (l traceLifecycle) OnStepFinished(
 				span.SetStepRunType(typ)
 			}
 
+			if stepType := op.StepType(); stepType != enums.StepTypeUnknown {
+				span.SetStepType(stepType)
+			}
+
 			if op.IsError() {
 				span.SetStepOutput(op.Error)
 				span.SetStatus(codes.Error, op.Error.Message)
@@ -837,18 +840,17 @@ func (l traceLifecycle) OnStepFinished(
 			switch op.Op {
 			case enums.OpcodeAIGateway:
 				req, _ := op.AIGatewayOpts()
-				if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+				if parsed, err := aigateway.ParseInput(req); err == nil {
 					span.SetAIRequestMetadata(parsed)
 				}
 			case enums.OpcodeStep, enums.OpcodeStepRun:
 				// Handle input and attempt to best-effort parse.
-				input, _ := op.Input()
-				if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
-					span.SetAIRequestMetadata(parsed)
-
-					// Now that we know the step run was a wrapped AI call, we can also parse the output
-					// to see if we can store the response metadata correctly.
-				}
+				// input, _ := op.Input()
+				// if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
+				// 	span.SetAIRequestMetadata(parsed)
+				// 	// Now that we know the step run was a wrapped AI call, we can also parse the output
+				// 	// to see if we can store the response metadata correctly.
+				// }
 			}
 
 		} else if resp.Retryable() { // these are function retries

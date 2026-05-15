@@ -7,11 +7,18 @@ import (
 
 var (
 	// in milliseconds
-	DefaultBoundaries          = []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000}
+	DefaultBoundaries          = []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000}
 	QueueItemLatencyBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
 		1000, 2000, 5000, 30_000, // < 1m
 		60_000, 300_000, // < 10m
+		600_000, 1_800_000, // < 1h
+	}
+
+	cancellationReadDurationBoundaries = []float64{
+		5, 10, 50, 100, 200, 500, // < 1s
+		1000, 2000, 5000, 30_000, // < 1m
+		60_000, 120_000, 300_000, // < 10m
 		600_000, 1_800_000, // < 1h
 	}
 
@@ -24,12 +31,63 @@ var (
 
 	peekSizeBoundaries = []float64{10, 30, 50, 100, 250, 500, 1000, 3000, 5000}
 
+	cancellationReadSizeBoundaries = []float64{10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 25_000, 50_000, 75_000, 100_000}
+
 	PausesBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
 		1000, 2000, 5000, 30_000, // < 1m
 		60_000, 300_000, // < 10m
 		600_000, 1_800_000, // < 1h
 		3_600_000, // 1h
+	}
+
+	constraintAPIRequestStateSizeBoundaries = []float64{
+		512,             // 512 bytes
+		1024,            // 1 KiB
+		4 * 1024,        // 4 KiB
+		8 * 1024,        // 8 KiB
+		16 * 1024,       // 16 KiB
+		32 * 1024,       // 32 KiB
+		64 * 1024,       // 64 KiB
+		128 * 1024,      // 128 KiB
+		256 * 1024,      // 256 KiB
+		512 * 1024,      // 512 KiB
+		1024 * 1024,     // 1 MiB
+		2 * 1024 * 1024, // 2 MiB
+		4 * 1024 * 1024, // 4 MiB
+	}
+
+	stateStoreBytesWrittenBoundaries = []float64{
+		32,              // 32 bytes
+		128,             // 128 bytes
+		512,             // 512 bytes
+		1024,            // 1 KiB
+		4 * 1024,        // 4 KiB
+		16 * 1024,       // 16 KiB
+		64 * 1024,       // 64 KiB
+		256 * 1024,      // 256 KiB
+		512 * 1024,      // 512 KiB
+		1024 * 1024,     // 1 MiB
+		2 * 1024 * 1024, // 2 MiB
+		3 * 1024 * 1024, // 3 MiB
+		4 * 1024 * 1024, // 4 MiB
+	}
+
+	ConstraintAPIDurationBoundaries = []float64{
+		5,
+		10,
+		15,
+		25,
+		50,
+		100,
+		200,
+		500,
+		1000,
+		2000,
+		5000,
+		10000,
+		30000,
+		60000,
 	}
 )
 
@@ -96,16 +154,6 @@ func HistogramQueueOperationDelay(ctx context.Context, delay time.Duration, opts
 	})
 }
 
-func HistogramQueueActiveCheckDuration(ctx context.Context, delay time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_duration",
-		Description: "Distribution of active check durations",
-		Tags:        opts.Tags,
-		Boundaries:  DefaultBoundaries,
-	})
-}
-
 func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, value, HistogramOpt{
 		PkgName:     opts.PkgName,
@@ -147,6 +195,17 @@ func HistogramConnectProxyAckTime(ctx context.Context, dur int64, opts Histogram
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConnectGatewayDrainDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.drain_duration",
+		Description: "Duration from sending GATEWAY_CLOSING to the worker until the WebSocket is closed.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
 	})
 }
 
@@ -276,5 +335,323 @@ func HistogramHTTPAPIBytesWritten(ctx context.Context, bytes int64, opts Histogr
 		Tags:        opts.Tags,
 		Unit:        "bytes",
 		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramPauseBlockFlushLatency(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_block_flush_duration",
+		Description: "Distribution of pauses block flush latency",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramPauseBlockFetchLatency(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_block_fetch_duration",
+		Description: "Distribution of pauses block fetching latency",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramPauseDeleteLatencyAfterBlockFlush(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_delete_after_flush_duration",
+		Description: "Distribution of pauses deletion duration after flushing a block",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramSpanFlush(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_flush_duration",
+		Description: "Distribution of span flushes from tracing",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  QueueItemLatencyBoundaries,
+	})
+}
+
+func HistogramPauseBlockCompactionDuration(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_block_compaction_duration",
+		Description: "Distribution of pause block compaction duration per block",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConstraintAPIScavengerShardProcessDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_process_duration",
+		Description: "Distribution of scavenger shard processing time duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_lease_age",
+		Description: "Distribution of scavenger expired lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, typ string, opts HistogramOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["type"] = typ
+
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "checkpoint_start_latency",
+		Description: "Distribution of time it took to receive the API request and start processing",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_partition_scavenge_duration",
+		Description: "Distribution of queue scavenger duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramCancellationReadSize(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_size",
+		Description: "Distribution of the number of items being read in single operations by the cancellation read writer",
+		Tags:        opts.Tags,
+		Boundaries:  cancellationReadSizeBoundaries,
+	})
+}
+
+func HistogramCancellationReadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_duration",
+		Description: "Distribution of cancellation read duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  cancellationReadDurationBoundaries,
+	})
+}
+
+func HistogramExecutorLatency(ctx context.Context, dur time.Duration, typ string, opts HistogramOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["type"] = typ
+
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "execution_latency",
+		Description: "Distribution of latency within the executor",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramCancellationCheckDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_check_duration",
+		Description: "Distribution of cancellation check duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  cancellationReadDurationBoundaries,
+	})
+}
+
+func HistogramScheduleDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_duration",
+		Description: "Distribution of schedule duration with constraint API tracking",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramConstraintAPIRequestStateSize(ctx context.Context, size int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, size, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_request_state_size",
+		Description: "Distribution of request state size",
+		Tags:        opts.Tags,
+		Unit:        "bytes",
+		Boundaries:  constraintAPIRequestStateSizeBoundaries,
+	})
+}
+
+func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, duration.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_lua_duration",
+		Description: "Distribution of Lua script duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPIRequestLatency(ctx context.Context, latency time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, latency.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_request_latency",
+		Description: "Distribution of request latency",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPIRetryAfterDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_retry_after_duration",
+		Description: "Distribution of retry after values",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPILimitingConstraintCacheTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_limiting_constraint_cache_ttl",
+		Description: "Distribution of cache TTL values",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPICacheEvictedRemainingTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_cache_evicted_remaining_ttl",
+		Description: "Distribution of remaining TTL for items evicted due to cache size pressure",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramConstraintAPIQueueItemLeaseTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, ttl.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_queue_item_lease_ttl",
+		Description: "Distribution of item lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramQueueSuccessivePeekedItems(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_successive_peeked_items",
+		Description: "Distribution of number of peeked items with same backlog",
+		Tags:        opts.Tags,
+		Boundaries: []float64{
+			1, 2, 5, 10, 15, 20, 25, 30, 50, 100, 200, 500, 1000,
+		},
+	})
+}
+
+func HistogramQueueRatioBacklogsToPeekedItems(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_ratio_backlogs_to_peeked_items",
+		Description: "Distribution of ratio of backlogs to peeked items",
+		Tags:        opts.Tags,
+		Boundaries: []float64{
+			1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+		},
+	})
+}
+
+func HistogramQueueBacklogGroupingDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_backlog_grouping_duration",
+		Description: "Distribution of time required to group all peeked items by backlog",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramStateWrittenCounter(ctx context.Context, bytes int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, bytes, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "state_store_bytes_written_hist",
+		Description: "Distribution of bytes written to the state store",
+		Tags:        opts.Tags,
+		Unit:        "bytes",
+		Boundaries:  stateStoreBytesWrittenBoundaries,
+	})
+}
+
+func HistogramConstraintAPISemaphoreDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_semaphore_duration",
+		Description: "Distribution of semaphore manager operation duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramDefersLoadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_load_duration",
+		Description: "Distribution of LoadDefers latency in run finalize, including retries",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramDefersPerRun(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_per_run",
+		Description: "Distribution of the number of defers loaded per finalized run",
+		Tags:        opts.Tags,
+		Boundaries:  []float64{1, 2, 5, 10, 15, 20},
 	})
 }

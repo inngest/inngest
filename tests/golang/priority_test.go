@@ -32,11 +32,11 @@ func TestFunctionPriorityRun(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "priority-run-test",
-			Concurrency: []inngestgo.ConfigStepConcurrency{
+			Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
 				{
 					Limit: 1,
 				},
-			},
+			}},
 			Priority: &inngestgo.ConfigPriority{
 				Run: inngestgo.StrPtr(`event.data.priority == "high" ? 5 : 0`),
 			},

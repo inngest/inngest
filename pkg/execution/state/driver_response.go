@@ -1,19 +1,25 @@
 package state
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
-const DefaultErrorName = "Error"
-const DefaultErrorMessage = "Function execution error"
-const DefaultStepErrorMessage = "Step execution error"
+const (
+	DefaultErrorName        = "Error"
+	DefaultErrorMessage     = "Function execution error"
+	DefaultStepErrorMessage = "Step execution error"
+)
 
 type Retryable interface {
 	Retryable() bool
@@ -46,7 +52,7 @@ type UserError struct {
 type DriverResponse struct {
 	// Step represents the step that this response is for.
 	Step inngest.Step `json:"step"`
-	// Duration is how long the step took to run, from the driver itsef.
+	// Duration is how long the step took to run, from the driver itself.
 	Duration time.Duration `json:"dur"`
 	// RequestVersion represents the hashing version used within the current SDK request.
 	//
@@ -103,6 +109,10 @@ type DriverResponse struct {
 	final bool
 
 	Header http.Header `json:"header,omitempty"`
+
+	// HTTPStat contains detailed HTTP timing breakdown from httpstat.
+	// Populated by httpdriver when making requests to user SDK functions.
+	HTTPStat *httpstat.Result `json:"-"`
 }
 
 // SetFinal indicates that this error is final, regardless of the status code
@@ -289,11 +299,17 @@ func (r *DriverResponse) UpdateOpcodeError(op *GeneratorOpcode, err UserError) {
 // return false if it's a step result.
 func (r *DriverResponse) IsFunctionResult() bool {
 	for _, op := range r.Generator {
-		if op.Op != enums.OpcodeNone {
-			return false
+		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			// Always a result...
+			return true
 		}
 	}
-	return true
+
+	return len(r.Generator) == 0
+}
+
+func (r *DriverResponse) IsOpResponse() bool {
+	return len(r.Generator) > 0
 }
 
 // IsDiscoveryResponse returns true if the response is the SDK reporting or
@@ -311,75 +327,153 @@ func (r *DriverResponse) IsDiscoveryResponse() bool {
 		return true
 	}
 
-	firstOpIsRequest := r.Generator[0].Op != enums.OpcodeStep &&
-		r.Generator[0].Op != enums.OpcodeStepRun &&
-		r.Generator[0].Op != enums.OpcodeStepError
-	if firstOpIsRequest {
-		// First op is a request, so this is still a discovery response.
+	// There's only one step.
+	switch r.Generator[0].Op {
+	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
+		return false
+	default:
+		return true
+	}
+}
+
+// IsGatewayRequest returns true if this `DriverResponse` is the SDK reporting that they
+// wish us to make a request via the gateway.
+//
+// Note that, like the gateways, this does not currently support parallelism; we
+// expect there to only be a single reported op for this to resole to `true`.
+func (r *DriverResponse) IsGatewayRequest() bool {
+	if !r.IsDiscoveryResponse() {
+		return false
+	}
+
+	if len(r.Generator) != 1 {
+		return false
+	}
+
+	switch r.Generator[0].Op {
+	case enums.OpcodeAIGateway, enums.OpcodeGateway:
 		return true
 	}
 
-	// Response has a single op code which indicates the SDK did idempotent
-	// work during this execution.
 	return false
 }
 
-// GetFunctionOutput returns the serialized output of the function if this
+// GetTraceFunctionOutput returns the serialized output of the function if this
 // response represents a function result. The output could also be an error.
-func (r *DriverResponse) GetFunctionOutput() (*string, error) {
+//
+// NOTE: This always returns a wrapped response: {"data":T} or {"error":T}.  We
+// ALWAYS wrap trace data.
+func (r *DriverResponse) GetTraceFunctionOutput() (string, error) {
 	if !r.IsFunctionResult() {
-		return nil, nil
+		return "", nil
 	}
 
-	output := r.Err
+	// Firstly, we are standardizing on an enums.OpcodeRunComplete opcode
+	// for this.  If this exists, return that data.
+	for _, op := range r.Generator {
+		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			// op.Data is always a json.RawMessage, and we want to always return data
+			// wrapped in a {"data": T} message in the same way as steps.  This saves
+			// us from unmarshalling and remarshalling.
+			data := fmt.Sprintf(`{"data":%s}`, op.Data)
+			return data, nil
+		}
+	}
+
+	var output string
+
+	if r.Err != nil {
+		output = *r.Err
+	}
+
 	if r.Output != nil {
 		switch v := r.Output.(type) {
 		case string:
 			{
-				output = &v
+				output = v
 			}
 		case []byte:
 			{
 				s := string(v)
-				output = &s
+				output = s
 			}
 		default:
 			{
 				byt, err := json.Marshal(r.Output)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal output: %w", err)
+					logger.StdlibLogger(context.Background()).Warn(
+						"failed to get driver output for type",
+						"type", fmt.Sprintf("%T", r.Output),
+					)
+					output = fmt.Sprintf("%v", r.Output)
+				} else {
+					output = string(byt)
 				}
-
-				s := string(byt)
-				output = &s
 			}
 		}
 	}
 
 	// If output is nil, somehow we have a function result with no output. That
 	// seems wrong.
-	if output == nil {
-		return nil, fmt.Errorf("function result has no output")
+	if output == "" {
+		return "", fmt.Errorf("function result has no output")
+	}
+
+	if isWrappedError([]byte(output)) {
+		// Error is already wrapped, return as-is.
+		return output, nil
 	}
 
 	// Now we have the output, we make sure it's keyed the same as regular step
 	// outputs are, either under `data` or `error`.
-	var keyedOutput *string
 	key := "data"
 	if r.Error() != "" {
 		key = "error"
 	}
 
-	keyedByt, err := json.Marshal(map[string]json.RawMessage{
-		key: json.RawMessage(*output),
+	// We expect - but it isn't always the case - that the user returns JSON.
+	// Check to see if output is valid JSON, and if not we'll treat it as a string
+	// within a `{"$key": T}` wrapper as expected.
+	if !json.Valid([]byte(output)) {
+		output = strconv.Quote(output)
+	}
+
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(map[string]json.RawMessage{
+		key: json.RawMessage(output),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
+		keyedByt := StandardError{
+			Message: "Unable to grab HTTP response",
+			Stack:   fmt.Sprintf("%v", output),
+		}.Serialize(key)
+		return string(keyedByt), nil
 	}
-	s := string(keyedByt)
-	keyedOutput = &s
+	// Remove the trailing newline that Encode adds
+	return string(bytes.TrimRight(buf.Bytes(), "\n")), nil
+}
 
-	return keyedOutput, nil
+func isWrappedError(maybeErr []byte) bool {
+	if len(maybeErr) == 0 || maybeErr[0] != '{' {
+		return false
+	}
+
+	// Unmarshal into a struct to check if it's already wrapped.
+	// We don't care about the full structure, just whether it has
+	// the right fields.
+	var wrappedError struct {
+		Error *struct {
+			Message *string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(maybeErr, &wrappedError); err != nil {
+		return false
+	}
+
+	return wrappedError.Error != nil && wrappedError.Error.Message != nil
 }
 
 type WrappedStandardError struct {
@@ -449,12 +543,12 @@ func (r *DriverResponse) StandardError() StandardError {
 
 	var raw map[string]any
 
-	switch rawJson := r.Output.(type) {
+	switch rawJSON := r.Output.(type) {
 	case json.RawMessage:
 		// Try to unmarshal, but don't return on error, use raw map as fallback
-		_ = json.Unmarshal(rawJson, &raw)
+		_ = json.Unmarshal(rawJSON, &raw)
 	case map[string]any:
-		raw = rawJson
+		raw = rawJSON
 	default:
 		// Handle other types by setting their value directly as a message
 		switch v := r.Output.(type) {
@@ -466,7 +560,7 @@ func (r *DriverResponse) StandardError() StandardError {
 			if len(v) > 0 {
 				raw = map[string]any{"message": v}
 			}
-		case interface{}:
+		case any:
 			if v != nil {
 				raw = map[string]any{"message": v}
 			}

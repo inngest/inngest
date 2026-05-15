@@ -29,7 +29,7 @@ import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../
 import {
   FunctionTriggerTypes,
   type GetFunctionQuery as DevServerGetFunctionQuery,
-} from '../../../../apps/dev-server-ui/src/store/generated';
+} from '../../../../apps/dev-server-ui/src/store/generated-types';
 
 type InngestFunction =
   | NonNullable<DevServerGetFunctionQuery['functionBySlug']>
@@ -54,6 +54,14 @@ export function FunctionConfiguration({
   getFunctionLink,
   getBillingUrl,
 }: FunctionConfigurationProps) {
+  if (!inngestFunction.configuration) {
+    // Should be unreachable. Only get here if the function doesn't have an
+    // "workflow versions". This is an invalid state, but bugs have caused it to
+    // happen
+    // return null;
+    throw new Error('Function missing configuration. Try resyncing the app');
+  }
+
   const configuration = inngestFunction.configuration;
   const triggers = inngestFunction.triggers;
 

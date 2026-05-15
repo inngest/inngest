@@ -65,8 +65,6 @@ type ResultType = {
   model?: Value;
 };
 
-const toNumber = (input?: Value): number => (isNaN(Number(input)) ? 0 : Number(input));
-
 /*
  * recursively search through the object to find any of the key pieces of ai information
  * we care about. For now just take the first match we find for each and stop there.

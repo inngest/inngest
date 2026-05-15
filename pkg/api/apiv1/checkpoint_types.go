@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -8,17 +9,23 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/exechttp"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
+
+// CheckpointMetrics represents base IDs used within checkpoint metrics.
+type CheckpointMetrics struct {
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+	AppID     uuid.UUID
+	FnID      uuid.UUID
+}
 
 // NewAPIRunData represents event data stored and used to create new API-based
 // runs.  This is wrapped via CheckpointNewRunRequestr
@@ -67,6 +74,21 @@ type CheckpointNewRunRequest struct {
 	// event for API-based runs.
 	Event inngestgo.GenericEvent[NewAPIRunData] `json:"event"`
 
+	// Steps represent optional steps sent when creating the new run.  Sometimes,
+	// the SDK may execute the run entirely and want to create run and accounting
+	// in the same step.
+	Steps []state.GeneratorOpcode `json:"steps"`
+
+	// RequestVersion represents the execution model that the SDK used when
+	// starting this run.
+	RequestVersion *int `json:"request_version,omitempty"`
+
+	// Retries indicates how many retry attempts should be made for steps in
+	// this run. For example, retries=3 means 4 total attempts (1 initial + 3
+	// retries). If not provided or <= 0, defaults to consts.DefaultRetryCount
+	// (4 retries = 5 attempts).
+	Retries int `json:"retries,omitempty"`
+
 	// XXX: SDK Version and language??
 }
 
@@ -97,20 +119,46 @@ func (r CheckpointNewRunRequest) FnID(appID uuid.UUID) uuid.UUID {
 	return util.DeterministicUUID(append(appID[:], []byte(r.FnSlug())...))
 }
 
+func (r CheckpointNewRunRequest) URL() string {
+	return r.Event.Data.Domain + r.Event.Data.Path
+}
+
 func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
-	uri := r.Event.Data.Domain + r.Event.Data.Path + "?x-inngest-type=sync&x-inngest-method=" + r.Event.Data.Method
+	// NOTE: We don't use r.Event.Data.Path, because that could contain IDs
+	// inside the URL (eg /v1/users/:id).
+	//
+	// This makes reusming sync functions harder.  For each request, we
+	// must store the URL in the run metadata.
+	uri := r.Event.Data.Domain
+
+	// Use the SDK-provided retry count, or fall back to the default. The SDK
+	// should send `retries` in the CheckpointNewRunRequest to specify how many
+	// retry attempts should be made for steps (e.g., 3 means 4 total
+	// attempts).
+	retries := r.Retries
+	if retries < 0 {
+		retries = consts.DefaultRetryCount
+	}
+
 	return inngest.Function{
 		ID:              r.FnID(appID),
 		ConfigVersion:   1,
 		FunctionVersion: 1,
 		Name:            r.FnSlug(),
 		Slug:            r.FnSlug(),
+		Driver: inngest.FunctionDriver{
+			URI: uri,
+			Metadata: map[string]any{
+				"type":   "sync", // This is a sync function
+				"method": r.Event.Data.Method,
+			},
+		},
 		Steps: []inngest.Step{
 			{
 				ID:      "step",
 				Name:    r.FnSlug(),
 				URI:     uri,
-				Retries: inngestgo.Ptr(0),
+				Retries: inngestgo.Ptr(retries),
 			},
 		},
 	}
@@ -120,19 +168,6 @@ func (r CheckpointNewRunRequest) FnConfig(envID uuid.UUID) string {
 	fn := r.Fn(envID)
 	byt, _ := json.Marshal(fn)
 	return string(byt)
-}
-
-// APIResult represents the final result of an API function call
-type APIResult struct {
-	// StatusCode represents the status code for the API result
-	StatusCode int `json:"status_code"`
-	// Headers represents any response headers sent in the server response
-	Headers map[string]string `json:"headers"`
-	// Body represents the API response.  This may be nil by default.  It is only
-	// captured when you manually specify that you want to track the result.
-	Body []byte `json:"body,omitempty"`
-	// Duration represents the overall time that it took for the API to execute.
-	Duration time.Duration `json:"duration"`
 }
 
 // CheckpointNewRunResponse represents the response payload for a successful run creation.
@@ -147,6 +182,12 @@ type CheckpointNewRunResponse struct {
 	AppID uuid.UUID `json:"app_id"`
 	// RunID is the function run ID created for this execution.
 	RunID string `json:"run_id"`
+	// Token is the token that can be used to view the run output for redirects.
+	Token string `json:"token,omitempty"`
+
+	// RealtimeToken is a short-lived JWT that the DurableEndpoint's client can
+	// use to subscribe to the stream after the run goes async.
+	RealtimeToken string `json:"realtime_token,omitempty"`
 }
 
 // runEvent creates a new event.Event from the CheckpointNewRunRequest.  This allows us to
@@ -176,104 +217,33 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 	return evt
 }
 
-// checkpointRunContext implements execution.RunContext for use in checkpoint API calls
-type checkpointRunContext struct {
-	md         sv2.Metadata
-	httpClient exechttp.RequestExecutor
-	events     []json.RawMessage
-
-	// Data from queue.Item that we actually need
-	groupID         string
-	attemptCount    int
-	maxAttempts     int
-	priorityFactor  *int64
-	concurrencyKeys []state.CustomConcurrency
-	parallelMode    enums.ParallelMode
+type checkpointAsyncSteps struct {
+	RunID ulid.ULID `json:"run_id"`
+	FnID  uuid.UUID `json:"fn_id"`
+	// QueueItemRef represents the queue item ID that's currently leased while
+	// executing the SDK.
+	QueueItemRef string                  `json:"qi_id"`
+	Steps        []state.GeneratorOpcode `json:"steps"`
+	// Timestamp is the unix-millisecond epoch when the request was created.
+	Timestamp int `json:"ts"`
 }
 
-func (c *checkpointRunContext) Metadata() *sv2.Metadata {
-	return &c.md
-}
-
-func (c *checkpointRunContext) Events() []json.RawMessage {
-	return c.events
-}
-
-func (c *checkpointRunContext) HTTPClient() exechttp.RequestExecutor {
-	return c.httpClient
-}
-
-func (c *checkpointRunContext) GroupID() string {
-	return c.groupID
-}
-
-func (c *checkpointRunContext) AttemptCount() int {
-	return c.attemptCount
-}
-
-func (c *checkpointRunContext) MaxAttempts() *int {
-	return &c.maxAttempts
-}
-
-func (c *checkpointRunContext) ShouldRetry() bool {
-	return c.attemptCount < c.maxAttempts
-}
-
-func (c *checkpointRunContext) IncrementAttempt() {
-	c.attemptCount++
-}
-
-func (c *checkpointRunContext) PriorityFactor() *int64 {
-	// TODO
-	return c.priorityFactor
-}
-
-func (c *checkpointRunContext) ConcurrencyKeys() []state.CustomConcurrency {
-	// TODO
-	return c.concurrencyKeys
-}
-
-func (c *checkpointRunContext) ParallelMode() enums.ParallelMode {
-	// TODO
-	return c.parallelMode
-}
-
-func (c *checkpointRunContext) LifecycleItem() queue.Item {
-	// For checkpoint context, we create a minimal queue.Item for lifecycle events
-	// This is the one place we still need to construct a queue.Item, but it's much simpler
-	return queue.Item{
-		Identifier: state.Identifier{
-			WorkspaceID: c.md.ID.Tenant.EnvID,
-			AppID:       c.md.ID.Tenant.AppID,
-			WorkflowID:  c.md.ID.FunctionID,
-			RunID:       c.md.ID.RunID,
-		},
-		WorkspaceID:           c.md.ID.Tenant.EnvID,
-		GroupID:               c.groupID,
-		Attempt:               c.attemptCount,
-		PriorityFactor:        c.priorityFactor,
-		CustomConcurrencyKeys: c.concurrencyKeys,
-		ParallelMode:          c.parallelMode,
-		Payload:               queue.PayloadEdge{
-			// TODO
-		},
+// TrackLatency tracks how long it took for us to receive the async checkpoint
+// request via metrics.
+func (c checkpointAsyncSteps) TrackLatency(ctx context.Context) {
+	if c.Timestamp == 0 {
+		return
 	}
+
+	d := time.Since(time.UnixMilli(int64(c.Timestamp)))
+	metrics.HistogramCheckpointStartLatency(ctx, d, "async", metrics.HistogramOpt{
+		PkgName: "checkpoint",
+	})
 }
 
-func (c *checkpointRunContext) SetStatusCode(code int) {
-	// this is a noop.
-}
-
-func (c *checkpointRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError) {
-	// TODO: Update the error by storing the opcodes in the checkpoint
-	// struct c.
-}
-
-func (c *checkpointRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {
-	// TODO: Update the output by storing the opcodes in the
-	// checkpoint struct c.
-}
-
-func (c *checkpointRunContext) SetError(err error) {
-	// TODO
+type checkpointSyncSteps struct {
+	RunID ulid.ULID               `json:"run_id"`
+	FnID  uuid.UUID               `json:"fn_id"`
+	AppID uuid.UUID               `json:"app_id"`
+	Steps []state.GeneratorOpcode `json:"steps"`
 }

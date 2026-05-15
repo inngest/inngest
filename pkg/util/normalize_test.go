@@ -35,6 +35,26 @@ func TestNormalizeAppURL(t *testing.T) {
 			expectedURL: "https://api.example.com/api/inngest",
 		},
 		{
+			name:        "http URL with explicit port 80 should normalize to no port",
+			inputURL:    "http://myhost:80/api/inngest",
+			expectedURL: "http://myhost/api/inngest",
+		},
+		{
+			name:        "https URL with explicit port 443 should normalize to no port",
+			inputURL:    "https://myhost:443/api/inngest",
+			expectedURL: "https://myhost/api/inngest",
+		},
+		{
+			name:        "localhost with explicit port 80 should normalize to no port",
+			inputURL:    "http://localhost:80/api/inngest",
+			expectedURL: "http://localhost/api/inngest",
+		},
+		{
+			name:        "non-default port should be preserved",
+			inputURL:    "http://myhost:8080/api/inngest",
+			expectedURL: "http://myhost:8080/api/inngest",
+		},
+		{
 			name:        "insecure WebSocket URL should be normalized to wss",
 			inputURL:    "ws://api.example.com/api/inngest",
 			expectedURL: "wss://api.example.com/api/inngest",

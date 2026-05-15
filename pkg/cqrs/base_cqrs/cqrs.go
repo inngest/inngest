@@ -1,6 +1,7 @@
 package base_cqrs
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,14 +24,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	dbpkg "github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -45,45 +48,44 @@ var (
 	nilUUID = uuid.UUID{}
 )
 
-func NewQueries(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) (q sqlc.Querier) {
-	if driver == "postgres" {
-		q = sqlc_postgres.NewNormalized(db, o)
-	} else {
-		q = sqlc.New(db)
-	}
-
-	return q
+// adapterWithHelpers extends db.Adapter with dialect-specific SQL helpers.
+// Both sqlite.Adapter and postgres.Adapter implement this.
+type adapterWithHelpers interface {
+	dbpkg.Adapter
+	Helpers() driverhelp.DialectHelpers
 }
 
-func NewCQRS(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) cqrs.Manager {
+func NewCQRS(adapter adapterWithHelpers) cqrs.Manager {
 	// Force goqu to use prepared statements for consistency with sqlc
 	sq.SetDefaultPrepared(true)
 	return wrapper{
-		driver: driver,
-		q:      NewQueries(db, driver, o),
-		db:     db,
-		opts:   o,
+		adapter: adapter,
+		q:       adapter.Q(),
 	}
 }
 
 type wrapper struct {
-	driver string
-	q      sqlc.Querier
-	db     *sql.DB
-	tx     *sql.Tx
-	opts   sqlc_postgres.NewNormalizedOpts
-}
-
-func (w wrapper) isPostgres() bool {
-	return w.driver == "postgres"
+	adapter adapterWithHelpers
+	q       dbpkg.Querier
+	tx      *sql.Tx
 }
 
 func (w wrapper) dialect() string {
-	if w.isPostgres() {
-		return "postgres"
-	}
+	return w.adapter.Helpers().GoquDialect()
+}
 
-	return "sqlite3"
+func (w wrapper) helpers() driverhelp.DialectHelpers {
+	return w.adapter.Helpers()
+}
+
+type normalizedSpan interface {
+	GetTraceID() string
+	GetRunID() string
+	GetDynamicSpanID() sql.NullString
+	GetParentSpanID() sql.NullString
+	GetStartTime() interface{}
+	GetEndTime() interface{}
+	GetSpanFragments() any
 }
 
 func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
@@ -93,120 +95,436 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		return nil, err
 	}
 
-	// We need an ordered map here because we loop over it later
-	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
+	return mapRootSpansFromRows(ctx, spans)
+}
 
-	// A map of dynamic span IDs to the specific span ID that contains an
-	// output
-	outputDynamicRefs := make(map[string]string)
-	var root *cqrs.OtelSpan
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
+		return nil, err
+	}
 
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	return buildDebugRunSpan(ctx, spans)
+}
+
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
+		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByDebugSession := make(map[string][]*dbpkg.SpanRow)
 	for _, span := range spans {
-		st := strings.Split(span.StartTime.(string), " m=")[0]
-		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+		if span.DebugRunID.Valid {
+			spansByDebugSession[span.DebugRunID.String] = append(spansByDebugSession[span.DebugRunID.String], span)
+		}
+	}
+
+	var allDebugRuns [][]*cqrs.OtelSpan
+
+	for _, runSpans := range spansByDebugSession {
+		debugRunSpans, err := buildDebugRunSpan(ctx, runSpans)
+		if err != nil {
+			return nil, err
+		}
+		allDebugRuns = append(allDebugRuns, debugRunSpans)
+	}
+
+	return allDebugRuns, nil
+}
+
+var _ normalizedSpan = (*dbpkg.SpanRow)(nil)
+
+func (w wrapper) GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetRunSpanByRunID(ctx, dbpkg.GetRunSpanByRunIDParams{
+		RunID:     runID.String(),
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting span by run ID", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetStepSpanByStepID(ctx, dbpkg.GetStepSpanByStepIDParams{
+		RunID:     runID.String(),
+		StepID:    stepID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step span by step ID", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetExecutionSpanByStepIDAndAttempt(ctx, dbpkg.GetExecutionSpanByStepIDAndAttemptParams{
+		RunID:       runID.String(),
+		StepID:      stepID,
+		StepAttempt: int64(attempt),
+		AccountID:   accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step execution span by step ID and attempt", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetLatestExecutionSpanByStepID(ctx, dbpkg.GetLatestExecutionSpanByStepIDParams{
+		RunID:     runID.String(),
+		StepID:    stepID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step execution span by step ID and attempt", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+func (w wrapper) GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetSpanBySpanID(ctx, dbpkg.GetSpanBySpanIDParams{
+		RunID:     runID.String(),
+		SpanID:    spanID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step span by step ID", "error", err)
+		return nil, err
+	}
+
+	return mapSpanFromRow(ctx, span, nil)
+}
+
+type IODynamicRef struct {
+	OutputRef string
+	InputRef  string
+}
+
+type spanRollupInfo struct {
+	metadataByParent map[string][]*cqrs.SpanMetadata
+	dynamicRefs      map[string]*IODynamicRef
+	// otelToDynamic maps OTEL span IDs to their owning dynamic span ID.
+	// This is needed because parent_span_id in the DB is an OTEL span ID,
+	// but the span tree is keyed by dynamic_span_id.
+	otelToDynamic map[string]string
+}
+
+// fragmentAttributesJSON returns the attributes field of a span fragment as
+// JSON bytes. The aggregation queries differ between backends: sqlite's
+// json_object embeds JSON columns as quoted strings while postgres'
+// json_build_object embeds jsonb as nested objects, so the decoded fragment
+// can land here as either a string or a map[string]any.
+func fragmentAttributesJSON(raw any) ([]byte, bool) {
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return nil, false
+		}
+		return []byte(v), true
+	case map[string]any:
+		byt, err := json.Marshal(v)
+		if err != nil {
+			return nil, false
+		}
+		return byt, true
+	default:
+		return nil, false
+	}
+}
+
+func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRollupInfo) (*cqrs.OtelSpan, error) {
+	// Use interface methods to get the fields directly
+	traceID := span.GetTraceID()
+	runIDStr := span.GetRunID()
+	dynamicSpanID := span.GetDynamicSpanID()
+	parentSpanID := span.GetParentSpanID()
+	startTime := span.GetStartTime()
+	endTime := span.GetEndTime()
+	spanFragments := span.GetSpanFragments()
+
+	var parsedStartTime time.Time
+	switch v := startTime.(type) {
+	case time.Time:
+		parsedStartTime = v
+	case string:
+		st := strings.Split(v, " m=")[0]
+		parsed, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
 			return nil, err
 		}
+		parsedStartTime = parsed
+	default:
+		return nil, fmt.Errorf("unexpected start time type: %T", startTime)
+	}
 
-		et := strings.Split(span.EndTime.(string), " m=")[0]
-		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+	var parsedEndTime time.Time
+	switch v := endTime.(type) {
+	case time.Time:
+		parsedEndTime = v
+	case string:
+		et := strings.Split(v, " m=")[0]
+		parsed, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
 			return nil, err
 		}
+		parsedEndTime = parsed
+	default:
+		return nil, fmt.Errorf("unexpected end time type: %T", endTime)
+	}
 
-		var parentSpanID *string
-		if span.ParentSpanID.Valid {
-			parentSpanID = &span.ParentSpanID.String
+	var parentSpanIDPtr *string
+	if parentSpanID.Valid {
+		parentSpanIDPtr = &parentSpanID.String
+	}
+
+	runID, err := ulid.Parse(runIDStr)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error parsing run ID from span", "error", err)
+		return nil, err
+	}
+
+	newSpan := &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			SpanID:       dynamicSpanID.String,
+			TraceID:      traceID,
+			ParentSpanID: parentSpanIDPtr,
+			StartTime:    parsedStartTime,
+			// NOTE:
+			// The end time is only valid if this span denotes a step end, or the run end.
+			// EG. if this is an "Executor.run" span, this would never have an end time.
+			// However, this is the actual span commit time.  We must handle this when we
+			// parse the spans.
+			EndTime:    parsedEndTime,
+			Name:       "",
+			Attributes: make(map[string]any),
+		},
+		Status:          enums.StepStatusRunning,
+		RunID:           runID,
+		MarkedAsDropped: false,
+	}
+
+	var (
+		outputSpanID *string
+		inputSpanID  *string
+		fragments    []map[string]any
+
+		isMetadata bool
+	)
+
+	var spanFragmentsBytes []byte
+	switch v := spanFragments.(type) {
+	case string:
+		spanFragmentsBytes = []byte(v)
+	case json.RawMessage:
+		spanFragmentsBytes = []byte(v)
+	case []byte:
+		spanFragmentsBytes = v
+	default:
+		return nil, fmt.Errorf("unexpected span fragments type: %T", spanFragments)
+	}
+
+	_ = json.Unmarshal(spanFragmentsBytes, &fragments)
+
+fragmentLoop:
+	for _, fragment := range fragments {
+		// Collect OTEL span IDs from fragments to build the reverse mapping.
+		if otelSpanID, ok := fragment["span_id"].(string); ok && otelSpanID != "" && info != nil {
+			info.otelToDynamic[otelSpanID] = dynamicSpanID.String
 		}
 
-		newSpan := &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				SpanID:       span.DynamicSpanID.String,
-				TraceID:      span.TraceID,
-				ParentSpanID: parentSpanID,
-				StartTime:    startTime,
-				EndTime:      endTime,
-				Name:         "",
-				Attributes:   make(map[string]any),
-			},
-			Status:          enums.StepStatusRunning,
-			RunID:           runID,
-			MarkedAsDropped: false,
-		}
-
-		var outputSpanID *string
-		var fragments []map[string]interface{}
-		groupedAttrs := make(map[string]any)
-		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
-
-		for _, fragment := range fragments {
-			if name, ok := fragment["name"].(string); ok {
-				if strings.HasPrefix(name, "executor.") {
-					newSpan.Name = name
-				}
+		if name, ok := fragment["name"].(string); ok {
+			switch {
+			case strings.HasPrefix(name, "executor."):
+				newSpan.Name = name
+			case name == meta.SpanNameMetadata:
+				newSpan.Name = name
+				isMetadata = true
+				break fragmentLoop
 			}
-
-			if attrs, ok := fragment["attributes"].(string); ok {
-				fragmentAttr := map[string]any{}
-				if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
-					logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
-					return nil, err
-				}
-
-				maps.Copy(groupedAttrs, fragmentAttr)
-
-				if outputRef, ok := fragment["output_span_id"].(string); ok {
-					outputSpanID = &outputRef
-					outputDynamicRefs[span.DynamicSpanID.String] = outputRef
-				}
-			}
 		}
 
-		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, groupedAttrs)
-		if err != nil {
-			return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
-		}
-
-		if newSpan.Attributes.DynamicStatus != nil {
-			newSpan.Status = *newSpan.Attributes.DynamicStatus
-		}
-
-		if newSpan.Attributes.AppID != nil {
-			newSpan.AppID = *newSpan.Attributes.AppID
-		}
-
-		if newSpan.Attributes.FunctionID != nil {
-			newSpan.FunctionID = *newSpan.Attributes.FunctionID
-		}
-
-		if newSpan.Attributes.RunID != nil {
-			newSpan.RunID = *newSpan.Attributes.RunID
-		}
-
-		if newSpan.Attributes.StartedAt != nil {
-			newSpan.StartTime = *newSpan.Attributes.StartedAt
-		}
-
-		if newSpan.Attributes.EndedAt != nil {
-			newSpan.EndTime = *newSpan.Attributes.EndedAt
-		}
-
-		if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
-			newSpan.MarkedAsDropped = true
-		}
-
-		// If this span has finished, set a preliminary output ID.
-		if outputSpanID != nil && *outputSpanID != "" {
-			newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
+		if attrs, ok := fragmentAttributesJSON(fragment["attributes"]); ok {
+			fragmentAttr := map[string]any{}
+			if err := json.Unmarshal(attrs, &fragmentAttr); err != nil {
+				logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
 				return nil, err
 			}
+
+			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
+
+			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
+				outputSpanID = &outputRef
+				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+					io.OutputRef = outputRef
+				} else {
+					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
+				}
+			}
+
+			if inputRef, ok := fragment["input_span_id"].(string); ok && info != nil {
+				inputSpanID = &inputRef
+				if io, ok := info.dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+					io.InputRef = inputRef
+				} else {
+					info.dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
+				}
+			}
+		}
+	}
+
+	if info != nil && isMetadata && parentSpanIDPtr != nil {
+		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
+		} else {
+			info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], metadata)
+		}
+	}
+
+	newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
+	if err != nil {
+		return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
+	}
+
+	if newSpan.Attributes.DynamicStatus != nil {
+		newSpan.Status = *newSpan.Attributes.DynamicStatus
+	}
+
+	if newSpan.Attributes.AppID != nil {
+		newSpan.AppID = *newSpan.Attributes.AppID
+	}
+
+	if newSpan.Attributes.FunctionID != nil {
+		newSpan.FunctionID = *newSpan.Attributes.FunctionID
+	}
+
+	if newSpan.Attributes.RunID != nil {
+		newSpan.RunID = *newSpan.Attributes.RunID
+	}
+
+	if newSpan.Attributes.DebugRunID != nil {
+		newSpan.DebugRunID = *newSpan.Attributes.DebugRunID
+	}
+
+	if newSpan.Attributes.DebugSessionID != nil {
+		newSpan.DebugSessionID = *newSpan.Attributes.DebugSessionID
+	}
+
+	if newSpan.Attributes.StartedAt != nil {
+		newSpan.StartTime = *newSpan.Attributes.StartedAt
+	}
+
+	if newSpan.Attributes.EndedAt != nil {
+		newSpan.EndTime = *newSpan.Attributes.EndedAt
+	}
+
+	if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
+		newSpan.MarkedAsDropped = true
+	}
+
+	// If this span has finished, set a preliminary output ID.
+	if (outputSpanID != nil && *outputSpanID != "") || (inputSpanID != nil && *inputSpanID != "") {
+		newSpan.OutputID, err = encodeSpanOutputID(outputSpanID, inputSpanID)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
+			return nil, err
+		}
+	}
+
+	return newSpan, nil
+}
+
+// Uses generics to accept slices of any type that implements normalizedSpan interface
+func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
+	// ordered map is required by subsequent gql mapping
+	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
+
+	metadataByParent := make(map[string][]*cqrs.SpanMetadata)
+
+	// A map of dynamic span IDs to the specific span ID that contains I/O
+	dynamicRefs := make(map[string]*IODynamicRef)
+
+	// Maps OTEL span IDs to their owning dynamic span ID.  Parent references
+	// in the DB use OTEL span IDs, but the span tree is keyed by dynamic IDs.
+	otelToDynamic := make(map[string]string)
+
+	var root *cqrs.OtelSpan
+	var runID ulid.ULID
+	var err error
+
+	for _, span := range spans {
+		info := spanRollupInfo{
+			dynamicRefs:      dynamicRefs,
+			metadataByParent: metadataByParent,
+			otelToDynamic:    otelToDynamic,
+		}
+		newSpan, err := mapSpanFromRow(ctx, span, &info)
+		if err != nil {
+			return nil, err
 		}
 
-		spanMap.Set(span.DynamicSpanID.String, newSpan)
+		if newSpan.Name == meta.SpanNameMetadata {
+			continue
+		}
+
+		spanMap.Set(newSpan.SpanID, newSpan)
+	}
+
+	// resolveDynamic looks up a dynamic span ID for the given ID, which may
+	// be either a dynamic span ID (already in the map) or an OTEL span ID
+	// that needs resolving via the otelToDynamic mapping.
+	resolveDynamic := func(id string) (string, bool) {
+		if _, ok := spanMap.Get(id); ok {
+			return id, true
+		}
+		if dynID, ok := otelToDynamic[id]; ok {
+			if _, ok := spanMap.Get(dynID); ok {
+				return dynID, true
+			}
+		}
+		return "", false
+	}
+
+	// Build a reverse lookup map for output references
+	outputDynamicRefs := make(map[string]*string)
+	for spanID, ioRef := range dynamicRefs {
+		if ioRef != nil && ioRef.OutputRef != "" {
+			outputDynamicRefs[ioRef.OutputRef] = &spanID
+		}
+	}
+
+	// Build a reverse map from dynamic span IDs to their OTEL span IDs,
+	// so metadata lookups below are O(1) instead of scanning the entire map.
+	dynamicToOtelIDs := make(map[string][]string, len(otelToDynamic))
+	for otelID, dynID := range otelToDynamic {
+		dynamicToOtelIDs[dynID] = append(dynamicToOtelIDs[dynID], otelID)
 	}
 
 	for _, span := range spanMap.AllFromFront() {
@@ -216,21 +534,38 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
 				// We've found the span ID that we need to target for
 				// this span. So let's use it!
-				span.OutputID, err = encodeSpanOutputID(targetSpanID)
+				span.OutputID, err = encodeSpanOutputID(targetSpanID, nil)
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
 					return nil, err
 				}
 			}
-
 		}
 
-		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
+		// Attach metadata to spans. Metadata spans reference their parent by
+		// OTEL span ID, so also check the otelToDynamic mapping.
+		if metadata, ok := metadataByParent[span.SpanID]; ok {
+			span.Metadata = metadata
+		} else if otelIDs, ok := dynamicToOtelIDs[span.SpanID]; ok {
+			// Check if any metadata references an OTEL span ID that
+			// belongs to this dynamic span group.
+			for _, otelID := range otelIDs {
+				if metadata, ok := metadataByParent[otelID]; ok {
+					span.Metadata = append(span.Metadata, metadata...)
+				}
+			}
+		}
+
+		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
 			root, _ = spanMap.Get(span.SpanID)
 			continue
 		}
 
-		if parent, ok := spanMap.Get(*span.ParentSpanID); ok {
+		// Resolve the parent span ID, which may be an OTEL span ID that
+		// needs mapping to the parent's dynamic span ID.
+		if parentDynID, ok := resolveDynamic(*span.ParentSpanID); ok {
+			parent, _ := spanMap.Get(parentDynID)
+
 			// This is wrong. Either do it properly in DB or infer it
 			// correctly here. e.g. if child failed but more attempts coming,
 			// still running
@@ -254,16 +589,142 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	}
 
 	sorter(root)
+	computeAndAttachUsageMetadata(root)
 
 	return root, nil
 }
 
-func encodeSpanOutputID(spanID string) (*string, error) {
+func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) (*cqrs.SpanMetadata, error) {
+	ret := &cqrs.SpanMetadata{
+		Values:    metadata.Values{},
+		UpdatedAt: updatedAt,
+	}
+
+	for _, fragment := range fragments {
+		attrs, ok := fragmentAttributesJSON(fragment["attributes"])
+		if !ok {
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind, no attributes")
+			continue
+		}
+
+		var fragmentAttr struct {
+			Scope  *metadata.Scope  `json:"_inngest.metadata.scope"`
+			Kind   *metadata.Kind   `json:"_inngest.metadata.kind"`
+			Op     *metadata.Opcode `json:"_inngest.metadata.op"`
+			Values *string          `json:"_inngest.metadata.values"`
+		}
+		if err := json.Unmarshal(attrs, &fragmentAttr); err != nil {
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span attributes", "error", err)
+			return nil, err
+		}
+
+		switch {
+		case fragmentAttr.Scope == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind")
+			continue // TODO: err
+		case fragmentAttr.Kind == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind")
+			continue // TODO: err
+		case fragmentAttr.Op == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span op")
+			continue
+		case fragmentAttr.Values == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span metadata")
+			continue
+		}
+
+		if ret.Kind == "" && *fragmentAttr.Kind != "" {
+			ret.Kind = *fragmentAttr.Kind
+		} else if ret.Kind != *fragmentAttr.Kind {
+			logger.StdlibLogger(ctx).Warn(
+				"mismatch in metadata kind during rollup, skipping",
+				"kinds", []metadata.Kind{ret.Kind, *fragmentAttr.Kind},
+			)
+			continue
+		}
+
+		if ret.Scope == enums.MetadataScopeUnknown && *fragmentAttr.Scope != enums.MetadataScopeUnknown {
+			ret.Scope = *fragmentAttr.Scope
+		} else if ret.Scope != *fragmentAttr.Scope {
+			logger.StdlibLogger(ctx).Warn(
+				"mismatch in metadata scope during rollup, skipping",
+				"scopes", []metadata.Scope{ret.Scope, *fragmentAttr.Scope},
+			)
+			continue
+		}
+
+		var fragmentMetadata metadata.Values
+		err := json.Unmarshal([]byte(*fragmentAttr.Values), &fragmentMetadata)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error unmarshalling span metadata", "error", err)
+			return nil, err
+		}
+
+		err = ret.Values.Combine(fragmentMetadata, *fragmentAttr.Op)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error rolling up metadata span metadata", "error", err)
+			return nil, err
+		}
+	}
+
+	return ret, nil
+}
+
+// computeAndAttachUsageMetadata walks the span tree, sums the size of all
+// non-usage metadata values, and attaches a synthetic "inngest.usage" metadata
+// entry to the root span. Any previously stored usage metadata entries are
+// removed first so the computed value is always authoritative.
+func computeAndAttachUsageMetadata(root *cqrs.OtelSpan) {
+	var totalSize int
+	removeStoredUsage(root)
+	walkMetadataSize(root, &totalSize)
+
+	if totalSize <= 0 {
+		return
+	}
+
+	ts := root.EndTime
+	if ts.IsZero() {
+		ts = root.StartTime
+	}
+
+	root.Metadata = append(root.Metadata, &cqrs.SpanMetadata{
+		Scope:     enums.MetadataScopeRun,
+		Kind:      "inngest.usage",
+		Values:    metadata.Values{"metadata_bytes": json.RawMessage(strconv.Itoa(totalSize))},
+		UpdatedAt: ts,
+	})
+}
+
+func removeStoredUsage(span *cqrs.OtelSpan) {
+	span.Metadata = slices.DeleteFunc(span.Metadata, func(m *cqrs.SpanMetadata) bool {
+		return m.Kind == "inngest.usage"
+	})
+	for _, child := range span.Children {
+		removeStoredUsage(child)
+	}
+}
+
+func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
+	for _, md := range span.Metadata {
+		*total += md.Values.Size()
+	}
+	for _, child := range span.Children {
+		walkMetadataSize(child, total)
+	}
+}
+
+func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, error) {
 	p := true
+	osid := ""
+	if outputSpanID != nil {
+		osid = *outputSpanID
+	}
 
 	id := &cqrs.SpanIdentifier{
-		SpanID:  spanID,
-		Preview: &p,
+		SpanID:      osid,
+		InputSpanID: inputSpanID,
+		Preview:     &p,
 	}
 
 	encoded, err := id.Encode()
@@ -274,6 +735,36 @@ func encodeSpanOutputID(spanID string) (*string, error) {
 	return &encoded, nil
 }
 
+// group by run id, sort by started at, let the frontend handle overlay.
+func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) ([]*cqrs.OtelSpan, error) {
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByRunID := make(map[string][]T)
+	for _, span := range spans {
+		runID := span.GetRunID()
+		spansByRunID[runID] = append(spansByRunID[runID], span)
+	}
+
+	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
+	for _, runSpansGroup := range spansByRunID {
+		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
+		if err != nil {
+			return nil, err
+		}
+		if runSpan != nil {
+			runSpans = append(runSpans, runSpan)
+		}
+	}
+
+	if len(runSpans) == 0 {
+		return nil, nil
+	}
+
+	return runSpans, nil
+}
+
 func sorter(span *cqrs.OtelSpan) {
 	sort.Slice(span.Children, func(i, j int) bool {
 		if !span.Children[i].StartTime.Equal(span.Children[j].StartTime) {
@@ -282,6 +773,12 @@ func sorter(span *cqrs.OtelSpan) {
 
 		// sort based on SpanID if two spans have equal timestamps
 		return span.Children[i].SpanID < span.Children[j].SpanID
+	})
+
+	slices.SortFunc(span.Metadata, func(a, b *cqrs.SpanMetadata) int {
+		return cmp.Or(
+			cmp.Compare(a.Scope, b.Scope),
+			cmp.Compare(a.Kind, b.Kind))
 	})
 
 	for _, child := range span.Children {
@@ -312,32 +809,39 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 		// Already in a tx else DB would be present.
 		return w, nil
 	}
-	tx, err := w.db.BeginTx(ctx, nil)
+	txAdapter, err := w.adapter.WithTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var q sqlc.Querier
-	if w.isPostgres() {
-		q = sqlc_postgres.NewNormalized(tx, w.opts)
-	} else {
-		q = sqlc.New(tx)
+	// The tx adapter must implement adapterWithHelpers; this is guaranteed by
+	// construction (both sqlite and postgres TxAdapter embed Adapter which has
+	// Helpers()). A failure here is a programming error, not a runtime condition.
+	txWithHelpers, ok := txAdapter.(adapterWithHelpers)
+	if !ok {
+		panic("bug: tx adapter does not implement adapterWithHelpers — ensure the concrete TxAdapter embeds Adapter")
 	}
 
 	return &wrapper{
-		driver: w.driver,
-		q:      q,
-		tx:     tx,
-		opts:   w.opts,
+		adapter: txWithHelpers,
+		q:       txAdapter.Q(),
 	}, nil
 }
 
 func (w wrapper) Commit(ctx context.Context) error {
-	return w.tx.Commit()
+	txAdapter, ok := w.adapter.(dbpkg.TxAdapter)
+	if !ok {
+		panic("bug: Commit called on a non-transaction wrapper")
+	}
+	return txAdapter.Commit(ctx)
 }
 
 func (w wrapper) Rollback(ctx context.Context) error {
-	return w.tx.Rollback()
+	txAdapter, ok := w.adapter.(dbpkg.TxAdapter)
+	if !ok {
+		panic("bug: Rollback called on a non-transaction wrapper")
+	}
+	return txAdapter.Rollback(ctx)
 }
 
 func (w wrapper) GetLatestQueueSnapshot(ctx context.Context) (*cqrs.QueueSnapshot, error) {
@@ -364,7 +868,7 @@ func (w wrapper) GetLatestQueueSnapshot(ctx context.Context) (*cqrs.QueueSnapsho
 }
 
 func (w wrapper) GetQueueSnapshot(ctx context.Context, snapshotID cqrs.SnapshotID) (*cqrs.QueueSnapshot, error) {
-	chunks, err := w.q.GetQueueSnapshotChunks(ctx, snapshotID)
+	chunks, err := w.q.GetQueueSnapshotChunks(ctx, snapshotID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error getting queue snapshot: %w", err)
 	}
@@ -438,7 +942,7 @@ func (w wrapper) InsertQueueSnapshot(ctx context.Context, params cqrs.InsertQueu
 }
 
 func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.InsertQueueSnapshotChunkParams) error {
-	err := w.q.InsertQueueSnapshotChunk(ctx, sqlc.InsertQueueSnapshotChunkParams{
+	err := w.q.InsertQueueSnapshotChunk(ctx, dbpkg.InsertQueueSnapshotChunkParams{
 		SnapshotID: params.SnapshotID.String(),
 		ChunkID:    int64(params.ChunkID),
 		Data:       params.Chunk,
@@ -461,7 +965,7 @@ func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.Filt
 		return nil, fmt.Errorf("could not get apps: %w", err)
 	}
 	if filter == nil {
-		return SQLiteToCQRSList(data, sqliteApp), nil
+		return domainToCQRSList(data, domainApp), nil
 	}
 
 	filtered := []*cqrs.App{}
@@ -469,7 +973,7 @@ func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.Filt
 		if filter.Method != nil && filter.Method.String() != app.Method {
 			continue
 		}
-		filtered = append(filtered, SQLiteToCQRS(app, sqliteApp))
+		filtered = append(filtered, domainToCQRS(app, domainApp))
 	}
 
 	return filtered, nil
@@ -480,7 +984,7 @@ func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRS(app, sqliteApp), nil
+	return domainToCQRS(app, domainApp), nil
 }
 
 func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
@@ -488,7 +992,7 @@ func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRS(app, sqliteApp), nil
+	return domainToCQRS(app, domainApp), nil
 }
 
 func (w wrapper) GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*cqrs.App, error) {
@@ -499,7 +1003,7 @@ func (w wrapper) GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRS(app, sqliteApp), nil
+	return domainToCQRS(app, domainApp), nil
 }
 
 func (w wrapper) GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error) {
@@ -507,7 +1011,7 @@ func (w wrapper) GetAppByName(ctx context.Context, envID uuid.UUID, name string)
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRS(app, sqliteApp), nil
+	return domainToCQRS(app, domainApp), nil
 }
 
 // GetAllApps returns all apps.
@@ -516,7 +1020,7 @@ func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, 
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRSList(apps, sqliteApp), nil
+	return domainToCQRSList(apps, domainApp), nil
 }
 
 // InsertApp creates a new app.
@@ -528,7 +1032,7 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 		arg.Method = enums.AppMethodServe.String()
 	}
 
-	app, err := w.q.UpsertApp(ctx, sqlc.UpsertAppParams{
+	app, err := w.q.UpsertApp(ctx, dbpkg.UpsertAppParams{
 		ID:          arg.ID,
 		Name:        arg.Name,
 		SdkLanguage: arg.SdkLanguage,
@@ -546,19 +1050,19 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 		return nil, err
 	}
 
-	return SQLiteToCQRS(app, sqliteApp), nil
+	return domainToCQRS(app, domainApp), nil
 }
 
 func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
 	// Use the direct SQL UPDATE query instead of load-then-upsert
-	app, err := w.q.UpdateAppError(ctx, sqlc.UpdateAppErrorParams{
+	app, err := w.q.UpdateAppError(ctx, dbpkg.UpdateAppErrorParams{
 		ID:    arg.ID,
 		Error: arg.Error,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRS(app, sqliteApp), nil
+	return domainToCQRS(app, domainApp), nil
 }
 
 func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
@@ -566,14 +1070,14 @@ func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) 
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
 
 	// Use the direct SQL UPDATE query instead of delete-and-reinsert
-	app, err := w.q.UpdateAppURL(ctx, sqlc.UpdateAppURLParams{
+	app, err := w.q.UpdateAppURL(ctx, dbpkg.UpdateAppURLParams{
 		ID:  arg.ID,
 		Url: arg.Url,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRS(app, sqliteApp), nil
+	return domainToCQRS(app, domainApp), nil
 }
 
 // DeleteApp deletes an app
@@ -591,7 +1095,7 @@ func (w wrapper) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*cqrs.
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, sqliteFunction), nil
+	return domainToCQRSList(fns, domainFunction), nil
 }
 
 func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID, fnSlug string) (*cqrs.Function, error) {
@@ -600,7 +1104,7 @@ func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, ap
 		return nil, err
 	}
 
-	return SQLiteToCQRS(fn, sqliteFunction), nil
+	return domainToCQRS(fn, domainFunction), nil
 }
 
 func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
@@ -609,7 +1113,16 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 		return nil, err
 	}
 
-	return SQLiteToCQRS(fn, sqliteFunction), nil
+	return domainToCQRS(fn, domainFunction), nil
+}
+
+func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {
+	fn, err := w.q.GetFunctionByAppNameAndSlug(ctx, appName, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainToCQRS(fn, domainFunction), nil
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
@@ -618,7 +1131,7 @@ func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, sqliteFunction), nil
+	return domainToCQRSList(fns, domainFunction), nil
 }
 
 func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
@@ -627,7 +1140,7 @@ func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUI
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, sqliteFunction), nil
+	return domainToCQRSList(fns, domainFunction), nil
 }
 
 func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
@@ -637,11 +1150,11 @@ func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uu
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, sqliteFunction), nil
+	return domainToCQRSList(fns, domainFunction), nil
 }
 
-func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
-	fn, err := w.q.InsertFunction(ctx, sqlc.InsertFunctionParams{
+func (w wrapper) UpsertFunction(ctx context.Context, params cqrs.UpsertFunctionParams) (*cqrs.Function, error) {
+	fn, err := w.q.UpsertFunction(ctx, dbpkg.UpsertFunctionParams{
 		ID:        params.ID,
 		AppID:     params.AppID,
 		Name:      params.Name,
@@ -653,7 +1166,7 @@ func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionP
 		return nil, err
 	}
 
-	return SQLiteToCQRS(fn, sqliteFunction), nil
+	return domainToCQRS(fn, domainFunction), nil
 }
 
 func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
@@ -665,7 +1178,7 @@ func (w wrapper) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) erro
 }
 
 func (w wrapper) UpdateFunctionConfig(ctx context.Context, arg cqrs.UpdateFunctionConfigParams) (*cqrs.Function, error) {
-	fn, err := w.q.UpdateFunctionConfig(ctx, sqlc.UpdateFunctionConfigParams{
+	fn, err := w.q.UpdateFunctionConfig(ctx, dbpkg.UpdateFunctionConfigParams{
 		ID:     arg.ID,
 		Config: arg.Config,
 	})
@@ -673,7 +1186,7 @@ func (w wrapper) UpdateFunctionConfig(ctx context.Context, arg cqrs.UpdateFuncti
 		return nil, err
 	}
 
-	return SQLiteToCQRS(fn, sqliteFunction), nil
+	return domainToCQRS(fn, domainFunction), nil
 }
 
 //
@@ -689,7 +1202,7 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	if err != nil {
 		return err
 	}
-	evt := sqlc.InsertEventParams{
+	evt := dbpkg.InsertEventParams{
 		InternalID: e.ID,
 		ReceivedAt: time.Now(),
 		EventID:    e.EventID,
@@ -711,7 +1224,7 @@ func (w wrapper) InsertEventBatch(ctx context.Context, eb cqrs.EventBatch) error
 		evtIDs[i] = evt.GetInternalID().String()
 	}
 
-	batch := sqlc.InsertEventBatchParams{
+	batch := dbpkg.InsertEventBatchParams{
 		ID:          eb.ID,
 		AccountID:   eb.AccountID,
 		WorkspaceID: eb.WorkspaceID,
@@ -732,7 +1245,7 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 		return nil, err
 	}
 
-	return SQLiteToCQRS(obj, sqliteEvent), nil
+	return domainToCQRS(obj, domainEvent), nil
 }
 
 func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID) ([]*cqrs.EventBatch, error) {
@@ -741,7 +1254,7 @@ func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(batches, sqliteEventBatch), nil
+	return domainToCQRSList(batches, domainEventBatch), nil
 }
 
 func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.EventBatch, error) {
@@ -750,7 +1263,7 @@ func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cq
 		return nil, err
 	}
 
-	return SQLiteToCQRS(obj, sqliteEventBatch), nil
+	return domainToCQRS(obj, domainEventBatch), nil
 }
 
 func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*cqrs.Event, error) {
@@ -759,7 +1272,7 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(objs, sqliteEvent), nil
+	return domainToCQRSList(objs, domainEvent), nil
 }
 
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
@@ -797,14 +1310,14 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 		return nil, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args...)
+	rows, err := w.adapter.Conn().QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
 
 	res := []*cqrs.Event{}
 	for rows.Next() {
-		data := sqlc.Event{}
+		data := dbpkg.Event{}
 		if err := rows.Scan(
 			&data.InternalID,
 			&data.AccountID,
@@ -822,10 +1335,7 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 			return nil, err
 		}
 
-		evt, err := data.ToCQRS()
-		if err != nil {
-			return nil, fmt.Errorf("error deserializing event: %w", err)
-		}
+		evt := domainEvent(&data)
 
 		ok, err := expHandler.MatchEventExpressions(ctx, evt.GetEvent())
 		if err != nil {
@@ -875,12 +1385,11 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		Order(order...).
 		Limit(uint(opts.Limit)).
 		ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args...)
+	rows, err := w.adapter.Conn().QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -888,7 +1397,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 
 	out := make([]*cqrs.Event, 0, opts.Limit)
 	for rows.Next() {
-		data := sqlc.Event{}
+		data := dbpkg.Event{}
 		if err := rows.Scan(
 			&data.InternalID,
 			&data.AccountID,
@@ -905,7 +1414,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		); err != nil {
 			return nil, err
 		}
-		out = append(out, SQLiteToCQRS(&data, sqliteEvent))
+		out = append(out, domainToCQRS(&data, domainEvent))
 	}
 
 	return out, nil
@@ -933,7 +1442,7 @@ func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, worksp
 	}
 
 	var count int64
-	err = w.db.QueryRowContext(ctx, sql, args...).Scan(&count)
+	err = w.adapter.Conn().QueryRowContext(ctx, sql, args...).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -976,7 +1485,6 @@ func (w wrapper) GetEventsIDbound(
 	limit int,
 	includeInternal bool,
 ) ([]*cqrs.Event, error) {
-
 	if ids.Before == nil {
 		ids.Before = &endULID
 	}
@@ -985,7 +1493,7 @@ func (w wrapper) GetEventsIDbound(
 		ids.After = &ulid.Zero
 	}
 
-	evts, err := w.q.GetEventsIDbound(ctx, sqlc.GetEventsIDboundParams{
+	evts, err := w.q.GetEventsIDbound(ctx, dbpkg.GetEventsIDboundParams{
 		After:           *ids.After,
 		Before:          *ids.Before,
 		IncludeInternal: strconv.FormatBool(includeInternal),
@@ -995,7 +1503,7 @@ func (w wrapper) GetEventsIDbound(
 		return []*cqrs.Event{}, err
 	}
 
-	return SQLiteToCQRSList(evts, sqliteEvent), nil
+	return domainToCQRSList(evts, domainEvent), nil
 }
 
 //
@@ -1003,7 +1511,7 @@ func (w wrapper) GetEventsIDbound(
 //
 
 func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) error {
-	run := sqlc.InsertFunctionRunParams{
+	run := dbpkg.InsertFunctionRunParams{
 		RunID:           e.RunID,
 		RunStartedAt:    e.RunStartedAt,
 		FunctionID:      e.FunctionID,
@@ -1070,7 +1578,7 @@ func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound,
 		before = *t.Before
 	}
 
-	runs, err := w.q.GetFunctionRunsTimebound(ctx, sqlc.GetFunctionRunsTimeboundParams{
+	runs, err := w.q.GetFunctionRunsTimebound(ctx, dbpkg.GetFunctionRunsTimeboundParams{
 		Before: before,
 		After:  after,
 		Limit:  int64(limit),
@@ -1095,7 +1603,7 @@ func (w wrapper) GetFunctionRunFinishesByRunIDs(
 	if err != nil {
 		return nil, err
 	}
-	return SQLiteToCQRSList(finish, sqliteFunctionFinish), nil
+	return domainToCQRSList(finish, domainFunctionFinish), nil
 }
 
 //
@@ -1116,7 +1624,7 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	return nil, err
 }
 
-func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionRun {
+func toCQRSRun(run dbpkg.FunctionRun, finish dbpkg.FunctionFinish) *cqrs.FunctionRun {
 	copied := cqrs.FunctionRun{
 		RunID:           run.RunID,
 		RunStartedAt:    run.RunStartedAt,
@@ -1147,7 +1655,7 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 //
 
 func (w wrapper) InsertSpan(ctx context.Context, span *cqrs.Span) error {
-	params := &sqlc.InsertTraceParams{
+	params := &dbpkg.InsertTraceParams{
 		Timestamp:       span.Timestamp,
 		TimestampUnixMs: span.Timestamp.UnixMilli(),
 		TraceID:         span.TraceID,
@@ -1195,7 +1703,7 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		return fmt.Errorf("error parsing runID as ULID: %w", err)
 	}
 
-	params := sqlc.InsertTraceRunParams{
+	params := dbpkg.InsertTraceRunParams{
 		AccountID:   run.AccountID,
 		WorkspaceID: run.WorkspaceID,
 		AppID:       run.AppID,
@@ -1232,7 +1740,7 @@ type traceRunCursorFilter struct {
 }
 
 func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
-	spans, err := w.q.GetTraceSpans(ctx, sqlc.GetTraceSpansParams{
+	spans, err := w.q.GetTraceSpans(ctx, dbpkg.GetTraceSpansParams{
 		TraceID: id.TraceID,
 		RunID:   id.RunID,
 	})
@@ -1321,7 +1829,7 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 }
 
 func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
-	// convert sqlc.TraceRun{} to cqrs.TraceRun{}
+	// convert db.TraceRun{} to cqrs.TraceRun{}
 	sqlcTraceRuns, err := w.q.GetTraceRunsByTriggerId(ctx, triggerID.String())
 	if err != nil {
 		return nil, err
@@ -1373,7 +1881,6 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
-
 	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {
 		return nil, err
@@ -1423,29 +1930,54 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve output")
+	ids := []string{}
+	if opts.SpanID != "" {
+		ids = append(ids, opts.SpanID)
+	}
+	if opts.InputSpanID != nil && *opts.InputSpanID != "" {
+		ids = append(ids, *opts.InputSpanID)
 	}
 
-	s, err := w.q.GetSpanOutput(ctx, opts.SpanID)
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("span ID or input span ID is required to retrieve output")
+	}
+
+	rows, err := w.q.GetSpanOutput(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving span output: %w", err)
 	}
 
 	so := &cqrs.SpanOutput{}
-	var m map[string]any
 
-	so.Data = []byte(fmt.Append(nil, s))
-	if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
-		if errData, ok := m["error"]; ok {
-			so.IsError = true
-			so.Data, _ = json.Marshal(errData)
-		} else if successData, ok := m["data"]; ok {
-			so.Data, _ = json.Marshal(successData)
-		} else {
-			sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
-			sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
-			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+	for _, row := range rows {
+		if len(row.Input) > 0 {
+			so.Input = row.Input
+		}
+
+		if len(row.Output) > 0 {
+			var m map[string]any
+
+			so.Data = row.Output
+			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
+				// NOTE: By default, we wrap errors and data.  However, unforutnately
+				// step.waitForEvent is _not_ wrapped, so we check to see if there's
+				// both "data" and "name";  if so, we return the data wholesale.
+				if isWaitForEventOutput(m) {
+					return so, nil
+				}
+
+				if errData, ok := m["error"]; ok {
+					so.IsError = true
+					so.Data, _ = json.Marshal(errData)
+				} else if successData, ok := m["data"]; ok {
+					so.Data, _ = json.Marshal(successData)
+				} else {
+					sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
+					sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
+
+					logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+				}
+			}
 		}
 	}
 
@@ -1461,7 +1993,7 @@ func (w wrapper) LegacyGetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifi
 	}
 
 	// query spans in descending order
-	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
+	spans, err := w.q.GetTraceSpanOutput(ctx, dbpkg.GetTraceSpanOutputParams{
 		TraceID: opts.TraceID,
 		SpanID:  opts.SpanID,
 	})
@@ -1530,7 +2062,7 @@ func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]
 	}
 
 	// query spans in descending order
-	spans, err := w.q.GetTraceSpanOutput(ctx, sqlc.GetTraceSpanOutputParams{
+	spans, err := w.q.GetTraceSpanOutput(ctx, dbpkg.GetTraceSpanOutputParams{
 		TraceID: opts.TraceID,
 		SpanID:  opts.SpanID,
 	})
@@ -1585,6 +2117,8 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 		}
 		filter = append(filter, sq.C("status").In(status))
 	}
+	// Skipped runs should only be visible in event-scoped queries, not the runs list
+	filter = append(filter, sq.C("status").Neq(enums.RunStatusSkipped.ToCode()))
 	tsfield := strings.ToLower(opt.Filter.TimeField.String())
 	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
 
@@ -1692,7 +2226,15 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	// explicitly set it to zero so it would not attempt to paginate
 	opt.Items = 0
-	res, err := w.GetTraceRuns(ctx, opt)
+	var (
+		res []*cqrs.TraceRun
+		err error
+	)
+	if opt.Preview {
+		res, err = w.GetSpanRuns(ctx, opt)
+	} else {
+		res, err = w.GetTraceRuns(ctx, opt)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -1701,6 +2243,10 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	if opt.Preview {
+		return w.GetSpanRuns(ctx, opt)
+	}
+
 	l := logger.StdlibLogger(ctx)
 
 	// use evtIDs as post query filter
@@ -1758,7 +2304,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		return nil, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args...)
+	rows, err := w.adapter.Conn().QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1766,7 +2312,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	res := []*cqrs.TraceRun{}
 	var count uint
 	for rows.Next() {
-		data := sqlc.TraceRun{}
+		data := dbpkg.TraceRun{}
 		err := rows.Scan(
 			&data.AppID,
 			&data.FunctionID,
@@ -1954,17 +2500,18 @@ func (w wrapper) InsertWorkerConnection(ctx context.Context, conn *cqrs.WorkerCo
 		}
 	}
 
-	params := sqlc.InsertWorkerConnectionParams{
+	params := dbpkg.InsertWorkerConnectionParams{
 		AccountID:   conn.AccountID,
 		WorkspaceID: conn.WorkspaceID,
 		AppID:       conn.AppID,
 		AppName:     conn.AppName,
 
-		ID:         conn.Id,
-		GatewayID:  conn.GatewayId,
-		InstanceID: conn.InstanceId,
-		Status:     int64(conn.Status),
-		WorkerIp:   conn.WorkerIP,
+		ID:                   conn.Id,
+		GatewayID:            conn.GatewayId,
+		InstanceID:           conn.InstanceId,
+		Status:               int64(conn.Status),
+		WorkerIp:             conn.WorkerIP,
+		MaxWorkerConcurrency: conn.MaxWorkerConcurrency,
 
 		ConnectedAt:     conn.ConnectedAt.UnixMilli(),
 		LastHeartbeatAt: lastHeartbeatAt,
@@ -1996,7 +2543,7 @@ type WorkerConnectionCursorFilter struct {
 }
 
 func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnectionIdentifier) (*cqrs.WorkerConnection, error) {
-	conn, err := w.q.GetWorkerConnection(ctx, sqlc.GetWorkerConnectionParams{
+	conn, err := w.q.GetWorkerConnection(ctx, dbpkg.GetWorkerConnectionParams{
 		AccountID:    id.AccountID,
 		WorkspaceID:  id.WorkspaceID,
 		ConnectionID: id.ConnectionID,
@@ -2031,11 +2578,12 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 		WorkspaceID: conn.WorkspaceID,
 		AppID:       conn.AppID,
 
-		Id:         conn.ID,
-		GatewayId:  conn.GatewayID,
-		InstanceId: conn.InstanceID,
-		Status:     connpb.ConnectionStatus(conn.Status),
-		WorkerIP:   conn.WorkerIp,
+		Id:                   conn.ID,
+		GatewayId:            conn.GatewayID,
+		InstanceId:           conn.InstanceID,
+		Status:               connpb.ConnectionStatus(conn.Status),
+		WorkerIP:             conn.WorkerIp,
+		MaxWorkerConcurrency: conn.MaxWorkerConcurrency,
 
 		LastHeartbeatAt: lastHeartbeatAt,
 		ConnectedAt:     connectedAt,
@@ -2224,6 +2772,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			"instance_id",
 			"status",
 			"worker_ip",
+			"max_worker_concurrency",
 
 			"connected_at",
 			"last_heartbeat_at",
@@ -2252,7 +2801,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 		return nil, err
 	}
 
-	rows, err := w.db.QueryContext(ctx, sql, args...)
+	rows, err := w.adapter.Conn().QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -2260,7 +2809,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	res := []*cqrs.WorkerConnection{}
 	var count uint
 	for rows.Next() {
-		data := sqlc.WorkerConnection{}
+		data := dbpkg.WorkerConnection{}
 		err := rows.Scan(
 			&data.AccountID,
 			&data.WorkspaceID,
@@ -2272,6 +2821,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.InstanceID,
 			&data.Status,
 			&data.WorkerIp,
+			&data.MaxWorkerConcurrency,
 
 			&data.ConnectedAt,
 			&data.LastHeartbeatAt,
@@ -2351,11 +2901,12 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			AppID:       data.AppID,
 			AppName:     data.AppName,
 
-			Id:         data.ID,
-			GatewayId:  data.GatewayID,
-			InstanceId: data.InstanceID,
-			Status:     connpb.ConnectionStatus(data.Status),
-			WorkerIP:   data.WorkerIp,
+			Id:                   data.ID,
+			GatewayId:            data.GatewayID,
+			InstanceId:           data.InstanceID,
+			Status:               connpb.ConnectionStatus(data.Status),
+			WorkerIP:             data.WorkerIp,
+			MaxWorkerConcurrency: data.MaxWorkerConcurrency,
 
 			LastHeartbeatAt: lastHeartbeatAt,
 			ConnectedAt:     connectedAt,
@@ -2387,4 +2938,474 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	}
 
 	return res, nil
+}
+
+// GetSpanRuns retrieves a list of span-based runs using the same filtering
+// logic as GetTraceRuns but working against the spans table with executor.run +
+// EXTEND span grouping
+func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	l := logger.StdlibLogger(ctx)
+	h := w.helpers()
+
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+
+	// Parse CEL expressions using adapter's converter
+	var celFilters []sq.Expression
+	var useJoin bool
+	if opt.Filter.CEL != "" {
+		expHandler, err := run.NewExpressionHandler(ctx,
+			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+			run.WithExpressionSQLConverter(h.CELConverter()),
+		)
+		if err != nil {
+			return nil, err
+		}
+		if expHandler.HasFilters() {
+			celFilters, err = expHandler.ToSQLFilters(ctx)
+			if err != nil {
+				return nil, err
+			}
+			useJoin = needsEventJoin(opt.Filter.CEL)
+		}
+	}
+
+	selectCols := []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.env_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+		sq.L("MIN(spans.start_time)").As("start_time"),
+		sq.L("MAX(spans.end_time)").As("end_time"),
+		// subselect for argmax(status, end_time)
+		// not the most efficient but it'll do for now
+		sq.L(`(SELECT s2.status FROM spans s2
+			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
+			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
+		h.EventIDsExpr(), // DB-specific due to storage differences
+	}
+
+	groupByCols := []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.env_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+	}
+
+	// Build ORDER BY for aggregated columns
+	var orderExprs []sqexp.OrderedExpression
+	for _, o := range opt.Order {
+		var aggExpr sqexp.LiteralExpression
+		switch o.Field {
+		case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+			aggExpr = sq.L("MIN(spans.start_time)")
+		case enums.TraceRunTimeEndedAt:
+			aggExpr = sq.L("MAX(spans.end_time)")
+		default:
+			aggExpr = sq.L("MIN(spans.start_time)")
+		}
+		if o.Direction == enums.TraceRunOrderAsc {
+			orderExprs = append(orderExprs, aggExpr.Asc())
+		} else {
+			orderExprs = append(orderExprs, aggExpr.Desc())
+		}
+	}
+	if len(orderExprs) == 0 {
+		orderExprs = append(orderExprs, sq.L("MIN(spans.start_time)").Desc())
+	}
+	// always add run_id at the end for stable sorting
+	orderExprs = append(orderExprs, sq.C("run_id").Asc())
+
+	q := sq.Dialect(h.GoquDialect()).From("spans")
+	if useJoin {
+		// database specific join syntax needed because event_ids is an array of ids to the events table,
+		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
+		q = h.BuildEventJoin(q)
+	}
+
+	allFilters := append(builder.filter, celFilters...)
+	// The inner subquery is bounded by Until (an executor.run always precedes
+	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
+	// also apply the From floor so the inner scan stops growing O(total
+	// executor.run history) as the system ages — at the cost of excluding runs
+	// whose root started before From but had EXTEND activity inside the
+	// window. For end_time-based windows we skip the floor: a run that ended
+	// in-window can legitimately have started arbitrarily earlier.
+	innerPreds := []sq.Expression{
+		sq.C("name").Eq(meta.SpanNameRun),
+		sq.C("start_time").Lt(opt.Filter.Until.UTC()),
+	}
+	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
+		innerPreds = append(innerPreds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
+	}
+	q = q.Select(selectCols...).
+		Where(sq.L("spans.dynamic_span_id").In(
+			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(innerPreds...),
+		)).
+		Where(allFilters...).
+		GroupBy(groupByCols...).
+		Order(orderExprs...)
+
+	if opt.Items > 0 {
+		q = q.Limit(opt.Items + 1) // fetch one more item than requested to determine hasNextPage
+	}
+
+	sqlQuery, args, err := q.ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	l.Debug("GetSpanRuns query", "sql", sqlQuery, "args", args)
+
+	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		l.Debug("GetSpanRuns query error", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
+}
+
+// convertSpanRunRows converts database rows to TraceRun structs
+func (w wrapper) convertSpanRunRows(
+	ctx context.Context,
+	rows *sql.Rows,
+	cursorLayout *cqrs.TracePageCursor,
+	h driverhelp.DialectHelpers,
+	itemLimit uint,
+) ([]*cqrs.TraceRun, error) {
+	l := logger.StdlibLogger(ctx)
+
+	type runRow struct {
+		RunID         string
+		DynamicSpanID string
+		AccountID     string
+		EnvID         string
+		AppID         string
+		FunctionID    string
+		TraceID       string
+		StartTime     string
+		EndTime       *string
+		Status        *string
+		EventIDs      *string
+	}
+
+	res := []*cqrs.TraceRun{}
+	var count uint
+
+	for rows.Next() {
+		var row runRow
+		err := rows.Scan(
+			&row.RunID,
+			&row.DynamicSpanID,
+			&row.AccountID,
+			&row.EnvID,
+			&row.AppID,
+			&row.FunctionID,
+			&row.TraceID,
+			&row.StartTime,
+			&row.EndTime,
+			&row.Status,
+			&row.EventIDs,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse times using adapter, times are stored differently across SQLite and Postgres
+		startTime, err := h.ParseTime(row.StartTime)
+		if err != nil {
+			l.Debug("invalid start_time", "start_time", row.StartTime, "error", err)
+			continue
+		}
+		var endTime *time.Time
+		if row.EndTime != nil && *row.EndTime != "" {
+			if t, err := h.ParseTime(*row.EndTime); err == nil {
+				endTime = &t
+			}
+		}
+
+		// Parse UUIDs
+		accountUUID, err := uuid.Parse(row.AccountID)
+		if err != nil {
+			l.Debug("invalid account ID", "account_id", row.AccountID, "error", err)
+			continue
+		}
+		workspaceUUID, err := uuid.Parse(row.EnvID)
+		if err != nil {
+			l.Debug("invalid workspace ID", "env_id", row.EnvID, "error", err)
+			continue
+		}
+		appUUID, err := uuid.Parse(row.AppID)
+		if err != nil {
+			l.Debug("invalid app ID", "app_id", row.AppID, "error", err)
+			continue
+		}
+		functionUUID, err := uuid.Parse(row.FunctionID)
+		if err != nil {
+			l.Debug("invalid function ID", "function_id", row.FunctionID, "error", err)
+			continue
+		}
+
+		// Parse status
+		status := enums.RunStatusRunning
+		if row.Status != nil && *row.Status != "" {
+			if stepStatus, err := enums.StepStatusString(*row.Status); err == nil && stepStatus != enums.StepStatusUnknown {
+				status = enums.StepStatusToRunStatus(stepStatus)
+			}
+		}
+
+		// Parse event IDs using adapter due to differences in column type and serialization
+		triggerIDs := h.ParseEventIDs(row.EventIDs)
+
+		// Calculate duration
+		var duration time.Duration
+		if endTime != nil {
+			duration = endTime.Sub(startTime)
+		}
+
+		// Build cursor for pagination
+		var cursor string
+		if cursorLayout != nil {
+			c := &cqrs.TracePageCursor{
+				ID:      row.RunID,
+				Cursors: map[string]cqrs.TraceCursor{},
+			}
+			for field := range cursorLayout.Cursors {
+				switch field {
+				case "start_time":
+					c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMicro()}
+				case "end_time":
+					if endTime != nil {
+						c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMicro()}
+					}
+				}
+			}
+			if encoded, err := c.Encode(); err == nil {
+				cursor = encoded
+			}
+		}
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountUUID,
+			WorkspaceID: workspaceUUID,
+			AppID:       appUUID,
+			FunctionID:  functionUUID,
+			TraceID:     row.TraceID,
+			RunID:       row.RunID,
+			QueuedAt:    startTime,
+			StartedAt:   startTime,
+			Duration:    duration,
+			Status:      status,
+			Cursor:      cursor,
+			TriggerIDs:  triggerIDs,
+		}
+
+		if endTime != nil {
+			traceRun.EndedAt = *endTime
+		}
+
+		res = append(res, traceRun)
+		count++
+
+		// We have filled a page's worth of requests, so break
+		if itemLimit > 0 && count >= itemLimit {
+			break
+		}
+	}
+
+	return res, nil
+}
+
+// newSpanRunsQueryBuilder creates a query builder for span-based runs Similar
+// to newRunsQueryBuilder but adapted for spans table structure
+func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+	l := logger.StdlibLogger(ctx)
+
+	// filters
+	filter := []sq.Expression{}
+	//
+	// debug runs are a special kind of run that should not be included in the main runs list
+	filter = append(filter, sq.C("debug_run_id").IsNull())
+	if opt.Filter.AccountID != uuid.Nil {
+		filter = append(filter, sq.C("account_id").Eq(opt.Filter.AccountID))
+	}
+	if opt.Filter.WorkspaceID != uuid.Nil {
+		filter = append(filter, sq.C("env_id").Eq(opt.Filter.WorkspaceID))
+	}
+	if len(opt.Filter.AppID) > 0 {
+		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
+	}
+	if len(opt.Filter.FunctionID) > 0 {
+		filter = append(filter, sq.C("function_id").In(opt.Filter.FunctionID))
+	}
+	if len(opt.Filter.Status) > 0 {
+		statusStrings := make([]string, 0, len(opt.Filter.Status))
+		for _, s := range opt.Filter.Status {
+			statusStrings = append(statusStrings, s.String())
+		}
+		filter = append(filter, sq.C("status").In(statusStrings))
+	}
+	// Skipped runs should only be visible in event-scoped queries, not the runs list.
+	// status is nullable in spans, so we must also accept NULL.
+	filter = append(filter, sq.Or(
+		sq.C("status").IsNull(),
+		sq.C("status").Neq(enums.RunStatusSkipped.String()),
+	))
+
+	// Map time fields - spans use start_time/end_time instead of
+	// queued_at/started_at/ended_at
+	var tsfield string
+	switch opt.Filter.TimeField {
+	case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+		tsfield = "start_time"
+	case enums.TraceRunTimeEndedAt:
+		tsfield = "end_time"
+	default:
+		tsfield = "start_time"
+	}
+
+	// Convert times to UTC to match spans storage format in SQLite
+	// We currently store SQLite timestamps as Go's time.Time string: "2025-07-13 19:32:24.939517 +0000 UTC m=+..."
+	// SQLite compares these as strings, so filter times must also serialize with "+0000 UTC" suffix to correctly use
+	// lexicographic comparisons.
+	// The UTC conversion was not strictly necessary for Postgres because the timestamp columns are timestamptz, so
+	// type and timezone conversion were handled for us
+	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UTC()))
+	filter = append(filter, sq.C(tsfield).Lt(opt.Filter.Until.UTC()))
+
+	// cursor
+	resCursorLayout := &cqrs.TracePageCursor{
+		Cursors: map[string]cqrs.TraceCursor{},
+	}
+
+	// decode request cursor if there's one
+	var reqCursor *cqrs.TracePageCursor
+	if len(opt.Cursor) > 0 {
+		reqCursor = &cqrs.TracePageCursor{Cursors: map[string]cqrs.TraceCursor{}}
+		if err := reqCursor.Decode(opt.Cursor); err != nil {
+			l.Debug("cursor decode failed", "error", err)
+			reqCursor = nil
+		}
+	}
+
+	// orders
+	order := []sqexp.OrderedExpression{}
+	for _, o := range opt.Order {
+		// Map enum field names to column names
+		var field string
+		switch o.Field {
+		case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+			field = "start_time"
+		case enums.TraceRunTimeEndedAt:
+			field = "end_time"
+		default:
+			field = "start_time"
+		}
+
+		resCursorLayout.Add(field)
+
+		switch o.Direction {
+		case enums.TraceRunOrderAsc:
+			order = append(order, sq.C(field).Asc())
+		case enums.TraceRunOrderDesc:
+			order = append(order, sq.C(field).Desc())
+		}
+	}
+
+	// Always add run_id as final sort field for stable pagination
+	order = append(order, sq.C("run_id").Asc())
+	resCursorLayout.Add("run_id")
+
+	// cursor-based pagination filter
+	if reqCursor != nil {
+		cursorFilters := []sq.Expression{}
+		for i, o := range opt.Order {
+			// Map field names same as above
+			var field string
+			switch o.Field {
+			case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+				field = "start_time"
+			case enums.TraceRunTimeEndedAt:
+				field = "end_time"
+			default:
+				field = "start_time"
+			}
+
+			if cursor := reqCursor.Find(field); cursor != nil {
+				// Build cursor condition for this field
+				// Convert int64 microseconds to time.Time in UTC for spans table comparison
+				cursorTime := time.UnixMicro(cursor.Value).UTC()
+				var baseCondition sq.Expression
+				if o.Direction == enums.TraceRunOrderAsc {
+					baseCondition = sq.C(field).Gt(cursorTime)
+				} else {
+					baseCondition = sq.C(field).Lt(cursorTime)
+				}
+
+				// Build compound condition for tie-breaking
+				equalityConditions := []sq.Expression{sq.C(field).Eq(cursorTime)}
+
+				// Add conditions for all subsequent fields in sort order
+				for j := i + 1; j < len(opt.Order); j++ {
+					var nextField string
+					switch opt.Order[j].Field {
+					case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+						nextField = "start_time"
+					case enums.TraceRunTimeEndedAt:
+						nextField = "end_time"
+					default:
+						nextField = "start_time"
+					}
+
+					if nextCursor := reqCursor.Find(nextField); nextCursor != nil {
+						nextCursorTime := time.UnixMicro(nextCursor.Value).UTC()
+						if opt.Order[j].Direction == enums.TraceRunOrderAsc {
+							equalityConditions = append(equalityConditions, sq.C(nextField).Gt(nextCursorTime))
+						} else {
+							equalityConditions = append(equalityConditions, sq.C(nextField).Lt(nextCursorTime))
+						}
+					}
+				}
+
+				// Add run_id tie-breaker
+				if reqCursor.ID != "" {
+					equalityConditions = append(equalityConditions, sq.C("run_id").Gt(reqCursor.ID))
+				}
+
+				// Combine: (field > cursor_value) OR (field = cursor_value AND next_conditions)
+				tieBreakingCondition := sq.And(equalityConditions...)
+				cursorFilters = append(cursorFilters, sq.Or(baseCondition, tieBreakingCondition))
+			}
+		}
+
+		if len(cursorFilters) > 0 {
+			filter = append(filter, sq.Or(cursorFilters...))
+		}
+	}
+
+	return &runsQueryBuilder{
+		filter:       filter,
+		order:        order,
+		cursor:       reqCursor,
+		cursorLayout: resCursorLayout,
+	}
+}
+
+// needsEventJoin checks if CEL expression references event.* fields
+func needsEventJoin(cel string) bool {
+	return strings.Contains(cel, "event.")
+}
+
+func isWaitForEventOutput(o map[string]any) bool {
+	_, name := o["name"]
+	_, data := o["data"]
+	_, ts := o["ts"]
+	return name && data && ts
 }

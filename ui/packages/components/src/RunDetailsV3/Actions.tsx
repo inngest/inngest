@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 import { toast } from 'sonner';

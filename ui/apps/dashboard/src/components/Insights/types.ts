@@ -1,19 +1,18 @@
 export interface QuerySnapshot {
-  createdAt: number;
   id: string;
+  isSnapshot: true;
   name: string;
   query: string;
 }
 
-export interface Query extends Omit<QuerySnapshot, 'createdAt'> {
-  saved: boolean;
-}
-
-export interface UnsavedQuery extends Omit<Query, 'saved'> {
-  saved: false;
-}
-
-export interface QueryTemplate extends Omit<QuerySnapshot, 'createdAt'> {
+export interface QueryTemplate extends Omit<QuerySnapshot, 'isSnapshot'> {
   explanation: string;
-  templateKind: 'error' | 'time' | 'warning';
+  templateKind: 'error' | 'success' | 'time' | 'warning';
+}
+
+export interface Tab {
+  id: string;
+  name: string;
+  query: string;
+  savedQueryId?: string;
 }

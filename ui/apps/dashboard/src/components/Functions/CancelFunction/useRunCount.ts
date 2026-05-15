@@ -1,5 +1,3 @@
-'use client';
-
 import { baseInitialFetchFailed } from '@inngest/components/types/fetch';
 import { maybeDateToString } from '@inngest/components/utils/date';
 

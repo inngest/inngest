@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '@inngest/components/Modal';
-import { Pill } from '@inngest/components/Pill/Pill';
+import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSearchLine } from '@remixicon/react';
@@ -27,8 +27,16 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   const res = useQuickSearch({ envSlug, term: debouncedTerm });
 
   return (
-    <Modal alignTop isOpen={isOpen} onClose={onClose} className="mt-cmdk-margin max-w-2xl">
-      <Command label="Search by functions, events, apps and IDs" shouldFilter={true}>
+    <Modal
+      alignTop
+      isOpen={isOpen}
+      onClose={onClose}
+      className="mt-cmdk-margin max-w-2xl"
+    >
+      <Command
+        label="Search by functions, events, apps and IDs"
+        shouldFilter={true}
+      >
         <div className="border-subtle bg-modalBase border-b px-4 py-3">
           <Pill appearance="solidBright" className="mb-3">
             {envName}
@@ -38,7 +46,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
             value={term}
             onValueChange={setTerm}
             className={cn(
-              'placeholder-disabled bg-modalBase w-[656px] border-0 p-0 outline-none focus:ring-0'
+              'placeholder-disabled bg-modalBase w-[656px] border-0 p-0 outline-none focus:ring-0',
             )}
           />
         </div>
@@ -61,7 +69,9 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                   className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
                 >
                   <ResultItem
-                    isDifferentEnv={envSlug !== coerceEnvSlug(res.data.run.envSlug)}
+                    isDifferentEnv={
+                      envSlug !== coerceEnvSlug(res.data.run.envSlug)
+                    }
                     key={res.data.run.id}
                     kind="run"
                     onClick={onClose}
@@ -84,7 +94,10 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       key={app.name}
                       kind="app"
                       onClick={onClose}
-                      path={pathCreator.app({ envSlug, externalAppID: app.name })}
+                      path={pathCreator.app({
+                        envSlug,
+                        externalAppID: app.name,
+                      })}
                       text={app.name}
                       value={`app-${i}-${app.name}`}
                     />
@@ -101,7 +114,10 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       key={fn.name}
                       kind="function"
                       onClick={onClose}
-                      path={pathCreator.function({ envSlug, functionSlug: fn.slug })}
+                      path={pathCreator.function({
+                        envSlug,
+                        functionSlug: fn.slug,
+                      })}
                       text={fn.name}
                       value={`function-${i}-${fn.name}`}
                     />
@@ -114,7 +130,9 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                   className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
                 >
                   <ResultItem
-                    isDifferentEnv={envSlug !== coerceEnvSlug(res.data.event.envSlug)}
+                    isDifferentEnv={
+                      envSlug !== coerceEnvSlug(res.data.event.envSlug)
+                    }
                     key={res.data.event.id}
                     kind="event"
                     onClick={onClose}
@@ -137,7 +155,10 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       key={eventType.name}
                       kind="eventType"
                       onClick={onClose}
-                      path={pathCreator.eventType({ envSlug, eventName: eventType.name })}
+                      path={pathCreator.eventType({
+                        envSlug,
+                        eventName: eventType.name,
+                      })}
                       text={eventType.name}
                       value={`eventType-${i}-${eventType.name}`}
                     />
@@ -146,12 +167,14 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
               </Command.Group>
             </>
           )}
-          {!isTyping && !res.isFetching && <Shortcuts onClose={onClose} envSlug={envSlug} />}
+          {!isTyping && !res.isFetching && (
+            <Shortcuts onClose={onClose} envSlug={envSlug} />
+          )}
 
           <Command.Empty
             className={cn(
               'text-muted flex h-10 items-center gap-2 px-2 text-sm',
-              !res.error && 'hidden'
+              !res.error && 'hidden',
             )}
           >
             <RiSearchLine className="text-light h-4 w-4" />
@@ -161,11 +184,12 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
           <Command.Empty
             className={cn(
               'text-muted flex h-10 items-center gap-2 px-2 text-sm',
-              (isTyping || res.isPending || res.error) && 'hidden'
+              (isTyping || res.isPending || res.error) && 'hidden',
             )}
           >
             <RiSearchLine className="text-light h-4 w-4" />
-            No results found for <span className="text-basis">&quot;{debouncedTerm}&quot;</span>
+            No results found for{' '}
+            <span className="text-basis">&quot;{debouncedTerm}&quot;</span>
           </Command.Empty>
         </Command.List>
       </Command>

@@ -1,26 +1,22 @@
 package realtime
 
 import (
-	"sync/atomic"
+	"encoding/json"
 
 	"github.com/google/uuid"
 )
 
-func NewInmemorySubscription(id uuid.UUID, writer func(m Message) error) Subscription {
+func NewInmemorySubscription(id uuid.UUID, writer func(b []byte) error) Subscription {
 	return subMemory{
 		id:     id,
 		writer: writer,
 	}
 }
 
-// subMemory represents an in-memory noop subscription
+// subMemory represents an in-memory subscription backed by a writer callback.
 type subMemory struct {
-	writeCalls  int32
-	streamCalls int32
-	id          uuid.UUID
-
-	writer      func(m Message) error
-	chunkWriter func(c Chunk) error
+	id     uuid.UUID
+	writer func(b []byte) error
 }
 
 func (s subMemory) ID() uuid.UUID {
@@ -31,20 +27,27 @@ func (s subMemory) Protocol() string {
 	return "memory"
 }
 
-func (s subMemory) WriteMessage(m Message) error {
-	atomic.AddInt32(&s.writeCalls, 1)
+func (s subMemory) Write(b []byte) error {
 	if s.writer != nil {
-		return s.writer(m)
+		return s.writer(b)
 	}
 	return nil
 }
 
-func (s subMemory) WriteChunk(c Chunk) error {
-	atomic.AddInt32(&s.streamCalls, 1)
-	if s.chunkWriter != nil {
-		return s.chunkWriter(c)
+func (s subMemory) WriteMessage(m Message) error {
+	byt, err := json.Marshal(m)
+	if err != nil {
+		return err
 	}
-	return nil
+	return s.Write(byt)
+}
+
+func (s subMemory) WriteChunk(c Chunk) error {
+	byt, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	return s.Write(byt)
 }
 
 func (s subMemory) SendKeepalive(m Message) error {

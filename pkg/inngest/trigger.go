@@ -4,13 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/syscode"
 	cron "github.com/robfig/cron/v3"
+	str2duration "github.com/xhit/go-str2duration/v2"
+)
+
+const (
+	MaxCronLength      = 255
+	MaxEventNameLength = 255
+	// MinCronJitter ensures jitter is large enough to be visible at second precision (RFC3339).
+	MinCronJitter = 1 * time.Second
+	// MaxCronJitter is intentionally conservative for v1. Can be raised based on user feedback.
+	MaxCronJitter = 5 * time.Minute
 )
 
 // Triggerable represents a single or multiple triggers for a function.
@@ -27,13 +40,16 @@ func (m MultipleTriggers) Triggers() []Trigger {
 func (m MultipleTriggers) Validate(ctx context.Context) error {
 	var err error
 
-	if len(m) < 1 {
-		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
-	} else if len(m) > consts.MaxTriggers {
+	if len(m) == 0 {
+		return nil
+	}
+
+	if len(m) > consts.MaxTriggers {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of triggers: %d", consts.MaxTriggers))
 	}
 
 	seen := make(map[string]struct{})
+	seenCronExprs := make(map[string]struct{})
 
 	for _, t := range m {
 		key, herr := t.Hash()
@@ -46,8 +62,30 @@ func (m MultipleTriggers) Validate(ctx context.Context) error {
 		}
 		seen[key] = struct{}{}
 
+		// Reject duplicate cron expressions even if jitter differs.
+		if t.CronTrigger != nil {
+			if _, ok := seenCronExprs[t.CronTrigger.Cron]; ok {
+				err = multierror.Append(err, fmt.Errorf("duplicate cron expression: %s", t.CronTrigger.Cron))
+			}
+			seenCronExprs[t.CronTrigger.Cron] = struct{}{}
+		}
+
 		if terr := t.Validate(ctx); terr != nil {
 			err = multierror.Append(err, terr)
+		}
+
+		if t.CronTrigger != nil && len(t.CronTrigger.Cron) > MaxCronLength {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeCronInvalid,
+				Message: fmt.Sprintf("cron is too long. maximum length is %d characters", MaxCronLength),
+			})
+		}
+
+		if t.EventTrigger != nil && len(t.Event) > MaxEventNameLength {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeEventNameInvalid,
+				Message: fmt.Sprintf("event name is too long. maximum length is %d characters", MaxEventNameLength),
+			})
 		}
 	}
 
@@ -133,6 +171,11 @@ func (e EventTrigger) TitleName() string {
 	return strings.Join(words, joiner)
 }
 
+// MatchesAnyPattern checks if this event trigger matches any of the provided patterns.
+func (e EventTrigger) MatchesAnyPattern(patterns []string) bool {
+	return slices.Contains(patterns, e.Event)
+}
+
 func (e EventTrigger) Validate(ctx context.Context) error {
 	if e.Event == "" {
 		return fmt.Errorf("An event trigger must specify an event name")
@@ -148,7 +191,21 @@ func (e EventTrigger) Validate(ctx context.Context) error {
 
 // CronTrigger is a trigger which invokes the function on a CRON schedule.
 type CronTrigger struct {
-	Cron string `json:"cron"`
+	Cron   string  `json:"cron"`
+	Jitter *string `json:"jitter,omitempty"`
+}
+
+func (c CronTrigger) JitterDuration() (time.Duration, error) {
+	if c.Jitter == nil || strings.TrimSpace(*c.Jitter) == "" {
+		return 0, nil
+	}
+
+	jitter, err := str2duration.ParseDuration(*c.Jitter)
+	if err != nil {
+		return 0, err
+	}
+
+	return jitter, nil
 }
 
 func (c CronTrigger) Validate(ctx context.Context) error {
@@ -158,5 +215,20 @@ func (c CronTrigger) Validate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("'%s' isn't a valid cron schedule", c.Cron)
 	}
+
+	jitter, err := c.JitterDuration()
+	if err != nil {
+		return fmt.Errorf("'%s' isn't a valid jitter duration", *c.Jitter)
+	}
+	if jitter < 0 {
+		return fmt.Errorf("cron jitter must be greater than or equal to zero")
+	}
+	if jitter > 0 && jitter < MinCronJitter {
+		return fmt.Errorf("cron jitter must be at least %s", MinCronJitter)
+	}
+	if jitter > MaxCronJitter {
+		return fmt.Errorf("cron jitter must be less than or equal to %s", MaxCronJitter)
+	}
+
 	return nil
 }

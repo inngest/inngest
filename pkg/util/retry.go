@@ -95,15 +95,15 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 			return result, nil
 		}
 
-		lastErr = err
-		if attempt == conf.MaxAttempts {
-			break
-		}
-
 		// check if the error returned should be retried.
 		// if not, return as is
 		if conf.RetryableErrors != nil && !conf.RetryableErrors(err) {
 			return result, err
+		}
+
+		lastErr = err
+		if attempt == conf.MaxAttempts {
+			break
 		}
 
 		l.Warn("retrying function",

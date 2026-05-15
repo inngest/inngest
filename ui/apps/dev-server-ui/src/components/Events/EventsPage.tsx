@@ -1,19 +1,23 @@
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
+import { useEffect, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { Header } from '@inngest/components/Header/Header';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import SendEventModal from '@/components/Event/SendEventModal';
 import { EventInfo } from '@/components/Events/EventInfo';
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
-import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+import {
+  useEventDetails,
+  useEventPayload,
+  useEventRuns,
+  useEvents,
+} from '@/components/Events/useEvents';
+import { useNavigate } from '@tanstack/react-router';
 
 const pollInterval = 400;
 
@@ -24,13 +28,26 @@ export default function EventsPage({
   eventTypeNames?: string[];
   showHeader?: boolean;
 }) {
-  const router = useRouter();
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false,
+  );
+  const navigate = useNavigate();
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
+  const { isModalVisible, selectedEvent, openModal, closeModal } =
+    useReplayModal();
+
+  useEffect(() => {
+    if (pollingFlagReady && pollingDisabled) {
+      setAutoRefresh(false);
+    }
+  }, [pollingDisabled, pollingFlagReady]);
 
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
+  const getEventRuns = useEventRuns();
 
   return (
     <>
@@ -61,6 +78,7 @@ export default function EventsPage({
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
+        getEventRuns={getEventRuns}
         eventNames={eventTypeNames}
         singleEventTypePage={false}
         features={{
@@ -73,7 +91,7 @@ export default function EventsPage({
             <Button
               appearance="outlined"
               label="Refresh"
-              onClick={() => router.refresh()}
+              onClick={() => navigate({ to: '/events' })}
               icon={<RiRefreshLine />}
               iconSide="left"
             />
@@ -102,7 +120,11 @@ export default function EventsPage({
         }}
       />
       {selectedEvent && (
-        <SendEventModal isOpen={isModalVisible} onClose={closeModal} data={selectedEvent.data} />
+        <SendEventModal
+          isOpen={isModalVisible}
+          onClose={closeModal}
+          data={selectedEvent.data}
+        />
       )}
     </>
   );

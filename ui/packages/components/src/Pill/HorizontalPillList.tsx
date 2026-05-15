@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@inngest/components/Popover';
 
@@ -11,8 +9,8 @@ type FunctionsCellContentProps = {
 };
 
 export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellContentProps) {
-  if (pills.length === 0) return null;
   const [open, setOpen] = useState(false);
+  if (pills.length === 0) return null;
 
   // If no alwaysVisibleCount is specified or there aren't more pills than the limit, show all
   if (!alwaysVisibleCount || pills.length <= alwaysVisibleCount) {

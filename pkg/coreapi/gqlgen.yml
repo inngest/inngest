@@ -1,5 +1,5 @@
 schema:
- - "pkg/coreapi/*.graphql"
+  - "pkg/coreapi/*.graphql"
 
 exec:
   filename: pkg/coreapi/generated/generated.go
@@ -20,6 +20,10 @@ models:
     model: github.com/inngest/inngest/pkg/coreapi.NullString
   Uint:
     model: github.com/99designs/gqlgen/graphql.Uint
+  Int64:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int
   Environment:
     model: github.com/inngest/inngest/pkg/coreapi/graph/models.Environment
   App:
@@ -27,8 +31,6 @@ models:
     fields:
       externalID:
         resolver: true
-  Runtime:
-    model: github.com/inngest/inngest/pkg/inngest.RuntimeWrapper
   FunctionVersion:
     model: github.com/inngest/inngest/pkg/function.FunctionVersion
   FunctionRunFinish:
@@ -55,8 +57,8 @@ models:
         resolver: true
       runs:
         resolver: true
-#      source:
-#        resolver: true
+  #      source:
+  #        resolver: true
   Function:
     fields:
       app:
@@ -105,6 +107,8 @@ models:
     fields:
       totalCount:
         resolver: true
+  RunTraceSpan:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunTraceSpan
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
   HistoryStepType:
@@ -125,6 +129,14 @@ models:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunction
   RunHistoryInvokeFunctionResult:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunctionResult
+  SpanMetadataKind:
+    model: github.com/inngest/inngest/pkg/tracing/metadata.Kind
+  SpanMetadataScope:
+    model: github.com/inngest/inngest/pkg/enums.MetadataScope
+  SpanMetadataValues:
+    model: github.com/inngest/inngest/pkg/tracing/metadata.Values
+  HTTPHeaders:
+    model: github.com/inngest/inngest/pkg/headers.Compact
   StreamItem:
     fields:
       inBatch:

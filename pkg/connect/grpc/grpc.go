@@ -7,13 +7,18 @@ import (
 	"sync"
 	"time"
 
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	grpcLib "google.golang.org/grpc"
+)
+
+const (
+	DefaultConnectGatewayGRPCPort  = 50052
+	DefaultConnectExecutorGRPCPort = 50053
+	DefaultConnectGRPCIP           = "127.0.0.1"
 )
 
 type GatewayGRPCForwarder interface {
@@ -47,6 +52,9 @@ type gatewayGRPCManager struct {
 	grpcServer       *grpcLib.Server
 	inFlightRequests sync.Map
 	inFlightAcks     sync.Map
+
+	gatewayGRPCPort  int
+	executorGRPCPort int
 }
 
 type GRPCDialer func(target string, opts ...grpcLib.DialOption) (*grpcLib.ClientConn, error)
@@ -65,17 +73,37 @@ func WithGatewayLogger(logger logger.Logger) GatewayGRPCManagerOption {
 	}
 }
 
+func WithGatewayGRPCPort(p int) GatewayGRPCManagerOption {
+	return func(m *gatewayGRPCManager) {
+		// Keep using the default value if an invalid port is passed
+		if p > 0 {
+			m.gatewayGRPCPort = p
+		}
+	}
+}
+
+func WithExecutorGRPCPort(p int) GatewayGRPCManagerOption {
+	return func(m *gatewayGRPCManager) {
+		// Keep using the default value if an invalid port is passed
+		if p > 0 {
+			m.executorGRPCPort = p
+		}
+	}
+}
+
 // gatewayURL creates a URL for connecting to a gateway's gRPC port
-func gatewayURL(ctx context.Context, gateway *state.Gateway) string {
-	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", connectConfig.Gateway(ctx).GRPCPort))
+func (i *gatewayGRPCManager) gatewayURL(ctx context.Context, gateway *state.Gateway) string {
+	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", i.gatewayGRPCPort))
 }
 
 func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManager, opts ...GatewayGRPCManagerOption) GatewayGRPCManager {
 	mgr := &gatewayGRPCManager{
-		gatewayManager: stateManager,
-		dialer:         grpcLib.NewClient,
-		grpcServer:     grpcLib.NewServer(),
-		logger:         logger.StdlibLogger(ctx),
+		gatewayManager:   stateManager,
+		dialer:           grpcLib.NewClient,
+		grpcServer:       grpcLib.NewServer(),
+		logger:           logger.StdlibLogger(ctx),
+		gatewayGRPCPort:  DefaultConnectGatewayGRPCPort,
+		executorGRPCPort: DefaultConnectExecutorGRPCPort,
 	}
 
 	for _, opt := range opts {
@@ -100,7 +128,7 @@ func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 }
 
 func (i *gatewayGRPCManager) gRPCServerListen(ctx context.Context) {
-	addr := fmt.Sprintf(":%d", connectConfig.Executor(ctx).GRPCPort)
+	addr := fmt.Sprintf(":%d", i.executorGRPCPort)
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -153,6 +181,7 @@ func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage)
 	i.logger.Error("ack channel has likely unsubscribed before getting an ack")
 	return &connectpb.AckResponse{Success: false}, nil
 }
+
 func (i *gatewayGRPCManager) Ping(ctx context.Context, req *connectpb.PingRequest) (*connectpb.PingResponse, error) {
 	return &connectpb.PingResponse{Message: "ok"}, nil
 }
@@ -170,19 +199,17 @@ func (i *gatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID s
 }
 
 func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
-	ch, loaded := i.inFlightRequests.LoadAndDelete(requestID)
-	if loaded {
-		replyChan := ch.(chan *connectpb.SDKResponse)
-		close(replyChan)
-	}
+	i.inFlightRequests.Delete(requestID)
+
+	// NOTE: To avoid panics due to sending on a closed channel, we do not close the message channel
+	// and instead let the gc reclaim it once no more goroutine is sending to it
 }
 
 func (i *gatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
-	ch, loaded := i.inFlightAcks.LoadAndDelete(requestID)
-	if loaded {
-		replyChan := ch.(chan *connectpb.AckMessage)
-		close(replyChan)
-	}
+	i.inFlightAcks.Delete(requestID)
+
+	// NOTE: To avoid panics due to sending on a closed channel, we do not close the message channel
+	// and instead let the gc reclaim it once no more goroutine is sending to it
 }
 
 // ConnectToGateways connects to all gateways through gRPC
@@ -196,7 +223,7 @@ func (i *gatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
 
 	var successCount int64
 	for _, g := range gateways {
-		url := gatewayURL(ctx, g)
+		url := i.gatewayURL(ctx, g)
 		_, err := i.grpcClientManager.GetOrCreateClient(ctx, g.Id.String(), url)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not create grpc client", "error", err)
@@ -228,7 +255,7 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 			return fmt.Errorf("could not find gateway %s: %w", gatewayID.String(), err)
 		}
 
-		url := gatewayURL(ctx, gateway)
+		url := i.gatewayURL(ctx, gateway)
 
 		grpcClient, err = i.grpcClientManager.GetOrCreateClient(ctx, gatewayID.String(), url)
 		if err != nil {
@@ -244,12 +271,16 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 		Data:         data,
 	})
 
-	logger.StdlibLogger(ctx).Debug("grpc message forwarded to connect gateway", "reply", reply, "err", err)
+	logger.StdlibLogger(ctx).Trace("grpc message forwarded to connect gateway", "reply", reply, "err", err)
 
-	success := err == nil
+	success := err == nil && reply != nil && reply.Success
 	metrics.IncrConnectGatewayGRPCForwardCounter(ctx, 1, metrics.CounterOpt{
 		Tags: map[string]any{"success": success},
 	})
+
+	if err == nil && reply != nil && !reply.Success {
+		return fmt.Errorf("gateway could not forward to connection %s: connection not available", connectionID.String())
+	}
 
 	return err
 }

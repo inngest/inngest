@@ -5,45 +5,80 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cron"
+	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/inngest/inngest/pkg/execution/pauses"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"google.golang.org/grpc"
 )
 
+const DefaultDebugAPIPort = 7777
+
 func NewDebugAPI(o Opts) service.Service {
+	port := DefaultDebugAPIPort
+	if o.Port != 0 {
+		port = o.Port
+	}
+
 	return &debugAPI{
-		rpc:       grpc.NewServer(),
-		log:       o.Log,
-		db:        o.DB,
-		queue:     o.Queue,
-		state:     o.State,
-		findShard: o.ShardSelector,
+		rpc:          grpc.NewServer(),
+		port:         port,
+		log:          o.Log,
+		db:           o.DB,
+		queue:        o.Queue,
+		state:        o.State,
+		croner:       o.Cron,
+		shards:       o.ShardRegistry,
+		pm:           o.PauseManager,
+		cm:           o.CapacityManager,
+		batchManager: o.BatchManager,
+		debouncer:    o.Debouncer,
 	}
 }
 
 type Opts struct {
-	Log   logger.Logger
-	DB    cqrs.Manager
-	Queue redis_state.QueueManager
-	State state.Manager
+	Log             logger.Logger
+	DB              cqrs.Manager
+	Queue           queue.QueueManager
+	State           state.Manager
+	Cron            cron.CronManager
+	PauseManager    pauses.Manager
+	CapacityManager constraintapi.CapacityManager
 
-	ShardSelector redis_state.ShardSelector
+	ShardRegistry queue.ShardRegistry
+
+	// Dependencies for batching and debounce insights
+	BatchManager batch.BatchManager
+	Debouncer    debounce.Debouncer
+
+	Port int
 }
 
 type debugAPI struct {
 	pb.DebugServer
+	port int
 
-	rpc       *grpc.Server
-	log       logger.Logger
-	findShard redis_state.ShardSelector
+	rpc    *grpc.Server
+	log    logger.Logger
+	shards queue.ShardRegistry
 
-	db    cqrs.Manager
-	queue redis_state.QueueManager
-	state state.Manager
+	db     cqrs.Manager
+	queue  queue.QueueManager
+	state  state.Manager
+	croner cron.CronManager
+	pm     pauses.Manager
+	cm     constraintapi.CapacityManager
+
+	// Dependencies for batching and debounce insights
+	batchManager batch.BatchManager
+	debouncer    debounce.Debouncer
 }
 
 func (d *debugAPI) Name() string {
@@ -57,8 +92,7 @@ func (d *debugAPI) Pre(ctx context.Context) error {
 }
 
 func (d *debugAPI) Run(ctx context.Context) error {
-	// TODO: make the port overridable
-	addr := fmt.Sprintf(":%d", 7777)
+	addr := fmt.Sprintf(":%d", d.port)
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {

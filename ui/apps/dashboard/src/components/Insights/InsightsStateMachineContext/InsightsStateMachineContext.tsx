@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -19,7 +17,8 @@ interface InsightsStateMachineContextValue {
   status: InsightsStatus;
 }
 
-const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
+const InsightsStateMachineContext =
+  createContext<InsightsStateMachineContextValue | null>(null);
 
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
@@ -53,6 +52,7 @@ export function InsightsStateMachineContextProvider({
       });
     },
     staleTime: 0,
+    retry: false,
   });
 
   const runQuery = useCallback(() => {
@@ -81,7 +81,7 @@ export function useInsightsStateMachineContext() {
   const context = useContext(InsightsStateMachineContext);
   if (!context) {
     throw new Error(
-      'useInsightsStateMachineContext must be used within InsightsStateMachineContextProvider'
+      'useInsightsStateMachineContext must be used within InsightsStateMachineContextProvider',
     );
   }
 
@@ -99,8 +99,10 @@ export function getInsightsStatus({
   isError,
   isLoading,
 }: GetInsightsStatusParams): InsightsStatus {
-  if (isError) return 'error';
   if (isLoading) return 'loading';
+  if (isError) return 'error';
+  if (data?.diagnostics.find((x) => x.severity === 'error') !== undefined)
+    return 'error';
   if (data !== undefined) return 'success';
   return 'initial';
 }

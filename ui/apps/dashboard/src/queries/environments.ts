@@ -92,7 +92,9 @@ export const useEnvironments = (): UseQueryResponse<Environment[]> => {
   return [{ data: environments, fetching, error, stale }, refetch];
 };
 
-export const useEnvironment = (environmentSlug: string): UseQueryResponse<Environment> => {
+export const useEnvironment = (
+  environmentSlug: string,
+): UseQueryResponse<Environment> => {
   const [{ fetching, data, error, stale }, refetch] = useQuery({
     query: GetEnvironmentBySlugDocument,
     requestPolicy: 'cache-first',

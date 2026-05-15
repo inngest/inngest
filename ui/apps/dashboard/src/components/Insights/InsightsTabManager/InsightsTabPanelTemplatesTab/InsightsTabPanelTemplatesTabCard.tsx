@@ -1,6 +1,9 @@
-'use client';
-
-import { RiAlertLine, RiErrorWarningLine, RiTimeLine } from '@remixicon/react';
+import {
+  RiAlertLine,
+  RiCheckLine,
+  RiErrorWarningLine,
+  RiTimeLine,
+} from '@remixicon/react';
 
 import type { QueryTemplate } from '@/components/Insights/types';
 import { useTabManagerActions } from '../TabManagerContext';
@@ -16,7 +19,7 @@ const SPACING_CLASSES = 'p-4';
 const TEXT_CLASSES = 'text-left';
 const TITLE_CLASSES = 'text-basis';
 
-const BUTTON_CARD_STYLES = `${LAYOUT_CLASSES} ${APPEARANCE_CLASSES} ${INTERACTION_CLASSES} ${SPACING_CLASSES} ${TEXT_CLASSES} ${SHADOW_CLASSES}`;
+export const BUTTON_CARD_STYLES = `${LAYOUT_CLASSES} ${APPEARANCE_CLASSES} ${INTERACTION_CLASSES} ${SPACING_CLASSES} ${TEXT_CLASSES} ${SHADOW_CLASSES}`;
 
 const TEMPLATE_KIND_CONFIG: Record<
   QueryTemplate['templateKind'],
@@ -41,6 +44,11 @@ const TEMPLATE_KIND_CONFIG: Record<
     icon: RiAlertLine,
     textColor: 'text-warning',
   },
+  success: {
+    backgroundColor: 'bg-success',
+    icon: RiCheckLine,
+    textColor: 'text-success',
+  },
 };
 
 interface InsightsTabPanelTemplatesTabCardProps {
@@ -64,7 +72,9 @@ export function InsightsTabPanelTemplatesTabCard({
       <div
         className={`${config.backgroundColor} flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md`}
       >
-        <IconComponent className={`${config.textColor} h-5 w-5 flex-shrink-0`} />
+        <IconComponent
+          className={`${config.textColor} h-5 w-5 flex-shrink-0`}
+        />
       </div>
       <div className={CONTENT_LAYOUT_CLASSES}>
         <h3 className={TITLE_CLASSES}>{template.name}</h3>

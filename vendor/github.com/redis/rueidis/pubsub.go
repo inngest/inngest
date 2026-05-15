@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 )
 
-// PubSubMessage represent a pubsub message from redis
+// PubSubMessage represents a pubsub message from redis
 type PubSubMessage struct {
 	// Pattern is only available with pmessage.
 	Pattern string
@@ -15,13 +15,13 @@ type PubSubMessage struct {
 	Message string
 }
 
-// PubSubSubscription represent a pubsub "subscribe", "unsubscribe", "psubscribe" or "punsubscribe" event.
+// PubSubSubscription represent a pubsub "subscribe", "unsubscribe", "ssubscribe", "sunsubscribe", "psubscribe" or "punsubscribe" event.
 type PubSubSubscription struct {
-	// Kind is "subscribe", "unsubscribe", "psubscribe" or "punsubscribe"
+	// Kind is "subscribe", "unsubscribe", "ssubscribe", "sunsubscribe", "psubscribe" or "punsubscribe"
 	Kind string
 	// Channel is the event subject.
 	Channel string
-	// Count is the current number of subscriptions for connection.
+	// Count is the current number of subscriptions for a connection.
 	Count int64
 }
 
@@ -42,9 +42,9 @@ func newSubs() *subs {
 }
 
 type subs struct {
-	cnt uint64
 	chs map[string]chs
 	sub map[uint64]*sub
+	cnt uint64
 	mu  sync.RWMutex
 }
 
@@ -54,6 +54,7 @@ type chs struct {
 
 type sub struct {
 	ch chan PubSubMessage
+	fn func(PubSubSubscription)
 	cs []string
 }
 
@@ -67,12 +68,12 @@ func (s *subs) Publish(channel string, msg PubSubMessage) {
 	}
 }
 
-func (s *subs) Subscribe(channels []string) (ch chan PubSubMessage, cancel func()) {
+func (s *subs) Subscribe(channels []string, fn func(PubSubSubscription)) (ch chan PubSubMessage, cancel func()) {
 	id := atomic.AddUint64(&s.cnt, 1)
 	s.mu.Lock()
 	if s.chs != nil {
 		ch = make(chan PubSubMessage, 16)
-		sb := &sub{cs: channels, ch: ch}
+		sb := &sub{cs: channels, ch: ch, fn: fn}
 		s.sub[id] = sb
 		for _, channel := range channels {
 			c := s.chs[channel].sub
@@ -110,13 +111,28 @@ func (s *subs) remove(id uint64) {
 	}
 }
 
-func (s *subs) Unsubscribe(channel string) {
+func (s *subs) Confirm(sub PubSubSubscription) {
+	if atomic.LoadUint64(&s.cnt) != 0 {
+		s.mu.RLock()
+		for _, sb := range s.chs[sub.Channel].sub {
+			if sb.fn != nil {
+				sb.fn(sub)
+			}
+		}
+		s.mu.RUnlock()
+	}
+}
+
+func (s *subs) Unsubscribe(sub PubSubSubscription) {
 	if atomic.LoadUint64(&s.cnt) != 0 {
 		s.mu.Lock()
-		for id := range s.chs[channel].sub {
+		for id, sb := range s.chs[sub.Channel].sub {
+			if sb.fn != nil {
+				sb.fn(sub)
+			}
 			s.remove(id)
 		}
-		delete(s.chs, channel)
+		delete(s.chs, sub.Channel)
 		s.mu.Unlock()
 	}
 }

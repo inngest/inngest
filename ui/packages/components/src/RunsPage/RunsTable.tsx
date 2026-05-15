@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSortAsc, RiSortDesc } from '@remixicon/react';
@@ -21,6 +22,8 @@ type RunsTableProps = {
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
+  error?: Error | null;
+  onRefresh?: () => void;
   renderSubComponent: (props: Run) => React.ReactElement;
   getRowCanExpand: (row: Row<Run>) => boolean;
   visibleColumns?: VisibilityState;
@@ -30,6 +33,8 @@ type RunsTableProps = {
 export default function RunsTable({
   data = [],
   isLoading,
+  error,
+  onRefresh,
   sorting,
   setSorting,
   getRowCanExpand,
@@ -94,6 +99,13 @@ export default function RunsTable({
   const tableColumnStyles = 'px-4';
 
   const isEmpty = data.length < 1 && !isLoading;
+  const hasError = error && !isLoading;
+
+  const isTimeout = hasError && isTimeoutError(error);
+
+  const errorMessage = isTimeout
+    ? 'Error: request timed out'
+    : `Error: ${error?.message || 'An error occurred'}`;
 
   return (
     <table className={cn(tableStyles, isEmpty && 'border-b-0')}>
@@ -126,7 +138,22 @@ export default function RunsTable({
         ))}
       </thead>
       <tbody className={tableBodyStyles}>
-        {isEmpty && (
+        {hasError && (
+          <tr>
+            <td
+              className="pt-28 text-center align-top"
+              colSpan={numberOfVisibleColumns || table.getVisibleFlatColumns().length}
+            >
+              <div className="flex flex-col items-center gap-4">
+                <p className="text-muted font-medium">{errorMessage}</p>
+                {onRefresh && (
+                  <Button label="Retry" kind="primary" appearance="outlined" onClick={onRefresh} />
+                )}
+              </div>
+            </td>
+          </tr>
+        )}
+        {isEmpty && !hasError && (
           <tr>
             <td
               className="text-muted pt-28 text-center align-top font-medium"
@@ -188,6 +215,21 @@ export default function RunsTable({
       )}
     </table>
   );
+}
+
+/**
+ * Check if an error is a timeout error by examining HTTP status codes or error message
+ * Handles both 408 (Request Timeout) and 504 (Gateway Timeout) status codes
+ */
+function isTimeoutError(error: Error): boolean {
+  // Check if this is a urql CombinedError with networkError
+  const networkError = (error as any)?.networkError;
+  const status = networkError?.response?.status;
+  if (status === 408 || status === 504) {
+    return true;
+  }
+  // Fallback to message check
+  return error.message.toLowerCase().includes('timeout');
 }
 
 const loadingRow = {

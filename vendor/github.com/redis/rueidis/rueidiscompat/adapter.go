@@ -138,13 +138,13 @@ type CoreCmdable interface {
 	BitPos(ctx context.Context, key string, bit int64, pos ...int64) *IntCmd
 	BitPosSpan(ctx context.Context, key string, bit int64, start, end int64, span string) *IntCmd
 	BitField(ctx context.Context, key string, args ...any) *IntSliceCmd
-	// TODO BitFieldRO(ctx context.Context, key string, values ...interface{}) *IntSliceCmd
+	BitFieldRO(ctx context.Context, key string, values ...any) *IntSliceCmd
 
 	Scan(ctx context.Context, cursor uint64, match string, count int64) *ScanCmd
 	ScanType(ctx context.Context, cursor uint64, match string, count int64, keyType string) *ScanCmd
 	SScan(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd
 	HScan(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd
-	// TODO HScanNoValues(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd
+	HScanNoValues(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd
 	ZScan(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd
 
 	HDel(ctx context.Context, key string, fields ...string) *IntCmd
@@ -155,6 +155,7 @@ type CoreCmdable interface {
 	HIncrByFloat(ctx context.Context, key, field string, incr float64) *FloatCmd
 	HKeys(ctx context.Context, key string) *StringSliceCmd
 	HLen(ctx context.Context, key string) *IntCmd
+	HStrLen(ctx context.Context, key, field string) *IntCmd
 	HMGet(ctx context.Context, key string, fields ...string) *SliceCmd
 	HSet(ctx context.Context, key string, values ...any) *IntCmd
 	HMSet(ctx context.Context, key string, values ...any) *BoolCmd
@@ -175,12 +176,17 @@ type CoreCmdable interface {
 	HPExpireTime(ctx context.Context, key string, fields ...string) *IntSliceCmd
 	HTTL(ctx context.Context, key string, fields ...string) *IntSliceCmd
 	HPTTL(ctx context.Context, key string, fields ...string) *IntSliceCmd
+	HGetDel(ctx context.Context, key string, fields ...string) *StringSliceCmd
+	HGetEX(ctx context.Context, key string, fields ...string) *StringSliceCmd
+	HGetEXWithArgs(ctx context.Context, key string, options *HGetEXOptions, fields ...string) *StringSliceCmd
+	HSetEX(ctx context.Context, key string, fieldsAndValues ...string) *IntCmd
+	HSetEXWithArgs(ctx context.Context, key string, options *HSetEXOptions, fieldsAndValues ...string) *IntCmd
 
 	BLPop(ctx context.Context, timeout time.Duration, keys ...string) *StringSliceCmd
 	BLMPop(ctx context.Context, timeout time.Duration, direction string, count int64, keys ...string) *KeyValuesCmd
 	BRPop(ctx context.Context, timeout time.Duration, keys ...string) *StringSliceCmd
 	BRPopLPush(ctx context.Context, source, destination string, timeout time.Duration) *StringCmd
-	// TODO LCS(ctx context.Context, q *LCSQuery) *LCSCmd
+	LCS(ctx context.Context, q *LCSQuery) *LCSCmd
 	LIndex(ctx context.Context, key string, index int64) *StringCmd
 	LInsert(ctx context.Context, key, op string, pivot, value any) *IntCmd
 	LInsertBefore(ctx context.Context, key string, pivot, value any) *IntCmd
@@ -320,7 +326,7 @@ type CoreCmdable interface {
 	ClientKill(ctx context.Context, ipPort string) *StatusCmd
 	ClientKillByFilter(ctx context.Context, keys ...string) *IntCmd
 	ClientList(ctx context.Context) *StringCmd
-	// TODO ClientInfo(ctx context.Context) *ClientInfoCmd
+	ClientInfo(ctx context.Context) *ClientInfoCmd
 	ClientPause(ctx context.Context, dur time.Duration) *BoolCmd
 	ClientUnpause(ctx context.Context) *BoolCmd
 	ClientID(ctx context.Context) *IntCmd
@@ -341,8 +347,9 @@ type CoreCmdable interface {
 	Shutdown(ctx context.Context) *StatusCmd
 	ShutdownSave(ctx context.Context) *StatusCmd
 	ShutdownNoSave(ctx context.Context) *StatusCmd
-	// TODO SlaveOf(ctx context.Context, host, port string) *StatusCmd
-	// TODO SlowLogGet(ctx context.Context, num int64) *SlowLogCmd
+	SlaveOf(ctx context.Context, host, port string) *StatusCmd
+	SlowLogGet(ctx context.Context, num int64) *SlowLogCmd
+	SlowLogReset(ctx context.Context) *StatusCmd
 	Time(ctx context.Context) *TimeCmd
 	DebugObject(ctx context.Context, key string) *StringCmd
 	ReadOnly(ctx context.Context) *StatusCmd
@@ -367,7 +374,7 @@ type CoreCmdable interface {
 	FunctionList(ctx context.Context, q FunctionListQuery) *FunctionListCmd
 	FunctionDump(ctx context.Context) *StringCmd
 	FunctionRestore(ctx context.Context, libDump string) *StringCmd
-	// TODO FunctionStats(ctx context.Context) *FunctionStatsCmd
+	FunctionStats(ctx context.Context) *FunctionStatsCmd
 	FCall(ctx context.Context, function string, keys []string, args ...any) *Cmd
 	FCallRO(ctx context.Context, function string, keys []string, args ...any) *Cmd
 
@@ -379,10 +386,10 @@ type CoreCmdable interface {
 	PubSubShardChannels(ctx context.Context, pattern string) *StringSliceCmd
 	PubSubShardNumSub(ctx context.Context, channels ...string) *StringIntMapCmd
 
-	// TODO ClusterMyShardID(ctx context.Context) *StringCmd
+	ClusterMyShardID(ctx context.Context) *StringCmd
 	ClusterSlots(ctx context.Context) *ClusterSlotsCmd
 	ClusterShards(ctx context.Context) *ClusterShardsCmd
-	// TODO ClusterLinks(ctx context.Context) *ClusterLinksCmd
+	ClusterLinks(ctx context.Context) *ClusterLinksCmd
 	ClusterNodes(ctx context.Context) *StringCmd
 	ClusterMeet(ctx context.Context, host string, port int64) *StatusCmd
 	ClusterForget(ctx context.Context, nodeID string) *StatusCmd
@@ -401,8 +408,6 @@ type CoreCmdable interface {
 	ClusterFailover(ctx context.Context) *StatusCmd
 	ClusterAddSlots(ctx context.Context, slots ...int64) *StatusCmd
 	ClusterAddSlotsRange(ctx context.Context, min, max int64) *StatusCmd
-	// TODO ReadOnly(ctx context.Context) *StatusCmd
-	// TODO ReadWrite(ctx context.Context) *StatusCmd
 
 	GeoAdd(ctx context.Context, key string, geoLocation ...GeoLocation) *IntCmd
 	GeoPos(ctx context.Context, key string, members ...string) *GeoPosCmd
@@ -417,10 +422,15 @@ type CoreCmdable interface {
 	GeoHash(ctx context.Context, key string, members ...string) *StringSliceCmd
 
 	ACLDryRun(ctx context.Context, username string, command ...any) *StringCmd
-	// TODO ACLLog(ctx context.Context, count int64) *ACLLogCmd
-	// TODO ACLLogReset(ctx context.Context) *StatusCmd
+	ACLLog(ctx context.Context, count int64) *ACLLogCmd
+	ACLSetUser(ctx context.Context, username string, rules ...string) *StatusCmd
+	ACLDelUser(ctx context.Context, username string) *IntCmd
+	ACLLogReset(ctx context.Context) *StatusCmd
+	ACLList(ctx context.Context) *StringSliceCmd
+	ACLCat(ctx context.Context) *StringSliceCmd
+	ACLCatArgs(ctx context.Context, options *ACLCatArgs) *StringSliceCmd
 
-	// TODO ModuleLoadex(ctx context.Context, conf *ModuleLoadexConfig) *StringCmd
+	ModuleLoadex(ctx context.Context, conf *ModuleLoadexConfig) *StringCmd
 	GearsCmdable
 	ProbabilisticCmdable
 	TimeseriesCmdable
@@ -435,7 +445,7 @@ type SearchCmdable interface {
 	FTAliasAdd(ctx context.Context, index string, alias string) *StatusCmd
 	FTAliasDel(ctx context.Context, alias string) *StatusCmd
 	FTAliasUpdate(ctx context.Context, index string, alias string) *StatusCmd
-	FTAlter(ctx context.Context, index string, skipInitalScan bool, definition []interface{}) *StatusCmd
+	FTAlter(ctx context.Context, index string, skipInitialScan bool, definition []interface{}) *StatusCmd
 	FTConfigGet(ctx context.Context, option string) *MapMapStringInterfaceCmd
 	FTConfigSet(ctx context.Context, option string, value interface{}) *StatusCmd
 	FTCreate(ctx context.Context, index string, options *FTCreateOptions, schema ...*FieldSchema) *StatusCmd
@@ -966,7 +976,7 @@ func (c *Compat) GetSet(ctx context.Context, key string, value any) *StringCmd {
 	return newStringCmd(resp)
 }
 
-// GetEx An expiration of zero removes the TTL associated with the key (i.e. GETEX key persist).
+// GetEx An expiration of zero removes the TTL associated with the key (i.e., GETEX key persist).
 // Requires Redis >= 6.2.0.
 func (c *Compat) GetEx(ctx context.Context, key string, expiration time.Duration) *StringCmd {
 	var resp rueidis.RedisResult
@@ -1245,6 +1255,15 @@ func (c *Compat) BitField(ctx context.Context, key string, args ...any) *IntSlic
 	return newIntSliceCmd(resp)
 }
 
+func (c *Compat) BitFieldRO(ctx context.Context, key string, args ...any) *IntSliceCmd {
+	cmd := c.client.B().Arbitrary("BITFIELD_RO").Keys(key)
+	for i := 0; i < len(args); i += 2 {
+		cmd = cmd.Args("GET", str(args[i]), str(args[i+1]))
+	}
+	resp := c.client.Do(ctx, cmd.ReadOnly())
+	return newIntSliceCmd(resp)
+}
+
 func (c *Compat) Scan(ctx context.Context, cursor uint64, match string, count int64) *ScanCmd {
 	cmd := c.client.B().Arbitrary("SCAN", strconv.FormatInt(int64(cursor), 10))
 	if match != "" {
@@ -1289,6 +1308,19 @@ func (c *Compat) HScan(ctx context.Context, key string, cursor uint64, match str
 	if count > 0 {
 		cmd = cmd.Args("COUNT", strconv.FormatInt(count, 10))
 	}
+	resp := c.client.Do(ctx, cmd.ReadOnly())
+	return newScanCmd(resp)
+}
+
+func (c *Compat) HScanNoValues(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd {
+	cmd := c.client.B().Arbitrary("HSCAN").Keys(key).Args(strconv.FormatInt(int64(cursor), 10))
+	if match != "" {
+		cmd = cmd.Args("MATCH", match)
+	}
+	if count > 0 {
+		cmd = cmd.Args("COUNT", strconv.FormatInt(count, 10))
+	}
+	cmd = cmd.Args("NOVALUES")
 	resp := c.client.Do(ctx, cmd.ReadOnly())
 	return newScanCmd(resp)
 }
@@ -1349,6 +1381,12 @@ func (c *Compat) HKeys(ctx context.Context, key string) *StringSliceCmd {
 
 func (c *Compat) HLen(ctx context.Context, key string) *IntCmd {
 	cmd := c.client.B().Hlen().Key(key).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newIntCmd(resp)
+}
+
+func (c *Compat) HStrLen(ctx context.Context, key, field string) *IntCmd {
+	cmd := c.client.B().Hstrlen().Key(key).Field(field).Build()
 	resp := c.client.Do(ctx, cmd)
 	return newIntCmd(resp)
 }
@@ -1529,6 +1567,92 @@ func (c *Compat) HPTTL(ctx context.Context, key string, fields ...string) *IntSl
 	return newIntSliceCmd(resp)
 }
 
+func (c *Compat) HGetDel(ctx context.Context, key string, fields ...string) *StringSliceCmd {
+	cmd := c.client.B().Hgetdel().Key(key).Fields().Numfields(int64(len(fields))).Field(fields...).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStringSliceCmd(resp)
+}
+
+func (c *Compat) HGetEX(ctx context.Context, key string, fields ...string) *StringSliceCmd {
+	cmd := c.client.B().Hgetex().Key(key).Fields().Numfields(int64(len(fields))).Field(fields...).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStringSliceCmd(resp)
+}
+
+func (c *Compat) HGetEXWithArgs(ctx context.Context, key string, options *HGetEXOptions, fields ...string) *StringSliceCmd {
+	if options == nil {
+		return c.HGetEX(ctx, key, fields...)
+	}
+
+	var cmd rueidis.Completed
+	if options.ExpirationType == HGetEXExpirationEX {
+		cmd = c.client.B().Hgetex().Key(key).Ex(options.ExpirationVal).Fields().Numfields(int64(len(fields))).Field(fields...).Build()
+	} else if options.ExpirationType == HGetEXExpirationPX {
+		cmd = c.client.B().Hgetex().Key(key).Px(options.ExpirationVal).Fields().Numfields(int64(len(fields))).Field(fields...).Build()
+	} else if options.ExpirationType == HGetEXExpirationEXAT {
+		cmd = c.client.B().Hgetex().Key(key).Exat(options.ExpirationVal).Fields().Numfields(int64(len(fields))).Field(fields...).Build()
+	} else if options.ExpirationType == HGetEXExpirationPXAT {
+		cmd = c.client.B().Hgetex().Key(key).Pxat(options.ExpirationVal).Fields().Numfields(int64(len(fields))).Field(fields...).Build()
+	} else if options.ExpirationType == HGetEXExpirationPERSIST {
+		cmd = c.client.B().Hgetex().Key(key).Persist().Fields().Numfields(int64(len(fields))).Field(fields...).Build()
+	}
+	resp := c.client.Do(ctx, cmd)
+	return newStringSliceCmd(resp)
+}
+
+func (c *Compat) HSetEX(ctx context.Context, key string, fieldsAndValues ...string) *IntCmd {
+	partial := c.client.B().Hsetex().Key(key).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+
+	for i := 0; i < len(fieldsAndValues); i += 2 {
+		partial = partial.FieldValue(fieldsAndValues[i], fieldsAndValues[i+1])
+	}
+	cmd := partial.Build()
+
+	resp := c.client.Do(ctx, cmd)
+	return newIntCmd(resp)
+}
+
+func (c *Compat) HSetEXWithArgs(ctx context.Context, key string, options *HSetEXOptions, fieldsAndValues ...string) *IntCmd {
+	if options == nil {
+		return c.HSetEX(ctx, key, fieldsAndValues...)
+	}
+
+	var partial cmds.HsetexFieldValue
+	if options.Condition == HSetEXFNX {
+		if options.ExpirationType == HSetEXExpirationEX {
+			partial = c.client.B().Hsetex().Key(key).Fnx().Ex(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationPX {
+			partial = c.client.B().Hsetex().Key(key).Fnx().Px(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationEXAT {
+			partial = c.client.B().Hsetex().Key(key).Fnx().Exat(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationPXAT {
+			partial = c.client.B().Hsetex().Key(key).Fnx().Pxat(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationKEEPTTL {
+			partial = c.client.B().Hsetex().Key(key).Fnx().Keepttl().Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		}
+	} else if options.Condition == HSetEXFXX {
+		if options.ExpirationType == HSetEXExpirationEX {
+			partial = c.client.B().Hsetex().Key(key).Fxx().Ex(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationPX {
+			partial = c.client.B().Hsetex().Key(key).Fxx().Px(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationEXAT {
+			partial = c.client.B().Hsetex().Key(key).Fxx().Exat(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationPXAT {
+			partial = c.client.B().Hsetex().Key(key).Fxx().Pxat(options.ExpirationVal).Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		} else if options.ExpirationType == HSetEXExpirationKEEPTTL {
+			partial = c.client.B().Hsetex().Key(key).Fxx().Keepttl().Fields().Numfields(int64(len(fieldsAndValues) / 2)).FieldValue()
+		}
+	}
+
+	for i := 0; i < len(fieldsAndValues); i += 2 {
+		partial = partial.FieldValue(fieldsAndValues[i], fieldsAndValues[i+1])
+	}
+
+	cmd := partial.Build()
+	resp := c.client.Do(ctx, cmd)
+	return newIntCmd(resp)
+}
+
 func (c *Compat) BLPop(ctx context.Context, timeout time.Duration, keys ...string) *StringSliceCmd {
 	cmd := c.client.B().Blpop().Key(keys...).Timeout(float64(formatSec(timeout))).Build()
 	resp := c.client.Do(ctx, cmd)
@@ -1554,6 +1678,34 @@ func (c *Compat) BRPopLPush(ctx context.Context, source, destination string, tim
 	cmd := c.client.B().Brpoplpush().Source(source).Destination(destination).Timeout(float64(formatSec(timeout))).Build()
 	resp := c.client.Do(ctx, cmd)
 	return newStringCmd(resp)
+}
+
+func (c *Compat) LCS(ctx context.Context, q *LCSQuery) *LCSCmd {
+	var cmd cmds.Completed
+	var readType uint8
+
+	_cmd := cmds.Incomplete(c.client.B().Lcs().Key1(q.Key1).Key2(q.Key2))
+
+	if q.Len {
+		readType = uint8(2)
+		cmd = cmds.LcsKey2(_cmd).Len().Build()
+	} else if q.Idx {
+		readType = uint8(3)
+		if q.MinMatchLen > 0 && q.WithMatchLen {
+			cmd = cmds.LcsKey2(_cmd).Idx().Minmatchlen(int64(q.MinMatchLen)).Withmatchlen().Build()
+		} else if q.MinMatchLen > 0 {
+			cmd = cmds.LcsKey2(_cmd).Idx().Minmatchlen(int64(q.MinMatchLen)).Build()
+		} else if q.WithMatchLen {
+			cmd = cmds.LcsKey2(_cmd).Idx().Withmatchlen().Build()
+		} else {
+			cmd = cmds.LcsKey2(_cmd).Idx().Build()
+		}
+	} else {
+		readType = uint8(1)
+		cmd = cmds.LcsKey2(_cmd).Build()
+	}
+
+	return newLCSCmd(c.client.Do(ctx, cmd), readType)
 }
 
 func (c *Compat) LIndex(ctx context.Context, key string, index int64) *StringCmd {
@@ -2036,13 +2188,13 @@ func (c *Compat) XAutoClaimJustID(ctx context.Context, a XAutoClaimArgs) *XAutoC
 	return newXAutoClaimJustIDCmd(resp)
 }
 
-// xTrim If approx is true, add the "~" parameter, otherwise it is the default "=" (redis default).
+// xTrim If approx is true, add the "~" parameter; otherwise it is the default "=" (redis default).
 // example:
 //
 //	XTRIM key MAXLEN/MINID threshold LIMIT limit.
 //	XTRIM key MAXLEN/MINID ~ threshold LIMIT limit.
 //
-// The redis-server version is lower than 6.2, please set limit to 0.
+// The redis-server version is lower than 6.2, please set the limit to 0.
 func (c *Compat) xTrim(ctx context.Context, key, strategy string,
 	approx bool, threshold string, limit int64) *IntCmd {
 	cmd := c.client.B().Arbitrary("XTRIM").Keys(key).Args(strategy)
@@ -2617,6 +2769,10 @@ func (c *Compat) ClientUnblockWithError(ctx context.Context, id int64) *IntCmd {
 	return newIntCmd(c.client.Do(ctx, c.client.B().ClientUnblock().ClientId(id).Error().Build()))
 }
 
+func (c *Compat) ClientInfo(ctx context.Context) *ClientInfoCmd {
+	return newClientInfoCmd(c.client.Do(ctx, c.client.B().ClientInfo().Build()))
+}
+
 func (c *Compat) ConfigGet(ctx context.Context, parameter string) *StringStringMapCmd {
 	cmd := c.client.B().ConfigGet().Parameter(parameter).Build()
 	resp := c.client.Do(ctx, cmd)
@@ -2705,6 +2861,24 @@ func (c *Compat) ShutdownNoSave(ctx context.Context) *StatusCmd {
 	return c.doStringCmdPrimaries(ctx, func(c rueidis.Client) rueidis.Completed {
 		return c.B().Shutdown().Nosave().Build()
 	})
+}
+
+func (c *Compat) SlaveOf(ctx context.Context, host, port string) *StatusCmd {
+	cmd := c.client.B().Arbitrary("SLAVEOF").Args(host, port).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStatusCmd(resp)
+}
+
+func (c *Compat) SlowLogGet(ctx context.Context, num int64) *SlowLogCmd {
+	cmd := c.client.B().SlowlogGet().Count(num).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newSlowLogCmd(resp)
+}
+
+func (c *Compat) SlowLogReset(ctx context.Context) *StatusCmd {
+	cmd := c.client.B().SlowlogReset().Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStatusCmd(resp)
 }
 
 func (c *Compat) Time(ctx context.Context) *TimeCmd {
@@ -2830,9 +3004,7 @@ func (c *Compat) FunctionFlush(ctx context.Context) *StringCmd {
 }
 
 func (c *Compat) FunctionKill(ctx context.Context) *StringCmd {
-	return c.doStringCmdPrimaries(ctx, func(c rueidis.Client) rueidis.Completed {
-		return c.B().FunctionKill().Build()
-	})
+	return newStringCmd(c.client.Do(ctx, c.client.B().FunctionKill().Build()))
 }
 
 func (c *Compat) FunctionFlushAsync(ctx context.Context) *StringCmd {
@@ -2914,6 +3086,12 @@ func (c *Compat) PubSubShardNumSub(ctx context.Context, channels ...string) *Str
 	return newStringIntMapCmd(resp)
 }
 
+func (c *Compat) ClusterMyShardID(ctx context.Context) *StringCmd {
+	cmd := c.client.B().ClusterMyshardid().Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStringCmd(resp)
+}
+
 func (c *Compat) ClusterSlots(ctx context.Context) *ClusterSlotsCmd {
 	cmd := c.client.B().ClusterSlots().Build()
 	resp := c.client.Do(ctx, cmd)
@@ -2930,6 +3108,12 @@ func (c *Compat) ClusterNodes(ctx context.Context) *StringCmd {
 	cmd := c.client.B().ClusterNodes().Build()
 	resp := c.client.Do(ctx, cmd)
 	return newStringCmd(resp)
+}
+
+func (c *Compat) ClusterLinks(ctx context.Context) *ClusterLinksCmd {
+	cmd := c.client.B().ClusterLinks().Build()
+	resp := c.client.Do(ctx, cmd)
+	return newClusterLinksCmd(resp)
 }
 
 func (c *Compat) ClusterMeet(ctx context.Context, host string, port int64) *StatusCmd {
@@ -3160,10 +3344,66 @@ func (c *Compat) GeoHash(ctx context.Context, key string, members ...string) *St
 	return newStringSliceCmd(resp)
 }
 
+func (c *Compat) FunctionStats(ctx context.Context) *FunctionStatsCmd {
+	cmd := c.client.B().FunctionStats().Build()
+	resp := c.client.Do(ctx, cmd)
+	return newFunctionStatsCmd(resp)
+}
+
 func (c *Compat) ACLDryRun(ctx context.Context, username string, command ...any) *StringCmd {
 	cmd := c.client.B().AclDryrun().Username(username).Command(command[0].(string)).Arg(argsToSlice(command[1:])...).Build()
 	resp := c.client.Do(ctx, cmd)
 	return newStringCmd(resp)
+}
+
+type ACLCatArgs struct {
+	Category string
+}
+
+func (c *Compat) ACLCatArgs(ctx context.Context, options *ACLCatArgs) *StringSliceCmd {
+	// if there is a category passed, build new cmd, if there isn't - use the ACLCat method
+	if options != nil && options.Category != "" {
+		cmd := c.client.B().AclCat().Categoryname(options.Category).Build()
+		resp := c.client.Do(ctx, cmd)
+		return newStringSliceCmd(resp)
+	}
+	return c.ACLCat(ctx)
+}
+
+func (c *Compat) ACLLog(ctx context.Context, count int64) *ACLLogCmd {
+	cmd := c.client.B().AclLog().Count(count).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newACLLogCmd(resp)
+}
+
+func (c *Compat) ACLSetUser(ctx context.Context, username string, rules ...string) *StatusCmd {
+	cmd := c.client.B().AclSetuser().Username(username).Rule(rules...).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStatusCmd(resp)
+}
+
+func (c *Compat) ACLLogReset(ctx context.Context) *StatusCmd {
+	cmd := c.client.B().AclLog().Reset().Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStatusCmd(resp)
+}
+
+func (c *Compat) ACLCat(ctx context.Context) *StringSliceCmd {
+	cmd := c.client.B().AclCat().Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStringSliceCmd(resp)
+}
+
+func (c *Compat) ACLList(ctx context.Context) *StringSliceCmd {
+	cmd := c.client.B().AclList().Build()
+	resp := c.client.Do(ctx, cmd)
+	return newStringSliceCmd(resp)
+}
+
+func (c *Compat) ACLDelUser(ctx context.Context, username string) *IntCmd {
+	cmd := c.client.B().AclDeluser().Username(username).Build()
+	resp := c.client.Do(ctx, cmd)
+	return newIntCmd(resp)
 }
 
 func (c *Compat) doPrimaries(ctx context.Context, fn func(c rueidis.Client) error) error {
@@ -3615,7 +3855,7 @@ func (c *Compat) CMSMergeWithWeight(ctx context.Context, destKey string, sourceK
 	wCmd := (cmds.CmsMergeSource)(_cmd).Weights()
 	for _, k := range keys {
 		// weight should be integer
-		// we converts int64 to float64 to avoid API breaking change
+		// we convert int64 to float64 to avoid API breaking change
 		wCmd.Weight((float64)(sourceKeys[k]))
 	}
 	cmd := (cmds.CmsMergeWeightWeight)(wCmd).Build()
@@ -3791,7 +4031,7 @@ func (c *Compat) TSAdd(ctx context.Context, key string, timestamp interface{}, v
 }
 
 // TSAddWithArgs - Adds one or more observations to a t-digest sketch.
-// This function also allows for specifying additional options such as:
+// This function also allows for specifying additional options such as
 // Retention, ChunkSize, Encoding, DuplicatePolicy and Labels.
 // For more information - https://redis.io/commands/ts.add/
 func (c *Compat) TSAddWithArgs(ctx context.Context, key string, timestamp interface{}, value float64, options *TSOptions) *IntCmd {
@@ -3849,7 +4089,7 @@ func (c *Compat) TSCreate(ctx context.Context, key string) *StatusCmd {
 }
 
 // TSCreateWithArgs - Creates a new time-series key with additional options.
-// This function allows for specifying additional options such as:
+// This function allows for specifying additional options such as
 // Retention, ChunkSize, Encoding, DuplicatePolicy and Labels.
 // For more information - https://redis.io/commands/ts.create/
 func (c *Compat) TSCreateWithArgs(ctx context.Context, key string, options *TSOptions) *StatusCmd {
@@ -3896,7 +4136,7 @@ func (c *Compat) TSCreateWithArgs(ctx context.Context, key string, options *TSOp
 }
 
 // TSAlter - Alters an existing time-series key with additional options.
-// This function allows for specifying additional options such as:
+// This function allows for specifying additional options such as
 // Retention, ChunkSize and DuplicatePolicy.
 // For more information - https://redis.io/commands/ts.alter/
 func (c *Compat) TSAlter(ctx context.Context, key string, options *TSAlterOptions) *StatusCmd {
@@ -3974,8 +4214,8 @@ func (c *Compat) TSCreateRule(ctx context.Context, sourceKey string, destKey str
 	return newStatusCmd(c.client.Do(ctx, cmd))
 }
 
-// TSCreateRuleWithArgs - Creates a compaction rule from sourceKey to destKey with additional option.
-// This function allows for specifying additional option such as:
+// TSCreateRuleWithArgs - Creates a compaction rule from sourceKey to destKey with an additional option.
+// This function allows for specifying an additional option such as
 // AlignTimestamp.
 // For more information - https://redis.io/commands/ts.createrule/
 func (c *Compat) TSCreateRuleWithArgs(ctx context.Context, sourceKey string, destKey string, aggregator Aggregator, bucketDuration int, options *TSCreateRuleOptions) *StatusCmd {
@@ -4107,8 +4347,8 @@ func (c *Compat) TSDeleteRule(ctx context.Context, sourceKey string, destKey str
 	return newStatusCmd(c.client.Do(ctx, cmd))
 }
 
-// TSGetWithArgs - Gets the last sample of a time-series key with additional option.
-// This function allows for specifying additional option such as:
+// TSGetWithArgs - Gets the last sample of a time-series key with an additional option.
+// This function allows for specifying an additional option such as
 // Latest.
 // For more information - https://redis.io/commands/ts.get/
 func (c *Compat) TSGetWithArgs(ctx context.Context, key string, options *TSGetOptions) *TSTimestampValueCmd {
@@ -4862,22 +5102,42 @@ func (c *Compat) FTAggregateWithArgs(ctx context.Context, index string, query st
 		if options.Verbatim {
 			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Verbatim())
 		}
+		// [SCORER]
+		if options.Scorer != "" {
+			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Scorer(options.Scorer))
+		}
+		// [ADDSCORES]
+		if options.AddScores {
+			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Addscores())
+		}
 		// [LOAD count field [field ...]]
 		if options.LoadAll {
 			// LOAD *
 			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).LoadAll())
 		} else {
-			// LOAD
-			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Load(int64(len(options.Load))))
-			fields := make([]string, 0, len(options.Load))
-			for _, l := range options.Load {
-				fields = append(fields, l.Field)
+			totalFields := []string{}
+			for _, load := range options.Load {
+				totalFields = append(totalFields, load.Field)
+				if load.As != "" {
+					totalFields = append(totalFields, "AS", load.As)
+				}
 			}
-			_cmd = cmds.Incomplete(cmds.FtAggregateOpLoadLoad(_cmd).Field(fields...))
+
+			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Load(int64(len(totalFields))))
+			_cmd = cmds.Incomplete(cmds.FtAggregateOpLoadLoad(_cmd).Field(totalFields...))
 		}
 		// [TIMEOUT timeout]
 		if options.Timeout > 0 {
 			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Timeout(int64(options.Timeout)))
+		}
+		// [ APPLY expression AS name [ APPLY expression AS name ...]]
+		if options.Apply != nil {
+			for _, apply := range options.Apply {
+				_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Apply(apply.Field))
+				if apply.As != "" {
+					_cmd = cmds.Incomplete(cmds.FtAggregateOpApplyApply(_cmd).As(apply.As))
+				}
+			}
 		}
 		// [ GROUPBY nargs property [property ...] [ REDUCE function nargs arg [arg ...] [AS name] [ REDUCE function nargs arg [arg ...] [AS name] ...]] ...]]
 		if options.GroupBy != nil {
@@ -4899,7 +5159,7 @@ func (c *Compat) FTAggregateWithArgs(ctx context.Context, index string, query st
 		// [ SORTBY nargs [ property ASC | DESC [ property ASC | DESC ...]] [MAX num] [WITHCOUNT]
 		if options.SortBy != nil {
 			var numOfArgs int64 = 0
-			// count number of args to be passed in to cmds.FtAggregateQuery(_cmd).Sortby()
+			// count the number of args to be passed in to cmds.FtAggregateQuery(_cmd).Sortby()
 			for _, sortBy := range options.SortBy {
 				numOfArgs++
 				if sortBy.Asc && sortBy.Desc {
@@ -4929,16 +5189,9 @@ func (c *Compat) FTAggregateWithArgs(ctx context.Context, index string, query st
 			_cmd = cmds.Incomplete(cmds.FtAggregateOpSortbySortby(_cmd).Max(int64(options.SortByMax)))
 		}
 		// FIXME: go-redis doesn't provide WITHCOUNT option
-
-		// [ APPLY expression AS name [ APPLY expression AS name ...]]
-		if options.Apply != nil {
-			for _, apply := range options.Apply {
-				_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Apply(apply.Field).As(apply.As))
-			}
-		}
 		// [ LIMIT offset num]
-		if options.LimitOffset > 0 {
-			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Limit().OffsetNum(int64(options.Limit), int64(options.LimitOffset)))
+		if options.LimitOffset >= 0 && options.Limit > 0 {
+			_cmd = cmds.Incomplete(cmds.FtAggregateQuery(_cmd).Limit().OffsetNum(int64(options.LimitOffset), int64(options.Limit)))
 		}
 		// [FILTER filter]
 		if options.Filter != "" {
@@ -5010,9 +5263,9 @@ func (c *Compat) FTAliasUpdate(ctx context.Context, index string, alias string) 
 // For more information, please refer to the Redis documentation:
 // [FT.ALTER]: (https://redis.io/commands/ft.alter/)
 // see go-redis v9.7.0 https://github.com/redis/go-redis/blob/v9.7.0/search_commands.go#L815
-func (c *Compat) FTAlter(ctx context.Context, index string, skipInitalScan bool, definition []interface{}) *StatusCmd {
+func (c *Compat) FTAlter(ctx context.Context, index string, skipInitialScan bool, definition []interface{}) *StatusCmd {
 	_cmd := cmds.Incomplete(c.client.B().FtAlter().Index(index))
-	if skipInitalScan {
+	if skipInitialScan {
 		_cmd = cmds.Incomplete(cmds.FtAlterIndex(_cmd).Skipinitialscan())
 	}
 	if len(definition) != 2 {
@@ -5044,7 +5297,7 @@ func (c *Compat) FTConfigSet(ctx context.Context, option string, value interface
 
 // FTCreate - Creates a new index with the given options and schema.
 // The 'index' parameter specifies the name of the index to create.
-// The 'options' parameter specifies various options for the index, such as:
+// The 'options' parameter specifies various options for the index, such as
 // whether to index hashes or JSONs, prefixes, filters, default language, score, score field, payload field, etc.
 // The 'schema' parameter specifies the schema for the index, which includes the field name, field type, etc.
 // For more information, please refer to the Redis documentation:
@@ -5088,7 +5341,7 @@ func (c *Compat) FTCreate(ctx context.Context, index string, options *FTCreateOp
 			_cmd = cmds.Incomplete(cmds.FtCreateIndex(_cmd).PayloadField(options.PayloadField))
 		}
 		// [MAXTEXTFIELDS]
-		// FIXME: in go-reids, FTCreateOptions.MaxTextFields should be bool, not int
+		// FIXME: in go-redis, FTCreateOptions.MaxTextFields should be bool, not int
 		if options.MaxTextFields > 0 {
 			_cmd = cmds.Incomplete(cmds.FtCreateIndex(_cmd).Maxtextfields())
 		}
@@ -5307,7 +5560,7 @@ func (c *Compat) FTDropIndex(ctx context.Context, index string) *StatusCmd {
 }
 
 // FTDropIndexWithArgs - Deletes an index with options.
-// The 'index' parameter specifies the index to delete, and the 'options' parameter specifies the DeleteDocs option for docs deletion.
+// The 'index' parameter specifies the index to delete, and the 'options' parameter specifies the DeleteDocs option for doc deletion.
 // For more information, please refer to the Redis documentation:
 // [FT.DROPINDEX]: (https://redis.io/commands/ft.dropindex/)
 // see go-redis v9.7.0 https://github.com/redis/go-redis/blob/v9.7.0/search_commands.go#L1101
@@ -5359,7 +5612,7 @@ func (c *Compat) FTInfo(ctx context.Context, index string) *FTInfoCmd {
 }
 
 // FTSpellCheck - Checks a query string for spelling errors.
-// For more details about spellcheck query please follow:
+// For more details about a spellcheck query please follow:
 // https://redis.io/docs/interact/search-and-query/advanced-concepts/spellcheck/
 // For more information, please refer to the Redis documentation:
 // [FT.SPELLCHECK]: (https://redis.io/commands/ft.spellcheck/)
@@ -5370,7 +5623,7 @@ func (c *Compat) FTSpellCheck(ctx context.Context, index string, query string) *
 }
 
 // FTSpellCheckWithArgs - Checks a query string for spelling errors with additional options.
-// For more details about spellcheck query please follow:
+// For more details about a spellcheck query please follow:
 // https://redis.io/docs/interact/search-and-query/advanced-concepts/spellcheck/
 // For more information, please refer to the Redis documentation:
 // [FT.SPELLCHECK]: (https://redis.io/commands/ft.spellcheck/)
@@ -5550,7 +5803,7 @@ func (c *Compat) FTSearchWithArgs(ctx context.Context, index string, query strin
 		}
 		// [LIMIT offset num]
 		if options.LimitOffset >= 0 && options.Limit > 0 {
-			_cmd = cmds.Incomplete(cmds.FtSearchQuery(_cmd).Limit().OffsetNum(int64(options.Limit), int64(options.LimitOffset)))
+			_cmd = cmds.Incomplete(cmds.FtSearchQuery(_cmd).Limit().OffsetNum(int64(options.LimitOffset), int64(options.Limit)))
 		}
 		// [PARAMS nargs name value [ name value ...]]
 		if options.Params != nil {
@@ -5614,6 +5867,20 @@ func (c *Compat) FTTagVals(ctx context.Context, index string, field string) *Str
 	return newStringSliceCmd(c.client.Do(ctx, cmd))
 }
 
+func (c *Compat) ModuleLoadex(ctx context.Context, conf *ModuleLoadexConfig) *StringCmd {
+	cmd := c.client.B().ModuleLoadex().Path(conf.Path).Config()
+	for k, v := range conf.Conf {
+		cmd = cmd.Config(k, str(v))
+	}
+	var resp rueidis.RedisResult
+	if len(conf.Args) > 0 {
+		resp = c.client.Do(ctx, cmd.Args(argsToSlice(conf.Args)...).Build())
+	} else {
+		resp = c.client.Do(ctx, cmd.Build())
+	}
+	return newStringCmd(resp)
+}
+
 func (c CacheCompat) BitCount(ctx context.Context, key string, bitCount *BitCount) *IntCmd {
 	var resp rueidis.RedisResult
 	if bitCount == nil {
@@ -5658,6 +5925,15 @@ func (c CacheCompat) BitPosSpan(ctx context.Context, key string, bit, start, end
 		resp = c.client.DoCache(ctx, c.client.B().Bitpos().Key(key).Bit(bit).Start(start).End(end).Byte().Cache(), c.ttl)
 	}
 	return newIntCmd(resp)
+}
+
+func (c CacheCompat) BitFieldRO(ctx context.Context, key string, args ...any) *IntSliceCmd {
+	cmd := c.client.B().Arbitrary("BITFIELD_RO").Keys(key)
+	for i := 0; i < len(args); i += 2 {
+		cmd = cmd.Args("GET", str(args[i]), str(args[i+1]))
+	}
+	resp := c.client.DoCache(ctx, rueidis.Cacheable(cmd.ReadOnly()), c.ttl)
+	return newIntSliceCmd(resp)
 }
 
 func (c CacheCompat) EvalRO(ctx context.Context, script string, keys []string, args ...any) *Cmd {
@@ -5777,6 +6053,12 @@ func (c CacheCompat) HKeys(ctx context.Context, key string) *StringSliceCmd {
 
 func (c CacheCompat) HLen(ctx context.Context, key string) *IntCmd {
 	cmd := c.client.B().Hlen().Key(key).Cache()
+	resp := c.client.DoCache(ctx, cmd, c.ttl)
+	return newIntCmd(resp)
+}
+
+func (c CacheCompat) HStrLen(ctx context.Context, key, field string) *IntCmd {
+	cmd := c.client.B().Hstrlen().Key(key).Field(field).Cache()
 	resp := c.client.DoCache(ctx, cmd, c.ttl)
 	return newIntCmd(resp)
 }
@@ -6324,12 +6606,12 @@ func appendStructField(v reflect.Value) []string {
 			continue
 		}
 
-		// if its a nil pointer
+		// if it's a nil pointer
 		if field.Kind() == reflect.Pointer && field.IsNil() {
 			continue
 		}
 
-		// if its a valid pointer
+		// if it's a valid pointer
 		if field.Kind() == reflect.Pointer && field.Elem().CanInterface() {
 			dst = append(dst, name, str(field.Elem().Interface()))
 			continue

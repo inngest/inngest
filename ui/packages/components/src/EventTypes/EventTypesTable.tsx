@@ -1,12 +1,9 @@
-'use client';
-
-import { useCallback, useEffect, useMemo, useRef, useState, type UIEventHandler } from 'react';
-import type { Route } from 'next';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import {
@@ -17,9 +14,10 @@ import {
   type PageInfo,
 } from '@inngest/components/types/eventType';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
-import { useSearchParam } from '../hooks/useSearchParam';
+import { useSearchParam } from '../hooks/useSearchParams';
 import EventTypesStatusFilter from './EventTypesStatusFilter';
 import { useColumns } from './columns';
 
@@ -33,8 +31,8 @@ export function EventTypesTable({
   emptyActions: React.ReactNode;
   eventTypeActions: (props: Row<EventType>) => React.ReactElement;
   pathCreator: {
-    function: (params: { functionSlug: string }) => Route;
-    eventType: (params: { eventName: string }) => Route;
+    function: (params: { functionSlug: string }) => string;
+    eventType: (params: { eventName: string }) => string;
   };
   getEventTypes: ({
     cursor,
@@ -51,9 +49,9 @@ export function EventTypesTable({
     eventName: string;
   }) => Promise<Pick<EventType, 'volume' | 'name'>>;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const columns = useColumns({ pathCreator, eventTypeActions, getEventTypeVolume });
-  const [sorting, setSorting] = useState<SortingState>([
+  const [sorting] = useState<SortingState>([
     {
       id: 'name',
       desc: true,
@@ -149,21 +147,6 @@ export function EventTypesTable({
     }
   }, [mergedData]);
 
-  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
-    (event) => {
-      if (hasEventTypesData && hasNextPage) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }
-    },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData, isFetching]
-  );
-
   useEffect(() => {
     const sortEntry = sorting[0];
     if (!sortEntry) return;
@@ -187,7 +170,7 @@ export function EventTypesTable({
   }
 
   return (
-    <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+    <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 mx-3 flex h-11 items-center gap-1.5">
         <Search
           name="search"
@@ -201,7 +184,7 @@ export function EventTypesTable({
         />
         <EventTypesStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div className="flex-1 overflow-y-auto" ref={containerRef}>
         <Table
           columns={columns}
           data={mergedData || []}
@@ -221,8 +204,16 @@ export function EventTypesTable({
               }
             />
           }
-          onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
+          onRowClick={(row) =>
+            navigate({ to: pathCreator.eventType({ eventName: row.original.name }) })
+          }
           getRowHref={(row) => pathCreator.eventType({ eventName: row.original.name })}
+        />
+        <InfiniteScrollTrigger
+          onIntersect={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoading={isFetching || isFetchingNextPage}
+          root={containerRef.current}
         />
         {!hasNextPage &&
           hasEventTypesData &&

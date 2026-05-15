@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { RiAddFill, RiAlertFill, RiSubtractFill } from '@remixicon/react';
 

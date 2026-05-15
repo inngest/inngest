@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
+	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/urfave/cli/v3"
 )
@@ -42,12 +45,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	portStr := localconfig.GetValue(cmd, "port", "8288")
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	port := localconfig.GetIntValue(cmd, "port", api.DefaultAPIPort)
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
@@ -66,35 +64,20 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	retryInterval := localconfig.GetIntValue(cmd, "retry-interval", 0)
 	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers)
 	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
+	persist := localconfig.GetBoolValue(cmd, "persist", false)
+	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
+
+	debugAPIPort := localconfig.GetIntValue(cmd, "debug-api-port", devserver.DefaultDebugAPIPort)
+
 	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
-	inMemory := localconfig.GetBoolValue(cmd, "in-memory", true)
+	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
+	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
 
-	traceEndpoint := fmt.Sprintf("localhost:%d", port)
-	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseUserTracer(ctx)
-	}()
-
-	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing-system",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces/system",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseSystemTracer(ctx)
-	}()
+	postgresURI := localconfig.GetValue(cmd, "postgres-uri", "")
+	postgresMaxIdleConns := localconfig.GetIntValue(cmd, "postgres-max-idle-conns", 10)
+	postgresMaxOpenConns := localconfig.GetIntValue(cmd, "postgres-max-open-conns", 100)
+	postgresConnMaxIdleTime := localconfig.GetIntValue(cmd, "postgres-conn-max-idle-time", 5)
+	postgresConnMaxLifetime := localconfig.GetIntValue(cmd, "postgres-conn-max-lifetime", 30)
 
 	conf.ServerKind = headers.ServerKindDev
 
@@ -109,8 +92,65 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		URLs:               urls,
 		ConnectGatewayPort: connectGatewayPort,
 		ConnectGatewayHost: conf.CoreAPI.Addr,
-		InMemory:           inMemory,
+		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
+			ctx,
+			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
+			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
+		),
+		Persist:                 persist,
+		SQLiteDir:               sqliteDir,
+		PostgresURI:             postgresURI,
+		PostgresMaxIdleConns:    postgresMaxIdleConns,
+		PostgresMaxOpenConns:    postgresMaxOpenConns,
+		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
+		PostgresConnMaxLifetime: postgresConnMaxLifetime,
+		DebugAPIPort:            debugAPIPort,
 	}
+
+	l := logger.StdlibLogger(ctx)
+
+	opts, changes, err := devserver.ResolvePortConflicts(opts)
+	if err != nil {
+		return err
+	}
+	for _, change := range changes {
+		l.Info(
+			"Port conflict, using new port",
+			"name", change.Name,
+			"from", change.From,
+			"to", change.To,
+		)
+	}
+
+	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
+	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
+		ServiceName:   "tracing",
+		TraceEndpoint: traceEndpoint,
+		TraceURLPath:  "/dev/traces",
+		Type:          itrace.TracerTypeOTLPHTTP,
+	}); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = itrace.CloseUserTracer(ctx)
+	}()
+
+	systemTraceEndpoint := localconfig.GetValue(cmd, "system-trace-endpoint", traceEndpoint)
+	systemTraceURLPath := localconfig.GetValue(cmd, "system-trace-url-path", "/dev/traces/system")
+
+	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
+		ServiceName:   "tracing-system",
+		TraceEndpoint: systemTraceEndpoint,
+		TraceURLPath:  systemTraceURLPath,
+		Type:          itrace.TracerTypeOTLPHTTP,
+	}); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = itrace.CloseSystemTracer(ctx)
+	}()
 
 	err = devserver.New(ctx, opts)
 	if err != nil {

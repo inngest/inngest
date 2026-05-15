@@ -12,7 +12,7 @@ export const eventsQuery = graphql(`
     $endTime: Time
     $celQuery: String = null
     $eventNames: [String!] = null
-    $includeInternalEvents: Boolean = true
+    $includeInternalEvents: Boolean = false
   ) {
     environment: workspace(id: $envID) {
       eventsV2(
@@ -73,14 +73,11 @@ export function useEvents() {
     async ({
       cursor,
       endTime,
-      source,
       eventNames,
       startTime,
       celQuery,
       includeInternalEvents,
     }: EventsQueryVariables) => {
-      // TODO: use params when available in the API
-      console.log(source);
       const result = await client
         .query(
           eventsQuery,
@@ -93,7 +90,7 @@ export function useEvents() {
             eventNames,
             includeInternalEvents,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -125,7 +122,7 @@ export function useEvents() {
         totalCount: eventsData.totalCount,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -160,7 +157,7 @@ export function useEventDetails() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -176,10 +173,12 @@ export function useEventDetails() {
       return {
         ...eventData,
         receivedAt: new Date(eventData.receivedAt),
-        occurredAt: eventData.occurredAt ? new Date(eventData.occurredAt) : undefined,
+        occurredAt: eventData.occurredAt
+          ? new Date(eventData.occurredAt)
+          : undefined,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -206,7 +205,7 @@ export function useEventPayload() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -221,7 +220,7 @@ export function useEventPayload() {
       const eventData = result.data.environment.eventV2.raw;
       return { payload: eventData };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -238,6 +237,10 @@ const eventRunsQuery = graphql(`
           function {
             name
             slug
+          }
+          trace(preview: true) {
+            skipReason
+            skipExistingRunID
           }
         }
       }
@@ -258,7 +261,7 @@ export function useEventRuns() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -280,9 +283,11 @@ export function useEventRuns() {
           id: run.id,
           completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
           startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+          skipReason: run.trace?.skipReason ?? undefined,
+          skipExistingRunID: run.trace?.skipExistingRunID ?? undefined,
         })),
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }

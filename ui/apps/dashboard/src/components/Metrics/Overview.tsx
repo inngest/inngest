@@ -172,7 +172,9 @@ export const MetricsOverview = ({
       </div>
       {overviewOpen && (
         <>
-          {error && <Error message="There was an error fetching overview metrics data." />}
+          {error && (
+            <Error message="There was an error fetching overview metrics data." />
+          )}
           <div className="relative flex w-full flex-row flex-wrap items-center justify-start gap-2 overflow-hidden md:flex-nowrap">
             <FunctionStatus totals={data?.workspace.totals} />
             <FailedFunctions

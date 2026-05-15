@@ -3,13 +3,14 @@ package golang
 import (
 	"context"
 	"fmt"
-	"github.com/inngest/inngest/tests/client"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/tests/client"
+
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -46,11 +47,13 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency",
-			Concurrency: []inngestgo.ConfigStepConcurrency{
-				{
-					Limit: 1,
-					Scope: enums.ConcurrencyScopeAccount,
-					Key:   inngestgo.StrPtr("'global'"),
+			Concurrency: &inngestgo.ConfigConcurrency{
+				Step: []inngestgo.ConfigStepConcurrency{
+					{
+						Limit: 1,
+						Scope: enums.ConcurrencyScopeAccount,
+						Key:   inngestgo.StrPtr("'global'"),
+					},
 				},
 			},
 		},
@@ -62,11 +65,13 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency-v2",
-			Concurrency: []inngestgo.ConfigStepConcurrency{
-				{
-					Limit: 1,
-					Scope: enums.ConcurrencyScopeAccount,
-					Key:   inngestgo.StrPtr("'global'"),
+			Concurrency: &inngestgo.ConfigConcurrency{
+				Step: []inngestgo.ConfigStepConcurrency{
+					{
+						Limit: 1,
+						Scope: enums.ConcurrencyScopeAccount,
+						Key:   inngestgo.StrPtr("'global'"),
+					},
 				},
 			},
 		},
@@ -100,5 +105,5 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&total) == 6
-	}, redis_state.PartitionConcurrencyLimitRequeueExtension/2, time.Millisecond*10)
+	}, queue.PartitionConcurrencyLimitRequeueExtension/2, time.Millisecond*10)
 }

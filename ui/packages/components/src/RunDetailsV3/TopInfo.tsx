@@ -12,9 +12,10 @@ import {
   SkeletonElement,
   TextElement,
   TimeElement,
-} from '../DetailsCard/NewElement';
+} from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -22,13 +23,17 @@ import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
+import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
+import type { Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
   getTrigger: (runID: string) => Promise<Trigger>;
   result?: TraceResult;
   runID: string;
+  resultLoading?: boolean;
+  trace?: Trace;
 };
 
 export type Trigger = {
@@ -79,7 +84,14 @@ export const actionConfigs = (
   };
 };
 
-export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
+export const TopInfo = ({
+  slug,
+  getTrigger,
+  runID,
+  result,
+  resultLoading,
+  trace,
+}: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
@@ -97,6 +109,9 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
     }, [getTrigger, runID]),
     retry: 3,
   });
+
+  const { booleanFlag } = useBooleanFlag();
+  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
 
   const prettyPayload = useMemo(() => {
     try {
@@ -255,7 +270,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         title="Function Payload"
                         raw={prettyPayload}
                         actions={codeBlockActions}
-                        loading={isPending}
+                        loading={isPending || resultLoading}
                       />
                     ),
                   },
@@ -266,7 +281,9 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                   {
                     label: 'Output',
                     id: 'output',
-                    node: <IO title="Output" raw={prettyOutput} loading={isPending} />,
+                    node: (
+                      <IO title="Output" raw={prettyOutput} loading={isPending || resultLoading} />
+                    ),
                   },
                 ]
               : []),
@@ -280,9 +297,18 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         title={result.error.message || 'Unknown error'}
                         raw={prettyErrorBody ?? ''}
                         error={true}
-                        loading={isPending}
+                        loading={isPending || resultLoading}
                       />
                     ),
+                  },
+                ]
+              : []),
+            ...(metadataIsEnabled && trace?.metadata?.length
+              ? [
+                  {
+                    label: 'Metadata',
+                    id: 'metadata',
+                    node: <MetadataAttrs metadata={trace.metadata} />,
                   },
                 ]
               : []),

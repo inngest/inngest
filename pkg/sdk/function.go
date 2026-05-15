@@ -23,6 +23,9 @@ type SDKFunction struct {
 	// This may be an int OR a struct, for backwards compatibility.
 	Concurrency *inngest.ConcurrencyLimits `json:"concurrency,omitempty"`
 
+	// Checkpoint represents checkpoint config.
+	Checkpoint *inngest.Checkpoint `json:"checkpoint,omitempty"`
+
 	// Priority represents the priority information for this function.
 	Priority *inngest.Priority `json:"priority,omitempty"`
 
@@ -75,6 +78,7 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		RateLimit:   s.RateLimit,
 		Throttle:    s.Throttle,
 		Cancel:      s.Cancel,
+		Checkpoint:  s.Checkpoint,
 		Debounce:    s.Debounce,
 		Timeouts:    s.Timeouts,
 		Singleton:   s.Singleton,

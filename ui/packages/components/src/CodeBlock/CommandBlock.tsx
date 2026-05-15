@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
@@ -13,7 +11,7 @@ import {
 } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { type editor } from 'monaco-editor';
+import type { editor } from 'monaco-editor';
 
 import { isDark } from '../utils/theme';
 
@@ -132,7 +130,7 @@ CommandBlock.Header = ({
   return <div className={cn('border-subtle border-b', className)}>{children}</div>;
 };
 
-CommandBlock.CopyButton = ({ content }: { content?: string }) => {
+function CommandBlockCopyButton({ content }: { content?: string }) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
   return (
     <CopyButton
@@ -143,7 +141,8 @@ CommandBlock.CopyButton = ({ content }: { content?: string }) => {
       appearance="outlined"
     />
   );
-};
+}
+CommandBlock.CopyButton = CommandBlockCopyButton;
 
 CommandBlock.Tabs = ({
   tabs,

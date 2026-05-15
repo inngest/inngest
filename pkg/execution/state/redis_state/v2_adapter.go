@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -39,10 +39,12 @@ func runServiceV2(m statev1.Manager, opts mgrV2Opts) (state.RunService, error) {
 	return v2, nil
 }
 
-type MgrV2Opt func(o *mgrV2Opts)
-type mgrV2Opts struct {
-	disabledRetries bool
-}
+type (
+	MgrV2Opt  func(o *mgrV2Opts)
+	mgrV2Opts struct {
+		disabledRetries bool
+	}
+)
 
 func WithDisabledRetries() MgrV2Opt {
 	return func(o *mgrV2Opts) {
@@ -81,6 +83,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			ReplayID:              s.Metadata.Config.ReplayID,
 			PriorityFactor:        s.Metadata.Config.PriorityFactor,
 			CustomConcurrencyKeys: s.Metadata.Config.CustomConcurrencyKeys,
+			Semaphores:            s.Metadata.Config.Semaphores,
 			BatchID:               s.Metadata.Config.BatchID,
 		},
 		EventBatchData: batchData,
@@ -88,27 +91,41 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		SpanID:         s.Metadata.Config.SpanID,
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
+		RequestVersion: &s.Metadata.Config.RequestVersion,
 	})
 	switch err {
 	case nil:
 		// no-op continue
 	case statev1.ErrIdentifierExists:
 		s.Metadata.ID.RunID = st.RunID()
-		st, err := v.LoadState(ctx, s.Metadata.ID)
+		// NOTE:  Idempotency keys are non-transactional, so we want to retry this LoadState
+		// call up to 3 times, to ensure that the original thread between saving idempotency
+		// keys and saving state is set.
+		st, err := util.WithRetry(
+			ctx,
+			"load-state",
+			func(ctx context.Context) (state.State, error) {
+				return v.LoadState(ctx, s.Metadata.ID)
+			},
+			util.RetryConf{
+				MaxAttempts:    3,
+				InitialBackoff: 25 * time.Millisecond,
+				MaxBackoff:     150 * time.Millisecond,
+			},
+		)
 		if err != nil {
-			return state.State{}, err
+			// If the run already completed and was GC'd, we still know the
+			// identifier exists.  Return ErrIdentifierExists with whatever
+			// metadata we have (the run ID was already extracted above).
+			return state.State{Metadata: s.Metadata}, statev1.ErrIdentifierExists
 		}
 		return st, statev1.ErrIdentifierExists
+	case statev1.ErrIdentifierTombstone:
+		s.Metadata.ID.RunID = st.RunID()
+		return state.State{Metadata: s.Metadata}, statev1.ErrIdentifierTombstone
 	default:
 		return state.State{}, err
 	}
-
-	metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
-		PkgName: "redis_state",
-		Tags: map[string]any{
-			"account_id": s.Metadata.ID.Tenant.AccountID,
-		},
-	})
 
 	// XXX: We do the exact same size calculations done in `mgr.New` to return a v2 state without changing the v1 interface.
 	var stepsByt []byte
@@ -143,11 +160,22 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			AccountID: s.Metadata.ID.Tenant.AccountID,
 		},
 	}
+	stateSize := len(events) + len(stepsByt) + len(stepInputsByt)
 	metadata.Metrics = state.RunMetrics{
 		EventSize: len(events),
-		StateSize: len(events) + len(stepsByt) + len(stepInputsByt),
+		StateSize: stateSize,
 		StepCount: len(s.Steps),
 	}
+
+	metrics.IncrStateWrittenCounter(ctx, stateSize, metrics.CounterOpt{
+		PkgName: "redis_state",
+		Tags: map[string]any{
+			"account_id": s.Metadata.ID.Tenant.AccountID,
+		},
+	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(stateSize), metrics.HistogramOpt{
+		PkgName: "redis_state",
+	})
 
 	steps := make(map[string]json.RawMessage)
 	for _, step := range s.Steps {
@@ -162,11 +190,12 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
 // for the run from the store.  Nothing referencing the run should exist in the state
 // store after.
-func (v v2) Delete(ctx context.Context, id state.ID) (bool, error) {
+func (v v2) Delete(ctx context.Context, id state.ID) error {
 	return v.mgr.Delete(ctx, statev1.Identifier{
-		RunID:      id.RunID,
-		WorkflowID: id.FunctionID,
-		AccountID:  id.Tenant.AccountID,
+		RunID:       id.RunID,
+		WorkflowID:  id.FunctionID,
+		AccountID:   id.Tenant.AccountID,
+		WorkspaceID: id.Tenant.EnvID,
 	})
 }
 
@@ -174,14 +203,32 @@ func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {
 	return v.mgr.Exists(ctx, id.Tenant.AccountID, id.RunID)
 }
 
+func (v v2) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer, error) {
+	return v.mgr.LoadDefers(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+func (v v2) LoadDefersMeta(ctx context.Context, id state.ID) (map[string]state.DeferMeta, error) {
+	return v.mgr.LoadDefersMeta(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
 // LoadEvents returns all events for a run.
 func (v v2) LoadEvents(ctx context.Context, id state.ID) ([]json.RawMessage, error) {
 	return v.mgr.LoadEvents(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
-// LoadEvents returns all events for a run.
+// LoadSteps returns all steps for a run.
 func (v v2) LoadSteps(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
 	return v.mgr.LoadSteps(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+// LoadStepInputs returns only the step inputs for a run.
+func (v v2) LoadStepInputs(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
+	return v.mgr.LoadStepInputs(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+// LoadStepsWithIDs returns a list of steps with the given IDs for a run.
+func (v v2) LoadStepsWithIDs(ctx context.Context, id state.ID, stepIDs []string) (map[string]json.RawMessage, error) {
+	return v.mgr.LoadStepsWithIDs(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, stepIDs)
 }
 
 // LoadState returns all state for a run.
@@ -209,9 +256,16 @@ func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 	return state, nil
 }
 
-// StreamState returns all state without loading in-memory
-func (v v2) StreamState(ctx context.Context, id state.ID) (io.Reader, error) {
-	return nil, fmt.Errorf("not implemented")
+func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
+	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
+}
+
+func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
+	return v.mgr.SetDeferStatus(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hashedID, status)
+}
+
+func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
+	return v.mgr.SaveRejectedDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, fnSlug, hashedID)
 }
 
 // Metadata returns metadata for a given run
@@ -253,15 +307,18 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			OriginalRunID:         md.Identifier.OriginalRunID,
 			PriorityFactor:        md.Identifier.PriorityFactor,
 			CustomConcurrencyKeys: md.Identifier.CustomConcurrencyKeys,
+			Semaphores:            md.Identifier.Semaphores,
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
 			HasAI:                 md.HasAI,
 		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
-			EventSize: md.EventSize,
-			StateSize: md.StateSize,
-			StepCount: md.StepCount,
+			EventSize:          md.EventSize,
+			StateSize:          md.StateSize,
+			StepCount:          md.StepCount,
+			MetadataSize:       md.MetadataSize,
+			MetadataSizeLoaded: md.MetadataSize,
 		},
 	}
 
@@ -269,6 +326,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 	_ = result.Config.FunctionTrace()
 
 	return result, nil
+}
+
+// LoadStack returns the current stack for a run.
+func (v v2) LoadStack(ctx context.Context, id state.ID) ([]string, error) {
+	return v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)
 }
 
 // Update updates configuration on the state, eg. setting the execution
@@ -351,6 +413,9 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 			"account_id": id.Tenant.AccountID,
 		},
 	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(len(data)), metrics.HistogramOpt{
+		PkgName: "redis_state",
+	})
 
 	return hasPending, err
 }
@@ -376,12 +441,32 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 	return err
 }
 
+// ConsumePause consumes a pause by its ID such that it can't be used again.
+func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.ConsumePauseOpts) (statev1.ConsumePauseResult, error) {
+	r, err := util.WithRetry(
+		ctx,
+		"state.ConsumePause",
+		func(ctx context.Context) (statev1.ConsumePauseResult, error) {
+			res, err := v.mgr.ConsumePause(ctx, p, opts)
+			return res, err
+		},
+		v.retryPolicy(),
+	)
+
+	return r, err
+}
+
+// IncrementMetadataSize atomically increments the cumulative metadata size
+// counter for a run via HINCRBY.
+func (v v2) IncrementMetadataSize(ctx context.Context, id state.ID, delta int) error {
+	return v.mgr.IncrementMetadataSize(ctx, id.Tenant.AccountID, id.RunID, delta)
+}
+
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {
 	if v.disabledRetries {
-		return util.NewRetryConf(util.WithRetryConfMaxAttempts(1))
+		opts = append(opts, util.WithRetryConfMaxAttempts(1))
 	}
-	val := util.NewRetryConf(opts...)
-	return val
+	return util.NewRetryConf(opts...)
 }
 
 // determine what errors are retriable

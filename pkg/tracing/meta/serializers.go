@@ -4,14 +4,15 @@ package meta
 
 import (
 	"context"
+	"encoding"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"reflect"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -21,13 +22,19 @@ import (
 var BlankAttr = attribute.String("", "")
 
 type SerializableAttrs struct {
-	es    *util.ErrSet
-	Attrs []SerializableAttr
+	es     *util.ErrSet
+	Attrs  []SerializableAttr
+	keyMap map[string]int // maps key to index in Attrs slice
 }
 
 func NewAttrSet(attrs ...SerializableAttr) *SerializableAttrs {
+	keyMap := make(map[string]int)
+	for i, attr := range attrs {
+		keyMap[attr.key] = i
+	}
 	return &SerializableAttrs{
-		Attrs: attrs,
+		Attrs:  attrs,
+		keyMap: keyMap,
 	}
 }
 
@@ -37,17 +44,51 @@ type SerializableAttr struct {
 	value     any
 }
 
+// AddAttr adds an attribute to a set.  If the attribute key exists,
+// the value will be replaced.
 func AddAttr[T any](r *SerializableAttrs, attr attr[T], value T) {
-	r.Attrs = append(r.Attrs, Attr(attr, value))
+	if r.keyMap == nil {
+		r.keyMap = make(map[string]int)
+	}
+
+	if idx, exists := r.keyMap[attr.key]; exists {
+		r.Attrs[idx].value = value
+		return
+	}
+
+	newAttr := Attr(attr, value)
+	r.keyMap[attr.key] = len(r.Attrs)
+	r.Attrs = append(r.Attrs, newAttr)
 }
 
 func AddAttrIfUnset[T any](r *SerializableAttrs, attr attr[T], value T) {
-	for _, attrs := range r.Attrs {
-		if attrs.key == attr.key {
-			return
+	if r.keyMap == nil {
+		r.keyMap = make(map[string]int)
+	}
+
+	if _, exists := r.keyMap[attr.key]; exists {
+		return
+	}
+
+	newAttr := Attr(attr, value)
+	r.keyMap[attr.key] = len(r.Attrs)
+	r.Attrs = append(r.Attrs, newAttr)
+}
+
+func GetAttr[T any](r *SerializableAttrs, attr attr[*T]) (*T, bool) {
+	// Attributes that are applied later will override earlier ones, so we
+	// iterate in reverse order.
+	for i := len(r.Attrs) - 1; i >= 0; i-- {
+		if r.Attrs[i].key == attr.Key() {
+			if val, ok := r.Attrs[i].value.(T); ok {
+				return &val, true
+			}
+
+			return nil, false
 		}
 	}
-	r.Attrs = append(r.Attrs, Attr(attr, value))
+
+	return nil, false
 }
 
 func (r *SerializableAttrs) AddErr(err error) {
@@ -56,6 +97,13 @@ func (r *SerializableAttrs) AddErr(err error) {
 	}
 
 	r.es.Add(err)
+}
+
+func (r *SerializableAttrs) Get(name string) any {
+	if idx, ok := r.keyMap[name]; ok {
+		return r.Attrs[idx].value
+	}
+	return nil
 }
 
 func (r *SerializableAttrs) Merge(other *SerializableAttrs) *SerializableAttrs {
@@ -67,9 +115,17 @@ func (r *SerializableAttrs) Merge(other *SerializableAttrs) *SerializableAttrs {
 		es = r.es.Merge(o.es)
 	}
 
+	// Merge the attributes and rebuild the keyMap
+	mergedAttrs := append(r.Attrs, o.Attrs...)
+	keyMap := make(map[string]int)
+	for i, attr := range mergedAttrs {
+		keyMap[attr.key] = i
+	}
+
 	return &SerializableAttrs{
-		es:    es,
-		Attrs: append(r.Attrs, o.Attrs...),
+		es:     es,
+		Attrs:  mergedAttrs,
+		keyMap: keyMap,
 	}
 }
 
@@ -125,6 +181,10 @@ func (a attr[T]) DeserializeValue(v any) (any, bool) {
 	return a.deserialize(v)
 }
 
+func (a attr[T]) DeserializeTypedValue(v any) (T, bool) {
+	return a.deserialize(v)
+}
+
 func Attr[T any](attr attr[T], value T) SerializableAttr {
 	return SerializableAttr{
 		serialize: func(v any) (attribute.KeyValue, bool) {
@@ -169,6 +229,50 @@ func StringAttr(key string) attr[*string] {
 		deserialize: func(v any) (*string, bool) {
 			s, ok := v.(string)
 			return &s, ok
+		},
+	}
+}
+
+func TruncatedStringAttr(key string, length int) attr[*string] {
+	return attr[*string]{
+		key: withPrefix(key),
+		serialize: func(v *string) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			str := *v
+			if len(str) > length {
+				str = str[:length]
+			}
+
+			return attribute.String(withPrefix(key), str)
+		},
+		deserialize: func(v any) (*string, bool) {
+			s, ok := v.(string)
+			if ok && len(s) > length {
+				s = s[:length]
+			}
+			return &s, ok
+		},
+	}
+}
+
+// StringishAttr is a generic attribute serializer for types that are derived from string.
+func StringishAttr[T ~string](key string) attr[*T] {
+	return attr[*T]{
+		key: withPrefix(key),
+		serialize: func(v *T) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			return attribute.String(withPrefix(key), string(*v))
+		},
+		deserialize: func(v any) (*T, bool) {
+			s, ok := v.(string)
+			tStr := T(s)
+			return &tStr, ok
 		},
 	}
 }
@@ -225,7 +329,10 @@ func TimeAttr(key string) attr[*time.Time] {
 				return BlankAttr
 			}
 
-			return attribute.Int64(withPrefix(key), v.UnixMilli())
+			return attribute.String(
+				withPrefix(key),
+				fmt.Sprintf("%d", v.UnixMilli()),
+			)
 		},
 		deserialize: func(v any) (*time.Time, bool) {
 			switch v := v.(type) {
@@ -238,6 +345,9 @@ func TimeAttr(key string) attr[*time.Time] {
 			case string:
 				if f, err := strconv.ParseFloat(v, 64); err == nil {
 					t := time.UnixMilli(int64(f))
+					return &t, true
+				}
+				if t, err := dateutil.Parse(v); err == nil {
 					return &t, true
 				}
 			}
@@ -327,7 +437,22 @@ func IntAttr(key string) attr[*int] {
 			return attribute.Int(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*int, bool) {
-			if i, ok := v.(float64); ok {
+			// NOTE: Sometimes we may need to typecast from (string, *string) -> int in order
+			// to properly fill our values when reading a Map(string, string) from clickhouse.
+			switch i := v.(type) {
+			case string:
+				val, err := strconv.Atoi(i)
+				if err != nil {
+					return nil, false
+				}
+				return &val, true
+			case *string:
+				val, err := strconv.Atoi(*i)
+				if err != nil {
+					return nil, false
+				}
+				return &val, true
+			case float64:
 				val := int(i)
 				return &val, true
 			}
@@ -343,6 +468,12 @@ func StepStatusAttr(key string) attr[*enums.StepStatus] {
 		serialize: func(v *enums.StepStatus) attribute.KeyValue {
 			if v == nil {
 				return BlankAttr
+			}
+
+			// NOTE: For legacy reasons, we use StepStatusScheduled,
+			// however this must be represented as 'Queued' in traces.
+			if *v == enums.StepStatusScheduled {
+				return attribute.String(withPrefix(key), enums.StepStatusQueued.String())
 			}
 
 			return attribute.String(withPrefix(key), v.String())
@@ -381,23 +512,55 @@ func StepOpAttr(key string) attr[*enums.Opcode] {
 	}
 }
 
-func HttpHeaderAttr(key string) attr[*http.Header] {
-	return attr[*http.Header]{
+// TextAttr is a generic attribute serializer for types that implement
+// encoding.TextMarshaler and encoding.TextUnmarshaler. This includes enum types
+// generated by github.com/dmarkham/enumer.
+func TextAttr[T any, TPtr interface {
+	*T
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+}](key string) attr[*T] {
+	return attr[*T]{
 		key: withPrefix(key),
-		serialize: func(v *http.Header) attribute.KeyValue {
-			if v == nil || len(*v) == 0 {
+		serialize: func(v *T) attribute.KeyValue {
+			if v == nil {
 				return BlankAttr
 			}
 
-			headerByt, _ := json.Marshal(v)
+			text, _ := ((TPtr)(v)).MarshalText()
 
-			return attribute.String(withPrefix(key), string(headerByt))
+			return attribute.String(withPrefix(key), string(text))
 		},
-		deserialize: func(v any) (*http.Header, bool) {
-			if headerStr, ok := v.(string); ok {
-				var headers http.Header
-				if err := json.Unmarshal([]byte(headerStr), &headers); err == nil {
-					return &headers, true
+		deserialize: func(v any) (*T, bool) {
+			if str, ok := v.(string); ok {
+				var ret T
+				if err := (TPtr)(&ret).UnmarshalText([]byte(str)); err == nil {
+					return &ret, true
+				}
+			}
+
+			return nil, false
+		},
+	}
+}
+
+func JsonAttr[T any](key string) attr[*T] {
+	return attr[*T]{
+		key: withPrefix(key),
+		serialize: func(v *T) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			byt, _ := json.Marshal(v)
+
+			return attribute.String(withPrefix(key), string(byt))
+		},
+		deserialize: func(v any) (*T, bool) {
+			if str, ok := v.(string); ok {
+				var req T
+				if err := json.Unmarshal([]byte(str), &req); err == nil {
+					return &req, true
 				}
 			}
 

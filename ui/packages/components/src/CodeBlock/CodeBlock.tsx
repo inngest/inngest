@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -13,15 +11,21 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
-import { type editor } from 'monaco-editor';
-import { useLocalStorage } from 'react-use';
+import {
+  RiCollapseDiagonalLine,
+  RiDownload2Line,
+  RiEdit2Line,
+  RiExpandDiagonalLine,
+} from '@remixicon/react';
+import type { editor } from 'monaco-editor';
+import useLocalStorage from 'react-use/esm/useLocalStorage';
 
 import { Fullscreen } from '../Fullscreen/Fullscreen';
 import { isDark } from '../utils/theme';
 
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
 const MAX_LINES = 10;
+const EMPTY_INPUT = JSON.stringify({ data: {} }, null, 2);
 
 const LoadingIndicator = () => (
   <div className="bg-codeEditor flex h-full w-full items-center justify-center">
@@ -75,6 +79,7 @@ export function CodeBlock({
   const [fullScreen, setFullScreen] = useState(false);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [editEmtpy, setEditEmtpy] = useState(false);
 
   const [isWordWrap, setIsWordWrap] = useLocalStorage('isWordWrap', false);
   const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', false);
@@ -343,10 +348,10 @@ export function CodeBlock({
               ref={wrapperRef}
               className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-screen')}
             >
-              {isOutputTooLarge ? (
+              {isOutputTooLarge && !editEmtpy ? (
                 <>
                   <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
-                  <div className="flex h-24 items-center justify-center	">
+                  <div className="flex h-24 flex-row items-center justify-center gap-2	">
                     <Button
                       label="Download Raw"
                       icon={<RiDownload2Line />}
@@ -354,6 +359,15 @@ export function CodeBlock({
                       appearance="outlined"
                       kind="secondary"
                     />
+                    {!readOnly && (
+                      <Button
+                        label="Add New Input"
+                        icon={<RiEdit2Line />}
+                        onClick={() => setEditEmtpy(true)}
+                        appearance="outlined"
+                        kind="secondary"
+                      />
+                    )}
                   </div>
                 </>
               ) : loading ? (
@@ -369,8 +383,8 @@ export function CodeBlock({
                 <Editor
                   className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
                   height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
-                  defaultLanguage={language}
-                  value={content}
+                  language={language}
+                  value={editEmtpy ? EMPTY_INPUT : content}
                   theme="inngest-theme"
                   loading={<LoadingIndicator />}
                   options={{

@@ -33,6 +33,7 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
     - [4.3.2](#432-syncing). Syncing
     - [4.3.3](#433-handling-failure). Handling failure
     - [4.3.4](#434-handling-success). Handling success
+    - [4.3.5](#435-in-band-sync). In-Band Sync
   - [4.4](#44-call-requests). Call Requests
     - [4.4.1](#441-receiving-a-call-request). Receiving a Call Request
     - [4.4.2](#442-retrieving-the-full-payload). Retrieving the full payload
@@ -51,6 +52,9 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
     - [5.3.2](#532-sleep). Sleep
     - [5.3.3](#533-wait-for-event). Wait for Event
     - [5.3.4](#534-invoke). Invoke
+    - [5.3.5](#535-send-event). Send Event
+    - [5.3.6](#536-ai-gateway). AI Gateway
+    - [5.3.7](#537-gateway-http-fetch). Gateway (HTTP Fetch)
   - [5.4](#54-recovery-and-the-stack). Recovery and the stack
   - [5.5](#55-parallelism). Parallelism
 - [6](#6-middleware). Middleware
@@ -61,6 +65,25 @@ This document presents the Open Source SDK Specification for Inngest, outlining 
     - [6.3.2](#632-event-send). Event send
   - [6.4](#64-glossary). Glossary
 - [7](#7-modes). Modes
+- [8](#8-connect). Connect
+  - [8.1](#81-environment-variables). Environment variables
+  - [8.2](#82-runtime-type). Runtime type
+- [9](#9-streaming). Streaming
+- [10](#10-checkpointing). Checkpointing
+  - [10.1](#101-configuration). Configuration
+    - [10.1.1](#1011-sync-payload). Sync payload
+  - [10.2](#102-sync-and-async-opcodes). Sync and async opcodes
+  - [10.3](#103-checkpoint-api). Checkpoint API
+    - [10.3.1](#1031-async-checkpointing). Async checkpointing
+    - [10.3.2](#1032-sync-checkpointing). Sync checkpointing
+    - [10.3.3](#1033-retry-behavior). Retry behavior
+    - [10.3.4](#1034-signing-key-fallback). Signing key fallback
+  - [10.4](#104-execution-flow). Execution flow
+    - [10.4.1](#1041-async-checkpointing-flow). Async checkpointing flow
+    - [10.4.2](#1042-sync-checkpointing-flow). Sync checkpointing flow
+    - [10.4.3](#1043-graceful-fallback). Graceful fallback
+  - [10.5](#105-implementation-differences-between-go-and-typescript-sdks). Implementation differences
+- [11](#11-failure-handlers). Failure Handlers
 
 # 1. Introduction
 
@@ -217,6 +240,14 @@ Can be used to allow a Developer to inform the SDK of where it should send Event
 Because an SDK exposes an HTTP endpoint for Inngest to contact, the SDK needs to know the URL at which it exists. Sometimes this can be inferred, but it may also be useful to allow a Developer to set this manually. This environment variable sets the origin and appends the discovered path or `INNGEST_SERVE_PATH`.
 - `INNGEST_SERVE_PATH`
 Because an SDK exposes an HTTP endpoint for Inngest to contact, the SDK needs to know the URL at which it exists. Sometimes this can be inferred, but it may also be useful to allow a Developer to set this manually. This environment variable sets the path and prepends the discovered origin or `INNGEST_SERVE_ORIGIN`.
+- `INNGEST_BASE_URL`
+Can be used as a shorthand for setting both `INNGEST_API_BASE_URL` and `INNGEST_EVENT_API_BASE_URL` to the same origin. If more specific variables are also set, they take precedence.
+- `INNGEST_STREAMING`
+Can be used to enable HTTP streaming responses. When enabled, the SDK sends keep-alive data on the HTTP response while executing functions, preventing platform timeouts on serverless environments. See Streaming [[9](#9-streaming)].
+- `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY`
+Controls the maximum number of concurrent function executions when using the Connect protocol [[8](#8-connect)].
+
+An SDK SHOULD also attempt to detect the hosting platform by reading well-known environment variables set by platforms such as Vercel, Railway, Render, Netlify, and Cloudflare. This information can be used to set the `X-Inngest-Platform` header and infer the serve origin.
 
 # 4. HTTP
 
@@ -266,6 +297,10 @@ The standard HTTP header `Retry-After` as defined in [RFC 9110](https://datatrac
 A header received from an Inngest Server to indicate that type of Inngest Server the request came from, either `dev` or `cloud`. Note that this MUST NOT be used to decide whether to verify requests. See Kinds of Inngest Server [[4.2](#42-kinds-of-inngest-server)].
 - `X-Inngest-Expected-Server-Kind`
 A header sent to an Inngest Server when Syncing to indicate which type of Inngest Server the SDK intends to contact. See Syncing [[4.3.2](#432-syncing)].
+- `X-Inngest-Sync-Kind`
+Sent by an SDK when performing an in-band sync to indicate the sync type. A value of `"in-band"` means the sync data is sent alongside a normal execution response. See In-Band Sync [[4.3.5](#435-in-band-sync)].
+- `Server-Timing`
+An SDK MAY send the standard `Server-Timing` header as defined in the [Server Timing spec](https://www.w3.org/TR/server-timing/) to provide observability into SDK execution performance.
 
 ### 4.1.2. Requirements when responding to requests
 
@@ -274,7 +309,7 @@ When responding to a Call Request from Inngest, an SDK MUST send the following h
 - `X-Inngest-Sdk` [[4.1.1](#411-definitions)]
 Requests made or responses given to an Inngest Server without this header will be rejected.
 - `X-Inngest-Req-Version` [[4.1.1](#411-definitions)]
-The execution version used. MUST be `1`.
+The execution version used. MUST be `2`.
 
 ### 4.1.3. Requirements when receiving requests
 
@@ -557,6 +592,12 @@ A Sync’s payload MUST be the following JSON object:
        * MUST be 1s to 60s.
        */
       timeout: string;
+
+      /**
+       * An optional Expression to partition batches by key. Events that
+       * evaluate to the same key will be batched together.
+       */
+      key?: string;
     };
 
     cancel?: Array<{
@@ -688,6 +729,76 @@ A Sync’s payload MUST be the following JSON object:
            */
           scope?: "fn" | "env" | "account";
         }>;
+
+    /**
+     * Throttle function execution to a given number of runs per period.
+     * Unlike rateLimit which drops excess invocations, throttle queues
+     * them and executes at the specified rate.
+     */
+    throttle?: {
+      /**
+       * An optional key Expression to partition throttle groups. The
+       * result of this expression creates separate throttle buckets.
+       */
+      key?: string;
+
+      /**
+       * The maximum number of runs to allow per the given `period`.
+       */
+      limit: number;
+
+      /**
+       * The period of time over which `limit` applies.
+       */
+      period: TimeStr;
+
+      /**
+       * An optional burst capacity, allowing a short spike of runs
+       * beyond the steady-state rate. Defaults to `1`.
+       */
+      burst?: number;
+    };
+
+    /**
+     * Ensures only one run per key executes at a time. If a new run is
+     * triggered while one is already active for the same key, the
+     * behavior depends on `mode`.
+     */
+    singleton?: {
+      /**
+       * An optional key Expression to partition singleton groups.
+       */
+      key?: string;
+
+      /**
+       * Determines what happens when a new run is triggered while one
+       * is already active:
+       * - `"skip"`: the new run is silently discarded.
+       * - `"cancel"`: the existing run is cancelled and replaced by
+       *   the new one.
+       */
+      mode: "skip" | "cancel";
+    };
+
+    /**
+     * Controls how long a function has to start and finish execution.
+     */
+    timeouts?: {
+      /**
+       * Maximum time from trigger to the first execution attempt.
+       * If the function has not started within this period, it will
+       * be marked as timed out.
+       */
+      start?: TimeStr;
+
+      /**
+       * Maximum total time for the function run to complete,
+       * measured from when it first starts executing. If the
+       * function has not returned a final result within this period,
+       * it will be marked as timed out.
+       */
+      finish?: TimeStr;
+    };
   }>;
 }
 ```
@@ -744,6 +855,14 @@ An SDK MUST respond to the initial `PUT` request with either the `modified` valu
 	modified: true;
 }
 ```
+
+### 4.3.5. In-Band Sync
+
+An SDK MAY support in-band sync, where the SDK's registration data (the same payload described in Syncing [[4.3.2](#432-syncing)]) is sent alongside a normal execution response rather than as a separate `POST` request. This can reduce latency by combining the sync with the first Call Request.
+
+When performing an in-band sync, the SDK MUST set the `X-Inngest-Sync-Kind` header with a value of `"in-band"` on the response.
+
+An SDK MAY allow a Developer to control whether in-band sync is enabled via the `INNGEST_ALLOW_IN_BAND_SYNC` environment variable.
 
 ## 4.4. Call Requests
 
@@ -923,10 +1042,17 @@ The following is schema version `2024-05-24`:
   // signed but failed validation
   authentication_succeeded: false | null
 
+  // Optional object advertising SDK capabilities and their versions.
+  capabilities?: {
+    connect?: string
+    in_band_sync?: string
+    trust_probe?: string
+  }
+
   extra?: Record<string, any>
-	function_count: number
-	has_event_key: boolean
-	has_signing_key: boolean
+  function_count: number
+  has_event_key: boolean
+  has_signing_key: boolean
   has_signing_key_fallback: boolean
   mode: "cloud" | "dev"
   schema_version: "2024-05-24"
@@ -938,6 +1064,13 @@ The following is schema version `2024-05-24`:
   app_id: string
   authentication_succeeded: true
 
+  // Optional object advertising SDK capabilities and their versions.
+  capabilities?: {
+    connect?: string
+    in_band_sync?: string
+    trust_probe?: string
+  }
+
   // Inngest environment name
   env: string | null
 
@@ -948,11 +1081,11 @@ The following is schema version `2024-05-24`:
   event_key_hash: string | null
 
   framework: string
-	function_count: number
-	has_event_key: boolean
-	has_signing_key: boolean
+  function_count: number
+  has_event_key: boolean
+  has_signing_key: boolean
   has_signing_key_fallback: boolean
-	mode: "cloud" | "dev"
+  mode: "cloud" | "dev"
   schema_version: "2024-05-24"
   sdk_language: string
   sdk_version: string
@@ -960,14 +1093,14 @@ The following is schema version `2024-05-24`:
   serve_path: string | null
 
   // sha256 hash of the signing key
-	signing_key_fallback_hash: string | null
+  signing_key_fallback_hash: string | null
 
   // sha256 hash of the signing key fallback
-	signing_key_hash: string | null
+  signing_key_hash: string | null
 }
 ```
 
-An SDK MUST NOT set any top-level keys not specified in the aforementioned schemas. An SDK MAY put any arbitrary data into the `extra` field. This avoids name collisions in the future.
+An SDK MUST NOT set any top-level keys not specified in the aforementioned schemas, with the exception of `capabilities`. An SDK MAY put any arbitrary data into the `extra` field. This avoids name collisions in the future.
 
 # 5. Steps
 
@@ -1227,6 +1360,93 @@ An Invocation Step informs the Inngest Server that the Run wishes to trigger ano
 
 When the invoked Function has run to completion and returned a value, the Inngest Server will memoize the Step with either a `{ data }` or an `{ error }` object depending on whether the invoked Function succeeded or failed.
 
+### 5.3.5. Send Event
+
+A Send Event Step sends one or more Events to the Inngest Server as a retriable Step. This provides a durable way to emit events from within a Function, ensuring that the send is retried if it fails.
+
+An SDK MAY implement this as a wrapper around a Run Step [[5.3.1](#531-run)] (i.e. a `step.run()` whose body sends events), or as a distinct step method. Either approach is acceptable as long as the send is retriable and memoized.
+
+The Step SHOULD return an array of event IDs for the sent events.
+
+An SDK SHOULD expose this as `step.sendEvent()` or an equivalent.
+
+### 5.3.6. AI Gateway
+
+An AI Gateway Step sends an inference request through Inngest's AI gateway, which handles provider routing, retries, and cost tracking. This allows a Developer to call AI models durably as a Step.
+
+```tsx
+{
+	id: string;
+	op: "AiGateway";
+	opts: {
+		/**
+		 * The URL of the AI provider's endpoint.
+		 */
+		url: string;
+
+		/**
+		 * Optional headers to send with the request, such as
+		 * authorization tokens for the AI provider.
+		 */
+		headers?: Record<string, string>;
+
+		/**
+		 * The request body, typically containing the model name,
+		 * messages/prompt, and provider-specific parameters.
+		 */
+		body: any;
+
+		/**
+		 * An optional format hint for the response, such as
+		 * `"openai-chat"` or `"anthropic"`.
+		 */
+		format?: string;
+	};
+	displayName?: string;
+}
+```
+
+The memoized result will be either a `{ data }` object containing the inference response from the provider, or an `{ error }` object if the request failed.
+
+An SDK SHOULD expose this as `step.ai.infer()` or an equivalent, and MAY provide higher-level wrappers such as `step.ai.wrap()` for common providers (OpenAI, Anthropic, Google Gemini, etc.).
+
+### 5.3.7. Gateway (HTTP Fetch)
+
+A Gateway Step makes an HTTP request through Inngest's gateway, providing retries and observability for external API calls. This gives a Developer a durable alternative to making HTTP requests directly within a Run Step.
+
+```tsx
+{
+	id: string;
+	op: "Gateway";
+	opts: {
+		/**
+		 * The URL to make the request to.
+		 */
+		url: string;
+
+		/**
+		 * The HTTP method to use. Defaults to `"GET"`.
+		 */
+		method?: string;
+
+		/**
+		 * Optional headers to send with the request.
+		 */
+		headers?: Record<string, string>;
+
+		/**
+		 * Optional request body, serialized as JSON.
+		 */
+		body?: any;
+	};
+	displayName?: string;
+}
+```
+
+The memoized result will be either a `{ data }` object containing the HTTP response, or an `{ error }` object if the request failed.
+
+An SDK SHOULD expose this as `step.fetch()` or an equivalent.
+
 ## 5.4. Recovery and the stack
 
 When memoizing Steps [[5.2](#52-memoizing-step-results)], the Call Request will provide an array of Step IDs at `ctx.stack.stack` which represents the order in which previous Steps were completed. Each ID present will exist as a key in the `steps` object with some memoized data. This ordering can be critical if code relies on assessing race conditions, as the order in which Steps are discovered dynamically by an SDK can differ from the order in which they should be memoized.
@@ -1273,15 +1493,14 @@ There are two lifecycles groups to cover: a function run and sending an event.
 
 ### 6.3.1. Function run
 
-- For a single SDK request, all lifecycle methods MUST be called EXACTLY once.
+- For a single SDK request, all required lifecycle methods MUST be called EXACTLY once.
 - The lifecycle methods MUST be called in the following order:
-  - Transform input
-  - Before memoization
-  - After memoization
-  - Before execution
-  - After execution
-  - Transform output
-  - Before response
+  - Transform input (REQUIRED)
+  - After memoization (RECOMMENDED)
+  - Before execution (REQUIRED)
+  - After execution (REQUIRED)
+  - Transform output (REQUIRED)
+  - Before response (RECOMMENDED)
 
 #### Transform input
 - MUST call before executing the Inngest Function callback.
@@ -1289,13 +1508,10 @@ There are two lifecycles groups to cover: a function run and sending an event.
   - Context object that's passed to the Inngest Function callback.
   - Map of memoized step data
 
-#### Before memoization
-- MUST call before beginning first memoized step call.
-- Effectively the same as "transform input", but executed after it.
-
 #### After memoization
-- MUST call after last memoized step call.
-- Called immediately after the "before memoization" hook if the run has no state, as we will immediately be executing new code.
+- SHOULD call after the last memoized step call, before executing new code.
+- Called immediately if the run has no state, as the SDK will immediately be executing new code.
+- An SDK that does not implement this hook MUST still ensure that subsequent hooks are called in the correct order.
 
 #### Before execution
 - MUST call before executing unmemoized code.
@@ -1309,10 +1525,12 @@ There are two lifecycles groups to cover: a function run and sending an event.
 - Arguments:
   - Thrown/returned error. Will not exist if the function/step returned successfully.
   - Data returned by the function/step. Will not exist if the function/step errored.
-  - Step data (user-specified ID, opcode, etc.). Will not exist of a new step was not executed.
+  - Step data (user-specified ID, opcode, etc.). Will not exist if a new step was not executed.
 
 #### Before response
-- MUST call after the output has been set and before the response is sent back to an Inngest Server.
+- SHOULD call after the output has been set and before the response is sent back to an Inngest Server.
+
+An SDK MAY also provide additional step-level middleware hooks (e.g. before/after each step execution) and event send hooks, as long as the required lifecycle ordering above is respected.
 
 ### 6.3.2. Event send
 
@@ -1354,3 +1572,688 @@ When in `cloud` mode:
 When in `dev` mode:
 - The SDK defaults to the Dev Server's default URL (`http://localhost:8288`).
 - Incoming request signatures are only validated if present and the SDK has a signing key.
+
+# 8. Connect
+
+An SDK MAY support a persistent WebSocket-based connection to the Inngest Server, called "Connect." When using Connect, the SDK maintains a long-lived connection instead of exposing an HTTP endpoint that Inngest polls.
+
+Connect changes the execution model: instead of Inngest making HTTP `POST` requests to the SDK, the SDK establishes an outbound WebSocket connection to Inngest's Connect gateway. Execution requests are received over this connection and responses are sent back on the same connection.
+
+This is useful when the SDK is running in an environment that cannot receive inbound HTTP requests (e.g. behind a firewall, on a developer's local machine without tunneling, or in a container without a public URL).
+
+The reference implementations of Connect are in the Go SDK ([`inngestgo/connect/`](https://github.com/inngest/inngestgo/tree/main/connect)) and the TypeScript SDK ([`inngest-js/packages/inngest/src/components/connect/`](https://github.com/inngest/inngest-js/tree/main/packages/inngest/src/components/connect)). The protocol definitions are in [`proto/connect/v1/connect.proto`](https://github.com/inngest/inngest/blob/main/proto/connect/v1/connect.proto).
+
+## 8.1. Environment variables
+
+The following environment variables are relevant to Connect:
+
+| Variable                                 | Required | Description                                                                                                                                  |
+|------------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY` | No       | Maximum concurrent function executions. Go SDK defaults to 1,000.                                                                            |
+| `INNGEST_CONNECT_ISOLATE_EXECUTION`      | No       | TS SDK only. When `true` (default), runs the WebSocket connection in a separate worker thread to prevent user code from blocking heartbeats. |
+| `INNGEST_CONNECT_GATEWAY_URL`            | No       | TS SDK only. Override the WebSocket gateway endpoint URL.                                                                                    |
+
+## 8.2. Runtime type
+
+When using Connect, the step runtime `type` in the sync payload [[4.3.2](#432-syncing)] MUST be `"ws"` instead of `"http"`, and the `url` field of the step runtime is not required.
+
+```tsx
+steps: {
+  step: {
+    id: "step";
+    name: "step";
+    runtime: {
+      type: "ws";
+    };
+  };
+};
+```
+
+## 8.3. Wire format
+
+All Connect messages use Protocol Buffers (`connect.v1` package) serialized as binary WebSocket frames. The message envelope is:
+
+```protobuf
+message ConnectMessage {
+  GatewayMessageType kind = 1;
+  bytes payload = 2;
+}
+```
+
+The `payload` field contains a nested Protobuf message specific to the `kind`. The WebSocket sub-protocol MUST be `v0.connect.inngest.com`.
+
+## 8.4. Message types
+
+The following message types are defined in the `GatewayMessageType` enum:
+
+| Value | Name                              | Direction        | Purpose                                                         |
+|-------|-----------------------------------|------------------|-----------------------------------------------------------------|
+| 0     | `GATEWAY_HELLO`                   | Gateway → Worker | Server greeting after WebSocket open                            |
+| 1     | `WORKER_CONNECT`                  | Worker → Gateway | Worker authentication and registration                          |
+| 2     | `GATEWAY_CONNECTION_READY`        | Gateway → Worker | Connection confirmed ready (includes heartbeat/lease intervals) |
+| 3     | `GATEWAY_EXECUTOR_REQUEST`        | Gateway → Worker | Function execution request                                      |
+| 4     | `WORKER_READY`                    | Worker → Gateway | Manual readiness acknowledgment (optional)                      |
+| 5     | `WORKER_REQUEST_ACK`              | Worker → Gateway | Acknowledges receipt of execution request                       |
+| 6     | `WORKER_REPLY`                    | Worker → Gateway | Function execution response                                     |
+| 7     | `WORKER_REPLY_ACK`                | Gateway → Worker | Gateway confirms receipt of worker reply                        |
+| 8     | `WORKER_PAUSE`                    | Worker → Gateway | Worker is shutting down, stop sending requests                  |
+| 9     | `WORKER_HEARTBEAT`                | Worker → Gateway | Periodic worker keepalive                                       |
+| 10    | `GATEWAY_HEARTBEAT`               | Gateway → Worker | Periodic gateway keepalive                                      |
+| 11    | `GATEWAY_CLOSING`                 | Gateway → Worker | Gateway is draining; worker should reconnect                    |
+| 12    | `WORKER_REQUEST_EXTEND_LEASE`     | Worker → Gateway | Request to extend execution lease                               |
+| 13    | `WORKER_REQUEST_EXTEND_LEASE_ACK` | Gateway → Worker | Lease extension response (contains new lease ID)                |
+| 14    | `SYNC_FAILED`                     | Gateway → Worker | Sync failure notification                                       |
+
+## 8.5. Connection lifecycle
+
+The Connect protocol has three phases: Pre-Connection (HTTP), Handshake (WebSocket), and Steady-State (WebSocket).
+
+### 8.5.1. Phase 1: Pre-Connection (HTTP Start API)
+
+Before establishing the WebSocket connection, the SDK MUST obtain connection parameters from the Inngest API via an HTTP request.
+
+**Request:**
+
+```
+POST {apiBaseURL}/v0/connect/start
+Content-Type: application/protobuf
+Authorization: Bearer {hashedSigningKey}
+X-Inngest-Env: {environment}  (optional)
+```
+
+The request body is a Protobuf-encoded `StartRequest`:
+
+```protobuf
+message StartRequest {
+  repeated string exclude_gateways = 1;
+}
+```
+
+The `exclude_gateways` field lists gateway groups that should be avoided (e.g. a gateway that was previously draining or timed out during handshake).
+
+**Response:**
+
+On success (HTTP 200), the response body is a Protobuf-encoded `StartResponse`:
+
+```protobuf
+message StartResponse {
+  string connection_id = 1;    // ULID assigned to this connection
+  string gateway_endpoint = 2; // WebSocket URL to dial
+  string gateway_group = 3;    // Gateway group name (for exclusion on reconnect)
+  string session_token = 4;    // Auth token for the WebSocket handshake
+  string sync_token = 5;       // Sync token for the WebSocket handshake
+}
+```
+
+**Error responses:**
+
+| HTTP Status | Meaning              | SDK Behavior                                                     |
+|-------------|----------------------|------------------------------------------------------------------|
+| 401         | Unauthenticated      | Retry with fallback signing key if available; fatal if both fail |
+| 429         | Too many connections | Fatal on initial connection; retry on subsequent reconnects      |
+| Other       | Server error         | Treat as retriable; reconnect with backoff                       |
+
+### 8.5.2. Phase 2: WebSocket Handshake
+
+After obtaining a `StartResponse`, the SDK opens a WebSocket connection to the `gateway_endpoint` with sub-protocol `v0.connect.inngest.com`. The SDK SHOULD use a connection timeout of 10 seconds. The default message read limit SHOULD be 10MB.
+
+The handshake consists of three steps:
+
+**Step 1: Gateway Hello** (Gateway → Worker)
+
+The first message received MUST be a `ConnectMessage` with `kind = GATEWAY_HELLO`. The SDK SHOULD time out after 5 seconds if no message is received. If any other message type is received first, the handshake MUST fail and the SDK SHOULD reconnect.
+
+**Step 2: Worker Connect** (Worker → Gateway)
+
+The SDK sends a `ConnectMessage` with `kind = WORKER_CONNECT`. The payload is a Protobuf-encoded `WorkerConnectRequestData`:
+
+```protobuf
+message WorkerConnectRequestData {
+  string connection_id = 1;                   // From StartResponse
+  string instance_id = 2;                     // Stable worker identifier (hostname or user-provided)
+  AuthData auth_data = 3;                     // session_token + sync_token from StartResponse
+  bytes capabilities = 4;                     // JSON-marshaled SDK capabilities
+  repeated AppConfiguration apps = 5;         // App configs with serialized function definitions
+  bool worker_manual_readiness_ack = 6;       // Whether the worker will send WORKER_READY manually
+  SystemAttributes system_attributes = 7;     // CPU cores, memory, OS
+  optional string environment = 8;            // Environment name
+  string framework = 9;                       // Framework identifier (e.g. "connect")
+  optional string platform = 10;              // Platform identifier
+  string sdk_version = 11;                    // SDK version string
+  string sdk_language = 12;                   // "go" or "typescript"
+  google.protobuf.Timestamp started_at = 13;  // Worker start time
+  optional int64 max_worker_concurrency = 14; // Max concurrent executions
+}
+```
+
+The `capabilities` field SHOULD include at minimum:
+
+```json
+{ "trust_probe": "v1", "connect": "v1" }
+```
+
+Each `AppConfiguration` contains:
+
+```protobuf
+message AppConfiguration {
+  string app_name = 1;
+  optional string app_version = 2;
+  bytes functions = 4;  // JSON-serialized function configurations
+}
+```
+
+**Step 3: Connection Ready** (Gateway → Worker)
+
+The next message received MUST be a `ConnectMessage` with `kind = GATEWAY_CONNECTION_READY`. The SDK SHOULD time out after 20 seconds. The payload is a Protobuf-encoded `GatewayConnectionReadyData`:
+
+```protobuf
+message GatewayConnectionReadyData {
+  string heartbeat_interval = 1;       // Duration string (e.g. "10s")
+  string extend_lease_interval = 2;    // Duration string (e.g. "5s")
+}
+```
+
+These server-provided intervals govern all subsequent heartbeat and lease extension timing. The SDK MUST parse these duration strings and use the specified intervals. After receiving this message, the connection transitions to the `ACTIVE` state.
+
+### 8.5.3. Phase 3: Steady-State
+
+Once the handshake completes, the SDK enters a message processing loop. The SDK MUST handle the following message types:
+
+#### Heartbeats
+
+- The SDK MUST send `WORKER_HEARTBEAT` messages at the interval specified by `heartbeat_interval` from the `GATEWAY_CONNECTION_READY` message.
+- The SDK MUST monitor for `GATEWAY_HEARTBEAT` messages from the server.
+- If the SDK misses 2 consecutive expected gateway heartbeats (i.e. no `GATEWAY_HEARTBEAT` received within `2 × heartbeat_interval`), the SDK MUST treat the connection as dead and trigger reconnection.
+
+Both Go and TS SDKs implement this as: increment a pending-heartbeats counter on each sent heartbeat, reset to 0 on each received `GATEWAY_HEARTBEAT`, and reconnect when the counter reaches 2.
+
+#### Function execution
+
+When a `GATEWAY_EXECUTOR_REQUEST` message is received:
+
+1. **Decode** the `GatewayExecutorRequestData` payload:
+
+```protobuf
+message GatewayExecutorRequestData {
+  string request_id = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string app_id = 4;
+  string app_name = 5;
+  string function_id = 6;
+  string function_slug = 7;
+  optional string step_id = 8;
+  bytes request_payload = 9;    // JSON body (same format as HTTP execution requests)
+  bytes system_trace_ctx = 10;
+  bytes user_trace_ctx = 11;
+  string run_id = 12;
+  string lease_id = 13;
+}
+```
+
+2. **Acknowledge** the request immediately by sending `WORKER_REQUEST_ACK` with a `WorkerRequestAckData` payload that echoes back the request metadata fields (`request_id`, `account_id`, `env_id`, `app_id`, `function_slug`, `step_id`, `system_trace_ctx`, `user_trace_ctx`, `run_id`).
+
+3. **Begin lease extension** by periodically sending `WORKER_REQUEST_EXTEND_LEASE` at the `extend_lease_interval` from the handshake. The payload (`WorkerRequestExtendLeaseData`) includes the current `lease_id`. The server responds with `WORKER_REQUEST_EXTEND_LEASE_ACK` containing a `new_lease_id`. If `new_lease_id` is present, the SDK MUST update its stored lease ID. If absent, the lease could not be extended and the SDK SHOULD stop extending.
+
+4. **Execute** the function using the same execution logic as HTTP-based execution (the `request_payload` has the same JSON format as the HTTP POST body).
+
+5. **Reply** by sending `WORKER_REPLY` with a Protobuf-encoded `SDKResponse` payload:
+
+```protobuf
+message SDKResponse {
+  string request_id = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string app_id = 4;
+  SDKResponseStatus status = 5;  // NOT_COMPLETED=0, DONE=1, ERROR=2
+  bytes body = 6;                // JSON response body
+  bool no_retry = 7;
+  optional string retry_after = 8;  // RFC3339 timestamp
+  string sdk_version = 9;
+  uint32 request_version = 10;
+  bytes system_trace_ctx = 11;
+  bytes user_trace_ctx = 12;
+  string run_id = 13;
+}
+```
+
+The `status` field maps to HTTP status codes as follows:
+- `DONE` (1) → 200
+- `ERROR` (2) → 500
+- `NOT_COMPLETED` (0) → 206 (step/generator opcodes returned; function is mid-execution)
+
+6. **Wait for acknowledgment**: The gateway responds with `WORKER_REPLY_ACK` containing the `request_id`. The SDK SHOULD track pending replies and use a timeout (both SDKs use 5 seconds) to detect unacknowledged replies.
+
+#### Gateway draining
+
+When a `GATEWAY_CLOSING` message is received, the gateway is shutting down. The SDK SHOULD:
+
+1. Establish a **new** connection to a different gateway (excluding the draining gateway's group via `exclude_gateways` in the `StartRequest`).
+2. Keep the old connection open for in-flight requests until the new connection is ready.
+3. Transition in-flight lease extensions to use the **new** connection's WebSocket.
+4. Close the old connection after all in-flight requests complete or the new connection is ready.
+
+Both the Go and TS SDKs implement this pattern: establish the replacement connection first, then tear down the old one.
+
+## 8.6. Reconnection
+
+The SDK MUST implement automatic reconnection with exponential backoff. Both reference implementations use the following backoff sequence: `[1s, 2s, 5s, 10s, 20s, 30s, 60s, 120s, 300s]`.
+
+**Reconnect triggers:**
+- WebSocket close (any close code, unless non-retriable)
+- Unexpected `net.ErrClosed`, `io.EOF`, or equivalent connection errors
+- Missed gateway heartbeats (2 consecutive)
+- Any retriable error during the handshake or start API
+
+**Reconnection behavior:**
+- The SDK SHOULD allow a maximum number of consecutive failed attempts (Go SDK uses 5) before giving up.
+- The attempt counter MUST reset to 0 on a successful connection.
+- Before reconnecting, the SDK SHOULD flush any buffered unacknowledged replies via the HTTP flush API (`POST /v0/connect/flush`).
+
+**Non-retriable close codes:**
+
+The SDK SHOULD treat certain WebSocket close codes as fatal (non-retriable). Close codes for auth failures that are not recoverable (e.g. invalid signing key with no fallback) SHOULD terminate the connection loop.
+
+**Auth retry:**
+
+On a 401 from the start API, the SDK SHOULD retry once using a fallback signing key (if available). If both keys fail, the error is fatal.
+
+## 8.7. Message buffering and reliable delivery
+
+The SDK SHOULD implement a message buffer to ensure at-least-once delivery of `WORKER_REPLY` messages:
+
+1. When a reply is sent, add it to a pending-acknowledgment map with a timeout (both SDKs use 5 seconds).
+2. When `WORKER_REPLY_ACK` is received, remove the corresponding entry from the map.
+3. If the timeout expires without acknowledgment, move the message to a buffer for fallback delivery.
+4. If the WebSocket is unavailable when a reply completes (e.g. mid-reconnection), add the reply directly to the buffer.
+5. Flush buffered messages via `POST {apiBaseURL}/v0/connect/flush` with the Protobuf-encoded `SDKResponse` as the request body.
+6. Flush SHOULD be attempted: before each reconnect, after establishing a new connection, and during graceful shutdown.
+7. Flush SHOULD retry up to 5 times with exponential backoff.
+
+## 8.8. Graceful shutdown
+
+When the SDK is shutting down (e.g. SIGINT/SIGTERM), it SHOULD:
+
+1. Send `WORKER_PAUSE` to tell the gateway to stop sending new requests.
+2. Wait for all in-progress function executions to complete (via the worker pool).
+3. Flush any buffered unacknowledged replies via the HTTP flush API.
+4. Close the WebSocket with close code `1000` (Normal Closure) and reason `WORKER_SHUTDOWN`.
+
+## 8.9. Worker pool
+
+The SDK SHOULD maintain a bounded worker pool to limit concurrent function executions:
+
+- The pool size is configured via `INNGEST_CONNECT_MAX_WORKER_CONCURRENCY` or the `maxWorkerConcurrency` option.
+- The Go SDK defaults to 1,000 concurrent workers.
+- The TS SDK defaults to the value of `maxWorkerConcurrency` if set, with no hard default.
+- The pool tracks in-progress requests via a wait group (or equivalent) for graceful shutdown.
+- Incoming `GATEWAY_EXECUTOR_REQUEST` messages SHOULD be dispatched to the pool non-blocking.
+
+## 8.10. Connection states
+
+The SDK SHOULD track connection state using the following states:
+
+| State          | Description                                                 |
+|----------------|-------------------------------------------------------------|
+| `CONNECTING`   | Initial state; performing HTTP start + WebSocket handshake  |
+| `ACTIVE`       | Handshake complete; processing messages                     |
+| `RECONNECTING` | Connection lost; attempting to re-establish                 |
+| `CLOSING`      | Graceful shutdown initiated; waiting for in-flight requests |
+| `CLOSED`       | Fully closed; terminal state                                |
+
+## 8.11. Implementation differences between Go and TypeScript SDKs
+
+While both SDKs implement the same protocol, there are notable implementation differences:
+
+| Aspect                           | Go SDK (`inngestgo`)                                 | TypeScript SDK (`inngest-js`)                                                                                                                                                      |
+|----------------------------------|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Entry point**                  | `connect/handler.go`, `connect/connection.go`        | `components/connect/index.ts`, `strategies/core/connection.ts`                                                                                                                     |
+| **Thread model**                 | Single goroutine-based; goroutine pool for execution | Supports two strategies: same-thread and worker-thread (default). Worker-thread runs WebSocket in a Node.js `worker_threads` Worker to prevent user code from blocking heartbeats. |
+| **Default concurrency**          | 1,000                                                | No hard default (configured by user)                                                                                                                                               |
+| **Reconnect max attempts**       | 5 consecutive failures                               | Unlimited (loops until `CLOSED` state)                                                                                                                                             |
+| **Backoff sequence**             | `[1s, 2s, 5s, 10s, 20s, 30s, 60s, 120s, 300s]`       | `[1s, 2s, 5s, 10s, 20s, 30s, 60s, 120s, 300s]`                                                                                                                                     |
+| **Pending ack timeout**          | 5 seconds                                            | 5 seconds                                                                                                                                                                          |
+| **Handshake hello timeout**      | 5 seconds                                            | 10 seconds (entire handshake)                                                                                                                                                      |
+| **Handshake ready timeout**      | 20 seconds                                           | 10 seconds (entire handshake)                                                                                                                                                      |
+| **Heartbeat miss threshold**     | 2 × heartbeat_interval grace period                  | 2 consecutive missed heartbeats                                                                                                                                                    |
+| **Capabilities JSON**            | `{"trust_probe":"v1","connect":"v1"}`                | `{"trust_probe":"v1","connect":"v1"}`                                                                                                                                              |
+| **Worker thread crash recovery** | N/A                                                  | Respawns with exponential backoff (500ms base, 30s max), gives up after 10 consecutive crashes                                                                                     |
+
+# 9. Streaming
+
+An SDK MAY support HTTP streaming responses, controlled by the `INNGEST_STREAMING` environment variable [[3.2](#32-optional-variables)].
+
+When streaming is enabled, the SDK sends keep-alive data (such as whitespace or small status tokens) on the HTTP response while executing functions. This prevents platform-level request timeouts on serverless environments (e.g. AWS Lambda, Vercel) where idle connections may be terminated.
+
+The final response data MUST still be sent as the last chunk of the stream and MUST conform to the same response format as non-streaming responses. The keep-alive data sent before the final response MUST be safely ignorable by the Inngest Server.
+
+# 10. Checkpointing
+
+An SDK MAY support checkpointing, which allows the SDK to execute multiple steps within a single invocation by sending step results to the Inngest Server's API in the background, rather than yielding control back to the executor after each step.
+
+In the traditional (non-checkpointed) execution model, the SDK returns a `206` response after each step, and the Inngest executor makes a new Call Request for the next step. This creates one HTTP round-trip per step. Checkpointing eliminates this overhead by letting the SDK persist step results to the server as they complete, continuing execution without waiting for a new Call Request.
+
+Checkpointing is only applicable to **sync opcodes** (primarily `StepRun`). When the SDK encounters an **async opcode** (e.g. `Sleep`, `WaitForEvent`, `InvokeFunction`), it MUST fall back to the standard yield-and-return model, because these opcodes require the executor to schedule future work.
+
+The reference implementations are in the Go SDK ([`inngestgo/internal/checkpoint/`](https://github.com/inngest/inngestgo)) and the TypeScript SDK ([`inngest-js/packages/inngest/src/components/execution/engine.ts`](https://github.com/inngest/inngest-js)).
+
+## 10.1. Configuration
+
+An SDK that supports checkpointing SHOULD allow configuration at both the client level (default for all functions) and the function level (overrides client default). If no explicit configuration is provided, the SDK MAY enable checkpointing by default (the TS SDK defaults to enabled; the Go SDK requires explicit opt-in).
+
+The configuration options are:
+
+```typescript
+checkpoint?: {
+  /**
+   * Maximum number of steps to buffer before sending a checkpoint
+   * request to the server. When the buffer reaches this count,
+   * the SDK MUST flush immediately.
+   *
+   * A value of 0 or 1 means checkpoint after every single step
+   * (safest, highest latency). A higher value batches steps for
+   * fewer API calls (faster, less granular durability).
+   *
+   * Go SDK calls this `batch_steps`. TS SDK calls this `bufferedSteps`.
+   */
+  bufferedSteps?: number;  // Default: 0 (Go) or 1 (TS) — checkpoint after every step
+
+  /**
+   * Maximum time interval between checkpoint flushes. If set, the
+   * SDK starts a timer when the first step enters the buffer. When
+   * the timer fires, all buffered steps are flushed regardless of
+   * count.
+   *
+   * Go SDK calls this `batch_interval`. TS SDK calls this `maxInterval`.
+   */
+  maxInterval?: Duration;  // Default: 0 (disabled)
+
+  /**
+   * Maximum total execution time for a single invocation. When
+   * exceeded, the SDK MUST yield control back to the executor
+   * (by returning a `DiscoveryRequest` opcode), which will
+   * schedule a new Call Request to continue execution.
+   *
+   * This is useful in serverless environments with execution
+   * time limits.
+   */
+  maxRuntime?: Duration;   // Default: 0 (disabled)
+}
+```
+
+Both SDKs provide preset configurations:
+
+| Preset         | `bufferedSteps` | `maxInterval` | Description                                              |
+|----------------|-----------------|---------------|----------------------------------------------------------|
+| Safe (default) | 0 / 1           | 0             | Checkpoint after every step. Most durable.               |
+| Performant     | 1000            | 0             | Batch as many steps as possible. Least durable, fastest. |
+| Blended        | 3               | 3s            | Checkpoint after 3 steps or 3 seconds. Balanced.         |
+
+### 10.1.1. Sync payload
+
+When registering a function that has checkpointing enabled, the SDK SHOULD include the checkpoint configuration in the sync payload so the Inngest Server is aware of the function's checkpointing behavior:
+
+```json
+{
+  "checkpoint": {
+    "batch_steps": 0,
+    "batch_interval": "3s",
+    "max_runtime": "0s"
+  }
+}
+```
+
+## 10.2. Sync and async opcodes
+
+Opcodes are classified as either **sync** (checkpointable) or **async** (requires executor intervention):
+
+| Opcode                 | Classification | Rationale                                         |
+|------------------------|----------------|---------------------------------------------------|
+| `StepRun` (2)          | Sync           | Step executed and returned data; SDK can continue |
+| `Step` (1)             | Sync           | Legacy variant of StepRun                         |
+| `RunComplete` (11)     | Sync           | Function finished; terminal                       |
+| `SyncRunComplete` (13) | Sync           | Sync API function completed; terminal             |
+| `StepFailed` (12)      | Sync           | Step permanently failed; terminal                 |
+| `StepPlanned` (4)      | Async          | Step needs to be scheduled for separate execution |
+| `Sleep` (5)            | Async          | Requires executor to schedule a future wake-up    |
+| `WaitForEvent` (6)     | Async          | Requires executor to listen for an event          |
+| `InvokeFunction` (7)   | Async          | Requires executor to trigger another function     |
+| `AIGateway` (8)        | Async          | Requires executor to route through AI gateway     |
+| `Gateway` (9)          | Async          | Requires executor to route through HTTP gateway   |
+| `WaitForSignal` (10)   | Async          | Requires executor to listen for a signal          |
+| `StepError` (3)        | Async*         | Requires executor to schedule a retry             |
+
+\* `StepError` is treated as async because it requires the executor to manage retry scheduling and backoff.
+
+When the SDK is in checkpoint mode and encounters an async opcode, it MUST stop checkpointing and yield control by returning the accumulated opcodes (including the async one) in the standard `206` response format. The executor then takes over scheduling.
+
+## 10.3. Checkpoint API
+
+The SDK communicates checkpointed step results to the Inngest Server via HTTP API calls. There are two checkpoint flows depending on how the function was initiated.
+
+### 10.3.1. Async checkpointing
+
+Used when a function was initiated by the Inngest executor (the standard background execution model) but has checkpointing enabled. The SDK sends step results to the server without yielding the HTTP response.
+
+**Endpoint:**
+
+```
+POST {apiBaseURL}/v1/checkpoint/{runID}/async
+Authorization: Bearer {hashedSigningKey}
+Content-Type: application/json
+```
+
+**Request body:**
+
+```json
+{
+  "run_id": "01ABC123...",
+  "fn_id": "uuid-of-function",
+  "qi_id": "base64-encoded-queue-item-ref",
+  "steps": [
+    {
+      "op": "StepRun",
+      "id": "hashed-step-id",
+      "name": "step-name",
+      "data": { "result": "value" }
+    }
+  ]
+}
+```
+
+The `qi_id` (queue item reference) is provided in the Call Request context as `ctx.qi_id`. It identifies the current queue item so the server can reset the retry counter after a successful checkpoint (since a single queue item is shared across many checkpointed steps).
+
+**Response:** `200 OK` on success.
+
+**Error handling:**
+- `401`: Retry with fallback signing key if available.
+- Other errors: The SDK SHOULD fall back to the standard async response (return all buffered steps in the `206` response body). This ensures the function run is not lost even if the checkpoint API is unavailable.
+
+**Constraints:** Only sync opcodes (`StepRun`) are accepted. The server rejects async opcodes (sleep, waitForEvent, etc.) in async checkpoint requests.
+
+### 10.3.2. Sync checkpointing
+
+Used for sync/durable endpoint functions where the SDK drives the entire execution flow from an external HTTP request (e.g. an API route handler). In this mode, the SDK creates the run itself and checkpoints all steps.
+
+**Create run + initial checkpoint:**
+
+```
+POST {apiBaseURL}/v1/checkpoint
+Authorization: Bearer {hashedSigningKey}
+Content-Type: application/json
+```
+
+```json
+{
+  "run_id": "01ABC123...",
+  "event": { "name": "...", "data": { ... } },
+  "steps": [ ... ],
+  "request_version": 2,
+  "retries": 3
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "fn_id": "uuid",
+    "app_id": "uuid",
+    "run_id": "ulid",
+    "token": "jwt-token"
+  }
+}
+```
+
+The `token` is a JWT that can be used to poll for run output (for async fallback).
+
+**Subsequent step checkpoints:**
+
+```
+POST {apiBaseURL}/v1/checkpoint/{runID}/steps
+Authorization: Bearer {hashedSigningKey}
+Content-Type: application/json
+```
+
+```json
+{
+  "fn_id": "uuid",
+  "app_id": "uuid",
+  "run_id": "ulid",
+  "steps": [ ... ]
+}
+```
+
+**Run completion:**
+
+When the function completes in sync mode, the SDK checkpoints a `RunComplete` opcode containing the final result.
+
+### 10.3.3. Retry behavior
+
+All checkpoint API calls SHOULD be retried on transient failures. Both SDKs use up to 5 retry attempts with exponential backoff (Go: not explicitly retried at the checkpoint level; TS: 5 attempts, 100ms base delay with jitter).
+
+### 10.3.4. Signing key fallback
+
+If a checkpoint API call returns `401 Unauthorized` and a fallback signing key is available, the SDK SHOULD retry with the fallback key. This is a one-way switch: once the fallback key succeeds, all subsequent calls use it.
+
+## 10.4. Execution flow
+
+### 10.4.1. Async checkpointing flow
+
+This is the most common checkpointing mode, used when the Inngest executor initiates the function via a standard Call Request.
+
+```
+Inngest Server                          SDK
+     |                                   |
+     |--- POST (Call Request) ---------->|
+     |    (with step state, fn_id,       |
+     |     qi_id in ctx)                 |
+     |                                   |  Resolve checkpoint config
+     |                                   |  Enter checkpoint mode
+     |                                   |
+     |                                   |  Execute step A
+     |                                   |  Buffer step A result
+     |<-- POST /v1/checkpoint/{id}/async |  (buffer full or interval)
+     |--- 200 OK ----------------------->|
+     |                                   |  Execute step B
+     |                                   |  Buffer step B result
+     |<-- POST /v1/checkpoint/{id}/async |
+     |--- 200 OK ----------------------->|
+     |                                   |  Execute step C (sleep)
+     |                                   |  Async opcode → yield
+     |<---------- 206 (step C: Sleep) ---|
+     |                                   |
+     |  (executor schedules sleep,       |
+     |   calls back after sleep)         |
+```
+
+**Key rules:**
+
+1. When the SDK receives a Call Request and the function has checkpointing enabled, the SDK enters checkpoint mode (both SDKs call this `StepModeCheckpoint` or `AsyncCheckpointing`).
+
+2. As each `StepRun` completes, the result is added to a buffer.
+
+3. When the buffer reaches `bufferedSteps` count, OR `maxInterval` time elapses since the first buffered step, the SDK flushes: sends all buffered steps to `POST /v1/checkpoint/{runID}/async` and clears the buffer.
+
+4. If the checkpoint API call succeeds, the checkpointed steps are removed from the SDK's response opcode list (they have already been persisted server-side).
+
+5. If the checkpoint API call fails, the SDK MUST fall back: include the buffered steps in the normal `206` response. This ensures no step results are lost.
+
+6. If an async opcode is encountered (sleep, waitForEvent, etc.), the SDK MUST flush any buffered steps first, then yield by returning a `206` response containing the async opcode.
+
+7. If `maxRuntime` is exceeded, the SDK MUST yield by returning a `DiscoveryRequest` opcode, which tells the executor to schedule a new Call Request to continue execution.
+
+8. When the function completes (returns a value or throws a final error), the SDK returns a `206` response containing any remaining buffered steps plus a `RunComplete` opcode (TS SDK), or returns the standard `200` response (Go SDK, after final checkpoint flush).
+
+### 10.4.2. Sync checkpointing flow
+
+Used for durable endpoint / API-route functions where the SDK drives execution from an external HTTP request.
+
+```
+Client                SDK                    Inngest Server
+  |                    |                          |
+  |-- HTTP request --->|                          |
+  |                    |  Execute step A          |
+  |                    |-- POST /v1/checkpoint -->|  (creates run)
+  |                    |<-- {run_id, token} ------|
+  |                    |                          |
+  |                    |  Execute step B          |
+  |                    |-- POST /checkpoint/      |
+  |                    |   {runID}/steps -------->|
+  |                    |<-- 200 OK ---------------|
+  |                    |                          |
+  |                    |  Execute step C (sleep)  |
+  |                    |  Async opcode → switch   |
+  |                    |-- POST /checkpoint/      |
+  |                    |   {runID}/steps -------->|  (with sleep opcode)
+  |                    |<-- 200 OK ---------------|
+  |                    |                          |
+  |<-- 302 redirect --|  (or token response)     |
+  |    to /v1/checkpoint/{runID}/output?token=... |
+```
+
+**Key rules:**
+
+1. In sync mode, the SDK creates the run by calling `POST /v1/checkpoint` with the event and initial steps. The server returns a `run_id` and `token`.
+
+2. Subsequent steps are checkpointed via `POST /v1/checkpoint/{runID}/steps`.
+
+3. If the function completes without hitting any async opcodes, the SDK checkpoints a `RunComplete` and returns the result directly to the caller.
+
+4. If an async opcode is encountered (e.g. sleep, parallel steps), the SDK checkpoints the current state and transitions from sync to async mode. It returns either:
+   - A `302` redirect to a long-poll output endpoint: `/v1/checkpoint/{runID}/output?token=...`
+   - A `200` response with `{ "run_id": "...", "token": "..." }` for the caller to poll
+
+5. The executor then takes over scheduling, and the caller can poll for the final result.
+
+### 10.4.3. Graceful fallback
+
+If any checkpoint API call fails, the SDK MUST NOT lose step results. The fallback behavior is:
+
+- **Async checkpointing**: Return the buffered steps in the standard `206` response. The executor receives them as if checkpointing was never used.
+- **Sync checkpointing**: Transition to async mode, returning a redirect/token for the caller to poll.
+
+This ensures that checkpointing is a transparent optimization: function execution correctness does not depend on the checkpoint API being available.
+
+## 10.5. Implementation differences between Go and TypeScript SDKs
+
+| Aspect                    | Go SDK (`inngestgo`)                                     | TypeScript SDK (`inngest-js`)                                                           |
+|---------------------------|----------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| **Default behavior**      | Opt-in (requires explicit `Checkpoint` config)           | Opt-in via `checkpointing` option (defaults to `true` when not running a targeted step) |
+| **Config field names**    | `BatchSteps`, `BatchInterval`, `MaxRuntime`              | `bufferedSteps`, `maxInterval`, `maxRuntime`                                            |
+| **Preset names**          | `ConfigSafe`, `ConfigPerformant`, `ConfigBlended`        | No named presets; raw config object                                                     |
+| **Default bufferedSteps** | 0 (checkpoint every step)                                | 1 (checkpoint every step)                                                               |
+| **Checkpoint retry**      | Single attempt + key fallback                            | 5 attempts with exponential backoff + key fallback                                      |
+| **Async fallback**        | Steps remain in response buffer on error                 | Steps returned as `206` `steps-found` on error                                          |
+| **Sync mode**             | Supported via `stephttp` package                         | Supported via `StepMode.Sync` with redirect/token                                       |
+| **DiscoveryRequest**      | Not explicitly emitted (yields with remaining ops)       | Returns `DiscoveryRequest` opcode on `maxRuntime` timeout                               |
+| **Entry points**          | `internal/checkpoint/`, `internal/sdkrequest/manager.go` | `components/execution/engine.ts`                                                        |
+
+# 11. Failure Handlers
+
+An SDK MAY allow a Developer to specify a failure handler for a Function. The failure handler is a separate Function that is automatically invoked when the original Function exhausts all retries and fails permanently.
+
+When a failure handler is configured, the SDK SHOULD automatically create an internal Function that is triggered by the `inngest/function.failed` event, scoped to the original Function's ID. This internal Function SHOULD have a separate retry configuration (typically zero retries) and SHOULD NOT have the same concurrency settings as the original Function.
+
+The failure handler receives the failure event, which contains the original error and the event that triggered the failed run. An SDK SHOULD expose this as an `onFailure` option in the Function configuration.

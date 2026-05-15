@@ -1,11 +1,16 @@
 package rueidis
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"time"
 )
 
-func newPool(cap int, dead wire, cleanup time.Duration, minSize int, makeFn func() wire) *pool {
+// errAcquireComplete is a special error used to indicate that the Acquire operation has completed successfully
+var errAcquireComplete = errors.New("acquire complete")
+
+func newPool(cap int, dead wire, cleanup time.Duration, minSize int, makeFn func(context.Context) wire) *pool {
 	if cap <= 0 {
 		cap = DefaultPoolSize
 	}
@@ -26,7 +31,7 @@ type pool struct {
 	dead    wire
 	cond    *sync.Cond
 	timer   *time.Timer
-	make    func() wire
+	make    func(ctx context.Context) wire
 	list    []wire
 	cleanup time.Duration
 	size    int
@@ -36,21 +41,58 @@ type pool struct {
 	timerOn bool
 }
 
-func (p *pool) Acquire() (v wire) {
+func (p *pool) Acquire(ctx context.Context) (v wire) {
 	p.cond.L.Lock()
-	for len(p.list) == 0 && p.size == p.cap && !p.down {
+
+	// Set up ctx handling when waiting for an available connection
+	if len(p.list) == 0 && p.size == p.cap && !p.down && ctx.Err() == nil && ctx.Done() != nil {
+		poolCtx, cancel := context.WithCancelCause(ctx)
+		defer cancel(errAcquireComplete)
+
+		go func() {
+			<-poolCtx.Done()
+			if context.Cause(poolCtx) != errAcquireComplete { // no need to broadcast if the poolCtx is cancelled explicitly.
+				p.cond.Broadcast()
+			}
+		}()
+	}
+
+retry:
+	for len(p.list) == 0 && p.size == p.cap && !p.down && ctx.Err() == nil {
 		p.cond.Wait()
 	}
+
+	if ctx.Err() != nil {
+		deadPipe := deadFn()
+		deadPipe.error.Store(&errs{error: ctx.Err()})
+		v = deadPipe
+		p.cond.L.Unlock()
+		return v
+	}
+
 	if p.down {
 		v = p.dead
-	} else if len(p.list) == 0 {
+		p.cond.L.Unlock()
+		return v
+	}
+	if len(p.list) == 0 {
 		p.size++
-		v = p.make()
-	} else {
-		i := len(p.list) - 1
-		v = p.list[i]
-		p.list[i] = nil
-		p.list = p.list[:i]
+		// unlock before start to make a new wire
+		// allowing others to make wires concurrently instead of waiting in line
+		p.cond.L.Unlock()
+		v = p.make(ctx)
+		v.StopTimer()
+		return v
+	}
+
+	i := len(p.list) - 1
+	v = p.list[i]
+	p.list[i] = nil
+	p.list = p.list[:i]
+	if !v.StopTimer() || v.Error() != nil {
+		p.size--
+		v.Close()
+		goto retry
 	}
 	p.cond.L.Unlock()
 	return v
@@ -61,6 +103,7 @@ func (p *pool) Store(v wire) {
 	if !p.down && v.Error() == nil {
 		p.list = append(p.list, v)
 		p.startTimerIfNeeded()
+		v.ResetTimer()
 	} else {
 		p.size--
 		v.Close()
