@@ -406,34 +406,46 @@ Move =NewCQRS=, the =wrapper= type, and transaction logic into
 
 Action items:
 
-- [ ] move =NewCQRS= into =pkg/cqrs/manager=
-- [ ] rename the constructor if a better permanent name is chosen
-- [ ] move =wrapper= into =pkg/cqrs/manager=
-- [ ] move =adapterWithHelpers= into =pkg/cqrs/manager= or replace it with a
+- [X] move =NewCQRS= into =pkg/cqrs/manager=
+- [X] rename the constructor if a better permanent name is chosen
+- [X] move =wrapper= into =pkg/cqrs/manager=
+- [X] move =adapterWithHelpers= into =pkg/cqrs/manager= or replace it with a
   better-named local interface
-- [ ] move =WithTx()= intact before further cleanup
-- [ ] move =Commit()= and =Rollback()= intact before further cleanup
-- [ ] preserve =cqrs.Manager= conformance
-- [ ] preserve =cqrs.TxManager= conformance
-- [ ] preserve dependency on =pkg/db.Adapter= rather than dialect packages
-- [ ] update runtime call sites to construct managers from =pkg/cqrs/manager=
-- [ ] update tests that currently import =base_cqrs.NewCQRS()=
-- [ ] keep transaction tests green before any domain-level file splitting
-- [ ] add or update manager-construction tests if constructor or package shape
+- [X] move =WithTx()= intact before further cleanup
+- [X] move =Commit()= and =Rollback()= intact before further cleanup
+- [X] preserve =cqrs.Manager= conformance
+- [X] preserve =cqrs.TxManager= conformance
+- [X] preserve dependency on =pkg/db.Adapter= rather than dialect packages
+- [X] update runtime call sites to construct managers from =pkg/cqrs/manager=
+- [X] update tests that currently import =base_cqrs.NewCQRS()=
+- [X] keep transaction tests green before any domain-level file splitting
+- [X] add or update manager-construction tests if constructor or package shape
   changes require it
-- [ ] run manager and transaction DAL tests immediately after moving the
+- [X] run manager and transaction DAL tests immediately after moving the
   composite manager
 
 Completion checklist:
 
-- [ ] no runtime code calls =base_cqrs.NewCQRS()=
-- [ ] no tests call =base_cqrs.NewCQRS()=
-- [ ] =pkg/cqrs/manager= is the only composite manager package
-- [ ] transaction semantics are unchanged
-- [ ] history read and write interfaces are implemented from the same manager
+- [X] no runtime code calls =base_cqrs.NewCQRS()=
+- [X] no tests call =base_cqrs.NewCQRS()=
+- [X] =pkg/cqrs/manager= is the only composite manager package
+- [X] transaction semantics are unchanged
+- [X] history read and write interfaces are implemented from the same manager
   package
-- [ ] manager construction and transaction tests are green
-- [ ] manager-specific DAL verification is green after migration
+- [X] manager construction and transaction tests are green
+- [X] manager-specific DAL verification is green after migration
+
+Review notes:
+
+- 2026-05-15: moved the composite manager to =pkg/cqrs/manager= with
+  constructor =manager.New(db.Adapter)=; the existing helper-aware adapter
+  assertion remains package-local.
+- 2026-05-15: migrated runtime and test manager construction call sites off
+  =base_cqrs.NewCQRS()=; =base_cqrs= remains only for the legacy history
+  driver/reader shims scheduled for later phases.
+- 2026-05-15: verification passed with =go test ./pkg/cqrs/manager
+  ./pkg/cqrs/base_cqrs -count=1= and =go test ./pkg/devserver ./pkg/db
+  ./tests/execution/executor -count=1=.
 
 ** Phase 4: split the manager by domain
 

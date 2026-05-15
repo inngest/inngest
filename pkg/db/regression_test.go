@@ -16,7 +16,7 @@ import (
 	gqlmodels "github.com/inngest/inngest/pkg/coreapi/graph/models"
 	gqlresolvers "github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
@@ -1093,7 +1093,7 @@ func newTestManagerAndResolverCtx(t *testing.T) (cqrs.Manager, context.Context, 
 	helperAdapter, ok := adapter.(adapterWithHelpers)
 	require.True(t, ok, "test adapter must expose dialect helpers")
 
-	manager := base_cqrs.NewCQRS(helperAdapter)
+	manager := cqrsmanager.New(helperAdapter)
 	ctx := gqlloader.ToCtx(context.Background(), gqlloader.NewLoaders(gqlloader.LoaderParams{DB: manager}))
 	return manager, ctx, cleanup
 }

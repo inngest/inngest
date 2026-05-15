@@ -36,6 +36,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
@@ -209,7 +210,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}
 		adapter = dbsqlite.New(db)
 	}
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	hd := base_cqrs.NewHistoryDriver(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 

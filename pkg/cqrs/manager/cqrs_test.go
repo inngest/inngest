@@ -1,4 +1,4 @@
-package base_cqrs
+package manager
 
 import (
 	"context"
@@ -1969,7 +1969,7 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 		adapter = dbsqlite.New(db)
 	}
 
-	cm := NewCQRS(adapter)
+	cm := New(adapter)
 
 	cleanup := func() {
 		db.Close()
