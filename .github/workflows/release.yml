@@ -141,5 +141,6 @@ jobs:
         continue-on-error: true
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
-          version: ${{ github.ref_name }}
+          # version: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           command: complete
