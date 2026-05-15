@@ -226,3 +226,10 @@ jobs:
           gh pr edit "${{ steps.existing-pr.outputs.pr_number }}" \
             --title "chore(release): ${RELEASE_TAG}" \
             --body-file /tmp/release-pr-body.md
+
+      - name: Sync Linear release
+        if: github.event_name != 'schedule' && steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0'
+        uses: linear/linear-release-action@v0
+        continue-on-error: true
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
