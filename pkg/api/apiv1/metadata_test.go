@@ -238,7 +238,7 @@ func TestAddRunMetadataAllowsScoreMetadata(t *testing.T) {
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
 			Kind:   metadata.KindInngestScore,
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"accuracy": json.RawMessage(`1`)},
+			Values: metadata.Values{"passed": json.RawMessage(`true`)},
 		}}},
 	})
 	require.NoError(t, err)

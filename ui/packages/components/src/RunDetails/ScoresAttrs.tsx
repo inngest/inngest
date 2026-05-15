@@ -8,7 +8,7 @@ type ScoreMetadata = {
 type ScoreRow = {
   name: string;
   updatedAt: string;
-  value: number;
+  value: number | boolean;
 };
 
 type ScoreTrace = {
@@ -28,9 +28,11 @@ function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   return metadata
     .flatMap((md) =>
       Object.entries(md.values)
-        .filter((entry): entry is [string, number] => {
+        .filter((entry): entry is [string, number | boolean] => {
           const [, value] = entry;
-          return typeof value === 'number' && Number.isFinite(value);
+          return (
+            typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
+          );
         })
         .map(([name, value]) => ({
           name,
@@ -65,7 +67,7 @@ export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
           className="border-muted grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 border-b px-4 py-3 text-sm last:border-b-0"
         >
           <div className="text-basis min-w-0 font-medium [overflow-wrap:anywhere]">{row.name}</div>
-          <div className="text-basis font-mono">{row.value}</div>
+          <div className="text-basis font-mono">{String(row.value)}</div>
           <TimeElement date={new Date(row.updatedAt)} />
         </div>
       ))}

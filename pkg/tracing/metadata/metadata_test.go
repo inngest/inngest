@@ -99,6 +99,14 @@ func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 			}},
 		},
 		{
+			name: "flat boolean score is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"passed": json.RawMessage(`true`)},
+			}},
+		},
+		{
 			name: "nested score object is invalid",
 			update: Update{RawUpdate: RawUpdate{
 				Kind:   KindInngestScore,

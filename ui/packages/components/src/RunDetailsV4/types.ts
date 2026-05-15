@@ -136,7 +136,7 @@ export type SpanMetadataInngestScore = {
   scope: SpanMetadataScope;
   kind: 'inngest.score';
   updatedAt: string;
-  values: Record<string, number>;
+  values: Record<string, number | boolean>;
 };
 
 export type SpanMetadataUserland = {

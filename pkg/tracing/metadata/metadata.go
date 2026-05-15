@@ -18,7 +18,7 @@ var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
 	ErrScoreNameInvalid        = errors.New("score name is invalid")
-	ErrScoreValueInvalid       = errors.New("score value must be a finite number")
+	ErrScoreValueInvalid       = errors.New("score value must be a finite number or boolean")
 )
 
 var scoreNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,63}$`)
@@ -186,14 +186,21 @@ func validateScoreValues(values Values) error {
 			return fmt.Errorf("invalid score name %q: %w", name, ErrScoreNameInvalid)
 		}
 
-		var value *float64
-		// Pointer keeps JSON null from looking like numeric zero.
+		var value any
 		if err := json.Unmarshal(raw, &value); err != nil {
 			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
 		}
-		if value == nil || math.IsNaN(*value) || math.IsInf(*value, 0) {
-			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
+
+		switch v := value.(type) {
+		case bool:
+			continue
+		case float64:
+			if !math.IsNaN(v) && !math.IsInf(v, 0) {
+				continue
+			}
 		}
+
+		return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
 	}
 
 	return nil
