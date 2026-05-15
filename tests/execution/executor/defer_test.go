@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -68,7 +68,7 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()

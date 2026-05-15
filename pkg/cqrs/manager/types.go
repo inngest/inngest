@@ -1,4 +1,4 @@
-package base_cqrs
+package manager
 
 import (
 	dbpkg "github.com/inngest/inngest/pkg/db"

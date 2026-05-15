@@ -58,6 +58,14 @@ func TestShouldExcludePR(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "generated release pr",
+			pr: PullRequest{
+				Title: "chore(release): v1.19.4",
+				Files: []string{"CHANGELOG.md"},
+			},
+			want: true,
+		},
+		{
 			name: "scoped non release prefix",
 			pr: PullRequest{
 				Title: "cloud(dashboard): update card",

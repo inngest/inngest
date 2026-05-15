@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -44,6 +45,9 @@ func ParseCliffExcludePaths(config string) []string {
 }
 
 func ShouldExcludePR(pr PullRequest, excludes []string) bool {
+	if isGeneratedReleasePRTitle(pr.Title) {
+		return true
+	}
 	if isNonReleaseTitle(pr.Title) {
 		return true
 	}
@@ -56,6 +60,12 @@ func ShouldExcludePR(pr PullRequest, excludes []string) bool {
 		}
 	}
 	return true
+}
+
+var generatedReleasePRTitlePattern = regexp.MustCompile(`^chore\(release\): v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9a-z.-]+)?$`)
+
+func isGeneratedReleasePRTitle(title string) bool {
+	return generatedReleasePRTitlePattern.MatchString(strings.ToLower(strings.TrimSpace(title)))
 }
 
 func isNonReleaseTitle(title string) bool {

@@ -1,3 +1,2 @@
-// Package manager is the future home of the composite cqrs.Manager
-// implementation over db.Adapter.
+// Package manager implements the composite cqrs.Manager over db.Adapter.
 package manager
