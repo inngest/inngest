@@ -1137,7 +1137,16 @@ func (s *sink) handleReqRespBatch(
 				"max_retries_reached", !failUnknown && batch.tries.Load() > s.cl.cfg.recordRetries,
 			)
 		} else {
-			batch.owner.okOnSink = true
+			// Only credit okOnSink to the sink that earned it. If the
+			// recBuf migrated mid-flight, this response is from the old
+			// sink; setting okOnSink=true here would let the new sink
+			// pipeline a second produce before its own first ack and
+			// re-introduce the #223 OOOSN-on-retry race the gate exists
+			// to prevent. lastAckedOffset and addedToTxn track broker-
+			// side facts and remain unconditional.
+			if batch.owner.sink == s {
+				batch.owner.okOnSink = true
+			}
 			batch.owner.lastAckedOffset = rp.BaseOffset + int64(len(batch.records))
 			if resp.Version >= 12 && s.cl.cfg.txnID != nil {
 				batch.owner.addedToTxn.Swap(true)

@@ -494,6 +494,35 @@ func (g *groupConsumer) manageFailWait(consecutiveErrors int, err error) (ctxCan
 	return false
 }
 
+// abandonAssignment fires onLost, invalidates cursors, and clears local
+// assignment state in preparation for re-joining. Used by the 848 manage
+// loop when the server-side member state was lost (Fenced/UnknownMember/
+// StaleMember/GroupMaxSize/UnsupportedAssignor): the partitions are no
+// longer ours, so cursors must stop fetching before the next initialJoin
+// to prevent dual-processing records that have been reassigned to another
+// member. Mirrors manageFailWait's cleanup without the consecutive-error
+// backoff. Must be called with memberGen still holding the OLD member id
+// so onLost callbacks see the membership context that was active when the
+// loss occurred.
+func (g *groupConsumer) abandonAssignment(why string) {
+	g.c.waitAndAddRebalance()
+
+	g.cfg.onLost(g.cl.ctx, g.cl, g.nowAssigned.read())
+
+	g.c.mu.Lock()
+	g.c.assignPartitions(nil, assignInvalidateAll, nil, why)
+	g.mu.Lock()     // before allowing poll to touch uncommitted, lock the group
+	g.c.mu.Unlock() // now part of poll can continue
+	g.uncommitted = nil
+	g.mu.Unlock()
+
+	g.nowAssigned.store(nil)
+	g.lastAssigned = nil
+	g.fetching = nil
+
+	g.c.unaddRebalance()
+}
+
 // Manages the group consumer's join / sync / heartbeat / fetch offset flow.
 //
 // Once a group is assigned, we fire a metadata request for all topics the
@@ -1864,17 +1893,36 @@ start:
 					)
 					select {
 					case <-ctx.Done():
+						// Cancellation here means the
+						// heartbeat exited (rebalance, new
+						// assignment, client close); the
+						// session is tearing down. Returning
+						// ctx.Err() prevents falling through
+						// to the non-retryable injection path
+						// below, which would surface a
+						// transient retryable error as a fake
+						// fetch error to the user.
+						return ctx.Err()
 					case <-time.After(time.Second):
 						goto start
 					}
 				}
-				g.cfg.logger.Log(LogLevelError, "fetch offsets failed",
+				// A single non-retryable partition error (e.g.
+				// TopicAuthorizationFailed) used to abort the
+				// entire fetchOffsets and tear the session down,
+				// which then immediately rejoined and hit the same
+				// error: a spin loop driven by one bad partition.
+				// Instead we surface the error to the user via a
+				// fake fetch and drop the partition from this
+				// assignment; the rest of the session proceeds.
+				g.cfg.logger.Log(LogLevelError, "fetch offsets failed for partition; injecting error and continuing with remaining partitions",
 					"group", g.cfg.group,
 					"topic", topic,
 					"partition", rPartition.Partition,
 					"err", err,
 				)
-				return err
+				g.c.addFakeReadyForDraining(topic, rPartition.Partition, err, "fetch offsets returned a non-retryable partition error")
+				continue
 			}
 			offset := Offset{
 				at:    rPartition.Offset,
@@ -3177,6 +3225,14 @@ func (g *groupConsumer) commit(
 		// wire. Pin to v9 so the broker continues to match by name.
 		// See #1312. Held in a separate variable from commitCtx so
 		// the cancel/retry-sleep paths keep using the unwrapped ctx.
+		//
+		// pinV9 is computed once here and not recomputed inside the
+		// STALE_MEMBER_EPOCH retry loop below because that loop only
+		// DROPS partitions from req.Topics; it never re-adds topics
+		// whose TopicID state could change pinV9. If a future change
+		// allows re-adding topics on retry, recompute pinV9 (and rebuild
+		// reqCtx) inside the loop so a topic-id-less topic never lands
+		// on a v10+ wire by accident.
 		reqCtx := commitCtx
 		if pinV9 {
 			reqCtx = context.WithValue(commitCtx, ctxPinReq, &pinReq{pinMax: true, max: 9})

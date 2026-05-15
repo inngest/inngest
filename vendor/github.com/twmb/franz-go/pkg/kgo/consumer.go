@@ -1839,8 +1839,13 @@ func (c *consumer) stopSession() (listOrEpochLoads, *topicsPartitions) {
 	c.sourcesReadyForDraining = nil
 
 	// At this point, we have invalidated any buffered data from the prior
-	// session. We leave any fake things that were ready so that the user
-	// can act on errors. The session is dead.
+	// session. We deliberately leave c.fakeReadyForDraining so the user can
+	// still observe errors that happened in the dying session (data loss,
+	// list/epoch failures, no-committed-offset notices, etc.). A consequence
+	// is that the user's next poll may surface an error for a partition the
+	// new assignment does not include; callers that key off fake-fetch errors
+	// for committing must check current ownership before acting. The session
+	// is dead.
 
 	session.listOrEpochLoadsWaiting.mergeFrom(session.listOrEpochLoadsLoading)
 	return session.listOrEpochLoadsWaiting, session.tps

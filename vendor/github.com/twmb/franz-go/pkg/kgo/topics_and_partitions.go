@@ -216,6 +216,7 @@ func (m pausedTopics) delTopics(topics ...string) {
 			continue
 		}
 		pps.all = false
+		m[topic] = pps
 		if !pps.all && len(pps.m) == 0 {
 			delete(m, topic)
 		}
