@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const DefaultGRPCPort = 50051
+const DefaultGRPCPort = 8290
 
 const gracefulStopTimeout = 10 * time.Second
 

@@ -297,7 +297,7 @@ func TestResolveTargetDefaultsToDevServer(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, "localhost:50051", gotTarget)
+	require.Equal(t, "localhost:8290", gotTarget)
 }
 
 func TestResolveTargetUsesAPIPortEnv(t *testing.T) {
