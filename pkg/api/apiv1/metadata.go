@@ -116,7 +116,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		return err
 	}
 
-	if err := metadata.ValidateUpdatesAllowed(req.Metadata, scope); err != nil {
+	if err := metadata.ValidateUpdatesAllowed(req.Metadata); err != nil {
 		return publicerr.Wrap(err, 400, "Invalid metadata")
 	}
 

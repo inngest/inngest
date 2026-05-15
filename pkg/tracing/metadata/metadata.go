@@ -18,7 +18,6 @@ var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
 	ErrScoreNameInvalid        = errors.New("score name is invalid")
-	ErrScoreScopeInvalid       = errors.New("score metadata must target run or step scope")
 	ErrScoreValueInvalid       = errors.New("score value must be a finite number")
 )
 
@@ -128,30 +127,9 @@ type ScopedUpdate struct {
 	Update
 }
 
-// ValidateAllowed applies reserved-kind rules after a target has been resolved
-// to a scope.
+// ValidateAllowed applies reserved-kind rules.
 func (m ScopedUpdate) ValidateAllowed() error {
-	if err := m.Update.Validate(); err != nil {
-		return err
-	}
-
-	if err := m.Kind().ValidateAllowed(); err != nil {
-		return err
-	}
-
-	if m.Kind() != KindInngestScore {
-		return nil
-	}
-
-	if err := validateScoreValues(m.RawUpdate.Values); err != nil {
-		return err
-	}
-
-	if !isScoreScope(m.Scope) {
-		return fmt.Errorf("invalid score scope %q: %w", m.Scope, ErrScoreScopeInvalid)
-	}
-
-	return nil
+	return m.Update.ValidateAllowed()
 }
 
 type Update struct {
@@ -180,24 +158,33 @@ func (m Update) Validate() error {
 	return nil
 }
 
-// ValidateUpdatesAllowed applies reserved-kind rules to each update for scope.
-func ValidateUpdatesAllowed(updates []Update, scope Scope) error {
-	for _, update := range updates {
-		if err := (ScopedUpdate{Scope: scope, Update: update}).ValidateAllowed(); err != nil {
-			return err
-		}
+// ValidateAllowed checks generic shape, reserved kind allowlists, and reserved
+// value formats.
+func (m Update) ValidateAllowed() error {
+	if err := m.Validate(); err != nil {
+		return err
+	}
+
+	if err := m.Kind().ValidateAllowed(); err != nil {
+		return err
+	}
+
+	if m.Kind() == KindInngestScore {
+		return validateScoreValues(m.RawUpdate.Values)
 	}
 
 	return nil
 }
 
-func isScoreScope(scope Scope) bool {
-	switch scope {
-	case enums.MetadataScopeRun, enums.MetadataScopeStep:
-		return true
-	default:
-		return false
+// ValidateUpdatesAllowed applies reserved-kind rules to each update.
+func ValidateUpdatesAllowed(updates []Update) error {
+	for _, update := range updates {
+		if err := update.ValidateAllowed(); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func validateScoreValues(values Values) error {
