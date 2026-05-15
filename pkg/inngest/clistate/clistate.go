@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 
 	"github.com/google/uuid"
@@ -106,7 +105,7 @@ func (s State) Persist(ctx context.Context) error {
 		return fmt.Errorf("error reading ~/.config/inngest")
 	}
 
-	return ioutil.WriteFile(path, byt, 0600)
+	return os.WriteFile(path, byt, 0600)
 }
 
 // Client returns an API client, attempting to use authentication from
