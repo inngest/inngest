@@ -266,12 +266,6 @@ type PeekOperations interface {
 		peekUntil time.Time,
 		sequential bool,
 	) ([]*QueuePartition, error)
-	PeekGlobalPartitions(
-		ctx context.Context,
-		peekLimit int64,
-		peekUntil time.Time,
-		sequential bool,
-	) ([]*QueuePartition, error)
 }
 
 // ShadowProcessingOperations is the per-shard surface for shadow partition,
