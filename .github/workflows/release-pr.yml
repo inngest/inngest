@@ -229,7 +229,7 @@ jobs:
 
       - name: Sync Linear release
         if: github.event_name != 'schedule' && steps.skip.outputs.skip == 'false' && steps.changes.outputs.ahead != '0'
-        uses: linear/linear-release-action@v0
+        uses: linear/linear-release-action@0917777589db006387af296dde440385f88d6ac4 # v0
         continue-on-error: true
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
