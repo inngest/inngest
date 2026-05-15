@@ -82,7 +82,7 @@ func TestValuesSizeNilMap(t *testing.T) {
 	}
 }
 
-func TestScopedUpdateValidateAllowedScoreValues(t *testing.T) {
+func TestUpdateValidateAllowedScoreValues(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -148,7 +148,7 @@ func TestScopedUpdateValidateAllowedScoreValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := ScopedUpdate{Scope: enums.MetadataScopeStep, Update: tt.update}.ValidateAllowed()
+			err := tt.update.ValidateAllowed()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				return
@@ -157,18 +157,4 @@ func TestScopedUpdateValidateAllowedScoreValues(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-}
-
-func TestScopedUpdateValidateAllowedScoreScopes(t *testing.T) {
-	t.Parallel()
-
-	update := Update{RawUpdate: RawUpdate{
-		Kind:   KindInngestScore,
-		Op:     enums.MetadataOpcodeMerge,
-		Values: Values{"accuracy": json.RawMessage(`1`)},
-	}}
-
-	require.NoError(t, ScopedUpdate{Scope: enums.MetadataScopeStep, Update: update}.ValidateAllowed())
-	require.NoError(t, ScopedUpdate{Scope: enums.MetadataScopeRun, Update: update}.ValidateAllowed())
-	require.ErrorIs(t, ScopedUpdate{Scope: enums.MetadataScopeStepAttempt, Update: update}.ValidateAllowed(), ErrScoreScopeInvalid)
 }
