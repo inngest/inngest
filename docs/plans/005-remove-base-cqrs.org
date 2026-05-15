@@ -1,7 +1,7 @@
 #+TITLE: Remove base_cqrs and Reframe CQRS/DB Package Boundaries
 #+AUTHOR: Darwin D. Wu
 #+DATE: 2026-04-22
-#+STATUS: Draft
+#+STATUS: Active
 #+STARTUP: showall
 
 * Summary
