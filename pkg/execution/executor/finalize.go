@@ -224,26 +224,15 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
-		// The GraphQL `defers` field surfaces both SCHEDULED and ABORTED rows;
-		// Rejected and any future enum value are out of contract and skipped
-		// rather than persisted as an unknown string.
-		if e.deferStore != nil {
-			var deferRowStatus cqrs.RunDeferStatus
-			switch d.ScheduleStatus {
-			case enums.DeferStatusAfterRun:
-				deferRowStatus = cqrs.RunDeferStatusScheduled
-			case enums.DeferStatusAborted:
-				deferRowStatus = cqrs.RunDeferStatusAborted
-			}
-			if deferRowStatus != "" {
-				deferInserts = append(deferInserts, cqrs.RunDeferInsert{
-					ID:          opts.Metadata.ID,
-					DeferID:     d.HashedID,
-					UserDeferID: d.UserlandID,
-					FnSlug:      d.FnSlug,
-					Status:      deferRowStatus,
-				})
-			}
+		// Only AfterRun and Aborted are surfaced via the GraphQL `defers`
+		// field; Rejected and any future enum value are out of contract.
+		if e.deferStore != nil && (d.ScheduleStatus == enums.DeferStatusAfterRun || d.ScheduleStatus == enums.DeferStatusAborted) {
+			deferInserts = append(deferInserts, cqrs.RunDeferInsert{
+				DeferID:     d.HashedID,
+				UserDeferID: d.UserlandID,
+				FnSlug:      d.FnSlug,
+				Status:      d.ScheduleStatus,
+			})
 		}
 
 		// TODO: what about an immediate execution mode?
@@ -320,7 +309,7 @@ func (e *executor) buildDeferEvents(
 	if e.deferStore != nil && len(deferInserts) > 0 {
 		_, err := util.WithRetry(ctx, "deferStore.InsertRunDefers",
 			func(ctx context.Context) (struct{}, error) {
-				return struct{}{}, e.deferStore.InsertRunDefers(ctx, deferInserts)
+				return struct{}{}, e.deferStore.InsertRunDefers(ctx, opts.Metadata.ID, deferInserts)
 			},
 			util.NewRetryConf(),
 		)

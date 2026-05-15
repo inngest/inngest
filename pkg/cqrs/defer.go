@@ -3,6 +3,7 @@ package cqrs
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/enums"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/oklog/ulid/v2"
 )
@@ -10,8 +11,8 @@ import (
 // DeferStore writes parent-run → child-run defer linkages so the dev-server
 // GraphQL can expose deferred runs after the parent's state has been deleted.
 //
-// deferID is the SHA1 hash of the user-supplied defer id (the join key with
-// UpdateRunDeferChildRunID). userDeferID preserves the original string so the
+// DeferID is the SHA1 hash of the user-supplied defer id (the join key with
+// UpdateRunDeferChildRunID). UserDeferID preserves the original string so the
 // UI can show the id the SDK caller typed.
 //
 // The id parameter on each method is the **parent** run identifier. It carries
@@ -20,28 +21,30 @@ import (
 // having to plumb separate accountID/envID parameters. Single-tenant
 // implementations (the dev-server Postgres) just unpack id.RunID.
 type DeferStore interface {
-	InsertRunDefer(ctx context.Context, id sv2.ID, deferID, userDeferID, fnSlug string, status RunDeferStatus) error
-	InsertRunDefers(ctx context.Context, defers []RunDeferInsert) error
-	UpdateRunDeferChildRunID(ctx context.Context, id sv2.ID, deferID string, childRunID ulid.ULID) error
+	InsertRunDefer(ctx context.Context, id sv2.ID, rd RunDeferInsert) error
+	InsertRunDefers(ctx context.Context, id sv2.ID, defers []RunDeferInsert) error
+	UpdateRunDeferChildRunID(ctx context.Context, id sv2.ID, upd RunDeferUpdate) error
 }
 
-// RunDeferInsert is a single defer row to be persisted. ID is the parent
-// run identifier (run id + tenant); the child run id is set later via
-// UpdateRunDeferChildRunID once the deferred.schedule event fires.
+// RunDeferInsert is the per-row payload for inserting a defer. The parent
+// run identifier is passed alongside (see DeferStore); the child run id is
+// set later via UpdateRunDeferChildRunID once the deferred.schedule event
+// fires.
 type RunDeferInsert struct {
-	ID          sv2.ID
 	DeferID     string
 	UserDeferID string
 	FnSlug      string
-	Status      RunDeferStatus
+	Status      enums.DeferStatus
 }
 
-type RunDeferStatus string
-
-const (
-	RunDeferStatusScheduled RunDeferStatus = "SCHEDULED"
-	RunDeferStatusAborted   RunDeferStatus = "ABORTED"
-)
+// RunDeferUpdate is the payload for UpdateRunDeferChildRunID. DeferID is the
+// SHA1-hashed defer id (join key); ChildRunID is the run id of the deferred
+// child run, parsed from the inngest/deferred.schedule event the runner just
+// processed.
+type RunDeferUpdate struct {
+	DeferID    string
+	ChildRunID ulid.ULID
+}
 
 // RunDefer is a single defer attached to a parent function run. Parsed from
 // the parent's history opcodes (DeferAdd/DeferAbort) and joined to the
@@ -57,7 +60,7 @@ type RunDefer struct {
 	ID          string
 	UserDeferID string
 	FnSlug      string
-	Status      RunDeferStatus
+	Status      enums.DeferStatus
 	Run         *TraceRun
 }
 

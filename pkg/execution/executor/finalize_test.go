@@ -33,7 +33,7 @@ type deferInsertCall struct {
 	DeferID     string
 	UserDeferID string
 	FnSlug      string
-	Status      cqrs.RunDeferStatus
+	Status      enums.DeferStatus
 }
 
 type deferUpdateCall struct {
@@ -42,31 +42,31 @@ type deferUpdateCall struct {
 	ChildRunID ulid.ULID
 }
 
-func (f *fakeDeferStore) InsertRunDefer(_ context.Context, id sv2.ID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
+func (f *fakeDeferStore) InsertRunDefer(_ context.Context, id sv2.ID, rd cqrs.RunDeferInsert) error {
 	f.inserts = append(f.inserts, deferInsertCall{
 		ID:          id,
-		DeferID:     deferID,
-		UserDeferID: userDeferID,
-		FnSlug:      fnSlug,
-		Status:      status,
+		DeferID:     rd.DeferID,
+		UserDeferID: rd.UserDeferID,
+		FnSlug:      rd.FnSlug,
+		Status:      rd.Status,
 	})
 	return f.insertErr
 }
 
-func (f *fakeDeferStore) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInsert) error {
+func (f *fakeDeferStore) InsertRunDefers(ctx context.Context, id sv2.ID, defers []cqrs.RunDeferInsert) error {
 	for _, d := range defers {
-		if err := f.InsertRunDefer(ctx, d.ID, d.DeferID, d.UserDeferID, d.FnSlug, d.Status); err != nil {
+		if err := f.InsertRunDefer(ctx, id, d); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (f *fakeDeferStore) UpdateRunDeferChildRunID(_ context.Context, id sv2.ID, deferID string, childRunID ulid.ULID) error {
+func (f *fakeDeferStore) UpdateRunDeferChildRunID(_ context.Context, id sv2.ID, upd cqrs.RunDeferUpdate) error {
 	f.updates = append(f.updates, deferUpdateCall{
 		ID:         id,
-		DeferID:    deferID,
-		ChildRunID: childRunID,
+		DeferID:    upd.DeferID,
+		ChildRunID: upd.ChildRunID,
 	})
 	return f.updateErr
 }
@@ -162,7 +162,7 @@ func TestBuildDeferEvents(t *testing.T) {
 		assert.Equal(t, "hash-a", store.inserts[0].DeferID)
 		assert.Equal(t, "user-a", store.inserts[0].UserDeferID)
 		assert.Equal(t, "child-fn", store.inserts[0].FnSlug)
-		assert.Equal(t, cqrs.RunDeferStatusScheduled, store.inserts[0].Status)
+		assert.Equal(t, enums.DeferStatusAfterRun, store.inserts[0].Status)
 
 		evt := events[0]
 		assert.Equal(t, consts.FnDeferScheduleName, evt.Name)
@@ -218,7 +218,7 @@ func TestBuildDeferEvents(t *testing.T) {
 		assert.Empty(t, events)
 
 		require.Len(t, store.inserts, 1)
-		assert.Equal(t, cqrs.RunDeferStatusAborted, store.inserts[0].Status)
+		assert.Equal(t, enums.DeferStatusAborted, store.inserts[0].Status)
 	})
 
 	t.Run("Rejected and Scheduled (unknown-to-row) are skipped (no row, no event)", func(t *testing.T) {

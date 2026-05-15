@@ -1625,38 +1625,38 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 	return nil, err
 }
 
-func (w wrapper) InsertRunDefer(ctx context.Context, id sv2.ID, deferID, userDeferID, fnSlug string, status cqrs.RunDeferStatus) error {
+func (w wrapper) InsertRunDefer(ctx context.Context, id sv2.ID, rd cqrs.RunDeferInsert) error {
 	return w.q.InsertRunDefer(ctx, dbpkg.InsertRunDeferParams{
 		ParentRunID: id.RunID,
-		DeferID:     deferID,
-		UserDeferID: userDeferID,
-		FnSlug:      fnSlug,
-		Status:      string(status),
+		DeferID:     rd.DeferID,
+		UserDeferID: rd.UserDeferID,
+		FnSlug:      rd.FnSlug,
+		Status:      rd.Status.String(),
 	})
 }
 
-func (w wrapper) InsertRunDefers(ctx context.Context, defers []cqrs.RunDeferInsert) error {
+func (w wrapper) InsertRunDefers(ctx context.Context, id sv2.ID, defers []cqrs.RunDeferInsert) error {
 	if len(defers) == 0 {
 		return nil
 	}
 	params := make([]dbpkg.InsertRunDeferParams, len(defers))
 	for i, d := range defers {
 		params[i] = dbpkg.InsertRunDeferParams{
-			ParentRunID: d.ID.RunID,
+			ParentRunID: id.RunID,
 			DeferID:     d.DeferID,
 			UserDeferID: d.UserDeferID,
 			FnSlug:      d.FnSlug,
-			Status:      string(d.Status),
+			Status:      d.Status.String(),
 		}
 	}
 	return w.q.InsertRunDefers(ctx, params)
 }
 
-func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, id sv2.ID, deferID string, childRunID ulid.ULID) error {
+func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, id sv2.ID, upd cqrs.RunDeferUpdate) error {
 	return w.q.UpdateRunDeferChildRunID(ctx, dbpkg.UpdateRunDeferChildRunIDParams{
-		ChildRunID:  childRunID,
+		ChildRunID:  upd.ChildRunID,
 		ParentRunID: id.RunID,
-		DeferID:     deferID,
+		DeferID:     upd.DeferID,
 	})
 }
 
@@ -1687,11 +1687,17 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 
 	out := make(map[ulid.ULID][]cqrs.RunDefer, len(runIDs))
 	for _, r := range rows {
+		// Skip unrecognized statuses rather than passing DeferStatusUnknown
+		// through to the resolver, which would fail the whole Defers query.
+		status, err := enums.DeferStatusString(r.Status)
+		if err != nil {
+			continue
+		}
 		entry := cqrs.RunDefer{
 			ID:          r.DeferID,
 			UserDeferID: r.UserDeferID,
 			FnSlug:      r.FnSlug,
-			Status:      cqrs.RunDeferStatus(r.Status),
+			Status:      status,
 		}
 		if !r.ChildRunID.IsZero() {
 			if tr, ok := runsByID[r.ChildRunID]; ok {

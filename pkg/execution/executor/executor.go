@@ -1619,7 +1619,10 @@ func (e *executor) backfillDeferChildRunID(ctx context.Context, req execution.Sc
 		}
 		_, err = util.WithRetry(ctx, "deferStore.UpdateRunDeferChildRunID",
 			func(ctx context.Context) (struct{}, error) {
-				return struct{}{}, e.deferStore.UpdateRunDeferChildRunID(ctx, parentID, deferredMeta.DeferID, childRunID)
+				return struct{}{}, e.deferStore.UpdateRunDeferChildRunID(ctx, parentID, cqrs.RunDeferUpdate{
+					DeferID:    deferredMeta.DeferID,
+					ChildRunID: childRunID,
+				})
 			},
 			util.NewRetryConf(),
 		)
