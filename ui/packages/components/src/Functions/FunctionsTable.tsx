@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
+import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { Search } from '@inngest/components/Forms/Search';
 import TableBlankState from '@inngest/components/Functions/TableBlankState';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
+import { type Option } from '@inngest/components/Select/Select';
 import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { type Function, type PageInfo } from '@inngest/components/types/function';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, type LinkComponentProps } from '@tanstack/react-router';
 
-import { useSearchParam } from '../hooks/useSearchParams';
+import { useSearchParam, useStringArraySearchParam } from '../hooks/useSearchParams';
 import FunctionsStatusFilter from './StatusMenu';
 import { useColumns } from './columns';
 
@@ -19,6 +21,7 @@ export function FunctionsTable({
   getFunctionVolume,
   pathCreator,
   emptyActions,
+  apps,
 }: {
   emptyActions: React.ReactNode;
   pathCreator: {
@@ -29,9 +32,12 @@ export function FunctionsTable({
   getFunctions: ({
     cursor,
     archived,
+    nameSearch,
+    appIDs,
   }: {
     cursor: number | null;
     nameSearch: string | null;
+    appIDs: string[] | null;
     archived: boolean;
   }) => Promise<{ functions: Omit<Function, 'usage'>[]; pageInfo: PageInfo }>;
   getFunctionVolume: ({
@@ -39,6 +45,7 @@ export function FunctionsTable({
   }: {
     functionID: string;
   }) => Promise<Pick<Function, 'usage' | 'failureRate'>>;
+  apps?: Option[];
 }) {
   const navigate = useNavigate();
   const columns = useColumns({ pathCreator, getFunctionVolume });
@@ -48,6 +55,8 @@ export function FunctionsTable({
   const [isScrollable, setIsScrollable] = useState(false);
   const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
   const [searchInput, setSearchInput] = useState<string>(nameSearch || '');
+  const [filteredApp = [], setFilteredApp, removeFilteredApp] =
+    useStringArraySearchParam('filterApp');
   const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToTop = useCallback(
@@ -83,6 +92,18 @@ export function FunctionsTable({
     [setFilteredStatus, removeFilteredStatus]
   );
 
+  const onAppFilterChange = useCallback(
+    (value: string[]) => {
+      if (value.length > 0) {
+        setFilteredApp(value);
+      } else {
+        removeFilteredApp();
+      }
+      scrollToTop();
+    },
+    [setFilteredApp, removeFilteredApp]
+  );
+
   const {
     isPending, // first load, no data
     error,
@@ -93,9 +114,14 @@ export function FunctionsTable({
     refetch,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['functions', { archived, nameSearch }],
+    queryKey: ['functions', { archived, nameSearch, appIDs: filteredApp }],
     queryFn: ({ pageParam = 1 }: { pageParam: number }) =>
-      getFunctions({ cursor: pageParam, archived, nameSearch }),
+      getFunctions({
+        cursor: pageParam,
+        archived,
+        nameSearch,
+        appIDs: filteredApp.length > 0 ? filteredApp : null,
+      }),
     refetchOnWindowFocus: false,
     getNextPageParam: (lastPage) => {
       const { currentPage, totalPages } = lastPage.pageInfo;
@@ -144,6 +170,14 @@ export function FunctionsTable({
           }}
         />
         <FunctionsStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
+        {apps && (
+          <EntityFilter
+            type="app"
+            onFilterChange={onAppFilterChange}
+            selectedEntities={filteredApp}
+            entities={apps}
+          />
+        )}
       </div>
       <div className="flex-1 overflow-y-auto" ref={containerRef}>
         <Table
