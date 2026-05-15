@@ -116,8 +116,8 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		return err
 	}
 
-	if err := validateRunMetadata(req.Metadata, scope); err != nil {
-		return err
+	if err := metadata.ValidateUpdatesAllowed(req.Metadata, scope); err != nil {
+		return publicerr.Wrap(err, 400, "Invalid metadata")
 	}
 
 	stateID := runMetadataStateID(parentSpan, auth)
@@ -169,16 +169,6 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 					"delta", delta,
 				)
 			}
-		}
-	}
-
-	return nil
-}
-
-func validateRunMetadata(updates []metadata.Update, scope metadata.Scope) error {
-	for _, md := range updates {
-		if err := (metadata.ScopedUpdate{Scope: scope, Update: md}).ValidateAllowed(); err != nil {
-			return publicerr.Wrap(err, 400, "Invalid metadata")
 		}
 	}
 

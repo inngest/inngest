@@ -131,7 +131,27 @@ type ScopedUpdate struct {
 // ValidateAllowed applies reserved-kind rules after a target has been resolved
 // to a scope.
 func (m ScopedUpdate) ValidateAllowed() error {
-	return m.Update.validateAllowedForScope(m.Scope)
+	if err := m.Update.Validate(); err != nil {
+		return err
+	}
+
+	if err := m.Kind().ValidateAllowed(); err != nil {
+		return err
+	}
+
+	if m.Kind() != KindInngestScore {
+		return nil
+	}
+
+	if err := validateScoreValues(m.RawUpdate.Values); err != nil {
+		return err
+	}
+
+	if !isScoreScope(m.Scope) {
+		return fmt.Errorf("invalid score scope %q: %w", m.Scope, ErrScoreScopeInvalid)
+	}
+
+	return nil
 }
 
 type Update struct {
@@ -160,29 +180,12 @@ func (m Update) Validate() error {
 	return nil
 }
 
-func (m Update) validateAllowedKindAndValues() error {
-	if err := m.Validate(); err != nil {
-		return err
-	}
-
-	if err := m.Kind().ValidateAllowed(); err != nil {
-		return err
-	}
-
-	if m.Kind() == KindInngestScore {
-		return validateScoreValues(m.RawUpdate.Values)
-	}
-
-	return nil
-}
-
-func (m Update) validateAllowedForScope(scope Scope) error {
-	if err := m.validateAllowedKindAndValues(); err != nil {
-		return err
-	}
-
-	if m.Kind() == KindInngestScore && !isScoreScope(scope) {
-		return fmt.Errorf("invalid score scope %q: %w", scope, ErrScoreScopeInvalid)
+// ValidateUpdatesAllowed applies reserved-kind rules to each update for scope.
+func ValidateUpdatesAllowed(updates []Update, scope Scope) error {
+	for _, update := range updates {
+		if err := (ScopedUpdate{Scope: scope, Update: update}).ValidateAllowed(); err != nil {
+			return err
+		}
 	}
 
 	return nil
