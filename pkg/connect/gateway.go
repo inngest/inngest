@@ -1313,6 +1313,10 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				select {
 				case <-ackCh:
 					msg.Result <- nil
+				case <-c.stopForwarding:
+					c.pendingAcks.Delete(data.RequestId)
+					msg.Result <- fmt.Errorf("connection closed before worker ACK for request %s", data.RequestId)
+					log.Warn("connection closed before worker ACK, re-routing", "req_id", data.RequestId)
 				case <-time.After(consts.ConnectWorkerRequestLeaseDuration + consts.ConnectWorkerRequestGracePeriod):
 					c.pendingAcks.Delete(data.RequestId)
 					msg.Result <- fmt.Errorf("worker did not ACK request %s", data.RequestId)
