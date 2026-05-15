@@ -160,8 +160,19 @@ type Run struct {
 func (c *Client) Run(ctx context.Context, runID string) Run {
 	c.Helper()
 
+	run, err := c.RunOrError(ctx, runID)
+	if err != nil {
+		c.Fatalf("err with gql: %v", err)
+	}
+	return run
+}
+
+// RunOrError queries the function run by ID and returns an error instead of
+// fatally exiting on GQL errors. This allows callers like WaitForRunStatus to
+// tolerate transient "not found" errors during polling.
+func (c *Client) RunOrError(ctx context.Context, runID string) (Run, error) {
 	if runID == "" {
-		c.Fatalf("runID cannot be empty")
+		return Run{}, fmt.Errorf("runID cannot be empty")
 	}
 
 	query := `
@@ -179,7 +190,7 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 		},
 	})
 	if len(resp.Errors) > 0 {
-		c.Fatalf("err with gql: %#v", resp.Errors)
+		return Run{}, fmt.Errorf("%s", resp.Errors.Error())
 	}
 
 	type response struct {
@@ -188,10 +199,10 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 
 	data := &response{}
 	if err := json.Unmarshal(resp.Data, data); err != nil {
-		c.Fatal(err.Error())
+		return Run{}, fmt.Errorf("unmarshal run response: %w", err)
 	}
 
-	return data.FunctionRun
+	return data.FunctionRun, nil
 }
 
 type WaitForRunStatusOpts struct {
@@ -218,9 +229,12 @@ func (c *Client) WaitForRunStatus(
 	start := time.Now()
 	var run Run
 	for {
-		run = c.Run(ctx, runID)
-		if run.Status == expectedStatus {
-			return run
+		r, err := c.RunOrError(ctx, runID)
+		if err == nil {
+			run = r
+			if r.Status == expectedStatus {
+				return r
+			}
 		}
 
 		if time.Since(start) > timeout {
