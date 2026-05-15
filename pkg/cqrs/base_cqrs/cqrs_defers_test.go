@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -23,17 +24,17 @@ func parentID(runID ulid.ULID) sv2.ID {
 	return sv2.ID{RunID: runID}
 }
 
-func insert(deferID, userDeferID, fnSlug string, status enums.DeferStatus) cqrs.RunDeferInsert {
+func insert(hashedDeferID, userDeferID, fnSlug string, status enums.DeferStatus) cqrs.RunDeferInsert {
 	return cqrs.RunDeferInsert{
-		DeferID:     deferID,
-		UserDeferID: userDeferID,
-		FnSlug:      fnSlug,
-		Status:      status,
+		HashedDeferID: hashedDeferID,
+		UserDeferID:   userDeferID,
+		FnSlug:        fnSlug,
+		Status:        status,
 	}
 }
 
-func childUpdate(deferID string, childRunID ulid.ULID) cqrs.RunDeferUpdate {
-	return cqrs.RunDeferUpdate{DeferID: deferID, ChildRunID: childRunID}
+func childUpdate(hashedDeferID string, childRunID ulid.ULID) cqrs.RunDeferUpdate {
+	return cqrs.RunDeferUpdate{HashedDeferID: hashedDeferID, ChildRunID: childRunID}
 }
 
 func getDefersForRun(ctx context.Context, cm cqrs.Manager, runID ulid.ULID) ([]cqrs.RunDefer, error) {
@@ -54,8 +55,8 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 	parentRunID := ulid.Make()
 
 	t.Run("roundtrips all fields", func(t *testing.T) {
-		deferID := "hash-roundtrip"
-		err := cm.InsertRunDefer(ctx, parentID(parentRunID), insert(deferID, "user-id", "app-fn", enums.DeferStatusAfterRun))
+		hashedDeferID := "hash-roundtrip"
+		err := cm.InsertRunDefer(ctx, parentID(parentRunID), insert(hashedDeferID, "user-id", "app-fn", enums.DeferStatusAfterRun))
 		require.NoError(t, err)
 
 		got, err := getDefersForRun(ctx, cm, parentRunID)
@@ -63,13 +64,14 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 
 		var found *cqrs.RunDefer
 		for i := range got {
-			if got[i].ID == deferID {
+			if got[i].HashedDeferID == hashedDeferID {
 				found = &got[i]
 				break
 			}
 		}
 		require.NotNil(t, found, "expected inserted defer to be returned")
-		assert.Equal(t, deferID, found.ID)
+		assert.Equal(t, hashedDeferID, found.HashedDeferID)
+		spew.Dump("\n\nhashedDeferID is ", hashedDeferID, "\n\n")
 		assert.Equal(t, "user-id", found.UserDeferID)
 		assert.Equal(t, "app-fn", found.FnSlug)
 		assert.Equal(t, enums.DeferStatusAfterRun, found.Status)
@@ -90,11 +92,11 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 		require.Len(t, got, 3)
 		byID := map[string]cqrs.RunDefer{}
 		for _, d := range got {
-			byID[d.ID] = d
+			byID[d.HashedDeferID] = d
 		}
 		for _, in := range batch {
-			d, ok := byID[in.DeferID]
-			require.True(t, ok, "missing %s", in.DeferID)
+			d, ok := byID[in.HashedDeferID]
+			require.True(t, ok, "missing %s", in.HashedDeferID)
 			assert.Equal(t, in.UserDeferID, d.UserDeferID)
 			assert.Equal(t, in.FnSlug, d.FnSlug)
 			assert.Equal(t, in.Status, d.Status)
@@ -107,10 +109,10 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 
 	t.Run("upsert on (parent, defer) replaces status/slug", func(t *testing.T) {
 		parent := ulid.Make()
-		deferID := "hash-upsert"
+		hashedDeferID := "hash-upsert"
 
-		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(deferID, "user-a", "fn-a", enums.DeferStatusAfterRun)))
-		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(deferID, "user-b", "fn-b", enums.DeferStatusAborted)))
+		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(hashedDeferID, "user-a", "fn-a", enums.DeferStatusAfterRun)))
+		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(hashedDeferID, "user-b", "fn-b", enums.DeferStatusAborted)))
 
 		got, err := getDefersForRun(ctx, cm, parent)
 		require.NoError(t, err)
@@ -122,13 +124,13 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 
 	t.Run("upsert preserves child_run_id set between inserts", func(t *testing.T) {
 		parent := ulid.Make()
-		deferID := "hash-preserve-child"
+		hashedDeferID := "hash-preserve-child"
 		childRunID := ulid.Make()
 
-		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(deferID, "u", "fn", enums.DeferStatusAfterRun)))
-		require.NoError(t, cm.UpdateRunDeferChildRunID(ctx, parentID(parent), childUpdate(deferID, childRunID)))
+		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(hashedDeferID, "u", "fn", enums.DeferStatusAfterRun)))
+		require.NoError(t, cm.UpdateRunDeferChildRunID(ctx, parentID(parent), childUpdate(hashedDeferID, childRunID)))
 		// Re-insert (e.g. finalize retry) must NOT clear the existing linkage.
-		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(deferID, "u2", "fn2", enums.DeferStatusAfterRun)))
+		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parent), insert(hashedDeferID, "u2", "fn2", enums.DeferStatusAfterRun)))
 
 		from, err := getDeferredFromForRun(ctx, cm, childRunID)
 		require.NoError(t, err)
@@ -139,10 +141,10 @@ func TestCQRSInsertRunDefer(t *testing.T) {
 	t.Run("different parents don't collide", func(t *testing.T) {
 		parentA := ulid.Make()
 		parentB := ulid.Make()
-		deferID := "hash-shared"
+		hashedDeferID := "hash-shared"
 
-		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parentA), insert(deferID, "ua", "fn-a", enums.DeferStatusAfterRun)))
-		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parentB), insert(deferID, "ub", "fn-b", enums.DeferStatusAfterRun)))
+		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parentA), insert(hashedDeferID, "ua", "fn-a", enums.DeferStatusAfterRun)))
+		require.NoError(t, cm.InsertRunDefer(ctx, parentID(parentB), insert(hashedDeferID, "ub", "fn-b", enums.DeferStatusAfterRun)))
 
 		gotA, err := getDefersForRun(ctx, cm, parentA)
 		require.NoError(t, err)
@@ -188,9 +190,9 @@ func TestCQRSGetRunDefers(t *testing.T) {
 		got, err := getDefersForRun(ctx, cm, parent)
 		require.NoError(t, err)
 		require.Len(t, got, 3)
-		assert.Equal(t, "hash-a", got[0].ID)
-		assert.Equal(t, "hash-b", got[1].ID)
-		assert.Equal(t, "hash-c", got[2].ID)
+		assert.Equal(t, "hash-a", got[0].HashedDeferID)
+		assert.Equal(t, "hash-b", got[1].HashedDeferID)
+		assert.Equal(t, "hash-c", got[2].HashedDeferID)
 	})
 
 	t.Run("joins to TraceRun when child_run_id set", func(t *testing.T) {
@@ -255,7 +257,7 @@ func TestCQRSGetRunDefers(t *testing.T) {
 
 		statuses := map[string]enums.DeferStatus{}
 		for _, d := range got {
-			statuses[d.ID] = d.Status
+			statuses[d.HashedDeferID] = d.Status
 		}
 		assert.Equal(t, enums.DeferStatusAfterRun, statuses["hash-1"])
 		assert.Equal(t, enums.DeferStatusAborted, statuses["hash-2"])
@@ -394,7 +396,7 @@ func TestCQRSUpdateRunDeferChildRunID(t *testing.T) {
 		require.Len(t, defers, 2)
 		var sibling *cqrs.RunDefer
 		for i := range defers {
-			if defers[i].ID == "hash-sibling" {
+			if defers[i].HashedDeferID == "hash-sibling" {
 				sibling = &defers[i]
 			}
 		}

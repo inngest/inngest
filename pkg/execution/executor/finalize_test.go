@@ -45,7 +45,7 @@ type deferUpdateCall struct {
 func (f *fakeDeferStore) InsertRunDefer(_ context.Context, id sv2.ID, rd cqrs.RunDeferInsert) error {
 	f.inserts = append(f.inserts, deferInsertCall{
 		ID:          id,
-		DeferID:     rd.DeferID,
+		DeferID:     rd.HashedDeferID,
 		UserDeferID: rd.UserDeferID,
 		FnSlug:      rd.FnSlug,
 		Status:      rd.Status,
@@ -65,7 +65,7 @@ func (f *fakeDeferStore) InsertRunDefers(ctx context.Context, id sv2.ID, defers 
 func (f *fakeDeferStore) UpdateRunDeferChildRunID(_ context.Context, id sv2.ID, upd cqrs.RunDeferUpdate) error {
 	f.updates = append(f.updates, deferUpdateCall{
 		ID:         id,
-		DeferID:    upd.DeferID,
+		DeferID:    upd.HashedDeferID,
 		ChildRunID: upd.ChildRunID,
 	})
 	return f.updateErr
@@ -172,7 +172,7 @@ func TestBuildDeferEvents(t *testing.T) {
 		assert.Equal(t, "child-fn", meta.FnSlug)
 		assert.Equal(t, "parent-fn", meta.ParentFnSlug)
 		assert.Equal(t, runID.String(), meta.ParentRunID)
-		assert.Equal(t, "hash-a", meta.DeferID)
+		assert.Equal(t, "hash-a", meta.HashedDeferID)
 	})
 
 	t.Run("AfterRun event ID is deterministic across calls", func(t *testing.T) {
@@ -268,7 +268,7 @@ func TestBuildDeferEvents(t *testing.T) {
 		require.Len(t, events, 1)
 		meta, ok := events[0].Data[consts.InngestEventDataPrefix].(event.DeferredScheduleMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "hash-good", meta.DeferID)
+		assert.Equal(t, "hash-good", meta.HashedDeferID)
 
 		require.Len(t, store.inserts, 1)
 		assert.Equal(t, "hash-good", store.inserts[0].DeferID)
@@ -298,7 +298,7 @@ func TestBuildDeferEvents(t *testing.T) {
 		require.Len(t, events, 1)
 		meta, ok := events[0].Data[consts.InngestEventDataPrefix].(event.DeferredScheduleMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "hash-ok", meta.DeferID)
+		assert.Equal(t, "hash-ok", meta.HashedDeferID)
 	})
 
 	t.Run("null input yields an event with only the _inngest envelope", func(t *testing.T) {
@@ -341,7 +341,7 @@ func TestBuildDeferEvents(t *testing.T) {
 
 		meta, ok := events[0].Data[consts.InngestEventDataPrefix].(event.DeferredScheduleMetadata)
 		require.True(t, ok, "_inngest envelope must be the typed server value, not user-supplied data")
-		assert.Equal(t, "hash-overwrite", meta.DeferID)
+		assert.Equal(t, "hash-overwrite", meta.HashedDeferID)
 		assert.Equal(t, runID.String(), meta.ParentRunID)
 		assert.EqualValues(t, 1, events[0].Data["x"])
 	})
@@ -417,7 +417,7 @@ func TestBuildDeferEvents(t *testing.T) {
 		for _, evt := range events {
 			meta, ok := evt.Data[consts.InngestEventDataPrefix].(event.DeferredScheduleMetadata)
 			require.True(t, ok)
-			gotIDs[meta.DeferID] = true
+			gotIDs[meta.HashedDeferID] = true
 		}
 		assert.Equal(t, map[string]bool{"hash-a": true, "hash-b": true, "hash-c": true}, gotIDs)
 

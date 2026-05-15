@@ -1628,7 +1628,7 @@ func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]
 func (w wrapper) InsertRunDefer(ctx context.Context, id sv2.ID, rd cqrs.RunDeferInsert) error {
 	return w.q.InsertRunDefer(ctx, dbpkg.InsertRunDeferParams{
 		ParentRunID: id.RunID,
-		DeferID:     rd.DeferID,
+		DeferID:     rd.HashedDeferID,
 		UserDeferID: rd.UserDeferID,
 		FnSlug:      rd.FnSlug,
 		Status:      rd.Status.String(),
@@ -1643,7 +1643,7 @@ func (w wrapper) InsertRunDefers(ctx context.Context, id sv2.ID, defers []cqrs.R
 	for i, d := range defers {
 		params[i] = dbpkg.InsertRunDeferParams{
 			ParentRunID: id.RunID,
-			DeferID:     d.DeferID,
+			DeferID:     d.HashedDeferID,
 			UserDeferID: d.UserDeferID,
 			FnSlug:      d.FnSlug,
 			Status:      d.Status.String(),
@@ -1656,7 +1656,7 @@ func (w wrapper) UpdateRunDeferChildRunID(ctx context.Context, id sv2.ID, upd cq
 	return w.q.UpdateRunDeferChildRunID(ctx, dbpkg.UpdateRunDeferChildRunIDParams{
 		ChildRunID:  upd.ChildRunID,
 		ParentRunID: id.RunID,
-		DeferID:     upd.DeferID,
+		DeferID:     upd.HashedDeferID,
 	})
 }
 
@@ -1694,10 +1694,10 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 			continue
 		}
 		entry := cqrs.RunDefer{
-			ID:          r.DeferID,
-			UserDeferID: r.UserDeferID,
-			FnSlug:      r.FnSlug,
-			Status:      status,
+			HashedDeferID: r.DeferID,
+			UserDeferID:   r.UserDeferID,
+			FnSlug:        r.FnSlug,
+			Status:        status,
 		}
 		if !r.ChildRunID.IsZero() {
 			if tr, ok := runsByID[r.ChildRunID]; ok {

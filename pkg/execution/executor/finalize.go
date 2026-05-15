@@ -228,10 +228,10 @@ func (e *executor) buildDeferEvents(
 		// field; Rejected and any future enum value are out of contract.
 		if e.deferStore != nil && (d.ScheduleStatus == enums.DeferStatusAfterRun || d.ScheduleStatus == enums.DeferStatusAborted) {
 			deferInserts = append(deferInserts, cqrs.RunDeferInsert{
-				DeferID:     d.HashedID,
-				UserDeferID: d.UserlandID,
-				FnSlug:      d.FnSlug,
-				Status:      d.ScheduleStatus,
+				HashedDeferID: d.HashedID,
+				UserDeferID:   d.UserlandID,
+				FnSlug:        d.FnSlug,
+				Status:        d.ScheduleStatus,
 			})
 		}
 
@@ -281,10 +281,10 @@ func (e *executor) buildDeferEvents(
 		// or similar inside this loop would otherwise fail to compile in
 		// a non-obvious way.
 		deferredMeta := event.DeferredScheduleMetadata{
-			FnSlug:       d.FnSlug,
-			ParentFnSlug: fnSlug,
-			ParentRunID:  opts.Metadata.ID.RunID.String(),
-			DeferID:      d.HashedID,
+			FnSlug:        d.FnSlug,
+			ParentFnSlug:  fnSlug,
+			ParentRunID:   opts.Metadata.ID.RunID.String(),
+			HashedDeferID: d.HashedID,
 		}
 		if err := deferredMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(

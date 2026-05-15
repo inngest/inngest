@@ -46,7 +46,7 @@ func (r *functionRunV2Resolver) Defers(ctx context.Context, fn *models.FunctionR
 			return nil, fmt.Errorf("error converting defer status: %w", err)
 		}
 		out = append(out, &models.RunDefer{
-			ID:          d.ID,
+			ID:          d.HashedDeferID,
 			UserDeferID: d.UserDeferID,
 			FnSlug:      d.FnSlug,
 			Status:      status,

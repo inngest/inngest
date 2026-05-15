@@ -8,13 +8,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// DeferStore writes parent-run → child-run defer linkages so the dev-server
-// GraphQL can expose deferred runs after the parent's state has been deleted.
-//
-// DeferID is the SHA1 hash of the user-supplied defer id (the join key with
-// UpdateRunDeferChildRunID). UserDeferID preserves the original string so the
-// UI can show the id the SDK caller typed.
-//
 // The id parameter on each method is the **parent** run identifier. It carries
 // the run's tenant (account, env, app) so downstream tenant-aware
 // implementations (e.g. ClickHouse) can scope writes without each call site
@@ -31,10 +24,10 @@ type DeferStore interface {
 // set later via UpdateRunDeferChildRunID once the deferred.schedule event
 // fires.
 type RunDeferInsert struct {
-	DeferID     string
-	UserDeferID string
-	FnSlug      string
-	Status      enums.DeferStatus
+	HashedDeferID string
+	UserDeferID   string
+	FnSlug        string
+	Status        enums.DeferStatus
 }
 
 // RunDeferUpdate is the payload for UpdateRunDeferChildRunID. DeferID is the
@@ -42,8 +35,8 @@ type RunDeferInsert struct {
 // child run, parsed from the inngest/deferred.schedule event the runner just
 // processed.
 type RunDeferUpdate struct {
-	DeferID    string
-	ChildRunID ulid.ULID
+	HashedDeferID string
+	ChildRunID    ulid.ULID
 }
 
 // RunDefer is a single defer attached to a parent function run. Parsed from
@@ -57,11 +50,11 @@ type RunDeferUpdate struct {
 // is what the dev-server UI shows. The SDK always emits userland.id, so
 // UserDeferID is expected to be non-empty for any defer this server records.
 type RunDefer struct {
-	ID          string
-	UserDeferID string
-	FnSlug      string
-	Status      enums.DeferStatus
-	Run         *TraceRun
+	HashedDeferID string
+	UserDeferID   string
+	FnSlug        string
+	Status        enums.DeferStatus
+	Run           *TraceRun
 }
 
 // RunDeferredFrom is the parent-run linkage of a deferred (child) run,

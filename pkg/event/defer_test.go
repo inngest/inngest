@@ -13,7 +13,7 @@ func TestDeferredScheduleMetadataValidate(t *testing.T) {
 		FnSlug:       "score",
 		ParentFnSlug: "app-parent-fn",
 		ParentRunID:  "01ABCDEF",
-		DeferID:      "deadbeef",
+		HashedDeferID: "deadbeef",
 	}
 
 	t.Run("valid", func(t *testing.T) {
@@ -40,7 +40,7 @@ func TestEventDeferredScheduleMetadata(t *testing.T) {
 		FnSlug:       "child-fn",
 		ParentFnSlug: "parent-fn",
 		ParentRunID:  "01ABCDEF",
-		DeferID:      "deadbeef",
+		HashedDeferID: "deadbeef",
 	}
 
 	t.Run("missing _inngest prefix returns an error", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestEventDeferredScheduleMetadata(t *testing.T) {
 				"fn_slug":        wantMeta.FnSlug,
 				"parent_fn_slug": wantMeta.ParentFnSlug,
 				"parent_run_id":  wantMeta.ParentRunID,
-				"defer_id":       wantMeta.DeferID,
+				"defer_id":       wantMeta.HashedDeferID,
 			},
 		}}
 		got, err := e.DeferredScheduleMetadata()
