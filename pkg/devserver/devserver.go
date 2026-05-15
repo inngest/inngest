@@ -953,7 +953,7 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) queue.RefreshI
 
 		evtMap := evt0.Map()
 
-		return queue.GetThrottleConfig(ctx, id.FunctionID, fn.Throttle, evtMap), nil
+		return queue.GetThrottleConfig(ctx, id, fn.Throttle, evtMap), nil
 	}
 }
 
@@ -1023,6 +1023,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 				Limit:                     int(fn.Throttle.Limit),
 				Burst:                     int(fn.Throttle.Burst),
 				Period:                    int(fn.Throttle.Period.Seconds()),
+				Scope:                     fn.Throttle.Scope,
 			}
 		}
 

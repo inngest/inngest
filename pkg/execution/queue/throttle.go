@@ -28,6 +28,10 @@ func (q PartitionConstraintConfig) HasOutdatedThrottle(qi QueueItem) enums.Outda
 			return enums.OutdatedThrottleReasonMissingKeyExpressionHash
 		}
 
+		if itemThrottle.Scope != constraintThrottle.Scope {
+			return enums.OutdatedThrottleReasonKeyExpressionMismatch
+		}
+
 		// The key expression hash was set on both sides and changed: Throttle key expression was updated
 		if itemThrottle.KeyExpressionHash != constraintThrottle.ThrottleKeyExpressionHash {
 			return enums.OutdatedThrottleReasonKeyExpressionMismatch

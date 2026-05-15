@@ -34,6 +34,9 @@ type CustomConcurrencyLimit struct {
 }
 
 type PartitionThrottle struct {
+	// Scope controls whether this throttle applies to the function, environment, or account.
+	Scope enums.ThrottleScope `json:"s,omitempty"`
+
 	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
 	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
 
@@ -201,6 +204,7 @@ func ConstraintConfigFromConstraints(
 
 	if constraints.Throttle != nil {
 		config.Throttle = append(config.Throttle, constraintapi.ThrottleConfig{
+			Scope:             constraints.Throttle.Scope,
 			Limit:             constraints.Throttle.Limit,
 			Burst:             constraints.Throttle.Burst,
 			Period:            constraints.Throttle.Period,
@@ -563,10 +567,14 @@ func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints Partiti
 		)
 	}
 
-	if backlog.Throttle != nil && latestConstraints.Throttle != nil && backlog.Throttle.ThrottleKeyExpressionHash == latestConstraints.Throttle.ThrottleKeyExpressionHash {
+	if backlog.Throttle != nil &&
+		latestConstraints.Throttle != nil &&
+		backlog.Throttle.Scope == latestConstraints.Throttle.Scope &&
+		backlog.Throttle.ThrottleKeyExpressionHash == latestConstraints.Throttle.ThrottleKeyExpressionHash {
 		constraints = append(constraints, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindThrottle,
 			Throttle: &constraintapi.ThrottleConstraint{
+				Scope:             backlog.Throttle.Scope,
 				KeyExpressionHash: backlog.Throttle.ThrottleKeyExpressionHash,
 				EvaluatedKeyHash:  backlog.Throttle.ThrottleKey,
 			},

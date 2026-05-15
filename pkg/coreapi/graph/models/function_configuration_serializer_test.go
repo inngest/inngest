@@ -225,6 +225,27 @@ func TestToFunctionConfiguration(t *testing.T) {
 					Period: "30m0s",
 					Burst:  3,
 					Key:    util.StrPtr("event.data.customer_id"),
+					Scope:  ThrottleScopeFunction,
+				},
+			}),
+		},
+		{
+			name: "account scoped throttle",
+			fn: mergeWithDefaultFunction(&inngest.Function{
+				Throttle: &inngest.Throttle{
+					Limit:  10,
+					Period: 30 * time.Minute,
+					Burst:  3,
+					Scope:  enums.ThrottleScopeAccount,
+				},
+			}),
+			planConcurrencyLimit: UnknownPlanConcurrencyLimit,
+			expected: mergeWithDefaultFunctionConfiguration(&FunctionConfiguration{
+				Throttle: &ThrottleConfiguration{
+					Limit:  10,
+					Period: "30m0s",
+					Burst:  3,
+					Scope:  ThrottleScopeAccount,
 				},
 			}),
 		},

@@ -1020,6 +1020,25 @@ func TestBacklogIsOutdated(t *testing.T) {
 		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.IsOutdated(constraints))
 	})
 
+	t.Run("changing throttle scope should mark as outdated", func(t *testing.T) {
+		keyHash := util.XXHash("event.data.orgID")
+
+		constraints := osqueue.PartitionConstraintConfig{
+			Throttle: &osqueue.PartitionThrottle{
+				Scope:                     enums.ThrottleScopeAccount,
+				ThrottleKeyExpressionHash: keyHash,
+			},
+		}
+		backlog := &osqueue.QueueBacklog{
+			Throttle: &osqueue.BacklogThrottle{
+				Scope:                     enums.ThrottleScopeEnv,
+				ThrottleKeyExpressionHash: keyHash,
+			},
+		}
+
+		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.IsOutdated(constraints))
+	})
+
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 

@@ -96,6 +96,34 @@ func TestBuildBacklogID_StartWithThrottleCustomExpression(t *testing.T) {
 	require.Equal(t, expected.BacklogID, got)
 }
 
+func TestBuildBacklogID_StartWithEnvThrottleCustomExpression(t *testing.T) {
+	fnID := uuid.New()
+	envID := uuid.New()
+
+	got := BuildBacklogID(fnID, true, &ThrottleKeyInput{
+		Expression:     "event.data.customerId",
+		EvaluatedValue: "customer-123",
+		Scope:          enums.ThrottleScopeEnv,
+		ScopeID:        envID,
+	}, nil)
+
+	throttleKey := HashID(context.Background(), "env:"+envID.String()) + "-" + HashID(context.Background(), "customer-123")
+	item := QueueItem{
+		FunctionID: fnID,
+		Data: Item{
+			Kind: KindStart,
+			Throttle: &Throttle{
+				Key:               throttleKey,
+				KeyExpressionHash: util.XXHash("event.data.customerId"),
+				Scope:             enums.ThrottleScopeEnv,
+			},
+		},
+	}
+	expected := ItemBacklog(context.Background(), item)
+
+	require.Equal(t, expected.BacklogID, got)
+}
+
 func TestBuildBacklogID_ThrottleIgnoredForNonStart(t *testing.T) {
 	fnID := uuid.New()
 

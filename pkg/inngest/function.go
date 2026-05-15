@@ -12,7 +12,6 @@ import (
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
-	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
@@ -222,6 +221,9 @@ type Throttle struct {
 	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
 	// that we throttle functions for each user independently.
 	Key *string `json:"key,omitempty"`
+	// Scope controls whether this throttle is isolated to the function or shared
+	// across the environment or account. Defaults to function scope.
+	Scope enums.ThrottleScope `json:"scope,omitempty"`
 }
 
 func (t *Throttle) UnmarshalJSON(in []byte) error {
@@ -231,10 +233,11 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 
 	var err error
 	input := struct {
-		Limit  uint    `json:"limit"`
-		Period string  `json:"period"`
-		Burst  uint    `json:"burst"`
-		Key    *string `json:"key,omitempty"`
+		Limit  uint                `json:"limit"`
+		Period string              `json:"period"`
+		Burst  uint                `json:"burst"`
+		Key    *string             `json:"key,omitempty"`
+		Scope  enums.ThrottleScope `json:"scope,omitempty"`
 	}{}
 	if err = json.Unmarshal(in, &input); err != nil {
 		return err
@@ -243,6 +246,7 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 	t.Limit = input.Limit
 	t.Burst = input.Burst
 	t.Key = input.Key
+	t.Scope = input.Scope
 	t.Period, err = str2duration.ParseDuration(input.Period)
 
 	// Normalization
@@ -257,12 +261,39 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 }
 
 func (t Throttle) MarshalJSON() ([]byte, error) {
-	s := structs.New(t)
-	s.TagName = "json"
-	val := s.Map()
-	// convert period to a string.
-	val["period"] = str2duration.String(t.Period)
-	return json.Marshal(val)
+	output := struct {
+		Limit  uint    `json:"limit"`
+		Period string  `json:"period"`
+		Burst  uint    `json:"burst"`
+		Key    *string `json:"key,omitempty"`
+		Scope  *string `json:"scope,omitempty"`
+	}{
+		Limit:  t.Limit,
+		Period: str2duration.String(t.Period),
+		Burst:  t.Burst,
+		Key:    t.Key,
+	}
+
+	if t.Scope != enums.ThrottleScopeFn {
+		scope := strings.ToLower(t.Scope.String())
+		output.Scope = &scope
+	}
+
+	return json.Marshal(output)
+}
+
+func (t Throttle) Validate(ctx context.Context) error {
+	if !t.Scope.IsAThrottleScope() {
+		return fmt.Errorf("Invalid throttle scope: %s", t.Scope)
+	}
+
+	if t.Key != nil {
+		if _, err := expressions.NewExpressionEvaluator(ctx, *t.Key); err != nil {
+			return fmt.Errorf("Invalid throttle key '%s': %w", *t.Key, err)
+		}
+	}
+
+	return nil
 }
 
 // Timeouts represents timeouts for the function. If any of the timeouts are hit, the function
@@ -423,6 +454,12 @@ func (f Function) Validate(ctx context.Context) error {
 	if f.Concurrency != nil {
 		if cerr := f.Concurrency.Validate(ctx); cerr != nil {
 			err = multierror.Append(err, cerr)
+		}
+	}
+
+	if f.Throttle != nil {
+		if terr := f.Throttle.Validate(ctx); terr != nil {
+			err = multierror.Append(err, terr)
 		}
 	}
 
