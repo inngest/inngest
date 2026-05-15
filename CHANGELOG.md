@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.19.4] - 2026-05-15
+
+### 🐛 Bug Fixes
+
+- ARM docker image base image mismatch (#2912)
+- Missing retries in UI (#4202)
+
+### 🚜 Refactor
+
+- *(queue)* Remove duplicate item lookup method (#4194)
+- *(queue)* Scope debounce and singleton operations (#4198)
+- *(cqrs)* Establish package boundaries (#4045)
+
+### 📚 Documentation
+
+- Update API docs to recommend api keys (#4156)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* Restore tag-triggered publishing (#4191)
+- Update protobuf to add deltas/changed bool (#4195)
+- Add missing metric on state store delete (#4200)
+
 ## [v1.19.3] - 2026-05-14
 
 ### 🐛 Bug Fixes
@@ -33,6 +56,7 @@ All notable changes to this project will be documented in this file.
 - Link release PRs to compare view
 - Update semaphore manager to return idempotency info (#4186)
 - Add "docs" to allowed list (#4175)
+- *(release)* V1.19.3 (#4188)
 
 ## [v1.19.2] - 2026-05-07
 
