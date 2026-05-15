@@ -30,33 +30,28 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 	}
 
 	if !foundStepToRunFrom {
-		// This implementation has been given a step to run from that
-		// doesn't exist in this run.  This is a bad request.
 		return fmt.Errorf("step to run from not found in original run")
 	}
 
 	steps := []state.MemoizedStep{}
 
-	// Copy the state from the original run to the new run.
+	// Copy the state from the original run from the begining until the rerun step
 	for _, stepID := range stack {
 		if stepID == req.FromStep.StepID {
-			// We've reached the step to run from, so we can stop
-			// copying
-
 			break
 		}
 
 		span, ok := stepSpans[stepID]
 		if !ok {
-			// This signifies that the step was present in the stack but
-			// we couldn't find the span that represents it. This
-			// indicates a data integrity issue and we should not
-			// attempt to recover from this.
+			// step is in the stack but the span is missing. this
+			// is a data integrity issue and we should not
+			// attempt to recover from
 			return fmt.Errorf("step found in stack but span not found in original run")
 		}
 
 		outputID := span.GetOutputID()
 		if outputID == nil {
+			// no outputs on sleeps.
 			if isSleepStep(span) {
 				steps = append(steps, state.MemoizedStep{ID: stepID, Data: nil})
 				continue
@@ -115,6 +110,8 @@ func reconstructStack(root *cqrs.OtelSpan, fromStepID string) ([]string, map[str
 	responseSteps := []responseStepIDs{}
 	stepSpans := map[string]*cqrs.OtelSpan{}
 
+	//
+	// this gets the response stacks and the spans that constitute each step output
 	walkOtelSpans(root, func(span *cqrs.OtelSpan) {
 		if span == nil || span.Attributes == nil {
 			return
@@ -122,6 +119,8 @@ func reconstructStack(root *cqrs.OtelSpan, fromStepID string) ([]string, map[str
 
 		if span.Attributes.StepID != nil && *span.Attributes.StepID != "" {
 			stepID := *span.Attributes.StepID
+			//
+			// actual output may live on a child execution spans
 			if outputSpan := findOutputSpan(span); outputSpan != nil {
 				stepSpans[stepID] = outputSpan
 			} else if _, ok := stepSpans[stepID]; !ok {
@@ -133,6 +132,8 @@ func reconstructStack(root *cqrs.OtelSpan, fromStepID string) ([]string, map[str
 			return
 		}
 
+		//
+		// extract the steps ids
 		ids := []string{}
 		for _, op := range *span.Attributes.ResponseSteps {
 			if op.ID != "" {
@@ -154,6 +155,7 @@ func reconstructStack(root *cqrs.OtelSpan, fromStepID string) ([]string, map[str
 	stack := []string{}
 	seen := map[string]bool{}
 	foundStepToRunFrom := false
+	// flatten sdk response stacks, preserve order and dedupe
 	for _, responseStep := range responseSteps {
 		for _, stepID := range responseStep.ids {
 			if seen[stepID] {
