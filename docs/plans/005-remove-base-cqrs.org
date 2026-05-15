@@ -339,11 +339,11 @@ packages.
 
 Action items:
 
-- [ ] define SQLite bootstrap options in =pkg/db/sqlite=
-- [ ] define Postgres bootstrap options in =pkg/db/postgres=
-- [ ] move SQLite connection opening into =pkg/db/sqlite=
-- [ ] move Postgres connection opening into =pkg/db/postgres=
-- [ ] move goose migration wiring into each dialect package
+- [X] define SQLite bootstrap options in =pkg/db/sqlite=
+- [X] define Postgres bootstrap options in =pkg/db/postgres=
+- [X] move SQLite connection opening into =pkg/db/sqlite=
+- [X] move Postgres connection opening into =pkg/db/postgres=
+- [X] move goose migration wiring into each dialect package
 - [X] move migration filesystem ownership fully into each dialect package
 - [ ] move SQLite sqlc package under =pkg/db/sqlite/sqlc=
 - [ ] move Postgres sqlc package under =pkg/db/postgres/sqlc=
@@ -364,8 +364,10 @@ Review notes from 2026-05-15:
 
 - migration files and embedded migration filesystems now live in
   =pkg/db/sqlite= and =pkg/db/postgres=
-- =base_cqrs.New()= still owns connection opening and goose execution, so
-  dialect-local =Open()= / =Migrate()= work remains open
+- =pkg/db/sqlite.Open()=, =pkg/db/postgres.Open()=, and dialect-local
+  =Migrate()= helpers now own connection opening and goose execution
+- =base_cqrs.New()= is temporarily left as a delegating compatibility wrapper
+  until call sites are migrated
 - SQLite and Postgres adapters still import sqlc packages from
   =pkg/cqrs/base_cqrs/sqlc=
 
