@@ -176,47 +176,47 @@ func (m *mockShardForIterator) ShardLease(ctx context.Context, key string, durat
 	return nil, nil
 }
 
-func (m *mockShardForIterator) SingletonGetRunID(ctx context.Context, key string) (*ulid.ULID, error) {
+func (m *mockShardForIterator) SingletonGetRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error) {
 	return nil, nil
 }
 
-func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, key string) (*ulid.ULID, error) {
+func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error) {
 	return nil, nil
 }
 
-func (m *mockShardForIterator) DebounceCreate(ctx context.Context, fnID uuid.UUID, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
+func (m *mockShardForIterator) DebounceCreate(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
 	return nil, nil
 }
 
-func (m *mockShardForIterator) DebounceUpdate(ctx context.Context, fnID uuid.UUID, key string, debounceID ulid.ULID, item []byte, ttl time.Duration, jobID string, now time.Time, eventTimestamp int64) (int64, DebounceUpdateStatus, error) {
+func (m *mockShardForIterator) DebounceUpdate(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration, jobID string, now time.Time, eventTimestamp int64) (int64, DebounceUpdateStatus, error) {
 	return 0, DebounceUpdateOK, nil
 }
 
-func (m *mockShardForIterator) DebounceStartExecution(ctx context.Context, fnID uuid.UUID, key string, newDebounceID, debounceID ulid.ULID) (DebounceStartStatus, error) {
+func (m *mockShardForIterator) DebounceStartExecution(ctx context.Context, scope Scope, key string, newDebounceID, debounceID ulid.ULID) (DebounceStartStatus, error) {
 	return DebounceStartStarted, nil
 }
 
-func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, fnID uuid.UUID, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
+func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
 	return nil, 0, nil
 }
 
-func (m *mockShardForIterator) DebounceGetItem(ctx context.Context, debounceID ulid.ULID) ([]byte, error) {
+func (m *mockShardForIterator) DebounceGetItem(ctx context.Context, scope Scope, debounceID ulid.ULID) ([]byte, error) {
 	return nil, nil
 }
 
-func (m *mockShardForIterator) DebounceDeleteItems(ctx context.Context, debounceIDs ...ulid.ULID) error {
+func (m *mockShardForIterator) DebounceDeleteItems(ctx context.Context, scope Scope, debounceIDs ...ulid.ULID) error {
 	return nil
 }
 
-func (m *mockShardForIterator) DebounceDeleteMigratingFlag(ctx context.Context, debounceID ulid.ULID) error {
+func (m *mockShardForIterator) DebounceDeleteMigratingFlag(ctx context.Context, scope Scope, debounceID ulid.ULID) error {
 	return nil
 }
 
-func (m *mockShardForIterator) DebounceGetPointer(ctx context.Context, fnID uuid.UUID, key string) (string, error) {
+func (m *mockShardForIterator) DebounceGetPointer(ctx context.Context, scope Scope, key string) (string, error) {
 	return "", nil
 }
 
-func (m *mockShardForIterator) DebounceDeletePointer(ctx context.Context, fnID uuid.UUID, key string) error {
+func (m *mockShardForIterator) DebounceDeletePointer(ctx context.Context, scope Scope, key string) error {
 	return nil
 }
 
@@ -229,10 +229,6 @@ func (m *mockShardForIterator) AccountPeek(ctx context.Context, sequential bool,
 }
 
 func (m *mockShardForIterator) PeekAccountPartitions(ctx context.Context, accountID uuid.UUID, peekLimit int64, peekUntil time.Time, sequential bool) ([]*QueuePartition, error) {
-	return nil, nil
-}
-
-func (m *mockShardForIterator) PeekGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, sequential bool) ([]*QueuePartition, error) {
 	return nil, nil
 }
 
@@ -334,10 +330,6 @@ func (m *mockShardForIterator) TotalSystemQueueDepth(ctx context.Context) (int64
 
 func (m *mockShardForIterator) DequeueByJobID(ctx context.Context, jobID string) error {
 	return nil
-}
-
-func (m *mockShardForIterator) ItemByID(ctx context.Context, jobID string) (*QueueItem, error) {
-	return nil, nil
 }
 
 func (m *mockShardForIterator) ItemExists(ctx context.Context, jobID string) (bool, error) {

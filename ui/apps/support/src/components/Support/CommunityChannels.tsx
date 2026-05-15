@@ -7,7 +7,7 @@ export function CommunityChannels() {
     <div className="mt-8 p-4 border rounded flex flex-col gap-4 max-w-xl">
       <h2 className="text-basis text-lg font-bold">Community</h2>
       <p>
-        Chat with other developers and the Inngest team in our{" "}
+        Chat with other developers in our{" "}
         <Link
           target="_blank"
           href="https://www.inngest.com/discord"
@@ -23,7 +23,7 @@ export function CommunityChannels() {
           target="_blank"
           size="medium"
         >
-          #help-forum
+          #ask-the-community
         </Link>{" "}
         channel or submit your own question.
       </p>

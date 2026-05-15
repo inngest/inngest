@@ -175,7 +175,7 @@ function SupportComponent() {
 
           <SupportChannel title="Community">
             <p>
-              Chat with other developers and the Inngest team in our{' '}
+              Chat with other developers in our{' '}
               <Link
                 target="_blank"
                 href="https://www.inngest.com/discord"
@@ -191,7 +191,7 @@ function SupportComponent() {
                 target="_blank"
                 size="medium"
               >
-                #help-forum
+                #ask-the-community
               </Link>{' '}
               channel or submit your own question.
             </p>

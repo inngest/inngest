@@ -6,21 +6,20 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
 // DebounceCreate implements queue.DebounceOperations.
-func (q *queue) DebounceCreate(ctx context.Context, fnID uuid.UUID, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
+func (q *queue) DebounceCreate(ctx context.Context, scope osqueue.Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
 	out, err := scripts["debounce/newDebounce"].Exec(
 		ctx,
 		client,
-		[]string{kg.DebouncePointer(ctx, fnID, key), kg.Debounce(ctx)},
+		[]string{kg.DebouncePointer(ctx, scope.FunctionID, key), kg.Debounce(ctx)},
 		[]string{debounceID.String(), string(item), strconv.Itoa(int(ttl.Seconds()))},
 	).ToString()
 	if err != nil {
@@ -41,7 +40,7 @@ func (q *queue) DebounceCreate(ctx context.Context, fnID uuid.UUID, key string, 
 // DebounceUpdate implements queue.DebounceOperations.
 func (q *queue) DebounceUpdate(
 	ctx context.Context,
-	fnID uuid.UUID,
+	scope osqueue.Scope,
 	key string,
 	debounceID ulid.ULID,
 	item []byte,
@@ -57,7 +56,7 @@ func (q *queue) DebounceUpdate(
 		ctx,
 		client,
 		[]string{
-			kg.DebouncePointer(ctx, fnID, key),
+			kg.DebouncePointer(ctx, scope.FunctionID, key),
 			kg.Debounce(ctx),
 			kg.QueueItem(),
 		},
@@ -87,7 +86,7 @@ func (q *queue) DebounceUpdate(
 }
 
 // DebounceStartExecution implements queue.DebounceOperations.
-func (q *queue) DebounceStartExecution(ctx context.Context, fnID uuid.UUID, key string, newDebounceID, debounceID ulid.ULID) (osqueue.DebounceStartStatus, error) {
+func (q *queue) DebounceStartExecution(ctx context.Context, scope osqueue.Scope, key string, newDebounceID, debounceID ulid.ULID) (osqueue.DebounceStartStatus, error) {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
@@ -95,7 +94,7 @@ func (q *queue) DebounceStartExecution(ctx context.Context, fnID uuid.UUID, key 
 		ctx,
 		client,
 		[]string{
-			kg.DebouncePointer(ctx, fnID, key),
+			kg.DebouncePointer(ctx, scope.FunctionID, key),
 			kg.DebounceMigrating(ctx),
 		},
 		[]string{
@@ -118,7 +117,7 @@ func (q *queue) DebounceStartExecution(ctx context.Context, fnID uuid.UUID, key 
 }
 
 // DebouncePrepareMigration implements queue.DebounceOperations.
-func (q *queue) DebouncePrepareMigration(ctx context.Context, fnID uuid.UUID, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
+func (q *queue) DebouncePrepareMigration(ctx context.Context, scope osqueue.Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
@@ -126,7 +125,7 @@ func (q *queue) DebouncePrepareMigration(ctx context.Context, fnID uuid.UUID, ke
 		ctx,
 		client,
 		[]string{
-			kg.DebouncePointer(ctx, fnID, key),
+			kg.DebouncePointer(ctx, scope.FunctionID, key),
 			kg.Debounce(ctx),
 			kg.DebounceMigrating(ctx),
 		},
@@ -179,7 +178,7 @@ func (q *queue) DebouncePrepareMigration(ctx context.Context, fnID uuid.UUID, ke
 }
 
 // DebounceGetItem implements queue.DebounceOperations.
-func (q *queue) DebounceGetItem(ctx context.Context, debounceID ulid.ULID) ([]byte, error) {
+func (q *queue) DebounceGetItem(ctx context.Context, scope osqueue.Scope, debounceID ulid.ULID) ([]byte, error) {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
@@ -195,7 +194,7 @@ func (q *queue) DebounceGetItem(ctx context.Context, debounceID ulid.ULID) ([]by
 }
 
 // DebounceDeleteItems implements queue.DebounceOperations.
-func (q *queue) DebounceDeleteItems(ctx context.Context, debounceIDs ...ulid.ULID) error {
+func (q *queue) DebounceDeleteItems(ctx context.Context, scope osqueue.Scope, debounceIDs ...ulid.ULID) error {
 	if len(debounceIDs) == 0 {
 		return nil
 	}
@@ -218,7 +217,7 @@ func (q *queue) DebounceDeleteItems(ctx context.Context, debounceIDs ...ulid.ULI
 }
 
 // DebounceDeleteMigratingFlag implements queue.DebounceOperations.
-func (q *queue) DebounceDeleteMigratingFlag(ctx context.Context, debounceID ulid.ULID) error {
+func (q *queue) DebounceDeleteMigratingFlag(ctx context.Context, scope osqueue.Scope, debounceID ulid.ULID) error {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
@@ -234,11 +233,11 @@ func (q *queue) DebounceDeleteMigratingFlag(ctx context.Context, debounceID ulid
 }
 
 // DebounceGetPointer implements queue.DebounceOperations.
-func (q *queue) DebounceGetPointer(ctx context.Context, fnID uuid.UUID, key string) (string, error) {
+func (q *queue) DebounceGetPointer(ctx context.Context, scope osqueue.Scope, key string) (string, error) {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
-	val, err := client.Do(ctx, client.B().Get().Key(kg.DebouncePointer(ctx, fnID, key)).Build()).ToString()
+	val, err := client.Do(ctx, client.B().Get().Key(kg.DebouncePointer(ctx, scope.FunctionID, key)).Build()).ToString()
 	if rueidis.IsRedisNil(err) {
 		return "", osqueue.ErrDebounceNotFound
 	}
@@ -249,11 +248,11 @@ func (q *queue) DebounceGetPointer(ctx context.Context, fnID uuid.UUID, key stri
 }
 
 // DebounceDeletePointer implements queue.DebounceOperations.
-func (q *queue) DebounceDeletePointer(ctx context.Context, fnID uuid.UUID, key string) error {
+func (q *queue) DebounceDeletePointer(ctx context.Context, scope osqueue.Scope, key string) error {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
-	err := client.Do(ctx, client.B().Del().Key(kg.DebouncePointer(ctx, fnID, key)).Build()).Error()
+	err := client.Do(ctx, client.B().Del().Key(kg.DebouncePointer(ctx, scope.FunctionID, key)).Build()).Error()
 	if err != nil && !rueidis.IsRedisNil(err) {
 		return fmt.Errorf("error deleting debounce pointer: %w", err)
 	}

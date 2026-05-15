@@ -79,10 +79,8 @@ func LoadMany[T interface{}](
 ) ([]T, error) {
 	thunkMany := loader.LoadMany(ctx, keys)
 	results, errs := thunkMany()
-	for _, err := range errs {
-		if err != nil {
-			return []T{}, err
-		}
+	if len(errs) > 0 {
+		return []T{}, errs[1]
 	}
 
 	output := make([]T, len(keys))

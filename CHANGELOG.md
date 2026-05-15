@@ -2,38 +2,61 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [v1.19.4] - 2026-05-15
+
+### 🐛 Bug Fixes
+
+- ARM docker image base image mismatch (#2912)
+- Missing retries in UI (#4202)
+
+### 🚜 Refactor
+
+- *(queue)* Remove duplicate item lookup method (#4194)
+- *(queue)* Scope debounce and singleton operations (#4198)
+- *(cqrs)* Establish package boundaries (#4045)
+
+### 📚 Documentation
+
+- Update API docs to recommend api keys (#4156)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* Restore tag-triggered publishing (#4191)
+- Update protobuf to add deltas/changed bool (#4195)
+- Add missing metric on state store delete (#4200)
+
+## [v1.19.3] - 2026-05-14
 
 ### 🐛 Bug Fixes
 
 - *(connect)* Keep persisted SDK replies from closing Connect workers (#4152)
+- *(grpc)* Handle unimplemented error for `LoadDefersMeta` for backwards compatibility (#4159)
+- Gracefully handle checkpoint dupes (#4130)
+- Opcode Gateway -> StepTypeFetch (#4180)
 
 ### 💼 Other
 
 - Add phase 1 agentic api contract (#3984)
+- Entirely Synchronous Durable endpoints move to Completed Status (#4119)
+- Test Durable Endpoints against JS SDK (#4146)
+- Remove release/next branch trigger
 
-### 📚 Documentation
+### 🚜 Refactor
 
-- *(pr)* Simplify pull request template
-- *(pr)* Document release note conventions
-- *(release)* Document automated release testing
-- *(release)* Record local rollout checks
+- Refactor debouncer ops to expose via ShardOperations (SYS-824) (#4127)
 
-### 🧪 Testing
+### ⚡ Performance
 
-- *(release)* Cover release note edge cases
-- *(release)* Combine repeated note sections
-- *(release)* Split release note tests
+- *(pauses)* Evaluations containing string comparisons (#4154)
 
 ### ⚙️ Miscellaneous Tasks
 
-- *(pr)* Validate conventional titles
-- *(release)* Create automated release pr
-- *(release)* Tag merged release prs
-- *(release)* Publish assembled release notes
-- *(release)* Publish prereleases from prs
-- *(release)* Harden release workflows
-- *(pr)* Restore conventional check permissions
+- Fix PR release job (#4163)
+- Run full CI for release PRs
+- Link release PRs to compare view
+- Update semaphore manager to return idempotency info (#4186)
+- Add "docs" to allowed list (#4175)
+- *(release)* V1.19.3 (#4188)
 
 ## [v1.19.2] - 2026-05-07
 

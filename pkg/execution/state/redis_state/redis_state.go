@@ -1109,7 +1109,9 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
 func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
-	err := m.shardedMgr.delete(ctx, ctx, i)
+	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+	defer cancel()
+	err := m.shardedMgr.delete(ctx, callCtx, i)
 	if err != nil {
 		return err
 	}
@@ -1126,6 +1128,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 
 func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "delete"), redis_telemetry.ScopeFnRunState)
+	callCtx = redis_telemetry.WithScope(redis_telemetry.WithOpName(callCtx, "delete"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)

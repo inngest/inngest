@@ -1442,6 +1442,14 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			limit = authResp.Entitlements.AppsPerConnection
 		}
 
+		if len(initialMessageData.Apps) == 0 {
+			return nil, &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
+				StatusCode: websocket.StatusPolicyViolation,
+				Msg:        "Missing apps in SDK connect message",
+			}
+		}
+
 		if len(initialMessageData.Apps) > limit {
 			return nil, &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectTooManyAppsPerConnection,

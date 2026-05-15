@@ -10,6 +10,10 @@ message SingletonInfoRequest {
   // singleton_key is the optional evaluated singleton key suffix (hash part).
   // If empty, uses the function_id as the singleton key.
   string singleton_key = 2;
+  // account_id is the UUID of the account that owns the function.
+  string account_id = 3;
+  // env_id is the UUID of the environment that owns the function.
+  string env_id = 4;
 }
 
 // SingletonInfoResponse contains information about the current singleton lock.
@@ -27,6 +31,10 @@ message DeleteSingletonLockRequest {
   // singleton_key is the optional evaluated singleton key suffix (hash part).
   // If empty, uses the function_id as the singleton key.
   string singleton_key = 2;
+  // account_id is the UUID of the account that owns the function.
+  string account_id = 3;
+  // env_id is the UUID of the environment that owns the function.
+  string env_id = 4;
 }
 
 // DeleteSingletonLockResponse contains information about the deleted lock.
