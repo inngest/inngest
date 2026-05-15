@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS run_defers (
     parent_run_id BYTEA NOT NULL,
     defer_id VARCHAR NOT NULL,
-    user_defer_id VARCHAR NOT NULL DEFAULT '',
+    user_defer_id VARCHAR NOT NULL,
     fn_slug VARCHAR NOT NULL,
     status VARCHAR NOT NULL,
     child_run_id BYTEA,
