@@ -120,11 +120,41 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		return publicerr.Wrap(err, 400, "Invalid metadata")
 	}
 
-	stateID := runMetadataStateID(parentSpan, auth)
-	stateMetadata, loadedFromState, err := a.loadRunMetadataForSizeLimit(ctx, stateID)
-	if err != nil {
-		return err
+	// Load run metadata to enforce the per-run cumulative size limit against
+	// metadata that already exists in the run, not just this request.
+	stateID := statev2.ID{
+		RunID:      parentSpan.RunID,
+		FunctionID: parentSpan.FunctionID,
+		Tenant: statev2.Tenant{
+			AppID:     parentSpan.AppID,
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
 	}
+
+	var stateMetadata *statev2.Metadata
+	loadedFromState := false
+	if a.opts.State != nil {
+		md, err := a.opts.State.LoadMetadata(ctx, stateID)
+		if errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
+			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
+				"error", err,
+				"run_id", runID.String(),
+			)
+		} else if err != nil {
+			return publicerr.Wrap(err, 500, "Unable to load run metadata")
+		} else {
+			stateMetadata = &md
+			loadedFromState = true
+		}
+	}
+
+	// Missing state uses a request-local fallback so this write still enforces
+	// the cumulative size limit within the request.
+	if stateMetadata == nil {
+		stateMetadata = &statev2.Metadata{ID: stateID}
+	}
+	statev2.InitConfig(&stateMetadata.Config)
 
 	parentSpanRef := &meta.SpanReference{
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
@@ -173,46 +203,6 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	return nil
-}
-
-func runMetadataStateID(parentSpan *cqrs.OtelSpan, auth apiv1auth.V1Auth) statev2.ID {
-	return statev2.ID{
-		RunID:      parentSpan.RunID,
-		FunctionID: parentSpan.FunctionID,
-		Tenant: statev2.Tenant{
-			AppID:     parentSpan.AppID,
-			EnvID:     auth.WorkspaceID(),
-			AccountID: auth.AccountID(),
-		},
-	}
-}
-
-func (a router) loadRunMetadataForSizeLimit(ctx context.Context, stateID statev2.ID) (*statev2.Metadata, bool, error) {
-	if a.opts.State != nil {
-		md, err := a.opts.State.LoadMetadata(ctx, stateID)
-		switch {
-		case isMissingMetadataState(err):
-			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
-				"error", err,
-				"run_id", stateID.RunID.String(),
-			)
-		case err != nil:
-			return nil, false, publicerr.Wrap(err, 500, "Unable to load run metadata")
-		default:
-			statev2.InitConfig(&md.Config)
-			return &md, true, nil
-		}
-	}
-
-	// Missing state uses a request-local fallback so this write still enforces
-	// the cumulative size limit within the request.
-	md := &statev2.Metadata{ID: stateID}
-	statev2.InitConfig(&md.Config)
-	return md, false, nil
-}
-
-func isMissingMetadataState(err error) bool {
-	return errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound)
 }
 
 func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget) (*cqrs.OtelSpan, metadata.Scope, error) {
