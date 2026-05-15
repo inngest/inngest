@@ -35,6 +35,7 @@ const (
 	V2_SyncApp_FullMethodName                 = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName        = "/api.v2.V2/GetFunctionTrace"
 	V2_InvokeFunction_FullMethodName          = "/api.v2.V2/InvokeFunction"
+	V2_QueryInsights_FullMethodName           = "/api.v2.V2/QueryInsights"
 )
 
 // V2Client is the client API for V2 service.
@@ -60,6 +61,7 @@ type V2Client interface {
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
+	QueryInsights(ctx context.Context, in *QueryInsightsRequest, opts ...grpc.CallOption) (*QueryInsightsResponse, error)
 }
 
 type v2Client struct {
@@ -230,6 +232,16 @@ func (c *v2Client) InvokeFunction(ctx context.Context, in *InvokeFunctionRequest
 	return out, nil
 }
 
+func (c *v2Client) QueryInsights(ctx context.Context, in *QueryInsightsRequest, opts ...grpc.CallOption) (*QueryInsightsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryInsightsResponse)
+	err := c.cc.Invoke(ctx, V2_QueryInsights_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -253,6 +265,7 @@ type V2Server interface {
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
+	QueryInsights(context.Context, *QueryInsightsRequest) (*QueryInsightsResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -310,6 +323,9 @@ func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTrace
 }
 func (UnimplementedV2Server) InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvokeFunction not implemented")
+}
+func (UnimplementedV2Server) QueryInsights(context.Context, *QueryInsightsRequest) (*QueryInsightsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QueryInsights not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -620,6 +636,24 @@ func _V2_InvokeFunction_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_QueryInsights_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryInsightsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).QueryInsights(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_QueryInsights_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).QueryInsights(ctx, req.(*QueryInsightsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -690,6 +724,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InvokeFunction",
 			Handler:    _V2_InvokeFunction_Handler,
+		},
+		{
+			MethodName: "QueryInsights",
+			Handler:    _V2_QueryInsights_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
