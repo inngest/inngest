@@ -137,7 +137,7 @@ func TestCommandUsesAPIPortForAPIHost(t *testing.T) {
 	require.Equal(t, "/api/v2/health", gotPath)
 }
 
-func TestResolveBaseURLAPICloudOverridesTarget(t *testing.T) {
+func TestResolveBaseURLProdUsesCloud(t *testing.T) {
 	var baseURL string
 	cmd := Command()
 	cmd.Commands = []*cli.Command{
@@ -153,13 +153,89 @@ func TestResolveBaseURLAPICloudOverridesTarget(t *testing.T) {
 
 	err := cmd.Run(context.Background(), []string{
 		"api",
-		"--api-cloud",
-		"--api-host", "http://localhost:1",
+		"--prod",
 		"capture",
 	})
 
 	require.NoError(t, err)
 	require.Equal(t, cloudAPIURL, baseURL)
+}
+
+func TestResolveBaseURLCustomTargetOverridesProd(t *testing.T) {
+	var baseURL string
+	cmd := Command()
+	cmd.Commands = []*cli.Command{
+		{
+			Name: "capture",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				var err error
+				baseURL, err = resolveBaseURL(ctx, cmd)
+				return err
+			},
+		},
+	}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--prod",
+		"--api-host", "http://localhost:1",
+		"capture",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "http://localhost:1/api/v2", baseURL)
+}
+
+func TestResolveBaseURLAPIPortOverridesProd(t *testing.T) {
+	var baseURL string
+	cmd := Command()
+	cmd.Commands = []*cli.Command{
+		{
+			Name: "capture",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				var err error
+				baseURL, err = resolveBaseURL(ctx, cmd)
+				return err
+			},
+		},
+	}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--prod",
+		"--api-port", "9999",
+		"capture",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "http://localhost:9999/api/v2", baseURL)
+}
+
+func TestResolveBaseURLDefaultsToDevServer(t *testing.T) {
+	t.Setenv("INNGEST_API_HOST", "")
+	t.Setenv("INNGEST_API_PORT", "")
+	t.Setenv("INNGEST_PROD", "")
+
+	var baseURL string
+	cmd := Command()
+	cmd.Commands = []*cli.Command{
+		{
+			Name: "capture",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				var err error
+				baseURL, err = resolveBaseURL(ctx, cmd)
+				return err
+			},
+		},
+	}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"capture",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, defaultDevServerURL, baseURL)
 }
 
 func TestCommandPrefersAPIKeyOverSigningKeyEnv(t *testing.T) {
@@ -224,48 +300,6 @@ func TestNormalizeAPIURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actual, err := normalizeAPIURL(tt.rawURL)
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, actual)
-		})
-	}
-}
-
-func TestNormalizeServerHostTarget(t *testing.T) {
-	tests := []struct {
-		name     string
-		rawURL   string
-		port     int
-		expected string
-	}{
-		{
-			name:     "host uses provided port",
-			rawURL:   "localhost",
-			port:     9999,
-			expected: "http://localhost:9999/api/v2",
-		},
-		{
-			name:     "origin value uses api v2 path",
-			rawURL:   "http://127.0.0.1:9999",
-			port:     8288,
-			expected: "http://127.0.0.1:9999/api/v2",
-		},
-		{
-			name:     "unspecified bind host targets localhost",
-			rawURL:   "0.0.0.0",
-			port:     8288,
-			expected: "http://localhost:8288/api/v2",
-		},
-		{
-			name:     "unspecified bind host with port targets localhost",
-			rawURL:   "0.0.0.0:9999",
-			port:     8288,
-			expected: "http://localhost:9999/api/v2",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual, err := normalizeServerHostTarget(tt.rawURL, tt.port)
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, actual)
 		})

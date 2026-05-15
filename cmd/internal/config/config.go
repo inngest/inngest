@@ -25,7 +25,7 @@ type Config struct {
 	Host        string   `koanf:"host"`
 	APIHost     string   `koanf:"api-host"`
 	APIPort     int      `koanf:"api-port"`
-	APICloud    bool     `koanf:"api-cloud"`
+	Prod        bool     `koanf:"prod"`
 	Port        string   `koanf:"port"`
 
 	// Advanced dev command configuration

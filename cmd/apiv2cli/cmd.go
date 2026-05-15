@@ -53,8 +53,8 @@ func Command() *cli.Command {
 		Usage:     "Call Inngest REST API v2 endpoints",
 		UsageText: "inngest alpha api [target/auth flags] <endpoint> [endpoint flags]",
 		Description: strings.Join([]string{
-			"By default, the command uses a running local dev server, then falls back to Inngest Cloud.",
-			"Set --api-cloud to force use of Inngest Cloud Production, or --api-host/--api-port to target a self-hosted server.",
+			"By default, the command targets the local dev server.",
+			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a self-hosted server.",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
@@ -84,8 +84,8 @@ func commonFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.BoolFlag{
 			Category: "Target",
-			Name:     "api-cloud",
-			Usage:    "Target Inngest Cloud Production API, ignoring local dev server and target host flags",
+			Name:     "prod",
+			Usage:    "Target Inngest Cloud Production API unless --api-host or --api-port is set",
 		},
 		&cli.StringFlag{
 			Category: "Target",
@@ -95,25 +95,13 @@ func commonFlags() []cli.Flag {
 		&cli.StringFlag{
 			Category: "Target",
 			Name:     "api-host",
-			Usage:    "Selt-hosted API host or origin. Takes precedence over --host.",
+			Usage:    "Custom API host or origin",
 		},
 		&cli.IntFlag{
 			Category:    "Target",
 			Name:        "api-port",
-			DefaultText: "same as --port",
-			Usage:       "Self-hosted API port. Falls back to --port when unset.",
-		},
-		&cli.StringFlag{
-			Category: "Target",
-			Name:     "host",
-			Usage:    "Inngest server host",
-		},
-		&cli.IntFlag{
-			Category: "Target",
-			Name:     "port",
-			Aliases:  []string{"p"},
-			Value:    api.DefaultAPIPort,
-			Usage:    "Inngest server port",
+			DefaultText: "default local dev server port",
+			Usage:       "Custom API port",
 		},
 		&cli.StringFlag{
 			Category: "Auth",
@@ -271,6 +259,9 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 	client := &http.Client{Timeout: cmd.Duration("timeout")}
 	resp, err := client.Do(req)
 	if err != nil {
+		if req.URL.Scheme+"://"+req.URL.Host == defaultDevServerOrigin {
+			return fmt.Errorf("local dev server is not available at %s; start it with `inngest dev` or use --prod to target Inngest Cloud: %w", defaultDevServerOrigin, err)
+		}
 		return err
 	}
 	defer resp.Body.Close()
@@ -389,37 +380,23 @@ func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
 		return "", err
 	}
 
-	if localconfig.GetBoolValue(cmd, "api-cloud", false) {
-		return cloudAPIURL, nil
-	}
-
-	port := localconfig.GetIntValue(cmd, "port", api.DefaultAPIPort)
-	apiPort := localconfig.GetIntValue(cmd, "api-port", port)
+	apiPort := localconfig.GetIntValue(cmd, "api-port", 0)
 	if apiHost := localconfig.GetValue(cmd, "api-host", ""); apiHost != "" {
+		if apiPort == 0 {
+			apiPort = api.DefaultAPIPort
+		}
 		return normalizeAPIHostTarget(apiHost, apiPort)
 	}
 
-	if host := localconfig.GetValue(cmd, "host", ""); host != "" {
-		return normalizeServerHostTarget(host, apiPort)
+	if apiPort != 0 {
+		return normalizeAPIHostTarget("localhost", apiPort)
 	}
 
-	if apiPort != api.DefaultAPIPort {
-		return normalizeServerHostTarget("localhost", apiPort)
+	if localconfig.GetBoolValue(cmd, "prod", false) {
+		return cloudAPIURL, nil
 	}
 
-	if localDevServerAvailable(ctx) {
-		return defaultDevServerURL, nil
-	}
-
-	fmt.Fprintf(errWriter(cmd), "No local dev server detected; targeting Inngest Cloud at %s\n", cloudAPIURL)
-	return cloudAPIURL, nil
-}
-
-func errWriter(cmd *cli.Command) io.Writer {
-	if w := cmd.Root().ErrWriter; w != nil {
-		return w
-	}
-	return os.Stderr
+	return defaultDevServerURL, nil
 }
 
 func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
@@ -445,25 +422,6 @@ func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
 	return normalizeAPIURL(fmt.Sprintf("%s://%s", scheme, rawHost))
 }
 
-func normalizeServerHostTarget(rawHost string, port int) (string, error) {
-	if looksLikeURL(rawHost) {
-		return normalizeAPIURL(rawHost)
-	}
-
-	if host, parsedPort, err := net.SplitHostPort(rawHost); err == nil {
-		if isUnspecifiedHost(host) {
-			rawHost = net.JoinHostPort("localhost", parsedPort)
-		}
-	} else {
-		if isUnspecifiedHost(rawHost) {
-			rawHost = "localhost"
-		}
-		rawHost = net.JoinHostPort(rawHost, strconv.Itoa(port))
-	}
-
-	return normalizeAPIURL(fmt.Sprintf("http://%s", rawHost))
-}
-
 func normalizeAPIURL(rawURL string) (string, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
@@ -485,27 +443,6 @@ func normalizeAPIURL(rawURL string) (string, error) {
 	}
 
 	return strings.TrimRight(parsed.String(), "/"), nil
-}
-
-// checks if there is a running dev server.
-// only used if no explicit configs are provided.
-func localDevServerAvailable(ctx context.Context) bool {
-	reqCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, defaultDevServerURL+"/health", nil)
-	if err != nil {
-		return false
-	}
-
-	client := &http.Client{Timeout: 300 * time.Millisecond}
-	resp, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	return resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusUnauthorized
 }
 
 func resolvePath(cmd *cli.Command, ep endpoint) (string, error) {
@@ -806,9 +743,4 @@ func isCloudHost(host string) bool {
 
 func isLocalHost(host string) bool {
 	return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0"
-}
-
-func isUnspecifiedHost(host string) bool {
-	parsed := net.ParseIP(host)
-	return parsed != nil && parsed.IsUnspecified()
 }
