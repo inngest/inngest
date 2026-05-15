@@ -127,11 +127,6 @@ type ScopedUpdate struct {
 	Update
 }
 
-// ValidateAllowed applies reserved-kind rules.
-func (m ScopedUpdate) ValidateAllowed() error {
-	return m.Update.ValidateAllowed()
-}
-
 type Update struct {
 	RawUpdate
 }
@@ -148,9 +143,7 @@ func (m Update) Serialize() (Values, error) {
 	return m.RawUpdate.Values, nil
 }
 
-// Validate checks only generic metadata shape; reserved inngest.* rules depend
-// on scope.
-func (m Update) Validate() error {
+func (m Update) validate() error {
 	if err := m.RawUpdate.Kind.Validate(); err != nil {
 		return fmt.Errorf("invalid kind: %w", err)
 	}
@@ -161,7 +154,7 @@ func (m Update) Validate() error {
 // ValidateAllowed checks generic shape, reserved kind allowlists, and reserved
 // value formats.
 func (m Update) ValidateAllowed() error {
-	if err := m.Validate(); err != nil {
+	if err := m.validate(); err != nil {
 		return err
 	}
 
