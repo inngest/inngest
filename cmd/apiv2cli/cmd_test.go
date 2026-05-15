@@ -25,11 +25,24 @@ func TestDiscoverEndpointsFromProto(t *testing.T) {
 	}
 
 	require.NotContains(t, byName, "-schema-only")
+	require.NotContains(t, byName, "create-partner-account")
+	require.NotContains(t, byName, "fetch-partner-accounts")
+	require.NotContains(t, byName, "fetch-account")
+	require.NotContains(t, byName, "list-webhooks")
+	require.Contains(t, byName, "get-account")
+	require.Contains(t, byName, "get-webhooks")
 	require.Equal(t, http.MethodPost, byName["invoke-function"].method)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/invoke", byName["invoke-function"].path)
 	require.Equal(t, []string{"app_id", "function_id"}, byName["invoke-function"].pathParams)
 	require.Equal(t, http.MethodGet, byName["get-function-trace"].method)
 	require.Equal(t, "/runs/{run_id}/trace", byName["get-function-trace"].path)
+}
+
+func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {
+	require.Equal(t, "get-account", endpointCommandName("FetchAccount"))
+	require.Equal(t, "get-webhooks", endpointCommandName("ListWebhooks"))
+	require.Equal(t, "get-function-run", endpointCommandName("GetFunctionRun"))
+	require.Equal(t, "create-env", endpointCommandName("CreateEnv"))
 }
 
 func TestCommandCallsGeneratedEndpoint(t *testing.T) {

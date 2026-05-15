@@ -38,6 +38,11 @@ const (
 
 var pathParamPattern = regexp.MustCompile(`\{([^}=]+)(=[^}]*)?}`)
 
+var hiddenEndpointMethods = map[string]struct{}{
+	"CreatePartnerAccount": {},
+	"FetchPartnerAccounts": {},
+}
+
 type endpoint struct {
 	name       string
 	method     string
@@ -54,7 +59,7 @@ func Command() *cli.Command {
 		UsageText: "inngest alpha api [target/auth flags] <endpoint> [endpoint flags]",
 		Description: strings.Join([]string{
 			"By default, the command targets the local dev server.",
-			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a self-hosted server.",
+			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
@@ -198,7 +203,11 @@ func discoverEndpoints() []endpoint {
 	methods := service.Methods()
 	for i := 0; i < methods.Len(); i++ {
 		method := methods.Get(i)
-		if strings.HasPrefix(string(method.Name()), "_") {
+		methodName := string(method.Name())
+		if strings.HasPrefix(methodName, "_") {
+			continue
+		}
+		if _, hidden := hiddenEndpointMethods[methodName]; hidden {
 			continue
 		}
 
@@ -213,7 +222,7 @@ func discoverEndpoints() []endpoint {
 		}
 
 		endpoints = append(endpoints, endpoint{
-			name:       kebab(string(method.Name())),
+			name:       endpointCommandName(methodName),
 			method:     httpMethod,
 			path:       path,
 			body:       httpRule.Body,
@@ -223,6 +232,16 @@ func discoverEndpoints() []endpoint {
 	}
 
 	return endpoints
+}
+
+func endpointCommandName(methodName string) string {
+	name := kebab(methodName)
+	for _, prefix := range []string{"fetch-", "list-"} {
+		if strings.HasPrefix(name, prefix) {
+			return "get-" + strings.TrimPrefix(name, prefix)
+		}
+	}
+	return name
 }
 
 func httpRule(method protoreflect.MethodDescriptor) *annotations.HttpRule {
