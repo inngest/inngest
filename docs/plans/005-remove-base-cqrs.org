@@ -446,6 +446,8 @@ Review notes:
 - 2026-05-15: verification passed with =go test ./pkg/cqrs/manager
   ./pkg/cqrs/base_cqrs -count=1= and =go test ./pkg/devserver ./pkg/db
   ./tests/execution/executor -count=1=.
+- 2026-05-15: Postgres-backed verification passed with
+  =TEST_DATABASE=postgres go test ./pkg/cqrs/manager ./pkg/db -count=1=.
 
 ** Phase 4: split the manager by domain
 
