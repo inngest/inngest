@@ -14,10 +14,7 @@ import (
 var _ db.Querier = (*sqliteQuerier)(nil)
 
 type sqliteQuerier struct {
-	// conn is nil when this querier is bound to a transaction (see TxAdapter
-	// in adapter.go). Batch methods check it before starting their own tx.
-	conn *sql.DB
-	q    sqlc.Querier
+	q sqlc.Querier
 }
 
 // bytesToNullString preserves nil-vs-empty semantics while adapting db-layer
@@ -375,32 +372,6 @@ func (sq *sqliteQuerier) HistoryCountRuns(ctx context.Context) (int64, error) {
 }
 
 // --- Run defers ---
-
-func (sq *sqliteQuerier) InsertRunDefers(ctx context.Context, defers []db.InsertRunDeferParams) error {
-	if len(defers) == 0 {
-		return nil
-	}
-	if sq.conn == nil {
-		for _, d := range defers {
-			if err := sq.InsertRunDefer(ctx, d); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	tx, err := sq.conn.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	txQ := &sqliteQuerier{q: sqlc.New(tx)}
-	for _, d := range defers {
-		if err := txQ.InsertRunDefer(ctx, d); err != nil {
-			_ = tx.Rollback()
-			return err
-		}
-	}
-	return tx.Commit()
-}
 
 func (sq *sqliteQuerier) InsertRunDefer(ctx context.Context, arg db.InsertRunDeferParams) error {
 	return sq.q.InsertRunDefer(ctx, sqlc.InsertRunDeferParams{

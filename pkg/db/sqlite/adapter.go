@@ -26,7 +26,7 @@ type Adapter struct {
 func New(conn *sql.DB) *Adapter {
 	return &Adapter{
 		conn: conn,
-		q:    &sqliteQuerier{conn: conn, q: sqlc.New(conn)},
+		q:    &sqliteQuerier{q: sqlc.New(conn)},
 		h:    &helpers{},
 	}
 }
