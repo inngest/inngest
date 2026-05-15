@@ -42,7 +42,7 @@ func TestCheckpointAPI_Output(t *testing.T) {
 				"X-Custom-Header": "custom-value",
 				"Content-Type":    "text/plain",
 			},
-			Body: []byte("response body content"),
+			Body: "response body content",
 		}
 		wrappedOutput, err := json.Marshal(map[string]any{"data": apiRes})
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestCheckpointAPI_Output(t *testing.T) {
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
-			Body: []byte(`{"error":"internal server error"}`),
+			Body: `{"error":"internal server error"}`,
 		}
 		wrappedOutput, err := json.Marshal(map[string]any{"data": apiRes})
 		require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestCheckpointAPI_Output(t *testing.T) {
 		apiRes := apiresult.APIResult{
 			StatusCode: 204,
 			Headers:    map[string]string{},
-			Body:       nil,
+			Body:       "",
 		}
 		wrappedOutput, err := json.Marshal(map[string]any{"data": apiRes})
 		require.NoError(t, err)

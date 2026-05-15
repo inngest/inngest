@@ -1,0 +1,632 @@
+#+TITLE: CLI Conformance Runner
+#+AUTHOR: Darwin D. Wu
+#+STATUS: Draft
+#+STARTUP: showall
+
+* Overview
+Add a new =inngest conformance= command family to the CLI that can be run inside SDK
+repositories to measure feature compatibility against the Inngest dev server and, later,
+other Inngest targets.
+
+The command should support both SDK transport models:
+- =serve=: SDK exposes the standard HTTP serve endpoint.
+- =connect=: SDK runs a persistent worker that connects to the dev server over the Connect
+  control-plane and gateway WebSocket protocol.
+
+This should be designed as a reusable runner with stable machine-readable reports, so SDK
+repos can use it locally and in CI without depending on Go's =testing= package or this
+repo's internal test layout.
+
+* Goals
+- Provide a single CLI entrypoint for SDK conformance testing.
+- Support execution in external SDK repositories after downloading the Inngest CLI.
+- Produce both human-readable and machine-readable reports.
+- Model compatibility by feature, not only by test case.
+- Support both =serve= and =connect= transports with a shared case/report model.
+- Work in local development and CI with minimal SDK-specific glue.
+
+* Non-Goals
+- Reuse =go test= directly as the user-facing conformance runner.
+- Implement cloud-target conformance in v1.
+- Cover every SDK feature in the first iteration.
+- Replace existing repo-local integration tests in this repository.
+
+* User Experience
+** Primary commands
+- =inngest conformance run=
+  Execute one or more suites or cases and emit a report.
+- =inngest conformance list=
+  Show available transports, suites, cases, and features.
+- =inngest conformance doctor=
+  Validate prerequisites before running conformance.
+- =inngest conformance report=
+  Re-render an existing result artifact as =pretty=, =json=, =junit=, or =markdown=.
+
+** Useful follow-ups
+- =inngest conformance init=
+  Scaffold a minimal config file for SDK repos.
+- =inngest conformance diff=
+  Compare two reports and surface regressions.
+- =inngest conformance capture=
+  Gather extra diagnostics for failed runs.
+- =inngest conformance replay=
+  Re-run a failed case from a saved report.
+
+* Transport Model
+** Serve
+The runner targets an HTTP SDK endpoint, typically exposed as =/api/inngest= and
+=/api/introspect=, and drives execution through standard registration and event APIs.
+
+** Connect
+The runner must not assume a serve endpoint exists.
+
+Instead, the flow is:
+1. Start =inngest dev=.
+2. Start the SDK fixture process in worker mode.
+3. Wait for the worker to become ready via dev server Connect state.
+4. Send events through the server.
+5. Assert outcomes from server-observable behavior and the final run state.
+
+Important implication:
+- The runner does not need to implement the Connect WebSocket protocol itself for normal
+  conformance runs.
+- It needs orchestration, readiness checks, event injection, and result collection.
+
+* Proposed CLI Shape
+** Examples
+#+begin_src bash
+inngest conformance run \
+  --transport serve \
+  --sdk-url http://127.0.0.1:3000/api/inngest
+
+inngest conformance run \
+  --transport connect \
+  --worker-cmd 'go run ./cmd/worker' \
+  --report-format json
+#+end_src
+
+** Common flags
+- =--transport serve|connect=
+- =--suite=
+- =--case=
+- =--feature=
+- =--report-format pretty|json|junit|markdown=
+- =--report-out=
+- =--timeout=
+- =--verbose=
+
+** Serve-specific flags
+- =--sdk-url=
+- =--introspect-path=
+- =--inngest-path=
+
+** Connect-specific flags
+- =--worker-cmd=
+- =--wait-for-ready-timeout=
+- =--connect-state-url= or derived from dev server defaults
+- =--instance-id= for debugging and correlation
+
+** Server/runtime flags
+- =--dev-url=
+- =--event-url=
+- =--event-key=
+- =--signing-key=
+- =--start-dev=
+- =--dev-cmd=
+
+* Report Model
+Reports should be stable and versioned.
+
+** Required top-level fields
+- schema version
+- run id
+- timestamp
+- CLI version
+- SDK metadata
+- target metadata
+- transport
+- overall status
+- summary counts
+- per-case results
+- per-feature compatibility summary
+
+** Per-case result fields
+- case id
+- suite id
+- feature ids
+- status
+- duration
+- transport
+- evidence
+- failure message
+- artifacts
+
+** Per-feature summary fields
+- feature id
+- feature label
+- support status: supported, partial, unsupported, unknown
+- backing cases
+- notes
+
+* Test Data Strategy
+We should use golden data, but narrowly.
+
+Golden data is useful when we need a stable, reviewable expectation for:
+- normalized registration payloads
+- generated SDK responses
+- report rendering output
+- sanitized error payloads
+- case manifests and expected feature summaries
+
+Golden data should not be the only oracle for execution behavior. For many conformance
+cases, especially timing-sensitive and transport-sensitive ones, assertions should be
+structural and semantic instead:
+- response status class
+- presence or absence of fields
+- generator opcode shape
+- final run status
+- security invariants
+
+Recommended split:
+- use golden fixtures for deterministic data contracts and report snapshots
+- use semantic assertions for runtime behavior, time-based flows, retries, and reconnects
+
+Golden fixtures should be:
+- versioned with the report schema
+- sanitized so they contain no secrets, ephemeral IDs, timestamps, or host-specific values
+- transport-aware where necessary, but shared where possible
+
+Non-goal for v1:
+- building a brittle snapshot suite that fails on harmless formatting or ordering changes
+
+* Case Taxonomy
+The plan should treat conformance cases as more than happy-path feature checks.
+
+** Positive cases
+These verify expected feature support under valid inputs and normal execution:
+- registration and discovery
+- invocation
+- steps
+- sleeps
+- retries
+- cancel
+- wait-for-event
+
+** Negative and defensive cases
+These verify SDK behavior under malformed, unexpected, or incomplete inputs. The goal is
+not only "returns an error", but "fails safely and predictably".
+
+Examples:
+- malformed request payloads
+- unexpected field types in event data
+- missing required fields
+- invalid step IDs
+- invalid signatures or auth context
+- oversized payloads
+- unknown opcodes or unsupported request shapes where relevant
+- duplicate or replay-like requests where idempotency expectations apply
+
+Expected assertions:
+- no panic or worker crash
+- no unbounded retry loop
+- no secret leakage in the error body or logs captured by the runner
+- explicit and stable error classification where possible
+- connection remains healthy unless disconnect is the correct behavior
+
+** Security and hardening cases
+These should be a first-class suite, not an afterthought.
+
+Primary goals:
+- verify the SDK does not expose process environment variables, secrets, or internal
+  implementation details in normal outputs or error paths
+- verify untrusted input is handled without reflecting sensitive runtime state
+- verify transport-level failures do not cause unsafe fallback behavior
+
+Initial security-focused checks should include:
+- environment variables are not returned in function output unless explicitly referenced by
+  the fixture code
+- environment variables are not echoed in error messages, stack traces, or serialized step
+  state
+- signing keys, event keys, session tokens, and auth headers never appear in reports or
+  captured artifacts
+- malformed requests do not trigger verbose debug dumps containing headers, local paths, or
+  raw process state
+- connect handshake or serve registration failures do not leak secrets through surfaced
+  diagnostics
+
+The runner should sanitize captured evidence before persisting it to disk.
+
+* Suite Layout
+Suites should be organized by intent rather than by implementation language.
+
+Suggested top-level suites:
+- =core=: basic compatible behavior
+- =negative=: invalid and malformed inputs
+- =security=: hardening and secret-handling checks
+- =transport/serve=: serve-specific behavior
+- =transport/connect=: connect-specific behavior
+
+This allows a repo to run:
+- a fast default suite locally
+- a broader CI suite including negative and security checks
+- transport-specific suites when the SDK supports more than one transport
+
+* Package Layout
+#+begin_src text
+cmd/
+  conformance/
+    cmd.go
+    run.go
+    list.go
+    doctor.go
+    report.go
+
+pkg/conformance/
+  suite.go
+  case.go
+  feature.go
+  runner.go
+  report.go
+  doctor.go
+  config.go
+  runner/
+    serve/
+      runner.go
+      register.go
+      execute.go
+    connect/
+      runner.go
+      readiness.go
+      execute.go
+  output/
+    pretty.go
+    json.go
+    junit.go
+    markdown.go
+#+end_src
+
+* Reuse From Existing Code
+There is useful protocol and case logic in this repository's =tests/= directory, especially:
+- SDK introspection and registration flow
+- request/response expectation patterns
+- existing SDK feature scenarios for Go and JS
+
+However, the conformance runner should extract reusable logic into =pkg/conformance=
+instead of wrapping =go test= or depending on =testing.T=.
+
+* Initial Feature Set
+Start with a small, portable suite that covers the highest-signal compatibility areas:
+- basic function registration and invocation
+- step execution
+- sleep
+- retry
+- cancel
+- wait-for-event
+
+Connect-specific transport checks should also cover:
+- worker startup
+- ready state reached
+- event delivery to the worker
+- reply path functioning
+- reconnect and drain behavior as a follow-up suite
+
+The first portable expansion after happy-path coverage should be:
+- malformed event payload handling
+- invalid request/body handling
+- stable error responses for unsupported or unexpected inputs
+- secret non-disclosure checks in outputs, logs, and reports
+
+* SDK Repository Integration
+Each SDK repo should provide one of:
+- a serve fixture that exposes the expected HTTP endpoints
+- a connect fixture that starts a worker process
+
+SDK repos should also provide:
+- a small set of intentionally invalid-input fixtures where the expected outcome is safe
+  rejection
+- a security fixture that can validate the runtime does not accidentally expose selected
+  environment variables
+
+Recommended CI pattern:
+1. Download or install the Inngest CLI.
+2. Start the SDK fixture process or let the CLI start it.
+3. Run =inngest conformance doctor=.
+4. Run =inngest conformance run --report-format json --report-out ...=.
+5. Publish the JSON report and optional rendered summaries as CI artifacts.
+
+* Decisions
+** Config format
+Use YAML as the canonical config format and load it with =koanf=.
+
+Reasons:
+- easier for humans to edit in SDK repositories
+- good fit for commands, env vars, suites, and fixture definitions
+- leaves room to accept JSON or TOML later with little extra implementation cost
+
+** Dev server lifecycle
+Default =conformance run= to starting a fresh dev server.
+
+Reasons:
+- better fit for SDK repositories such as =inngest-rs= and =inngest-kt=
+- reduces setup friction in local development and CI
+- gives the runner stronger control over ports, env, lifecycle, and captured diagnostics
+
+Follow-up:
+- add an explicit attach mode later for users who want to point at an already-running dev
+  server
+
+** Base report vs capture artifacts
+Recommendation:
+- keep the base report compact and semantic
+- put verbose transport traces, request/response dumps, and process logs into optional
+  capture artifacts
+
+Base report should include:
+- feature and case status
+- normalized error summary
+- short evidence snippets
+- references to any captured artifacts
+
+Optional capture artifacts may include:
+- dev server logs
+- SDK fixture stdout and stderr
+- normalized registration payloads
+- sanitized request and response bodies
+- connect readiness and connection-state snapshots
+
+All captures must be redacted before persistence.
+
+Default failure artifact bundle should contain:
+- =report.json=
+  normalized run report with per-case status, feature status, reasons, and artifact references
+- =summary.md=
+  human-readable failure summary for CI and local triage
+- =manifest.json=
+  CLI version, SDK metadata, transport, config used, normalized ports and URLs, and
+  selected suites or cases
+- =sdk.log=
+  captured SDK fixture stdout and stderr, redacted
+- =devserver.log=
+  captured =inngest dev= stdout and stderr, redacted
+- =case-artifacts/<case-id>.json=
+  per-case normalized evidence including expected behavior, actual behavior, failure reason,
+  duration, and sanitized request or response snippets when relevant
+- =redactions.json=
+  a record of applied redaction rules so artifact consumers know why fields are absent
+
+Transport-specific artifacts should be included only when relevant:
+- =connect-state.json=
+  connection readiness and status snapshots for connect-mode failures
+- =serve-registration.json=
+  normalized introspection and registration evidence for serve-mode failures
+
+Default behavior should avoid including:
+- full raw request dumps for every passing case
+- unredacted environment variables
+- excessive debug traces or packet-level logs
+- full stack traces unless the sanitized summary is insufficient
+
+Follow-up:
+- support a more verbose capture mode for deeper local debugging
+
+** Suite execution behavior
+Do not fail fast by default.
+
+The runner should attempt to execute the full selected suite and report:
+- which features passed
+- which features failed
+- which features are not implemented
+- which features could not be evaluated
+
+When possible, the report should also include a normalized reason, such as:
+- not implemented by this SDK
+- transport setup failed
+- behavior diverged from expectation
+- security invariant violated
+- prerequisite case failed
+
+This gives SDK maintainers a fuller compatibility picture from a single run.
+
+** Compatibility classification
+Do not collapse outcomes into a single binary "compatible" label.
+
+Instead summarize at the SDK level as:
+- full compatibility
+- partial compatibility
+- incompatible
+- unknown
+
+Feature-level evaluation remains the source of truth.
+
+** Golden fixture strictness
+Use semantic snapshots, not byte-for-byte snapshots.
+
+Normalization before comparison should include:
+- stable key ordering
+- redaction of secrets
+- removal of timestamps, ports, paths, IDs, and other ephemeral values
+- separation of transport-specific metadata from shared feature expectations
+
+** Negative case requirements
+Evaluate negative and defensive behavior per feature, not as a single global gate.
+
+Examples:
+- if a feature accepts signed requests, test invalid signature handling for that feature
+- if a feature accepts structured input, test malformed payload handling for that feature
+- if a feature uses retries or state serialization, test invalid or oversized state for that
+  feature
+
+This keeps compatibility reporting aligned to actual implemented feature sets.
+
+** Security boundary
+Adopt the balanced split for security coverage.
+
+Conformance should verify portable, externally observable guarantees:
+- selected env var non-disclosure checks
+- registration and handshake redaction checks
+- common auth failure handling
+- safe behavior for oversized and malformed inputs
+- no secret leakage in normal outputs, surfaced errors, reports, or captures
+
+Each SDK repository should continue owning:
+- framework-specific hardening
+- dependency and supply-chain security
+- runtime-specific exploit classes
+- language-specific exception and debug-mode behavior
+
+** Transport-critical compatibility
+Reconnect, drain, lease-extension, and related state-handling behavior should block general
+compatibility.
+
+Reason:
+- an SDK should not be treated as generally compatible for live usage if these state and
+  delivery guarantees do not work correctly
+
+Implementation note:
+- these cases can still live in clearly named transport suites, but their results must feed
+  into the overall compatibility classification rather than being treated as optional
+
+** Additional config formats
+JSON and TOML support do not need special planning work up front if they come nearly for free
+through =koanf=.
+
+Implementation note:
+- keep YAML as the documented canonical format
+- accept JSON and TOML as convenience formats if loader support is trivial
+
+* Security Boundary Options
+There are a few reasonable ways to divide security checks between conformance and each SDK's
+own deeper test suite.
+
+** Option 1: Minimal conformance boundary
+Conformance checks only portable guarantees:
+- no secret leakage in normal outputs
+- no secret leakage in surfaced errors
+- no secret leakage in runner-generated reports and captures
+- malformed inputs fail safely
+
+SDK repos own:
+- runtime-specific sandboxing
+- memory safety and unsafe deserialization concerns
+- framework-specific debug mode and stack trace exposure
+
+** Option 2: Balanced split
+Conformance checks the portable guarantees above, plus:
+- selected env var non-disclosure checks
+- registration and handshake redaction checks
+- common auth failure handling
+- safe behavior for oversized and malformed inputs
+
+SDK repos own:
+- framework-specific hardening
+- dependency and supply-chain security
+- runtime-specific exploit classes
+
+This is the recommended starting point.
+
+** Option 3: Aggressive conformance boundary
+Conformance attempts to verify deeper hardening behavior across SDKs, including:
+- broad env and process isolation expectations
+- framework-specific exception behavior
+- detailed log-policy enforcement
+- more invasive negative and fuzz-style inputs
+
+This gives higher assurance but will be expensive, brittle, and uneven across languages.
+
+* Phases
+** Phase 1: Command and shared model
+Overview:
+- establish the CLI surface and the shared data model that every later phase builds on
+- make the conformance command discoverable even before all runners and suites are complete
+
+Subtasks:
+- [X] Add =cmd/conformance= and register it in the root CLI.
+- [X] Define the top-level subcommands: =run=, =list=, =doctor=, and =report=.
+- [X] Define shared config, suite, case, feature, status, and report types.
+- [X] Define report schema versioning and a stable JSON shape.
+- [X] Implement =list= against the shared registry so available suites and cases are visible.
+- [X] Implement a stub =run= path that loads config, selects suites, and validates inputs.
+- [X] Define fixture and golden-data conventions, including sanitization and normalization
+  rules.
+- [X] Establish the compatibility classification model: full, partial, incompatible, and
+  unknown.
+
+** Phase 2: Serve runner
+Overview:
+- deliver the first useful end-to-end runner by targeting SDKs that expose the standard HTTP
+  serve flow
+- prove the shared model works in a real transport before adding connect-specific complexity
+
+Subtasks:
+- [X] Extract serve-oriented protocol logic from =tests/= into =pkg/conformance/runner/serve=.
+- [X] Define the serve transport contract, including introspection, registration, and event
+  injection expectations.
+- [X] Implement the first happy-path cases: registration, invocation, steps, retry, cancel,
+  and wait-for-event.
+- [X] Add serve-mode doctor checks for SDK reachability, required endpoints, and basic config
+  validation.
+- [X] Emit pretty and JSON reports from serve runs using the shared report model.
+- [ ] Add the first negative-input serve cases, focusing on malformed payloads and safe error
+  handling.
+- [ ] Add basic security assertions in serve mode, including secret redaction and env var
+  non-disclosure checks.
+- [ ] Validate that failures still produce a useful artifact bundle and do not fail fast by
+  default.
+
+** Phase 3: Connect runner
+Overview:
+- extend the system to SDKs that use Connect workers instead of HTTP serve endpoints
+- keep the case model shared, while adapting orchestration, readiness, and evidence capture
+  to the Connect transport
+
+Subtasks:
+- [ ] Implement worker process orchestration, lifecycle handling, and cleanup.
+- [ ] Add readiness checks against dev server Connect state before test execution begins.
+- [ ] Define the connect transport contract in terms of observable behavior rather than raw
+  protocol implementation.
+- [ ] Reuse shared feature cases where transport-independent and add transport adapters where
+  needed.
+- [ ] Add Connect-specific doctor checks and diagnostics for worker startup, readiness, and
+  state visibility.
+- [ ] Add connect-safe negative cases that validate error handling without requiring the
+  runner to implement the wire protocol directly.
+- [ ] Add transport-critical cases for reconnect, drain, and lease-extension behavior.
+- [ ] Feed transport-critical case results into the overall compatibility classification.
+
+** Phase 4: Reporting and CI ergonomics
+Overview:
+- make the runner useful in CI and easy to consume by humans without reading raw logs
+- ensure failure artifacts are stable, sanitized, and structured enough for regression
+  tracking
+
+Subtasks:
+- [ ] Implement =report= for re-rendering existing artifacts without re-running tests.
+- [ ] Add output renderers for pretty terminal output, JSON, JUnit, and Markdown.
+- [ ] Finalize the default failure artifact bundle and optional verbose capture behavior.
+- [ ] Support stable artifact paths, stable exit codes, and CI-friendly summary output.
+- [ ] Ensure reports and captures redact secrets and unstable values consistently.
+- [ ] Add normalized reason codes and evidence snippets to improve triage quality.
+- [ ] Document how CI should store, render, and diff conformance artifacts.
+
+** Phase 5: Config and adoption
+Overview:
+- make adoption easy for SDK repositories and validate the design across multiple language
+  implementations
+- use early adopters to refine config, fixture expectations, and compatibility reporting
+
+Subtasks:
+- [ ] Add =init= scaffolding for SDK repos.
+- [ ] Support per-repo config files for commands, env, suites, and fixture metadata.
+- [ ] Define a small canonical config example for serve and connect transports.
+- [ ] Trial adoption in =inngestgo= first to validate both shared cases and connect support.
+- [ ] Extend adoption to =inngest-rs= and =inngest-kt=, refining assumptions where the SDK
+  architecture differs.
+- [ ] Add =negative= and =security= suites to the default CI recommendation once stable.
+- [ ] Use adoption feedback to tune classifications, reason codes, and fixture requirements.
+
+* Success Criteria
+- An SDK repository can run =inngest conformance run= locally with one command.
+- CI can consume JSON output and fail on regressions deterministically.
+- The same feature can be reported across =serve= and =connect= transports.
+- The command surface remains small and understandable.
+- Adding new cases does not require changing CLI wiring or report consumers.

@@ -74,7 +74,7 @@ func Infer[InputT any, OutputT any](
 		}
 
 		// Check to see if we were passed a pointer or not. If not, we must make this a pointer.
-		if reflect.TypeOf(out).Kind() != reflect.Ptr {
+		if reflect.TypeOf(out).Kind() != reflect.Pointer {
 			v := reflect.New(reflect.TypeOf(out)).Interface()
 			err := json.Unmarshal(val, v)
 			return reflect.ValueOf(v).Elem().Interface().(OutputT), err

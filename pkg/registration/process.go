@@ -63,7 +63,7 @@ func (r *ProcessResult) SetSemaphoreCapacity(ctx context.Context, sm constrainta
 			// add the idempotency key to the fn ID.  this resets after the semaphore idempotency period,
 			// eg 20 seconds, but ensures simultaneous deploys still update the sem.
 			ik := fmt.Sprintf("%s-%s", r.opts.IdempotencyKey, df.ID.String())
-			_ = sm.SetCapacity(ctx, df.AccountID, semID, ik, int64(fc.Limit))
+			_, _ = sm.SetCapacity(ctx, df.AccountID, semID, ik, int64(fc.Limit))
 		}
 	}
 }
@@ -72,9 +72,6 @@ func (r *ProcessResult) SetSemaphoreCapacity(ctx context.Context, sm constrainta
 // This is the single entry point for function registration logic shared between
 // devserver and cloud.
 func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts ProcessOpts) (*ProcessResult, error) {
-	if len(req.Functions) == 0 {
-		return nil, sdk.ErrNoFunctions
-	}
 
 	// Collect all errors for reporting.
 	var errs error
@@ -82,6 +79,10 @@ func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts Process
 	result := &ProcessResult{
 		opts:      opts,
 		Functions: make([]inngest.DeployedFunction, 0, len(req.Functions)),
+	}
+
+	if len(req.Functions) == 0 {
+		return result, sdk.ErrNoFunctions
 	}
 
 	for _, sdkFn := range req.Functions {

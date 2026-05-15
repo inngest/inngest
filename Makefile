@@ -67,7 +67,7 @@ schema-dump: ## Dump SQLite and Postgres schema files from migrations
 
 .PHONY: snapshot
 snapshot: ## Build release snapshot
-	goreleaser release --snapshot --skip publish --clean
+	goreleaser release --snapshot --skip=publish --clean
 
 .PHONY: build-ui
 build-ui: ## Build dev server UI

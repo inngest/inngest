@@ -94,6 +94,14 @@
         },
         "type": "object"
       },
+      "v2AppRef": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "v2CreateAccountData": {
         "properties": {
           "apiKey": {
@@ -376,6 +384,101 @@
         ],
         "type": "string"
       },
+      "v2FunctionRef": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionRun": {
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/v2AppRef"
+          },
+          "durationMs": {
+            "format": "uint64",
+            "type": "string"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "function": {
+            "$ref": "#/components/schemas/v2FunctionRef"
+          },
+          "id": {
+            "type": "string"
+          },
+          "output": {
+            "type": "object"
+          },
+          "queuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/v2FunctionRunStatus"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/v2RunTrigger"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionRunStatus": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "QUEUED",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "CANCELLED"
+        ],
+        "type": "string"
+      },
+      "v2FunctionTrace": {
+        "properties": {
+          "rootSpan": {
+            "$ref": "#/components/schemas/v2TraceSpan"
+          },
+          "runId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2GetFunctionRunResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2FunctionRun"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2GetFunctionTraceResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2FunctionTrace"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
       "v2HealthData": {
         "properties": {
           "status": {
@@ -496,6 +599,29 @@
         },
         "type": "object"
       },
+      "v2RunTrigger": {
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "cronSchedule": {
+            "type": "string"
+          },
+          "eventIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "eventName": {
+            "type": "string"
+          },
+          "isBatch": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "v2SigningKey": {
         "properties": {
           "createdAt": {
@@ -558,6 +684,108 @@
           }
         },
         "type": "object"
+      },
+      "v2TraceSpan": {
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/v2TraceSpan"
+            },
+            "type": "array"
+          },
+          "durationMs": {
+            "format": "uint64",
+            "type": "string"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object"
+          },
+          "metadata": {
+            "items": {
+              "$ref": "#/components/schemas/v2TraceSpanMetadata"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "output": {
+            "type": "object"
+          },
+          "queuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/v2TraceSpanStatus"
+          },
+          "stepId": {
+            "type": "string"
+          },
+          "stepOp": {
+            "$ref": "#/components/schemas/v2TraceStepOp"
+          }
+        },
+        "type": "object"
+      },
+      "v2TraceSpanMetadata": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "v2TraceSpanStatus": {
+        "default": "UNKNOWN",
+        "enum": [
+          "UNKNOWN",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "WAITING",
+          "CANCELLED",
+          "SKIPPED"
+        ],
+        "type": "string"
+      },
+      "v2TraceStepOp": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "RUN",
+          "SLEEP",
+          "WAIT_FOR_EVENT",
+          "INVOKE",
+          "SEND_EVENT",
+          "AI_GATEWAY",
+          "WAIT_FOR_SIGNAL"
+        ],
+        "type": "string"
       },
       "v2Webhook": {
         "properties": {
@@ -2174,6 +2402,96 @@
           "Partner API"
         ]
       }
+    },
+    "/runs/{runId}": {
+      "get": {
+        "description": "Fetches the canonical run summary for a single function run",
+        "operationId": "V2_GetFunctionRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeOutput",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetFunctionRunResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get function run",
+        "tags": [
+          "Runs"
+        ],
+        "x-beta": true
+      }
+    },
+    "/runs/{runId}/trace": {
+      "get": {
+        "description": "Fetches the trace tree for a single function run",
+        "operationId": "V2_GetFunctionTrace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeOutput",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetFunctionTraceResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get function trace",
+        "tags": [
+          "Runs"
+        ],
+        "x-beta": true
+      }
     }
   },
   "servers": [
@@ -2210,6 +2528,10 @@
     {
       "description": "Invoke and manage functions",
       "name": "Functions"
+    },
+    {
+      "description": "Inspect function runs",
+      "name": "Runs"
     },
     {
       "description": "Partner account management",

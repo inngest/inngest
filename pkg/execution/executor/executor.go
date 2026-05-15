@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/inngest/inngest/pkg/execution/defers"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -544,6 +546,18 @@ func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeF
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
+}
+
+func (e *executor) RunFunctionFinishedLifecycle(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	evts []json.RawMessage,
+	resp state.DriverResponse,
+) {
+	for _, l := range e.lifecycles {
+		go l.OnFunctionFinished(context.WithoutCancel(ctx), md, item, evts, resp)
+	}
 }
 
 func (e *executor) CloseLifecycleListeners(ctx context.Context) {
@@ -1174,7 +1188,11 @@ func (e *executor) schedule(
 			// the lock becomes available to any competing run. If a faster run acquires it before
 			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
 			// behaving as if the singleton mode were set to skip.
-			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton, req.AccountID)
+			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, queue.Scope{
+				AccountID:  req.AccountID,
+				EnvID:      req.WorkspaceID,
+				FunctionID: req.Function.ID,
+			}, singletonKey, *req.Function.Singleton)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1445,6 +1463,10 @@ func (e *executor) schedule(
 		}
 	}
 
+	// If this run was triggered by an invoke, write the invoked run's ID back
+	// onto the invoking function's invoke span so the in-progress trace shows it.
+	e.updateInvokeSpanWithInvokedRunID(ctx, l, req.Events, metadata.ID.RunID)
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -1487,6 +1509,61 @@ func (e *executor) schedule(
 	return &metadata.ID.RunID, &metadata, nil
 }
 
+func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logger.Logger, events []event.TrackedEvent, invokedRunID ulid.ULID) {
+	// We should only have one Invoke event at most, but this technically handles a batch of invoke events
+	if len(events) == 0 || events[0].GetEvent().Name != consts.FnInvokeName {
+		return
+	}
+	for _, trackedEvent := range events {
+		invocationEvtID := trackedEvent.GetInternalID()
+		raw, ok := trackedEvent.GetEvent().Data[consts.InngestEventDataPrefix]
+		if !ok {
+			l.Debug("invocation event missing inngest metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		invocationMeta := event.InngestMetadata{}
+		if err := invocationMeta.Decode(raw); err != nil {
+			l.Debug("failed to decode invocation metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID, "error", err)
+			continue
+		}
+		if invocationMeta.InvokeSpanRef == nil {
+			l.Debug("invocation event missing invoke span ref; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		sourceRunID := invocationMeta.RunID()
+		if sourceRunID == nil {
+			l.Debug("invocation event has unparseable correlation id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "correlation_id", invocationMeta.InvokeCorrelationId)
+			continue
+		}
+		sourceFnID, err := uuid.Parse(invocationMeta.SourceFnID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source fn id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_fn_id", invocationMeta.SourceFnID, "error", err)
+			continue
+		}
+		sourceAppID, err := uuid.Parse(invocationMeta.SourceAppID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source app id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_app_id", invocationMeta.SourceAppID, "error", err)
+			continue
+		}
+		sourceAccountID := trackedEvent.GetAccountID()
+		sourceEnvID := trackedEvent.GetWorkspaceID()
+		if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.Schedule.invokeRunID"},
+			TargetSpan: invocationMeta.InvokeSpanRef,
+			Attributes: meta.NewAttrSet(
+				meta.Attr(meta.Attrs.StepInvokeRunID, &invokedRunID),
+				meta.Attr(meta.Attrs.RunID, sourceRunID),
+				meta.Attr(meta.Attrs.AccountID, &sourceAccountID),
+				meta.Attr(meta.Attrs.EnvID, &sourceEnvID),
+				meta.Attr(meta.Attrs.FunctionID, &sourceFnID),
+				meta.Attr(meta.Attrs.AppID, &sourceAppID),
+			),
+		}); err != nil {
+			l.Debug("error updating invoke span with invoked runID", "error", err)
+		}
+	}
+}
+
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
 	for _, e := range e.lifecycles {
 		service.Go(
@@ -1519,17 +1596,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
+	requestID := ulid.MustNew(ulid.Timestamp(e.now()), rand.Reader).String()
+	jobID := queue.JobIDFromContext(ctx)
+	if item.JobID != nil {
+		jobID = *item.JobID
+	}
+	ctx = driver.WithRequestIDs(ctx, requestID, jobID)
+
 	l := e.log.With(
 		"account_id", item.Identifier.AccountID,
 		"env_id", item.WorkspaceID,
 		"app_id", item.Identifier.AppID,
 		"fn_id", item.Identifier.WorkflowID,
 		"run_id", id.RunID,
+		"request_id", requestID,
+		"job_id", jobID,
 	)
 	ctx = logger.WithStdlib(ctx, l)
 
 	conditionalSpan.SetAttributes(attribute.String("run_id", id.RunID.String()))
 	conditionalSpan.SetAttributes(attribute.String("event_id", id.EventID.String()))
+	conditionalSpan.SetAttributes(attribute.String("request_id", requestID))
+	conditionalSpan.SetAttributes(attribute.String("job_id", jobID))
 
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
@@ -1756,6 +1844,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		item:       item,
 		edge:       edge,
 		stackIndex: stackIndex,
+		requestID:  requestID,
+		jobID:      jobID,
 		httpClient: e.httpClient,
 		parentSpan: parentRef,
 		c:          e.clock,
@@ -1763,6 +1853,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	// This span will be updated with output as soon as execution finishes.
+	execAttrs := tracing.FunctionAttrs(&instance.f)
+	meta.AddAttr(execAttrs, meta.Attrs.RequestID, &instance.requestID)
+	meta.AddAttr(execAttrs, meta.Attrs.JobID, &instance.jobID)
+
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,
 		meta.SpanNameExecution,
@@ -1771,7 +1865,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Parent:     parentRef,
 			Metadata:   &md,
 			QueueItem:  &item,
-			Attributes: tracing.FunctionAttrs(&instance.f),
+			Attributes: execAttrs,
 			StartTime:  e.now(),
 		},
 	)
@@ -1797,12 +1891,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
+		responseAttrs := tracing.DriverResponseAttrs(resp, nil)
+		meta.AddAttr(responseAttrs, meta.Attrs.RequestID, &instance.requestID)
+		meta.AddAttr(responseAttrs, meta.Attrs.JobID, &instance.jobID)
+
 		updateOpts := &tracing.UpdateSpanOptions{
 			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
 			Metadata:   &md,
 			QueueItem:  &item,
 			TargetSpan: instance.execSpan,
-			Attributes: tracing.DriverResponseAttrs(resp, nil),
+			Attributes: responseAttrs,
 		}
 
 		// For most executions, we now set the status of the execution span.
@@ -2245,6 +2343,8 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		Index:      run.stackIndex,
 		StepID:     &stepID,
 		QueueRef:   queueref.StringFromCtx(ctx),
+		RequestID:  run.requestID,
+		JobID:      run.jobID,
 		URL:        url,
 	})
 
@@ -3180,6 +3280,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	nonLazy := nonLazyOpCount(resp.Generator)
+
 	{
 		// The following code helps with parallelism and the V2 -> V3 executor changes
 		var update *sv2.MutableConfig
@@ -3192,7 +3294,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 				StartedAt:      i.md.Config.StartedAt,
 			}
 		}
-		if len(resp.Generator) > 1 {
+		if nonLazy > 1 {
 			if !i.md.Config.ForceStepPlan {
 				// With parallelism, we currently instruct the SDK to disable immediate execution,
 				// enforcing that every step becomes pre-planned.
@@ -3239,7 +3341,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	// We only save pending steps if there's >= 1 step planned op.
 	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
-		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
+		if err := e.smv2.SavePending(ctx, i.md.ID, groups.NonLazyIDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
 	}
@@ -3251,8 +3353,12 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// When this happens, we ALWAYS need to create a trace for each step.
 	//
 	// We pass this down in context, unfortunately.
-	if len(resp.Generator) > 1 {
+	if nonLazy > 1 {
 		for _, op := range resp.Generator {
+			if op == nil {
+				// Just in case, because panics are bad
+				continue
+			}
 			if op.Op == enums.OpcodeStepRun {
 				ctx = setEmitCheckpointTraces(ctx)
 				break
@@ -3291,6 +3397,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					e.log.Error(
 						"panic in handleGenerator",
 						"error", r,
+						"stack", string(debug.Stack()),
 					)
 				}
 			}()
@@ -3364,6 +3471,32 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
+	case enums.OpcodeDeferAdd:
+		err := e.handleGeneratorDeferAdd(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer add",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
+	case enums.OpcodeDeferAbort:
+		err := e.handleGeneratorDeferAbort(ctx, runCtx, gen, edge)
+		if err != nil {
+			// Log without returning the error. We may rethink this as the Defer
+			// feature matures.
+			logger.StdlibLogger(ctx).Error(
+				"error handling defer cancel",
+				"error", err,
+				"step_id", sanitizeLogValue(gen.ID),
+				"run_id", runCtx.Metadata().ID.RunID.String(),
+			)
+		}
+		return nil
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -3445,6 +3578,15 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	return nil
 }
 
+// sanitizeLogValue strips CR/LF from a user-supplied string before logging
+// to defuse log injection (CodeQL "log entries created from user input").
+// Used at the few sites that log SDK-controlled identifiers like step IDs.
+func sanitizeLogValue(v string) string {
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+	return v
+}
+
 // handleGeneratorDiscoveryRequest handles OpcodeDiscoveryRequest, which
 // indicates that the SDK is requesting new work to be scheduled, typically
 // after checkpointing or in an effort to recover from non-determinism.
@@ -3462,6 +3604,62 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 		edge,
 		groupID,
 		false,
+	)
+}
+
+func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	if err := defers.SaveFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+		return err
+	}
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAdd")
+}
+
+func (e *executor) handleGeneratorDeferAbort(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// If the SDK emits `[DeferAdd("X"), DeferAbort("X")]` in one response, the
+	// two ops race within the priority group's errgroup. If DeferAbort runs
+	// first it will error. We don't guard against this here (e.g. by writing a
+	// cancelled tombstone when the defer is absent) because emitting an
+	// DeferAdd and DeferAbort for the same hashed ID in a single response is
+	// an SDK bug, and the cost of handling it isn't worth the complexity.
+	if err := defers.AbortFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+		return err
+	}
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAbort")
+}
+
+// enqueueLazyOpFallback ensures that a run doesn't hang due to an "only lazy
+// ops" scenario. This should never happen (e.g. caused by an SDK bug), but we
+// still need a defensive fallback.
+func (e *executor) enqueueLazyOpFallback(
+	ctx context.Context,
+	runCtx execution.RunContext,
+	gen state.GeneratorOpcode,
+	edge queue.PayloadEdge,
+	opName string,
+) error {
+	if !runCtx.OnlyHasLazyOps() {
+		// Common case: a host op in this batch drives forward progress.
+		return nil
+	}
+
+	e.log.Error(
+		opName+" received without a host op; enqueuing discovery as fallback",
+		"step_id", sanitizeLogValue(gen.ID),
+		"unreachable", true,
+	)
+	groupID := uuid.New().String()
+
+	// Assume no pending steps. This may not be correct, but we're
+	// optimizing for avoiding a hanging function run.
+	hasPendingSteps := false
+
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		hasPendingSteps,
 	)
 }
 
@@ -3523,10 +3721,14 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	// The step output was already persisted, typically by an earlier
+	// attempt that timed out or errored after succeeding. Clear the error so the
+	// discovery step still enqueues; otherwise the run stalls.
+	// XXX: hasPendingSteps can be stale on duplicate; worst case is
+	// redundant SDK invocations per in-flight parallel siblng.
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-		// This is fine.
-		// XXX: we should totally attach a warning to the function run here.
-		return nil
+		e.log.Warn("step output already persisted; keeping existing output", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
+		err = nil
 	}
 	if err != nil {
 		return err
@@ -4805,6 +5007,13 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	if span != nil {
 		_ = span.Send()
+	}
+
+	// Attach the v2 invoke span ref to the invocation event so the invoked
+	// function's Schedule can call UpdateSpan to write its runID onto this
+	// invoke span while the invoke is still in progress.
+	if span != nil && span.Ref != nil {
+		evt.Event.SetInvokeSpanRef(span.Ref)
 	}
 
 	// Send the event.

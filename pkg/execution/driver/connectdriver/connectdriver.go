@@ -95,6 +95,8 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	return ProxyRequest(ctx, traceCtx, e.forwarder, s.ID, item, httpdriver.Request{
 		WorkflowID: s.ID.FunctionID,
 		RunID:      s.ID.RunID,
+		RequestID:  driver.RequestIDFromContext(ctx),
+		JobID:      driver.JobIDFromContext(ctx),
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
@@ -106,15 +108,22 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, id sv2.ID, item queue.Item, r httpdriver.Request) (*state.DriverResponse, error) {
 	l := logger.StdlibLogger(ctx)
 
-	var requestID string
-	if item.JobID != nil {
-		// Use the stable queue item ID
-		requestID = *item.JobID
-	} else {
-		// This should never happen, handle it gracefully
-		l.Warn("queue item missing jobID", "item", item, "id", id)
+	requestID := r.RequestID
+	if requestID == "" {
+		l.Warn("connect request missing requestID", "item", item, "id", id)
 		requestID = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
+
+	jobID := r.JobID
+	if jobID == "" && item.JobID != nil {
+		// Use the stable queue item ID
+		jobID = *item.JobID
+	}
+	if jobID == "" {
+		// This should never happen, handle it gracefully
+		l.Warn("queue item missing jobID", "item", item, "id", id)
+	}
+	l = l.With("request_id", requestID, "job_id", jobID)
 
 	requestToForward := connect.GatewayExecutorRequestData{
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
@@ -127,6 +136,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder
 		AccountId:      id.Tenant.AccountID.String(),
 		RunId:          id.RunID.String(),
 		RequestId:      requestID,
+		JobId:          jobID,
 	}
 	// If we have a generator step name, ensure we add the step ID parameter
 	if r.Edge.IncomingGeneratorStep != "" {
@@ -138,6 +148,8 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder
 	span := trace.SpanFromContext(traceCtx)
 	span.SetAttributes(
 		attribute.String("step_id", requestToForward.GetStepId()),
+		attribute.String("request_id", requestID),
+		attribute.String("job_id", jobID),
 	)
 
 	opts := grpc.ProxyOpts{

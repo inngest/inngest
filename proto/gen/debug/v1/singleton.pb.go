@@ -28,7 +28,11 @@ type SingletonInfoRequest struct {
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	// singleton_key is the optional evaluated singleton key suffix (hash part).
 	// If empty, uses the function_id as the singleton key.
-	SingletonKey  string `protobuf:"bytes,2,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
+	SingletonKey string `protobuf:"bytes,2,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
+	// account_id is the UUID of the account that owns the function.
+	AccountId string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// env_id is the UUID of the environment that owns the function.
+	EnvId         string `protobuf:"bytes,4,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -73,6 +77,20 @@ func (x *SingletonInfoRequest) GetFunctionId() string {
 func (x *SingletonInfoRequest) GetSingletonKey() string {
 	if x != nil {
 		return x.SingletonKey
+	}
+	return ""
+}
+
+func (x *SingletonInfoRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SingletonInfoRequest) GetEnvId() string {
+	if x != nil {
+		return x.EnvId
 	}
 	return ""
 }
@@ -139,7 +157,11 @@ type DeleteSingletonLockRequest struct {
 	FunctionId string `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	// singleton_key is the optional evaluated singleton key suffix (hash part).
 	// If empty, uses the function_id as the singleton key.
-	SingletonKey  string `protobuf:"bytes,2,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
+	SingletonKey string `protobuf:"bytes,2,opt,name=singleton_key,json=singletonKey,proto3" json:"singleton_key,omitempty"`
+	// account_id is the UUID of the account that owns the function.
+	AccountId string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// env_id is the UUID of the environment that owns the function.
+	EnvId         string `protobuf:"bytes,4,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -184,6 +206,20 @@ func (x *DeleteSingletonLockRequest) GetFunctionId() string {
 func (x *DeleteSingletonLockRequest) GetSingletonKey() string {
 	if x != nil {
 		return x.SingletonKey
+	}
+	return ""
+}
+
+func (x *DeleteSingletonLockRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *DeleteSingletonLockRequest) GetEnvId() string {
+	if x != nil {
+		return x.EnvId
 	}
 	return ""
 }
@@ -247,18 +283,24 @@ var File_debug_v1_singleton_proto protoreflect.FileDescriptor
 
 const file_debug_v1_singleton_proto_rawDesc = "" +
 	"\n" +
-	"\x18debug/v1/singleton.proto\x12\bdebug.v1\"\\\n" +
+	"\x18debug/v1/singleton.proto\x12\bdebug.v1\"\x92\x01\n" +
 	"\x14SingletonInfoRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12#\n" +
-	"\rsingleton_key\x18\x02 \x01(\tR\fsingletonKey\"X\n" +
+	"\rsingleton_key\x18\x02 \x01(\tR\fsingletonKey\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06env_id\x18\x04 \x01(\tR\x05envId\"X\n" +
 	"\x15SingletonInfoResponse\x12\x19\n" +
 	"\bhas_lock\x18\x01 \x01(\bR\ahasLock\x12$\n" +
-	"\x0ecurrent_run_id\x18\x02 \x01(\tR\fcurrentRunId\"b\n" +
+	"\x0ecurrent_run_id\x18\x02 \x01(\tR\fcurrentRunId\"\x98\x01\n" +
 	"\x1aDeleteSingletonLockRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12#\n" +
-	"\rsingleton_key\x18\x02 \x01(\tR\fsingletonKey\"N\n" +
+	"\rsingleton_key\x18\x02 \x01(\tR\fsingletonKey\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06env_id\x18\x04 \x01(\tR\x05envId\"N\n" +
 	"\x1bDeleteSingletonLockResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runIdB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"

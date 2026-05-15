@@ -133,6 +133,8 @@ func TestSyncHeaders(t *testing.T) {
 
 	opts := driver.V2RequestOpts{
 		Fn:         fn,
+		RequestID:  "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		JobID:      "job-123",
 		SigningKey: []byte("test-signing-key"),
 		Metadata: sv2.Metadata{
 			ID: sv2.ID{
@@ -151,6 +153,8 @@ func TestSyncHeaders(t *testing.T) {
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "t=")
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "s=")
 	require.Equal(t, runID.String(), receivedHeaders.Get("X-Run-ID"))
+	require.Equal(t, opts.RequestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, opts.JobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 	// ForceStepPlan not set, so header should be absent
 	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
 }
@@ -599,7 +603,10 @@ func (m *mockStateLoader) LoadStack(ctx context.Context, id sv2.ID) ([]string, e
 func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, error) {
 	return sv2.State{}, nil
 }
-func (m *mockStateLoader) LoadV1Metadata(ctx context.Context, id sv2.ID) (*sv1.Metadata, error) {
+func (m *mockStateLoader) LoadDefers(ctx context.Context, id sv2.ID) (map[string]sv2.Defer, error) {
+	return nil, nil
+}
+func (m *mockStateLoader) LoadDefersMeta(ctx context.Context, id sv2.ID) (map[string]sv2.DeferMeta, error) {
 	return nil, nil
 }
 

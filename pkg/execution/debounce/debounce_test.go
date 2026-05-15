@@ -29,6 +29,14 @@ func migrationShardMap(defaultShard, newSystemShard queue.QueueShard) map[string
 	}
 }
 
+func testScope(accountID, workspaceID, functionID uuid.UUID) queue.Scope {
+	return queue.Scope{
+		AccountID:  accountID,
+		EnvID:      workspaceID,
+		FunctionID: functionID,
+	}
+}
+
 // migrationShardSelector routes system queue items (queueName != nil) to the
 // new system shard and everything else to the default shard.
 func migrationShardSelector(defaultShard, newSystemShard queue.QueueShard) func(ctx context.Context, accountID uuid.UUID, queueName *string) (queue.QueueShard, error) {
@@ -70,8 +78,14 @@ func TestDebounce(t *testing.T) {
 
 	fakeClock := clockwork.NewFakeClock()
 
-	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q).(debouncer)
-	redisDebouncer.c = fakeClock
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           shardRegistry,
+		PrimaryShardName: shard.Name(),
+		Queue:            q,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	redisDebouncer := deb.(debouncer)
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -259,7 +273,7 @@ func TestDebounce(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, debounceId.String(), val)
 
-		di, err := redisDebouncer.GetDebounceItem(ctx, debounceId, accountId)
+		di, err := redisDebouncer.GetDebounceItem(ctx, testScope(accountId, workspaceId, functionId), debounceId)
 		require.NoError(t, err)
 
 		err = redisDebouncer.StartExecution(ctx, *di, fn, debounceId)
@@ -281,7 +295,7 @@ func TestDebounce(t *testing.T) {
 		err = json.Unmarshal([]byte(unshardedCluster.HGet(debounceClient.KeyGenerator().Debounce(ctx), debounceIds[0])), &di)
 		require.NoError(t, err)
 
-		err = redisDebouncer.DeleteDebounceItem(ctx, debounceId, di, accountId)
+		err = redisDebouncer.DeleteDebounceItem(ctx, testScope(accountId, workspaceId, functionId), debounceId, di)
 		require.NoError(t, err)
 
 		_, err = unshardedCluster.HKeys(debounceClient.KeyGenerator().Debounce(ctx))
@@ -345,25 +359,27 @@ func TestJITDebounceMigration(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
-	oldRedisDebouncer.c = fakeClock
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-		PrimaryDebounceClient: newSystemDebounceClient,
-		PrimaryQueue:          newQueue,
-		PrimaryQueueShard:     newSystemShard,
-
-		SecondaryDebounceClient: unshardedDebounceClient,
-		SecondaryQueue:          oldQueue,
-		SecondaryQueueShard:     defaultQueueShard,
-
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:             newShardRegistry,
+		PrimaryShardName:   newSystemShard.Name(),
+		SecondaryShardName: defaultQueueShard.Name(),
+		Queue:              newQueue,
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
+		Clock: fakeClock,
 	})
 	require.NoError(t, err)
 	newRedisDebouncer := deb.(debouncer)
-	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -608,25 +624,27 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	kg := defaultQueueShard.Client().KeyGenerator()
-	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
-	oldRedisDebouncer.c = fakeClock
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-		PrimaryDebounceClient: newSystemDebounceClient,
-		PrimaryQueue:          newQueue,
-		PrimaryQueueShard:     newSystemShard,
-
-		SecondaryDebounceClient: unshardedDebounceClient,
-		SecondaryQueue:          oldQueue,
-		SecondaryQueueShard:     defaultQueueShard,
-
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:             newShardRegistry,
+		PrimaryShardName:   newSystemShard.Name(),
+		SecondaryShardName: defaultQueueShard.Name(),
+		Queue:              newQueue,
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
+		Clock: fakeClock,
 	})
 	require.NoError(t, err)
 	newRedisDebouncer := deb.(debouncer)
-	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -856,25 +874,27 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
-	oldRedisDebouncer.c = fakeClock
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-		PrimaryDebounceClient: newSystemDebounceClient,
-		PrimaryQueue:          newQueue,
-		PrimaryQueueShard:     newSystemShard,
-
-		SecondaryDebounceClient: unshardedDebounceClient,
-		SecondaryQueue:          oldQueue,
-		SecondaryQueueShard:     defaultQueueShard,
-
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:             newShardRegistry,
+		PrimaryShardName:   newSystemShard.Name(),
+		SecondaryShardName: defaultQueueShard.Name(),
+		Queue:              newQueue,
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
+		Clock: fakeClock,
 	})
 	require.NoError(t, err)
 	newRedisDebouncer := deb.(debouncer)
-	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1067,25 +1087,27 @@ func TestDebounceExplicitMigration(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
-	oldRedisDebouncer.c = fakeClock
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	oldRedisDebouncer := oldDeb.(debouncer)
 
-	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-		PrimaryDebounceClient: newSystemDebounceClient,
-		PrimaryQueue:          newQueue,
-		PrimaryQueueShard:     newSystemShard,
-
-		SecondaryDebounceClient: unshardedDebounceClient,
-		SecondaryQueue:          oldQueue,
-		SecondaryQueueShard:     defaultQueueShard,
-
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:             newShardRegistry,
+		PrimaryShardName:   newSystemShard.Name(),
+		SecondaryShardName: defaultQueueShard.Name(),
+		Queue:              newQueue,
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
+		Clock: fakeClock,
 	})
 	require.NoError(t, err)
 	newRedisDebouncer := deb.(debouncer)
-	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1202,7 +1224,6 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	require.NoError(t, err)
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	unshardedDebounceClient := unshardedClient.Debounce()
 
 	fakeClock := clockwork.NewFakeClock()
 
@@ -1224,7 +1245,6 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	require.NoError(t, err)
 	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClusterClient.Queue(), opts...)
-	newSystemDebounceClient := newSystemClusterClient.Debounce()
 
 	// TODO What happens if both old and new services are running? Does this break debounces?
 	//  Do we need to keep the old behavior and flip using a feature flag (LaunchDarkly)
@@ -1245,23 +1265,27 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
 	require.NoError(t, err)
 
-	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
-	oldRedisDebouncer.c = fakeClock
+	_, err = NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
 
 	// Initial state: Only one primary configured, feature flag off.
 	t.Run("before two clusters are configured for migration, use primary", func(t *testing.T) {
-		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-			PrimaryDebounceClient: newSystemDebounceClient,
-			PrimaryQueue:          newQueue,
-			PrimaryQueueShard:     newSystemShard,
-
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
+			Shards:           newShardRegistry,
+			PrimaryShardName: newSystemShard.Name(),
+			Queue:            newQueue,
 			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 				return true
 			},
+			Clock: fakeClock,
 		})
 		require.NoError(t, err)
 		newRedisDebouncer := deb.(debouncer)
-		newRedisDebouncer.c = fakeClock
 
 		// If only a single cluster is configured as primary, use that. This is the target state.
 		require.True(t, newRedisDebouncer.usePrimary(false))
@@ -1269,22 +1293,18 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 
 	// Preparation for migration: Switch primary -> secondary and add new primary.
 	t.Run("when two clusters are configured, use secondary", func(t *testing.T) {
-		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-			PrimaryDebounceClient: newSystemDebounceClient,
-			PrimaryQueue:          newQueue,
-			PrimaryQueueShard:     newSystemShard,
-
-			SecondaryDebounceClient: unshardedDebounceClient,
-			SecondaryQueue:          oldQueue,
-			SecondaryQueueShard:     defaultQueueShard,
-
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
+			Shards:             newShardRegistry,
+			PrimaryShardName:   newSystemShard.Name(),
+			SecondaryShardName: defaultQueueShard.Name(),
+			Queue:              newQueue,
 			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 				return true
 			},
+			Clock: fakeClock,
 		})
 		require.NoError(t, err)
 		newRedisDebouncer := deb.(debouncer)
-		newRedisDebouncer.c = fakeClock
 
 		// When the feature flag is not yet enabled, keep using the (previous/old) secondary cluster.
 		// This is important because we'd otherwise lose existing debounces and create inconsistencies.
@@ -1299,22 +1319,18 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	// Start migration: Enable feature flag. This test assumes the change propagation is immediate and is registered by
 	// all consumers at once.
 	t.Run("during migration, use primary", func(t *testing.T) {
-		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-			PrimaryDebounceClient: newSystemDebounceClient,
-			PrimaryQueue:          newQueue,
-			PrimaryQueueShard:     newSystemShard,
-
-			SecondaryDebounceClient: unshardedDebounceClient,
-			SecondaryQueue:          oldQueue,
-			SecondaryQueueShard:     defaultQueueShard,
-
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
+			Shards:             newShardRegistry,
+			PrimaryShardName:   newSystemShard.Name(),
+			SecondaryShardName: defaultQueueShard.Name(),
+			Queue:              newQueue,
 			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 				return true
 			},
+			Clock: fakeClock,
 		})
 		require.NoError(t, err)
 		newRedisDebouncer := deb.(debouncer)
-		newRedisDebouncer.c = fakeClock
 
 		// When the feature flag is flipped, start using the primary. Also migrate existing entries.
 		require.True(t, newRedisDebouncer.usePrimary(true))
@@ -1325,18 +1341,17 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	// Once all debounces are moved from the old shard, we can remove the reference (by dropping the secondary).
 	// To prevent old deployments from using the old cluster again, we must keep the feature flag enabled during this time.
 	t.Run("after removing secondary once migration is completed, use primary", func(t *testing.T) {
-		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-			PrimaryDebounceClient: newSystemDebounceClient,
-			PrimaryQueue:          newQueue,
-			PrimaryQueueShard:     newSystemShard,
-
+		deb, err := NewDebouncerWithMigration(DebouncerOpts{
+			Shards:           newShardRegistry,
+			PrimaryShardName: newSystemShard.Name(),
+			Queue:            newQueue,
 			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 				return true
 			},
+			Clock: fakeClock,
 		})
 		require.NoError(t, err)
 		newRedisDebouncer := deb.(debouncer)
-		newRedisDebouncer.c = fakeClock
 
 		// This is similar to the first test case, but the feature flag is still enabled because there
 		// may be containers still running the old code which has both clusters configured and relies on the flag
@@ -1402,18 +1417,20 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
-	oldRedisDebouncer.c = fakeClock
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	oldRedisDebouncer := oldDeb.(debouncer)
 
-	newRedisDebouncer, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-		PrimaryDebounceClient: newSystemDebounceClient,
-		PrimaryQueue:          newQueue,
-		PrimaryQueueShard:     newSystemShard,
-
-		SecondaryDebounceClient: unshardedDebounceClient,
-		SecondaryQueue:          oldQueue,
-		SecondaryQueueShard:     defaultQueueShard,
-
+	newDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:             newShardRegistry,
+		PrimaryShardName:   newSystemShard.Name(),
+		SecondaryShardName: defaultQueueShard.Name(),
+		Queue:              newQueue,
 		// Always migrate
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
@@ -1421,6 +1438,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 		Clock: fakeClock,
 	})
 	require.NoError(t, err)
+	newRedisDebouncer := newDeb.(debouncer)
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1516,7 +1534,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 
 		debounceId := ulid.MustParse(debounceIds[0])
 
-		di, err := newRedisDebouncer.GetDebounceItem(ctx, debounceId, accountId)
+		di, err := newRedisDebouncer.GetDebounceItem(ctx, testScope(accountId, workspaceId, functionId), debounceId)
 		require.NoError(t, err)
 
 		// Must retrieve from secondary cluster
@@ -1538,12 +1556,12 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 		require.False(t, newSystemCluster.Exists(newSystemDebounceClient.KeyGenerator().DebouncePointer(ctx, functionId, functionId.String())))
 
 		// A racing prepareMigration call must not be able to find the debounce
-		deb := newRedisDebouncer.(debouncer)
-		existingID, _, err := deb.prepareMigration(ctx, *di, fn)
+		fakeID := ulid.MustNew(ulid.Now(), rand.Reader)
+		existingID, _, err := defaultQueueShard.DebouncePrepareMigration(ctx, testScope(accountId, workspaceId, fn.ID), fn.ID.String(), fakeID)
 		require.NoError(t, err)
 		require.Nil(t, existingID)
 
-		err = newRedisDebouncer.DeleteDebounceItem(ctx, debounceId, *di, accountId)
+		err = newRedisDebouncer.DeleteDebounceItem(ctx, testScope(accountId, workspaceId, functionId), debounceId, *di)
 		require.NoError(t, err)
 
 		// Debounce should be dropped
@@ -1605,18 +1623,20 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 
 	kg := defaultQueueShard.Client().KeyGenerator()
 
-	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
-	oldRedisDebouncer.c = fakeClock
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	oldRedisDebouncer := oldDeb.(debouncer)
 
-	newRedisDebouncer, err := NewRedisDebouncerWithMigration(DebouncerOpts{
-		PrimaryDebounceClient: newSystemDebounceClient,
-		PrimaryQueue:          newQueue,
-		PrimaryQueueShard:     newSystemShard,
-
-		SecondaryDebounceClient: unshardedDebounceClient,
-		SecondaryQueue:          oldQueue,
-		SecondaryQueueShard:     defaultQueueShard,
-
+	newDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:             newShardRegistry,
+		PrimaryShardName:   newSystemShard.Name(),
+		SecondaryShardName: defaultQueueShard.Name(),
+		Queue:              newQueue,
 		// Always migrate
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
@@ -1624,6 +1644,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		Clock: fakeClock,
 	})
 	require.NoError(t, err)
+	newRedisDebouncer := newDeb.(debouncer)
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1719,15 +1740,15 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 
 		debounceId := ulid.MustParse(debounceIds[0])
 
-		di, err := newRedisDebouncer.GetDebounceItem(ctx, debounceId, accountId)
+		di, err := newRedisDebouncer.GetDebounceItem(ctx, testScope(accountId, workspaceId, functionId), debounceId)
 		require.NoError(t, err)
 
 		// Must retrieve from secondary cluster
 		require.True(t, di.isSecondary)
 
 		// If prepareMigration is called first, it must lock the execution from running the debounce item
-		deb := newRedisDebouncer.(debouncer)
-		existingID, _, err := deb.prepareMigration(ctx, *di, fn)
+		fakeID := ulid.MustNew(ulid.Now(), rand.Reader)
+		existingID, _, err := defaultQueueShard.DebouncePrepareMigration(ctx, testScope(accountId, workspaceId, fn.ID), fn.ID.String(), fakeID)
 		require.NoError(t, err)
 		require.NotNil(t, existingID)
 		require.Equal(t, debounceId, *existingID)
@@ -1755,7 +1776,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrDebounceMigrating)
 
-		err = deb.deleteMigratingFlag(ctx, debounceId, unshardedDebounceClient)
+		err = defaultQueueShard.DebounceDeleteMigratingFlag(ctx, testScope(accountId, workspaceId, functionId), debounceId)
 		require.NoError(t, err)
 
 		// Lock must be gone
@@ -1773,7 +1794,6 @@ func TestGetDebounceInfo(t *testing.T) {
 	require.NoError(t, err)
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	debounceClient := unshardedClient.Debounce()
 
 	opts := []queue.QueueOpt{
 		queue.WithKindToQueueMapping(map[string]string{
@@ -1789,13 +1809,14 @@ func TestGetDebounceInfo(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
 	t.Run("no debounce exists returns empty info", func(t *testing.T) {
-		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		info, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, functionId), functionId.String())
 		require.NoError(t, err)
 		require.Equal(t, "", info.DebounceID)
 		require.Nil(t, info.Item)
@@ -1831,7 +1852,7 @@ func TestGetDebounceInfo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Query with function ID as debounce key (default)
-		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		info, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, functionId), functionId.String())
 		require.NoError(t, err)
 		require.NotEmpty(t, info.DebounceID)
 		require.NotNil(t, info.Item)
@@ -1874,14 +1895,14 @@ func TestGetDebounceInfo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Query with the custom key
-		info, err := redisDebouncer.GetDebounceInfo(ctx, customFnId, customKey)
+		info, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, customFnId), customKey)
 		require.NoError(t, err)
 		require.NotEmpty(t, info.DebounceID)
 		require.NotNil(t, info.Item)
 		require.Equal(t, eventId, info.Item.EventID)
 
 		// Query with wrong key should return empty
-		info2, err := redisDebouncer.GetDebounceInfo(ctx, customFnId, "wrong-key")
+		info2, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, customFnId), "wrong-key")
 		require.NoError(t, err)
 		require.Equal(t, "", info2.DebounceID)
 		require.Nil(t, info2.Item)
@@ -1938,7 +1959,7 @@ func TestGetDebounceInfo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Query should return the latest event
-		info, err := redisDebouncer.GetDebounceInfo(ctx, updateFnId, updateFnId.String())
+		info, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, updateFnId), updateFnId.String())
 		require.NoError(t, err)
 		require.NotEmpty(t, info.DebounceID)
 		require.NotNil(t, info.Item)
@@ -1947,7 +1968,7 @@ func TestGetDebounceInfo(t *testing.T) {
 
 	t.Run("non-existent function returns empty", func(t *testing.T) {
 		nonExistentFnId := uuid.New()
-		info, err := redisDebouncer.GetDebounceInfo(ctx, nonExistentFnId, nonExistentFnId.String())
+		info, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, nonExistentFnId), nonExistentFnId.String())
 		require.NoError(t, err)
 		require.Equal(t, "", info.DebounceID)
 		require.Nil(t, info.Item)
@@ -1964,7 +1985,6 @@ func TestDeleteDebounce(t *testing.T) {
 	require.NoError(t, err)
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	debounceClient := unshardedClient.Debounce()
 
 	opts := []queue.QueueOpt{
 		queue.WithKindToQueueMapping(map[string]string{
@@ -1980,14 +2000,15 @@ func TestDeleteDebounce(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
 
 	t.Run("delete non-existent debounce returns deleted=false", func(t *testing.T) {
 		nonExistentFnId := uuid.New()
-		result, err := redisDebouncer.DeleteDebounce(ctx, nonExistentFnId, nonExistentFnId.String())
+		result, err := redisDebouncer.DeleteDebounce(ctx, testScope(accountId, workspaceId, nonExistentFnId), nonExistentFnId.String())
 		require.NoError(t, err)
 		require.False(t, result.Deleted)
 		require.Equal(t, "", result.DebounceID)
@@ -2025,21 +2046,21 @@ func TestDeleteDebounce(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify debounce exists
-		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		info, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, functionId), functionId.String())
 		require.NoError(t, err)
 		require.NotEmpty(t, info.DebounceID)
 		require.NotNil(t, info.Item)
 		debounceID := info.DebounceID
 
 		// Delete the debounce
-		result, err := redisDebouncer.DeleteDebounce(ctx, functionId, functionId.String())
+		result, err := redisDebouncer.DeleteDebounce(ctx, testScope(accountId, workspaceId, functionId), functionId.String())
 		require.NoError(t, err)
 		require.True(t, result.Deleted)
 		require.Equal(t, debounceID, result.DebounceID)
 		require.Equal(t, eventId.String(), result.EventID)
 
 		// Verify debounce no longer exists
-		infoAfter, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		infoAfter, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, functionId), functionId.String())
 		require.NoError(t, err)
 		require.Equal(t, "", infoAfter.DebounceID)
 		require.Nil(t, infoAfter.Item)
@@ -2056,7 +2077,6 @@ func TestRunDebounce(t *testing.T) {
 	require.NoError(t, err)
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	debounceClient := unshardedClient.Debounce()
 
 	opts := []queue.QueueOpt{
 		queue.WithKindToQueueMapping(map[string]string{
@@ -2072,7 +2092,8 @@ func TestRunDebounce(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
@@ -2083,6 +2104,7 @@ func TestRunDebounce(t *testing.T) {
 			FunctionID:  nonExistentFnId,
 			DebounceKey: nonExistentFnId.String(),
 			AccountID:   accountId,
+			EnvID:       workspaceId,
 		})
 		require.NoError(t, err)
 		require.False(t, result.Scheduled)
@@ -2121,7 +2143,7 @@ func TestRunDebounce(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify debounce exists
-		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		info, err := redisDebouncer.GetDebounceInfo(ctx, testScope(accountId, workspaceId, functionId), functionId.String())
 		require.NoError(t, err)
 		require.NotEmpty(t, info.DebounceID)
 		debounceID := info.DebounceID
@@ -2131,6 +2153,7 @@ func TestRunDebounce(t *testing.T) {
 			FunctionID:  functionId,
 			DebounceKey: functionId.String(),
 			AccountID:   accountId,
+			EnvID:       workspaceId,
 		})
 		require.NoError(t, err)
 		require.True(t, result.Scheduled)
@@ -2165,15 +2188,15 @@ func TestDeleteDebounceByID(t *testing.T) {
 	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
 	require.NoError(t, err)
 
-	redisDebouncer := NewRedisDebouncer(debounceClient, shard, q)
+	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
 
-	// helper to create a debounce and return its ULID
-	createDebounce := func(t *testing.T) (uuid.UUID, ulid.ULID) {
+	// helper to create a debounce and return its scope and ULID
+	createDebounce := func(t *testing.T, functionId uuid.UUID) (queue.Scope, ulid.ULID) {
 		t.Helper()
-		functionId := uuid.New()
 		fn := inngest.Function{
 			ID: functionId,
 			Debounce: &inngest.Debounce{
@@ -2202,12 +2225,13 @@ func TestDeleteDebounceByID(t *testing.T) {
 		err := redisDebouncer.Debounce(ctx, di, fn)
 		require.NoError(t, err)
 
-		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		scope := testScope(accountId, workspaceId, functionId)
+		info, err := redisDebouncer.GetDebounceInfo(ctx, scope, functionId.String())
 		require.NoError(t, err)
 		require.NotEmpty(t, info.DebounceID)
 
 		debounceID := ulid.MustParse(info.DebounceID)
-		return functionId, debounceID
+		return scope, debounceID
 	}
 
 	// hashFieldExists checks if a field exists in a Redis hash using miniredis.
@@ -2218,12 +2242,13 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 	t.Run("no debounce exists should succeed", func(t *testing.T) {
 		fakeID := ulid.MustNew(ulid.Now(), rand.Reader)
-		err := redisDebouncer.DeleteDebounceByID(ctx, fakeID)
+		err := redisDebouncer.DeleteDebounceByID(ctx, testScope(accountId, workspaceId, uuid.New()), fakeID)
 		require.NoError(t, err)
 	})
 
 	t.Run("delete current debounce by ID", func(t *testing.T) {
-		functionId, debounceID := createDebounce(t)
+		functionId := uuid.New()
+		scope, debounceID := createDebounce(t, functionId)
 
 		// Verify the debounce item exists in the hash
 		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
@@ -2235,7 +2260,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.NoError(t, err, "timeout queue item should exist")
 
 		// Delete by ID
-		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		err = redisDebouncer.DeleteDebounceByID(ctx, scope, debounceID)
 		require.NoError(t, err)
 
 		// Verify the debounce item is gone from the hash
@@ -2247,13 +2272,13 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 		// The pointer key may still exist (DeleteDebounceByID does not clean it up),
 		// but GetDebounceInfo should handle this gracefully.
-		info, err := redisDebouncer.GetDebounceInfo(ctx, functionId, functionId.String())
+		info, err := redisDebouncer.GetDebounceInfo(ctx, scope, functionId.String())
 		require.NoError(t, err)
 		require.Nil(t, info.Item, "debounce item should not be found via pointer")
 	})
 
 	t.Run("delete debounce after pointer is dropped", func(t *testing.T) {
-		_, debounceID := createDebounce(t)
+		scope, debounceID := createDebounce(t, uuid.New())
 
 		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
 		require.True(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should exist in hash before deletion")
@@ -2264,7 +2289,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.NoError(t, err, "timeout queue item should exist")
 
 		// Delete by ID (pointer is gone, but item + timeout still exist)
-		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		err = redisDebouncer.DeleteDebounceByID(ctx, scope, debounceID)
 		require.NoError(t, err)
 
 		// Verify item is gone from hash
@@ -2276,7 +2301,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 	})
 
 	t.Run("delete debounce when timeout already removed", func(t *testing.T) {
-		_, debounceID := createDebounce(t)
+		scope, debounceID := createDebounce(t, uuid.New())
 
 		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
 		require.True(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should exist in hash")
@@ -2291,7 +2316,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout should already be gone")
 
 		// Delete by ID should still succeed (timeout removal is best-effort)
-		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		err = redisDebouncer.DeleteDebounceByID(ctx, scope, debounceID)
 		require.NoError(t, err)
 
 		// Verify item is gone from hash
@@ -2299,7 +2324,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 	})
 
 	t.Run("missing item but existing timeout job should clean up timeout", func(t *testing.T) {
-		_, debounceID := createDebounce(t)
+		scope, debounceID := createDebounce(t, uuid.New())
 
 		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
 
@@ -2313,7 +2338,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.NoError(t, err, "timeout queue item should still exist")
 
 		// Delete by ID — HDEL on missing item is a no-op, but timeout should be cleaned up
-		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID)
+		err = redisDebouncer.DeleteDebounceByID(ctx, scope, debounceID)
 		require.NoError(t, err)
 
 		// Verify timeout queue item is now gone
@@ -2322,8 +2347,8 @@ func TestDeleteDebounceByID(t *testing.T) {
 	})
 
 	t.Run("batch delete multiple debounce IDs", func(t *testing.T) {
-		_, debounceID1 := createDebounce(t)
-		_, debounceID2 := createDebounce(t)
+		scope, debounceID1 := createDebounce(t, uuid.New())
+		_, debounceID2 := createDebounce(t, uuid.New())
 
 		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
 
@@ -2340,7 +2365,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Batch delete both
-		err = redisDebouncer.DeleteDebounceByID(ctx, debounceID1, debounceID2)
+		err = redisDebouncer.DeleteDebounceByID(ctx, scope, debounceID1, debounceID2)
 		require.NoError(t, err)
 
 		// Both items should be gone from hash
@@ -2355,7 +2380,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 	})
 
 	t.Run("empty ID list is a no-op", func(t *testing.T) {
-		err := redisDebouncer.DeleteDebounceByID(ctx)
+		err := redisDebouncer.DeleteDebounceByID(ctx, testScope(accountId, workspaceId, uuid.New()))
 		require.NoError(t, err)
 	})
 }

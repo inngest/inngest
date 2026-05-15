@@ -68,7 +68,7 @@ export type SpanMetadataInngestExperiment = {
   updatedAt: string;
   values: {
     experiment_name: string;
-    variant_selected: string;
+    variant: string;
     selection_strategy: string;
     available_variants?: string[];
     variant_weights?: Record<string, number>;

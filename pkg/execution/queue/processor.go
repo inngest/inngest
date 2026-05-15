@@ -223,11 +223,6 @@ func (q *queueProcessor) Dequeue(ctx context.Context, shard QueueShard, i QueueI
 	return shard.Dequeue(ctx, i, opts...)
 }
 
-// ItemByID implements QueueManager.
-func (q *queueProcessor) ItemByID(ctx context.Context, shard QueueShard, jobID string) (*QueueItem, error) {
-	return shard.ItemByID(ctx, jobID)
-}
-
 // ItemExists implements QueueManager.
 func (q *queueProcessor) ItemExists(ctx context.Context, shard QueueShard, jobID string) (bool, error) {
 	return shard.ItemExists(ctx, jobID)

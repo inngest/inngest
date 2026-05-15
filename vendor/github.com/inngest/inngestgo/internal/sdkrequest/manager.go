@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"slices"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/inngest/inngestgo/experimental"
 	"github.com/inngest/inngestgo/internal/checkpoint"
 	"github.com/inngest/inngestgo/internal/fn"
+	"github.com/inngest/inngestgo/internal/logger"
 	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/opcode"
 	"github.com/inngest/inngestgo/internal/util"
@@ -304,7 +304,7 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 				}
 				return
 			}
-			slog.Default().Warn("error checkpointing state, falling back to async response", "error", err)
+			logger.Default().Warn("error checkpointing state, falling back to async response", "error", err)
 		})
 	default:
 		// Do nothing else.

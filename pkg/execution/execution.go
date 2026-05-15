@@ -117,6 +117,10 @@ type Executor interface {
 
 	Finalize(ctx context.Context, opts FinalizeOpts) error
 
+	// RunFunctionFinishedLifecycle fans OnFunctionFinished out to every
+	// registered LifecycleListener.
+	RunFunctionFinishedLifecycle(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage, resp state.DriverResponse)
+
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
@@ -161,6 +165,16 @@ type RunContext interface {
 	MaxAttempts() *int
 	ShouldRetry() bool
 	IncrementAttempt()
+
+	// OnlyHasLazyOps reports whether the opcode batch being processed contains
+	// only lazy ops (DeferAdd, DeferAbort), i.e. no host op to drive forward
+	// progress. Lazy ops normally piggyback on a host (e.g. StepRun); the
+	// all-lazy case shouldn't happen, but lazy handlers fall back to enqueueing
+	// their own discovery step when it does. See enums.OpcodeIsLazy.
+	//
+	// In other words, this should always return false, but an SDK bug could
+	// make it true.
+	OnlyHasLazyOps() bool
 
 	// Queue item creation - provides the "template" data for new items
 	PriorityFactor() *int64

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -59,6 +60,14 @@ func isConnectionClosedErr(err error) bool {
 	return errors.As(err, &closeErr)
 }
 
+func isWebSocketReadLimitErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(err.Error(), "read limited at")
+}
+
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *connecterrors.SocketError) {
 	// reason must be limited to 125 bytes and should not be dynamic,
 	// so we restrict it to the known syscodes to prevent unintentional overflows
@@ -109,6 +118,9 @@ type connectionHandler struct {
 
 	lastStatusLock       sync.Mutex
 	lastStatusReceivedAt time.Time
+
+	connectionStatus   connectpb.ConnectionStatus
+	connectionStatusOK bool
 }
 
 func (c *connectionHandler) setLastHeartbeat(time time.Time) {
@@ -133,6 +145,88 @@ func (c *connectionHandler) getLastStatus() time.Time {
 	c.lastStatusLock.Lock()
 	defer c.lastStatusLock.Unlock()
 	return c.lastStatusReceivedAt
+}
+
+func (c *connectionHandler) bindConnectionLogger(conn *state.Connection) {
+	c.log = c.log.With(connectionLogAttrs(conn)...)
+}
+
+func connectionLogAttrs(conn *state.Connection) []any {
+	if conn == nil {
+		return nil
+	}
+
+	attrs := []any{
+		"account_id", conn.AccountID.String(),
+		"env_id", conn.EnvID.String(),
+		"connection_id", conn.ConnectionId.String(),
+		"worker_ip", util.SanitizeLogField(conn.WorkerIP),
+	}
+
+	if conn.Data != nil {
+		attrs = append(attrs,
+			"instance_id", util.SanitizeLogField(conn.Data.GetInstanceId()),
+			"sdk_language", conn.Data.GetSdkLanguage(),
+			"sdk_version", conn.Data.GetSdkVersion(),
+			"sdk_platform", conn.Data.GetPlatform(),
+			"sdk_framework", conn.Data.GetFramework(),
+			"worker_environment", conn.Data.GetEnvironment(),
+			"worker_manual_readiness_ack", conn.Data.GetWorkerManualReadinessAck(),
+			"max_worker_concurrency", conn.Data.GetMaxWorkerConcurrency(),
+			"app_names", conn.AppNames(),
+			"app_count", len(conn.Data.GetApps()),
+		)
+
+		system := conn.Data.GetSystemAttributes()
+		attrs = append(attrs,
+			"worker_cpu_cores", system.GetCpuCores(),
+			"worker_mem_bytes", system.GetMemBytes(),
+			"worker_os", system.GetOs(),
+		)
+	}
+
+	groupHashes := make([]string, 0, len(conn.Groups))
+	for groupHash := range conn.Groups {
+		groupHashes = append(groupHashes, groupHash)
+	}
+	sort.Strings(groupHashes)
+
+	attrs = append(attrs, "worker_group_hashes", groupHashes)
+
+	return attrs
+}
+
+func (c *connectionHandler) logConnStatus(status connectpb.ConnectionStatus, reason string, attrs ...any) {
+	c.updateLock.Lock()
+	defer c.updateLock.Unlock()
+
+	c.logConnStatusLocked(status, reason, attrs...)
+}
+
+func (c *connectionHandler) logConnStatusLocked(status connectpb.ConnectionStatus, reason string, attrs ...any) {
+	previous := c.connectionStatus
+	previousOK := c.connectionStatusOK
+	c.connectionStatus = status
+	c.connectionStatusOK = true
+
+	from := ""
+	if previousOK {
+		from = previous.String()
+	}
+
+	logAttrs := []any{
+		"from", from,
+		"to", status.String(),
+		"reason", reason,
+	}
+	logAttrs = append(logAttrs, attrs...)
+
+	if !previousOK || previous != status {
+		c.log.Debug("worker connection status transition", logAttrs...)
+		return
+	}
+
+	c.log.Trace("worker connection status refreshed", logAttrs...)
 }
 
 var ErrDraining = connecterrors.SocketError{
@@ -271,17 +365,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		instanceId := ""
-		if conn.Data != nil {
-			instanceId = conn.Data.InstanceId
-		}
-		ch.log = ch.log.With(
-			"account_id", conn.AccountID,
-			"env_id", conn.EnvID,
-			"conn_id", conn.ConnectionId,
-			"instance_id", util.SanitizeLogField(instanceId),
-			"worker_ip", util.SanitizeLogField(conn.WorkerIP))
-
 		workerDrainedCtx, notifyWorkerDrained := context.WithCancel(context.Background())
 		defer notifyWorkerDrained()
 
@@ -297,7 +380,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// If gateway is shutting down, we must immediately start the draining process
-			ch.log.Debug("context done, starting draining process")
+			ch.log.Debug("context done, starting draining process", "active_connections", c.connectionCount.Count())
 
 			// Mark connection as draining in-memory to prevent subsequent
 			// heartbeats from marking it as ready, but do NOT update Redis
@@ -321,7 +404,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			})
 			if err != nil {
 				// Can't tell the worker so we mark as DRAINING immediately.
-				if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
+				if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING, "gateway drain started after failed closing write", "err", err); statusErr != nil {
 					ch.log.ReportError(statusErr, "could not update connection status after context done")
 				}
 				ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
@@ -340,7 +423,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				ch.log.Debug("timed out waiting for drain ack, marking connection as draining")
 			}
 
-			if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING); statusErr != nil {
+			if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING, "gateway drain completed or timed out", "drain_ack_wait_ms", time.Since(drainStart).Milliseconds()); statusErr != nil {
 				ch.log.ReportError(statusErr, "could not update connection status after drain ack")
 			}
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
@@ -364,6 +447,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			// Ensure receiveRouterMessagesFromGRPC exits on any disconnect.
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
+			ch.logConnStatus(connectpb.ConnectionStatus_DISCONNECTED, "connection cleanup", "close_reason", *closeReasonPtr.Load())
 
 			// This is a transactional operation, it should always complete regardless of context cancellation
 			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
@@ -431,7 +515,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// upsert connection to update WorkerGroups map
-			if err := c.stateManager.UpsertConnection(context.Background(), conn, connectpb.ConnectionStatus_CONNECTED, time.Now()); err != nil {
+			if err := ch.updateConnStatus(connectpb.ConnectionStatus_CONNECTED, "worker groups synced"); err != nil {
 				ch.log.ReportError(err, "updating connection state after sync failed")
 				c.closeWithConnectError(ws, &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
@@ -485,7 +569,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				err := wsproto.Read(runLoopCtx, ws, &msg)
 				if err != nil {
 					// immediately stop routing messages to this connection
-					if err := ch.updateConnStatus(connectpb.ConnectionStatus_DISCONNECTING); err != nil {
+					if err := ch.updateConnStatus(connectpb.ConnectionStatus_DISCONNECTING, "websocket read loop ended", "err", err); err != nil {
 						ch.log.ReportError(err, "could not update connection status after read error")
 					}
 
@@ -539,8 +623,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					// Unfortunately, the websocket library does not expose a proper error when the size limit is reached,
 					// so we have to check the error message instead. This should rarely happen.
-					if strings.HasPrefix(err.Error(), "read limited at") {
+					if isWebSocketReadLimitErr(err) {
 						setCloseReason(connectpb.WorkerDisconnectReason_MESSAGE_TOO_LARGE.String())
+						ch.log.Warn("worker WebSocket message exceeded read limit", "max_bytes", consts.MaxSDKResponseBodySize, "err", err)
 						return nil
 					}
 
@@ -621,7 +706,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
-			err = c.stateManager.UpsertConnection(ctx, conn, connectpb.ConnectionStatus_READY, time.Now())
+			err = ch.updateConnStatus(connectpb.ConnectionStatus_READY, "automatic readiness")
 			if err != nil {
 				if ctx.Err() != nil {
 					c.closeDraining(ws)
@@ -729,7 +814,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 			return nil
 		}
 
-		err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
+		err := c.updateConnStatus(connectpb.ConnectionStatus_READY, "worker ready message")
 		if err != nil {
 			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
@@ -783,7 +868,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 			)
 		}
 
-		err := c.updateConnStatus(status)
+		err := c.updateConnStatus(status, "worker heartbeat",
+			"conn_draining", c.draining.Load(),
+			"svc_draining", c.svc.isDraining.Load(),
+		)
 		if err != nil {
 
 			c.log.ReportError(err, "failed to update connection status after heartbeat")
@@ -834,6 +922,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 		}
 
 		c.setLastHeartbeat(time.Now())
+		c.log.Trace("worker heartbeat processed", "status", status.String())
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_STATUS:
@@ -871,7 +960,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.Connec
 
 		// Update the Redis status to DRAINING so the router stops selecting
 		// this connection for new requests.
-		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
+		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING, "worker pause message", "svc_draining", c.svc.isDraining.Load())
 		if err != nil {
 			c.log.Error("could not update connection status to DRAINING on WORKER_PAUSE",
 				"err", err,
@@ -1365,7 +1454,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	log := c.log.With(
 		"account_id", authResp.AccountID,
 		"env_id", authResp.EnvID,
-		"conn_id", connectionId.String(),
+		"connection_id", connectionId.String(),
 		"instance_id", util.SanitizeLogField(initialMessageData.InstanceId),
 		"worker_ip", util.SanitizeLogField(c.remoteAddr))
 
@@ -1420,13 +1509,15 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		// Used for routing messages to the correct gateway
 		GatewayId: c.svc.gatewayId,
 	}
+	c.conn = &conn
+	c.bindConnectionLogger(&conn)
 
 	{
 		// This is a transactional operation, it should always complete regardless of context cancellation
 
 		// Connection should always be upserted, we don't want inconsistent state
-		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn, connectpb.ConnectionStatus_CONNECTED, time.Now()); err != nil {
-			log.ReportError(err, "adding connection state failed")
+		if err := c.updateConnStatus(connectpb.ConnectionStatus_CONNECTED, "worker authenticated"); err != nil {
+			c.log.ReportError(err, "adding connection state failed")
 			return nil, &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -1450,7 +1541,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			maxConcurrency = *initialMessageData.MaxWorkerConcurrency
 		}
 		if err := c.svc.stateManager.SetWorkerTotalCapacity(context.Background(), authResp.EnvID, initialMessageData.InstanceId, maxConcurrency); err != nil {
-			log.ReportError(err, "failed to set worker capacity")
+			c.log.ReportError(err, "failed to set worker capacity")
 			return nil, &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -1458,15 +1549,13 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			}
 		}
 
-		log.Trace("worker capacity set", "account_id", authResp.AccountID, "env_id", authResp.EnvID, "instance_id", initialMessageData.InstanceId, "max_concurrency", maxConcurrency)
+		c.log.Trace("worker capacity set", "max_concurrency", maxConcurrency)
 
 		// TODO Connection should not be marked as ready to receive traffic until the read loop is set up, sync is handled, and the client optionally sent a ready signal
 		for _, l := range c.svc.lifecycles {
 			go l.OnConnected(context.Background(), &conn)
 		}
 	}
-
-	c.conn = &conn
 
 	return &conn, nil
 }
@@ -1502,12 +1591,12 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		switch {
 		case err == nil:
 			if _, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data}); err != nil {
-				return fmt.Errorf("could not send response through grpc: %w", err)
+				l.Warn("could not fast-track response through grpc, executor will poll buffered response", "err", err)
 			}
 		case errors.Is(err, state.ErrExecutorNotFound):
 			l.Debug("executor not found in lease, reply was likely picked up by polling")
 		default:
-			return err
+			l.Warn("could not create grpc client for sdk reply, executor will poll buffered response", "err", err)
 		}
 	}
 
@@ -1524,16 +1613,22 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		Kind:    connectpb.GatewayMessageType_WORKER_REPLY_ACK,
 		Payload: replyAck,
 	}); err != nil {
-		return fmt.Errorf("could not send reply ack: %w", err)
+		l.Warn("could not send worker reply ack after response was buffered", "err", err)
 	}
 
 	return nil
 }
 
-func (c *connectionHandler) updateConnStatus(status connectpb.ConnectionStatus) error {
+func (c *connectionHandler) updateConnStatus(status connectpb.ConnectionStatus, reason string, attrs ...any) error {
 	c.updateLock.Lock()
 	defer c.updateLock.Unlock()
 
 	// Always update the connection status, do not use context cancellation
-	return c.svc.stateManager.UpsertConnection(context.Background(), c.conn, status, time.Now())
+	err := c.svc.stateManager.UpsertConnection(context.Background(), c.conn, status, time.Now())
+	if err != nil {
+		return err
+	}
+
+	c.logConnStatusLocked(status, reason, attrs...)
+	return nil
 }

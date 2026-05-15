@@ -36,6 +36,13 @@ func (c *checkpointRunContext) DriverResponse() *state.DriverResponse {
 	return nil
 }
 
+func (c *checkpointRunContext) OnlyHasLazyOps() bool {
+	// Checkpoint dispatches DeferAdd/DeferAbort via defers.SaveFromOp /
+	// defers.AbortFromOp before reaching the executor's lazy handlers, so
+	// this predicate is unreachable from a checkpoint runCtx.
+	return false
+}
+
 func (c *checkpointRunContext) Events() []json.RawMessage {
 	return c.events
 }

@@ -234,6 +234,29 @@ type spanRollupInfo struct {
 	otelToDynamic map[string]string
 }
 
+// fragmentAttributesJSON returns the attributes field of a span fragment as
+// JSON bytes. The aggregation queries differ between backends: sqlite's
+// json_object embeds JSON columns as quoted strings while postgres'
+// json_build_object embeds jsonb as nested objects, so the decoded fragment
+// can land here as either a string or a map[string]any.
+func fragmentAttributesJSON(raw any) ([]byte, bool) {
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return nil, false
+		}
+		return []byte(v), true
+	case map[string]any:
+		byt, err := json.Marshal(v)
+		if err != nil {
+			return nil, false
+		}
+		return byt, true
+	default:
+		return nil, false
+	}
+}
+
 func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRollupInfo) (*cqrs.OtelSpan, error) {
 	// Use interface methods to get the fields directly
 	traceID := span.GetTraceID()
@@ -347,9 +370,9 @@ fragmentLoop:
 			}
 		}
 
-		if attrs, ok := fragment["attributes"].(string); ok {
+		if attrs, ok := fragmentAttributesJSON(fragment["attributes"]); ok {
 			fragmentAttr := map[string]any{}
-			if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+			if err := json.Unmarshal(attrs, &fragmentAttr); err != nil {
 				logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
 				return nil, err
 			}
@@ -578,7 +601,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 	}
 
 	for _, fragment := range fragments {
-		attrs, ok := fragment["attributes"].(string)
+		attrs, ok := fragmentAttributesJSON(fragment["attributes"])
 		if !ok {
 			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind, no attributes")
 			continue
@@ -590,7 +613,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 			Op     *metadata.Opcode `json:"_inngest.metadata.op"`
 			Values *string          `json:"_inngest.metadata.values"`
 		}
-		if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+		if err := json.Unmarshal(attrs, &fragmentAttr); err != nil {
 			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span attributes", "error", err)
 			return nil, err
 		}

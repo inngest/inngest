@@ -71,6 +71,18 @@ const (
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 
+	// MaxDefersPerRun is the maximum number of defers allowed per function run.
+	MaxDefersPerRun = 20
+
+	// MaxDeferInputSize is the maximum size of the Input payload on a single defer.
+	MaxDeferInputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxDeferInputAggregateSize is the maximum total size, in bytes, of all
+	// defer input payloads combined for a single function run. Must be a
+	// separate budget than DefaultMaxStateSizeLimit, so that defers can't fail
+	// the parent run.
+	MaxDeferInputAggregateSize = 1024 * 1024 * 4 // 4MB
+
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
@@ -151,7 +163,7 @@ const (
 	// a connect worker does not specify MaxWorkerConcurrency.
 	DefaultWorkerConcurrency int64 = 1000
 
-	ConnectWorkerHeartbeatInterval = 10 * time.Second
+	ConnectWorkerHeartbeatInterval  = 10 * time.Second
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
 	ConnectGCThreshold              = 5 * time.Minute
 

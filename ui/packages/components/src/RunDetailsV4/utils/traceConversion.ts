@@ -216,7 +216,7 @@ function traceToBarData(
   const experimentMetadata = experimentMd
     ? {
         experimentName: experimentMd.values.experiment_name,
-        variantSelected: experimentMd.values.variant_selected,
+        variantSelected: experimentMd.values.variant,
         availableVariants: experimentMd.values.available_variants,
         variantWeights: experimentMd.values.variant_weights,
         functionSlug,

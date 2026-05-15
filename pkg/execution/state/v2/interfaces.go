@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -18,17 +18,6 @@ type CreateState struct {
 	// StepInputs allows users to specify pre-defined step inputs to run
 	// workflows from arbitrary points.
 	StepInputs []state.MemoizedStep
-}
-
-type StateService interface {
-	RunService
-
-	// FunctionMetrics returns state metrics for a given function.
-	FunctionMetrics(ctx context.Context, fnID uuid.UUID) (RunMetrics, error)
-	// EnvMetrics returns state metrics grouped by environment.
-	EnvMetrics(ctx context.Context, envID uuid.UUID) (RunMetrics, error)
-	// AccountMetrics returns state metrics grouped by account.
-	AccountMetrics(ctx context.Context, accountID uuid.UUID) (RunMetrics, error)
 }
 
 type RunService interface {
@@ -58,11 +47,15 @@ type RunService interface {
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
 
-	// Duplicate creates a copy of the given state in this store with the provided
-	// raw metadata (v1) and step inputs. This is used for migrating state between backends.
-	// Step inputs must be loaded separately from the source backend since State.Steps
-	// only contains step outputs.
-	Duplicate(ctx context.Context, source State, destID ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error
+	SaveDefer(ctx context.Context, id ID, d Defer) error
+	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when
+	// no defer exists for hashedID. The Aborted transition also releases
+	// the Input from the aggregate budget; the meta entry stays.
+	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
+	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
+	// No-op if any defer already exists for hashedID. Returns
+	// ErrDeferLimitExceeded if no room.
+	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
@@ -88,8 +81,6 @@ func TryIncrementMetadataSize(ctx context.Context, svc RunService, id ID, delta 
 type StateLoader interface {
 	// Metadata returns metadata for a given run
 	LoadMetadata(ctx context.Context, id ID) (Metadata, error)
-	// LoadV1Metadata returns the v1 Metadata for a given run, like status, RunType, etc.
-	LoadV1Metadata(ctx context.Context, id ID) (*state.Metadata, error)
 	// LoadEvents loads the triggering events for the given run.
 	LoadEvents(ctx context.Context, id ID) ([]json.RawMessage, error)
 	// LoadState returns all steps for a run.
@@ -104,8 +95,11 @@ type StateLoader interface {
 	// LoadState returns all state for a run, including steps, events, and metadata.
 	LoadState(ctx context.Context, id ID) (State, error)
 
-	// StreamState returns all state without loading in-memory
-	// StreamState(ctx context.Context, id ID) (io.Reader, error)
+	LoadDefers(ctx context.Context, id ID) (map[string]Defer, error)
+
+	// LoadDefersMeta returns each defer's metadata without loading its Input.
+	// Prefer this when only FnSlug/HashedID/ScheduleStatus are needed.
+	LoadDefersMeta(ctx context.Context, id ID) (map[string]DeferMeta, error)
 }
 
 //
@@ -122,4 +116,8 @@ var (
 	ErrRunNotFound        = state.ErrRunNotFound
 	ErrIdempotentResponse = state.ErrIdempotentResponse
 	ErrDuplicateResponse  = state.ErrDuplicateResponse
+
+	// ErrDeferInputTooLarge re-exports the v1 error so v2 callers can match
+	// without importing v1.
+	ErrDeferInputTooLarge = state.ErrDeferInputTooLarge
 )

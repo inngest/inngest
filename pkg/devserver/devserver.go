@@ -90,7 +90,7 @@ const (
 	DefaultPollInterval = 5
 	DefaultQueueWorkers = 100
 
-	DefaultConnectGatewayPort      = 8289
+	DefaultConnectGatewayPort      = connect.DefaultGatewayPort
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
 
@@ -403,7 +403,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
+	debouncer, err := debounce.NewDebouncer(shardRegistry, queueShard.Name(), rq)
+	if err != nil {
+		return fmt.Errorf("could not create debounce manager: %w", err)
+	}
 	croner := cron.NewManager(queueShard, rq, l)
 
 	sn := singleton.New(ctx, shardRegistry)
@@ -698,6 +701,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Functions:           NewFunctionProvider(dbcqrs),
+		FunctionRuns:        NewFunctionRunReader(dbcqrs),
+		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
 	}

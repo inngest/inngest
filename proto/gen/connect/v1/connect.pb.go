@@ -708,6 +708,7 @@ type GatewayExecutorRequestData struct {
 	UserTraceCtx   []byte                 `protobuf:"bytes,11,opt,name=user_trace_ctx,json=userTraceCtx,proto3" json:"user_trace_ctx,omitempty"`
 	RunId          string                 `protobuf:"bytes,12,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	LeaseId        string                 `protobuf:"bytes,13,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
+	JobId          string                 `protobuf:"bytes,14,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -829,6 +830,13 @@ func (x *GatewayExecutorRequestData) GetRunId() string {
 func (x *GatewayExecutorRequestData) GetLeaseId() string {
 	if x != nil {
 		return x.LeaseId
+	}
+	return ""
+}
+
+func (x *GatewayExecutorRequestData) GetJobId() string {
+	if x != nil {
+		return x.JobId
 	}
 	return ""
 }
@@ -1925,7 +1933,7 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\x0fstatus_interval\x18\x03 \x01(\tR\x0estatusInterval\"t\n" +
 	"\x10WorkerStatusData\x121\n" +
 	"\x15in_flight_request_ids\x18\x01 \x03(\tR\x12inFlightRequestIds\x12-\n" +
-	"\x12shutdown_requested\x18\x02 \x01(\bR\x11shutdownRequested\"\xbe\x03\n" +
+	"\x12shutdown_requested\x18\x02 \x01(\bR\x11shutdownRequested\"\xd5\x03\n" +
 	"\x1aGatewayExecutorRequestData\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1d\n" +
@@ -1943,7 +1951,8 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	" \x01(\fR\x0esystemTraceCtx\x12$\n" +
 	"\x0euser_trace_ctx\x18\v \x01(\fR\fuserTraceCtx\x12\x15\n" +
 	"\x06run_id\x18\f \x01(\tR\x05runId\x12\x19\n" +
-	"\blease_id\x18\r \x01(\tR\aleaseIdB\n" +
+	"\blease_id\x18\r \x01(\tR\aleaseId\x12\x15\n" +
+	"\x06job_id\x18\x0e \x01(\tR\x05jobIdB\n" +
 	"\n" +
 	"\b_step_id\"\xb8\x02\n" +
 	"\x14WorkerRequestAckData\x12\x1d\n" +
