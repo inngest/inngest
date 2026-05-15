@@ -34,6 +34,7 @@ type Config struct {
 	QueueWorkers       int   `koanf:"queue-workers"`
 	Tick               int   `koanf:"tick"`
 	ConnectGatewayPort int   `koanf:"connect-gateway-port"`
+	APIGRPCPort        int   `koanf:"api-grpc-port"`
 	Persist            *bool `koanf:"persist"`
 
 	// Start command configuration

@@ -95,6 +95,8 @@ const (
 	DefaultConnectExecutorGRPCPort = 50053
 
 	DefaultDebugAPIPort = 7777
+
+	DefaultAPIGRPCPort = apiv2.DefaultGRPCPort
 )
 
 var defaultPartitionConstraintConfig = queue.PartitionConstraintConfig{
@@ -156,6 +158,9 @@ type StartOpts struct {
 
 	// Debug API
 	DebugAPIPort int `json:"debugAPIPort"`
+
+	// Defaults to DefaultAPIGRPCPort. Set to a negative value to disable.
+	APIGRPCPort int `json:"apiGRPCPort"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -712,11 +717,21 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	apiv2Base := apiv2base.NewBase()
-	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, serviceOpts, apiv2.HTTPHandlerOptions{
+	apiv2HTTPOpts := apiv2.HTTPHandlerOptions{
 		AuthnMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-	}, apiv2Base)
+	}
+	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, serviceOpts, apiv2HTTPOpts, apiv2Base)
 	if err != nil {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
+	}
+
+	apiGRPCPort := opts.APIGRPCPort
+	if apiGRPCPort == 0 {
+		apiGRPCPort = DefaultAPIGRPCPort
+	}
+	var apiGRPC service.Service
+	if apiGRPCPort > 0 {
+		apiGRPC = apiv2.NewGRPCService(apiGRPCPort, serviceOpts, apiv2HTTPOpts)
 	}
 
 	// Create a new data API directly in the devserver.  This allows us to inject
@@ -772,6 +787,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	services = append(services, ds, runner, executorSvc, ds.Apiservice, connGateway)
+
+	if apiGRPC != nil {
+		services = append(services, apiGRPC)
+	}
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{

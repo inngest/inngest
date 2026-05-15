@@ -1,9 +1,8 @@
 package apiv2cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -20,23 +18,25 @@ import (
 	"unicode"
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
-	"github.com/inngest/inngest/pkg/api"
-	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	apiv2 "github.com/inngest/inngest/pkg/api/v2"
+	apiv2proto "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/genproto/googleapis/api/annotations"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 const (
-	defaultDevServerOrigin = "http://localhost:8288"
-	defaultDevServerURL    = defaultDevServerOrigin + "/api/v2"
-	cloudAPIURL            = "https://api.inngest.com/v2"
-	defaultTimeout         = 30 * time.Second
-	maxResponseBytes       = 25 << 20
+	cloudGRPCTarget = "api.inngest.com:443"
+	defaultTimeout  = 30 * time.Second
 )
-
-var pathParamPattern = regexp.MustCompile(`\{([^}=]+)(=[^}]*)?}`)
 
 var hiddenEndpointMethods = map[string]struct{}{
 	"CreatePartnerAccount": {},
@@ -45,21 +45,22 @@ var hiddenEndpointMethods = map[string]struct{}{
 
 type endpoint struct {
 	name       string
-	method     string
+	methodName string
+	fullMethod string
+	httpMethod string
 	path       string
-	body       string
 	input      protoreflect.MessageDescriptor
-	pathParams []string
+	output     protoreflect.MessageDescriptor
 }
 
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "api",
-		Usage:     "Call Inngest REST API v2 endpoints",
+		Usage:     "Call Inngest API v2 endpoints over gRPC",
 		UsageText: "inngest alpha api [target/auth flags] <endpoint> [endpoint flags]",
 		Description: strings.Join([]string{
-			"By default, the command targets the local dev server.",
-			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
+			"By default, the command targets the local dev server's gRPC endpoint.",
+			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom server.",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
@@ -73,7 +74,7 @@ func endpointCommands() []*cli.Command {
 	for _, ep := range endpoints {
 		cmds = append(cmds, &cli.Command{
 			Name:      ep.name,
-			Usage:     fmt.Sprintf("%s %s", ep.method, ep.path),
+			Usage:     fmt.Sprintf("%s %s", ep.httpMethod, ep.path),
 			UsageText: fmt.Sprintf("inngest alpha api [target/auth flags] %s [endpoint flags]", ep.name),
 			Flags:     endpointFlags(ep),
 			Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -90,7 +91,7 @@ func commonFlags() []cli.Flag {
 		&cli.BoolFlag{
 			Category: "Target",
 			Name:     "prod",
-			Usage:    "Target Inngest Cloud Production API unless --api-host or --api-port is set",
+			Usage:    "Target Inngest Cloud Production unless --api-host or --api-port is set",
 		},
 		&cli.StringFlag{
 			Category: "Target",
@@ -100,13 +101,18 @@ func commonFlags() []cli.Flag {
 		&cli.StringFlag{
 			Category: "Target",
 			Name:     "api-host",
-			Usage:    "Custom API host or origin",
+			Usage:    "Custom host (or host:port) for the gRPC endpoint",
 		},
 		&cli.IntFlag{
 			Category:    "Target",
 			Name:        "api-port",
-			DefaultText: "default local dev server port",
-			Usage:       "Custom API port",
+			DefaultText: "default API v2 gRPC port",
+			Usage:       "Custom API v2 gRPC port",
+		},
+		&cli.BoolFlag{
+			Category: "Target",
+			Name:     "insecure",
+			Usage:    "Force plaintext gRPC (default for localhost, TLS otherwise)",
 		},
 		&cli.StringFlag{
 			Category: "Auth",
@@ -130,46 +136,34 @@ func commonFlags() []cli.Flag {
 			Category: "Target",
 			Name:     "timeout",
 			Value:    defaultTimeout,
-			Usage:    "HTTP request timeout",
+			Usage:    "RPC call timeout",
 		},
 		&cli.BoolFlag{
 			Category: "Output",
 			Name:     "raw",
-			Usage:    "Print the response body without JSON formatting",
+			Usage:    "Print the response as compact JSON (no pretty-printing)",
 		},
 	}
 }
 
 func endpointFlags(ep endpoint) []cli.Flag {
-	var flags []cli.Flag
-	if ep.body != "" {
-		flags = append(flags,
-			&cli.StringFlag{
-				Category: "Body",
-				Name:     "body",
-				Usage:    "Raw JSON request body. Endpoint field flags override matching keys.",
-			},
-			&cli.StringFlag{
-				Category: "Body",
-				Name:     "body-file",
-				Usage:    "Path to a JSON request body file, or '-' for stdin.",
-			},
-		)
+	flags := []cli.Flag{
+		&cli.StringFlag{
+			Category: "Body",
+			Name:     "body",
+			Usage:    "Raw JSON request body. Field flags override matching keys.",
+		},
+		&cli.StringFlag{
+			Category: "Body",
+			Name:     "body-file",
+			Usage:    "Path to a JSON request body file, or '-' for stdin.",
+		},
 	}
 
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
-		name := string(field.Name())
-		flagName := kebab(name)
-		category := "Query"
-		if slices.Contains(ep.pathParams, name) {
-			category = "Path"
-		} else if ep.body != "" {
-			category = "Body"
-		}
-
-		flags = append(flags, flagForField(category, flagName, field))
+		flags = append(flags, flagForField("Field", kebab(string(field.Name())), field))
 	}
 
 	return flags
@@ -177,6 +171,9 @@ func endpointFlags(ep endpoint) []cli.Flag {
 
 func flagForField(category, name string, field protoreflect.FieldDescriptor) cli.Flag {
 	usage := string(field.JSONName())
+	if isRequiredField(field) {
+		usage += " (required)"
+	}
 	if field.IsList() {
 		return &cli.StringSliceFlag{
 			Category: category,
@@ -194,10 +191,11 @@ func flagForField(category, name string, field protoreflect.FieldDescriptor) cli
 }
 
 func discoverEndpoints() []endpoint {
-	service := apiv2.File_api_v2_service_proto.Services().ByName("V2")
+	service := apiv2proto.File_api_v2_service_proto.Services().ByName("V2")
 	if service == nil {
 		return nil
 	}
+	serviceFullName := string(service.FullName())
 
 	endpoints := []endpoint{}
 	methods := service.Methods()
@@ -223,11 +221,12 @@ func discoverEndpoints() []endpoint {
 
 		endpoints = append(endpoints, endpoint{
 			name:       endpointCommandName(methodName),
-			method:     httpMethod,
+			methodName: methodName,
+			fullMethod: fmt.Sprintf("/%s/%s", serviceFullName, methodName),
+			httpMethod: httpMethod,
 			path:       path,
-			body:       httpRule.Body,
 			input:      method.Input(),
-			pathParams: pathParams(path),
+			output:     method.Output(),
 		})
 	}
 
@@ -270,294 +269,91 @@ func methodAndPath(rule *annotations.HttpRule) (string, string) {
 }
 
 func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
-	req, err := buildRequest(ctx, cmd, ep)
+	target, useTLS, err := resolveTarget(ctx, cmd)
 	if err != nil {
 		return err
 	}
 
-	client := &http.Client{Timeout: cmd.Duration("timeout")}
-	resp, err := client.Do(req)
-	if err != nil {
-		if req.URL.Scheme+"://"+req.URL.Host == defaultDevServerOrigin {
-			return fmt.Errorf("local dev server is not available at %s; start it with `inngest dev` or use --prod to target Inngest Cloud: %w", defaultDevServerOrigin, err)
-		}
-		return err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	token, err := authToken(cmd)
 	if err != nil {
 		return err
 	}
-	if int64(len(body)) > maxResponseBytes {
-		return fmt.Errorf("response body exceeded %d bytes", maxResponseBytes)
+
+	if token != "" && !useTLS && !targetIsLocal(target) {
+		return fmt.Errorf("refusing to send credentials over plaintext gRPC to %s; pass --insecure only for local targets", target)
 	}
 
-	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(body)))
-	}
-
-	writer := cmd.Root().Writer
-	if writer == nil {
-		writer = os.Stdout
-	}
-
-	if cmd.Bool("raw") {
-		_, err = writer.Write(append(body, '\n'))
+	req := dynamicpb.NewMessage(ep.input)
+	if err := populateRequest(cmd, ep, req); err != nil {
 		return err
 	}
 
-	formatted, err := prettyJSON(body)
+	var creds credentials.TransportCredentials = insecure.NewCredentials()
+	if useTLS {
+		creds = credentials.NewTLS(&tls.Config{})
+	}
+
+	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		_, err = writer.Write(append(body, '\n'))
 		return err
 	}
+	defer conn.Close()
 
-	_, err = writer.Write(append(formatted, '\n'))
-	return err
-}
-
-func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Request, error) {
-	baseURL, err := resolveBaseURL(ctx, cmd)
-	if err != nil {
-		return nil, err
+	md := metadata.MD{}
+	if token != "" {
+		md.Set("authorization", "Bearer "+token)
 	}
-
-	path, err := resolvePath(cmd, ep)
-	if err != nil {
-		return nil, err
-	}
-
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		return nil, err
-	}
-	u.Path = strings.TrimRight(u.Path, "/") + path
-
-	body, err := requestBody(cmd, ep)
-	if err != nil {
-		return nil, err
-	}
-
-	query, err := queryParams(cmd, ep)
-	if err != nil {
-		return nil, err
-	}
-	u.RawQuery = query.Encode()
-
-	var reader io.Reader
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-		reader = bytes.NewReader(encoded)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, ep.method, u.String(), reader)
-	if err != nil {
-		return nil, err
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	req.Header.Set("Accept", "application/json")
-
-	if token, err := authToken(cmd); err != nil {
-		return nil, err
-	} else if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
 	if env := cmd.String("env"); env != "" {
-		req.Header.Set("X-Inngest-Env", env)
+		md.Set("x-inngest-env", env)
 	}
 
-	if err := guardPlaintextAuth(req); err != nil {
-		return nil, err
+	timeout := cmd.Duration("timeout")
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+	callCtx, cancel := context.WithTimeout(metadata.NewOutgoingContext(ctx, md), timeout)
+	defer cancel()
+
+	resp := dynamicpb.NewMessage(ep.output)
+	if err := conn.Invoke(callCtx, ep.fullMethod, req, resp); err != nil {
+		if targetIsLocal(target) && isConnRefused(err) {
+			return fmt.Errorf("local dev server is not available at %s; start it with `inngest dev` or use --prod to target Inngest Cloud: %w", target, err)
+		}
+		return formatGRPCError(err)
 	}
 
-	return req, nil
+	return writeResponse(cmd, resp)
 }
 
-// don't ship credentials to a non-local host over http
-func guardPlaintextAuth(req *http.Request) error {
-	if req.Header.Get("Authorization") == "" {
-		return nil
-	}
-	if req.URL.Scheme != "http" {
-		return nil
-	}
-	if isLocalHost(req.URL.Hostname()) {
-		return nil
-	}
-	return fmt.Errorf("refusing to send credentials over plaintext HTTP to %s; use an https:// target", req.URL.Host)
-}
-
-func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
-	if err := localconfig.InitDevConfig(ctx, cmd); err != nil {
-		return "", err
-	}
-
-	apiPort := localconfig.GetIntValue(cmd, "api-port", 0)
-	if apiHost := localconfig.GetValue(cmd, "api-host", ""); apiHost != "" {
-		if apiPort == 0 {
-			apiPort = api.DefaultAPIPort
-		}
-		return normalizeAPIHostTarget(apiHost, apiPort)
-	}
-
-	if apiPort != 0 {
-		return normalizeAPIHostTarget("localhost", apiPort)
-	}
-
-	if localconfig.GetBoolValue(cmd, "prod", false) {
-		return cloudAPIURL, nil
-	}
-
-	return defaultDevServerURL, nil
-}
-
-func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
-	if looksLikeURL(rawHost) {
-		return normalizeAPIURL(rawHost)
-	}
-
-	host := rawHost
-	hasPort := true
-	if parsedHost, _, err := net.SplitHostPort(rawHost); err == nil {
-		host = parsedHost
-	} else {
-		hasPort = false
-	}
-
-	scheme := "http"
-	if !isLocalHost(host) {
-		scheme = "https"
-	} else if !hasPort {
-		rawHost = net.JoinHostPort(rawHost, strconv.Itoa(port))
-	}
-
-	return normalizeAPIURL(fmt.Sprintf("%s://%s", scheme, rawHost))
-}
-
-func normalizeAPIURL(rawURL string) (string, error) {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return "", err
-	}
-	if parsed.Scheme == "" || parsed.Host == "" {
-		return "", fmt.Errorf("api host must include scheme and host")
-	}
-
-	switch strings.TrimRight(parsed.Path, "/") {
-	case "":
-		if isCloudHost(parsed.Hostname()) {
-			parsed.Path = "/v2"
-		} else {
-			parsed.Path = "/api/v2"
-		}
-	case "/api":
-		parsed.Path = "/api/v2"
-	}
-
-	return strings.TrimRight(parsed.String(), "/"), nil
-}
-
-func resolvePath(cmd *cli.Command, ep endpoint) (string, error) {
-	var firstErr error
-	path := pathParamPattern.ReplaceAllStringFunc(ep.path, func(match string) string {
-		if firstErr != nil {
-			return match
-		}
-
-		parts := pathParamPattern.FindStringSubmatch(match)
-		if len(parts) < 2 {
-			firstErr = fmt.Errorf("invalid path parameter %q", match)
-			return match
-		}
-
-		name := parts[1]
-		flagName := kebab(name)
-		if !cmd.IsSet(flagName) || cmd.String(flagName) == "" {
-			firstErr = fmt.Errorf("missing required --%s", flagName)
-			return match
-		}
-
-		return url.PathEscape(cmd.String(flagName))
-	})
-
-	if firstErr != nil {
-		return "", firstErr
-	}
-	return path, nil
-}
-
-func queryParams(cmd *cli.Command, ep endpoint) (url.Values, error) {
-	values := url.Values{}
-	if ep.body != "" {
-		return values, nil
-	}
-
-	fields := ep.input.Fields()
-	for i := 0; i < fields.Len(); i++ {
-		field := fields.Get(i)
-		name := string(field.Name())
-		if slices.Contains(ep.pathParams, name) {
-			continue
-		}
-
-		flagName := kebab(name)
-		if !cmd.IsSet(flagName) {
-			continue
-		}
-
-		value, err := fieldValue(cmd, field, flagName)
-		if err != nil {
-			return nil, err
-		}
-
-		addQueryValue(values, field.JSONName(), value)
-	}
-
-	return values, nil
-}
-
-func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
-	if ep.body == "" {
-		return nil, nil
-	}
-
+func populateRequest(cmd *cli.Command, ep endpoint, msg *dynamicpb.Message) error {
 	body, err := rawBody(cmd)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
-		name := string(field.Name())
-		if slices.Contains(ep.pathParams, name) {
-			continue
-		}
-
-		flagName := kebab(name)
+		flagName := kebab(string(field.Name()))
 		if !cmd.IsSet(flagName) {
 			continue
 		}
-
-		value, err := fieldValue(cmd, field, flagName)
+		value, err := flagJSONValue(cmd, field, flagName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		body[field.JSONName()] = value
 	}
 
-	if err := validateBody(cmd, ep, body); err != nil {
-		return nil, err
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return err
 	}
 
-	return body, nil
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(encoded, msg); err != nil {
+		return fmt.Errorf("invalid request payload: %w", err)
+	}
+	return nil
 }
 
 func rawBody(cmd *cli.Command) (map[string]any, error) {
@@ -597,32 +393,28 @@ func readBodyFile(cmd *cli.Command, path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func validateBody(cmd *cli.Command, ep endpoint, body map[string]any) error {
-	fields := ep.input.Fields()
-	for i := 0; i < fields.Len(); i++ {
-		field := fields.Get(i)
-		name := string(field.Name())
-		if slices.Contains(ep.pathParams, name) || !isRequiredField(field) {
-			continue
-		}
-
-		if _, ok := body[field.JSONName()]; ok {
-			continue
-		}
-		if _, ok := body[name]; ok {
-			continue
-		}
-		if cmd.IsSet(kebab(name)) {
-			continue
-		}
-
-		return fmt.Errorf("missing required --%s or body field %q", kebab(name), field.JSONName())
+// flagJSONValue returns a JSON-serialisable value (string, bool, number, list)
+// that protojson can decode into the typed proto field. We let protojson
+// validate kinds rather than reimplementing it here.
+func flagJSONValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName string) (any, error) {
+	if field.IsList() {
+		return cmd.StringSlice(flagName), nil
 	}
-	return nil
+
+	switch field.Kind() {
+	case protoreflect.BoolKind:
+		return cmd.Bool(flagName), nil
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		var value any
+		if err := json.Unmarshal([]byte(cmd.String(flagName)), &value); err != nil {
+			return nil, fmt.Errorf("--%s must be valid JSON: %w", flagName, err)
+		}
+		return value, nil
+	default:
+		return cmd.String(flagName), nil
+	}
 }
 
-// isRequiredField reports whether the field carries a
-// `(google.api.field_behavior) = REQUIRED` annotation.
 func isRequiredField(field protoreflect.FieldDescriptor) bool {
 	opts := field.Options()
 	if !proto.HasExtension(opts, annotations.E_FieldBehavior) {
@@ -635,43 +427,6 @@ func isRequiredField(field protoreflect.FieldDescriptor) bool {
 	return slices.Contains(behaviors, annotations.FieldBehavior_REQUIRED)
 }
 
-func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName string) (any, error) {
-	if field.IsList() {
-		return cmd.StringSlice(flagName), nil
-	}
-
-	switch field.Kind() {
-	case protoreflect.BoolKind:
-		return cmd.Bool(flagName), nil
-	case protoreflect.StringKind:
-		return cmd.String(flagName), nil
-	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
-		return parseInt(cmd.String(flagName), 32)
-	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
-		return parseInt(cmd.String(flagName), 64)
-	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
-		return parseUint(cmd.String(flagName), 32)
-	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-		return parseUint(cmd.String(flagName), 64)
-	case protoreflect.FloatKind:
-		return parseFloat(cmd.String(flagName), 32)
-	case protoreflect.DoubleKind:
-		return parseFloat(cmd.String(flagName), 64)
-	case protoreflect.EnumKind:
-		return cmd.String(flagName), nil
-	case protoreflect.MessageKind, protoreflect.GroupKind:
-		var value any
-		if err := json.Unmarshal([]byte(cmd.String(flagName)), &value); err != nil {
-			return nil, fmt.Errorf("--%s must be valid JSON: %w", flagName, err)
-		}
-		return value, nil
-	case protoreflect.BytesKind:
-		return base64.StdEncoding.EncodeToString([]byte(cmd.String(flagName))), nil
-	default:
-		return nil, fmt.Errorf("unsupported field type for --%s", flagName)
-	}
-}
-
 func authToken(cmd *cli.Command) (string, error) {
 	if apiKey := cmd.String("api-key"); apiKey != "" {
 		return apiKey, nil
@@ -679,58 +434,106 @@ func authToken(cmd *cli.Command) (string, error) {
 	return cmd.String("signing-key"), nil
 }
 
-func addQueryValue(values url.Values, key string, value any) {
-	switch v := value.(type) {
-	case []string:
-		for _, item := range v {
-			values.Add(key, item)
+func resolveTarget(ctx context.Context, cmd *cli.Command) (string, bool, error) {
+	if err := localconfig.InitDevConfig(ctx, cmd); err != nil {
+		return "", false, err
+	}
+
+	insecureFlag := localconfig.GetBoolValue(cmd, "insecure", false)
+	apiPort := localconfig.GetIntValue(cmd, "api-port", 0)
+	apiHost := localconfig.GetValue(cmd, "api-host", "")
+
+	if apiHost != "" {
+		target, useTLS, err := buildTarget(apiHost, apiPort, insecureFlag)
+		return target, useTLS, err
+	}
+
+	if apiPort != 0 {
+		return net.JoinHostPort("localhost", strconv.Itoa(apiPort)), false, nil
+	}
+
+	if localconfig.GetBoolValue(cmd, "prod", false) {
+		return cloudGRPCTarget, !insecureFlag, nil
+	}
+
+	return net.JoinHostPort("localhost", strconv.Itoa(apiv2.DefaultGRPCPort)), false, nil
+}
+
+func buildTarget(rawHost string, port int, insecureFlag bool) (string, bool, error) {
+	host := rawHost
+	if looksLikeURL(rawHost) {
+		parsed, err := url.Parse(rawHost)
+		if err != nil {
+			return "", false, err
 		}
-	default:
-		values.Set(key, fmt.Sprint(v))
-	}
-}
-
-func pathParams(path string) []string {
-	matches := pathParamPattern.FindAllStringSubmatch(path, -1)
-	params := make([]string, 0, len(matches))
-	for _, match := range matches {
-		if len(match) > 1 {
-			params = append(params, match[1])
+		host = parsed.Host
+		if host == "" {
+			return "", false, fmt.Errorf("api host must include a host name")
 		}
 	}
-	return params
+
+	if parsedHost, parsedPort, err := net.SplitHostPort(host); err == nil {
+		if port == 0 {
+			p, perr := strconv.Atoi(parsedPort)
+			if perr != nil {
+				return "", false, perr
+			}
+			port = p
+		}
+		host = parsedHost
+	}
+
+	if port == 0 {
+		if isLocalHost(host) {
+			port = apiv2.DefaultGRPCPort
+		} else if insecureFlag {
+			port = apiv2.DefaultGRPCPort
+		} else {
+			port = 443
+		}
+	}
+
+	target := net.JoinHostPort(host, strconv.Itoa(port))
+	useTLS := !insecureFlag && !isLocalHost(host)
+	return target, useTLS, nil
 }
 
-func parseInt(value string, bitSize int) (int64, error) {
-	parsed, err := strconv.ParseInt(value, 10, bitSize)
+func writeResponse(cmd *cli.Command, msg *dynamicpb.Message) error {
+	writer := cmd.Root().Writer
+	if writer == nil {
+		writer = os.Stdout
+	}
+
+	marshal := protojson.MarshalOptions{
+		Multiline:       !cmd.Bool("raw"),
+		Indent:          "  ",
+		EmitUnpopulated: false,
+	}
+	body, err := marshal.Marshal(msg)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return parsed, nil
+	_, err = writer.Write(append(body, '\n'))
+	return err
 }
 
-func parseUint(value string, bitSize int) (uint64, error) {
-	parsed, err := strconv.ParseUint(value, 10, bitSize)
+func formatGRPCError(err error) error {
+	if s, ok := status.FromError(err); ok {
+		return fmt.Errorf("%s: %s", s.Code(), s.Message())
+	}
+	return err
+}
+
+func isConnRefused(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "connection refused")
+}
+
+func targetIsLocal(target string) bool {
+	host, _, err := net.SplitHostPort(target)
 	if err != nil {
-		return 0, err
+		host = target
 	}
-	return parsed, nil
-}
-
-func parseFloat(value string, bitSize int) (float64, error) {
-	parsed, err := strconv.ParseFloat(value, bitSize)
-	if err != nil {
-		return 0, err
-	}
-	return parsed, nil
-}
-
-func prettyJSON(body []byte) ([]byte, error) {
-	var value any
-	if err := json.Unmarshal(body, &value); err != nil {
-		return nil, err
-	}
-	return json.MarshalIndent(value, "", "  ")
+	return isLocalHost(host)
 }
 
 func kebab(value string) string {
@@ -754,10 +557,6 @@ func kebab(value string) string {
 func looksLikeURL(value string) bool {
 	parsed, err := url.Parse(value)
 	return err == nil && parsed.Scheme != "" && parsed.Host != ""
-}
-
-func isCloudHost(host string) bool {
-	return host == "api.inngest.com"
 }
 
 func isLocalHost(host string) bool {

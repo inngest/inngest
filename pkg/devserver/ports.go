@@ -60,6 +60,13 @@ func resolvePortConflicts(opts StartOpts, isAvailable func(string, int) bool) (S
 				opts.ConnectGRPCConfig.Executor.Port = port
 			},
 		},
+		{
+			name: "api grpc",
+			port: resolved.APIGRPCPort,
+			set: func(opts *StartOpts, port int) {
+				opts.APIGRPCPort = port
+			},
+		},
 	}
 
 	if os.Getenv("DEBUG") != "" {
@@ -73,7 +80,7 @@ func resolvePortConflicts(opts StartOpts, isAvailable func(string, int) bool) (S
 	}
 
 	for _, assignment := range assignments {
-		if assignment.port == 0 {
+		if assignment.port <= 0 {
 			continue
 		}
 

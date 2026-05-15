@@ -116,6 +116,12 @@ func Command() *cli.Command {
 				Value:    devserver.DefaultConnectGatewayPort,
 				Usage:    "Port to expose connect gateway endpoint",
 			},
+			&cli.IntFlag{
+				Category: "Advanced",
+				Name:     "api-grpc-port",
+				Value:    devserver.DefaultAPIGRPCPort,
+				Usage:    "Port to expose the API grpc endpoint (set to -1 to disable)",
+			},
 			&cli.BoolFlag{
 				Category: "Advanced",
 				Name:     "no-ui",
