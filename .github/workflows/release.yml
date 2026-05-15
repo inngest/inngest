@@ -158,8 +158,9 @@ jobs:
         with:
           fetch-depth: 0 # required for commit history
 
-      - uses: linear/linear-release-action@v0
+      - uses: linear/linear-release-action@0917777589db006387af296dde440385f88d6ac4 # v0
         if: needs.check-release-type.outputs.prerelease == ''
+        continue-on-error: true
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
           version: ${{ github.ref_name }}
