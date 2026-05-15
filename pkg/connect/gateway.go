@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -647,11 +648,28 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					Tags:    tags,
 				})
 
-				serr := ch.handleIncomingWebSocketMessage(&msg)
-				if serr != nil {
-					c.closeWithConnectError(ws, serr)
-					return serr
-				}
+				// Handle message in a goroutine to ensure we don't process
+				// messages sequentially.
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							ch.log.Error("panic handling incoming websocket message",
+								"panic", r,
+								"stack", string(debug.Stack()),
+								"kind", msg.Kind.String(),
+							)
+							ch.svc.closeWithConnectError(ch.ws, &connecterrors.SocketError{
+								SysCode:    syscode.CodeConnectInternal,
+								StatusCode: websocket.StatusInternalError,
+								Msg:        "internal panic",
+							})
+						}
+					}()
+
+					if serr := ch.handleIncomingWebSocketMessage(&msg); serr != nil {
+						ch.svc.closeWithConnectError(ch.ws, serr)
+					}
+				}()
 			}
 		})
 
