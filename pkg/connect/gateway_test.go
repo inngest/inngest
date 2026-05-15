@@ -1747,6 +1747,46 @@ func TestEstablishConnectionMissingInstanceId(t *testing.T) {
 	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
 }
 
+// TestEstablishConnectionMissingApps tests missing app configurations.
+func TestEstablishConnectionMissingApps(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	connID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	reqData := proto.Clone(res.reqData).(*connect.WorkerConnectRequestData)
+	reqData.ConnectionId = connID.String()
+	reqData.Apps = nil
+
+	connectMsg, err := proto.Marshal(reqData)
+	require.NoError(t, err)
+
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
+		Payload: connectMsg,
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
+
+	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, connID)
+	require.NoError(t, err)
+	require.Nil(t, conn)
+}
+
 // TestCloseWithConnectError tests the closeWithConnectError function
 func TestCloseWithConnectError(t *testing.T) {
 	res := createTestingGateway(t, testingParameters{
