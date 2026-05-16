@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -80,7 +81,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		})
 	}()
 
-	jID := queue.JobIDFromContext(ctx)
+	jID := queueref.StringFromCtx(ctx)
 
 	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts(), jID)
 	if err != nil {

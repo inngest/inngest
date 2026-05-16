@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/flags"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -79,6 +81,8 @@ type CheckpointAPIOpts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// AllowAsyncDispatchValidation gates the dispatch validator per account.
+	AllowAsyncDispatchValidation flags.BoolFlag
 }
 
 // checkpointAPI is the base implementation.
@@ -100,14 +104,15 @@ type checkpointAPI struct {
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	c := checkpoint.New(checkpoint.Opts{
-		State:             o.State,
-		FnReader:          o.FunctionReader,
-		Executor:          o.Executor,
-		TracerProvider:    o.TracerProvider,
-		Queue:             o.Queue,
-		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
-		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
-		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
+		State:                        o.State,
+		FnReader:                     o.FunctionReader,
+		Executor:                     o.Executor,
+		TracerProvider:               o.TracerProvider,
+		Queue:                        o.Queue,
+		MetricsProvider:              o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:                  o.CheckpointOpts.BackoffFunc,
+		AllowStepMetadata:            o.CheckpointOpts.AllowStepMetadata,
+		AllowAsyncDispatchValidation: o.CheckpointOpts.AllowAsyncDispatchValidation,
 	})
 
 	api := checkpointAPI{
@@ -357,22 +362,29 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 	input.TrackLatency(ctx)
 
 	err = a.checkpointer.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
-		RunID:        input.RunID,
-		FnID:         input.FnID,
-		Steps:        input.Steps,
-		QueueItemRef: input.QueueItemRef,
-		AccountID:    auth.AccountID(),
-		EnvID:        auth.WorkspaceID(),
+		RunID:            input.RunID,
+		FnID:             input.FnID,
+		Steps:            input.Steps,
+		QueueItemRef:     input.QueueItemRef,
+		RequestID:        input.RequestID,
+		RequestStartedAt: input.RequestStartedAt,
+		AccountID:        auth.AccountID(),
+		EnvID:            auth.WorkspaceID(),
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+		status := http.StatusBadRequest
+		if errors.Is(err, checkpoint.ErrStaleDispatch) {
+			status = http.StatusConflict
+		}
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Message: "Failed to checkpoint steps",
 			Data: map[string]any{
 				"run_id": input.RunID,
 			},
-			Status: 400,
+			Status: status,
 		})
+		return
 	}
 }
 

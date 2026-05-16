@@ -18,18 +18,22 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/defers"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/flags"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
+	"github.com/oklog/ulid/v2"
 )
 
 type Checkpointer interface {
@@ -47,6 +51,23 @@ type SyncCheckpointer interface {
 type AsyncCheckpointer interface {
 	// CheckpointAsyncSteps checkpoints steps for an async function.
 	CheckpointAsyncSteps(context.Context, AsyncCheckpoint) error
+}
+
+const pkgName = "checkpoint"
+
+var ErrStaleDispatch = errors.New("stale dispatch")
+
+// Disallow dispatch validation if the queue item is younger than this duration.
+// This is to reduce the number of validations, which in turn reduces load on
+// the queue.
+//
+// We chose 10 seconds somewhat arbitrarily. We want a value that will not
+// exceed timeout durations on our users' cloud providers, and some serverless
+// providers have a 10 second timeout.
+const dispatchValidationSkipDuration = 10 * time.Second
+
+type queueItemLoader interface {
+	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
 }
 
 type Opts struct {
@@ -67,6 +88,8 @@ type Opts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// AllowAsyncDispatchValidation gates the dispatch validator per account.
+	AllowAsyncDispatchValidation flags.BoolFlag
 }
 
 func New(o Opts) Checkpointer {
@@ -558,6 +581,109 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), ref.JobID()); err != nil {
 		l.Error("error resetting queue item attempts", "error", err)
 		return err
+	}
+
+	// IMPORTANT: Validation must occur after processing the request. What that
+	// seems illogical, we're doing it because work actually did complete and we
+	// need to update state.
+	//
+	// A concrete example of this need is an HTTP timeout while checkpointing is
+	// enabled. In that situation, the HTTP response (the timeout) was processed
+	// before the SDK sent the outgoing checkpoint request. That means that the
+	// HTTP response processing already incremented the queue item's generation
+	// ID, guaranteeing that our dispatch validation will fail. If we don't
+	// still save the step in that situation, we'll keep retrying the step even
+	// though the user code actually completed it.
+	if c.AllowAsyncDispatchValidation.Enabled(ctx, input.AccountID) {
+		if err := c.validateAsyncDispatch(ctx, input); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) (err error) {
+	start := time.Now()
+	result := "skipped"
+	defer func() {
+		if errors.Is(err, ErrStaleDispatch) {
+			result = "stale"
+		}
+		metrics.HistogramCheckpointAsyncDispatchValidationDuration(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"result": result},
+		})
+	}()
+
+	// Fail open when the SDK didn't echo a request id. Older SDKs predate the
+	// fence; rejecting them would break valid checkpoints.
+	if input.RequestID == "" {
+		return nil
+	}
+
+	// Skip the queue-item load when the dispatch is younger than the minimum
+	// requeue window. A Requeue is the only path that bumps GenerationID, and
+	// it can't fire until the queue lease expires, so a fresh dispatch is
+	// provably uncontested. Negative elapsed (future-dated stamp from clock
+	// skew or a buggy SDK) falls through to the existing validation.
+	if input.RequestStartedAt != 0 {
+		elapsed := time.Since(time.UnixMilli(input.RequestStartedAt))
+		if elapsed >= 0 && elapsed < dispatchValidationSkipDuration {
+			return nil
+		}
+	}
+
+	parsed, err := ulid.Parse(input.RequestID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid request id %q: %v", ErrStaleDispatch, input.RequestID, err)
+	}
+
+	ref := queueref.Decode(input.QueueItemRef)
+	if ref[0] == "" {
+		return fmt.Errorf("%w: missing queue item reference", ErrStaleDispatch)
+	}
+
+	loader, ok := c.Queue.(queueItemLoader)
+	if !ok {
+		// Fail open if the queue can't load items (e.g. mock or alt backend);
+		// the alternative is rejecting every fenced POST forever.
+		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
+			"run_id", input.RunID,
+		)
+		return nil
+	}
+
+	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
+	if errors.Is(err, queue.ErrQueueItemNotFound) {
+		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
+	}
+	if err != nil {
+		// Fail open on transient load errors (e.g. Redis timeout). Rejecting
+		// here would surface as HTTP 400 and abort an otherwise-valid run.
+		logger.StdlibLogger(ctx).Warn("checkpoint: failed to load queue item for dispatch validation; skipping",
+			"error", err,
+			"run_id", input.RunID,
+		)
+		return nil
+	}
+	// Fail open for queue items that pre-date the rollout.
+	if item.GenerationID == 0 {
+		return nil
+	}
+
+	var jobID string
+	if item.Data.JobID == nil {
+		return nil
+	}
+	jobID = *item.Data.JobID
+
+	result = "passed"
+
+	// Compare only the entropy: the dispatch timestamp isn't recoverable
+	// from the SDK-echoed RequestID and isn't part of the fence.
+	if parsed != driver.DispatchRequestID(input.RunID, jobID, item.GenerationID) {
+		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
 	}
 
 	return nil

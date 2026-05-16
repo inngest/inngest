@@ -3,14 +3,29 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
 type sdkRequestIDCtxKey struct{}
 
 type sdkJobIDCtxKey struct{}
+
+// DispatchRequestID returns the deterministic ULID the executor stamps on
+// outbound SDK requests for a given dispatch. Single source of truth for the
+// producer (executor) and the validator (checkpoint package): a drift in
+// either the seed format or the entropy derivation would silently break
+// fencing for in-flight runs.
+func DispatchRequestID(runID ulid.ULID, jobID string, generationID int) ulid.ULID {
+	return util.MustDeterministicULID(
+		time.UnixMilli(int64(runID.Time())),
+		fmt.Appendf(nil, "%s:%s:%d", runID, jobID, generationID),
+	)
+}
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
 // driver calls.

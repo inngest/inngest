@@ -8,8 +8,16 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+// MustDeterministicULID panics on error; the underlying entropy reader cannot fail.
+func MustDeterministicULID(ts time.Time, seed []byte) ulid.ULID {
+	id, err := DeterministicULID(ts, seed)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // DeterministicULID creates a deterministic ULID given the seed.
-// new SeededID.
 func DeterministicULID(ts time.Time, seed []byte) (ulid.ULID, error) {
 	// ULID requires 10 bytes of entropy. If seed is shorter, pad it with zeros.
 	// If seed is longer, use all of it as the entropy source.

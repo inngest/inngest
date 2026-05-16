@@ -431,6 +431,17 @@ func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, typ
 	})
 }
 
+func HistogramCheckpointAsyncDispatchValidationDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "checkpoint_async_dispatch_validation_duration",
+		Description: "Distribution of time spent validating async checkpoint dispatch staleness, tagged by result",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
 func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
 		PkgName:     opts.PkgName,

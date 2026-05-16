@@ -155,6 +155,8 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 	// Unset any lease ID as this is requeued.
 	i.LeaseID = nil
+	// Bump GenerationID so the next dispatch supersedes the previous one.
+	i.GenerationID++
 	// Update the At timestamp.
 	// NOTE: This does no priority factorization or FIFO for function ordering,
 	// eg. adjusting AtMS based off of function run time.

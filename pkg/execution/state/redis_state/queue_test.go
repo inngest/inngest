@@ -988,6 +988,7 @@ func TestQueuePeek(t *testing.T) {
 			ia.EnqueuedAt = items[0].EnqueuedAt
 			require.EqualValues(t, int64(1), items[0].ScavengeCount, "ScavengeCount should be 1 after first scavenge/requeue")
 			ia.ScavengeCount = 1
+			ia.GenerationID = items[0].GenerationID
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 
