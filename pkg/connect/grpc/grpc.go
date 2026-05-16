@@ -28,10 +28,7 @@ type GatewayGRPCForwarder interface {
 
 type GatewayGRPCReceiver interface {
 	Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse
-	SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage
-
 	Unsubscribe(ctx context.Context, requestID string)
-	UnsubscribeWorkerAck(ctx context.Context, requestID string)
 }
 
 type GatewayGRPCManager interface {
@@ -51,7 +48,6 @@ type gatewayGRPCManager struct {
 	connectpb.ConnectExecutorServer
 	grpcServer       *grpcLib.Server
 	inFlightRequests sync.Map
-	inFlightAcks     sync.Map
 
 	gatewayGRPCPort  int
 	executorGRPCPort int
@@ -163,23 +159,9 @@ func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequ
 	return &connectpb.ReplyResponse{Success: false}, nil
 }
 
+// TODO: Only kept for next rollout, can be removed after
 func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage) (*connectpb.AckResponse, error) {
-	if ch, ok := i.inFlightAcks.Load(req.RequestId); ok {
-		ackChan := ch.(chan *connectpb.AckMessage)
-
-		select {
-		case ackChan <- req:
-			return &connectpb.AckResponse{Success: true}, nil
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-			i.logger.Error("ack channel was closed")
-			return &connectpb.AckResponse{Success: false}, nil
-		}
-	}
-
-	i.logger.Error("ack channel has likely unsubscribed before getting an ack")
-	return &connectpb.AckResponse{Success: false}, nil
+	return &connectpb.AckResponse{Success: true}, nil
 }
 
 func (i *gatewayGRPCManager) Ping(ctx context.Context, req *connectpb.PingRequest) (*connectpb.PingResponse, error) {
@@ -192,21 +174,8 @@ func (i *gatewayGRPCManager) Subscribe(ctx context.Context, requestID string) ch
 	return channel
 }
 
-func (i *gatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
-	channel := make(chan *connectpb.AckMessage)
-	i.inFlightAcks.Store(requestID, channel)
-	return channel
-}
-
 func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
 	i.inFlightRequests.Delete(requestID)
-
-	// NOTE: To avoid panics due to sending on a closed channel, we do not close the message channel
-	// and instead let the gc reclaim it once no more goroutine is sending to it
-}
-
-func (i *gatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
-	i.inFlightAcks.Delete(requestID)
 
 	// NOTE: To avoid panics due to sending on a closed channel, we do not close the message channel
 	// and instead let the gc reclaim it once no more goroutine is sending to it
