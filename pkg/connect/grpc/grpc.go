@@ -159,11 +159,6 @@ func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequ
 	return &connectpb.ReplyResponse{Success: false}, nil
 }
 
-// TODO: Only kept for next rollout, can be removed after
-func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage) (*connectpb.AckResponse, error) {
-	return &connectpb.AckResponse{Success: true}, nil
-}
-
 func (i *gatewayGRPCManager) Ping(ctx context.Context, req *connectpb.PingRequest) (*connectpb.PingResponse, error) {
 	return &connectpb.PingResponse{Message: "ok"}, nil
 }

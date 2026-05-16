@@ -3,8 +3,6 @@ package connect
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
-	"net"
 	"testing"
 	"time"
 
@@ -17,8 +15,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -345,121 +341,6 @@ func TestWorkerReplyDuringGatewayDrain_IsProcessed(t *testing.T) {
 	require.NotNil(t, savedResponse)
 	require.Equal(t, requestID, savedResponse.RequestId)
 	require.Equal(t, connectpb.SDKResponseStatus_DONE, savedResponse.Status)
-}
-
-// mockExecutorServer implements ConnectExecutorServer for testing the ack flow.
-type mockExecutorServer struct {
-	connectpb.UnimplementedConnectExecutorServer
-	ackReceived chan *connectpb.AckMessage
-}
-
-func (s *mockExecutorServer) Ack(_ context.Context, msg *connectpb.AckMessage) (*connectpb.AckResponse, error) {
-	s.ackReceived <- msg
-	return &connectpb.AckResponse{Success: true}, nil
-}
-
-func (s *mockExecutorServer) Ping(_ context.Context, _ *connectpb.PingRequest) (*connectpb.PingResponse, error) {
-	return &connectpb.PingResponse{Message: "ok"}, nil
-}
-
-// TestWorkerAckDuringGatewayDrain_IsProcessed verifies that worker request
-// acks are accepted and forwarded via gRPC during drain.
-func TestWorkerAckDuringGatewayDrain_IsProcessed(t *testing.T) {
-	ctx := context.Background()
-	res := createTestingGateway(t, testingParameters{
-		consecutiveMissesBeforeClose: 10,
-		heartbeatInterval:            1 * time.Second,
-		silent:                       true,
-	})
-	handshake(t, res)
-
-	// Start a mock gRPC executor server on a free port
-	mockServer := &mockExecutorServer{
-		ackReceived: make(chan *connectpb.AckMessage, 1),
-	}
-	grpcServer := grpc.NewServer()
-	connectpb.RegisterConnectExecutorServer(grpcServer, mockServer)
-
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	executorPort := lis.Addr().(*net.TCPAddr).Port
-
-	go func() { _ = grpcServer.Serve(lis) }()
-	t.Cleanup(grpcServer.Stop)
-
-	// Override the executor port so the gateway connects to our mock
-	res.svc.grpcConfig.Executor.Port = executorPort
-
-	// Verify mock gRPC server is reachable
-	testConn, err := grpc.NewClient(
-		fmt.Sprintf("127.0.0.1:%d", executorPort),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-	testConn.Close()
-
-	// Lease a request so GetExecutorIP returns 127.0.0.1
-	requestID := "test-drain-ack-req"
-	_, err = res.svc.stateManager.LeaseRequest(ctx, res.envID, requestID, 5*time.Second, testExecutorIP)
-	require.NoError(t, err)
-
-	// Forward a request to the worker via wsConnections channel
-	expectedPayload := &connectpb.GatewayExecutorRequestData{
-		RequestId:      requestID,
-		AccountId:      res.accountID.String(),
-		EnvId:          res.envID.String(),
-		AppId:          res.appID.String(),
-		AppName:        res.appName,
-		FunctionId:     res.fnID.String(),
-		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
-		RequestPayload: []byte("ack test payload"),
-		RunId:          res.runID.String(),
-		LeaseId:        "test-lease",
-	}
-
-	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
-	require.True(t, ok, "connection should be registered for gRPC delivery")
-
-	go func() {
-		messageChan.(*connectionHandler).messageChan <- forwardMessage{Data: expectedPayload, Result: make(chan error, 1)}
-	}()
-
-	// Worker receives GATEWAY_EXECUTOR_REQUEST
-	msg := awaitNextMessage(t, res.ws, 3*time.Second)
-	require.Equal(t, connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
-
-	// Start gateway drain
-	err = res.svc.DrainGateway()
-	require.NoError(t, err)
-
-	// Gateway sends GATEWAY_CLOSING
-	msg = awaitNextMessage(t, res.ws, 3*time.Second)
-	require.Equal(t, connectpb.GatewayMessageType_GATEWAY_CLOSING, msg.Kind)
-
-	// Worker sends WORKER_REQUEST_ACK
-	ackPayload, err := proto.Marshal(&connectpb.WorkerRequestAckData{
-		RequestId: requestID,
-		AccountId: res.accountID.String(),
-		EnvId:     res.envID.String(),
-		AppId:     res.appID.String(),
-	})
-	require.NoError(t, err)
-
-	err = wsproto.Write(ctx, res.ws, &connectpb.ConnectMessage{
-		Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_ACK,
-		Payload: ackPayload,
-	})
-	require.NoError(t, err)
-
-	// Verify mock gRPC server received the ack
-	select {
-	case ackMsg := <-mockServer.ackReceived:
-		require.Equal(t, requestID, ackMsg.RequestId,
-			"mock executor should receive ack with correct request ID")
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for ack to reach mock executor")
-	}
 }
 
 // TestLeaseExtensionDuringGatewayDrain_IsProcessed verifies that lease
