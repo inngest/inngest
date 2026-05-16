@@ -4,14 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -258,6 +261,88 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		mocks.state.AssertExpectations(t)
 		mocks.tracer.AssertExpectations(t)
 		mocks.queue.AssertExpectations(t)
+	})
+
+	t.Run("step output too large", func(t *testing.T) {
+		// A single step whose output exceeds MaxStepOutputSize causes
+		// CheckpointAsyncSteps to return ErrStepOutputTooLarge without
+		// attempting to save state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		// A JSON string of MaxStepOutputSize 'x' characters: when wrapped in
+		// {"data": ...} the total output exceeds the 4 MiB per-step limit.
+		largeData := json.RawMessage(`"` + strings.Repeat("x", consts.MaxStepOutputSize) + `"`)
+		op := state.GeneratorOpcode{
+			ID:   "big-step",
+			Op:   enums.OpcodeStepRun,
+			Data: largeData,
+			Name: "Big Step",
+		}
+
+		_, testData := setupAsyncCheckpointTest(t, op)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStepOutputTooLarge)
+	})
+
+	t.Run("cumulative state overflow", func(t *testing.T) {
+		// When accumulated state already equals the 32 MiB limit, any
+		// additional step output causes CheckpointAsyncSteps to return
+		// ErrStateOverflowed before saving state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		runID := ulid.MustNew(ulid.Now(), nil)
+		fnID := uuid.New()
+		accountID := uuid.New()
+		envID := uuid.New()
+
+		md := state.Metadata{
+			ID: state.ID{
+				RunID:      runID,
+				FunctionID: fnID,
+				Tenant: state.Tenant{
+					AccountID: accountID,
+					EnvID:     envID,
+				},
+			},
+			Metrics: state.RunMetrics{
+				StateSize: consts.DefaultMaxStateSizeLimit,
+			},
+		}
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`"small"`),
+			Name: "Step 1",
+		}
+
+		qRef := queueref.QueueRef{"job-x", "shard-x"}
+		asyncCheckpoint := AsyncCheckpoint{
+			RunID:        runID,
+			FnID:         fnID,
+			Steps:        []state.GeneratorOpcode{op},
+			QueueItemRef: qRef.String(),
+			AccountID:    accountID,
+			EnvID:        envID,
+		}
+
+		stateMock := &mockRunService{}
+		stateMock.On("LoadMetadata", ctx, asyncCheckpoint.ID()).Return(md, nil)
+
+		checkpointer := New(Opts{
+			State:           stateMock,
+			TracerProvider:  &mockTracerProvider{},
+			Queue:           &mockQueue{},
+			MetricsProvider: &mockMetricsProvider{},
+		})
+
+		err := checkpointer.CheckpointAsyncSteps(ctx, asyncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStateOverflowed)
+
+		stateMock.AssertNotCalled(t, "SaveStep")
 	})
 }
 
