@@ -47,6 +47,11 @@ func TestKind_ValidateAllowed(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name:    "inngest.score is allowed",
+			kind:    KindInngestScore,
+			wantErr: nil,
+		},
+		{
 			name:    "inngest.unknown is rejected",
 			kind:    "inngest.unknown",
 			wantErr: ErrKindNotAllowed,

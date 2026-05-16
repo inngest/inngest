@@ -3,6 +3,9 @@ package metadata
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValuesSize(t *testing.T) {
@@ -76,5 +79,82 @@ func TestValuesSizeNilMap(t *testing.T) {
 	var v Values
 	if got := v.Size(); got != 0 {
 		t.Errorf("nil Values.Size() = %d, want 0", got)
+	}
+}
+
+func TestUpdateValidateAllowedScoreValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		update  Update
+		wantErr error
+	}{
+		{
+			name: "flat numeric score is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"accuracy": json.RawMessage(`1`)},
+			}},
+		},
+		{
+			name: "nested score object is invalid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"score": json.RawMessage(`{"value":1}`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "null score is invalid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"score": json.RawMessage(`null`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "string score is invalid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"accuracy": json.RawMessage(`"1"`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "invalid score name is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"bad-name": json.RawMessage(`1`)},
+			}},
+			wantErr: ErrScoreNameInvalid,
+		},
+		{
+			name: "non-score metadata keeps generic shape",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "userland.score",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"score": json.RawMessage(`{"value":1}`)},
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.update.ValidateAllowed()
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+		})
 	}
 }

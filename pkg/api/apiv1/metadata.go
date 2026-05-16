@@ -81,13 +81,6 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, md := range data.Metadata {
-		if err := md.Validate(); err != nil {
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid metadata"))
-			return
-		}
-	}
-
 	err = a.AddRunMetadata(ctx, auth, runID, &data)
 	switch {
 	case errors.Is(err, metadata.ErrMetadataSpanTooLarge):
@@ -123,6 +116,10 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		return err
 	}
 
+	if err := metadata.ValidateUpdatesAllowed(req.Metadata); err != nil {
+		return publicerr.Wrap(err, 400, "Invalid metadata")
+	}
+
 	// Load run metadata to enforce the per-run cumulative size limit against
 	// metadata that already exists in the run, not just this request.
 	stateID := statev2.ID{
@@ -139,22 +136,21 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	loadedFromState := false
 	if a.opts.State != nil {
 		md, err := a.opts.State.LoadMetadata(ctx, stateID)
-		if err != nil {
+		if errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
 			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
 				"error", err,
 				"run_id", runID.String(),
 			)
+		} else if err != nil {
+			return publicerr.Wrap(err, 500, "Unable to load run metadata")
 		} else {
 			stateMetadata = &md
 			loadedFromState = true
 		}
 	}
 
-	// When state metadata is unavailable (e.g. stale runs evicted from the
-	// state store), use a zero-value Metadata as a request-local fallback so
-	// that CreateMetadataSpan still enforces the per-run cumulative size
-	// limit within this request. This prevents unbounded metadata writes to
-	// old runs.
+	// Missing state uses a request-local fallback so this write still enforces
+	// the cumulative size limit within the request.
 	if stateMetadata == nil {
 		stateMetadata = &statev2.Metadata{ID: stateID}
 	}
@@ -175,10 +171,6 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	for _, md := range req.Metadata {
-		if err := md.Validate(); err != nil {
-			return publicerr.Wrap(err, 400, "Invalid metadata")
-		}
-
 		_, err = tracing.CreateMetadataSpan(
 			ctx,
 			a.opts.TracerProvider,

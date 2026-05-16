@@ -14,6 +14,7 @@ import {
 } from '../DetailsCard/Element';
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
+import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
 import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -245,17 +246,33 @@ export const StepInfo = ({
 
   const nonHeaderMetadata = metadataIsEnabled
     ? trace.metadata?.filter(
-        (md) => md.kind !== 'inngest.response_headers' && !isExperimentMetadata(md)
-      )
-    : undefined;
+        (md) =>
+          md.kind !== 'inngest.response_headers' &&
+          md.kind !== 'inngest.score' &&
+          !isExperimentMetadata(md)
+      ) ?? []
+    : [];
+
+  const scoreMetadataList = trace.metadata?.filter((md) => md.kind === 'inngest.score') ?? [];
 
   const experimentMetadataList = metadataIsEnabled
-    ? trace.metadata?.filter(isExperimentMetadata)
-    : undefined;
+    ? trace.metadata?.filter(isExperimentMetadata) ?? []
+    : [];
 
-  const experimentMetadata = experimentMetadataList?.[0];
+  const experimentMetadata = experimentMetadataList[0];
+  const hasHeadersTab = responseHeaderData.length > 0;
+  const hasExperimentTab = experimentMetadataList.length > 0;
+  const hasScoresTab = scoreMetadataList.length > 0;
+  const hasMetadataTab = nonHeaderMetadata.length > 0;
 
-  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+  const hasNoData =
+    !prettyInput &&
+    !prettyOutput &&
+    !result?.error &&
+    !hasHeadersTab &&
+    !hasExperimentTab &&
+    !hasScoresTab &&
+    !hasMetadataTab;
 
   let emptyStateMessage = 'No output available';
   if (loading) {
@@ -383,7 +400,7 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(responseHeaderData?.length
+              ...(hasHeadersTab
                 ? [
                     {
                       label: 'Headers',
@@ -392,7 +409,7 @@ export const StepInfo = ({
                     },
                   ]
                 : []),
-              ...(experimentMetadataList?.length
+              ...(hasExperimentTab
                 ? [
                     {
                       label: 'Experiment',
@@ -401,7 +418,16 @@ export const StepInfo = ({
                     },
                   ]
                 : []),
-              ...(nonHeaderMetadata?.length
+              ...(hasScoresTab
+                ? [
+                    {
+                      label: 'Scores',
+                      id: 'scores',
+                      node: <ScoresAttrs metadata={scoreMetadataList} />,
+                    },
+                  ]
+                : []),
+              ...(hasMetadataTab
                 ? [
                     {
                       label: 'Metadata',
@@ -423,7 +449,7 @@ export const StepInfo = ({
               </div>
             ) : (
               <Tabs
-                defaultActive={result?.error ? 'error' : 'output'}
+                defaultActive={result?.error ? 'error' : prettyOutput ? 'output' : ''}
                 tabs={[
                   ...(prettyInput
                     ? [
@@ -459,7 +485,7 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(responseHeaderData?.length
+                  ...(hasHeadersTab
                     ? [
                         {
                           label: 'Headers',
@@ -468,7 +494,7 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(experimentMetadataList?.length
+                  ...(hasExperimentTab
                     ? [
                         {
                           label: 'Experiment',
@@ -477,7 +503,16 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(nonHeaderMetadata?.length
+                  ...(hasScoresTab
+                    ? [
+                        {
+                          label: 'Scores',
+                          id: 'scores',
+                          node: <ScoresAttrs metadata={scoreMetadataList} />,
+                        },
+                      ]
+                    : []),
+                  ...(hasMetadataTab
                     ? [
                         {
                           label: 'Metadata',

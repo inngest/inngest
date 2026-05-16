@@ -32,7 +32,7 @@ export type ResponseInfo = {
   headers: Record<string, string | string[]>;
 };
 
-export type SpanMetadataKind = GeneratedSpanMetadataKind;
+export type SpanMetadataKind = GeneratedSpanMetadataKind | 'inngest.score';
 
 export type SpanMetadataKindUserland = GeneratedSpanMetadataKindUserland;
 
@@ -45,6 +45,7 @@ export type SpanMetadata =
   | SpanMetadataInngestHTTPTiming
   | SpanMetadataInngestTiming
   | SpanMetadataInngestResponseHeaders
+  | SpanMetadataInngestScore
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
   | SpanMetadataUnknown;
@@ -129,6 +130,13 @@ export type SpanMetadataInngestWarnings = {
   kind: 'inngest.warnings';
   updatedAt: string;
   values: Warnings;
+};
+
+export type SpanMetadataInngestScore = {
+  scope: SpanMetadataScope;
+  kind: 'inngest.score';
+  updatedAt: string;
+  values: Record<string, number>;
 };
 
 export type SpanMetadataUserland = {

@@ -15,6 +15,7 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import { ScoresAttrs, collectScoreMetadata } from '../RunDetails/ScoresAttrs';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
@@ -112,6 +113,9 @@ export const TopInfo = ({
 
   const { booleanFlag } = useBooleanFlag();
   const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const scoreMetadata = useMemo(() => collectScoreMetadata(trace), [trace]);
+  const nonScoreMetadata = trace?.metadata?.filter((md) => md.kind !== 'inngest.score') ?? [];
+  const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   const prettyPayload = useMemo(() => {
     try {
@@ -258,7 +262,9 @@ export const TopInfo = ({
       {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
       <div className="flex-1">
         <Tabs
-          defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
+          defaultActive={
+            result?.error ? 'error' : prettyPayload ? 'input' : prettyOutput ? 'output' : ''
+          }
           tabs={[
             ...(prettyPayload
               ? [
@@ -303,12 +309,21 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(metadataIsEnabled && trace?.metadata?.length
+            ...(scoreMetadata.length
+              ? [
+                  {
+                    label: 'Scores',
+                    id: 'scores',
+                    node: <ScoresAttrs metadata={scoreMetadata} />,
+                  },
+                ]
+              : []),
+            ...(hasMetadataTab
               ? [
                   {
                     label: 'Metadata',
                     id: 'metadata',
-                    node: <MetadataAttrs metadata={trace.metadata} />,
+                    node: <MetadataAttrs metadata={nonScoreMetadata} />,
                   },
                 ]
               : []),

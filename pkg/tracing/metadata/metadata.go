@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
+	"regexp"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/enums"
@@ -15,7 +17,11 @@ import (
 var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
+	ErrScoreNameInvalid        = errors.New("score name is invalid")
+	ErrScoreValueInvalid       = errors.New("score value must be a finite number")
 )
+
+var scoreNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,63}$`)
 
 type Opcode = enums.MetadataOpcode
 
@@ -121,6 +127,11 @@ type ScopedUpdate struct {
 	Update
 }
 
+// ValidateAllowed applies reserved-kind rules.
+func (m ScopedUpdate) ValidateAllowed() error {
+	return m.Update.ValidateAllowed()
+}
+
 type Update struct {
 	RawUpdate
 }
@@ -137,9 +148,59 @@ func (m Update) Serialize() (Values, error) {
 	return m.RawUpdate.Values, nil
 }
 
+// Validate checks only generic metadata shape; reserved inngest.* rules depend
+// on scope.
 func (m Update) Validate() error {
 	if err := m.RawUpdate.Kind.Validate(); err != nil {
 		return fmt.Errorf("invalid kind: %w", err)
+	}
+
+	return nil
+}
+
+// ValidateAllowed checks generic shape, reserved kind allowlists, and reserved
+// value formats.
+func (m Update) ValidateAllowed() error {
+	if err := m.Validate(); err != nil {
+		return err
+	}
+
+	if err := m.Kind().ValidateAllowed(); err != nil {
+		return err
+	}
+
+	if m.Kind() == KindInngestScore {
+		return validateScoreValues(m.RawUpdate.Values)
+	}
+
+	return nil
+}
+
+// ValidateUpdatesAllowed applies reserved-kind rules to each update.
+func ValidateUpdatesAllowed(updates []Update) error {
+	for _, update := range updates {
+		if err := update.ValidateAllowed(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateScoreValues(values Values) error {
+	for name, raw := range values {
+		if !scoreNameRegex.MatchString(name) {
+			return fmt.Errorf("invalid score name %q: %w", name, ErrScoreNameInvalid)
+		}
+
+		var value *float64
+		// Pointer keeps JSON null from looking like numeric zero.
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
+		}
+		if value == nil || math.IsNaN(*value) || math.IsInf(*value, 0) {
+			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
+		}
 	}
 
 	return nil

@@ -8,8 +8,8 @@ import (
 type Kind string
 
 var (
-	ErrKindTooLong       = errors.New("kind exceeds maximum length")
-	ErrKindNotAllowed    = errors.New("inngest-prefixed kind is not in the allowlist")
+	ErrKindTooLong    = errors.New("kind exceeds maximum length")
+	ErrKindNotAllowed = errors.New("inngest-prefixed kind is not in the allowlist")
 )
 
 const (
@@ -17,6 +17,8 @@ const (
 
 	KindPrefixInngest  = "inngest."
 	KindPrefixUserland = "userland."
+
+	KindInngestScore Kind = "inngest.score"
 )
 
 func (k Kind) String() string {
@@ -49,6 +51,7 @@ var allowedInngestKinds = map[Kind]bool{
 	"inngest.response_headers": true,
 	"inngest.warnings":         true,
 	"inngest.experiment":       true,
+	KindInngestScore:           true,
 }
 
 // ValidateAllowed checks that the kind is valid and, if it uses the inngest.*
