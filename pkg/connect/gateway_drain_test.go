@@ -286,6 +286,46 @@ func TestNoNewConnectionsDuringDrain(t *testing.T) {
 	require.Equal(t, 0, readyCount, "no onReady events should fire")
 }
 
+func TestForwardDuringGatewayDrainReturnsFalse(t *testing.T) {
+	ctx := context.Background()
+	res := createTestingGateway(t, testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+		drainAckTimeout:              100 * time.Millisecond,
+		silent:                       true,
+	})
+	handshake(t, res)
+
+	err := res.svc.DrainGateway()
+	require.NoError(t, err)
+
+	msg := awaitNextMessage(t, res.ws, 3*time.Second)
+	require.Equal(t, connectpb.GatewayMessageType_GATEWAY_CLOSING, msg.Kind)
+
+	forwardCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	resp, err := res.svc.Forward(forwardCtx, &connectpb.ForwardRequest{
+		ConnectionID: res.connID.String(),
+		Data: &connectpb.GatewayExecutorRequestData{
+			RequestId:      "test-forward-during-drain",
+			AccountId:      res.accountID.String(),
+			EnvId:          res.envID.String(),
+			AppId:          res.appID.String(),
+			AppName:        res.appName,
+			FunctionId:     res.fnID.String(),
+			FunctionSlug:   res.fnSlug,
+			StepId:         ptr.String("step"),
+			RequestPayload: []byte("should not be delivered while draining"),
+			RunId:          res.runID.String(),
+			LeaseId:        "test-lease",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.False(t, resp.Success)
+}
+
 // TestWorkerReplyDuringGatewayDrain_IsProcessed verifies that worker replies
 // are accepted, saved to Redis, and acknowledged during drain.
 func TestWorkerReplyDuringGatewayDrain_IsProcessed(t *testing.T) {
