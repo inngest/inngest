@@ -71,7 +71,7 @@
     "vite": "8.0.12",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.6",
-    "@rsbuild/core": "2.0.5"
+    "@rsbuild/core": "2.0.6"
   },
   "engines": {
     "node": "24.x",
