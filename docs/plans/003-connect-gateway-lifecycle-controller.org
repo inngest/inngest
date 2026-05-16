@@ -426,20 +426,37 @@ changes.
 
 Purpose: capture the behavior we rely on before moving lifecycle code.
 
+Intentionally preserved baseline behavior:
+
+- =WORKER_REQUEST_ACK= uses Option A: a parsed worker ACK releases
+  =pendingAcks= before best-effort executor gRPC =Ack= notification.
+- Unknown request ACKs and post-worker-ACK executor notification failures are
+  non-fatal to the worker websocket.
+- =WORKER_REPLY= persistence is the durable boundary. After
+  =SaveResponse= succeeds, executor gRPC =Reply= failure and
+  =WORKER_REPLY_ACK= write failure are non-fatal because the executor can poll
+  the buffered response.
+- Worker heartbeats during drain still receive =GATEWAY_HEARTBEAT=, but Redis
+  connection status remains =DRAINING=.
+- =WORKER_PAUSE= during gateway drain is accepted and removes the connection
+  from in-memory routing.
+- New =Forward= calls during gateway drain block or reject with
+  =Success=false= instead of writing a new =GATEWAY_EXECUTOR_REQUEST=.
+
 *** Implementation checklist
 
-- [ ] Keep the SYS-856 =handleSdkReply= regressions:
-  - [ ] persisted response plus gRPC =Reply= failure is non-fatal;
+- [X] Keep the SYS-856 =handleSdkReply= regressions:
+  - [X] persisted response plus gRPC =Reply= failure is non-fatal;
   - [X] persisted response plus =WORKER_REPLY_ACK= write failure is non-fatal.
 - [X] Add coverage for =WORKER_REQUEST_ACK= ordering:
   - [X] worker ACK received for a known request;
   - [X] =pendingAcks= waiter behavior is explicit;
   - [X] executor gRPC =Ack= failure behavior is explicit.
-- [ ] Add coverage for drain and forwarding:
-  - [ ] gateway drain blocks or rejects new =Forward= calls;
+- [X] Add coverage for drain and forwarding:
+  - [X] gateway drain blocks or rejects new =Forward= calls;
   - [X] worker pause removes =wsConnections= and stops forwarding;
   - [X] heartbeat during drain cannot mark connection =READY=.
-- [ ] Document any behavior that is intentionally preserved even if awkward.
+- [X] Document any behavior that is intentionally preserved even if awkward.
 
 *** Validation checklist
 
@@ -447,9 +464,9 @@ Purpose: capture the behavior we rely on before moving lifecycle code.
 
 *** Exit criteria
 
-- [ ] Tests fail for the current ambiguous =WORKER_REQUEST_ACK= behavior if the
+- [X] Tests fail for the current ambiguous =WORKER_REQUEST_ACK= behavior if the
   chosen policy is not implemented.
-- [ ] Drain and reply behavior can be refactored without relying on real socket
+- [X] Drain and reply behavior can be refactored without relying on real socket
   races.
 
 ** Phase 1: Add gateway connection phases without behavior changes
