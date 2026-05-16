@@ -200,6 +200,8 @@ func (g GeneratorOpcode) RunType() string {
 // This does not map 1-1 to Opcode. For example, many different SDK operations map to OpcodeStepRun.
 func (g GeneratorOpcode) StepType() enums.StepType {
 	switch g.RunType() {
+	case "step.run":
+		return enums.StepTypeRun
 	case "step.sendEvent":
 		return enums.StepTypeSendEvent
 	case "step.sendSignal":

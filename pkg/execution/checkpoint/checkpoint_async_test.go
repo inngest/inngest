@@ -192,6 +192,87 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		require.True(hasMetadata, "Expected a metadata span")
 	})
 
+	t.Run("StepPlanned then StepRun share the same span seed", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		now := time.Now()
+		planned := state.GeneratorOpcode{
+			ID:     "step-1",
+			Op:     enums.OpcodeStepPlanned,
+			Name:   "work",
+			Timing: interval.New(now, time.Time{}),
+		}
+		run := state.GeneratorOpcode{
+			ID:     "step-1",
+			Op:     enums.OpcodeStepRun,
+			Data:   json.RawMessage(`{"result":"ok"}`),
+			Name:   "work",
+			Timing: interval.New(now, now.Add(time.Second)),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, planned, run)
+
+		expectedData := map[string]any{"data": json.RawMessage(run.Data)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-1", expectedOutputBytes).Return(false, nil)
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil).
+			Twice()
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		require.Len(mocks.tracer.createdSpans, 2)
+		leadingEdgeSpan := mocks.tracer.createdSpans[0]
+		completionArmSpan := mocks.tracer.createdSpans[1]
+
+		completionSeed := completionArmSpan.options.Seed
+		require.NotEmpty(completionSeed, "completion arm should still use Seed")
+		expectedDynID := tracing.DeterministicSpanConfig(completionSeed).SpanID.String()
+
+		require.Empty(leadingEdgeSpan.options.Seed, "leading edge should still not use Seed")
+		require.Equal(expectedDynID, leadingEdgeSpan.options.DynamicSpanIDOverride,
+			"leading-edge DynamicSpanIDOverride must equal DeterministicSpanConfig(completion.Seed).SpanID")
+
+		require.EqualValues("Running",
+			leadingEdgeSpan.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
+		require.Nil(leadingEdgeSpan.attributes.Get(meta.Attrs.EndedAt.Key()))
+
+		require.EqualValues("Completed",
+			completionArmSpan.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
+		require.NotNil(completionArmSpan.attributes.Get(meta.Attrs.EndedAt.Key()))
+	})
+
+	t.Run("StepPlanned span creation failure does not fail the request", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:     "step-flaky",
+			Op:     enums.OpcodeStepPlanned,
+			Name:   "work",
+			Timing: interval.New(time.Now(), time.Time{}),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, fmt.Errorf("simulated tracer outage")).
+			Once()
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err, "best-effort: tracer failure must not surface to caller")
+
+		mocks.state.AssertNotCalled(t, "SaveStep")
+		mocks.tracer.AssertExpectations(t)
+		mocks.queue.AssertExpectations(t)
+	})
+
 	t.Run("defer add", func(t *testing.T) {
 		// Async path handles OpcodeDeferAdd the same way the sync path
 		// does: persist a Defer record. SDK-side memoization is carried

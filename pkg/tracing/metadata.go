@@ -77,7 +77,9 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 			Metadata:   stateMetadata,
 			Attributes: cfg.Attrs,
 
-			DynamicSeed: MetadataSpanIDSeed(parent.DynamicSpanID, kind),
+			// Set the dynamic_span_id from (parent, kind) so every
+			// metadata emission of this kind under this parent aggregates together.
+			DynamicSpanIDOverride: DeterministicSpanID(MetadataSpanIDSeed(parent.DynamicSpanID, kind)).String(),
 		},
 	)
 	if err != nil {
