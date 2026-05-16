@@ -1,7 +1,7 @@
 #+TITLE: Connect Gateway Lifecycle Controller
 #+AUTHOR: Darwin D. Wu
 #+DATE: 2026-05-08
-#+STATUS: Draft
+#+STATUS: Active
 #+STARTUP: showall
 
 * Overview
@@ -264,6 +264,11 @@ is intentional, executor ACK failures should likely be downgraded from
 =connect_internal_error=. If it is not intentional, the ordering should be fixed
 and covered by tests.
 
+Current decision: use Option A. A parsed =WORKER_REQUEST_ACK= for a known
+request accepts worker delivery and releases the local =pendingAcks= waiter
+before best-effort executor gRPC =Ack= notification. Executor notification
+failures are request-level warnings and must not close the worker websocket.
+
 ** Option A: worker ACK acceptance is enough
 
 #+BEGIN_SRC mermaid
@@ -425,20 +430,20 @@ Purpose: capture the behavior we rely on before moving lifecycle code.
 
 - [ ] Keep the SYS-856 =handleSdkReply= regressions:
   - [ ] persisted response plus gRPC =Reply= failure is non-fatal;
-  - [ ] persisted response plus =WORKER_REPLY_ACK= write failure is non-fatal.
-- [ ] Add coverage for =WORKER_REQUEST_ACK= ordering:
-  - [ ] worker ACK received for a known request;
-  - [ ] =pendingAcks= waiter behavior is explicit;
-  - [ ] executor gRPC =Ack= failure behavior is explicit.
+  - [X] persisted response plus =WORKER_REPLY_ACK= write failure is non-fatal.
+- [X] Add coverage for =WORKER_REQUEST_ACK= ordering:
+  - [X] worker ACK received for a known request;
+  - [X] =pendingAcks= waiter behavior is explicit;
+  - [X] executor gRPC =Ack= failure behavior is explicit.
 - [ ] Add coverage for drain and forwarding:
   - [ ] gateway drain blocks or rejects new =Forward= calls;
-  - [ ] worker pause removes =wsConnections= and stops forwarding;
-  - [ ] heartbeat during drain cannot mark connection =READY=.
+  - [X] worker pause removes =wsConnections= and stops forwarding;
+  - [X] heartbeat during drain cannot mark connection =READY=.
 - [ ] Document any behavior that is intentionally preserved even if awkward.
 
 *** Validation checklist
 
-- [ ] =go test ./pkg/connect -count=1=
+- [X] =go test ./pkg/connect -count=1=
 
 *** Exit criteria
 
@@ -550,30 +555,30 @@ accepted.
 
 *** Implementation checklist
 
-- [ ] Choose Option A or Option B.
+- [X] Choose Option A or Option B.
 - [ ] Encode the chosen order in one helper.
-- [ ] Make unknown request ACKs non-fatal and clearly logged.
-- [ ] Make executor ACK failures return request-level failure or warning,
+- [X] Make unknown request ACKs non-fatal and clearly logged.
+- [X] Make executor ACK failures return request-level failure or warning,
   according to the chosen option.
-- [ ] Remove the direct =connect_internal_error= close for post-worker-ACK
+- [X] Remove the direct =connect_internal_error= close for post-worker-ACK
   executor notification failures unless tests prove it is required.
 
 *** Test checklist
 
 - [ ] gRPC client creation failure during =WORKER_REQUEST_ACK= does not close
   the websocket unless chosen policy explicitly requires it;
-- [ ] gRPC =Ack= RPC failure behavior matches chosen policy;
-- [ ] =reply.Success=false= behavior matches chosen policy;
+- [X] gRPC =Ack= RPC failure behavior matches chosen policy;
+- [X] =reply.Success=false= behavior matches chosen policy;
 - [ ] =Forward= result matches chosen policy.
 
 *** Validation checklist
 
-- [ ] =go test ./pkg/connect -run 'Test.*Ack|Test.*Forward|Test.*Drain' -count=1=
-- [ ] =go test ./pkg/connect -count=1=
+- [X] =go test ./pkg/connect -run 'Test.*Ack|Test.*Forward|Test.*Drain' -count=1=
+- [X] =go test ./pkg/connect -count=1=
 
 *** Exit criteria
 
-- [ ] =WORKER_REQUEST_ACK= can no longer unexpectedly close the worker
+- [X] =WORKER_REQUEST_ACK= can no longer unexpectedly close the worker
   websocket for an executor notification failure after the worker ACK has been
   accepted.
 
