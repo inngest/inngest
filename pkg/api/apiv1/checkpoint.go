@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
@@ -22,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
+
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -325,7 +327,16 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 		Steps:     input.Steps,
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
+		if errors.Is(err, state.ErrStepOutputTooLarge) || errors.Is(err, state.ErrStateOverflowed) {
+			logger.StdlibLogger(ctx).Error("sync checkpoint skipped: step output too large",
+				"run_id", input.RunID,
+				"fn_id", input.FnID,
+				"step_count", len(input.Steps),
+				"error", err,
+			)
+		} else {
+			logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
+		}
 	}
 }
 
@@ -365,13 +376,24 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		EnvID:        auth.WorkspaceID(),
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+		status := http.StatusBadRequest
+		if errors.Is(err, state.ErrStepOutputTooLarge) || errors.Is(err, state.ErrStateOverflowed) {
+			logger.StdlibLogger(ctx).Error("async checkpoint rejected",
+				"run_id", input.RunID,
+				"fn_id", input.FnID,
+				"step_count", len(input.Steps),
+				"error", err,
+			)
+			status = http.StatusRequestEntityTooLarge
+		} else {
+			logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+		}
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
-			Message: "Failed to checkpoint steps",
+			Message: err.Error(),
 			Data: map[string]any{
 				"run_id": input.RunID,
 			},
-			Status: 400,
+			Status: status,
 		})
 	}
 }

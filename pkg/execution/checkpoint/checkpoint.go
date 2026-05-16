@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/backoff"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
@@ -173,6 +174,12 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		}
 	}
 
+	if !complete {
+		if input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
+			return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
+		}
+	}
+
 	for _, op := range ordered {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, input.Metadata.ID)
@@ -185,6 +192,10 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			output, err := op.Output()
 			if err != nil {
 				l.Error("error fetching checkpoint step output", "error", err)
+			}
+
+			if len(output) > consts.MaxStepOutputSize {
+				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 
 			if !complete {
@@ -461,6 +472,10 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
+	if md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
+		return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
+	}
+
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, md.ID)
@@ -472,6 +487,10 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			output, err := op.Output()
 			if err != nil {
 				l.Error("error fetching checkpoint step output", "error", err)
+			}
+
+			if len(output) > consts.MaxStepOutputSize {
+				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 
 			_, err = c.State.SaveStep(ctx, md.ID, op.ID, []byte(output))
@@ -561,6 +580,19 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 	}
 
 	return nil
+}
+
+// stepOutputSize returns the total byte size of all StepRun/Step outputs in ops.
+func stepOutputSize(ops []state.GeneratorOpcode) int {
+	total := 0
+	for _, op := range ops {
+		if op.Op == enums.OpcodeStepRun || op.Op == enums.OpcodeStep {
+			if out, err := op.Output(); err == nil {
+				total += len(out)
+			}
+		}
+	}
+	return total
 }
 
 func (c checkpointer) runContext(md state.Metadata, fn *inngest.Function) execution.RunContext {
