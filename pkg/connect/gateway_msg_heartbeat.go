@@ -28,15 +28,8 @@ func (c *connectionHandler) handleWorkerHeartbeat() *connecterrors.SocketError {
 		"conn_draining", c.draining.Load(),
 		"svc_draining", c.svc.isDraining.Load(),
 	)
-	if err != nil {
-		c.log.ReportError(err, "failed to update connection status after heartbeat")
-
-		// TODO Should we actually close the connection here?
-		return &connecterrors.SocketError{
-			SysCode:    syscode.CodeConnectInternal,
-			StatusCode: websocket.StatusInternalError,
-			Msg:        "could not update connection status",
-		}
+	if serr := c.handleConnStatusUpdateResult(err, "failed to update connection status after heartbeat"); serr != nil {
+		return serr
 	}
 
 	if c.conn.Data.InstanceId == "" {

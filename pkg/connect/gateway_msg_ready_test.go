@@ -1,6 +1,7 @@
 package connect
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -49,6 +50,28 @@ func TestHandleWorkerReadyIgnoresDrainingConnection(t *testing.T) {
 	conn, err := res.stateManager.GetConnection(t.Context(), res.envID, res.connID)
 	require.NoError(t, err)
 	require.Equal(t, connectpb.ConnectionStatus_READY, conn.Status)
+}
+
+func TestHandleWorkerReadyStatusUpdateFailureIsNonFatalUntilThreshold(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	res.svc.stateManager = upsertConnectionErrorStateManager{
+		StateManager: res.svc.stateManager,
+		err:          errors.New("upsert connection failed"),
+	}
+
+	ch := newTestConnectionHandler(t, res)
+
+	for range maxConsecutiveConnStatusUpdateFailures - 1 {
+		serr := ch.handleWorkerReady()
+		require.Nil(t, serr)
+	}
+
+	serr := ch.handleWorkerReady()
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
+	require.Contains(t, serr.Msg, "could not update connection status")
 }
 
 func TestHandleWorkerReadyMissingInstanceIDIsFatal(t *testing.T) {

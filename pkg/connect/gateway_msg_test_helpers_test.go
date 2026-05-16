@@ -1,9 +1,12 @@
 package connect
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/connect/state"
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,4 +35,13 @@ func newTestConnectionHandler(t *testing.T, res testingResources) *connectionHan
 		log:            res.svc.logger,
 		stopForwarding: make(chan struct{}),
 	}
+}
+
+type upsertConnectionErrorStateManager struct {
+	state.StateManager
+	err error
+}
+
+func (m upsertConnectionErrorStateManager) UpsertConnection(ctx context.Context, conn *state.Connection, status connectpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
+	return m.err
 }

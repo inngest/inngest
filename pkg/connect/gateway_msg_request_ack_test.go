@@ -31,7 +31,7 @@ func TestHandleWorkerRequestAckInvalidPayloadIsFatal(t *testing.T) {
 	require.Equal(t, syscode.CodeConnectWorkerRequestAckInvalidPayload, serr.SysCode)
 }
 
-func TestHandleWorkerRequestAckMissingExecutorLeaseIsFatalAfterPendingAck(t *testing.T) {
+func TestHandleWorkerRequestAckMissingExecutorLeaseIsNonFatalAfterPendingAck(t *testing.T) {
 	res := createTestingGateway(t)
 	handshake(t, res)
 
@@ -41,9 +41,7 @@ func TestHandleWorkerRequestAckMissingExecutorLeaseIsFatalAfterPendingAck(t *tes
 	ch.pendingAcks.Store(requestID, ackCh)
 
 	serr := ch.handleWorkerRequestAck(workerRequestAckMessage(t, res, requestID))
-	require.NotNil(t, serr)
-	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
-	require.Contains(t, serr.Msg, "could not create grpc client to ack")
+	require.Nil(t, serr)
 
 	select {
 	case <-ackCh:
@@ -78,7 +76,7 @@ func TestHandleWorkerRequestAckNotifiesExecutor(t *testing.T) {
 	}
 }
 
-func TestHandleWorkerRequestAckRPCFailureIsFatal(t *testing.T) {
+func TestHandleWorkerRequestAckRPCFailureIsNonFatal(t *testing.T) {
 	res := createTestingGateway(t)
 	handshake(t, res)
 
@@ -95,9 +93,7 @@ func TestHandleWorkerRequestAckRPCFailureIsFatal(t *testing.T) {
 	ch := newTestConnectionHandler(t, res)
 
 	serr := ch.handleWorkerRequestAck(workerRequestAckMessage(t, res, requestID))
-	require.NotNil(t, serr)
-	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
-	require.Contains(t, serr.Msg, "could not ack message through gRPC")
+	require.Nil(t, serr)
 }
 
 func TestHandleWorkerRequestAckExecutorDoneIsNonFatal(t *testing.T) {

@@ -1,10 +1,13 @@
 package connect
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/syscode"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/stretchr/testify/require"
 )
@@ -41,6 +44,25 @@ func TestHandleWorkerHeartbeatKeepsDrainingStatus(t *testing.T) {
 		onHeartbeatCount:     1,
 		onStartDrainingCount: 1,
 	})
+}
+
+func TestHandleWorkerHeartbeatStatusUpdateFailureWritesGatewayHeartbeatUntilThreshold(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	res.svc.stateManager = upsertConnectionErrorStateManager{
+		StateManager: res.svc.stateManager,
+		err:          errors.New("upsert connection failed"),
+	}
+
+	for range maxConsecutiveConnStatusUpdateFailures - 1 {
+		exchangeHeartbeat(t, res.ws, 2*time.Second)
+	}
+
+	sendWorkerHeartbeatMessage(t, res.ws)
+	status, reason := awaitClosure(t, res.ws, 2*time.Second)
+	require.Equal(t, websocket.StatusInternalError, status)
+	require.Equal(t, syscode.CodeConnectInternal, reason)
 }
 
 func TestHandleWorkerHeartbeatMissingInstanceIDIsFatal(t *testing.T) {

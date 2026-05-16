@@ -32,13 +32,8 @@ func (c *connectionHandler) handleWorkerReady() *connecterrors.SocketError {
 	}
 
 	err := c.updateConnStatus(connectpb.ConnectionStatus_READY, "worker ready message")
-	if err != nil {
-		// TODO Should we actually close the connection here?
-		return &connecterrors.SocketError{
-			SysCode:    syscode.CodeConnectInternal,
-			StatusCode: websocket.StatusInternalError,
-			Msg:        "could not update connection status",
-		}
+	if serr := c.handleConnStatusUpdateResult(err, "failed to update connection status after worker ready"); serr != nil {
+		return serr
 	}
 
 	if c.conn.Data.InstanceId == "" {
