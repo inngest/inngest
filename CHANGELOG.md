@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.19.5] - 2026-05-17
+
+### 🐛 Bug Fixes
+
+- Adding A Check For Minimum Number of Apps Per Connection (#4193)
+- *(connect)* Keep worker messages alive on transient gateway errors (#4211)
+
+### 🚜 Refactor
+
+- *(queue)* Remove duplicate global partition peek method (#4204)
+- *(db)* Move CQRS bootstrap into dialect packages (#4203)
+- *(cqrs)* Move composite manager package (#4209)
+- *(connect)* Split gateway message handlers (#4210)
+
 ## [v1.19.4] - 2026-05-15
 
 ### 🐛 Bug Fixes
@@ -24,6 +38,7 @@ All notable changes to this project will be documented in this file.
 - *(release)* Restore tag-triggered publishing (#4191)
 - Update protobuf to add deltas/changed bool (#4195)
 - Add missing metric on state store delete (#4200)
+- *(release)* V1.19.4 (#4196)
 
 ## [v1.19.3] - 2026-05-14
 
