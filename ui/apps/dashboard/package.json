@@ -99,7 +99,7 @@
     "@types/react-syntax-highlighter": "15.5.13",
     "@typescript-eslint/eslint-plugin": "8.59.3",
     "@typescript-eslint/parser": "8.59.3",
-    "@vitejs/plugin-react": "6.0.1",
+    "@vitejs/plugin-react": "6.0.2",
     "autoprefixer": "10.5.0",
     "concurrently": "9.2.1",
     "eslint": "10.3.0",
