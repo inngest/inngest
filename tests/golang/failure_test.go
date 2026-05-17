@@ -65,7 +65,7 @@ func TestFunctionFailure(t *testing.T) {
 	require.EqualValues(t, 1, atomic.LoadInt32(&counter))
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
-				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, ChildSpanCount: 1, RequireTraceOutputID: true})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed, ChildSpanCount: 1, RequireTraceOutputID: true, Timeout: 30 * time.Second})
 
 				require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
 				// output test
@@ -140,7 +140,28 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	require.EqualValues(t, 1, atomic.LoadInt32(&counter))
 
 	t.Run("in progress run", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
+		// Poll until the run is RUNNING and the first attempt's trace has settled to FAILED.
+		// WaitForRunTraces only checks run-level status/child count, not sub-span status,
+		// so we poll directly to avoid a race where the attempt span hasn't settled yet.
+		var run *client.RunV2
+		require.Eventually(t, func() bool {
+			r, err := c.RunTraces(ctx, runID, false)
+			if err != nil || r == nil || r.Trace == nil {
+				return false
+			}
+			if r.Status != models.FunctionStatusRunning.String() {
+				return false
+			}
+			if len(r.Trace.ChildSpans) == 0 || len(r.Trace.ChildSpans[0].ChildSpans) == 0 {
+				return false
+			}
+			if r.Trace.ChildSpans[0].ChildSpans[0].Status != models.RunTraceSpanStatusFailed.String() {
+				return false
+			}
+			run = r
+			return true
+		}, 30*time.Second, 2*time.Second)
+		require.NotNil(t, run)
 
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 		require.Nil(t, run.Trace.OutputID)
@@ -348,7 +369,26 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("in progress run with large response body", func(t *testing.T) {
-		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
+		// Poll until the run is RUNNING and the first attempt's trace has settled to FAILED.
+		var run *client.RunV2
+		require.Eventually(t, func() bool {
+			r, err := c.RunTraces(ctx, runID, false)
+			if err != nil || r == nil || r.Trace == nil {
+				return false
+			}
+			if r.Status != models.FunctionStatusRunning.String() {
+				return false
+			}
+			if len(r.Trace.ChildSpans) == 0 || len(r.Trace.ChildSpans[0].ChildSpans) == 0 {
+				return false
+			}
+			if r.Trace.ChildSpans[0].ChildSpans[0].Status != models.RunTraceSpanStatusFailed.String() {
+				return false
+			}
+			run = r
+			return true
+		}, 30*time.Second, 2*time.Second)
+		require.NotNil(t, run)
 
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
 		require.Nil(t, run.Trace.OutputID)

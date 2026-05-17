@@ -67,6 +67,7 @@ func TestEventIdempotency(t *testing.T) {
 			run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
 				Status:         models.FunctionStatusCompleted,
 				ChildSpanCount: 1,
+				Timeout:        30 * time.Second,
 			})
 			require.False(t, run.IsBatch)
 			require.Nil(t, run.BatchCreatedAt)

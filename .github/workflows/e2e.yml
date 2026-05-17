@@ -3,11 +3,7 @@ name: SDK E2E Tests
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "ui/**"
   pull_request:
-    paths-ignore:
-      - "ui/**"
 
 permissions:
   contents: read
@@ -300,3 +296,16 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: exec,kq-${{ matrix.experimentalKeyQueues }}
+
+  e2e-ci:
+    name: E2E CI
+    if: always()
+    needs: [ts, golang, api, execution]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" || "${{ contains(needs.*.result, 'skipped') }}" == "true" ]]; then
+            echo "One or more E2E jobs failed, were cancelled, or were skipped"
+            exit 1
+          fi
