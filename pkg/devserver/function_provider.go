@@ -49,10 +49,19 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 	if err != nil {
 		return inngest.DeployedFunction{}, err
 	}
+
+	appName := ""
+	if p.apps != nil {
+		if app, err := p.apps.GetAppByID(ctx, fn.AppID); err == nil {
+			appName = app.Name
+		}
+	}
+
 	return inngest.DeployedFunction{
 		ID:            fn.ID,
 		Slug:          fn.Slug,
 		AppID:         fn.AppID,
+		AppName:       appName,
 		AccountID:     consts.DevServerAccountID,
 		EnvironmentID: consts.DevServerEnvID,
 		Function:      *inngestFn,

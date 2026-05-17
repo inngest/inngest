@@ -153,6 +153,30 @@ func (f *fakeFunctionStore) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs
 	return f.app, nil
 }
 
+func (f *fakeFunctionStore) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	for _, fn := range f.fns {
+		if fn.ID == fnID {
+			return fn, nil
+		}
+	}
+	return nil, errors.New("function not found")
+}
+
+func (f *fakeFunctionStore) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID string, functionID string) (*cqrs.Function, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	for _, fn := range f.fns {
+		if fn.Slug == functionID {
+			return fn, nil
+		}
+	}
+	return nil, errors.New("function not found")
+}
+
 type fakeFunctionRunReader struct {
 	run         *cqrs.FunctionRun
 	accountID   uuid.UUID
