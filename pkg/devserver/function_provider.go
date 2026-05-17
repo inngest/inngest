@@ -3,6 +3,7 @@ package devserver
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
@@ -54,6 +55,12 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 	if p.apps != nil {
 		if app, err := p.apps.GetAppByID(ctx, fn.AppID); err == nil {
 			appName = app.Name
+		} else {
+			slog.Warn("failed to look up app name for function",
+				"app_id", fn.AppID,
+				"function_id", fn.ID,
+				"error", err,
+			)
 		}
 	}
 
