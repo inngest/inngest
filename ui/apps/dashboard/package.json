@@ -109,12 +109,12 @@
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",
     "typescript-eslint": "8.59.3",
-    "vite": "8.0.12",
+    "vite": "8.0.13",
     "vite-plugin-svgr": "5.2.0",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.6"
   },
-  "packageManager": "pnpm@11.1.1",
+  "packageManager": "pnpm@11.1.2",
   "engines": {
     "node": "24.x",
     "pnpm": "11.x"

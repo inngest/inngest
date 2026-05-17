@@ -34,15 +34,15 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
     "tailwindcss": "4.3.0",
-    "tsx": "4.21.0",
+    "tsx": "4.21.1",
     "yaml": "2.9.0",
     "typescript": "5.9.3",
-    "vite": "8.0.12",
+    "vite": "8.0.13",
     "vite-tsconfig-paths": "6.1.1"
   },
   "engines": {
     "node": "24.x",
     "pnpm": "11.x"
   },
-  "packageManager": "pnpm@11.1.1"
+  "packageManager": "pnpm@11.1.2"
 }
