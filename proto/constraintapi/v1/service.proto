@@ -281,6 +281,13 @@ message SemaphoreReleaseRequest {
 }
 
 message SemaphoreResponse {
+  // applied is false when the call was an idempotent replay of a previously
+  // seen idempotency key. Callers emitting side effects (audit events) should
+  // gate on this field.
+  bool applied = 1;
+  // capacity is the resulting semaphore capacity after the call. For replays,
+  // it is the cached capacity value from the original applied call.
+  int64 capacity = 2;
 }
 
 service ConstraintAPI {

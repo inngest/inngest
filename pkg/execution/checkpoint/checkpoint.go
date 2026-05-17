@@ -22,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -307,9 +308,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		case enums.OpcodeRunComplete:
-			result := struct {
-				Data apiresult.APIResult `json:"data"`
-			}{}
+			result := apiresult.APIResult{}
 			if err := json.Unmarshal(op.Data, &result); err != nil {
 				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
 			}
@@ -322,9 +321,27 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}, enums.RunStatusCompleted)
 
 			// Call finalize and process the entire op.
-			if err := c.finalize(ctx, *input.Metadata, result.Data); err != nil {
+			if err := c.finalize(ctx, *input.Metadata, result); err != nil {
 				l.Error("error finalizing sync run", "error", err)
 			}
+
+			finishedResp := sv1.DriverResponse{
+				StatusCode: result.StatusCode,
+				Output:     result.Body,
+				Duration:   result.Duration,
+			}
+			if result.StatusCode < 200 || result.StatusCode > 299 {
+				errStr := fmt.Sprintf("invalid status code: %d", result.StatusCode)
+				finishedResp.Err = &errStr
+			}
+
+			c.Executor.RunFunctionFinishedLifecycle(
+				ctx,
+				*input.Metadata,
+				runCtx.LifecycleItem(),
+				runCtx.Events(),
+				finishedResp,
+			)
 
 		case enums.OpcodeDeferAdd:
 			if err := defers.SaveFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {

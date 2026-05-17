@@ -98,14 +98,11 @@ func TestSystemQueueConfigs(t *testing.T) {
 	t.Run("debounce timeouts should not be added to function queue", func(t *testing.T) {
 		r.FlushAll()
 
-		debouncer, err := debounce.NewRedisDebouncerWithMigration(debounce.DebouncerOpts{
-			PrimaryDebounceClient: redis_state.NewDebounceClient(rc, redis_state.QueueDefaultKey),
-			PrimaryQueue:          q,
-			PrimaryQueueShard:     shard,
-			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
-				return false
-			},
-			Clock: clock,
+		debouncer, err := debounce.NewDebouncerWithMigration(debounce.DebouncerOpts{
+			Shards:           shardRegistry,
+			PrimaryShardName: shard.Name(),
+			Queue:            q,
+			Clock:            clock,
 		})
 		require.NoError(t, err)
 

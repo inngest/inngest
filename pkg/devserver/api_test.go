@@ -54,18 +54,18 @@ type capturingSemaphoreManager struct {
 	setCalls []semaphoreSetCall
 }
 
-func (c *capturingSemaphoreManager) SetCapacity(_ context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error {
+func (c *capturingSemaphoreManager) SetCapacity(_ context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) (constraintapi.SetResult, error) {
 	c.setCalls = append(c.setCalls, semaphoreSetCall{
 		accountID:      accountID,
 		name:           name,
 		idempotencyKey: idempotencyKey,
 		capacity:       capacity,
 	})
-	return nil
+	return constraintapi.SetResult{Applied: true, Capacity: capacity}, nil
 }
 
-func (c *capturingSemaphoreManager) AdjustCapacity(context.Context, uuid.UUID, string, string, int64) error {
-	return nil
+func (c *capturingSemaphoreManager) AdjustCapacity(context.Context, uuid.UUID, string, string, int64) (constraintapi.AdjustResult, error) {
+	return constraintapi.AdjustResult{}, nil
 }
 
 func (c *capturingSemaphoreManager) GetCapacity(context.Context, uuid.UUID, string, string) (int64, int64, error) {

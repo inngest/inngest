@@ -47,6 +47,8 @@ type DeployedFunction struct {
 	EnvironmentID uuid.UUID
 	// AppID represents the app that the function belongs to
 	AppID uuid.UUID
+	// AppName represents the app ID defined in user code.
+	AppName string
 	// PausedAt, if non-zero, indicates that the function is paused as of the given time.
 	PausedAt time.Time
 	// DrainedAt, if non-zero, indicates that the function is draining as of the given time.

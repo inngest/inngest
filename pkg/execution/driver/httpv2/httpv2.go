@@ -142,6 +142,12 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("X-Inngest-Signature", sig)
 	req.Header.Add("X-Run-ID", opts.Metadata.ID.RunID.String())
+	if opts.RequestID != "" {
+		req.Header.Add(headers.HeaderKeyRequestID, opts.RequestID)
+	}
+	if opts.JobID != "" {
+		req.Header.Add(headers.HeaderKeyJobID, opts.JobID)
+	}
 	req.Header.Add(headers.HeaderKeyRequestVersion, fmt.Sprintf("%d", opts.Metadata.Config.RequestVersion))
 
 	if opts.Metadata.Config.ForceStepPlan {

@@ -7,6 +7,10 @@ import (
 
 var ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
 
+// ErrDebounceNotFound is returned by DebounceOperations when the requested
+// debounce item or pointer is missing on the shard.
+var ErrDebounceNotFound = fmt.Errorf("debounce not found")
+
 func NewKeyError(err error, key string) error {
 	return KeyError{
 		cause: err,

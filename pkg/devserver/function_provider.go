@@ -19,12 +19,21 @@ type functionLookupReader interface {
 
 type cqrsFunctionProvider struct {
 	reader functionLookupReader
+	apps   cqrs.AppReader
 }
 
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
 // slug or UUID using direct database lookups.
 func NewFunctionProvider(reader functionLookupReader) apiv2.FunctionProvider {
-	return &cqrsFunctionProvider{reader: reader}
+	var apps cqrs.AppReader
+	if appReader, ok := reader.(cqrs.AppReader); ok {
+		apps = appReader
+	}
+
+	return &cqrsFunctionProvider{
+		reader: reader,
+		apps:   apps,
+	}
 }
 
 func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {

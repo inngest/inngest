@@ -2434,7 +2434,14 @@ func (x *SemaphoreReleaseRequest) GetWeight() int64 {
 }
 
 type SemaphoreResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// applied is false when the call was an idempotent replay of a previously
+	// seen idempotency key. Callers emitting side effects (audit events) should
+	// gate on this field.
+	Applied bool `protobuf:"varint,1,opt,name=applied,proto3" json:"applied,omitempty"`
+	// capacity is the resulting semaphore capacity after the call. For replays,
+	// it is the cached capacity value from the original applied call.
+	Capacity      int64 `protobuf:"varint,2,opt,name=capacity,proto3" json:"capacity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2467,6 +2474,20 @@ func (x *SemaphoreResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SemaphoreResponse.ProtoReflect.Descriptor instead.
 func (*SemaphoreResponse) Descriptor() ([]byte, []int) {
 	return file_constraintapi_v1_service_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *SemaphoreResponse) GetApplied() bool {
+	if x != nil {
+		return x.Applied
+	}
+	return false
+}
+
+func (x *SemaphoreResponse) GetCapacity() int64 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
 }
 
 var File_constraintapi_v1_service_proto protoreflect.FileDescriptor
@@ -2652,8 +2673,10 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\vusage_value\x18\x03 \x01(\tR\n" +
 	"usageValue\x12'\n" +
 	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12\x16\n" +
-	"\x06weight\x18\x05 \x01(\x03R\x06weight\"\x13\n" +
-	"\x11SemaphoreResponse*\xd2\x01\n" +
+	"\x06weight\x18\x05 \x01(\x03R\x06weight\"I\n" +
+	"\x11SemaphoreResponse\x12\x18\n" +
+	"\aapplied\x18\x01 \x01(\bR\aapplied\x12\x1a\n" +
+	"\bcapacity\x18\x02 \x01(\x03R\bcapacity*\xd2\x01\n" +
 	"\x1bConstraintApiRateLimitScope\x12/\n" +
 	"+CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED\x10\x00\x12,\n" +
 	"(CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION\x10\x01\x12'\n" +

@@ -364,7 +364,7 @@ export const NewCodeBlock = ({
                   getItemString={() => null}
                 />
               </div>
-              <div className="bg-canvasSubtle text-muted border-subtle min-h-8 flex shrink-0 items-center justify-between border-t px-3 py-1">
+              <div className="bg-canvasSubtle text-muted border-subtle flex min-h-8 shrink-0 items-center justify-between border-t px-3 py-1">
                 <code className="truncate font-mono text-xs">
                   {hoveredPath || (
                     <span className="text-muted flex items-center gap-1">
@@ -431,7 +431,7 @@ export const NewCodeBlock = ({
                 />
               </div>
               {language === 'json' && (
-                <div className="bg-canvasSubtle text-muted border-subtle min-h-8 flex shrink-0 items-center justify-between border-t px-3 py-1">
+                <div className="bg-canvasSubtle text-muted border-subtle flex min-h-8 shrink-0 items-center justify-between border-t px-3 py-1">
                   <code className="truncate font-mono text-xs">
                     {cursorPath || (
                       <span className="text-muted flex items-center gap-1">

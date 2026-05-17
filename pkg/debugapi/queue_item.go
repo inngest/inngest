@@ -26,7 +26,7 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 	}
 
 	if itemID := req.GetItemId(); itemID != "" {
-		queueItem, err := d.queue.ItemByID(ctx, shard, itemID)
+		queueItem, err := d.queue.LoadQueueItem(ctx, shard.Name(), itemID)
 		if err != nil {
 			if errors.Is(err, queue.ErrQueueItemNotFound) {
 				return nil, status.Error(codes.NotFound, "no item found with id")

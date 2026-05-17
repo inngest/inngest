@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
@@ -45,12 +45,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	portStr := localconfig.GetValue(cmd, "port", "8288")
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	port := localconfig.GetIntValue(cmd, "port", api.DefaultAPIPort)
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
