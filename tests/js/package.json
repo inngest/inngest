@@ -13,7 +13,8 @@
     "overrides": {
       "h3@<1.15.6": ">=1.15.6 <2",
       "cjs-module-lexer@<=2.2.0": "2.2.0",
-      "next@<16.2.5": "16.2.5"
+      "next@<16.2.6": "16.2.6",
+      "protobufjs@<=8.0.2": "8.0.2"
     }
   },
   "dependencies": {
@@ -21,7 +22,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "inngest": "4.2.6",
-    "next": "16.2.5",
+    "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "typescript": "5.9.3",
