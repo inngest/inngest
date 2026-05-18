@@ -2885,6 +2885,14 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
+		if r.ForceLifecycleHook {
+			l.Warn(
+				"cancel: metadata not found while force lifecycle hook was requested",
+				"error", err,
+				"cancellation_id", r.CancellationID,
+			)
+			return err
+		}
 		return nil
 	}
 	if err != nil {
@@ -2900,7 +2908,16 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if errors.Is(err, state.ErrEventNotFound) {
 		// If the event has gone, another thread cancelled the function.
-		l.Warn("cancel: events not found but metadata exists, skipping finalize")
+		l.Warn(
+			"cancel: events not found but metadata exists",
+			"force_lifecycle_hook", r.ForceLifecycleHook,
+			"cancellation_id", r.CancellationID,
+		)
+		if r.ForceLifecycleHook {
+			for _, e := range e.lifecycles {
+				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, nil)
+			}
+		}
 		return nil
 	}
 	if err != nil {
