@@ -14,16 +14,32 @@ const (
 	semaphoreIdempotencyTTL = 60 * time.Second
 )
 
+// SetResult describes the outcome of SetCapacity. Applied is false when the
+// call was an idempotent replay of a previously-seen idempotency key; callers
+// emitting side effects (audit events) should gate on Applied. Capacity is the
+// resulting semaphore capacity.
+type SetResult struct {
+	Applied  bool
+	Capacity int64
+}
+
+// AdjustResult describes the outcome of AdjustCapacity. See SetResult for the
+// meaning of the fields.
+type AdjustResult struct {
+	Applied  bool
+	Capacity int64
+}
+
 // SemaphoreManager provides underlying internal APIs for managing semaphores.  these are required because,
 // unlike other constraints, semaphores can be manually adjusted:  the capacity must be adjusted when new
 // workers come online, and for fn concurrency Release is called manually.
 type SemaphoreManager interface {
 	// SetCapacity sets the total capacity for a named semaphore.
-	SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error
+	SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) (SetResult, error)
 
 	// AdjustCapacity atomically adjusts capacity by delta (e.g., +N on worker connect, -N on disconnect).
 	// This upserts the semaphore if it does not exist.
-	AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) error
+	AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) (AdjustResult, error)
 
 	// GetCapacity returns current capacity and usage for a named semaphore.
 	GetCapacity(ctx context.Context, accountID uuid.UUID, name, usageValue string) (capacity int64, usage int64, err error)
@@ -53,7 +69,7 @@ func semaphoreIdempotencyKey(accountID uuid.UUID, op, idempotencyKey string) str
 	return fmt.Sprintf("{cs}:%s:sem:ik:%s:%s", accountScope(accountID), op, idempotencyKey)
 }
 
-func (m *redisSemaphoreManager) SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) error {
+func (m *redisSemaphoreManager) SetCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, capacity int64) (SetResult, error) {
 	start := time.Now()
 
 	keys := []string{
@@ -65,14 +81,17 @@ func (m *redisSemaphoreManager) SetCapacity(ctx context.Context, accountID uuid.
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
 	}
 
-	err := scripts["semaphore_set_capacity"].Exec(ctx, m.client, keys, args).Error()
+	res, err := parseCapacityScriptResult(scripts["semaphore_set_capacity"].Exec(ctx, m.client, keys, args))
 
 	m.recordMetrics(ctx, "set_capacity", start, err)
 
-	return err
+	if err != nil {
+		return SetResult{}, err
+	}
+	return SetResult(res), nil
 }
 
-func (m *redisSemaphoreManager) AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) error {
+func (m *redisSemaphoreManager) AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) (AdjustResult, error) {
 	start := time.Now()
 
 	keys := []string{
@@ -84,11 +103,30 @@ func (m *redisSemaphoreManager) AdjustCapacity(ctx context.Context, accountID uu
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
 	}
 
-	err := scripts["semaphore_adjust_capacity"].Exec(ctx, m.client, keys, args).Error()
+	res, err := parseCapacityScriptResult(scripts["semaphore_adjust_capacity"].Exec(ctx, m.client, keys, args))
 
 	m.recordMetrics(ctx, "adjust_capacity", start, err)
 
-	return err
+	if err != nil {
+		return AdjustResult{}, err
+	}
+	return AdjustResult(res), nil
+}
+
+// parseCapacityScriptResult decodes the {capacity, applied} array that
+// semaphore_set_capacity and semaphore_adjust_capacity return.
+func parseCapacityScriptResult(result rueidis.RedisResult) (AdjustResult, error) {
+	values, err := result.AsIntSlice()
+	if err != nil {
+		return AdjustResult{}, err
+	}
+	if len(values) != 2 {
+		return AdjustResult{}, fmt.Errorf("unexpected capacity script result length: %d", len(values))
+	}
+	return AdjustResult{
+		Capacity: values[0],
+		Applied:  values[1] == 1,
+	}, nil
 }
 
 func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.UUID, name, usageValue string) (int64, int64, error) {

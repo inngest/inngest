@@ -14,6 +14,8 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util/errs"
+	"google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 )
 
 // DriverV2 represents a driver that makes requests to SDKs to re-enter and execute
@@ -56,6 +58,12 @@ type V2RequestOpts struct {
 	// QueueRef is the executor.QueueRef encoded as a string, used when checkpointing
 	// async functions so that the API knows which queue item to reset.
 	QueueRef string
+
+	// RequestID is a unique ID generated for each outbound SDK request.
+	RequestID string
+
+	// JobID is the stable queue item ID for this SDK request.
+	JobID string
 
 	// StepID is an optional step ID that we're specifically executing.
 	//
@@ -123,7 +131,14 @@ func MarshalV1(
 	// read the input data.
 	defers, err := sl.LoadDefersMeta(ctx, md.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error loading defers in driver marshaller: %w", err)
+		// Older state-service deployments may not yet expose LoadDefersMeta.
+		// Treat that as an empty set rather than failing the whole request, so
+		// a rolling upgrade doesn't break in-flight executions.
+		if st, ok := grpcStatus.FromError(err); ok && st.Code() == codes.Unimplemented {
+			defers = map[string]sv2.DeferMeta{}
+		} else {
+			return nil, fmt.Errorf("error loading defers in driver marshaller: %w", err)
+		}
 	}
 
 	deferEntries := make(map[string]SDKDeferEntry, len(defers))
@@ -149,6 +164,8 @@ func MarshalV1(
 			StepID:       step.ID,
 			RunID:        md.ID.RunID,
 			QueueItemRef: queueItemRef,
+			RequestID:    RequestIDFromContext(ctx),
+			JobID:        JobIDFromContext(ctx),
 			Stack: &FunctionStack{
 				Stack:   md.Stack,
 				Current: stackIndex,

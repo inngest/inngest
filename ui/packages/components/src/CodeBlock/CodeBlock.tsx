@@ -195,7 +195,7 @@ export function CodeBlock({
           } else {
             // When using word wrap, monaco breaks keys and values in different lines
             const keyValuePair = lineContent?.split(':');
-            let linesNeeded = 1;
+            let linesNeeded: number;
             if (keyValuePair && keyValuePair.length === 2 && keyValuePair[0] && keyValuePair[1]) {
               const initialSpaces = (keyValuePair[0]?.match(/^\s*/) || [])[0];
               const keyLength = getTextWidth(

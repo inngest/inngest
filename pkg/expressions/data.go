@@ -9,6 +9,23 @@ import (
 	"github.com/google/cel-go/interpreter"
 )
 
+// precomputePatterns builds the full path list and the corresponding
+// AttributePattern chain for every path in attrs, both keyed by index.
+// These are expression-specific and never change, so the caller should
+// compute them once and reuse them across evaluations.
+func precomputePatterns(attrs *UsedAttributes) ([][]string, []*interpreter.AttributePattern) {
+	paths := attrs.FullPaths()
+	pats := make([]*interpreter.AttributePattern, len(paths))
+	for i, path := range paths {
+		pat := cel.AttributePattern(path[0])
+		for _, piece := range path[1:] {
+			pat = pat.QualString(piece)
+		}
+		pats[i] = pat
+	}
+	return paths, pats
+}
+
 // NewData returns data ready for use within an evaluation.  This formats all
 // values of the incoming map correctly for evaluation.
 func NewData(data map[string]interface{}) *Data {
@@ -80,6 +97,23 @@ func (d *Data) Partial(ctx context.Context, attrs UsedAttributes) (interpreter.P
 	// Add the mapped data and the "patterns" which allow us to use empty data
 	// within CEL.
 	return interpreter.NewPartialActivation(d.data, patterns...)
+}
+
+// partialWithPatterns is the fast-path variant of Partial that uses pre-computed
+// paths and patterns (both indexed together) rather than rebuilding them from
+// UsedAttributes on every call.  fullPaths[i] and allPatterns[i] must correspond
+// to the same attribute path.
+func (d *Data) partialWithPatterns(ctx context.Context, fullPaths [][]string, allPatterns []*interpreter.AttributePattern) (interpreter.PartialActivation, error) {
+	var selected []*interpreter.AttributePattern
+	for i, path := range fullPaths {
+		if !d.PathExists(ctx, path) {
+			if selected == nil {
+				selected = make([]*interpreter.AttributePattern, 0, len(allPatterns))
+			}
+			selected = append(selected, allPatterns[i])
+		}
+	}
+	return interpreter.NewPartialActivation(d.data, selected...)
 }
 
 // Get returns the data from the given path, with a boolean indicating

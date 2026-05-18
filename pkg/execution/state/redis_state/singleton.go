@@ -20,7 +20,7 @@ return v
 var getAndDeleteScript = rueidis.NewLuaScript(getAndDeleteLua)
 
 // SingletonGetRunID implements queue.ShardOperations.
-func (q *queue) SingletonGetRunID(ctx context.Context, key string) (*ulid.ULID, error) {
+func (q *queue) SingletonGetRunID(ctx context.Context, scope osqueue.Scope, key string) (*ulid.ULID, error) {
 	client := q.RedisClient.Client()
 	redisKey := q.RedisClient.KeyGenerator().SingletonKey(&osqueue.Singleton{Key: key})
 
@@ -29,7 +29,7 @@ func (q *queue) SingletonGetRunID(ctx context.Context, key string) (*ulid.ULID, 
 }
 
 // SingletonReleaseRunID implements queue.ShardOperations.
-func (q *queue) SingletonReleaseRunID(ctx context.Context, key string) (*ulid.ULID, error) {
+func (q *queue) SingletonReleaseRunID(ctx context.Context, scope osqueue.Scope, key string) (*ulid.ULID, error) {
 	client := q.RedisClient.Client()
 	redisKey := q.RedisClient.KeyGenerator().SingletonKey(&osqueue.Singleton{Key: key})
 

@@ -404,13 +404,6 @@ func (m *mockRunService) LoadState(ctx context.Context, id statev2.ID) (statev2.
 	return statev2.State{}, nil
 }
 
-func (m *mockRunService) LoadV1Metadata(ctx context.Context, id statev2.ID) (*state.Metadata, error) {
-	return nil, nil
-}
-
-func (m *mockRunService) Duplicate(ctx context.Context, source statev2.State, destID statev2.ID, rawMeta *state.Metadata, stepInputs map[string]json.RawMessage) error {
-	return nil
-}
 func (m *mockRunService) SaveDefer(ctx context.Context, id statev2.ID, d statev2.Defer) error {
 	return nil
 }

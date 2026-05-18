@@ -63,13 +63,12 @@ export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes
   let beforeWidth = queued - min;
   let queuedWidth = (started ?? max) - queued;
   let runningWidth = 0;
-  let afterWidth = 0;
 
   if (started) {
     runningWidth = (ended ?? max) - started;
   }
 
-  afterWidth = max - (ended ?? max);
+  const afterWidth = max - (ended ?? max);
 
   const totalWidth = max - min;
 
