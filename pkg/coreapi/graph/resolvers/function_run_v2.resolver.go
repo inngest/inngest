@@ -76,10 +76,6 @@ func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.Fun
 	}, nil
 }
 
-// InvokedFrom returns the parent linkage for a run that was triggered via
-// `step.invoke`. The linkage is reverse-derived from the parent's invoke
-// step span (see cqrs.GetRunInvokedFrom). Returns nil when the run was not
-// invoked from another run.
 func (r *functionRunV2Resolver) InvokedFrom(ctx context.Context, fn *models.FunctionRunV2) (*models.RunInvokedFrom, error) {
 	rif, err := loader.LoadOneWithString[cqrs.RunInvokedFrom](ctx, loader.FromCtx(ctx).RunInvokedFromLoader, fn.ID.String())
 	if err != nil {
@@ -101,9 +97,6 @@ func (r *functionRunV2Resolver) InvokedFrom(ctx context.Context, fn *models.Func
 	}, nil
 }
 
-// RunType reports whether a run was scheduled as a deferred (child) run or
-// as a primary run. Goes through RunDeferredFromLoader so a query for N runs
-// batches into one backend call.
 func (r *functionRunV2Resolver) RunType(ctx context.Context, fn *models.FunctionRunV2) (models.RunType, error) {
 	df, err := loader.LoadOneWithString[cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
 	if err != nil {
