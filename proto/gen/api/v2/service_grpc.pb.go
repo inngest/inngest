@@ -19,25 +19,26 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	V2_Health_FullMethodName                  = "/api.v2.V2/Health"
-	V2_XSchemaOnly_FullMethodName             = "/api.v2.V2/_SchemaOnly"
-	V2_CreatePartnerAccount_FullMethodName    = "/api.v2.V2/CreatePartnerAccount"
-	V2_CreateEnv_FullMethodName               = "/api.v2.V2/CreateEnv"
-	V2_FetchPartnerAccounts_FullMethodName    = "/api.v2.V2/FetchPartnerAccounts"
-	V2_FetchAccount_FullMethodName            = "/api.v2.V2/FetchAccount"
-	V2_FetchAccountEnvs_FullMethodName        = "/api.v2.V2/FetchAccountEnvs"
-	V2_FetchAccountEventKeys_FullMethodName   = "/api.v2.V2/FetchAccountEventKeys"
-	V2_FetchAccountSigningKeys_FullMethodName = "/api.v2.V2/FetchAccountSigningKeys"
-	V2_CreateWebhook_FullMethodName           = "/api.v2.V2/CreateWebhook"
-	V2_ListWebhooks_FullMethodName            = "/api.v2.V2/ListWebhooks"
-	V2_PatchEnv_FullMethodName                = "/api.v2.V2/PatchEnv"
-	V2_GetFunctionRun_FullMethodName          = "/api.v2.V2/GetFunctionRun"
-	V2_SyncApp_FullMethodName                 = "/api.v2.V2/SyncApp"
-	V2_GetFunctionTrace_FullMethodName        = "/api.v2.V2/GetFunctionTrace"
-	V2_InvokeFunction_FullMethodName          = "/api.v2.V2/InvokeFunction"
-	V2_ListInsightsTables_FullMethodName      = "/api.v2.V2/ListInsightsTables"
-	V2_QueryInsightsPrompt_FullMethodName     = "/api.v2.V2/QueryInsightsPrompt"
-	V2_QueryInsights_FullMethodName           = "/api.v2.V2/QueryInsights"
+	V2_Health_FullMethodName                   = "/api.v2.V2/Health"
+	V2_XSchemaOnly_FullMethodName              = "/api.v2.V2/_SchemaOnly"
+	V2_CreatePartnerAccount_FullMethodName     = "/api.v2.V2/CreatePartnerAccount"
+	V2_CreateEnv_FullMethodName                = "/api.v2.V2/CreateEnv"
+	V2_FetchPartnerAccounts_FullMethodName     = "/api.v2.V2/FetchPartnerAccounts"
+	V2_FetchAccount_FullMethodName             = "/api.v2.V2/FetchAccount"
+	V2_FetchAccountEnvs_FullMethodName         = "/api.v2.V2/FetchAccountEnvs"
+	V2_FetchAccountEventKeys_FullMethodName    = "/api.v2.V2/FetchAccountEventKeys"
+	V2_FetchAccountSigningKeys_FullMethodName  = "/api.v2.V2/FetchAccountSigningKeys"
+	V2_CreateWebhook_FullMethodName            = "/api.v2.V2/CreateWebhook"
+	V2_ListWebhooks_FullMethodName             = "/api.v2.V2/ListWebhooks"
+	V2_PatchEnv_FullMethodName                 = "/api.v2.V2/PatchEnv"
+	V2_GetFunctionRun_FullMethodName           = "/api.v2.V2/GetFunctionRun"
+	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
+	V2_GetFunctionTrace_FullMethodName         = "/api.v2.V2/GetFunctionTrace"
+	V2_InvokeFunction_FullMethodName           = "/api.v2.V2/InvokeFunction"
+	V2_ListInsightsTables_FullMethodName       = "/api.v2.V2/ListInsightsTables"
+	V2_ListInsightsEventSchemas_FullMethodName = "/api.v2.V2/ListInsightsEventSchemas"
+	V2_QueryInsightsPrompt_FullMethodName      = "/api.v2.V2/QueryInsightsPrompt"
+	V2_QueryInsights_FullMethodName            = "/api.v2.V2/QueryInsights"
 )
 
 // V2Client is the client API for V2 service.
@@ -64,6 +65,7 @@ type V2Client interface {
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
 	ListInsightsTables(ctx context.Context, in *ListInsightsTablesRequest, opts ...grpc.CallOption) (*ListInsightsTablesResponse, error)
+	ListInsightsEventSchemas(ctx context.Context, in *ListInsightsEventSchemasRequest, opts ...grpc.CallOption) (*ListInsightsEventSchemasResponse, error)
 	QueryInsightsPrompt(ctx context.Context, in *QueryInsightsPromptRequest, opts ...grpc.CallOption) (*QueryInsightsPromptResponse, error)
 	QueryInsights(ctx context.Context, in *QueryInsightsRequest, opts ...grpc.CallOption) (*QueryInsightsResponse, error)
 }
@@ -246,6 +248,16 @@ func (c *v2Client) ListInsightsTables(ctx context.Context, in *ListInsightsTable
 	return out, nil
 }
 
+func (c *v2Client) ListInsightsEventSchemas(ctx context.Context, in *ListInsightsEventSchemasRequest, opts ...grpc.CallOption) (*ListInsightsEventSchemasResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListInsightsEventSchemasResponse)
+	err := c.cc.Invoke(ctx, V2_ListInsightsEventSchemas_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) QueryInsightsPrompt(ctx context.Context, in *QueryInsightsPromptRequest, opts ...grpc.CallOption) (*QueryInsightsPromptResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryInsightsPromptResponse)
@@ -290,6 +302,7 @@ type V2Server interface {
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
 	ListInsightsTables(context.Context, *ListInsightsTablesRequest) (*ListInsightsTablesResponse, error)
+	ListInsightsEventSchemas(context.Context, *ListInsightsEventSchemasRequest) (*ListInsightsEventSchemasResponse, error)
 	QueryInsightsPrompt(context.Context, *QueryInsightsPromptRequest) (*QueryInsightsPromptResponse, error)
 	QueryInsights(context.Context, *QueryInsightsRequest) (*QueryInsightsResponse, error)
 	mustEmbedUnimplementedV2Server()
@@ -352,6 +365,9 @@ func (UnimplementedV2Server) InvokeFunction(context.Context, *InvokeFunctionRequ
 }
 func (UnimplementedV2Server) ListInsightsTables(context.Context, *ListInsightsTablesRequest) (*ListInsightsTablesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListInsightsTables not implemented")
+}
+func (UnimplementedV2Server) ListInsightsEventSchemas(context.Context, *ListInsightsEventSchemasRequest) (*ListInsightsEventSchemasResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListInsightsEventSchemas not implemented")
 }
 func (UnimplementedV2Server) QueryInsightsPrompt(context.Context, *QueryInsightsPromptRequest) (*QueryInsightsPromptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryInsightsPrompt not implemented")
@@ -686,6 +702,24 @@ func _V2_ListInsightsTables_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ListInsightsEventSchemas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInsightsEventSchemasRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListInsightsEventSchemas(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListInsightsEventSchemas_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListInsightsEventSchemas(ctx, req.(*ListInsightsEventSchemasRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_QueryInsightsPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryInsightsPromptRequest)
 	if err := dec(in); err != nil {
@@ -796,6 +830,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListInsightsTables",
 			Handler:    _V2_ListInsightsTables_Handler,
+		},
+		{
+			MethodName: "ListInsightsEventSchemas",
+			Handler:    _V2_ListInsightsEventSchemas_Handler,
 		},
 		{
 			MethodName: "QueryInsightsPrompt",

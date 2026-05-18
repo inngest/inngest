@@ -1272,6 +1272,79 @@ service V2 {
     };
   }
 
+  rpc ListInsightsEventSchemas(ListInsightsEventSchemasRequest) returns (ListInsightsEventSchemasResponse) {
+    option (google.api.http) = {
+      get: "/insights/events/schemas"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List event type schemas"
+      tags: "Insights"
+      tags: "Beta"
+      description: "Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Paginated list of event type schemas"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ListInsightsEventSchemasResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc QueryInsightsPrompt(QueryInsightsPromptRequest) returns (QueryInsightsPromptResponse) {
     option (google.api.http) = {
       post: "/insights/query/prompt",
@@ -2149,6 +2222,44 @@ message QueryInsightsPromptData {
   repeated InsightsDiagnostic diagnostics = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Any non-fatal diagnostics or warnings about the generated query"
+    }
+  ];
+}
+
+message ListInsightsEventSchemasRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of event schemas to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message ListInsightsEventSchemasResponse {
+  repeated InsightsEventSchema data = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Paginated list of event type schemas"
+    }
+  ];
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message InsightsEventSchema {
+  string name = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Event type name"
+      example: "\"orders/payment.created\""
+    }
+  ];
+  google.protobuf.Struct schema = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "JSON Schema describing the shape of this event's data, represented as a nested JSON object"
     }
   ];
 }
