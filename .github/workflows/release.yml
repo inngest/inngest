@@ -7,7 +7,7 @@ on:
 
 jobs:
   check-release-type:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04
     outputs:
       prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
@@ -112,7 +112,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   npm:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04
     needs: [goreleaser, check-release-type]
     permissions:
       contents: read
@@ -148,7 +148,7 @@ jobs:
           fi
 
   linear-release:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04
     permissions:
       contents: read
     # We block on goreleaser to not track any failed releases
@@ -158,9 +158,11 @@ jobs:
         with:
           fetch-depth: 0 # required for commit history
 
-      - uses: linear/linear-release-action@v0
+      - uses: linear/linear-release-action@0917777589db006387af296dde440385f88d6ac4 # v0
         if: needs.check-release-type.outputs.prerelease == ''
+        continue-on-error: true
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
-          version: ${{ github.ref_name }}
+          # version: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           command: complete

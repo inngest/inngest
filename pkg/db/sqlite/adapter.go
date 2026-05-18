@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 )

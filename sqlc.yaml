@@ -3,12 +3,12 @@ version: 2
 sql:
   - engine: "postgresql"
     schema: "pkg/db/postgres/schema.sql"
-    queries: "pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql"
+    queries: "pkg/db/postgres/sqlc/queries.sql"
     gen:
       go:
         emit_result_struct_pointers: true
         package: "sqlc"
-        out: "pkg/cqrs/base_cqrs/sqlc/postgres"
+        out: "pkg/db/postgres/sqlc"
         overrides:
           - column: "apps.id"
             go_type: "github.com/google/uuid.UUID"
@@ -147,13 +147,13 @@ sql:
 
   - engine: "sqlite"
     schema: "pkg/db/sqlite/schema.sql"
-    queries: "pkg/cqrs/base_cqrs/sqlc/sqlite/queries.sql"
+    queries: "pkg/db/sqlite/sqlc/queries.sql"
     gen:
       go:
         emit_interface: true
         emit_result_struct_pointers: true
         package: "sqlc"
-        out: "pkg/cqrs/base_cqrs/sqlc/sqlite"
+        out: "pkg/db/sqlite/sqlc"
         overrides:
           - column: "apps.id"
             go_type: "github.com/google/uuid.UUID"

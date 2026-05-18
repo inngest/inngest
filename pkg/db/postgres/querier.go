@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/oklog/ulid/v2"
