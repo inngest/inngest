@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -451,6 +453,50 @@ func TestCheckpointSyncSteps(t *testing.T) {
 		mocks.tracer.AssertExpectations(t)
 		mocks.queue.AssertExpectations(t)
 		mocks.executor.AssertExpectations(t)
+	})
+
+	t.Run("step output too large", func(t *testing.T) {
+		// A single step whose output exceeds MaxStepOutputSize causes
+		// CheckpointSyncSteps to return ErrStepOutputTooLarge without
+		// attempting to save state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		// A JSON string of MaxStepOutputSize 'x' characters: when wrapped in
+		// {"data": ...} the total output exceeds the 4 MiB per-step limit.
+		largeData := json.RawMessage(`"` + strings.Repeat("x", consts.MaxStepOutputSize) + `"`)
+		op := state.GeneratorOpcode{
+			ID:   "big-step",
+			Op:   enums.OpcodeStepRun,
+			Data: largeData,
+			Name: "Big Step",
+		}
+
+		_, testData := setupSyncCheckpointTest(t, op)
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStepOutputTooLarge)
+	})
+
+	t.Run("cumulative state overflow", func(t *testing.T) {
+		// When accumulated state already equals the 32 MiB limit, any
+		// additional step output causes CheckpointSyncSteps to return
+		// ErrStateOverflowed before saving state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`"small"`),
+			Name: "Step 1",
+		}
+
+		_, testData := setupSyncCheckpointTest(t, op)
+		testData.syncCheckpoint.Metadata.Metrics.StateSize = consts.DefaultMaxStateSizeLimit
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStateOverflowed)
 	})
 }
 
