@@ -2636,7 +2636,6 @@ export type Workspace = {
   signingKeys: Array<SigningKey>;
   slug: Scalars['String']['output'];
   test: Scalars['Boolean']['output'];
-  traceOutput: Scalars['Bytes']['output'];
   type: EnvironmentType;
   unattachedSyncs: Array<Deploy>;
   vercelApps: Array<VercelApp>;
@@ -2766,11 +2765,6 @@ export type WorkspaceScopedFunctionStatusArgs = {
 
 export type WorkspaceScopedMetricsArgs = {
   filter: ScopedMetricsFilter;
-};
-
-
-export type WorkspaceTraceOutputArgs = {
-  outputID: Scalars['String']['input'];
 };
 
 
