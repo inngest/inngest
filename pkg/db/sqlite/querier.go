@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 
 	"github.com/google/uuid"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
@@ -14,7 +15,8 @@ import (
 var _ db.Querier = (*sqliteQuerier)(nil)
 
 type sqliteQuerier struct {
-	q sqlc.Querier
+	db sqlc.DBTX
+	q  sqlc.Querier
 }
 
 // bytesToNullString preserves nil-vs-empty semantics while adapting db-layer
@@ -428,6 +430,52 @@ func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams
 		Status:         arg.Status,
 		EventIds:       bytesToNullString(arg.EventIds),
 	})
+}
+
+func (sq *sqliteQuerier) InsertSpans(ctx context.Context, args []db.InsertSpanParams) error {
+	if len(args) == 0 {
+		return nil
+	}
+
+	const colCount = 20
+	const chunkSize = 500
+
+	for i := 0; i < len(args); i += chunkSize {
+		end := i + chunkSize
+		if end > len(args) {
+			end = len(args)
+		}
+		chunk := args[i:end]
+
+		const rowPlaceholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS TEXT), CAST(? AS TEXT), CAST(? AS TEXT), CAST(? AS TEXT), ?, ?, ?, CAST(? AS TEXT))"
+		var qb strings.Builder
+		qb.WriteString("INSERT INTO spans (span_id, trace_id, parent_span_id, name, start_time, end_time, run_id, account_id, app_id, function_id, env_id, dynamic_span_id, attributes, links, output, input, debug_run_id, debug_session_id, status, event_ids) VALUES ")
+		vals := make([]any, 0, len(chunk)*colCount)
+		for j, arg := range chunk {
+			if j > 0 {
+				qb.WriteString(", ")
+			}
+			qb.WriteString(rowPlaceholder)
+
+			startTime := arg.StartTime.Round(0).UTC()
+			endTime := arg.EndTime.Round(0).UTC()
+			vals = append(vals,
+				arg.SpanID, arg.TraceID, arg.ParentSpanID,
+				arg.Name, startTime, endTime,
+				arg.RunID, arg.AccountID, arg.AppID,
+				arg.FunctionID, arg.EnvID, arg.DynamicSpanID,
+				bytesToNullString(arg.Attributes), bytesToNullString(arg.Links),
+				bytesToNullString(arg.Output), bytesToNullString(arg.Input),
+				arg.DebugRunID, arg.DebugSessionID, arg.Status,
+				bytesToNullString(arg.EventIds),
+			)
+		}
+
+		if _, err := sq.db.ExecContext(ctx, qb.String()+" ON CONFLICT (trace_id, span_id) DO NOTHING", vals...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (sq *sqliteQuerier) GetSpansByRunID(ctx context.Context, runID string) ([]*db.SpanRow, error) {

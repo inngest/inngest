@@ -73,6 +73,7 @@ type Querier interface {
 
 	// Spans (new tracing)
 	InsertSpan(ctx context.Context, arg InsertSpanParams) error
+	InsertSpans(ctx context.Context, args []InsertSpanParams) error
 	GetSpansByRunID(ctx context.Context, runID string) ([]*SpanRow, error)
 	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*SpanRow, error)
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*SpanRow, error)
