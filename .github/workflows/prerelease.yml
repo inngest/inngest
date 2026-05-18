@@ -102,7 +102,7 @@ jobs:
         if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run == 'true'
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
-          version: 10.18.2
+          version: 10.33.4
 
       - name: Set up Docker Buildx for release snapshot
         if: steps.command.outputs.matched == 'true' && steps.command.outputs.dry_run == 'true'
