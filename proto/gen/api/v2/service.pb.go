@@ -303,20 +303,20 @@ func (FilterType) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{4}
 }
 
-type InsightsColumnType int32
+type InsightsOutputColumnType int32
 
 const (
-	InsightsColumnType_VALUE_TYPE_UNSPECIFIED InsightsColumnType = 0
-	InsightsColumnType_STRING                 InsightsColumnType = 1
-	InsightsColumnType_NUMBER                 InsightsColumnType = 2
-	InsightsColumnType_BOOLEAN                InsightsColumnType = 3
-	InsightsColumnType_DATETIME               InsightsColumnType = 4
-	InsightsColumnType_COMPLEX                InsightsColumnType = 5
+	InsightsOutputColumnType_VALUE_TYPE_UNSPECIFIED InsightsOutputColumnType = 0
+	InsightsOutputColumnType_STRING                 InsightsOutputColumnType = 1
+	InsightsOutputColumnType_NUMBER                 InsightsOutputColumnType = 2
+	InsightsOutputColumnType_BOOLEAN                InsightsOutputColumnType = 3
+	InsightsOutputColumnType_DATETIME               InsightsOutputColumnType = 4
+	InsightsOutputColumnType_COMPLEX                InsightsOutputColumnType = 5
 )
 
-// Enum value maps for InsightsColumnType.
+// Enum value maps for InsightsOutputColumnType.
 var (
-	InsightsColumnType_name = map[int32]string{
+	InsightsOutputColumnType_name = map[int32]string{
 		0: "VALUE_TYPE_UNSPECIFIED",
 		1: "STRING",
 		2: "NUMBER",
@@ -324,7 +324,7 @@ var (
 		4: "DATETIME",
 		5: "COMPLEX",
 	}
-	InsightsColumnType_value = map[string]int32{
+	InsightsOutputColumnType_value = map[string]int32{
 		"VALUE_TYPE_UNSPECIFIED": 0,
 		"STRING":                 1,
 		"NUMBER":                 2,
@@ -334,30 +334,30 @@ var (
 	}
 )
 
-func (x InsightsColumnType) Enum() *InsightsColumnType {
-	p := new(InsightsColumnType)
+func (x InsightsOutputColumnType) Enum() *InsightsOutputColumnType {
+	p := new(InsightsOutputColumnType)
 	*p = x
 	return p
 }
 
-func (x InsightsColumnType) String() string {
+func (x InsightsOutputColumnType) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (InsightsColumnType) Descriptor() protoreflect.EnumDescriptor {
+func (InsightsOutputColumnType) Descriptor() protoreflect.EnumDescriptor {
 	return file_api_v2_service_proto_enumTypes[5].Descriptor()
 }
 
-func (InsightsColumnType) Type() protoreflect.EnumType {
+func (InsightsOutputColumnType) Type() protoreflect.EnumType {
 	return &file_api_v2_service_proto_enumTypes[5]
 }
 
-func (x InsightsColumnType) Number() protoreflect.EnumNumber {
+func (x InsightsOutputColumnType) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use InsightsColumnType.Descriptor instead.
-func (InsightsColumnType) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use InsightsOutputColumnType.Descriptor instead.
+func (InsightsOutputColumnType) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{5}
 }
 
@@ -3611,9 +3611,8 @@ func (x *QueryInsightsRequest) GetQuery() string {
 
 type QueryInsightsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Columns       []*InsightsColumn      `protobuf:"bytes,1,rep,name=columns,proto3" json:"columns,omitempty"`
-	Rows          []*InsightsRow         `protobuf:"bytes,2,rep,name=rows,proto3" json:"rows,omitempty"`
-	Diagnostics   []*InsightsDiagnostic  `protobuf:"bytes,3,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
+	Data          *QueryInsightsData     `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3648,49 +3647,43 @@ func (*QueryInsightsResponse) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{53}
 }
 
-func (x *QueryInsightsResponse) GetColumns() []*InsightsColumn {
+func (x *QueryInsightsResponse) GetData() *QueryInsightsData {
 	if x != nil {
-		return x.Columns
+		return x.Data
 	}
 	return nil
 }
 
-func (x *QueryInsightsResponse) GetRows() []*InsightsRow {
+func (x *QueryInsightsResponse) GetMetadata() *ResponseMetadata {
 	if x != nil {
-		return x.Rows
+		return x.Metadata
 	}
 	return nil
 }
 
-func (x *QueryInsightsResponse) GetDiagnostics() []*InsightsDiagnostic {
-	if x != nil {
-		return x.Diagnostics
-	}
-	return nil
-}
-
-type InsightsColumn struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Type          InsightsColumnType     `protobuf:"varint,2,opt,name=type,proto3,enum=api.v2.InsightsColumnType" json:"type,omitempty"`
+type QueryInsightsData struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Columns       []*InsightsOutputColumn `protobuf:"bytes,1,rep,name=columns,proto3" json:"columns,omitempty"`
+	Rows          []*InsightsRow          `protobuf:"bytes,2,rep,name=rows,proto3" json:"rows,omitempty"`
+	Diagnostics   []*InsightsDiagnostic   `protobuf:"bytes,3,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *InsightsColumn) Reset() {
-	*x = InsightsColumn{}
+func (x *QueryInsightsData) Reset() {
+	*x = QueryInsightsData{}
 	mi := &file_api_v2_service_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *InsightsColumn) String() string {
+func (x *QueryInsightsData) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*InsightsColumn) ProtoMessage() {}
+func (*QueryInsightsData) ProtoMessage() {}
 
-func (x *InsightsColumn) ProtoReflect() protoreflect.Message {
+func (x *QueryInsightsData) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_service_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -3702,23 +3695,82 @@ func (x *InsightsColumn) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use InsightsColumn.ProtoReflect.Descriptor instead.
-func (*InsightsColumn) Descriptor() ([]byte, []int) {
+// Deprecated: Use QueryInsightsData.ProtoReflect.Descriptor instead.
+func (*QueryInsightsData) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{54}
 }
 
-func (x *InsightsColumn) GetName() string {
+func (x *QueryInsightsData) GetColumns() []*InsightsOutputColumn {
+	if x != nil {
+		return x.Columns
+	}
+	return nil
+}
+
+func (x *QueryInsightsData) GetRows() []*InsightsRow {
+	if x != nil {
+		return x.Rows
+	}
+	return nil
+}
+
+func (x *QueryInsightsData) GetDiagnostics() []*InsightsDiagnostic {
+	if x != nil {
+		return x.Diagnostics
+	}
+	return nil
+}
+
+type InsightsOutputColumn struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Name          string                   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type          InsightsOutputColumnType `protobuf:"varint,2,opt,name=type,proto3,enum=api.v2.InsightsOutputColumnType" json:"type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InsightsOutputColumn) Reset() {
+	*x = InsightsOutputColumn{}
+	mi := &file_api_v2_service_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InsightsOutputColumn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InsightsOutputColumn) ProtoMessage() {}
+
+func (x *InsightsOutputColumn) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InsightsOutputColumn.ProtoReflect.Descriptor instead.
+func (*InsightsOutputColumn) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *InsightsOutputColumn) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *InsightsColumn) GetType() InsightsColumnType {
+func (x *InsightsOutputColumn) GetType() InsightsOutputColumnType {
 	if x != nil {
 		return x.Type
 	}
-	return InsightsColumnType_VALUE_TYPE_UNSPECIFIED
+	return InsightsOutputColumnType_VALUE_TYPE_UNSPECIFIED
 }
 
 type InsightsRow struct {
@@ -3730,7 +3782,7 @@ type InsightsRow struct {
 
 func (x *InsightsRow) Reset() {
 	*x = InsightsRow{}
-	mi := &file_api_v2_service_proto_msgTypes[55]
+	mi := &file_api_v2_service_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3742,7 +3794,7 @@ func (x *InsightsRow) String() string {
 func (*InsightsRow) ProtoMessage() {}
 
 func (x *InsightsRow) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[55]
+	mi := &file_api_v2_service_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3755,7 +3807,7 @@ func (x *InsightsRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsRow.ProtoReflect.Descriptor instead.
 func (*InsightsRow) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{55}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *InsightsRow) GetValues() []*structpb.Value {
@@ -3777,7 +3829,7 @@ type InsightsDiagnostic struct {
 
 func (x *InsightsDiagnostic) Reset() {
 	*x = InsightsDiagnostic{}
-	mi := &file_api_v2_service_proto_msgTypes[56]
+	mi := &file_api_v2_service_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3789,7 +3841,7 @@ func (x *InsightsDiagnostic) String() string {
 func (*InsightsDiagnostic) ProtoMessage() {}
 
 func (x *InsightsDiagnostic) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[56]
+	mi := &file_api_v2_service_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3802,7 +3854,7 @@ func (x *InsightsDiagnostic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsDiagnostic.ProtoReflect.Descriptor instead.
 func (*InsightsDiagnostic) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{56}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *InsightsDiagnostic) GetSeverity() InsightsDiagnosticSeverity {
@@ -3844,7 +3896,7 @@ type InsightsDiagnosticPosition struct {
 
 func (x *InsightsDiagnosticPosition) Reset() {
 	*x = InsightsDiagnosticPosition{}
-	mi := &file_api_v2_service_proto_msgTypes[57]
+	mi := &file_api_v2_service_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3856,7 +3908,7 @@ func (x *InsightsDiagnosticPosition) String() string {
 func (*InsightsDiagnosticPosition) ProtoMessage() {}
 
 func (x *InsightsDiagnosticPosition) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[57]
+	mi := &file_api_v2_service_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3869,7 +3921,7 @@ func (x *InsightsDiagnosticPosition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsDiagnosticPosition.ProtoReflect.Descriptor instead.
 func (*InsightsDiagnosticPosition) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{57}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *InsightsDiagnosticPosition) GetStart() int32 {
@@ -3889,6 +3941,214 @@ func (x *InsightsDiagnosticPosition) GetEnd() int32 {
 func (x *InsightsDiagnosticPosition) GetContext() string {
 	if x != nil {
 		return x.Context
+	}
+	return ""
+}
+
+type ListInsightsTablesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInsightsTablesRequest) Reset() {
+	*x = ListInsightsTablesRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInsightsTablesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInsightsTablesRequest) ProtoMessage() {}
+
+func (x *ListInsightsTablesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInsightsTablesRequest.ProtoReflect.Descriptor instead.
+func (*ListInsightsTablesRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{59}
+}
+
+type ListInsightsTablesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*InsightsTable       `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInsightsTablesResponse) Reset() {
+	*x = ListInsightsTablesResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInsightsTablesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInsightsTablesResponse) ProtoMessage() {}
+
+func (x *ListInsightsTablesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInsightsTablesResponse.ProtoReflect.Descriptor instead.
+func (*ListInsightsTablesResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *ListInsightsTablesResponse) GetData() []*InsightsTable {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListInsightsTablesResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type InsightsTable struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Columns       []*InsightsTableColumn `protobuf:"bytes,3,rep,name=columns,proto3" json:"columns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InsightsTable) Reset() {
+	*x = InsightsTable{}
+	mi := &file_api_v2_service_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InsightsTable) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InsightsTable) ProtoMessage() {}
+
+func (x *InsightsTable) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InsightsTable.ProtoReflect.Descriptor instead.
+func (*InsightsTable) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *InsightsTable) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *InsightsTable) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *InsightsTable) GetColumns() []*InsightsTableColumn {
+	if x != nil {
+		return x.Columns
+	}
+	return nil
+}
+
+type InsightsTableColumn struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InsightsTableColumn) Reset() {
+	*x = InsightsTableColumn{}
+	mi := &file_api_v2_service_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InsightsTableColumn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InsightsTableColumn) ProtoMessage() {}
+
+func (x *InsightsTableColumn) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InsightsTableColumn.ProtoReflect.Descriptor instead.
+func (*InsightsTableColumn) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *InsightsTableColumn) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *InsightsTableColumn) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *InsightsTableColumn) GetType() string {
+	if x != nil {
+		return x.Type
 	}
 	return ""
 }
@@ -4174,14 +4434,17 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"t\n" +
 	"\x14QueryInsightsRequest\x12\\\n" +
-	"\x05query\x18\x01 \x01(\tBF\x92AC2AThe insights query to execute, written in modified ClickHouse SQLR\x05query\"\x9d\x03\n" +
-	"\x15QueryInsightsResponse\x12d\n" +
-	"\acolumns\x18\x01 \x03(\v2\x16.api.v2.InsightsColumnB2\x92A/2-Column metadata for the insights query resultR\acolumns\x12\x96\x01\n" +
+	"\x05query\x18\x01 \x01(\tBF\x92AC2AThe insights query to execute, written in modified ClickHouse SQLR\x05query\"|\n" +
+	"\x15QueryInsightsResponse\x12-\n" +
+	"\x04data\x18\x01 \x01(\v2\x19.api.v2.QueryInsightsDataR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x9f\x03\n" +
+	"\x11QueryInsightsData\x12j\n" +
+	"\acolumns\x18\x01 \x03(\v2\x1c.api.v2.InsightsOutputColumnB2\x92A/2-Column metadata for the insights query resultR\acolumns\x12\x96\x01\n" +
 	"\x04rows\x18\x02 \x03(\v2\x13.api.v2.InsightsRowBm\x92Aj2hRows of the insights query result, where each row contains a list of values corresponding to the columnsR\x04rows\x12\x84\x01\n" +
-	"\vdiagnostics\x18\x03 \x03(\v2\x1a.api.v2.InsightsDiagnosticBF\x92AC2AAny non-fatal diagnostics related to the insights query executionR\vdiagnostics\"\xce\x01\n" +
-	"\x0eInsightsColumn\x12H\n" +
-	"\x04name\x18\x01 \x01(\tB4\x92A12/Name of the column in the insights query resultR\x04name\x12r\n" +
-	"\x04type\x18\x02 \x01(\x0e2\x1a.api.v2.InsightsColumnTypeBB\x92A?2=Data type of the column (e.g., 'string', 'number', 'boolean')R\x04type\"\x94\x02\n" +
+	"\vdiagnostics\x18\x03 \x03(\v2\x1a.api.v2.InsightsDiagnosticBF\x92AC2AAny non-fatal diagnostics related to the insights query executionR\vdiagnostics\"\xda\x01\n" +
+	"\x14InsightsOutputColumn\x12H\n" +
+	"\x04name\x18\x01 \x01(\tB4\x92A12/Name of the column in the insights query resultR\x04name\x12x\n" +
+	"\x04type\x18\x02 \x01(\x0e2 .api.v2.InsightsOutputColumnTypeBB\x92A?2=Data type of the column (e.g., 'string', 'number', 'boolean')R\x04type\"\x94\x02\n" +
 	"\vInsightsRow\x12\x84\x02\n" +
 	"\x06values\x18\x01 \x03(\v2\x16.google.protobuf.ValueB\xd3\x01\x92A\xcf\x012\xcc\x01Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)R\x06values\"\xa7\x04\n" +
 	"\x12InsightsDiagnostic\x12\x88\x01\n" +
@@ -4193,7 +4456,19 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1aInsightsDiagnosticPosition\x12d\n" +
 	"\x05start\x18\x01 \x01(\x05BN\x92AK2IStarting character index in the query string where the diagnostic appliesR\x05start\x12^\n" +
 	"\x03end\x18\x02 \x01(\x05BL\x92AI2GEnding character index in the query string where the diagnostic appliesR\x03end\x12t\n" +
-	"\acontext\x18\x03 \x01(\tBZ\x92AW2USnippet of the query string around the position to provide context for the diagnosticR\acontext*\xdf\x01\n" +
+	"\acontext\x18\x03 \x01(\tBZ\x92AW2USnippet of the query string around the position to provide context for the diagnosticR\acontext\"\x1b\n" +
+	"\x19ListInsightsTablesRequest\"\xd0\x01\n" +
+	"\x1aListInsightsTablesResponse\x12|\n" +
+	"\x04data\x18\x01 \x03(\v2\x15.api.v2.InsightsTableBQ\x92AN2LList of available tables that can be queried via the Insights query endpointR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xa5\x02\n" +
+	"\rInsightsTable\x12V\n" +
+	"\x04name\x18\x01 \x01(\tBB\x92A?2,Name of the table, used when writing queriesJ\x0f\"function_runs\"R\x04name\x12_\n" +
+	"\vdescription\x18\x02 \x01(\tB=\x92A:28Human-readable description of the table and its contentsR\vdescription\x12[\n" +
+	"\acolumns\x18\x03 \x03(\v2\x1b.api.v2.InsightsTableColumnB$\x92A!2\x1fColumns available in this tableR\acolumns\"\xa5\x02\n" +
+	"\x13InsightsTableColumn\x12A\n" +
+	"\x04name\x18\x01 \x01(\tB-\x92A*2(Name of the column in the insights tableR\x04name\x12h\n" +
+	"\vdescription\x18\x02 \x01(\tBF\x92AC2AHuman-readable description of the column and the data it containsR\vdescription\x12a\n" +
+	"\x04type\x18\x03 \x01(\tBM\x92AJ2HData type of the column (e.g., 'String', 'Int64', 'Array(String)', etc.)R\x04type*\xdf\x01\n" +
 	"\x11FunctionRunStatus\x12#\n" +
 	"\x1fFUNCTION_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_QUEUED\x10\x01\x12\x1f\n" +
@@ -4227,8 +4502,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x01*p\n" +
-	"\x12InsightsColumnType\x12\x1a\n" +
+	"\x04DENY\x10\x01*v\n" +
+	"\x18InsightsOutputColumnType\x12\x1a\n" +
 	"\x16VALUE_TYPE_UNSPECIFIED\x10\x00\x12\n" +
 	"\n" +
 	"\x06STRING\x10\x01\x12\n" +
@@ -4241,7 +4516,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x85Y\n" +
+	"\x04INFO\x10\x032\xd0]\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -4567,7 +4842,25 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\x8e\x06\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\xc8\x04\n" +
+	"\x12ListInsightsTables\x12!.api.v2.ListInsightsTablesRequest\x1a\".api.v2.ListInsightsTablesResponse\"\xea\x03\x92A\xce\x03\n" +
+	"\bInsights\n" +
+	"\x04Beta\x12\x14List insights tables\x1aOLists the available tables that can be queried via the Insights query endpoint.JZ\n" +
+	"\x03200\x12S\n" +
+	"!List of available insights tables\x12.\n" +
+	",\x1a*#/definitions/v2ListInsightsTablesResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\x8e\x06\n" +
 	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xbf\x05\x92A\xa1\x05\n" +
 	"\bInsights\n" +
 	"\x04Beta\x12\x0eQuery insights\x1a,Query Insights using the provided SQL query.JO\n" +
@@ -4621,14 +4914,14 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 59)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 64)
 var file_api_v2_service_proto_goTypes = []any{
 	(FunctionRunStatus)(0),                  // 0: api.v2.FunctionRunStatus
 	(TraceSpanStatus)(0),                    // 1: api.v2.TraceSpanStatus
 	(TraceStepOp)(0),                        // 2: api.v2.TraceStepOp
 	(EnvType)(0),                            // 3: api.v2.EnvType
 	(FilterType)(0),                         // 4: api.v2.FilterType
-	(InsightsColumnType)(0),                 // 5: api.v2.InsightsColumnType
+	(InsightsOutputColumnType)(0),           // 5: api.v2.InsightsOutputColumnType
 	(InsightsDiagnosticSeverity)(0),         // 6: api.v2.InsightsDiagnosticSeverity
 	(*HealthRequest)(nil),                   // 7: api.v2.HealthRequest
 	(*FetchAccountRequest)(nil),             // 8: api.v2.FetchAccountRequest
@@ -4684,40 +4977,45 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*SyncAppError)(nil),                    // 58: api.v2.SyncAppError
 	(*QueryInsightsRequest)(nil),            // 59: api.v2.QueryInsightsRequest
 	(*QueryInsightsResponse)(nil),           // 60: api.v2.QueryInsightsResponse
-	(*InsightsColumn)(nil),                  // 61: api.v2.InsightsColumn
-	(*InsightsRow)(nil),                     // 62: api.v2.InsightsRow
-	(*InsightsDiagnostic)(nil),              // 63: api.v2.InsightsDiagnostic
-	(*InsightsDiagnosticPosition)(nil),      // 64: api.v2.InsightsDiagnosticPosition
-	nil,                                     // 65: api.v2.TraceSpanMetadata.ValuesEntry
-	(*timestamppb.Timestamp)(nil),           // 66: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                 // 67: google.protobuf.Struct
-	(*structpb.Value)(nil),                  // 68: google.protobuf.Value
+	(*QueryInsightsData)(nil),               // 61: api.v2.QueryInsightsData
+	(*InsightsOutputColumn)(nil),            // 62: api.v2.InsightsOutputColumn
+	(*InsightsRow)(nil),                     // 63: api.v2.InsightsRow
+	(*InsightsDiagnostic)(nil),              // 64: api.v2.InsightsDiagnostic
+	(*InsightsDiagnosticPosition)(nil),      // 65: api.v2.InsightsDiagnosticPosition
+	(*ListInsightsTablesRequest)(nil),       // 66: api.v2.ListInsightsTablesRequest
+	(*ListInsightsTablesResponse)(nil),      // 67: api.v2.ListInsightsTablesResponse
+	(*InsightsTable)(nil),                   // 68: api.v2.InsightsTable
+	(*InsightsTableColumn)(nil),             // 69: api.v2.InsightsTableColumn
+	nil,                                     // 70: api.v2.TraceSpanMetadata.ValuesEntry
+	(*timestamppb.Timestamp)(nil),           // 71: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                 // 72: google.protobuf.Struct
+	(*structpb.Value)(nil),                  // 73: google.protobuf.Value
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	10,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	13,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	11,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	66,  // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	66,  // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	71,  // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	71,  // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	14,  // 5: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
 	15,  // 6: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
 	0,   // 7: api.v2.FunctionRun.status:type_name -> api.v2.FunctionRunStatus
-	66,  // 8: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
-	66,  // 9: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
-	66,  // 10: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
+	71,  // 8: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
+	71,  // 9: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
+	71,  // 10: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
 	16,  // 11: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
-	67,  // 12: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
+	72,  // 12: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
 	17,  // 13: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
 	13,  // 14: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	65,  // 15: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
-	66,  // 16: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
+	70,  // 15: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
+	71,  // 16: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
 	1,   // 17: api.v2.TraceSpan.status:type_name -> api.v2.TraceSpanStatus
 	2,   // 18: api.v2.TraceSpan.step_op:type_name -> api.v2.TraceStepOp
-	66,  // 19: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
-	66,  // 20: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
-	66,  // 21: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
-	67,  // 22: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
-	67,  // 23: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
+	71,  // 19: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
+	71,  // 20: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
+	71,  // 21: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
+	72,  // 22: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
+	72,  // 23: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
 	20,  // 24: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
 	21,  // 25: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
 	21,  // 26: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
@@ -4728,27 +5026,27 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	29,  // 31: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
 	13,  // 32: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	3,   // 33: api.v2.Env.type:type_name -> api.v2.EnvType
-	66,  // 34: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	66,  // 35: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	66,  // 36: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	71,  // 34: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	71,  // 35: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	71,  // 36: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
 	34,  // 37: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
 	13,  // 38: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 39: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
 	34,  // 40: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
 	13,  // 41: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	66,  // 42: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	66,  // 43: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	71,  // 42: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	71,  // 43: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
 	38,  // 44: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
 	13,  // 45: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 46: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	66,  // 47: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	71,  // 47: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
 	29,  // 48: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
 	13,  // 49: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 50: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
 	43,  // 51: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
 	13,  // 52: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 53: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	66,  // 54: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	71,  // 54: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
 	46,  // 55: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
 	49,  // 56: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
 	13,  // 57: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -4757,65 +5055,72 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	13,  // 60: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 61: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
 	46,  // 62: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	66,  // 63: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	66,  // 64: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	71,  // 63: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	71,  // 64: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
 	29,  // 65: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
 	13,  // 66: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	67,  // 67: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	72,  // 67: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
 	54,  // 68: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
 	13,  // 69: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	66,  // 70: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	66,  // 71: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	66,  // 72: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	71,  // 70: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	71,  // 71: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	71,  // 72: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
 	57,  // 73: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
 	13,  // 74: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
 	58,  // 75: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
-	61,  // 76: api.v2.QueryInsightsResponse.columns:type_name -> api.v2.InsightsColumn
-	62,  // 77: api.v2.QueryInsightsResponse.rows:type_name -> api.v2.InsightsRow
-	63,  // 78: api.v2.QueryInsightsResponse.diagnostics:type_name -> api.v2.InsightsDiagnostic
-	5,   // 79: api.v2.InsightsColumn.type:type_name -> api.v2.InsightsColumnType
-	68,  // 80: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
-	6,   // 81: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
-	64,  // 82: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
-	7,   // 83: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	7,   // 84: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	25,  // 85: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	27,  // 86: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	31,  // 87: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	8,   // 88: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	39,  // 89: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	36,  // 90: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	41,  // 91: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	44,  // 92: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	47,  // 93: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	50,  // 94: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	18,  // 95: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	55,  // 96: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	23,  // 97: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	52,  // 98: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	59,  // 99: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	9,   // 100: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	12,  // 101: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	26,  // 102: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	28,  // 103: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	32,  // 104: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	33,  // 105: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	40,  // 106: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	37,  // 107: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	42,  // 108: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	45,  // 109: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	48,  // 110: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	51,  // 111: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	19,  // 112: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	56,  // 113: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	24,  // 114: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	53,  // 115: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	60,  // 116: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	100, // [100:117] is the sub-list for method output_type
-	83,  // [83:100] is the sub-list for method input_type
-	83,  // [83:83] is the sub-list for extension type_name
-	83,  // [83:83] is the sub-list for extension extendee
-	0,   // [0:83] is the sub-list for field type_name
+	61,  // 76: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
+	13,  // 77: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	62,  // 78: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
+	63,  // 79: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
+	64,  // 80: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
+	5,   // 81: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
+	73,  // 82: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
+	6,   // 83: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
+	65,  // 84: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
+	68,  // 85: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
+	13,  // 86: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
+	69,  // 87: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
+	7,   // 88: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	7,   // 89: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	25,  // 90: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	27,  // 91: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	31,  // 92: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	8,   // 93: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	39,  // 94: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	36,  // 95: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	41,  // 96: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	44,  // 97: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	47,  // 98: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	50,  // 99: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	18,  // 100: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	55,  // 101: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	23,  // 102: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	52,  // 103: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	66,  // 104: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	59,  // 105: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	9,   // 106: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	12,  // 107: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	26,  // 108: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	28,  // 109: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	32,  // 110: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	33,  // 111: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	40,  // 112: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	37,  // 113: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	42,  // 114: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	45,  // 115: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	48,  // 116: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	51,  // 117: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	19,  // 118: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	56,  // 119: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	24,  // 120: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	53,  // 121: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	67,  // 122: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	60,  // 123: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	106, // [106:124] is the sub-list for method output_type
+	88,  // [88:106] is the sub-list for method input_type
+	88,  // [88:88] is the sub-list for extension type_name
+	88,  // [88:88] is the sub-list for extension extendee
+	0,   // [0:88] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -4843,14 +5148,14 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[45].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[47].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[50].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[56].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[57].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   59,
+			NumMessages:   64,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

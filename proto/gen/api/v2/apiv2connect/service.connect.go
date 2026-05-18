@@ -67,6 +67,8 @@ const (
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
 	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
+	// V2ListInsightsTablesProcedure is the fully-qualified name of the V2's ListInsightsTables RPC.
+	V2ListInsightsTablesProcedure = "/api.v2.V2/ListInsightsTables"
 	// V2QueryInsightsProcedure is the fully-qualified name of the V2's QueryInsights RPC.
 	V2QueryInsightsProcedure = "/api.v2.V2/QueryInsights"
 )
@@ -92,6 +94,7 @@ type V2Client interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
 	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 }
 
@@ -202,6 +205,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		listInsightsTables: connect.NewClient[v2.ListInsightsTablesRequest, v2.ListInsightsTablesResponse](
+			httpClient,
+			baseURL+V2ListInsightsTablesProcedure,
+			connect.WithSchema(v2Methods.ByName("ListInsightsTables")),
+			connect.WithClientOptions(opts...),
+		),
 		queryInsights: connect.NewClient[v2.QueryInsightsRequest, v2.QueryInsightsResponse](
 			httpClient,
 			baseURL+V2QueryInsightsProcedure,
@@ -229,6 +238,7 @@ type v2Client struct {
 	syncApp                 *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace        *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	invokeFunction          *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
+	listInsightsTables      *connect.Client[v2.ListInsightsTablesRequest, v2.ListInsightsTablesResponse]
 	queryInsights           *connect.Client[v2.QueryInsightsRequest, v2.QueryInsightsResponse]
 }
 
@@ -312,6 +322,11 @@ func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.I
 	return c.invokeFunction.CallUnary(ctx, req)
 }
 
+// ListInsightsTables calls api.v2.V2.ListInsightsTables.
+func (c *v2Client) ListInsightsTables(ctx context.Context, req *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error) {
+	return c.listInsightsTables.CallUnary(ctx, req)
+}
+
 // QueryInsights calls api.v2.V2.QueryInsights.
 func (c *v2Client) QueryInsights(ctx context.Context, req *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error) {
 	return c.queryInsights.CallUnary(ctx, req)
@@ -338,6 +353,7 @@ type V2Handler interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
 	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 }
 
@@ -444,6 +460,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ListInsightsTablesHandler := connect.NewUnaryHandler(
+		V2ListInsightsTablesProcedure,
+		svc.ListInsightsTables,
+		connect.WithSchema(v2Methods.ByName("ListInsightsTables")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2QueryInsightsHandler := connect.NewUnaryHandler(
 		V2QueryInsightsProcedure,
 		svc.QueryInsights,
@@ -484,6 +506,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2InvokeFunctionProcedure:
 			v2InvokeFunctionHandler.ServeHTTP(w, r)
+		case V2ListInsightsTablesProcedure:
+			v2ListInsightsTablesHandler.ServeHTTP(w, r)
 		case V2QueryInsightsProcedure:
 			v2QueryInsightsHandler.ServeHTTP(w, r)
 		default:
@@ -557,6 +581,10 @@ func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request
 
 func (UnimplementedV2Handler) InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.InvokeFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListInsightsTables is not implemented"))
 }
 
 func (UnimplementedV2Handler) QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error) {
