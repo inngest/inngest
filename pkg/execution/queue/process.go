@@ -71,6 +71,7 @@ func (q *queueProcessor) ProcessItem(
 	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
 	jobCtx = WithShardID(jobCtx, shard.Name())
 	jobCtx = WithJobID(jobCtx, qi.ID)
+	jobCtx = WithGenerationID(jobCtx, qi.GenerationID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
