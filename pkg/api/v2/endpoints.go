@@ -284,6 +284,10 @@ func (s *Service) ListInsightsTables(ctx context.Context, req *apiv2.ListInsight
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
 }
 
+func (s *Service) QueryInsightsPrompt(ctx context.Context, req *apiv2.QueryInsightsPromptRequest) (*apiv2.QueryInsightsPromptResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
+}
+
 func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (*apiv2.QueryInsightsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
 }

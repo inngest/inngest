@@ -4153,6 +4153,154 @@ func (x *InsightsTableColumn) GetType() string {
 	return ""
 }
 
+type QueryInsightsPromptRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Prompt        string                 `protobuf:"bytes,1,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryInsightsPromptRequest) Reset() {
+	*x = QueryInsightsPromptRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryInsightsPromptRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryInsightsPromptRequest) ProtoMessage() {}
+
+func (x *QueryInsightsPromptRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryInsightsPromptRequest.ProtoReflect.Descriptor instead.
+func (*QueryInsightsPromptRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *QueryInsightsPromptRequest) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
+	}
+	return ""
+}
+
+type QueryInsightsPromptResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Data          *QueryInsightsPromptData `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata        `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryInsightsPromptResponse) Reset() {
+	*x = QueryInsightsPromptResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryInsightsPromptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryInsightsPromptResponse) ProtoMessage() {}
+
+func (x *QueryInsightsPromptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryInsightsPromptResponse.ProtoReflect.Descriptor instead.
+func (*QueryInsightsPromptResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *QueryInsightsPromptResponse) GetData() *QueryInsightsPromptData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *QueryInsightsPromptResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type QueryInsightsPromptData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	Diagnostics   []*InsightsDiagnostic  `protobuf:"bytes,2,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryInsightsPromptData) Reset() {
+	*x = QueryInsightsPromptData{}
+	mi := &file_api_v2_service_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryInsightsPromptData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryInsightsPromptData) ProtoMessage() {}
+
+func (x *QueryInsightsPromptData) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryInsightsPromptData.ProtoReflect.Descriptor instead.
+func (*QueryInsightsPromptData) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *QueryInsightsPromptData) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *QueryInsightsPromptData) GetDiagnostics() []*InsightsDiagnostic {
+	if x != nil {
+		return x.Diagnostics
+	}
+	return nil
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
@@ -4468,7 +4616,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x13InsightsTableColumn\x12A\n" +
 	"\x04name\x18\x01 \x01(\tB-\x92A*2(Name of the column in the insights tableR\x04name\x12h\n" +
 	"\vdescription\x18\x02 \x01(\tBF\x92AC2AHuman-readable description of the column and the data it containsR\vdescription\x12a\n" +
-	"\x04type\x18\x03 \x01(\tBM\x92AJ2HData type of the column (e.g., 'String', 'Int64', 'Array(String)', etc.)R\x04type*\xdf\x01\n" +
+	"\x04type\x18\x03 \x01(\tBM\x92AJ2HData type of the column (e.g., 'String', 'Int64', 'Array(String)', etc.)R\x04type\"\xb4\x01\n" +
+	"\x1aQueryInsightsPromptRequest\x12\x95\x01\n" +
+	"\x06prompt\x18\x01 \x01(\tB}\x92Az25Natural language description of the query to generateJA\"Show me the top 10 functions by failure rate in the last 7 days\"R\x06prompt\"\x88\x01\n" +
+	"\x1bQueryInsightsPromptResponse\x123\n" +
+	"\x04data\x18\x01 \x01(\v2\x1f.api.v2.QueryInsightsPromptDataR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xc9\x03\n" +
+	"\x17QueryInsightsPromptData\x12\xa8\x02\n" +
+	"\x05query\x18\x01 \x01(\tB\x91\x02\x92A\x8d\x022 The generated Insights SQL queryJ\xe8\x01\"SELECT function_id, COUNT(*) AS total, countIf(status = 'Failed') AS failures, failures / total AS failure_rate FROM function_runs WHERE started_at >= now() - INTERVAL 7 DAY GROUP BY function_id ORDER BY failure_rate DESC LIMIT 10\"R\x05query\x12\x82\x01\n" +
+	"\vdiagnostics\x18\x02 \x03(\v2\x1a.api.v2.InsightsDiagnosticBD\x92AA2?Any non-fatal diagnostics or warnings about the generated queryR\vdiagnostics*\xdf\x01\n" +
 	"\x11FunctionRunStatus\x12#\n" +
 	"\x1fFUNCTION_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_QUEUED\x10\x01\x12\x1f\n" +
@@ -4516,7 +4672,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xd0]\n" +
+	"\x04INFO\x10\x032\xe7c\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -4860,7 +5016,31 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\x8e\x06\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\x94\x06\n" +
+	"\x13QueryInsightsPrompt\x12\".api.v2.QueryInsightsPromptRequest\x1a#.api.v2.QueryInsightsPromptResponse\"\xb3\x05\x92A\x8e\x05\n" +
+	"\bInsights\n" +
+	"\x04Beta\x12#Generate insights query from prompt\x1a@Translates a natural language prompt into an Insights SQL query.JV\n" +
+	"\x03200\x12O\n" +
+	"\x1cQuery generated successfully\x12/\n" +
+	"-\x1a+#/definitions/v2QueryInsightsPromptResponseJL\n" +
+	"\x03400\x12E\n" +
+	" Bad Request - invalid input data\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJt\n" +
+	"\x03422\x12m\n" +
+	"HUnprocessable Entity - prompt could not be translated into a valid query\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/insights/query/prompt\x12\x8e\x06\n" +
 	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xbf\x05\x92A\xa1\x05\n" +
 	"\bInsights\n" +
 	"\x04Beta\x12\x0eQuery insights\x1a,Query Insights using the provided SQL query.JO\n" +
@@ -4914,7 +5094,7 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 64)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
 var file_api_v2_service_proto_goTypes = []any{
 	(FunctionRunStatus)(0),                  // 0: api.v2.FunctionRunStatus
 	(TraceSpanStatus)(0),                    // 1: api.v2.TraceSpanStatus
@@ -4986,36 +5166,39 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*ListInsightsTablesResponse)(nil),      // 67: api.v2.ListInsightsTablesResponse
 	(*InsightsTable)(nil),                   // 68: api.v2.InsightsTable
 	(*InsightsTableColumn)(nil),             // 69: api.v2.InsightsTableColumn
-	nil,                                     // 70: api.v2.TraceSpanMetadata.ValuesEntry
-	(*timestamppb.Timestamp)(nil),           // 71: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                 // 72: google.protobuf.Struct
-	(*structpb.Value)(nil),                  // 73: google.protobuf.Value
+	(*QueryInsightsPromptRequest)(nil),      // 70: api.v2.QueryInsightsPromptRequest
+	(*QueryInsightsPromptResponse)(nil),     // 71: api.v2.QueryInsightsPromptResponse
+	(*QueryInsightsPromptData)(nil),         // 72: api.v2.QueryInsightsPromptData
+	nil,                                     // 73: api.v2.TraceSpanMetadata.ValuesEntry
+	(*timestamppb.Timestamp)(nil),           // 74: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                 // 75: google.protobuf.Struct
+	(*structpb.Value)(nil),                  // 76: google.protobuf.Value
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	10,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	13,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	11,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	71,  // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	71,  // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	74,  // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	74,  // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	14,  // 5: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
 	15,  // 6: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
 	0,   // 7: api.v2.FunctionRun.status:type_name -> api.v2.FunctionRunStatus
-	71,  // 8: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
-	71,  // 9: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
-	71,  // 10: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
+	74,  // 8: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
+	74,  // 9: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
+	74,  // 10: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
 	16,  // 11: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
-	72,  // 12: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
+	75,  // 12: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
 	17,  // 13: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
 	13,  // 14: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	70,  // 15: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
-	71,  // 16: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
+	73,  // 15: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
+	74,  // 16: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
 	1,   // 17: api.v2.TraceSpan.status:type_name -> api.v2.TraceSpanStatus
 	2,   // 18: api.v2.TraceSpan.step_op:type_name -> api.v2.TraceStepOp
-	71,  // 19: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
-	71,  // 20: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
-	71,  // 21: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
-	72,  // 22: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
-	72,  // 23: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
+	74,  // 19: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
+	74,  // 20: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
+	74,  // 21: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
+	75,  // 22: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
+	75,  // 23: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
 	20,  // 24: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
 	21,  // 25: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
 	21,  // 26: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
@@ -5026,27 +5209,27 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	29,  // 31: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
 	13,  // 32: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	3,   // 33: api.v2.Env.type:type_name -> api.v2.EnvType
-	71,  // 34: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	71,  // 35: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	71,  // 36: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	74,  // 34: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	74,  // 35: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	74,  // 36: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
 	34,  // 37: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
 	13,  // 38: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 39: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
 	34,  // 40: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
 	13,  // 41: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 42: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	71,  // 43: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	74,  // 42: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	74,  // 43: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
 	38,  // 44: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
 	13,  // 45: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 46: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	71,  // 47: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	74,  // 47: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
 	29,  // 48: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
 	13,  // 49: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 50: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
 	43,  // 51: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
 	13,  // 52: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 53: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	71,  // 54: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	74,  // 54: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
 	46,  // 55: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
 	49,  // 56: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
 	13,  // 57: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -5055,16 +5238,16 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	13,  // 60: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 61: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
 	46,  // 62: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	71,  // 63: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	71,  // 64: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	74,  // 63: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	74,  // 64: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
 	29,  // 65: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
 	13,  // 66: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	72,  // 67: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	75,  // 67: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
 	54,  // 68: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
 	13,  // 69: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 70: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	71,  // 71: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	71,  // 72: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	74,  // 70: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	74,  // 71: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	74,  // 72: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
 	57,  // 73: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
 	13,  // 74: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
 	58,  // 75: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
@@ -5074,53 +5257,58 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	63,  // 79: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
 	64,  // 80: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
 	5,   // 81: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
-	73,  // 82: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
+	76,  // 82: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
 	6,   // 83: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
 	65,  // 84: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
 	68,  // 85: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
 	13,  // 86: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
 	69,  // 87: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
-	7,   // 88: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	7,   // 89: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	25,  // 90: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	27,  // 91: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	31,  // 92: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	8,   // 93: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	39,  // 94: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	36,  // 95: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	41,  // 96: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	44,  // 97: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	47,  // 98: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	50,  // 99: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	18,  // 100: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	55,  // 101: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	23,  // 102: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	52,  // 103: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	66,  // 104: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
-	59,  // 105: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	9,   // 106: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	12,  // 107: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	26,  // 108: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	28,  // 109: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	32,  // 110: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	33,  // 111: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	40,  // 112: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	37,  // 113: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	42,  // 114: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	45,  // 115: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	48,  // 116: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	51,  // 117: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	19,  // 118: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	56,  // 119: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	24,  // 120: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	53,  // 121: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	67,  // 122: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
-	60,  // 123: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	106, // [106:124] is the sub-list for method output_type
-	88,  // [88:106] is the sub-list for method input_type
-	88,  // [88:88] is the sub-list for extension type_name
-	88,  // [88:88] is the sub-list for extension extendee
-	0,   // [0:88] is the sub-list for field type_name
+	72,  // 88: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
+	13,  // 89: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
+	64,  // 90: api.v2.QueryInsightsPromptData.diagnostics:type_name -> api.v2.InsightsDiagnostic
+	7,   // 91: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	7,   // 92: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	25,  // 93: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	27,  // 94: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	31,  // 95: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	8,   // 96: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	39,  // 97: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	36,  // 98: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	41,  // 99: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	44,  // 100: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	47,  // 101: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	50,  // 102: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	18,  // 103: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	55,  // 104: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	23,  // 105: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	52,  // 106: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	66,  // 107: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	70,  // 108: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
+	59,  // 109: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	9,   // 110: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	12,  // 111: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	26,  // 112: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	28,  // 113: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	32,  // 114: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	33,  // 115: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	40,  // 116: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	37,  // 117: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	42,  // 118: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	45,  // 119: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	48,  // 120: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	51,  // 121: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	19,  // 122: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	56,  // 123: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	24,  // 124: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	53,  // 125: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	67,  // 126: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	71,  // 127: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
+	60,  // 128: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	110, // [110:129] is the sub-list for method output_type
+	91,  // [91:110] is the sub-list for method input_type
+	91,  // [91:91] is the sub-list for extension type_name
+	91,  // [91:91] is the sub-list for extension extendee
+	0,   // [0:91] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -5155,7 +5343,7 @@ func file_api_v2_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   64,
+			NumMessages:   67,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

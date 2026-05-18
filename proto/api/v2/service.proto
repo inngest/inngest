@@ -1272,6 +1272,91 @@ service V2 {
     };
   }
 
+  rpc QueryInsightsPrompt(QueryInsightsPromptRequest) returns (QueryInsightsPromptResponse) {
+    option (google.api.http) = {
+      post: "/insights/query/prompt",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Generate insights query from prompt"
+      tags: "Insights"
+      tags: "Beta"
+      description: "Translates a natural language prompt into an Insights SQL query."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Query generated successfully"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2QueryInsightsPromptResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "422"
+        value: {
+          description: "Unprocessable Entity - prompt could not be translated into a valid query"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc QueryInsights(QueryInsightsRequest) returns (QueryInsightsResponse) {
     option (google.api.http) = {
       post: "/insights/query",
@@ -2036,6 +2121,34 @@ message InsightsTableColumn {
   string type = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Data type of the column (e.g., 'String', 'Int64', 'Array(String)', etc.)"
+    }
+  ];
+}
+
+message QueryInsightsPromptRequest {
+  string prompt = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Natural language description of the query to generate"
+      example: "\"Show me the top 10 functions by failure rate in the last 7 days\""
+    }
+  ];
+}
+
+message QueryInsightsPromptResponse {
+  QueryInsightsPromptData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message QueryInsightsPromptData {
+  string query = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The generated Insights SQL query"
+      example: "\"SELECT function_id, COUNT(*) AS total, countIf(status = 'Failed') AS failures, failures / total AS failure_rate FROM function_runs WHERE started_at >= now() - INTERVAL 7 DAY GROUP BY function_id ORDER BY failure_rate DESC LIMIT 10\""
+    }
+  ];
+  repeated InsightsDiagnostic diagnostics = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Any non-fatal diagnostics or warnings about the generated query"
     }
   ];
 }
