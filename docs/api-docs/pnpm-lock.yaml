@@ -35,6 +35,9 @@ importers:
       shiki:
         specifier: ^3.0.0
         version: 3.23.0
+      yaml:
+        specifier: ^2.0.0
+        version: 2.8.3
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.0.0
@@ -72,9 +75,6 @@ importers:
       vite-tsconfig-paths:
         specifier: ^6.0.5
         version: 6.1.1(typescript@5.9.3)(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
-      yaml:
-        specifier: ^2.0.0
-        version: 2.8.3
 
 packages:
 
