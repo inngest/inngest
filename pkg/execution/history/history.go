@@ -13,6 +13,7 @@ import (
 type Driver interface {
 	Close(context.Context) error
 	Write(context.Context, History) error
+	WriteBatch(ctx context.Context, items []History) error
 }
 
 // History represents a row in:

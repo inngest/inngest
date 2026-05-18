@@ -103,6 +103,15 @@ func (w *writer) Write(
 	return nil
 }
 
+func (w *writer) WriteBatch(ctx context.Context, items []history.History) error {
+	for _, item := range items {
+		if err := w.Write(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (w *writer) writeHistory(
 	ctx context.Context,
 	item history.History,

@@ -513,11 +513,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithLifecycleListeners(
 			append([]execution.LifecycleListener{
-				history.NewLifecycleListener(
-					nil,
-					hd,
-					hmw,
-				),
+					history.NewLifecycleListener(
+						l,
+						history.NewBufferedDriver(hd, l),
+						hmw,
+					),
 				Lifecycle{
 					Cqrs:       dbcqrs,
 					Pb:         pb,
