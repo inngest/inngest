@@ -3,8 +3,6 @@ package connect
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
-	"net"
 	"testing"
 	"time"
 
@@ -17,8 +15,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -345,21 +341,6 @@ func TestWorkerReplyDuringGatewayDrain_IsProcessed(t *testing.T) {
 	require.NotNil(t, savedResponse)
 	require.Equal(t, requestID, savedResponse.RequestId)
 	require.Equal(t, connectpb.SDKResponseStatus_DONE, savedResponse.Status)
-}
-
-// mockExecutorServer implements ConnectExecutorServer for testing the ack flow.
-type mockExecutorServer struct {
-	connectpb.UnimplementedConnectExecutorServer
-	ackReceived chan *connectpb.AckMessage
-}
-
-func (s *mockExecutorServer) Ack(_ context.Context, msg *connectpb.AckMessage) (*connectpb.AckResponse, error) {
-	s.ackReceived <- msg
-	return &connectpb.AckResponse{Success: true}, nil
-}
-
-func (s *mockExecutorServer) Ping(_ context.Context, _ *connectpb.PingRequest) (*connectpb.PingResponse, error) {
-	return &connectpb.PingResponse{Message: "ok"}, nil
 }
 
 // TestLeaseExtensionDuringGatewayDrain_IsProcessed verifies that lease
