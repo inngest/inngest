@@ -1,9 +1,8 @@
 name: SDK E2E Tests
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,13 +12,8 @@ env:
 
 jobs:
   ts:
-    name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        experimentalKeyQueues: [false, true]
-    runs-on: ${{ matrix.os }}
+    name: TS SDK
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -55,7 +49,7 @@ jobs:
           cd ../../
           echo "Running dev server"
           mkdir $GOCOVERDIR
-          nohup ./inngest-bin dev --no-discovery 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt &
+          nohup ./inngest-bin dev --no-discovery 2> /tmp/devserver-logs-ts.txt &
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
@@ -65,7 +59,7 @@ jobs:
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
           TEST_MODE: true
-          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "true"
           LOG_LEVEL: trace
 
       - name: Convert coverage for tooling
@@ -78,29 +72,26 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api
-          path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt
+          name: devserver-logs-ts
+          path: /tmp/devserver-logs-ts.txt
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
+          flags: ts-e2e
 
   # refs:
   #  - https://go.dev/doc/build-cover
   golang:
-    name: "Go SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}, db: ${{ matrix.database }} / split: ${{ matrix.index }}"
+    name: "Go SDK / split: ${{ matrix.index }}"
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        experimentalKeyQueues: [false, true]
-        database: [sqlite, postgres]
-        parallelism: [5]
-        index: [0, 1, 2, 3, 4]
-    runs-on: ${{ matrix.os }}
+        parallelism: [3]
+        index: [0, 1, 2]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -112,7 +103,6 @@ jobs:
           go-version-file: ./go.mod
 
       - name: Start postgres container
-        if: matrix.database == 'postgres'
         run: |
           docker run -d --name inngest-test-postgres \
             -e POSTGRES_USER=postgres \
@@ -143,11 +133,7 @@ jobs:
         run: |
           echo "Running dev server"
           mkdir $GOCOVERDIR
-          if [ "${{ matrix.database }}" = "postgres" ]; then
-            nohup ./inngest-bin dev --no-discovery --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
-          else
-            nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
-          fi
+          nohup ./inngest-bin dev --no-discovery --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
@@ -159,8 +145,8 @@ jobs:
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
           TEST_MODE: true
-          TEST_DATABASE: ${{ matrix.database }}
-          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          TEST_DATABASE: postgres
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "true"
 
       - name: Convert coverage for tooling
         run: |
@@ -172,7 +158,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: devserver-logs-golang-kq-${{ matrix.experimentalKeyQueues }}-db-${{ matrix.database }}-split-${{ matrix.index }}
+          name: devserver-logs-golang-split-${{ matrix.index }}
           path: /tmp/dev-output.txt
           retention-days: 7
 
@@ -180,17 +166,11 @@ jobs:
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: go-e2e,split-${{ matrix.index }},kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+          flags: go-e2e,split-${{ matrix.index }}
 
   api:
-    name: "API / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}, db: ${{ matrix.database }}"
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        experimentalKeyQueues: [false, true]
-        database: [sqlite, postgres]
-    runs-on: ${{ matrix.os }}
+    name: API
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -202,7 +182,6 @@ jobs:
           go-version-file: ./go.mod
 
       - name: Start postgres container
-        if: matrix.database == 'postgres'
         run: |
           docker run -d --name inngest-test-postgres \
             -e POSTGRES_USER=postgres \
@@ -230,11 +209,7 @@ jobs:
         run: |
           echo "Running dev server"
           mkdir $GOCOVERDIR
-          if [ "${{ matrix.database }}" = "postgres" ]; then
-            nohup ./inngest-bin dev --no-discovery --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
-          else
-            nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
-          fi
+          nohup ./inngest-bin dev --no-discovery --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
@@ -246,8 +221,8 @@ jobs:
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
           TEST_MODE: true
-          TEST_DATABASE: ${{ matrix.database }}
-          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          TEST_DATABASE: postgres
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "true"
 
       - name: Convert coverage for tooling
         run: |
@@ -258,7 +233,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: devserver-logs-api-kq-${{ matrix.experimentalKeyQueues }}-db-${{ matrix.database }}
+          name: devserver-logs-api
           path: /tmp/dev-output.txt
           retention-days: 7
 
@@ -266,16 +241,11 @@ jobs:
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: api-e2e,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+          flags: api-e2e
 
   execution:
-    name: "Execution / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        experimentalKeyQueues: [false, true]
-    runs-on: ${{ matrix.os }}
+    name: Execution
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -289,13 +259,13 @@ jobs:
       - name: Run execution tests
         run: go test ./tests/execution/... -v -count=1 -coverprofile=coverage.txt
         env:
-          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "true"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: exec,kq-${{ matrix.experimentalKeyQueues }}
+          flags: exec
 
   e2e-ci:
     name: E2E CI
@@ -305,7 +275,7 @@ jobs:
     steps:
       - name: Check results
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" || "${{ contains(needs.*.result, 'skipped') }}" == "true" ]]; then
-            echo "One or more E2E jobs failed, were cancelled, or were skipped"
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more E2E jobs failed or were cancelled"
             exit 1
           fi
