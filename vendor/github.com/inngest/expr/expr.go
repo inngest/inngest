@@ -514,6 +514,11 @@ func (a *aggregator[T]) Add(ctx context.Context, eval T) (float64, error) {
 		return -1, err
 	}
 
+	// deduplicate evaluables, as engines do not expect duplicates and will cause false positives
+	if _, err := a.kv.Get(parsed.EvaluableID); err == nil {
+		return 0, nil
+	}
+
 	if err := a.kv.Set(eval); err != nil {
 		return -1, err
 	}
