@@ -142,9 +142,6 @@ func (w wrapper) fetchParentTraceRuns(ctx context.Context, parentRunIDSet map[ul
 	return w.GetTraceRunsByRunIDs(ctx, parentRunIDs)
 }
 
-// GetRunInvokedFrom uses hand-rolled SQL (queryInvokedFromSpans) because
-// sqlc 1.30's SQLite parser cannot bind a slice when its LHS is a
-// json_extract(...) expression.
 func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.RunInvokedFrom, error) {
 	if len(runIDs) == 0 {
 		return map[ulid.ULID]*cqrs.RunInvokedFrom{}, nil
@@ -198,9 +195,8 @@ func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map
 	return out, nil
 }
 
-// invokedFromSpanRow lets queryInvokedFromSpans's hand-rolled rows reuse
-// mapSpanFromRow. Time and fragment columns stay as `any` so mapSpanFromRow's
-// existing decoders own the parsing.
+// Time and fragment columns stay as `any` so mapSpanFromRow's existing
+// decoders own the parsing.
 type invokedFromSpanRow struct {
 	runID         string
 	traceID       string
@@ -221,10 +217,9 @@ func (r *invokedFromSpanRow) GetSpanFragments() any            { return r.spanFr
 
 var _ normalizedSpan = (*invokedFromSpanRow)(nil)
 
-// queryInvokedFromSpans returns one row per dynamic_span_id whose EXTEND
-// fragment's StepInvokeRunID matches a child in childRunIDs. The inner
-// subquery narrows on `name = 'EXTEND'` so the JSON-extract predicate runs
-// against only those rows.
+// Hand-rolled SQL: sqlc 1.30's SQLite parser can't bind a slice when the
+// LHS is a json_extract(...) call. Narrowing on `name = 'EXTEND'` in the
+// inner subquery keeps the JSON predicate off the full spans table.
 func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string) ([]*invokedFromSpanRow, error) {
 	dialect := w.dialect()
 

@@ -2113,12 +2113,8 @@ type runsQueryBuilder struct {
 	cursorLayout *cqrs.TracePageCursor
 }
 
-// runTypeFilterExpr returns an EXISTS / NOT EXISTS subquery against the spans
-// table that classifies the outer run as a defer child (root executor.run span
-// carries the DeferParentRunID attribute) or a primary run (absence of it).
-//
-// The inner spans table is aliased to `dt` so the GetSpanRuns caller, which
-// itself does FROM spans, doesn't shadow its own table.
+// The spans table is aliased to `dt` so callers that already FROM spans
+// (e.g. GetSpanRuns) don't shadow their own table.
 func runTypeFilterExpr(dialect string, outerRunIDCol string, runType cqrs.RunTypeFilter) sq.Expression {
 	if runType == cqrs.RunTypeFilterAny {
 		return nil
