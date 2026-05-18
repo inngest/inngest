@@ -91,6 +91,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ steps.pr.outputs.head_sha }}
           persist-credentials: false
+          submodules: recursive
 
       - name: Set up Go for PR head
         if: steps.command.outputs.matched == 'true'
