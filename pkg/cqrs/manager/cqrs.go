@@ -1847,6 +1847,9 @@ func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentif
 
 func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
 	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
+	// TODO: distinguish "no row" from real DB errors here. Today any error —
+	// including a transient connection failure — silently produces a stub
+	// TraceRun, which callers cannot tell apart from a genuine miss.
 	if err == nil {
 		return run, nil
 	}
@@ -1908,7 +1911,6 @@ func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (
 func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 	start := time.UnixMilli(run.StartedAt)
 	end := time.UnixMilli(run.EndedAt)
-	triggerIDS := strings.Split(string(run.TriggerIds), ",")
 
 	var (
 		isBatch bool
@@ -1937,7 +1939,7 @@ func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 		EndedAt:      end,
 		Duration:     end.Sub(start),
 		SourceID:     run.SourceID,
-		TriggerIDs:   triggerIDS,
+		TriggerIDs:   run.EventIDs(),
 		Output:       run.Output,
 		Status:       enums.RunCodeToStatus(run.Status),
 		BatchID:      batchID,

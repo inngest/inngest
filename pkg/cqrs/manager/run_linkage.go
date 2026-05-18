@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -30,7 +32,6 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 	}
 
 	out := make(map[ulid.ULID][]cqrs.RunDefer, len(spansByParent))
-	childIDs := make(map[ulid.ULID][]ulid.ULID, len(spansByParent))
 	var allChildRunIDs []ulid.ULID
 	for parentRunID, spans := range spansByParent {
 		for _, s := range spans {
@@ -58,24 +59,8 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 			if s.Attributes.DeferFnSlug != nil {
 				rd.FnSlug = *s.Attributes.DeferFnSlug
 			}
-			childRunID := util.DeterministicChildRunID(parentRunID, rd.HashedDeferID)
 			out[parentRunID] = append(out[parentRunID], rd)
-			childIDs[parentRunID] = append(childIDs[parentRunID], childRunID)
-			allChildRunIDs = append(allChildRunIDs, childRunID)
-		}
-	}
-
-	if len(allChildRunIDs) > 0 {
-		childRuns, err := w.GetTraceRunsByRunIDs(ctx, allChildRunIDs)
-		if err != nil {
-			return nil, fmt.Errorf("error loading deferred child runs: %w", err)
-		}
-		for parentRunID, defers := range out {
-			for i := range defers {
-				if run, ok := childRuns[childIDs[parentRunID][i]]; ok {
-					defers[i].Run = run
-				}
-			}
+			allChildRunIDs = append(allChildRunIDs, util.DeterministicChildRunID(parentRunID, rd.HashedDeferID))
 		}
 	}
 
@@ -85,6 +70,24 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 		sort.Slice(out[parentRunID], func(i, j int) bool {
 			return out[parentRunID][i].HashedDeferID < out[parentRunID][j].HashedDeferID
 		})
+	}
+
+	if len(allChildRunIDs) > 0 {
+		childRuns, err := w.GetTraceRunsByRunIDs(ctx, allChildRunIDs)
+		if err != nil {
+			return nil, fmt.Errorf("error loading deferred child runs: %w", err)
+		}
+		// Hydrate by recomputing the deterministic child run ID from each
+		// defer's HashedDeferID, so this loop doesn't depend on the order
+		// defers were appended above.
+		for parentRunID, defers := range out {
+			for i := range defers {
+				childRunID := util.DeterministicChildRunID(parentRunID, defers[i].HashedDeferID)
+				if run, ok := childRuns[childRunID]; ok {
+					defers[i].Run = run
+				}
+			}
+		}
 	}
 
 	return out, nil
@@ -118,7 +121,7 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 		}
 	}
 
-	parentRuns, err := w.fetchParentTraceRuns(ctx, parentRunIDSet)
+	parentRuns, err := w.GetTraceRunsByRunIDs(ctx, slices.Collect(maps.Keys(parentRunIDSet)))
 	if err != nil {
 		return nil, fmt.Errorf("error loading deferred-from parent runs: %w", err)
 	}
@@ -129,17 +132,6 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 	}
 
 	return out, nil
-}
-
-func (w wrapper) fetchParentTraceRuns(ctx context.Context, parentRunIDSet map[ulid.ULID]struct{}) (map[ulid.ULID]*cqrs.TraceRun, error) {
-	if len(parentRunIDSet) == 0 {
-		return nil, nil
-	}
-	parentRunIDs := make([]ulid.ULID, 0, len(parentRunIDSet))
-	for id := range parentRunIDSet {
-		parentRunIDs = append(parentRunIDs, id)
-	}
-	return w.GetTraceRunsByRunIDs(ctx, parentRunIDs)
 }
 
 func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.RunInvokedFrom, error) {
@@ -182,7 +174,7 @@ func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map
 		parentRunIDSet[parentRunID] = struct{}{}
 	}
 
-	parentRuns, err := w.fetchParentTraceRuns(ctx, parentRunIDSet)
+	parentRuns, err := w.GetTraceRunsByRunIDs(ctx, slices.Collect(maps.Keys(parentRunIDSet)))
 	if err != nil {
 		return nil, fmt.Errorf("error loading invoked-from parent runs: %w", err)
 	}
