@@ -3,7 +3,7 @@ package cqrs
 import (
 	"context"
 
-	exechistory "github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -12,22 +12,8 @@ type HistoryManager interface {
 	HistoryReader
 }
 
-type (
-	History              = exechistory.History
-	CancelEvent          = exechistory.CancelEvent
-	CancelUser           = exechistory.CancelUser
-	Sleep                = exechistory.Sleep
-	WaitForEvent         = exechistory.WaitForEvent
-	WaitResult           = exechistory.WaitResult
-	WaitForSignal        = exechistory.WaitForSignal
-	WaitForSignalResult  = exechistory.WaitForSignalResult
-	InvokeFunction       = exechistory.InvokeFunction
-	InvokeFunctionResult = exechistory.InvokeFunctionResult
-	Result               = exechistory.Result
-)
-
 type HistoryWriter interface {
-	InsertHistory(ctx context.Context, h History) error
+	InsertHistory(ctx context.Context, h history.History) error
 }
 
 type HistoryReader interface {
@@ -47,7 +33,7 @@ type HistoryReader interface {
 
 	// GetFunctionRunHistory must return history for the given function run,
 	// ordered from oldest to newest.
-	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error)
+	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*history.History, error)
 
 	// GetRunDefers returns defers attached to each parent run, keyed by
 	// parent run ID. Each entry's Run is the child TraceRun if one has been

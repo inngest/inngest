@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/usage"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -265,7 +266,7 @@ type RunHistoryResult struct {
 	SizeBytes   int     `json:"sizeBytes"`
 }
 
-func NewRunHistoryResultFromHistoryResult(hr *Result) *RunHistoryResult {
+func NewRunHistoryResultFromHistoryResult(hr *history.Result) *RunHistoryResult {
 	if hr == nil {
 		return nil
 	}
