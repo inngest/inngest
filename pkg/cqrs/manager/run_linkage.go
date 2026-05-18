@@ -1,12 +1,12 @@
 package manager
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -35,9 +35,6 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 	var allChildRunIDs []ulid.ULID
 	for parentRunID, spans := range spansByParent {
 		for _, s := range spans {
-			if s == nil || s.Attributes == nil {
-				continue
-			}
 			if s.Attributes.DeferHashedID == nil || s.Attributes.DeferStatus == nil {
 				continue
 			}
@@ -66,9 +63,9 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 
 	// Map iteration above is non-deterministic; sort by HashedDeferID so
 	// repeated queries return identical orderings.
-	for parentRunID := range out {
-		sort.Slice(out[parentRunID], func(i, j int) bool {
-			return out[parentRunID][i].HashedDeferID < out[parentRunID][j].HashedDeferID
+	for _, defers := range out {
+		slices.SortFunc(defers, func(a, b cqrs.RunDefer) int {
+			return cmp.Compare(a.HashedDeferID, b.HashedDeferID)
 		})
 	}
 
@@ -109,10 +106,7 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 		// Defer linkage attrs live on the root executor.run span only;
 		// extension spans share the dynamic_span_id but lack them.
 		for _, s := range spans {
-			if s == nil || s.Attributes == nil || !s.GetIsRoot() {
-				continue
-			}
-			if s.Attributes.DeferParentRunID == nil {
+			if !s.GetIsRoot() || s.Attributes.DeferParentRunID == nil {
 				continue
 			}
 			out[childRunID] = &cqrs.RunDeferredFrom{ParentRunID: *s.Attributes.DeferParentRunID}
@@ -125,9 +119,9 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 	if err != nil {
 		return nil, fmt.Errorf("error loading deferred-from parent runs: %w", err)
 	}
-	for childRunID, rdf := range out {
+	for _, rdf := range out {
 		if run, ok := parentRuns[rdf.ParentRunID]; ok {
-			out[childRunID].ParentRun = run
+			rdf.ParentRun = run
 		}
 	}
 
@@ -156,7 +150,7 @@ func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map
 		if err != nil {
 			return nil, err
 		}
-		if span == nil || span.Attributes.StepInvokeRunID == nil {
+		if span.Attributes.StepInvokeRunID == nil {
 			continue
 		}
 		childRunID := *span.Attributes.StepInvokeRunID
@@ -178,9 +172,9 @@ func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map
 	if err != nil {
 		return nil, fmt.Errorf("error loading invoked-from parent runs: %w", err)
 	}
-	for childRunID, rif := range out {
+	for _, rif := range out {
 		if run, ok := parentRuns[rif.ParentRunID]; ok {
-			out[childRunID].ParentRun = run
+			rif.ParentRun = run
 		}
 	}
 
@@ -213,25 +207,18 @@ var _ normalizedSpan = (*invokedFromSpanRow)(nil)
 // LHS is a json_extract(...) call. Narrowing on `name = 'EXTEND'` in the
 // inner subquery keeps the JSON predicate off the full spans table.
 func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string) ([]*invokedFromSpanRow, error) {
-	dialect := w.dialect()
-
 	stepInvokeRunIDKey := meta.Attrs.StepInvokeRunID.Key()
 
 	var (
-		placeholders []string
+		nameArg      string
+		placeholders = make([]string, len(childRunIDs))
 		jsonPath     string
 		jsonObject   string
 		jsonAgg      string
 	)
-	args := make([]any, 0, len(childRunIDs)+1)
-	args = append(args, meta.SpanNameDynamicExtension)
-	for _, id := range childRunIDs {
-		args = append(args, id)
-	}
-
-	switch dialect {
+	switch dialect := w.dialect(); dialect {
 	case "postgres":
-		placeholders = make([]string, len(childRunIDs))
+		nameArg = "$1"
 		for i := range childRunIDs {
 			placeholders[i] = fmt.Sprintf("$%d", i+2)
 		}
@@ -239,7 +226,7 @@ func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string
 		jsonObject = "json_build_object"
 		jsonAgg = "json_agg"
 	case "sqlite3":
-		placeholders = make([]string, len(childRunIDs))
+		nameArg = "?"
 		for i := range childRunIDs {
 			placeholders[i] = "?"
 		}
@@ -250,10 +237,12 @@ func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string
 		return nil, fmt.Errorf("queryInvokedFromSpans: unsupported dialect %q", dialect)
 	}
 
-	nameArg := "$1"
-	if dialect == "sqlite3" {
-		nameArg = "?"
+	args := make([]any, 0, len(childRunIDs)+1)
+	args = append(args, meta.SpanNameDynamicExtension)
+	for _, id := range childRunIDs {
+		args = append(args, id)
 	}
+
 	inList := strings.Join(placeholders, ",")
 	query := `
 SELECT
