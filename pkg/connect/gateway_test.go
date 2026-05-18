@@ -409,6 +409,54 @@ func TestExecutorMessageForwardingGRPC(t *testing.T) {
 	require.True(t, proto.Equal(expectedPayload, payload))
 }
 
+func TestExecutorMessageForwardingGRPC_StopForwardingBeforeWorkerACK(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+		shouldUseGRPC:                true,
+	}
+	res := createTestingGateway(t, params)
+	handshake(t, res)
+
+	payload := &connect.GatewayExecutorRequestData{
+		RequestId:      "test-req-stop",
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		AppName:        res.appName,
+		FunctionId:     res.fnID.String(),
+		FunctionSlug:   res.fnSlug,
+		StepId:         ptr.String("step"),
+		RequestPayload: []byte("hello world"),
+		RunId:          res.runID.String(),
+		LeaseId:        "lease-test",
+	}
+
+	handler, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok)
+	ch := handler.(*connectionHandler)
+
+	resultCh := make(chan error, 1)
+	go func() {
+		ch.messageChan <- forwardMessage{Data: payload, Result: resultCh}
+	}()
+
+	// Wait for the WS message to be forwarded to the worker, then close the connection.
+	awaitNextMessage(t, res.ws, 2*time.Second)
+
+	close(ch.stopForwarding)
+
+	select {
+	case err := <-resultCh:
+		require.ErrorContains(t, err, "connection closed before worker ACK")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for Result after stopForwarding")
+	}
+
+	_, stillPresent := ch.pendingAcks.Load(payload.RequestId)
+	require.False(t, stillPresent, "pendingAcks should be cleaned up after stopForwarding")
+}
+
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 5,
