@@ -27,7 +27,8 @@ type Manager interface {
 	AppManager
 	FunctionRunManager
 	EventManager
-	HistoryManager
+	HistoryReader
+	HistoryWriter
 
 	// Trace / dev only
 	TraceReadWriter

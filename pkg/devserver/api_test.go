@@ -470,7 +470,7 @@ func newTestDevServer(t *testing.T) *devserver {
 	t.Helper()
 
 	// Create in-memory database
-	db, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
+	db, err := dbsqlite.Open(t.Context(), dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
 
 	// Initialize CQRS manager

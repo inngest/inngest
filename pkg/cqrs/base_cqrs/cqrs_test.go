@@ -1960,11 +1960,11 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 		pc, pgErr = testutil.StartPostgres(t)
 		require.NoError(t, pgErr)
 
-		db, err = New(ctx, BaseCQRSOptions{PostgresURI: pc.URI, ForTest: true})
+		db, err = dbpostgres.Open(ctx, dbpostgres.Options{URI: pc.URI, ForTest: true})
 		require.NoError(t, err)
 		adapter = dbpostgres.New(db)
 	} else {
-		db, err = New(ctx, BaseCQRSOptions{Persist: false, ForTest: true})
+		db, err = dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 		require.NoError(t, err)
 		adapter = dbsqlite.New(db)
 	}

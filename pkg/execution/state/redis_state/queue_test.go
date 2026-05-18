@@ -1606,7 +1606,7 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	paused = true
 
-	peeked, err := shard.PeekGlobalPartitions(ctx, 100, now.Add(5*time.Minute), true)
+	peeked, err := shard.PartitionPeek(ctx, true, now.Add(5*time.Minute), 100)
 	require.NoError(t, err)
 	require.Len(t, peeked, 0)
 
@@ -1615,7 +1615,7 @@ func TestQueueFunctionPause(t *testing.T) {
 	err = q.UnpauseFunction(ctx, shard.Name(), uuid.Nil, uuid.Nil, idA)
 	require.NoError(t, err)
 
-	peeked, err = shard.PeekGlobalPartitions(ctx, 100, now.Add(5*time.Minute), true)
+	peeked, err = shard.PartitionPeek(ctx, true, now.Add(5*time.Minute), 100)
 	require.NoError(t, err)
 	require.Len(t, peeked, 1)
 	require.Equal(t, idA, *peeked[0].FunctionID)

@@ -129,19 +129,19 @@ type DebounceMigrator interface {
 // until a specific time period passes when no more events matching a key are received.
 type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
-	GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error)
-	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, d DebounceItem, accountID uuid.UUID) error
+	GetDebounceItem(ctx context.Context, scope queue.Scope, debounceID ulid.ULID) (*DebounceItem, error)
+	DeleteDebounceItem(ctx context.Context, scope queue.Scope, debounceID ulid.ULID, d DebounceItem) error
 	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
 	// GetDebounceInfo retrieves information about the current debounce for a function and debounce key.
 	// This is used for debugging and introspection.
-	GetDebounceInfo(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DebounceInfo, error)
+	GetDebounceInfo(ctx context.Context, scope queue.Scope, debounceKey string) (*DebounceInfo, error)
 	// DeleteDebounce deletes the current debounce for a function and debounce key.
 	// Returns information about the deleted debounce.
-	DeleteDebounce(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DeleteDebounceResult, error)
+	DeleteDebounce(ctx context.Context, scope queue.Scope, debounceKey string) (*DeleteDebounceResult, error)
 	// DeleteDebounceByID deletes debounces directly by their IDs.
 	// Unlike DeleteDebounce, this does not require function_id or debounce_key.
 	// It removes the debounce items from the hash and (best effort) removes the timeout queue items.
-	DeleteDebounceByID(ctx context.Context, debounceIDs ...ulid.ULID) error
+	DeleteDebounceByID(ctx context.Context, scope queue.Scope, debounceIDs ...ulid.ULID) error
 	// RunDebounce schedules immediate execution of a debounce by creating a timeout job that runs in one second.
 	RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunDebounceResult, error)
 }
@@ -169,6 +169,7 @@ type RunDebounceOpts struct {
 	FunctionID  uuid.UUID
 	DebounceKey string
 	AccountID   uuid.UUID
+	EnvID       uuid.UUID
 }
 
 // RunDebounceResult contains information about a scheduled debounce execution.
@@ -312,10 +313,22 @@ func (d debouncer) secondaryShard() (queue.QueueShard, error) {
 	return d.shards.ByName(d.secondaryShardName)
 }
 
+func scopeForDebounceItem(di DebounceItem) queue.Scope {
+	return queue.Scope{
+		AccountID:  di.AccountID,
+		EnvID:      di.WorkspaceID,
+		FunctionID: di.FunctionID,
+	}
+}
+
 // DeleteDebounceItem removes a debounce from the map.
-func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, di DebounceItem, accountID uuid.UUID) error {
+func (d debouncer) DeleteDebounceItem(ctx context.Context, scope queue.Scope, debounceID ulid.ULID, di DebounceItem) error {
+	if err := scope.Validate(); err != nil {
+		return err
+	}
+
 	// Determine the flag value once and pass down to prevent inconsistent values mid-deletion
-	shouldMigrate := d.shouldMigrate(ctx, accountID)
+	shouldMigrate := d.shouldMigrate(ctx, scope.AccountID)
 
 	// If the new primary is set up and the secondary is draining, for some time old debounces
 	// will still exist on the secondary. If a debounce item times out before being migrated,
@@ -338,7 +351,7 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 		})
 	}()
 
-	if err := queueShard.DebounceDeleteItems(ctx, debounceID); err != nil {
+	if err := queueShard.DebounceDeleteItems(ctx, scope, debounceID); err != nil {
 		return fmt.Errorf("could not delete debounce item: %w", err)
 	}
 
@@ -347,8 +360,12 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 }
 
 // GetDebounceItem returns a DebounceItem given a debounce ID.
-func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error) {
-	shouldMigrate := d.shouldMigrate(ctx, accountID)
+func (d debouncer) GetDebounceItem(ctx context.Context, scope queue.Scope, debounceID ulid.ULID) (*DebounceItem, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
+	shouldMigrate := d.shouldMigrate(ctx, scope.AccountID)
 
 	// Determine the flag value once and pass down to prevent inconsistent values mid-retrieval
 	queueShard, err := d.shard(shouldMigrate)
@@ -356,7 +373,7 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, ac
 		return nil, fmt.Errorf("could not resolve shard: %w", err)
 	}
 
-	di, err := getDebounceItem(ctx, queueShard, debounceID)
+	di, err := getDebounceItem(ctx, queueShard, scope, debounceID)
 	if err != nil && !errors.Is(err, ErrDebounceNotFound) {
 		return nil, err
 	}
@@ -380,7 +397,7 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, ac
 		if err != nil {
 			return nil, fmt.Errorf("could not resolve secondary shard: %w", err)
 		}
-		di, err := getDebounceItem(ctx, secondary, debounceID)
+		di, err := getDebounceItem(ctx, secondary, scope, debounceID)
 
 		// Mark DebounceItem as being retrieved from the secondary cluster. This is important
 		// for StartExecution() and DeleteDebounceItem() to use the correct cluster.
@@ -393,8 +410,8 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, ac
 	return di, nil
 }
 
-func getDebounceItem(ctx context.Context, shard queue.QueueShard, debounceID ulid.ULID) (*DebounceItem, error) {
-	byt, err := shard.DebounceGetItem(ctx, debounceID)
+func getDebounceItem(ctx context.Context, shard queue.QueueShard, scope queue.Scope, debounceID ulid.ULID) (*DebounceItem, error) {
+	byt, err := shard.DebounceGetItem(ctx, scope, debounceID)
 	if err != nil {
 		return nil, err
 	}
@@ -407,6 +424,10 @@ func getDebounceItem(ctx context.Context, shard queue.QueueShard, debounceID uli
 
 // StartExecution swaps out the underlying pointer of the debounce
 func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn inngest.Function, debounceID ulid.ULID) error {
+	if err := scopeForDebounceItem(di).Validate(); err != nil {
+		return err
+	}
+
 	dkey, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
 		return err
@@ -434,7 +455,7 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 		})
 	}()
 
-	res, err := queueShard.DebounceStartExecution(ctx, fn.ID, dkey, newDebounceID, debounceID)
+	res, err := queueShard.DebounceStartExecution(ctx, scopeForDebounceItem(di), dkey, newDebounceID, debounceID)
 	if err != nil {
 		status = "error"
 		return err
@@ -474,6 +495,9 @@ func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di Debounc
 func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Function) error {
 	if fn.Debounce == nil {
 		return fmt.Errorf("fn has no debounce config")
+	}
+	if err := scopeForDebounceItem(di).Validate(); err != nil {
+		return err
 	}
 	ttl, err := str2duration.ParseDuration(fn.Debounce.Period)
 	if err != nil {
@@ -538,7 +562,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 			di.Timeout = debounceTimeout
 
 			// Delete debounce state from old cluster
-			if err := secondary.DebounceDeleteItems(ctx, newDebounceID); err != nil {
+			if err := secondary.DebounceDeleteItems(ctx, scopeForDebounceItem(di), newDebounceID); err != nil {
 				l.Error("unable to delete old debounce after migration", "err", err)
 				return nil
 			}
@@ -551,7 +575,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 				l.Debug("deleted migrated debounce")
 			}
 
-			if err := secondary.DebounceDeleteMigratingFlag(ctx, newDebounceID); err != nil {
+			if err := secondary.DebounceDeleteMigratingFlag(ctx, scopeForDebounceItem(di), newDebounceID); err != nil {
 				l.Error("unable to delete debounce migrating flag", "err", err)
 			}
 
@@ -670,7 +694,7 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		return nil, fmt.Errorf("error marshalling debounce: %w", err)
 	}
 
-	existingID, err := queueShard.DebounceCreate(ctx, fn.ID, key, newDebounceID, byt, ttl)
+	existingID, err := queueShard.DebounceCreate(ctx, scopeForDebounceItem(di), key, newDebounceID, byt, ttl)
 	if err != nil {
 		return nil, fmt.Errorf("error creating debounce: %w", err)
 	}
@@ -714,7 +738,7 @@ func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inn
 		return nil, 0, err
 	}
 
-	return secondary.DebouncePrepareMigration(ctx, fn.ID, key, fakeDebounceID)
+	return secondary.DebouncePrepareMigration(ctx, scopeForDebounceItem(di), key, fakeDebounceID)
 }
 
 // updateDebounce updates the currently pending debounce to point to the new event ID.  It pushes
@@ -745,7 +769,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 
 	newTTL, status, err := queueShard.DebounceUpdate(
 		ctx,
-		fn.ID,
+		scopeForDebounceItem(di),
 		key,
 		debounceID,
 		byt,
@@ -829,10 +853,14 @@ func (d debouncer) debounceKey(ctx context.Context, evt event.TrackedEvent, fn i
 }
 
 // GetDebounceInfo retrieves information about the current debounce for a function and debounce key.
-func (d debouncer) GetDebounceInfo(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DebounceInfo, error) {
+func (d debouncer) GetDebounceInfo(ctx context.Context, scope queue.Scope, debounceKey string) (*DebounceInfo, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	// Use function ID as debounce key if not specified
 	if debounceKey == "" {
-		debounceKey = functionID.String()
+		debounceKey = scope.FunctionID.String()
 	}
 
 	// Always use the primary shard for debugging - this is read-only
@@ -842,7 +870,7 @@ func (d debouncer) GetDebounceInfo(ctx context.Context, functionID uuid.UUID, de
 	}
 
 	// Read the debounce ID from the pointer
-	debounceIDStr, err := queueShard.DebounceGetPointer(ctx, functionID, debounceKey)
+	debounceIDStr, err := queueShard.DebounceGetPointer(ctx, scope, debounceKey)
 	if errors.Is(err, ErrDebounceNotFound) {
 		// No active debounce
 		return &DebounceInfo{}, nil
@@ -856,7 +884,7 @@ func (d debouncer) GetDebounceInfo(ctx context.Context, functionID uuid.UUID, de
 		return nil, fmt.Errorf("invalid debounce id %q in pointer: %w", debounceIDStr, err)
 	}
 
-	itemBytes, err := queueShard.DebounceGetItem(ctx, debounceID)
+	itemBytes, err := queueShard.DebounceGetItem(ctx, scope, debounceID)
 	if errors.Is(err, ErrDebounceNotFound) {
 		// Debounce ID exists in pointer but item not found in hash
 		return &DebounceInfo{DebounceID: debounceIDStr}, nil
@@ -877,9 +905,13 @@ func (d debouncer) GetDebounceInfo(ctx context.Context, functionID uuid.UUID, de
 }
 
 // DeleteDebounce deletes the current debounce for a function and debounce key.
-func (d debouncer) DeleteDebounce(ctx context.Context, functionID uuid.UUID, debounceKey string) (*DeleteDebounceResult, error) {
+func (d debouncer) DeleteDebounce(ctx context.Context, scope queue.Scope, debounceKey string) (*DeleteDebounceResult, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
 	// Get the debounce info first
-	info, err := d.GetDebounceInfo(ctx, functionID, debounceKey)
+	info, err := d.GetDebounceInfo(ctx, scope, debounceKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get debounce info: %w", err)
 	}
@@ -896,7 +928,7 @@ func (d debouncer) DeleteDebounce(ctx context.Context, functionID uuid.UUID, deb
 
 	// Use function ID as debounce key if not specified (same as GetDebounceInfo)
 	if debounceKey == "" {
-		debounceKey = functionID.String()
+		debounceKey = scope.FunctionID.String()
 	}
 
 	queueShard, err := d.primaryShard()
@@ -904,10 +936,10 @@ func (d debouncer) DeleteDebounce(ctx context.Context, functionID uuid.UUID, deb
 		return nil, fmt.Errorf("could not resolve primary shard: %w", err)
 	}
 
-	if err := queueShard.DebounceDeleteItems(ctx, debounceID); err != nil {
+	if err := queueShard.DebounceDeleteItems(ctx, scope, debounceID); err != nil {
 		return nil, fmt.Errorf("failed to delete debounce item: %w", err)
 	}
-	if err := queueShard.DebounceDeletePointer(ctx, functionID, debounceKey); err != nil {
+	if err := queueShard.DebounceDeletePointer(ctx, scope, debounceKey); err != nil {
 		return nil, fmt.Errorf("failed to delete debounce pointer: %w", err)
 	}
 
@@ -923,7 +955,11 @@ func (d debouncer) DeleteDebounce(ctx context.Context, functionID uuid.UUID, deb
 }
 
 // DeleteDebounceByID deletes debounces directly by their IDs.
-func (d debouncer) DeleteDebounceByID(ctx context.Context, debounceIDs ...ulid.ULID) error {
+func (d debouncer) DeleteDebounceByID(ctx context.Context, scope queue.Scope, debounceIDs ...ulid.ULID) error {
+	if err := scope.Validate(); err != nil {
+		return err
+	}
+
 	if len(debounceIDs) == 0 {
 		return nil
 	}
@@ -933,7 +969,7 @@ func (d debouncer) DeleteDebounceByID(ctx context.Context, debounceIDs ...ulid.U
 		return fmt.Errorf("could not resolve primary shard: %w", err)
 	}
 
-	if err := queueShard.DebounceDeleteItems(ctx, debounceIDs...); err != nil {
+	if err := queueShard.DebounceDeleteItems(ctx, scope, debounceIDs...); err != nil {
 		return fmt.Errorf("failed to delete debounce items: %w", err)
 	}
 
@@ -949,7 +985,16 @@ func (d debouncer) DeleteDebounceByID(ctx context.Context, debounceIDs ...ulid.U
 // RunDebounce schedules immediate execution of a debounce by creating a timeout job that runs in one second.
 func (d debouncer) RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunDebounceResult, error) {
 	// Get the debounce info first
-	info, err := d.GetDebounceInfo(ctx, opts.FunctionID, opts.DebounceKey)
+	scope := queue.Scope{
+		AccountID:  opts.AccountID,
+		EnvID:      opts.EnvID,
+		FunctionID: opts.FunctionID,
+	}
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+
+	info, err := d.GetDebounceInfo(ctx, scope, opts.DebounceKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get debounce info: %w", err)
 	}

@@ -178,6 +178,45 @@ N/A
 	}
 }
 
+func TestBuildReleaseNotesDoesNotDuplicateManualNotesFromPreview(t *testing.T) {
+	releasePRBody := `### Additional Release Notes
+<!-- release-note:manual-start -->
+Manual release note.
+<!-- release-note:manual-end -->
+
+### Additional Migration Notes
+<!-- migration-note:manual-start -->
+Manual migration note.
+<!-- migration-note:manual-end -->
+
+## Final Release Page Preview
+<!-- release-note:preview-start -->
+## Release Notes
+
+Manual release note.
+
+## Migration Notes
+
+Manual migration note.
+
+## Changelog
+
+- Old entry
+<!-- release-note:preview-end -->`
+
+	got, err := BuildReleaseNotes(NotesFile{}, "### Bug Fixes\n\n- Fix thing", releasePRBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if count := strings.Count(got, "Manual release note."); count != 1 {
+		t.Fatalf("manual release note count = %d, want 1:\n%s", count, got)
+	}
+	if count := strings.Count(got, "Manual migration note."); count != 1 {
+		t.Fatalf("manual migration note count = %d, want 1:\n%s", count, got)
+	}
+}
+
 func TestBuildCommandWritesOutput(t *testing.T) {
 	dir := t.TempDir()
 	notesPath := filepath.Join(dir, "notes.json")

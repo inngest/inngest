@@ -139,7 +139,7 @@ type svc struct {
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
 	// exec runs the specific actions.
-	exec          execution.Executor
+	exec      execution.Executor
 	debouncer debounce.Debouncer
 	batcher   batch.BatchManager
 	croner    cron.CronManager
@@ -445,7 +445,12 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 
 	for _, f := range all {
 		if f.ID == d.FunctionID {
-			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID, d.AccountID)
+			scope := queue.Scope{
+				AccountID:  d.AccountID,
+				EnvID:      d.WorkspaceID,
+				FunctionID: d.FunctionID,
+			}
+			di, err := s.debouncer.GetDebounceItem(ctx, scope, d.DebounceID)
 			if err != nil {
 				if errors.Is(err, debounce.ErrDebounceNotFound) {
 					// This is expected after migrating items to a new primary cluster
@@ -512,7 +517,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				if errors.Is(err, state.ErrIdentifierExists) ||
 					errors.Is(err, ErrFunctionSkipped) ||
 					errors.Is(err, ErrFunctionSkippedIdempotency) {
-					if err := s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID); err != nil {
+					if err := s.debouncer.DeleteDebounceItem(ctx, scope, d.DebounceID, *di); err != nil {
 						logger.StdlibLogger(ctx).ReportError(err, "error deleting debounce item")
 					}
 
@@ -525,7 +530,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 			}
 
-			if err := s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID); err != nil {
+			if err := s.debouncer.DeleteDebounceItem(ctx, scope, d.DebounceID, *di); err != nil {
 				logger.StdlibLogger(ctx).ReportError(err, "error deleting debounce item")
 			}
 		}
