@@ -983,3 +983,21 @@ func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterO
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrEventFlushErrorCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "event_flush_error_total",
+		Description: "Total number of buffered event flush failures",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrEventFlushDroppedCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "event_flush_dropped_total",
+		Description: "Total number of events dropped due to flush failures",
+		Tags:        opts.Tags,
+	})
+}

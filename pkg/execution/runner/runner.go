@@ -146,6 +146,8 @@ type svc struct {
 	batcher batch.BatchManager
 	// croner handles cron operations
 	croner cron.CronManager
+	// bufferedWriter batches InsertEvent calls to reduce DB round-trips.
+	bufferedWriter *BufferedEventWriter
 
 	log logger.Logger
 }
@@ -181,6 +183,10 @@ func (s *svc) Pre(ctx context.Context) error {
 }
 
 func (s *svc) Run(ctx context.Context) error {
+	// Start the buffered event writer for bulk DB inserts.
+	s.bufferedWriter = NewBufferedEventWriter(s.cqrs, s.log)
+	s.bufferedWriter.Start(ctx)
+
 	// initialize crons from data store.
 	//
 	// this is more relevant for persisted environment like lite, where there's an external data store
@@ -202,6 +208,11 @@ func (s *svc) Run(ctx context.Context) error {
 }
 
 func (s *svc) Stop(ctx context.Context) error {
+	if s.bufferedWriter != nil {
+		if err := s.bufferedWriter.Stop(ctx); err != nil {
+			s.log.Error("error stopping buffered event writer", "error", err)
+		}
+	}
 	if s.batcher != nil {
 		return s.batcher.Close()
 	}
@@ -314,13 +325,17 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return fmt.Errorf("error creating event: %w", err)
 	}
 
-	// Write the event to our CQRS manager for long-term storage.
-	err = s.cqrs.InsertEvent(
-		ctx,
-		cqrs.ConvertFromEvent(tracked.GetInternalID(), tracked.GetEvent()),
-	)
-	if err != nil {
-		return err
+	// Buffer the event for bulk insertion instead of writing one-at-a-time.
+	// Errors are logged asynchronously by the buffered writer rather than
+	// returned here, since at incident scale (78K events) per-event
+	// round-trips overwhelm the database.
+	evt := cqrs.ConvertFromEvent(tracked.GetInternalID(), tracked.GetEvent())
+	if s.bufferedWriter != nil {
+		s.bufferedWriter.Write(ctx, evt)
+	} else {
+		if err := s.cqrs.InsertEvent(ctx, evt); err != nil {
+			return fmt.Errorf("error inserting event: %w", err)
+		}
 	}
 
 	l := s.log.With(

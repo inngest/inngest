@@ -88,7 +88,21 @@ type EventManager interface {
 
 type EventWriter interface {
 	InsertEvent(ctx context.Context, e Event) error
+	InsertEvents(ctx context.Context, events []Event) error
 	InsertEventBatch(ctx context.Context, eb EventBatch) error
+}
+
+// PartialInsertError is returned by InsertEvents when some events in
+// a batch were skipped (e.g. due to marshal failures) but the valid
+// subset was successfully persisted. Callers can use errors.As to
+// distinguish partial success from total failure.
+type PartialInsertError struct {
+	Inserted int
+	Skipped  int
+}
+
+func (e *PartialInsertError) Error() string {
+	return fmt.Sprintf("inserted %d events but skipped %d due to marshal errors", e.Inserted, e.Skipped)
 }
 
 type WorkspaceEventsOpts struct {
