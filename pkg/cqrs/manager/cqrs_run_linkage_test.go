@@ -18,10 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// deferSpanAttrs returns a JSON blob shaped like a real executor.defer span's
-// attributes column: the typed Attrs serializers use the "_inngest." prefix,
-// so we mirror that here so that ExtractTypedValues in mapSpanFromRow reads
-// the values back into ExtractedValues correctly.
+// Mirrors the attrs an executor.defer span carries in production; keep aligned with the typed Attrs serializers.
 func deferSpanAttrs(t *testing.T, hashedID, userID, fnSlug string, status enums.DeferStatus) []byte {
 	t.Helper()
 	statusText, err := status.MarshalText()
@@ -36,9 +33,7 @@ func deferSpanAttrs(t *testing.T, hashedID, userID, fnSlug string, status enums.
 	return byt
 }
 
-// runSpanAttrsWithParent mirrors the attributes a child run's executor.run
-// span carries when it was scheduled via deferred.schedule: just the parent
-// linkage attrs that the GetRunDeferredFrom CQRS method reads back.
+// Mirrors the parent-linkage attrs a deferred child run's executor.run span carries.
 func runSpanAttrsWithParent(t *testing.T, parentRunID ulid.ULID, hashedID string) []byte {
 	t.Helper()
 	byt, err := json.Marshal(map[string]any{
@@ -49,9 +44,6 @@ func runSpanAttrsWithParent(t *testing.T, parentRunID ulid.ULID, hashedID string
 	return byt
 }
 
-// insertChildTraceRun inserts a minimal TraceRun for the given run ID so that
-// GetTraceRunsByRunIDs returns it and GetRunDefers can stitch it onto the
-// parent's RunDefer entry.
 func insertChildTraceRun(t *testing.T, cm cqrs.Manager, runID ulid.ULID, accountID, workspaceID, appID, fnID uuid.UUID) {
 	t.Helper()
 	now := time.Now()
@@ -70,10 +62,9 @@ func insertChildTraceRun(t *testing.T, cm cqrs.Manager, runID ulid.ULID, account
 	require.NoError(t, err)
 }
 
-// TestGetRunDefers_ReadsExecutorDeferSpans seeds two executor.defer spans on
-// a single parent, links one of the deterministic child run IDs to a
-// TraceRun, and asserts GetRunDefers returns both defers, sorted by hashed
-// ID, with Run populated only for the linked one.
+// GetRunDefers must surface every defer on the parent, even when the child run hasn't
+// materialized yet. If this fails, the UI silently drops pending/aborted defers based
+// on child-run progress.
 func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -87,8 +78,7 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 
 	parentRunID := ulid.MustNew(ulid.Now(), nil)
 
-	// Two defers on the same parent. The first will have a child trace row,
-	// the second will not (Run must be nil for it).
+	// Two defers; only the first will get a child TraceRow.
 	defers := []struct {
 		hashedID string
 		userID   string
@@ -112,8 +102,7 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 		})
 	}
 
-	// Insert a trace run for the deterministic child run ID of the first
-	// defer only — the second defer's child should remain unlinked (Run nil).
+	// Link only the first defer's child.
 	linkedChildRunID := util.DeterministicChildRunID(parentRunID, defers[0].hashedID)
 	insertChildTraceRun(t, cm, linkedChildRunID, accountID, workspaceID, appID, fnID)
 
@@ -145,9 +134,7 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 	assert.Nil(t, second.Run, "Aborted/unlinked defer must surface with Run == nil")
 }
 
-// invokeStepSpanAttrs mirrors the attributes on the parent's executor.step
-// fragment of an invoke step span: just the step display name. The invoked
-// run ID lives on a separate EXTEND fragment (see invokeExtendSpanAttrs).
+// Mirrors the executor.step fragment of an invoke; the invoked run ID lives on the EXTEND fragment.
 func invokeStepSpanAttrs(t *testing.T, stepName string) []byte {
 	t.Helper()
 	byt, err := json.Marshal(map[string]any{
@@ -157,10 +144,7 @@ func invokeStepSpanAttrs(t *testing.T, stepName string) []byte {
 	return byt
 }
 
-// invokeExtendSpanAttrs mirrors the attributes on the EXTEND fragment that
-// the executor emits when the invoked run ID becomes known. The fragment
-// shares dynamic_span_id with the original executor.step row and shares
-// the parent's run_id; only the invoked-run-id attribute distinguishes it.
+// Mirrors the EXTEND fragment carrying the invoked run ID; shares dynamic_span_id with the executor.step fragment.
 func invokeExtendSpanAttrs(t *testing.T, invokedRunID ulid.ULID) []byte {
 	t.Helper()
 	byt, err := json.Marshal(map[string]any{
@@ -170,12 +154,9 @@ func invokeExtendSpanAttrs(t *testing.T, invokedRunID ulid.ULID) []byte {
 	return byt
 }
 
-// TestGetRunInvokedFrom_ReadsParentInvokeStepSpan seeds a parent run with
-// an executor.step + EXTEND fragment pair sharing a dynamic_span_id and a
-// child run that the invoke produced. GetRunInvokedFrom must locate the
-// parent linkage by reverse-walking from the child run ID through the
-// EXTEND fragment's StepInvokeRunID attribute, then pick up StepName from
-// the sibling executor.step fragment.
+// Invoke linkage spans two fragments sharing a dynamic_span_id: executor.step carries the
+// step name, EXTEND carries the invoked run ID. GetRunInvokedFrom must merge both — losing
+// either one blanks the child's "invoked from" panel.
 func TestGetRunInvokedFrom_ReadsParentInvokeStepSpan(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -193,10 +174,7 @@ func TestGetRunInvokedFrom_ReadsParentInvokeStepSpan(t *testing.T) {
 	insertChildTraceRun(t, cm, parentRunID, accountID, workspaceID, appID, fnID)
 	insertChildTraceRun(t, cm, childRunID, accountID, workspaceID, appID, fnID)
 
-	// Two fragments share the dynamic_span_id and trace_id; the first
-	// carries the step display name, the second is the EXTEND row with
-	// the invoked run ID. Both fields are required for the read-time
-	// merge in mapSpanFromRow (the query GROUPs by both).
+	// Both fragments must be present for mapSpanFromRow's read-time merge.
 	dynamicSpanID := "dyn-invoke-step"
 	traceID := "trace-invoke-step"
 	insertTestSpan(t, cm, testSpanFields{
@@ -235,10 +213,9 @@ func TestGetRunInvokedFrom_ReadsParentInvokeStepSpan(t *testing.T) {
 	assert.Equal(t, parentRunID.String(), rif.ParentRun.RunID)
 }
 
-// TestGetRunDeferredFrom_ReadsChildExecutorRunSpan seeds a parent run, a
-// child run, and an executor.run span on the child whose attributes carry
-// the parent linkage. GetRunDeferredFrom must return the parent run pointer
-// stitched onto the RunDeferredFrom entry.
+// The child's own executor.run span is the authoritative parent link for deferred runs (the
+// parent's defer span alone isn't sufficient). If this fails, a deferred child can't render
+// its parent breadcrumb.
 func TestGetRunDeferredFrom_ReadsChildExecutorRunSpan(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -253,8 +230,7 @@ func TestGetRunDeferredFrom_ReadsChildExecutorRunSpan(t *testing.T) {
 	parentRunID := ulid.MustNew(ulid.Now(), nil)
 	childRunID := ulid.MustNew(ulid.Now(), nil)
 
-	// Both runs exist as TraceRuns so GetRunDeferredFrom can hand back the
-	// parent pointer.
+	// Both TraceRuns must exist for GetRunDeferredFrom to return the parent pointer.
 	insertChildTraceRun(t, cm, parentRunID, accountID, workspaceID, appID, fnID)
 	insertChildTraceRun(t, cm, childRunID, accountID, workspaceID, appID, fnID)
 
