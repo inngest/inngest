@@ -1,6 +1,4 @@
 openapi: 3.1.0
-x-stoplight:
-  id: l4npshyzgv77t
 info:
   title: API v1
   version: "1.0"
@@ -37,13 +35,8 @@ servers:
     description: Production
   - url: http://localhost:8288
     description: Dev Server
-tags:
-  - name: Events
-  - name: Function runs
-    x-displayName: Function runs
-  - name: Signals
-  - name: Cancellations
-  - name: Webhooks
+security:
+  - your-signing-key: []
 paths:
   /v1/events:
     get:
@@ -2065,5 +2058,12 @@ components:
                     description: A JavaScript transform function that accepts the inbound request
                       components and returns an object in the Inngest event
                       payload format.
-security:
-  - your-signing-key: []
+tags:
+  - name: Events
+  - name: Function runs
+    x-displayName: Function runs
+  - name: Signals
+  - name: Cancellations
+  - name: Webhooks
+x-stoplight:
+  id: l4npshyzgv77t
