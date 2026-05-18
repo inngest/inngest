@@ -211,6 +211,25 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 	return n, nil
 }
 
+// WriteBatch writes multiple pauses in a single Redis pipeline roundtrip.
+// Returns a per-pause error slice (nil entry = success). This satisfies
+// the BatchPauseWriter optional interface. Falls back to sequential writes
+// if the underlying buffer does not support batch operations.
+func (m manager) WriteBatch(ctx context.Context, index Index, pauses []state.Pause) []error {
+	type batchWriter interface {
+		WriteBatch(ctx context.Context, index Index, pauses []state.Pause) []error
+	}
+	if bw, ok := m.buf.(batchWriter); ok {
+		return bw.WriteBatch(ctx, index, pauses)
+	}
+	// Fallback: write each pause individually.
+	errs := make([]error, len(pauses))
+	for i := range pauses {
+		_, errs[i] = m.Write(ctx, index, &pauses[i])
+	}
+	return errs
+}
+
 func (m manager) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
 	// NOTE: This is only used to look up pauses when they time out.  As of this PR, timeout jobs
 	// embed each pause, prevent the need to do lookups.

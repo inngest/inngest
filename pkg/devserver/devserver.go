@@ -544,6 +544,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithInvokeEventHandler(getInvokeEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
+		executor.WithInvokeEventBatchHandler(getInvokeEventBatchHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
 		executor.WithSingletonManager(sn),
 		executor.WithBatcher(batcher),
@@ -832,32 +833,59 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	return rc, r, nil
 }
 
+// buildInvokeMessage constructs a pubsub.Message from a TrackedEvent with trace propagation.
+func buildInvokeMessage(ctx context.Context, evt event.TrackedEvent) (pubsub.Message, error) {
+	byt, err := json.Marshal(evt)
+	if err != nil {
+		return pubsub.Message{}, fmt.Errorf("error marshalling invocation event: %w", err)
+	}
+
+	carrier := itrace.NewTraceCarrier()
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
+	return pubsub.Message{
+		Name:      event.EventReceivedName,
+		Data:      string(byt),
+		Timestamp: time.Now(),
+		Metadata: map[string]any{
+			consts.OtelPropagationKey: carrier,
+		},
+	}, nil
+}
+
 func getInvokeEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleInvokeEvent {
 	return func(ctx context.Context, evt event.TrackedEvent) error {
-		byt, err := json.Marshal(evt)
+		msg, err := buildInvokeMessage(ctx, evt)
 		if err != nil {
-			return fmt.Errorf("error marshalling invocation event: %w", err)
+			return err
 		}
-
-		carrier := itrace.NewTraceCarrier()
-		itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
-
-		err = pb.Publish(
-			ctx,
-			topic,
-			pubsub.Message{
-				Name:      event.EventReceivedName,
-				Data:      string(byt),
-				Timestamp: time.Now(),
-				Metadata: map[string]any{
-					consts.OtelPropagationKey: carrier,
-				},
-			},
-		)
-		if err != nil {
+		if err := pb.Publish(ctx, topic, msg); err != nil {
 			return fmt.Errorf("error publishing invocation event: %w", err)
 		}
+		return nil
+	}
+}
 
+func getInvokeEventBatchHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleInvokeEventsBatch {
+	return func(ctx context.Context, evts []event.TrackedEvent) error {
+		msgs := make([]pubsub.Message, 0, len(evts))
+		for _, evt := range evts {
+			msg, err := buildInvokeMessage(ctx, evt)
+			if err != nil {
+				return err
+			}
+			msgs = append(msgs, msg)
+		}
+
+		if bp, ok := pb.(pubsub.BatchPublisher); ok {
+			return bp.PublishBatch(ctx, topic, msgs)
+		}
+
+		for _, msg := range msgs {
+			if err := pb.Publish(ctx, topic, msg); err != nil {
+				return fmt.Errorf("error publishing invocation event: %w", err)
+			}
+		}
 		return nil
 	}
 }

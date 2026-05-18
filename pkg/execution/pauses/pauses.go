@@ -214,6 +214,15 @@ type Bufferer interface {
 	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
 }
 
+// BatchPauseWriter is an optional interface that pause managers can implement
+// to support batch writing of multiple pauses in a single Redis pipeline roundtrip.
+// The executor type-asserts against this to use batch writes when available.
+type BatchPauseWriter interface {
+	// WriteBatch writes multiple pauses to the backing store in a single pipeline
+	// roundtrip. Returns a per-pause error slice (nil entry = success).
+	WriteBatch(ctx context.Context, index Index, pauses []state.Pause) []error
+}
+
 // BlockStore is an implementation that reads and writes blocks.
 type BlockStore interface {
 	BlockFlusher

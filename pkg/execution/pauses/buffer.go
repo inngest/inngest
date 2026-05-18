@@ -38,6 +38,27 @@ func (r redisAdapter) Write(ctx context.Context, index Index, pauses ...*state.P
 	return total, nil
 }
 
+// batchPauseSaver is an optional interface for backing stores that support
+// pipelined batch pause writes.
+type batchPauseSaver interface {
+	SavePauseBatch(ctx context.Context, pauses []state.Pause) []error
+}
+
+// WriteBatch writes multiple pauses using a Redis pipeline if the backing store
+// supports it. Returns a per-pause error slice (nil entry = success).
+func (r redisAdapter) WriteBatch(ctx context.Context, index Index, pauses []state.Pause) []error {
+	if bs, ok := r.rsm.(batchPauseSaver); ok {
+		return bs.SavePauseBatch(ctx, pauses)
+	}
+	// Fallback: write sequentially.
+	errs := make([]error, len(pauses))
+	for i := range pauses {
+		_, err := r.rsm.SavePause(ctx, pauses[i])
+		errs[i] = err
+	}
+	return errs
+}
+
 // PausesSince loads pauses in the bfufer for a given index, since a given time.
 // If the time is ZeroTime, this must return all indexes in the buffer.
 //

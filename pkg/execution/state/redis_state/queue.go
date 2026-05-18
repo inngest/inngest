@@ -125,70 +125,47 @@ func fnConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 
 func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
 	l := logger.StdlibLogger(ctx)
-
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
-
-	kg := q.RedisClient.kg
-
-	if len(i.ID) == 0 {
-		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
-	} else {
-		if !opts.PassthroughJobId {
-			i.SetID(ctx, i.ID)
-		}
-	}
-
 	now := q.Clock.Now()
 
-	// XXX: If the length of ID >= max, error.
-	if i.WallTimeMS == 0 {
-		i.WallTimeMS = at.UnixMilli()
+	exec, err := q.prepareEnqueueLuaExec(ctx, &i, at, now, opts)
+	if err != nil {
+		return i, err
 	}
 
-	if at.Before(now) {
-		// Normalize to now to minimize latency.
-		i.WallTimeMS = now.UnixMilli()
+	endSpan := q.traceEnqueueItem(ctx, l, &i, at, now, opts)
+	defer endSpan()
+
+	status, err := scripts["queue/enqueue"].Exec(
+		redis_telemetry.WithScriptName(ctx, "enqueue"),
+		q.RedisClient.Client(),
+		exec.Keys,
+		exec.Args,
+	).AsInt64()
+	if err != nil {
+		return i, fmt.Errorf("error enqueueing item: %w", err)
 	}
 
-	// Add the At timestamp, if not included.
-	if i.AtMS == 0 {
-		i.AtMS = at.UnixMilli()
+	return q.handleEnqueueStatus(ctx, l, i, status, now)
+}
+
+// traceEnqueueItem adds telemetry tracing and debug logging for a single enqueue call.
+// It returns a cleanup function that ends the span; the caller must defer it so the span
+// wraps the subsequent Lua execution.
+func (q *queue) traceEnqueueItem(ctx context.Context, l logger.Logger, i *osqueue.QueueItem, at time.Time, now time.Time, opts osqueue.EnqueueOpts) func() {
+	defaultPartition := osqueue.ItemPartition(ctx, *i)
+	if defaultPartition.AccountID == uuid.Nil && !defaultPartition.IsSystem() {
+		l.Warn("attempting to enqueue item to non-system partition without account ID", "item", *i)
 	}
 
-	if i.Data.JobID == nil {
-		i.Data.JobID = &i.ID
-	}
-
-	partitionTime := at
-	if at.Before(now) {
-		// We don't want to enqueue partitions (pointers to fns) before now.
-		// Doing so allows users to stay at the front of the queue for
-		// leases.
-		partitionTime = q.Clock.Now()
-	}
-
-	i.EnqueuedAt = now.UnixMilli()
-
-	defaultPartition := osqueue.ItemPartition(ctx, i)
-
-	isSystemPartition := defaultPartition.IsSystem()
-
-	if defaultPartition.AccountID == uuid.Nil && !isSystemPartition {
-		l.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
-	}
-
-	enqueueToBacklogs := q.QueueOptions.ItemEnableKeyQueues(ctx, i)
-
-	var backlog osqueue.QueueBacklog
 	var shadowPartition osqueue.QueueShadowPartition
+	enqueueToBacklogs := q.QueueOptions.ItemEnableKeyQueues(ctx, *i)
 	if enqueueToBacklogs {
-		backlog = osqueue.ItemBacklog(ctx, i)
-		shadowPartition = osqueue.ItemShadowPartition(ctx, i)
+		shadowPartition = osqueue.ItemShadowPartition(ctx, *i)
 	}
 
 	partitionID := defaultPartition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
-	defer span.End()
+	_, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
 	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
 	span.SetAttributes(attribute.String("run_id", i.Data.Identifier.RunID.String()))
@@ -196,70 +173,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
 	}
 
-	keys := []string{
-		kg.QueueItem(),            // Queue item
-		kg.PartitionItem(),        // Partition item, map
-		kg.GlobalPartitionIndex(), // Global partition queue
-		kg.GlobalAccountIndex(),
-		kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
-		kg.Idempotency(i.ID),
-
-		// Add all 3 partition sets
-		partitionZsetKey(defaultPartition, kg),
-
-		// Key queues v2
-		kg.BacklogSet(backlog.BacklogID),
-		kg.BacklogMeta(),
-		kg.GlobalShadowPartitionSet(),
-		kg.ShadowPartitionSet(shadowPartition.PartitionID),
-		kg.ShadowPartitionMeta(),
-		kg.GlobalAccountShadowPartitions(),
-		kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // will be empty for system queues
-
-		// Key queue Normalization
-		kg.BacklogSet(opts.NormalizeFromBacklogID),
-		kg.PartitionNormalizeSet(shadowPartition.PartitionID),
-		kg.AccountNormalizeSet(i.Data.Identifier.AccountID),
-		kg.GlobalAccountNormalizeSet(),
-
-		// Singletons
-		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
-		kg.SingletonKey(i.Data.Singleton),
+	partitionTime := at
+	if at.Before(now) {
+		partitionTime = now
 	}
-	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
-		if idx != "" {
-			keys = append(keys, idx)
-		}
-	}
-
-	enqueueToBacklogsVal := "0"
-	if enqueueToBacklogs {
-		enqueueToBacklogsVal = "1"
-	}
-
-	args, err := StrSlice([]any{
-		i,
-		i.ID,
-		at.UnixMilli(),
-		partitionTime.Unix(),
-		now.UnixMilli(),
-		defaultPartition,
-		defaultPartition.ID,
-		i.Data.Identifier.AccountID.String(),
-		i.Data.Identifier.RunID.String(),
-
-		enqueueToBacklogsVal,
-		shadowPartition,
-		backlog,
-		backlog.BacklogID,
-
-		opts.NormalizeFromBacklogID,
-	})
-	if err != nil {
-		return i, err
-	}
-
 	l.Trace("enqueue item",
 		"id", i.ID,
 		"kind", i.Data.Kind,
@@ -269,18 +186,13 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		"backlog", enqueueToBacklogs,
 	)
 
-	status, err := scripts["queue/enqueue"].Exec(
-		redis_telemetry.WithScriptName(ctx, "enqueue"),
-		q.RedisClient.Client(),
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return i, fmt.Errorf("error enqueueing item: %w", err)
-	}
+	return func() { span.End() }
+}
+
+// handleEnqueueStatus interprets the Lua script return status for a single enqueue.
+func (q *queue) handleEnqueueStatus(ctx context.Context, l logger.Logger, i osqueue.QueueItem, status int64, now time.Time) (osqueue.QueueItem, error) {
 	switch status {
 	case 0:
-		// Track active runs for stale run detection when a new run starts.
 		if i.Data.Kind == osqueue.KindStart {
 			runInfo := osqueue.StaleRunInfo{
 				RunID:       i.Data.Identifier.RunID,
@@ -304,6 +216,164 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
+}
+
+// EnqueueItemBatch enqueues multiple items in a single Redis pipeline roundtrip
+// using ExecMulti. It returns a per-item error slice. ErrQueueItemExists and
+// ErrQueueItemSingletonExists are returned per-item for idempotency detection.
+func (q *queue) EnqueueItemBatch(ctx context.Context, items []osqueue.QueueItem, ats []time.Time, opts osqueue.EnqueueOpts) []error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItemBatch"), redis_telemetry.ScopeQueue)
+
+	if len(items) == 0 {
+		return nil
+	}
+
+	multi, prepErr := q.prepareBatchEnqueueExecs(ctx, items, ats, opts)
+	if prepErr != nil {
+		return prepErr
+	}
+
+	return q.executeBatchEnqueue(ctx, multi, len(items))
+}
+
+// prepareBatchEnqueueExecs builds LuaExec entries for all items in a batch.
+func (q *queue) prepareBatchEnqueueExecs(ctx context.Context, items []osqueue.QueueItem, ats []time.Time, opts osqueue.EnqueueOpts) ([]rueidis.LuaExec, []error) {
+	now := q.Clock.Now()
+	multi := make([]rueidis.LuaExec, 0, len(items))
+	for idx := range items {
+		exec, err := q.prepareEnqueueLuaExec(ctx, &items[idx], ats[idx], now, opts)
+		if err != nil {
+			errs := make([]error, len(items))
+			errs[idx] = err
+			return nil, errs
+		}
+		multi = append(multi, exec)
+	}
+	return multi, nil
+}
+
+// executeBatchEnqueue runs the Redis pipeline and interprets per-item results.
+func (q *queue) executeBatchEnqueue(ctx context.Context, multi []rueidis.LuaExec, count int) []error {
+	results := scripts["queue/enqueue"].ExecMulti(
+		redis_telemetry.WithScriptName(ctx, "enqueueBatch"),
+		q.RedisClient.Client(),
+		multi...,
+	)
+	return interpretEnqueueBatchResults(results, count)
+}
+
+// normalizeQueueItem sets IDs and timestamps on an item before enqueueing.
+func (q *queue) normalizeQueueItem(ctx context.Context, i *osqueue.QueueItem, at time.Time, now time.Time, opts osqueue.EnqueueOpts) time.Time {
+	if len(i.ID) == 0 {
+		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
+	} else if !opts.PassthroughJobId {
+		i.SetID(ctx, i.ID)
+	}
+
+	if i.WallTimeMS == 0 {
+		i.WallTimeMS = at.UnixMilli()
+	}
+	if at.Before(now) {
+		i.WallTimeMS = now.UnixMilli()
+	}
+	if i.AtMS == 0 {
+		i.AtMS = at.UnixMilli()
+	}
+	if i.Data.JobID == nil {
+		i.Data.JobID = &i.ID
+	}
+
+	partitionTime := at
+	if at.Before(now) {
+		partitionTime = q.Clock.Now()
+	}
+	i.EnqueuedAt = now.UnixMilli()
+
+	return partitionTime
+}
+
+// prepareEnqueueLuaExec builds the LuaExec entry (keys + args) for a single queue item.
+func (q *queue) prepareEnqueueLuaExec(ctx context.Context, i *osqueue.QueueItem, at time.Time, now time.Time, opts osqueue.EnqueueOpts) (rueidis.LuaExec, error) {
+	kg := q.RedisClient.kg
+	partitionTime := q.normalizeQueueItem(ctx, i, at, now, opts)
+
+	defaultPartition := osqueue.ItemPartition(ctx, *i)
+	enqueueToBacklogs := q.QueueOptions.ItemEnableKeyQueues(ctx, *i)
+
+	var backlog osqueue.QueueBacklog
+	var shadowPartition osqueue.QueueShadowPartition
+	if enqueueToBacklogs {
+		backlog = osqueue.ItemBacklog(ctx, *i)
+		shadowPartition = osqueue.ItemShadowPartition(ctx, *i)
+	}
+
+	keys := q.enqueueKeys(ctx, i, kg, defaultPartition, backlog, shadowPartition, opts)
+
+	enqueueToBacklogsVal := "0"
+	if enqueueToBacklogs {
+		enqueueToBacklogsVal = "1"
+	}
+
+	args, err := StrSlice([]any{
+		*i, i.ID, at.UnixMilli(), partitionTime.Unix(), now.UnixMilli(),
+		defaultPartition, defaultPartition.ID,
+		i.Data.Identifier.AccountID.String(), i.Data.Identifier.RunID.String(),
+		enqueueToBacklogsVal, shadowPartition, backlog, backlog.BacklogID,
+		opts.NormalizeFromBacklogID,
+	})
+	if err != nil {
+		return rueidis.LuaExec{}, fmt.Errorf("error building args: %w", err)
+	}
+
+	return rueidis.LuaExec{Keys: keys, Args: args}, nil
+}
+
+// enqueueKeys builds the Redis key list for the enqueue Lua script.
+func (q *queue) enqueueKeys(ctx context.Context, i *osqueue.QueueItem, kg QueueKeyGenerator, defaultPartition osqueue.QueuePartition, backlog osqueue.QueueBacklog, shadowPartition osqueue.QueueShadowPartition, opts osqueue.EnqueueOpts) []string {
+	keys := []string{
+		kg.QueueItem(), kg.PartitionItem(), kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(), kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		kg.Idempotency(i.ID), partitionZsetKey(defaultPartition, kg),
+		kg.BacklogSet(backlog.BacklogID), kg.BacklogMeta(),
+		kg.GlobalShadowPartitionSet(), kg.ShadowPartitionSet(shadowPartition.PartitionID),
+		kg.ShadowPartitionMeta(), kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(i.Data.Identifier.AccountID),
+		kg.BacklogSet(opts.NormalizeFromBacklogID),
+		kg.PartitionNormalizeSet(shadowPartition.PartitionID),
+		kg.AccountNormalizeSet(i.Data.Identifier.AccountID),
+		kg.GlobalAccountNormalizeSet(),
+		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
+		kg.SingletonKey(i.Data.Singleton),
+	}
+	for _, idx := range q.itemIndexer(ctx, *i, q.RedisClient.kg) {
+		if idx != "" {
+			keys = append(keys, idx)
+		}
+	}
+	return keys
+}
+
+// interpretEnqueueBatchResults maps ExecMulti results to per-item errors.
+func interpretEnqueueBatchResults(results []rueidis.RedisResult, count int) []error {
+	errs := make([]error, count)
+	for idx, res := range results {
+		status, err := res.AsInt64()
+		if err != nil {
+			errs[idx] = fmt.Errorf("error enqueueing item %d: %w", idx, err)
+			continue
+		}
+		switch status {
+		case 0:
+			// Success
+		case 1:
+			errs[idx] = osqueue.ErrQueueItemExists
+		case 2:
+			errs[idx] = osqueue.ErrQueueItemSingletonExists
+		default:
+			errs[idx] = fmt.Errorf("unknown response enqueueing item %d: %v", idx, status)
+		}
+	}
+	return errs
 }
 
 // dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated

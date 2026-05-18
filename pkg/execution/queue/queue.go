@@ -67,6 +67,16 @@ type Producer interface {
 	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
 }
 
+// BatchEnqueuer is an optional interface that queue implementations can satisfy
+// to support batch enqueuing of multiple items in a single Redis pipeline roundtrip.
+// The executor type-asserts against this to use batch enqueue when available.
+type BatchEnqueuer interface {
+	// EnqueueBatch enqueues multiple items in a single pipeline roundtrip.
+	// Returns a per-item error slice (nil = success). ErrQueueItemExists is
+	// returned per-item for idempotency detection.
+	EnqueueBatch(ctx context.Context, items []Item, ats []time.Time, opts EnqueueOpts) []error
+}
+
 type Consumer interface {
 	// Run is a blocking function which listens to the queue and executes the
 	// given function each time a new Item becomes available.

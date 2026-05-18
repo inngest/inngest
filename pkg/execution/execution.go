@@ -228,6 +228,10 @@ type InvokeFailHandler func(context.Context, InvokeFailHandlerOpts, []event.Even
 // item.
 type HandleInvokeEvent func(context.Context, event.TrackedEvent) error
 
+// HandleInvokeEventsBatch handles sending multiple invocation events in a
+// single batch pubsub publish, reducing roundtrips.
+type HandleInvokeEventsBatch func(context.Context, []event.TrackedEvent) error
+
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
 	Function inngest.Function

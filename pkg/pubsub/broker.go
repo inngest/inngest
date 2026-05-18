@@ -84,6 +84,40 @@ func (b *broker) Publish(ctx context.Context, topic string, m Message) error {
 	return nil
 }
 
+// PublishBatch publishes multiple messages to the given topic in a single batch,
+// reducing per-message overhead by opening the topic once and sending all messages.
+func (b *broker) PublishBatch(ctx context.Context, topic string, msgs []Message) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	t, err := b.openPublishTopic(ctx, topic)
+	if err != nil {
+		return err
+	}
+
+	for i := range msgs {
+		body, err := msgs[i].Encode()
+		if err != nil {
+			return fmt.Errorf("error encoding message %d: %w", i, err)
+		}
+
+		wrapped := &pubsub.Message{
+			Body: body,
+			Metadata: map[string]string{
+				"name":    msgs[i].Name,
+				"version": fmt.Sprintf("%d", msgs[i].Version),
+			},
+		}
+
+		if err = t.Send(ctx, wrapped); err != nil {
+			return fmt.Errorf("error publishing event %d: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
 // Subscribe subscribes to a topic, invoking the given run function consecutively
 // in a single threaded manner each time an event is received.
 func (b *broker) Subscribe(ctx context.Context, topic string, run PerformFunc) error {

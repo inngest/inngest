@@ -36,6 +36,12 @@ type Publisher interface {
 	Publish(ctx context.Context, topic string, m Message) error
 }
 
+// BatchPublisher is an optional interface that publishers can satisfy to
+// support publishing multiple messages in a single batch, reducing roundtrips.
+type BatchPublisher interface {
+	PublishBatch(ctx context.Context, topic string, msgs []Message) error
+}
+
 // Subscriber subscribes to a topic to consume events published by a Publisher.
 type Subscriber interface {
 	// Subscribe subscribes to the given topic, handling one message at a time
