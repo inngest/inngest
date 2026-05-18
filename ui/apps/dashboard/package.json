@@ -102,7 +102,7 @@
     "@vitejs/plugin-react": "6.0.2",
     "autoprefixer": "10.5.0",
     "concurrently": "9.2.1",
-    "eslint": "10.3.0",
+    "eslint": "10.4.0",
     "eslint-plugin-react-hooks": "5.2.0",
     "postcss": "8.5.14",
     "prettier": "3.8.3",
