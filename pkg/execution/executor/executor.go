@@ -2891,7 +2891,6 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 				"error", err,
 				"cancellation_id", r.CancellationID,
 			)
-			return err
 		}
 		return nil
 	}
