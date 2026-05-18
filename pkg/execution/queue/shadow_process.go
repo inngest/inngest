@@ -227,8 +227,17 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 		if fnBacklog != nil {
 			l.Trace("refilling from fn backlog for fairness", "backlog_id", fnBacklog.BacklogID)
 
+			// Remove the default backlog from the peeked list to avoid duplicates,
+			// since ShadowPartitionPeek may randomly include it.
+			filtered := make([]*QueueBacklog, 0, len(backlogs))
+			for _, b := range backlogs {
+				if b.BacklogID != fnBacklog.BacklogID {
+					filtered = append(filtered, b)
+				}
+			}
+
 			// Start with non-start function backlog
-			backlogs = append([]*QueueBacklog{fnBacklog}, backlogs...)
+			backlogs = append([]*QueueBacklog{fnBacklog}, filtered...)
 		}
 	}
 
