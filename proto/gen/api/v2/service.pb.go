@@ -4251,8 +4251,8 @@ func (x *QueryInsightsPromptResponse) GetMetadata() *ResponseMetadata {
 
 type QueryInsightsPromptData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
-	Diagnostics   []*InsightsDiagnostic  `protobuf:"bytes,2,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
+	Sql           string                 `protobuf:"bytes,1,opt,name=sql,proto3" json:"sql,omitempty"`
+	Summary       string                 `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4287,18 +4287,18 @@ func (*QueryInsightsPromptData) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{65}
 }
 
-func (x *QueryInsightsPromptData) GetQuery() string {
+func (x *QueryInsightsPromptData) GetSql() string {
 	if x != nil {
-		return x.Query
+		return x.Sql
 	}
 	return ""
 }
 
-func (x *QueryInsightsPromptData) GetDiagnostics() []*InsightsDiagnostic {
+func (x *QueryInsightsPromptData) GetSummary() string {
 	if x != nil {
-		return x.Diagnostics
+		return x.Summary
 	}
-	return nil
+	return ""
 }
 
 type ListInsightsEventSchemasRequest struct {
@@ -4785,10 +4785,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06prompt\x18\x01 \x01(\tB}\x92Az25Natural language description of the query to generateJA\"Show me the top 10 functions by failure rate in the last 7 days\"R\x06prompt\"\x88\x01\n" +
 	"\x1bQueryInsightsPromptResponse\x123\n" +
 	"\x04data\x18\x01 \x01(\v2\x1f.api.v2.QueryInsightsPromptDataR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xc9\x03\n" +
-	"\x17QueryInsightsPromptData\x12\xa8\x02\n" +
-	"\x05query\x18\x01 \x01(\tB\x91\x02\x92A\x8d\x022 The generated Insights SQL queryJ\xe8\x01\"SELECT function_id, COUNT(*) AS total, countIf(status = 'Failed') AS failures, failures / total AS failure_rate FROM function_runs WHERE started_at >= now() - INTERVAL 7 DAY GROUP BY function_id ORDER BY failure_rate DESC LIMIT 10\"R\x05query\x12\x82\x01\n" +
-	"\vdiagnostics\x18\x02 \x03(\v2\x1a.api.v2.InsightsDiagnosticBD\x92AA2?Any non-fatal diagnostics or warnings about the generated queryR\vdiagnostics\"\xe5\x01\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x8e\x05\n" +
+	"\x17QueryInsightsPromptData\x12\xa4\x02\n" +
+	"\x03sql\x18\x01 \x01(\tB\x91\x02\x92A\x8d\x022 The generated Insights SQL queryJ\xe8\x01\"SELECT function_id, COUNT(*) AS total, countIf(status = 'Failed') AS failures, failures / total AS failure_rate FROM function_runs WHERE started_at >= now() - INTERVAL 7 DAY GROUP BY function_id ORDER BY failure_rate DESC LIMIT 10\"R\x03sql\x12\xcb\x02\n" +
+	"\asummary\x18\x02 \x01(\tB\xb0\x02\x92A\xac\x022eA natural language summary of the generated query, useful for explaining the query's intent to agentsJ\xc2\x01\"This query retrieves the top 10 functions with the highest failure rate over the past week, showing the total number of runs, number of failures, and calculated failure rate for each function.\"R\asummary\"\xe5\x01\n" +
 	"\x1fListInsightsEventSchemasRequest\x12J\n" +
 	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12a\n" +
 	"\x05limit\x18\x02 \x01(\x05BF\x92AC2=Number of event schemas to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
@@ -5465,56 +5465,55 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	69,  // 87: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
 	72,  // 88: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
 	13,  // 89: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
-	64,  // 90: api.v2.QueryInsightsPromptData.diagnostics:type_name -> api.v2.InsightsDiagnostic
-	75,  // 91: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
-	13,  // 92: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 93: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
-	78,  // 94: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
-	7,   // 95: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	7,   // 96: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	25,  // 97: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	27,  // 98: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	31,  // 99: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	8,   // 100: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	39,  // 101: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	36,  // 102: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	41,  // 103: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	44,  // 104: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	47,  // 105: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	50,  // 106: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	18,  // 107: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	55,  // 108: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	23,  // 109: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	52,  // 110: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	66,  // 111: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
-	73,  // 112: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
-	70,  // 113: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
-	59,  // 114: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	9,   // 115: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	12,  // 116: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	26,  // 117: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	28,  // 118: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	32,  // 119: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	33,  // 120: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	40,  // 121: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	37,  // 122: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	42,  // 123: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	45,  // 124: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	48,  // 125: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	51,  // 126: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	19,  // 127: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	56,  // 128: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	24,  // 129: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	53,  // 130: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	67,  // 131: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
-	74,  // 132: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
-	71,  // 133: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
-	60,  // 134: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	115, // [115:135] is the sub-list for method output_type
-	95,  // [95:115] is the sub-list for method input_type
-	95,  // [95:95] is the sub-list for extension type_name
-	95,  // [95:95] is the sub-list for extension extendee
-	0,   // [0:95] is the sub-list for field type_name
+	75,  // 90: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
+	13,  // 91: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
+	35,  // 92: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
+	78,  // 93: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
+	7,   // 94: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	7,   // 95: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	25,  // 96: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	27,  // 97: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	31,  // 98: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	8,   // 99: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	39,  // 100: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	36,  // 101: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	41,  // 102: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	44,  // 103: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	47,  // 104: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	50,  // 105: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	18,  // 106: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	55,  // 107: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	23,  // 108: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	52,  // 109: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	66,  // 110: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	73,  // 111: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
+	70,  // 112: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
+	59,  // 113: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	9,   // 114: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	12,  // 115: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	26,  // 116: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	28,  // 117: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	32,  // 118: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	33,  // 119: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	40,  // 120: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	37,  // 121: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	42,  // 122: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	45,  // 123: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	48,  // 124: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	51,  // 125: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	19,  // 126: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	56,  // 127: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	24,  // 128: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	53,  // 129: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	67,  // 130: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	74,  // 131: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
+	71,  // 132: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
+	60,  // 133: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	114, // [114:134] is the sub-list for method output_type
+	94,  // [94:114] is the sub-list for method input_type
+	94,  // [94:94] is the sub-list for extension type_name
+	94,  // [94:94] is the sub-list for extension extendee
+	0,   // [0:94] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }

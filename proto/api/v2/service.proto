@@ -2225,11 +2225,6 @@ message QueryInsightsPromptData {
       example: "\"This query retrieves the top 10 functions with the highest failure rate over the past week, showing the total number of runs, number of failures, and calculated failure rate for each function.\""
     }
   ];
-  repeated InsightsDiagnostic diagnostics = 3 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Any non-fatal diagnostics or warnings about the generated query"
-    }
-  ];
 }
 
 message ListInsightsEventSchemasRequest {
