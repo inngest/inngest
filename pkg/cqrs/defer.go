@@ -5,30 +5,25 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// RunDefer is a single defer attached to a parent function run. Parsed from
-// the parent's history opcodes (DeferAdd/DeferAbort) and joined to the
-// resulting child run when one exists. Run is nil if the defer was aborted,
-// the schedule event has not yet been processed, or the child trace was
-// pruned.
+// RunDefer is a single defer attached to a parent function run. Run is nil
+// if the defer was aborted or its child run has not yet been recorded.
 type RunDefer struct {
 	HashedDeferID string            // SHA1-hashed UserDeferID
 	UserDeferID   string            // ID provided by the user, ie `defer("foo", ...)` => "foo"
 	FnSlug        string            // Slug of the deferred function, "foo-defer"
-	Status        enums.DeferStatus // status of the defer itself, not the potentially associated run
+	Status        enums.DeferStatus // Status of the defer itself, not its associated run
 	Run           *TraceRun
 }
 
+// RunDeferredFrom describes the parent run that scheduled a function run via
+// `defer`.
 type RunDeferredFrom struct {
 	ParentRunID ulid.ULID
 	ParentRun   *TraceRun
 }
 
-// RunInvokedFrom is the reverse-lookup for a function run that was triggered
-// by a parent run's `step.invoke`. The linkage is reconstructed from the
-// parent's invoke step span: an EXTEND fragment carries
-// `_inngest.step.invoke.run.id` (the child run ID), and the original
-// `executor.step` fragment sharing the same `dynamic_span_id` carries the
-// step display name.
+// RunInvokedFrom describes the parent run that triggered a function run via
+// `step.invoke`.
 type RunInvokedFrom struct {
 	ParentRunID ulid.ULID
 	ParentRun   *TraceRun
