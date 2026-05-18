@@ -2213,13 +2213,19 @@ message QueryInsightsPromptResponse {
 }
 
 message QueryInsightsPromptData {
-  string query = 1 [
+  string sql = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "The generated Insights SQL query"
       example: "\"SELECT function_id, COUNT(*) AS total, countIf(status = 'Failed') AS failures, failures / total AS failure_rate FROM function_runs WHERE started_at >= now() - INTERVAL 7 DAY GROUP BY function_id ORDER BY failure_rate DESC LIMIT 10\""
     }
   ];
-  repeated InsightsDiagnostic diagnostics = 2 [
+  string summary = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "A natural language summary of the generated query, useful for explaining the query's intent to agents"
+      example: "\"This query retrieves the top 10 functions with the highest failure rate over the past week, showing the total number of runs, number of failures, and calculated failure rate for each function.\""
+    }
+  ];
+  repeated InsightsDiagnostic diagnostics = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Any non-fatal diagnostics or warnings about the generated query"
     }
