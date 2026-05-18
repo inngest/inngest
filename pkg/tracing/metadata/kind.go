@@ -17,8 +17,6 @@ const (
 
 	KindPrefixInngest  = "inngest."
 	KindPrefixUserland = "userland."
-
-	KindInngestScore Kind = "inngest.score"
 )
 
 func (k Kind) String() string {

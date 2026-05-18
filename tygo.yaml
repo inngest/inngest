@@ -17,6 +17,7 @@ packages:
         | typeof KindInngestTiming
         | typeof KindInngestExperiment
         | typeof KindInngestWarnings
+        | typeof KindInngestScore
         | SpanMetadataKindUserland;
     type_mappings:
       error: "string"

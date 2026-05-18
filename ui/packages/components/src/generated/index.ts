@@ -12,11 +12,16 @@ export type SpanMetadataKind =
   | typeof KindInngestTiming
   | typeof KindInngestExperiment
   | typeof KindInngestWarnings
+  | typeof KindInngestScore
   | SpanMetadataKindUserland;
 
 //////////
 // source: types_gen.go
 
+/**
+ * From score.go
+ */
+export const KindInngestScore = 'inngest.score';
 /**
  * From warning.go
  */

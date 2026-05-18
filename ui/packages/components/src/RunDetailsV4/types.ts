@@ -32,7 +32,7 @@ export type ResponseInfo = {
   headers: Record<string, string | string[]>;
 };
 
-export type SpanMetadataKind = GeneratedSpanMetadataKind | 'inngest.score';
+export type SpanMetadataKind = GeneratedSpanMetadataKind;
 
 export type SpanMetadataKindUserland = GeneratedSpanMetadataKindUserland;
 
