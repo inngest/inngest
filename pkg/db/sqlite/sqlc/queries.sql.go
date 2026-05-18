@@ -1564,7 +1564,7 @@ SELECT
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
-WHERE name = ?1
+WHERE name = ?
   AND run_id IN (/*SLICE:run_ids*/?)
 GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY run_id, start_time
@@ -1585,10 +1585,6 @@ type GetSpansByRunIDsAndNameRow struct {
 	SpanFragments interface{}
 }
 
-// NOTE: `name` is intentionally listed before the slice in the WHERE clause so
-// sqlc binds it to ?1. If the slice came first, sqlc would still emit `name = ?N`
-// with a fixed N, but the runtime SLICE expansion shifts the slice's `?` slots
-// and the named index would point at a slice element instead.
 func (q *Queries) GetSpansByRunIDsAndName(ctx context.Context, arg GetSpansByRunIDsAndNameParams) ([]*GetSpansByRunIDsAndNameRow, error) {
 	query := getSpansByRunIDsAndName
 	var queryParams []interface{}

@@ -115,13 +115,15 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 		}
 	}
 
-	parentRuns, err := w.GetTraceRunsByRunIDs(ctx, slices.Collect(maps.Keys(parentRunIDSet)))
-	if err != nil {
-		return nil, fmt.Errorf("error loading deferred-from parent runs: %w", err)
-	}
-	for _, rdf := range out {
-		if run, ok := parentRuns[rdf.ParentRunID]; ok {
-			rdf.ParentRun = run
+	if len(parentRunIDSet) > 0 {
+		parentRuns, err := w.GetTraceRunsByRunIDs(ctx, slices.Collect(maps.Keys(parentRunIDSet)))
+		if err != nil {
+			return nil, fmt.Errorf("error loading deferred-from parent runs: %w", err)
+		}
+		for _, rdf := range out {
+			if run, ok := parentRuns[rdf.ParentRunID]; ok {
+				rdf.ParentRun = run
+			}
 		}
 	}
 
@@ -168,13 +170,15 @@ func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map
 		parentRunIDSet[parentRunID] = struct{}{}
 	}
 
-	parentRuns, err := w.GetTraceRunsByRunIDs(ctx, slices.Collect(maps.Keys(parentRunIDSet)))
-	if err != nil {
-		return nil, fmt.Errorf("error loading invoked-from parent runs: %w", err)
-	}
-	for _, rif := range out {
-		if run, ok := parentRuns[rif.ParentRunID]; ok {
-			rif.ParentRun = run
+	if len(parentRunIDSet) > 0 {
+		parentRuns, err := w.GetTraceRunsByRunIDs(ctx, slices.Collect(maps.Keys(parentRunIDSet)))
+		if err != nil {
+			return nil, fmt.Errorf("error loading invoked-from parent runs: %w", err)
+		}
+		for _, rif := range out {
+			if run, ok := parentRuns[rif.ParentRunID]; ok {
+				rif.ParentRun = run
+			}
 		}
 	}
 

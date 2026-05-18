@@ -284,7 +284,6 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
-
           # ref: overwrite because of bug in sqlc sqlite
           # https://github.com/sqlc-dev/sqlc/issues/3754
           - column: "spans.debug_run_id"

@@ -1847,9 +1847,6 @@ func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentif
 
 func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
 	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
-	// TODO: distinguish "no row" from real DB errors here. Today any error —
-	// including a transient connection failure — silently produces a stub
-	// TraceRun, which callers cannot tell apart from a genuine miss.
 	if err == nil {
 		return run, nil
 	}

@@ -609,6 +609,9 @@ func (sq *sqliteQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.
 }
 
 func (sq *sqliteQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
 	rows, err := sq.q.GetTraceRunsByRunIDs(ctx, runIDs)
 	if err != nil {
 		return nil, err
