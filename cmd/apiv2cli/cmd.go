@@ -3,6 +3,7 @@ package apiv2cli
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,14 +45,18 @@ var hiddenEndpointMethods = map[string]struct{}{
 	"FetchPartnerAccounts": {},
 }
 
+var pathParamPattern = regexp.MustCompile(`\{([^}=]+)(=[^}]*)?}`)
+
 type endpoint struct {
 	name       string
 	methodName string
 	fullMethod string
 	httpMethod string
 	path       string
+	body       string
 	input      protoreflect.MessageDescriptor
 	output     protoreflect.MessageDescriptor
+	pathParams []string
 }
 
 func Command() *cli.Command {
@@ -109,11 +115,6 @@ func commonFlags() []cli.Flag {
 			DefaultText: "default API v2 gRPC port",
 			Usage:       "Custom API v2 gRPC port",
 		},
-		&cli.BoolFlag{
-			Category: "Target",
-			Name:     "insecure",
-			Usage:    "Force plaintext gRPC (default for localhost, TLS otherwise)",
-		},
 		&cli.StringFlag{
 			Category: "Auth",
 			Name:     "api-key",
@@ -147,23 +148,34 @@ func commonFlags() []cli.Flag {
 }
 
 func endpointFlags(ep endpoint) []cli.Flag {
-	flags := []cli.Flag{
-		&cli.StringFlag{
-			Category: "Body",
-			Name:     "body",
-			Usage:    "Raw JSON request body. Field flags override matching keys.",
-		},
-		&cli.StringFlag{
-			Category: "Body",
-			Name:     "body-file",
-			Usage:    "Path to a JSON request body file, or '-' for stdin.",
-		},
+	var flags []cli.Flag
+	if ep.body != "" {
+		flags = append(flags,
+			&cli.StringFlag{
+				Category: "Body",
+				Name:     "body",
+				Usage:    "Raw JSON request body. Endpoint field flags override matching keys.",
+			},
+			&cli.StringFlag{
+				Category: "Body",
+				Name:     "body-file",
+				Usage:    "Path to a JSON request body file, or '-' for stdin.",
+			},
+		)
 	}
 
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
-		flags = append(flags, flagForField("Field", kebab(string(field.Name())), field))
+		name := string(field.Name())
+		category := "Query"
+		if slices.Contains(ep.pathParams, name) {
+			category = "Path"
+		} else if ep.body != "" {
+			category = "Body"
+		}
+
+		flags = append(flags, flagForField(category, kebab(name), field))
 	}
 
 	return flags
@@ -225,8 +237,10 @@ func discoverEndpoints() []endpoint {
 			fullMethod: fmt.Sprintf("/%s/%s", serviceFullName, methodName),
 			httpMethod: httpMethod,
 			path:       path,
+			body:       httpRule.Body,
 			input:      method.Input(),
 			output:     method.Output(),
+			pathParams: pathParams(path),
 		})
 	}
 
@@ -280,7 +294,7 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 	}
 
 	if token != "" && !useTLS && !targetIsLocal(target) {
-		return fmt.Errorf("refusing to send credentials over plaintext gRPC to %s; pass --insecure only for local targets", target)
+		return fmt.Errorf("refusing to send credentials over plaintext gRPC to %s; use a localhost target or TLS", target)
 	}
 
 	req := dynamicpb.NewMessage(ep.input)
@@ -330,6 +344,9 @@ func populateRequest(cmd *cli.Command, ep endpoint, msg *dynamicpb.Message) erro
 	if err != nil {
 		return err
 	}
+	if err := validatePathParams(cmd, ep); err != nil {
+		return err
+	}
 
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
@@ -338,11 +355,15 @@ func populateRequest(cmd *cli.Command, ep endpoint, msg *dynamicpb.Message) erro
 		if !cmd.IsSet(flagName) {
 			continue
 		}
-		value, err := flagJSONValue(cmd, field, flagName)
+		value, err := fieldValue(cmd, field, flagName)
 		if err != nil {
 			return err
 		}
 		body[field.JSONName()] = value
+	}
+
+	if err := validateBody(cmd, ep, body); err != nil {
+		return err
 	}
 
 	encoded, err := json.Marshal(body)
@@ -393,10 +414,45 @@ func readBodyFile(cmd *cli.Command, path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-// flagJSONValue returns a JSON-serialisable value (string, bool, number, list)
-// that protojson can decode into the typed proto field. We let protojson
-// validate kinds rather than reimplementing it here.
-func flagJSONValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName string) (any, error) {
+func validatePathParams(cmd *cli.Command, ep endpoint) error {
+	for _, name := range ep.pathParams {
+		flagName := kebab(name)
+		if !cmd.IsSet(flagName) || cmd.String(flagName) == "" {
+			return fmt.Errorf("missing required --%s", flagName)
+		}
+	}
+	return nil
+}
+
+func validateBody(cmd *cli.Command, ep endpoint, body map[string]any) error {
+	if ep.body == "" {
+		return nil
+	}
+
+	fields := ep.input.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		name := string(field.Name())
+		if slices.Contains(ep.pathParams, name) || !isRequiredField(field) {
+			continue
+		}
+
+		if _, ok := body[field.JSONName()]; ok {
+			continue
+		}
+		if _, ok := body[name]; ok {
+			continue
+		}
+		if cmd.IsSet(kebab(name)) {
+			continue
+		}
+
+		return fmt.Errorf("missing required --%s or body field %q", kebab(name), field.JSONName())
+	}
+	return nil
+}
+
+func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName string) (any, error) {
 	if field.IsList() {
 		return cmd.StringSlice(flagName), nil
 	}
@@ -404,14 +460,32 @@ func flagJSONValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagNam
 	switch field.Kind() {
 	case protoreflect.BoolKind:
 		return cmd.Bool(flagName), nil
+	case protoreflect.StringKind:
+		return cmd.String(flagName), nil
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return parseInt(cmd.String(flagName), 32)
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return parseInt(cmd.String(flagName), 64)
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return parseUint(cmd.String(flagName), 32)
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return parseUint(cmd.String(flagName), 64)
+	case protoreflect.FloatKind:
+		return parseFloat(cmd.String(flagName), 32)
+	case protoreflect.DoubleKind:
+		return parseFloat(cmd.String(flagName), 64)
+	case protoreflect.EnumKind:
+		return cmd.String(flagName), nil
 	case protoreflect.MessageKind, protoreflect.GroupKind:
 		var value any
 		if err := json.Unmarshal([]byte(cmd.String(flagName)), &value); err != nil {
 			return nil, fmt.Errorf("--%s must be valid JSON: %w", flagName, err)
 		}
 		return value, nil
+	case protoreflect.BytesKind:
+		return base64.StdEncoding.EncodeToString([]byte(cmd.String(flagName))), nil
 	default:
-		return cmd.String(flagName), nil
+		return nil, fmt.Errorf("unsupported field type for --%s", flagName)
 	}
 }
 
@@ -439,12 +513,11 @@ func resolveTarget(ctx context.Context, cmd *cli.Command) (string, bool, error) 
 		return "", false, err
 	}
 
-	insecureFlag := localconfig.GetBoolValue(cmd, "insecure", false)
 	apiPort := localconfig.GetIntValue(cmd, "api-port", 0)
 	apiHost := localconfig.GetValue(cmd, "api-host", "")
 
 	if apiHost != "" {
-		target, useTLS, err := buildTarget(apiHost, apiPort, insecureFlag)
+		target, useTLS, err := buildTarget(apiHost, apiPort)
 		return target, useTLS, err
 	}
 
@@ -453,20 +526,22 @@ func resolveTarget(ctx context.Context, cmd *cli.Command) (string, bool, error) 
 	}
 
 	if localconfig.GetBoolValue(cmd, "prod", false) {
-		return cloudGRPCTarget, !insecureFlag, nil
+		return cloudGRPCTarget, true, nil
 	}
 
 	return net.JoinHostPort("localhost", strconv.Itoa(apiv2.DefaultGRPCPort)), false, nil
 }
 
-func buildTarget(rawHost string, port int, insecureFlag bool) (string, bool, error) {
+func buildTarget(rawHost string, port int) (string, bool, error) {
 	host := rawHost
+	scheme := ""
 	if looksLikeURL(rawHost) {
 		parsed, err := url.Parse(rawHost)
 		if err != nil {
 			return "", false, err
 		}
 		host = parsed.Host
+		scheme = parsed.Scheme
 		if host == "" {
 			return "", false, fmt.Errorf("api host must include a host name")
 		}
@@ -486,15 +561,17 @@ func buildTarget(rawHost string, port int, insecureFlag bool) (string, bool, err
 	if port == 0 {
 		if isLocalHost(host) {
 			port = apiv2.DefaultGRPCPort
-		} else if insecureFlag {
-			port = apiv2.DefaultGRPCPort
 		} else {
 			port = 443
 		}
 	}
 
+	if scheme == "http" && !isLocalHost(host) {
+		return "", false, fmt.Errorf("api host must use https unless targeting localhost")
+	}
+
 	target := net.JoinHostPort(host, strconv.Itoa(port))
-	useTLS := !insecureFlag && !isLocalHost(host)
+	useTLS := !isLocalHost(host)
 	return target, useTLS, nil
 }
 
@@ -561,4 +638,39 @@ func looksLikeURL(value string) bool {
 
 func isLocalHost(host string) bool {
 	return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0"
+}
+
+func pathParams(path string) []string {
+	matches := pathParamPattern.FindAllStringSubmatch(path, -1)
+	params := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if len(match) > 1 {
+			params = append(params, match[1])
+		}
+	}
+	return params
+}
+
+func parseInt(value string, bitSize int) (int64, error) {
+	parsed, err := strconv.ParseInt(value, 10, bitSize)
+	if err != nil {
+		return 0, err
+	}
+	return parsed, nil
+}
+
+func parseUint(value string, bitSize int) (uint64, error) {
+	parsed, err := strconv.ParseUint(value, 10, bitSize)
+	if err != nil {
+		return 0, err
+	}
+	return parsed, nil
+}
+
+func parseFloat(value string, bitSize int) (float64, error) {
+	parsed, err := strconv.ParseFloat(value, bitSize)
+	if err != nil {
+		return 0, err
+	}
+	return parsed, nil
 }

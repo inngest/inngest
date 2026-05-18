@@ -47,6 +47,39 @@ func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {
 	require.Equal(t, "create-env", endpointCommandName("CreateEnv"))
 }
 
+func TestEndpointFlagsPreserveRESTShape(t *testing.T) {
+	endpoints := discoverEndpoints()
+	byName := map[string]endpoint{}
+	for _, ep := range endpoints {
+		byName[ep.name] = ep
+	}
+
+	invokeFlags := flagNames(endpointFlags(byName["invoke-function"]))
+	require.Contains(t, invokeFlags, "body")
+	require.Contains(t, invokeFlags, "body-file")
+	require.Contains(t, invokeFlags, "app-id")
+	require.Contains(t, invokeFlags, "function-id")
+	require.Contains(t, invokeFlags, "data")
+
+	traceFlags := flagNames(endpointFlags(byName["get-function-trace"]))
+	require.NotContains(t, traceFlags, "body")
+	require.NotContains(t, traceFlags, "body-file")
+	require.Contains(t, traceFlags, "run-id")
+	require.Contains(t, traceFlags, "include-output")
+}
+
+func TestCommonFlagsDoNotExposeInsecure(t *testing.T) {
+	require.NotContains(t, flagNames(commonFlags()), "insecure")
+}
+
+func flagNames(flags []cli.Flag) []string {
+	names := make([]string, 0, len(flags))
+	for _, flag := range flags {
+		names = append(names, flag.Names()[0])
+	}
+	return names
+}
+
 // recordingServer captures the last request and metadata it received so tests
 // can assert on the request shape and auth/env headers without poking at the
 // real implementation.
@@ -354,9 +387,9 @@ func TestBuildTarget(t *testing.T) {
 		name       string
 		rawHost    string
 		port       int
-		insecure   bool
 		wantTarget string
 		wantTLS    bool
+		wantErr    string
 	}{
 		{
 			name:       "local host with explicit port stays insecure",
@@ -384,18 +417,25 @@ func TestBuildTarget(t *testing.T) {
 			wantTLS:    true,
 		},
 		{
-			name:       "insecure flag disables TLS even for remote host",
-			rawHost:    "inngest.example.com",
-			port:       1234,
-			insecure:   true,
-			wantTarget: "inngest.example.com:1234",
+			name:       "http url is allowed for local host",
+			rawHost:    "http://localhost:9999",
+			wantTarget: "localhost:9999",
 			wantTLS:    false,
+		},
+		{
+			name:    "http url is rejected for remote host",
+			rawHost: "http://inngest.example.com:9443",
+			wantErr: "api host must use https unless targeting localhost",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			target, useTLS, err := buildTarget(tt.rawHost, tt.port, tt.insecure)
+			target, useTLS, err := buildTarget(tt.rawHost, tt.port)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, tt.wantTarget, target)
 			require.Equal(t, tt.wantTLS, useTLS)
@@ -403,24 +443,17 @@ func TestBuildTarget(t *testing.T) {
 	}
 }
 
-func TestRefusePlaintextCredsToRemoteHost(t *testing.T) {
-	svc := &recordingServer{healthResp: &apiv2.HealthResponse{}}
-	host, port := startRecordingServer(t, svc)
-	_ = host
-
+func TestCommandRejectsRemoteHTTPHost(t *testing.T) {
 	cmd := Command()
 	out := bytes.Buffer{}
 	cmd.Writer = &out
 
 	err := cmd.Run(context.Background(), []string{
 		"api",
-		"--api-host", "inngest.example.com",
-		"--api-port", strconv.Itoa(port),
-		"--insecure",
-		"--signing-key", "signkey-test",
+		"--api-host", "http://inngest.example.com:8290",
 		"health",
 	})
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "refusing to send credentials over plaintext")
+	require.Contains(t, err.Error(), "api host must use https unless targeting localhost")
 }
