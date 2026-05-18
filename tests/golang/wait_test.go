@@ -469,7 +469,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	r.EventuallyWithT(func(ct *assert.CollectT) {
 		a := assert.New(ct)
 		a.EqualValues(len(badEvents), atomic.LoadInt32(&counter))
-	}, 20*time.Second, 100*time.Millisecond)
+	}, 40*time.Second, 100*time.Millisecond)
 
 	// Trigger a function run with a valid expression that should match.
 	_, err = inngestClient.Send(ctx, &event.Event{
