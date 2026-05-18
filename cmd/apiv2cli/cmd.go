@@ -288,7 +288,7 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 		return err
 	}
 
-	var creds credentials.TransportCredentials = insecure.NewCredentials()
+	creds := insecure.NewCredentials()
 	if useTLS {
 		creds = credentials.NewTLS(&tls.Config{})
 	}
