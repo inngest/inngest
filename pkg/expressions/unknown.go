@@ -235,7 +235,7 @@ func maybeWrapLogicalOp(i interpreter.Interpretable) (interpreter.Interpretable,
 	//       terms []interpreter.Interpretable
 	//   }
 	v := reflect.ValueOf(i)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	termsField := v.FieldByName("terms")
