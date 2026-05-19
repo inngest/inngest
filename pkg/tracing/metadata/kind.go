@@ -57,7 +57,8 @@ var allowedInngestKinds = map[Kind]bool{
 // prefix, that it belongs to the allowlist. Userland kinds pass without
 // restriction. Score kinds (inngest.score.<name>) are accepted with any
 // non-empty suffix so the name appears as the outer Map key in storage,
-// mirroring how userland.<name> works.
+// mirroring how userland.<name> works — except for characters that the cloud
+// variant aggregation would silently drop (see validateScoreName).
 func (k Kind) ValidateAllowed() error {
 	if err := k.Validate(); err != nil {
 		return err
@@ -69,7 +70,7 @@ func (k Kind) ValidateAllowed() error {
 		return nil
 	}
 	if k.IsScoped(KindInngestScore) {
-		return nil
+		return validateScoreName(string(k)[len(KindInngestScore)+1:])
 	}
 	return ErrKindNotAllowed
 }
