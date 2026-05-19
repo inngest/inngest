@@ -14,7 +14,7 @@ const insightsRealtimeEventSchema = z.object({
 });
 
 export const insightsChannel = realtime.channel({
-  name: (userId: string) => `user:${userId}`,
+  name: (targetChannel: string) => targetChannel,
   topics: {
     agent_stream: { schema: insightsRealtimeEventSchema },
   },

@@ -29,6 +29,8 @@ type ChatEventData = {
     systemPrompt?: string;
   };
   userId?: string;
+  accountId?: string;
+  requestId?: string;
   channelKey?: string;
   history?: Array<Record<string, unknown>>;
 };
@@ -44,12 +46,16 @@ export const runInsightsAgent = inngest.createFunction(
       threadId: providedThreadId,
       userMessage,
       userId,
+      accountId,
+      requestId,
       channelKey,
       history,
     } = event.data as ChatEventData;
 
-    if (!userId) {
-      throw new Error('userId is required for agent chat execution');
+    if (!userId || (!accountId && !requestId)) {
+      throw new Error(
+        'userId or accountId and requestId is required for agent chat execution',
+      );
     }
 
     const threadId = await step.run('generate-thread-id', () => {
@@ -57,7 +63,9 @@ export const runInsightsAgent = inngest.createFunction(
     });
 
     const targetChannel = await step.run('generate-target-channel', () => {
-      return channelKey || userId;
+      return (
+        channelKey || `user:${userId}` || `request:${accountId}:${requestId}`
+      );
     });
 
     // Extract client state from the user message
