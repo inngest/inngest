@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.21.0] - 2026-05-19
+
+### 🚀 Features
+
+- EXE-1547 - Accept StepPlanned upon beginning to run a step (#4201)
+
+### 🐛 Bug Fixes
+
+- *(ci)* Disable provenance on publish (#4226)
+
 ## [v1.20.0] - 2026-05-19
 
 ### 🚀 Features
@@ -24,6 +34,10 @@ All notable changes to this project will be documented in this file.
 - *(cqrs)* Move composite manager package (#4209)
 - *(connect)* Split gateway message handlers (#4210)
 
+### 📚 Documentation
+
+- Add markdown and llms.txt generation to API docs site (#4218)
+
 ### ⚡ Performance
 
 - *(connect)* Split heartbeats into a high priority goroutine (#4224)
@@ -32,6 +46,7 @@ All notable changes to this project will be documented in this file.
 
 - Add graceful failure handling for linear-release step (#4192)
 - Add submodules to checkout (#4221)
+- *(release)* V1.20.0 (#4205)
 
 ## [v1.19.4] - 2026-05-15
 
