@@ -63,9 +63,9 @@ export const runInsightsAgent = inngest.createFunction(
     });
 
     const targetChannel = await step.run('generate-target-channel', () => {
-      return (
-        channelKey || `user:${userId}` || `request:${accountId}:${requestId}`
-      );
+      if (channelKey) return channelKey;
+      if (userId) return `user:${userId}`;
+      return `acct:${accountId}:${requestId}`;
     });
 
     // Extract client state from the user message
