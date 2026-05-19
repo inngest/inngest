@@ -3158,12 +3158,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			"consumed", consumeResult,
 		)
 
-		if !consumeResult.DidConsume {
-			// We don't need to do anything here.  This could be a dupe;  consuming a pause
-			// is transactional / atomic, so ignore this.
-			return nil
-		}
-
 		status := enums.StepStatusCompleted
 		if r.IsTimeout {
 			status = enums.StepStatusTimedOut
