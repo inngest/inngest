@@ -52,7 +52,7 @@ export const runInsightsAgent = inngest.createFunction(
       history,
     } = event.data as ChatEventData;
 
-    if (!userId || (!accountId && !requestId)) {
+    if (!userId && (!accountId || !requestId)) {
       throw new Error(
         'userId or accountId and requestId is required for agent chat execution',
       );
