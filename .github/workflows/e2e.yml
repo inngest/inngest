@@ -60,7 +60,7 @@ jobs:
           cd ../../
           echo "Running dev server"
           mkdir $GOCOVERDIR
-          nohup ./inngest-bin dev --no-discovery 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt &
+          nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt &
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
@@ -149,9 +149,9 @@ jobs:
           echo "Running dev server"
           mkdir $GOCOVERDIR
           if [ "${{ matrix.database }}" = "postgres" ]; then
-            nohup ./inngest-bin dev --no-discovery --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
+            nohup ./inngest-bin dev --no-discovery --no-poll --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
           else
-            nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
+            nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
           sleep 5
@@ -236,9 +236,9 @@ jobs:
           echo "Running dev server"
           mkdir $GOCOVERDIR
           if [ "${{ matrix.database }}" = "postgres" ]; then
-            nohup ./inngest-bin dev --no-discovery --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
+            nohup ./inngest-bin dev --no-discovery --no-poll --postgres-uri "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable" 2> /tmp/dev-output.txt &
           else
-            nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
+            nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
           sleep 5
