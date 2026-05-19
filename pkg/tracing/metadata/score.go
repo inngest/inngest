@@ -15,19 +15,19 @@ const (
 // inngest.score.<name> kind family. The user-supplied name lives in the kind
 // suffix (analogous to userland.<name>), so values carries exactly one entry
 // keyed "value" containing a finite number or boolean.
-func validateNamedScoreValue(values Values) error {
+func validateNamedScoreValue(kind Kind, values Values) error {
 	if len(values) != 1 {
-		return fmt.Errorf("score must have exactly one entry under \"value\": %w", ErrScoreValueInvalid)
+		return fmt.Errorf("score %q must have exactly one entry keyed \"value\": %w", kind, ErrScoreValueInvalid)
 	}
 
 	raw, ok := values["value"]
 	if !ok {
-		return fmt.Errorf("score value key must be \"value\": %w", ErrScoreValueInvalid)
+		return fmt.Errorf("score %q value key must be \"value\": %w", kind, ErrScoreValueInvalid)
 	}
 
 	var value any
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
+		return fmt.Errorf("invalid score value for kind %q: %w", kind, ErrScoreValueInvalid)
 	}
 
 	switch v := value.(type) {
@@ -39,5 +39,5 @@ func validateNamedScoreValue(values Values) error {
 		}
 	}
 
-	return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
+	return fmt.Errorf("invalid score value for kind %q: %w", kind, ErrScoreValueInvalid)
 }
