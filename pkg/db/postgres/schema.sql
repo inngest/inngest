@@ -429,6 +429,12 @@ CREATE INDEX idx_functions_app_id ON public.functions USING btree (app_id);
 CREATE INDEX idx_functions_slug ON public.functions USING btree (slug) WHERE (archived_at IS NULL);
 
 --
+-- Name: idx_history_created_at_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_history_created_at_type ON public.history USING btree (created_at, type);
+
+--
 -- Name: idx_history_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -463,6 +469,18 @@ CREATE INDEX idx_spans_run_id ON public.spans USING btree (run_id);
 --
 
 CREATE INDEX idx_spans_run_id_dynamic_start_time ON public.spans USING btree (run_id, dynamic_span_id, start_time);
+
+--
+-- Name: idx_spans_start_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_start_time ON public.spans USING btree (start_time);
+
+--
+-- Name: idx_traces_timestamp; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_traces_timestamp ON public.traces USING btree ("timestamp");
 
 --
 -- Name: idx_traces_trace_id; Type: INDEX; Schema: public; Owner: -
