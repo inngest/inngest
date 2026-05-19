@@ -7,8 +7,8 @@ import (
 
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo/connect"
-	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
+	"github.com/inngest/inngestgo/middleware"
 )
 
 // ConnectOpts

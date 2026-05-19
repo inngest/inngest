@@ -124,8 +124,8 @@ func (c *connection) logAttrs() []any {
 	}
 }
 
-func (c *connection) retire() {
-	c.retired.Store(true)
+func (c *connection) retire() bool {
+	return c.retired.CompareAndSwap(false, true)
 }
 
 func (c *connection) isRetired() bool {

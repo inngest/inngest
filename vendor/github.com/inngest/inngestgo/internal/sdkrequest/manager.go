@@ -11,13 +11,12 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngestgo/experimental"
 	"github.com/inngest/inngestgo/internal/checkpoint"
 	"github.com/inngest/inngestgo/internal/fn"
 	"github.com/inngest/inngestgo/internal/logger"
-	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/opcode"
 	"github.com/inngest/inngestgo/internal/util"
+	"github.com/inngest/inngestgo/middleware"
 )
 
 type ControlHijack struct{}
@@ -72,7 +71,7 @@ type InvocationManager interface {
 	// retrieve creds for eg. publishing or API alls.
 	SigningKey() string
 	// CallContext exposes the call context for middleware calls.
-	CallContext() experimental.CallContext
+	CallContext() middleware.CallContext
 	// StepMode returns how steps should be executed in this context
 	StepMode() StepMode
 	// SetStepMode overrides the step mode.

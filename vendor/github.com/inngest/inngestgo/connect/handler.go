@@ -166,6 +166,9 @@ type connectHandler struct {
 	gracefulCloseEg errgroup.Group
 	auth            authContext
 	closed          atomic.Bool
+
+	startConnection  func(context.Context, connectionEstablishData, ...connectOpt)
+	reconnectBackoff func(int) time.Duration
 }
 
 // authContext is wrapper for information related to authentication
@@ -351,7 +354,11 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 				}
 
 				// continue to reconnect logic
-				delay := expBackoff(attempts)
+				reconnectBackoff := h.reconnectBackoff
+				if reconnectBackoff == nil {
+					reconnectBackoff = expBackoff
+				}
+				delay := reconnectBackoff(attempts)
 
 				l.Debug("reconnecting", "delay", delay.String(), "attempts", attempts)
 
@@ -389,7 +396,12 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 				connectCtx = startCtx
 			}
 
-			go h.connect(connectCtx, connectionEstablishData{
+			startConnection := h.startConnection
+			if startConnection == nil {
+				startConnection = h.connect
+			}
+
+			go startConnection(connectCtx, connectionEstablishData{
 				hashedSigningKey:      h.auth.hashedSigningKey,
 				numCpuCores:           int32(numCpuCores),
 				totalMem:              int64(totalMem),

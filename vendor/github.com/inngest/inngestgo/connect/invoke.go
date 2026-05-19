@@ -126,10 +126,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	})
 	if err != nil {
 		l.Error("error marshaling request ack", "error", err)
-		return nil, publicerr.Error{
-			Message: "malformed input",
-			Status:  400,
-		}
+		return nil, publicerr.Wrap(err, 400, "malformed input")
 	}
 
 	// ACK is the ownership boundary. If this generation is already retired,
@@ -141,11 +138,9 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		Kind:    connectproto.GatewayMessageType_WORKER_REQUEST_ACK,
 		Payload: ackPayload,
 	}); err != nil {
+		preparedConn.retire()
 		l.Error("error sending request ack", "error", err)
-		return nil, publicerr.Error{
-			Message: "failed to ack worker request",
-			Status:  400,
-		}
+		return nil, publicerr.Wrap(err, 400, "failed to ack worker request")
 	}
 
 	// TODO Should we wait for a gateway response before starting to process? What if the gateway fails acking and we start too early?

@@ -1,3 +1,5 @@
+// Package middleware provides middleware hooks for Inngest clients and step
+// HTTP providers.
 package middleware
 
 import (
@@ -73,7 +75,7 @@ type Middleware interface {
 var _ Middleware = &BaseMiddleware{}
 
 // BaseMiddleware is a noop implementation that you can embed within custom
-// middelware to implement the middleware.Middleware interface, making every
+// middleware to implement the middleware.Middleware interface, making every
 // unimplemented call in your struct a no-op.
 type BaseMiddleware struct{}
 
@@ -90,7 +92,7 @@ func (m *BaseMiddleware) TransformOutput(
 	call CallContext,
 	output *TransformableOutput,
 ) {
-	//Noop
+	// Noop.
 }
 
 func (m *BaseMiddleware) OnPanic(ctx context.Context, call CallContext, recovered any, stack string) {
