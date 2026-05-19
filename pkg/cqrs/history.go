@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/inngest/inngest/pkg/execution/history"
+	exechistory "github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -12,8 +13,22 @@ type HistoryManager interface {
 	HistoryReader
 }
 
+type (
+	History              = exechistory.History
+	CancelEvent          = exechistory.CancelEvent
+	CancelUser           = exechistory.CancelUser
+	Sleep                = exechistory.Sleep
+	WaitForEvent         = exechistory.WaitForEvent
+	WaitResult           = exechistory.WaitResult
+	WaitForSignal        = exechistory.WaitForSignal
+	WaitForSignalResult  = exechistory.WaitForSignalResult
+	InvokeFunction       = exechistory.InvokeFunction
+	InvokeFunctionResult = exechistory.InvokeFunctionResult
+	Result               = exechistory.Result
+)
+
 type HistoryWriter interface {
-	InsertHistory(ctx context.Context, h history.History) error
+	InsertHistory(ctx context.Context, h History) error
 }
 
 type HistoryReader interface {
