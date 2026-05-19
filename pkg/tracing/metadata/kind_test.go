@@ -47,13 +47,33 @@ func TestKind_ValidateAllowed(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name:    "inngest.score is allowed",
+			name:    "bare inngest.score is rejected (name must live in suffix)",
 			kind:    KindInngestScore,
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.score.<name> with simple suffix is allowed",
+			kind:    "inngest.score.accuracy",
 			wantErr: nil,
+		},
+		{
+			name:    "inngest.score.<name> with arbitrary characters is allowed",
+			kind:    "inngest.score.checkout success rate (variant A) %",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score. with empty suffix is rejected",
+			kind:    "inngest.score.",
+			wantErr: ErrKindNotAllowed,
 		},
 		{
 			name:    "inngest.unknown is rejected",
 			kind:    "inngest.unknown",
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.ai.suffix is rejected (only score allows suffixes)",
+			kind:    "inngest.ai.gpt4",
 			wantErr: ErrKindNotAllowed,
 		},
 		{

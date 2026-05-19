@@ -41,7 +41,9 @@ func (k Kind) Validate() error {
 
 // allowedInngestKinds is the set of inngest-prefixed metadata kinds that SDK
 // clients are permitted to set. Any inngest.* kind not in this set is rejected
-// to prevent spoofing of internal metadata.
+// to prevent spoofing of internal metadata. Score kinds carry a user-supplied
+// name in their suffix (KindInngestScore + "." + name) and are gated by
+// IsScoped below rather than this map.
 var allowedInngestKinds = map[Kind]bool{
 	"inngest.ai":               true,
 	"inngest.http":             true,
@@ -49,18 +51,32 @@ var allowedInngestKinds = map[Kind]bool{
 	"inngest.response_headers": true,
 	"inngest.warnings":         true,
 	"inngest.experiment":       true,
-	KindInngestScore:           true,
 }
 
 // ValidateAllowed checks that the kind is valid and, if it uses the inngest.*
 // prefix, that it belongs to the allowlist. Userland kinds pass without
-// restriction.
+// restriction. Score kinds (inngest.score.<name>) are accepted with any
+// non-empty suffix so the name appears as the outer Map key in storage,
+// mirroring how userland.<name> works.
 func (k Kind) ValidateAllowed() error {
 	if err := k.Validate(); err != nil {
 		return err
 	}
-	if k.IsInngest() && !allowedInngestKinds[k] {
-		return ErrKindNotAllowed
+	if !k.IsInngest() {
+		return nil
 	}
-	return nil
+	if allowedInngestKinds[k] {
+		return nil
+	}
+	if k.IsScoped(KindInngestScore) {
+		return nil
+	}
+	return ErrKindNotAllowed
+}
+
+// IsScoped reports whether k uses base + "." as a prefix and carries a
+// non-empty suffix (e.g. base="inngest.score", k="inngest.score.accuracy").
+func (k Kind) IsScoped(base Kind) bool {
+	prefix := string(base) + "."
+	return len(string(k)) > len(prefix) && strings.HasPrefix(string(k), prefix)
 }

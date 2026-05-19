@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"math"
-	"regexp"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/enums"
@@ -17,11 +15,8 @@ import (
 var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
-	ErrScoreNameInvalid        = errors.New("score name is invalid")
 	ErrScoreValueInvalid       = errors.New("score value must be a finite number or boolean")
 )
-
-var scoreNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,63}$`)
 
 type Opcode = enums.MetadataOpcode
 
@@ -162,8 +157,8 @@ func (m Update) ValidateAllowed() error {
 		return err
 	}
 
-	if m.Kind() == KindInngestScore {
-		return validateScoreValues(m.RawUpdate.Values)
+	if m.Kind().IsScoped(KindInngestScore) {
+		return validateNamedScoreValue(m.RawUpdate.Values)
 	}
 
 	return nil
@@ -175,32 +170,6 @@ func ValidateUpdatesAllowed(updates []Update) error {
 		if err := update.ValidateAllowed(); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func validateScoreValues(values Values) error {
-	for name, raw := range values {
-		if !scoreNameRegex.MatchString(name) {
-			return fmt.Errorf("invalid score name %q: %w", name, ErrScoreNameInvalid)
-		}
-
-		var value any
-		if err := json.Unmarshal(raw, &value); err != nil {
-			return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
-		}
-
-		switch v := value.(type) {
-		case bool:
-			continue
-		case float64:
-			if !math.IsNaN(v) && !math.IsInf(v, 0) {
-				continue
-			}
-		}
-
-		return fmt.Errorf("invalid score value for %q: %w", name, ErrScoreValueInvalid)
 	}
 
 	return nil
