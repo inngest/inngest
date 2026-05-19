@@ -3225,13 +3225,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				e.log.Debug("error creating span for next step after resume", "error", err)
 			}
 
-			_, err = util.WithRetry(ctx, "executor.resume.enqueue", func(ctx context.Context) (any, error) {
-				return nil, e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			}, util.NewRetryConf(util.WithRetryConfRetryableErrors(func(err error) bool {
-				return !errors.Is(err, queue.ErrQueueItemExists)
-			})))
+			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 			if err != nil {
-				if errors.Is(err, queue.ErrQueueItemExists) {
+				if err == queue.ErrQueueItemExists {
 					nextStepSpan.Drop()
 				} else {
 					_ = nextStepSpan.Send()
