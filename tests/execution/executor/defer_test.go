@@ -65,8 +65,9 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 	t.Helper()
 	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 	adapter := dbsqlite.New(db)
 	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)

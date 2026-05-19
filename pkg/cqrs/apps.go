@@ -51,6 +51,14 @@ type AppCreator interface {
 	// UpsertApp creates or updates an app. The conflict key is the ID, which
 	// must always exist.
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
+
+	// UpsertAppByName creates or updates an app keyed by name. The conflict
+	// target is the partial unique index apps_name_active_key on (name)
+	// WHERE archived_at IS NULL AND name <> ''. On conflict, the existing
+	// row's id is preserved, so an SDK re-sync adopts an existing active
+	// row regardless of how its id was originally minted (e.g., legacy
+	// URL-derived ids from <v1.15).
+	UpsertAppByName(ctx context.Context, arg UpsertAppParams) (*App, error)
 }
 
 type AppWriter interface {
