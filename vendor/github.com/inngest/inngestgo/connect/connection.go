@@ -236,6 +236,10 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			case <-ctx.Done():
 				return
 			case <-heartbeatTicker.C:
+				if !preparedConn.canWriteHeartbeat() {
+					l.Debug("skipping worker heartbeat because connection phase does not allow heartbeat write", "phase", preparedConn.phase())
+					return
+				}
 				err := wsproto.Write(context.Background(), preparedConn.ws, &connectproto.ConnectMessage{
 					Kind: connectproto.GatewayMessageType_WORKER_HEARTBEAT,
 				})
@@ -413,13 +417,17 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 	// Signal gateway that we won't process additional messages!
 	{
-		l.Debug("sending worker pause message")
-		err := wsproto.Write(context.Background(), preparedConn.ws, &connectproto.ConnectMessage{
-			Kind: connectproto.GatewayMessageType_WORKER_PAUSE,
-		})
-		if err != nil {
-			// We should not exit here, as we're already in the shutdown routine
-			l.Error("failed to serialize worker pause msg", "err", err)
+		if preparedConn.canWritePause() {
+			l.Debug("sending worker pause message")
+			err := wsproto.Write(context.Background(), preparedConn.ws, &connectproto.ConnectMessage{
+				Kind: connectproto.GatewayMessageType_WORKER_PAUSE,
+			})
+			if err != nil {
+				// We should not exit here, as we're already in the shutdown routine
+				l.Error("failed to serialize worker pause msg", "err", err)
+			}
+		} else {
+			l.Debug("skipping worker pause because connection phase does not allow pause write", "phase", preparedConn.phase())
 		}
 	}
 

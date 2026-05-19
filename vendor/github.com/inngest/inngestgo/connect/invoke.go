@@ -31,7 +31,10 @@ func (h *connectHandler) handleInvokeMessage(ctx context.Context, preparedConn *
 		if errors.Is(err, errConnectionRetired) {
 			// This is a pre-ACK skip. Once ACK succeeds, connectInvoke invokes
 			// the function with context.Background() and must let it finish.
-			h.logger.Debug("skipping sdk request because connection retired before ack")
+			h.logger.Debug(
+				"skipping sdk request because connection phase does not allow request ack",
+				"phase", preparedConn.phase(),
+			)
 			return nil
 		}
 		h.logger.Error("failed to handle sdk request", "err", err)
@@ -56,15 +59,22 @@ func (h *connectHandler) handleInvokeMessage(ctx context.Context, preparedConn *
 	// that the message was truly passed on to the executor _unless_ we receive the ack message.
 	h.messageBuffer.addPending(ctx, resp, ResponseAcknowlegeDeadline)
 
-	if preparedConn.isRetired() {
+	if !preparedConn.canWriteReply() {
 		h.messageBuffer.append(resp)
-		h.logger.Debug("buffering sdk response because connection is retired", "request_id", resp.RequestId)
+		h.logger.Debug(
+			"buffering sdk response because connection phase does not allow reply write",
+			"request_id", resp.RequestId,
+			"phase", preparedConn.phase(),
+		)
 		return nil
 	}
 
 	err = wsproto.Write(ctx, preparedConn.ws, responseMessage)
 	if err != nil {
 		// We received an error, the message definitely was not sent: Buffer message to retry
+		// Phase 2 preserves the existing policy: reply write failure does not retire
+		// the generation. The ACKed function has already completed, so the reply is
+		// buffered for API flush and connection retirement remains a separate decision.
 		h.messageBuffer.append(resp)
 		h.logger.Debug("buffering sdk response after websocket write failure", "err", err, "request_id", resp.RequestId)
 
@@ -131,7 +141,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 
 	// ACK is the ownership boundary. If this generation is already retired,
 	// do not ACK and do not invoke; the gateway/executor can retry elsewhere.
-	if preparedConn.isRetired() {
+	if !preparedConn.canWriteRequestAck() {
 		return nil, errConnectionRetired
 	}
 	if err := wsproto.Write(ctx, preparedConn.ws, &connectproto.ConnectMessage{
@@ -191,7 +201,9 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				cancelExtendLeaseCtx()
 				return
 			}
-			if preparedConn.isRetired() {
+			if !preparedConn.canWriteExtendLease() {
+				// ACKed work remains owned through Draining and Closing, so this
+				// only stops at the hard no-write boundary: Retired or Closed.
 				cancelExtendLeaseCtx()
 				return
 			}

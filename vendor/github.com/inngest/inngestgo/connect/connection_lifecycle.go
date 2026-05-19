@@ -11,12 +11,29 @@ import (
 type connPhase uint8
 
 const (
+	// connPhaseNew is the zero-value phase for a connection object that exists
+	// locally but has not started the gateway websocket handshake.
 	connPhaseNew connPhase = iota
+	// connPhaseHandshaking allows only the connect handshake protocol. Request
+	// protocol writes are still forbidden in this phase.
 	connPhaseHandshaking
+	// connPhaseActive is the normal read-loop phase. Gateway requests may be
+	// ACKed, heartbeats and lease extensions may be sent, and replies may use
+	// the websocket.
 	connPhaseActive
+	// connPhaseDraining is gateway-initiated replacement. New request ACKs and
+	// heartbeats stop, but already-ACKed work keeps its lease and may still try
+	// to reply before the generation is retired.
 	connPhaseDraining
+	// connPhaseClosing is local worker shutdown. It permits the worker pause
+	// message, already-ACKed lease extensions, and replies while the worker pool
+	// drains.
 	connPhaseClosing
+	// connPhaseRetired is the hard no-write boundary. Queued pre-ACK work skips
+	// and already-ACKed work buffers replies instead of using this websocket.
 	connPhaseRetired
+	// connPhaseClosed means the transport has been closed or best-effort closed.
+	// It has the same write policy as Retired.
 	connPhaseClosed
 )
 
@@ -42,12 +59,17 @@ func (p connPhase) String() string {
 }
 
 type connLifecycle struct {
-	mu          sync.Mutex
-	phase       connPhase
-	reason      string
-	attrs       []any
-	noWrites    chan struct{}
-	logger      *slog.Logger
+	mu     sync.Mutex
+	phase  connPhase
+	reason string
+	attrs  []any
+	// noWrites is closed exactly once when a generation reaches Retired or
+	// Closed. Later phases can select on this channel instead of polling phase.
+	noWrites chan struct{}
+	logger   *slog.Logger
+	// flushNotify is intentionally best-effort and non-blocking. Retiring a
+	// generation tells the manager buffered replies may need API flush, but the
+	// connection lifecycle never performs API I/O directly.
 	flushNotify chan struct{}
 }
 
@@ -60,6 +82,8 @@ func (c *connection) initLifecycle(logger *slog.Logger, flushNotify chan struct{
 	c.lifecycle.ensureLocked()
 }
 
+// phase returns the observable lifecycle phase for this websocket generation.
+// Manager state is intentionally separate and coarser-grained.
 func (c *connection) phase() connPhase {
 	c.lifecycle.mu.Lock()
 	defer c.lifecycle.mu.Unlock()
@@ -115,6 +139,9 @@ func (c *connection) isRetired() bool {
 	}
 }
 
+// transition applies a validated phase change and its lifecycle side effects.
+// All phase mutations go through this path so write permissions, no-write
+// notification, manager flush notification, and transition logs stay coupled.
 func (c *connection) transition(to connPhase, reason string, attrs ...any) error {
 	_, err := c.transitionLocked(to, reason, attrs...)
 	return err
@@ -181,6 +208,9 @@ func entersNoWritePhase(from, to connPhase) bool {
 	}
 }
 
+// validConnPhaseTransition describes only websocket-generation lifecycle, not
+// public WorkerConnection manager state. Keeping these separate allows the
+// manager to remain ACTIVE while an older generation is Draining or Retired.
 func validConnPhaseTransition(from, to connPhase) bool {
 	switch from {
 	case connPhaseNew:
