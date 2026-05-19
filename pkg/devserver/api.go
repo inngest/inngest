@@ -258,6 +258,10 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		method = enums.AppMethodConnect
 	}
 
+	if len(r.AppName) == 0 {
+		return nil, publicerr.Wrap(err, 400, "App ID required")
+	}
+
 	// Candidate id for a fresh INSERT. UpsertAppByName uses the partial unique
 	// index apps_name_unique_key (name) WHERE name <> '' as the conflict
 	// target, so on conflict the existing row's id is preserved. This is what
@@ -303,7 +307,11 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// Iterate all apps rather than using GetAppByURL because that query
 	// returns LIMIT 1 and may find the real (named) app instead when both
 	// share the same URL.
-	if allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID); err == nil {
+	allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID)
+	if err != nil {
+		l.Error("error loading existing apps", err)
+	}
+	if len(allApps) > 0 {
 		normalizedURL := util.NormalizeAppURL(r.URL, false)
 		for _, app := range allApps {
 			if app.Name != "" || util.NormalizeAppURL(app.Url, false) != normalizedURL {
