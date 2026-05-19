@@ -26,7 +26,7 @@ import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
-import type { Trace } from './types';
+import { isScoreMetadata, type Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
@@ -115,7 +115,7 @@ export const TopInfo = ({
 
   const metadataIsEnabled = true;
   const scoreMetadata = useMemo(() => collectScoreMetadata(trace), [trace]);
-  const nonScoreMetadata = trace?.metadata?.filter((md) => md.kind !== 'inngest.score') ?? [];
+  const nonScoreMetadata = trace?.metadata?.filter((md) => !isScoreMetadata(md)) ?? [];
   const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   const prettyPayload = useMemo(() => {

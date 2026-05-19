@@ -1,6 +1,9 @@
 import { TimeElement } from '../DetailsCard/Element';
 
+const SCORE_KIND_PREFIX = 'inngest.score.';
+
 type ScoreMetadata = {
+  kind: string;
   updatedAt: string;
   values: Record<string, unknown>;
 };
@@ -12,13 +15,13 @@ type ScoreRow = {
 };
 
 type ScoreTrace = {
-  metadata?: Array<ScoreMetadata & { kind: string }>;
+  metadata?: ScoreMetadata[];
   childrenSpans?: ScoreTrace[];
 };
 
 export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
   // Run views need child spans because scores attach where they are emitted.
-  const metadata = trace?.metadata?.filter((md) => md.kind === 'inngest.score') ?? [];
+  const metadata = trace?.metadata?.filter((md) => md.kind.startsWith(SCORE_KIND_PREFIX)) ?? [];
   const childMetadata = trace?.childrenSpans?.flatMap((child) => collectScoreMetadata(child)) ?? [];
 
   return [...metadata, ...childMetadata];
@@ -26,20 +29,17 @@ export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
 
 function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   return metadata
-    .flatMap((md) =>
-      Object.entries(md.values)
-        .filter((entry): entry is [string, number | boolean] => {
-          const [, value] = entry;
-          return (
-            typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
-          );
-        })
-        .map(([name, value]) => ({
-          name,
-          value,
-          updatedAt: md.updatedAt,
-        }))
-    )
+    .flatMap((md) => {
+      const name = md.kind.slice(SCORE_KIND_PREFIX.length);
+      if (!name) {
+        return [];
+      }
+      const value = md.values.value;
+      if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
+        return [{ name, value, updatedAt: md.updatedAt }];
+      }
+      return [];
+    })
     .sort((a, b) => a.name.localeCompare(b.name) || a.updatedAt.localeCompare(b.updatedAt));
 }
 
