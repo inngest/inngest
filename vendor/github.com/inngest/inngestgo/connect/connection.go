@@ -19,6 +19,8 @@ import (
 
 var (
 	defaultWSReadLimit int64 = 10 * 1024 * 1024 // 10MB
+
+	gatewayDrainReplacementTimeout = 10 * time.Second
 )
 
 type connectReport struct {
@@ -209,8 +211,8 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 }
 
 func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, preparedConn *connection) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	backgroundCtx, stopBackground := context.WithCancel(ctx)
+	defer stopBackground()
 
 	l := h.logger.With(preparedConn.logAttrs()...)
 
@@ -233,7 +235,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 		defer heartbeatTicker.Stop()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-backgroundCtx.Done():
 				return
 			case <-heartbeatTicker.C:
 				if !preparedConn.canWriteHeartbeat() {
@@ -259,7 +261,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	go func() {
 		// Wait until initial heartbeat was sent out
 		select {
-		case <-ctx.Done():
+		case <-backgroundCtx.Done():
 			return
 		case <-time.After(preparedConn.heartbeatInterval):
 		}
@@ -269,7 +271,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 		defer heartbeatReplyTimer.Stop()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-backgroundCtx.Done():
 				return
 			case <-heartbeatReceived:
 				if !heartbeatReplyTimer.Stop() {
@@ -308,12 +310,16 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 			switch msg.Kind {
 			case connectproto.GatewayMessageType_GATEWAY_CLOSING:
-				// Stop the read loop: We will not receive any further messages and should establish a new connection
-				// We can still use the old connection to send replies to the gateway
+				// Gateway drain is gateway-initiated replacement, not local
+				// worker shutdown. The old generation stops new request ACKs
+				// and heartbeats immediately, but remains open for explicitly
+				// allowed writes from already-ACKed in-flight work until a
+				// replacement connects or the replacement wait times out.
 				l.Info("gateway requested connection drain")
 				if err := preparedConn.beginDrain("gateway closing"); err != nil {
 					l.Error("could not mark connection draining", "err", err)
 				}
+				stopBackground()
 				return errGatewayDraining
 			case connectproto.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
 				// Handle invoke in a non-blocking way to allow for other messages to be processed
@@ -356,28 +362,20 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	// - Worker shutdown, parent context got cancelled
 	if err := eg.Wait(); err != nil && ctx.Err() == nil {
 		if errors.Is(err, errGatewayDraining) {
-			// Gateway is draining and will not accept new connections.
-			// We must reconnect to a different gateway, only then can we close the old connection.
-			waitUntilConnected, doneWaiting := context.WithTimeout(context.Background(), 10*time.Second)
-			defer doneWaiting()
+			// Gateway is draining this generation. Establish a replacement on
+			// a different gateway before retiring and closing the old transport
+			// so already-ACKed work has a bounded window to reply on the socket
+			// that still owns it.
+			notifyConnectedChan := make(chan struct{}, 1)
+			go h.startConnectionFunc()(context.Background(), data, withNotifyConnectedChan(notifyConnectedChan), withExcludeGateways(preparedConn.gatewayGroupName))
 
-			// Set up local notification listener
-			notifyConnectedChan := make(chan struct{})
-			go func() {
-				<-notifyConnectedChan
-				doneWaiting()
-			}()
-
-			// Establish new connection, notify the routine above when the new connection is established
-			go h.connect(context.Background(), data, withNotifyConnectedChan(notifyConnectedChan), withExcludeGateways(preparedConn.gatewayGroupName))
-
-			// Wait until the new connection is established before closing the old one
-			<-waitUntilConnected.Done()
-			if errors.Is(waitUntilConnected.Err(), context.DeadlineExceeded) {
+			select {
+			case <-notifyConnectedChan:
+			case <-time.After(gatewayDrainReplacementTimeout):
 				l.Error("timed out waiting for new connection to be established")
 			}
 
-			// Send a proper close frame
+			preparedConn.retire("gateway drain complete")
 			preparedConn.closeNormal(connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String(), "reason", "gateway drain complete")
 
 			return errGatewayDraining
@@ -410,7 +408,10 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 		return newReconnectErr(fmt.Errorf("connection closed unexpectedly: %w", ctx.Err()))
 	}
 
-	// Perform graceful shutdown routine (parent context was cancelled)
+	// Graceful shutdown is local worker shutdown, not gateway-initiated
+	// replacement. Enter Closing to stop new request ACKs, notify the gateway
+	// with WORKER_PAUSE, and keep explicitly allowed writes for already-ACKed
+	// in-flight work until the worker pool drains.
 	if err := preparedConn.beginClose("worker context canceled"); err != nil {
 		l.Error("could not mark connection closing", "err", err)
 	}
@@ -436,6 +437,8 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	// Wait until all in-progress requests are completed
 	h.workerPool.Wait()
 
+	preparedConn.retire("worker pool drained")
+
 	// Attempt to shut down connection if not already done
 	preparedConn.closeNormal(connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String(), "reason", "worker shutdown")
 
@@ -450,6 +453,16 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	l.Debug("connection done")
 
 	return nil
+}
+
+// startConnectionFunc returns the connection starter used by paths that need
+// to create a replacement generation. Production uses h.connect directly; tests
+// can set h.startConnection to control replacement timing without a real dial.
+func (h *connectHandler) startConnectionFunc() func(context.Context, connectionEstablishData, ...connectOpt) {
+	if h.startConnection != nil {
+		return h.startConnection
+	}
+	return h.connect
 }
 
 func (h *connectHandler) handleMessageReplyAck(msg *connectproto.ConnectMessage) error {

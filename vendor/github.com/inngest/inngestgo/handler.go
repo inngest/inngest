@@ -1332,7 +1332,7 @@ func invoke(
 			for i, rawjson := range input.Events {
 				var evt event.Event
 				if err := json.Unmarshal(rawjson, &evt); err != nil {
-					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					mgr.SetErr(sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err)))
 					panic(sdkrequest.ControlHijack{})
 				}
 				evts[i] = &evt
@@ -1434,7 +1434,7 @@ func updateInput(
 			newEvent := reflect.New(eventType).Interface()
 
 			if err := json.Unmarshal(byt, newEvent); err != nil {
-				return fmt.Errorf("error unmarshalling event for function: %w", err)
+				return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent).Elem())
 		}
@@ -1454,7 +1454,7 @@ func updateInput(
 				// The same type as the event.
 				newEvent := reflect.New(eventType).Interface()
 				if err := json.Unmarshal(byt, newEvent); err != nil {
-					return fmt.Errorf("error unmarshalling event for function: %w", err)
+					return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 				}
 
 				newEvents = reflect.Append(newEvents, reflect.ValueOf(newEvent).Elem())
@@ -1471,7 +1471,7 @@ func updateInput(
 
 			newEvent := map[string]any{}
 			if err := json.Unmarshal(byt, &newEvent); err != nil {
-				return fmt.Errorf("error unmarshalling event for function: %w", err)
+				return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent))
 		}
@@ -1487,7 +1487,7 @@ func updateInput(
 
 				var newEvent map[string]any
 				if err := json.Unmarshal(byt, &newEvent); err != nil {
-					return fmt.Errorf("error unmarshalling event for function: %w", err)
+					return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 				}
 
 				newEvents[i] = newEvent
