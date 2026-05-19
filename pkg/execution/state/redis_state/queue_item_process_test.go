@@ -734,7 +734,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	clock := clockwork.NewFakeClock()
+	// Use a deterministic clock on a second boundary so that
+	// ProcessPartition.Peek's lookahead (Truncate(second) + 1s) reliably
+	// includes all enqueued items regardless of wall-clock timing.
+	clock := clockwork.NewFakeClockAt(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 
 	ctx := context.Background()
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))

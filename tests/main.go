@@ -216,8 +216,23 @@ func run(t *testing.T, test *Test) {
 		f()
 	}
 
-	fmt.Printf("\n===> Waiting for extraneous requests\n")
-	<-time.After(test.Timeout + buffer)
+	// Wait briefly to catch any unexpected late-arriving executor requests.
+	// Cap the wait to avoid accumulating dead time across the full suite,
+	// and respect the test-binary deadline so we don't trigger a panic.
+	const maxExtraneousWait = 10 * time.Second
+	wait := test.Timeout + buffer
+	if wait > maxExtraneousWait {
+		wait = maxExtraneousWait
+	}
+	if deadline, ok := t.Deadline(); ok {
+		if remaining := time.Until(deadline) - 5*time.Second; remaining < wait {
+			wait = remaining
+		}
+	}
+	if wait >= time.Millisecond {
+		fmt.Printf("\n===> Waiting for extraneous requests (%s)\n", wait.Round(time.Millisecond))
+		<-time.After(wait)
+	}
 	fmt.Printf("\n\n")
 }
 

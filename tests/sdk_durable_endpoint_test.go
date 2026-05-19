@@ -81,9 +81,36 @@ func TestDurableEndpoint_SyncToAsyncResponseRecorded(t *testing.T) {
 	require.NotEmpty(t, runID)
 
 	// 2. Poll the redirect URL for the final response.
-	final, finalBody := mustRequest(t, http.MethodGet, pollURL, nil)
-	require.Equal(t, 200, final.StatusCode)
-	require.Contains(t, final.Header.Get("content-type"), "application/json")
+	// The server long-polls until the run completes; if the run is slow
+	// the long-poll may time out and return text/plain. Use a per-request
+	// timeout and retry until we get the expected JSON or exceed our
+	// overall deadline.
+	pollClient := &http.Client{Timeout: 30 * time.Second}
+	var final *http.Response
+	var finalBody []byte
+	var lastPollErr error
+	pollDeadline := time.Now().Add(90 * time.Second)
+	for {
+		pollReq, pollErr := http.NewRequest(http.MethodGet, pollURL, nil)
+		require.NoError(t, pollErr)
+		final, lastPollErr = pollClient.Do(pollReq)
+		if lastPollErr == nil {
+			finalBody, _ = io.ReadAll(final.Body)
+			final.Body.Close()
+			if final.StatusCode == 200 && strings.Contains(final.Header.Get("content-type"), "application/json") {
+				break
+			}
+		}
+		if !time.Now().Before(pollDeadline) {
+			if lastPollErr != nil {
+				require.NoError(t, lastPollErr, "timed out polling; last request error")
+			}
+			require.FailNowf(t, "timed out waiting for JSON poll response",
+				"last status=%d content-type=%s body=%s",
+				final.StatusCode, final.Header.Get("content-type"), string(finalBody))
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 
 	// In async mode the SDK JSON-stringifies the user's body before
 	// checkpointing (so the wire body is a JSON-encoded string of the
