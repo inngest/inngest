@@ -34,33 +34,23 @@ func (m *DeferredScheduleMetadata) Validate() error {
 	return errors.Join(errs...)
 }
 
-func (m *DeferredScheduleMetadata) Decode(data any) error {
-	byt, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(byt, m)
-}
-
-// DeferredScheduleMetadata extracts the parent-run linkage carried inside the
-// `_inngest` data prefix of an inngest/deferred.schedule event. Returns an
-// error when the prefix is absent or the payload doesn't decode.
+// DeferredScheduleMetadata extracts the parent-run linkage from the
+// `_inngest` data prefix on an inngest/deferred.schedule event.
 func (e Event) DeferredScheduleMetadata() (*DeferredScheduleMetadata, error) {
 	raw, ok := e.Data[consts.InngestEventDataPrefix]
 	if !ok {
 		return nil, fmt.Errorf("no data found in prefix '%s'", consts.InngestEventDataPrefix)
 	}
-
-	switch v := raw.(type) {
-	case DeferredScheduleMetadata:
+	if v, ok := raw.(DeferredScheduleMetadata); ok {
 		return &v, nil
-	case *DeferredScheduleMetadata:
-		return v, nil
-	default:
-		var metadata DeferredScheduleMetadata
-		if err := metadata.Decode(raw); err != nil {
-			return nil, err
-		}
-		return &metadata, nil
 	}
+	var m DeferredScheduleMetadata
+	byt, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(byt, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
 }

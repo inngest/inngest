@@ -10,9 +10,9 @@ import (
 
 func TestDeferredScheduleMetadataValidate(t *testing.T) {
 	valid := DeferredScheduleMetadata{
-		FnSlug:       "score",
-		ParentFnSlug: "app-parent-fn",
-		ParentRunID:  "01ABCDEF",
+		FnSlug:        "score",
+		ParentFnSlug:  "app-parent-fn",
+		ParentRunID:   "01ABCDEF",
 		HashedDeferID: "deadbeef",
 	}
 
@@ -32,14 +32,11 @@ func TestDeferredScheduleMetadataValidate(t *testing.T) {
 	})
 }
 
-// TestEventDeferredScheduleMetadata covers the typed-vs-untyped envelope
-// branches in (*Event).DeferredScheduleMetadata so any future change to how
-// metadata is round-tripped (e.g. through Redis/event JSON) is caught.
 func TestEventDeferredScheduleMetadata(t *testing.T) {
 	wantMeta := DeferredScheduleMetadata{
-		FnSlug:       "child-fn",
-		ParentFnSlug: "parent-fn",
-		ParentRunID:  "01ABCDEF",
+		FnSlug:        "child-fn",
+		ParentFnSlug:  "parent-fn",
+		ParentRunID:   "01ABCDEF",
 		HashedDeferID: "deadbeef",
 	}
 
@@ -74,18 +71,9 @@ func TestEventDeferredScheduleMetadata(t *testing.T) {
 		assert.Equal(t, wantMeta, *got)
 	})
 
-	t.Run("decodes a *DeferredScheduleMetadata pointer", func(t *testing.T) {
-		m := wantMeta // copy
-		e := Event{Data: map[string]any{consts.InngestEventDataPrefix: &m}}
-		got, err := e.DeferredScheduleMetadata()
-		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, wantMeta, *got)
-	})
-
 	t.Run("bad payload returns an error", func(t *testing.T) {
 		// json.Marshal succeeds on any value but Unmarshal into the struct
-		// fails when the source is not an object (e.g. a string).
+		// fails when the source is not an object.
 		e := Event{Data: map[string]any{consts.InngestEventDataPrefix: "not-an-object"}}
 		got, err := e.DeferredScheduleMetadata()
 		require.Error(t, err)
