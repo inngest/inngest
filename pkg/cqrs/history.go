@@ -47,7 +47,7 @@ type HistoryReader interface {
 
 	// GetFunctionRunHistory must return history for the given function run,
 	// ordered from oldest to newest.
-	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*history.History, error)
+	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error)
 
 	// GetRunDefers returns defers attached to each parent run, keyed by
 	// parent run ID. Each entry's Run is the child TraceRun if one has been

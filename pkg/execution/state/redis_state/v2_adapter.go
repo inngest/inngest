@@ -264,8 +264,8 @@ func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, st
 	return v.mgr.SetDeferStatus(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hashedID, status)
 }
 
-func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
-	return v.mgr.SaveRejectedDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, fnSlug, hashedID)
+func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug, userlandID, hashedID string) error {
+	return v.mgr.SaveRejectedDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, fnSlug, userlandID, hashedID)
 }
 
 // Metadata returns metadata for a given run

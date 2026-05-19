@@ -29,14 +29,22 @@ func SaveFromOp(
 		rejectReason string
 	)
 
+	var userlandID string
+	if op.Userland != nil {
+		userlandID = op.Userland.ID
+	}
+
 	opts, parseErr := op.DeferAddOpts()
-	switch {
-	case errors.Is(parseErr, state.ErrDeferInputTooLarge):
+	if parseErr != nil {
 		rejected = true
-		rejectReason = "per_defer_size"
+		if errors.Is(parseErr, state.ErrDeferInputTooLarge) {
+			rejectReason = "per_defer_size"
+		} else {
+			rejectReason = "invalid_opts"
+		}
 		// Best-effort sentinel so SDK retransmits dedupe.
 		if opts != nil && opts.FnSlug != "" {
-			if rerr := rs.SaveRejectedDefer(ctx, id, opts.FnSlug, op.ID); rerr != nil {
+			if rerr := rs.SaveRejectedDefer(ctx, id, opts.FnSlug, userlandID, op.ID); rerr != nil {
 				log.Warn("failed to save rejected defer sentinel; SDK retransmits will not dedupe",
 					"step_id", sanitizeLogValue(op.ID),
 					"run_id", id.RunID,
@@ -44,17 +52,9 @@ func SaveFromOp(
 				)
 			}
 		}
-	case parseErr != nil:
-		// No FnSlug, so no sentinel. SDK retransmits absorbed.
-		rejected = true
-		rejectReason = "invalid_opts"
 	}
 
 	if !rejected {
-		var userlandID string
-		if op.Userland != nil {
-			userlandID = op.Userland.ID
-		}
 		saveErr := rs.SaveDefer(ctx, id, statev2.Defer{
 			FnSlug:         opts.FnSlug,
 			HashedID:       op.ID,

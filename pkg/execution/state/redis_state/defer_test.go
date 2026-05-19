@@ -448,7 +448,7 @@ func TestSaveRejectedDefer(t *testing.T) {
 		r.NoError(v2svc.SaveDefer(ctx, id, original))
 
 		// Late rejection signal must not downgrade the accepted defer.
-		r.NoError(v2svc.SaveRejectedDefer(ctx, id, original.FnSlug, original.HashedID))
+		r.NoError(v2svc.SaveRejectedDefer(ctx, id, original.FnSlug, original.UserlandID, original.HashedID))
 
 		defers, err := v2svc.LoadDefers(ctx, id)
 		r.NoError(err)
@@ -461,7 +461,7 @@ func TestSaveRejectedDefer(t *testing.T) {
 		r := require.New(t)
 		v2svc, id := newDeferTestRunService(t)
 
-		r.NoError(v2svc.SaveRejectedDefer(ctx, id, "onDefer-score", "hash-rejected"))
+		r.NoError(v2svc.SaveRejectedDefer(ctx, id, "onDefer-score", "user-defer-id", "hash-rejected"))
 
 		defers, err := v2svc.LoadDefers(ctx, id)
 		r.NoError(err)
@@ -469,6 +469,7 @@ func TestSaveRejectedDefer(t *testing.T) {
 		got := defers["hash-rejected"]
 		r.Equal(enums.DeferStatusRejected, got.ScheduleStatus)
 		r.Equal("onDefer-score", got.FnSlug)
+		r.Equal("user-defer-id", got.UserlandID)
 		r.Empty(got.Input)
 
 		// Subsequent SaveDefer hits the terminal-sticky check.

@@ -55,7 +55,7 @@ type RunService interface {
 	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
 	// No-op if any defer already exists for hashedID. Returns
 	// ErrDeferLimitExceeded if no room.
-	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
+	SaveRejectedDefer(ctx context.Context, id ID, fnSlug, userlandID, hashedID string) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for
