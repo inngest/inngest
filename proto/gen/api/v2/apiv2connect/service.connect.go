@@ -67,6 +67,15 @@ const (
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
 	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
+	// V2ListInsightsTablesProcedure is the fully-qualified name of the V2's ListInsightsTables RPC.
+	V2ListInsightsTablesProcedure = "/api.v2.V2/ListInsightsTables"
+	// V2ListInsightsEventSchemasProcedure is the fully-qualified name of the V2's
+	// ListInsightsEventSchemas RPC.
+	V2ListInsightsEventSchemasProcedure = "/api.v2.V2/ListInsightsEventSchemas"
+	// V2QueryInsightsPromptProcedure is the fully-qualified name of the V2's QueryInsightsPrompt RPC.
+	V2QueryInsightsPromptProcedure = "/api.v2.V2/QueryInsightsPrompt"
+	// V2QueryInsightsProcedure is the fully-qualified name of the V2's QueryInsights RPC.
+	V2QueryInsightsProcedure = "/api.v2.V2/QueryInsights"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -90,6 +99,10 @@ type V2Client interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
+	ListInsightsEventSchemas(context.Context, *connect.Request[v2.ListInsightsEventSchemasRequest]) (*connect.Response[v2.ListInsightsEventSchemasResponse], error)
+	QueryInsightsPrompt(context.Context, *connect.Request[v2.QueryInsightsPromptRequest]) (*connect.Response[v2.QueryInsightsPromptResponse], error)
+	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -199,27 +212,55 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		listInsightsTables: connect.NewClient[v2.ListInsightsTablesRequest, v2.ListInsightsTablesResponse](
+			httpClient,
+			baseURL+V2ListInsightsTablesProcedure,
+			connect.WithSchema(v2Methods.ByName("ListInsightsTables")),
+			connect.WithClientOptions(opts...),
+		),
+		listInsightsEventSchemas: connect.NewClient[v2.ListInsightsEventSchemasRequest, v2.ListInsightsEventSchemasResponse](
+			httpClient,
+			baseURL+V2ListInsightsEventSchemasProcedure,
+			connect.WithSchema(v2Methods.ByName("ListInsightsEventSchemas")),
+			connect.WithClientOptions(opts...),
+		),
+		queryInsightsPrompt: connect.NewClient[v2.QueryInsightsPromptRequest, v2.QueryInsightsPromptResponse](
+			httpClient,
+			baseURL+V2QueryInsightsPromptProcedure,
+			connect.WithSchema(v2Methods.ByName("QueryInsightsPrompt")),
+			connect.WithClientOptions(opts...),
+		),
+		queryInsights: connect.NewClient[v2.QueryInsightsRequest, v2.QueryInsightsResponse](
+			httpClient,
+			baseURL+V2QueryInsightsProcedure,
+			connect.WithSchema(v2Methods.ByName("QueryInsights")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // v2Client implements V2Client.
 type v2Client struct {
-	health                  *connect.Client[v2.HealthRequest, v2.HealthResponse]
-	xSchemaOnly             *connect.Client[v2.HealthRequest, v2.ErrorResponse]
-	createPartnerAccount    *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
-	createEnv               *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
-	fetchPartnerAccounts    *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
-	fetchAccount            *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
-	fetchAccountEnvs        *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
-	fetchAccountEventKeys   *connect.Client[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse]
-	fetchAccountSigningKeys *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
-	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
-	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
-	patchEnv                *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
-	getFunctionRun          *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
-	syncApp                 *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
-	getFunctionTrace        *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
-	invokeFunction          *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
+	health                   *connect.Client[v2.HealthRequest, v2.HealthResponse]
+	xSchemaOnly              *connect.Client[v2.HealthRequest, v2.ErrorResponse]
+	createPartnerAccount     *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
+	createEnv                *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
+	fetchPartnerAccounts     *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
+	fetchAccount             *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
+	fetchAccountEnvs         *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
+	fetchAccountEventKeys    *connect.Client[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse]
+	fetchAccountSigningKeys  *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
+	createWebhook            *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
+	listWebhooks             *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
+	patchEnv                 *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
+	getFunctionRun           *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
+	syncApp                  *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
+	getFunctionTrace         *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
+	invokeFunction           *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
+	listInsightsTables       *connect.Client[v2.ListInsightsTablesRequest, v2.ListInsightsTablesResponse]
+	listInsightsEventSchemas *connect.Client[v2.ListInsightsEventSchemasRequest, v2.ListInsightsEventSchemasResponse]
+	queryInsightsPrompt      *connect.Client[v2.QueryInsightsPromptRequest, v2.QueryInsightsPromptResponse]
+	queryInsights            *connect.Client[v2.QueryInsightsRequest, v2.QueryInsightsResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -302,6 +343,26 @@ func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.I
 	return c.invokeFunction.CallUnary(ctx, req)
 }
 
+// ListInsightsTables calls api.v2.V2.ListInsightsTables.
+func (c *v2Client) ListInsightsTables(ctx context.Context, req *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error) {
+	return c.listInsightsTables.CallUnary(ctx, req)
+}
+
+// ListInsightsEventSchemas calls api.v2.V2.ListInsightsEventSchemas.
+func (c *v2Client) ListInsightsEventSchemas(ctx context.Context, req *connect.Request[v2.ListInsightsEventSchemasRequest]) (*connect.Response[v2.ListInsightsEventSchemasResponse], error) {
+	return c.listInsightsEventSchemas.CallUnary(ctx, req)
+}
+
+// QueryInsightsPrompt calls api.v2.V2.QueryInsightsPrompt.
+func (c *v2Client) QueryInsightsPrompt(ctx context.Context, req *connect.Request[v2.QueryInsightsPromptRequest]) (*connect.Response[v2.QueryInsightsPromptResponse], error) {
+	return c.queryInsightsPrompt.CallUnary(ctx, req)
+}
+
+// QueryInsights calls api.v2.V2.QueryInsights.
+func (c *v2Client) QueryInsights(ctx context.Context, req *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error) {
+	return c.queryInsights.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -323,6 +384,10 @@ type V2Handler interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
+	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
+	ListInsightsEventSchemas(context.Context, *connect.Request[v2.ListInsightsEventSchemasRequest]) (*connect.Response[v2.ListInsightsEventSchemasResponse], error)
+	QueryInsightsPrompt(context.Context, *connect.Request[v2.QueryInsightsPromptRequest]) (*connect.Response[v2.QueryInsightsPromptResponse], error)
+	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -428,6 +493,30 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("InvokeFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ListInsightsTablesHandler := connect.NewUnaryHandler(
+		V2ListInsightsTablesProcedure,
+		svc.ListInsightsTables,
+		connect.WithSchema(v2Methods.ByName("ListInsightsTables")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListInsightsEventSchemasHandler := connect.NewUnaryHandler(
+		V2ListInsightsEventSchemasProcedure,
+		svc.ListInsightsEventSchemas,
+		connect.WithSchema(v2Methods.ByName("ListInsightsEventSchemas")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2QueryInsightsPromptHandler := connect.NewUnaryHandler(
+		V2QueryInsightsPromptProcedure,
+		svc.QueryInsightsPrompt,
+		connect.WithSchema(v2Methods.ByName("QueryInsightsPrompt")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2QueryInsightsHandler := connect.NewUnaryHandler(
+		V2QueryInsightsProcedure,
+		svc.QueryInsights,
+		connect.WithSchema(v2Methods.ByName("QueryInsights")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -462,6 +551,14 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2InvokeFunctionProcedure:
 			v2InvokeFunctionHandler.ServeHTTP(w, r)
+		case V2ListInsightsTablesProcedure:
+			v2ListInsightsTablesHandler.ServeHTTP(w, r)
+		case V2ListInsightsEventSchemasProcedure:
+			v2ListInsightsEventSchemasHandler.ServeHTTP(w, r)
+		case V2QueryInsightsPromptProcedure:
+			v2QueryInsightsPromptHandler.ServeHTTP(w, r)
+		case V2QueryInsightsProcedure:
+			v2QueryInsightsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -533,4 +630,20 @@ func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request
 
 func (UnimplementedV2Handler) InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.InvokeFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListInsightsTables is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListInsightsEventSchemas(context.Context, *connect.Request[v2.ListInsightsEventSchemasRequest]) (*connect.Response[v2.ListInsightsEventSchemasResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListInsightsEventSchemas is not implemented"))
+}
+
+func (UnimplementedV2Handler) QueryInsightsPrompt(context.Context, *connect.Request[v2.QueryInsightsPromptRequest]) (*connect.Response[v2.QueryInsightsPromptResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.QueryInsightsPrompt is not implemented"))
+}
+
+func (UnimplementedV2Handler) QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.QueryInsights is not implemented"))
 }
