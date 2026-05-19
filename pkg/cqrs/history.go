@@ -3,7 +3,6 @@ package cqrs
 import (
 	"context"
 
-	"github.com/inngest/inngest/pkg/execution/history"
 	exechistory "github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
