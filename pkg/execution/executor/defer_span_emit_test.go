@@ -100,11 +100,10 @@ func TestBuildDeferEvents_EmitsExecutorDeferSpan(t *testing.T) {
 
 	for _, d := range []sv2.Defer{afterRun, aborted} {
 		c := byHashed[d.HashedID]
-		// Seed must follow the "s"-tag convention from
-		// util.DeterministicChildRunID: parent || hashed || "s".
-		expectedSeed := []byte(parentRunID.String() + d.HashedID + "s")
-		require.Equal(t, expectedSeed, c.Opts.Seed,
-			"executor.defer seed must be parent || hashed || 's' for defer %q", d.HashedID)
+		require.Equal(t,
+			util.DeterministicDeferSpanSeed(parentRunID, d.HashedID),
+			c.Opts.Seed,
+			"executor.defer seed must come from util.DeterministicDeferSpanSeed for defer %q", d.HashedID)
 
 		userPtr, ok := c.Opts.Attributes.Get(meta.Attrs.DeferUserID.Key()).(*string)
 		require.True(t, ok, "DeferUserID must be a *string")

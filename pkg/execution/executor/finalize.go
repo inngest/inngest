@@ -232,23 +232,7 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
-		// Deterministic event ID so any duplicate-publish path dedupes on the
-		// runner side (runner.go uses event.ID as the schedule idempotency key).
-		// Time prefix is the parent run's start so the ULID stays well-formed.
-		// Untagged seed; see util.DeterministicChildRunID for the three-tag convention.
-		seed := []byte(opts.Metadata.ID.RunID.String() + d.HashedID)
-		eventID, err := util.DeterministicULID(ulid.Time(opts.Metadata.ID.RunID.Time()), seed)
-		if err != nil {
-			// Unreachable
-			logger.StdlibLogger(ctx).Error(
-				"error generating deferred event ID",
-				"error", err,
-				"run_id", opts.Metadata.ID.RunID,
-				"unreachable", true,
-			)
-			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
-			continue
-		}
+		eventID := util.DeterministicDeferEventID(opts.Metadata.ID.RunID, d.HashedID)
 
 		data := map[string]any{}
 		if len(d.Input) > 0 {
@@ -297,19 +281,15 @@ func (e *executor) buildDeferEvents(
 	return events, nil
 }
 
-// emitDeferSpan writes the executor.defer span for a single defer. The span is
-// the storage: resolvers reconstruct parent->child linkage from it rather than
-// reading a side-channel row. The "s"-tag seed is sibling to the untagged
-// event-ID seed in buildDeferEvents and the "r"-tag child run ID seed in
-// util.DeterministicChildRunID — see that helper for the three-tag convention.
+// emitDeferSpan emits the span tracing resolvers use to link a deferred child run to its parent.
 func (e *executor) emitDeferSpan(ctx context.Context, md sv2.Metadata, now time.Time, d sv2.Defer) {
 	_, err := e.tracerProvider.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
-		Debug:     &tracing.SpanDebugData{Location: "executor.buildDeferEvents"},
+		Debug:     &tracing.SpanDebugData{Location: "executor.emitDeferSpan"},
 		Metadata:  &md,
 		Parent:    tracing.RunSpanRefFromMetadata(&md),
 		StartTime: now,
 		EndTime:   now,
-		Seed:      []byte(md.ID.RunID.String() + d.HashedID + "s"),
+		Seed:      util.DeterministicDeferSpanSeed(md.ID.RunID, d.HashedID),
 		Attributes: meta.NewAttrSet(
 			meta.Attr(meta.Attrs.DeferHashedID, &d.HashedID),
 			meta.Attr(meta.Attrs.DeferUserID, &d.UserlandID),

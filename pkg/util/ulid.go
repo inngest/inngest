@@ -27,19 +27,31 @@ func DeterministicULID(ts time.Time, seed []byte) (ulid.ULID, error) {
 }
 
 // DeterministicChildRunID derives the run ID of a deferred child run from
-// its parent run ID and the defer's hashed ID. It is the "r"-tagged sibling
-// of two other deterministic IDs that share the same (parent_run_id,
-// hashed_id) input pair, all built in executor.buildDeferEvents:
+// its parent run ID and the defer's hashed ID. Determinism lets callers
+// idempotently look up the child run from the parent context.
 //
-//   - schedule event ID (untagged)
-//   - executor.defer span ID ("s" tag)
-//   - child run ID ("r" tag, this function)
-//
-// The tag is what differentiates these three ULIDs; do not change it
-// without updating all three sites in lockstep.
+// "r"-tagged sibling of DeterministicDeferEventID (untagged) and
+// DeterministicDeferSpanSeed ("s"); the trio shares the same
+// (parent, hashedID) input and differs only by the trailing tag byte.
+// Changing a tag requires updating all three in lockstep.
 func DeterministicChildRunID(parent ulid.ULID, hashedID string) ulid.ULID {
 	// err is unreachable: ulid.New only fails when its entropy reader errors,
 	// and bytes.Reader over a fixed SHA-256 sum cannot.
 	id, _ := DeterministicULID(ulid.Time(parent.Time()), []byte(parent.String()+hashedID+"r"))
 	return id
+}
+
+// DeterministicDeferEventID returns the inngest/deferred.schedule event ID
+// for a single defer. Determinism dedupes duplicate publishes on the runner
+// side, which uses event.ID as the schedule idempotency key.
+func DeterministicDeferEventID(parent ulid.ULID, hashedID string) ulid.ULID {
+	id, _ := DeterministicULID(ulid.Time(parent.Time()), []byte(parent.String()+hashedID))
+	return id
+}
+
+// DeterministicDeferSpanSeed returns the seed for the executor.defer span.
+// Determinism keeps the span ID stable across finalize retries so resolvers
+// don't see duplicates.
+func DeterministicDeferSpanSeed(parent ulid.ULID, hashedID string) []byte {
+	return []byte(parent.String() + hashedID + "s")
 }

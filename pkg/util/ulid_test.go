@@ -107,3 +107,10 @@ func TestDeterministicChildRunID(t *testing.T) {
 			DeterministicChildRunID(fixedParent, "fixed-hashed-id").String())
 	})
 }
+
+func TestDeterministicDeferEventID(t *testing.T) {
+	fixedParent := ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB")
+	require.Equal(t,
+		"01HKQJZ5R7CYQKSKMYBEBKYTBM",
+		DeterministicDeferEventID(fixedParent, "fixed-hashed-id").String())
+}
