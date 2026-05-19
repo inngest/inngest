@@ -505,13 +505,13 @@ func toRunsQueryOpt(
 		items = num
 	}
 
-	runType := cqrs.RunTypeFilterAny
+	var runTypes []enums.RunType
 	if filter.RunType != nil {
 		switch *filter.RunType {
 		case models.RunTypePrimary:
-			runType = cqrs.RunTypeFilterPrimary
+			runTypes = []enums.RunType{enums.RunTypePrimary}
 		case models.RunTypeDefer:
-			runType = cqrs.RunTypeFilterDefer
+			runTypes = []enums.RunType{enums.RunTypeDefer}
 		}
 	}
 
@@ -524,7 +524,7 @@ func toRunsQueryOpt(
 			Until:      until,
 			Status:     statuses,
 			CEL:        cel,
-			RunType:    runType,
+			RunType:    runTypes,
 		},
 		Order:   orderBy,
 		Cursor:  cursor,

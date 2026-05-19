@@ -2114,8 +2114,11 @@ type runsQueryBuilder struct {
 
 // The spans table is aliased to `dt` so callers that already FROM spans
 // (e.g. GetSpanRuns) don't shadow their own table.
-func runTypeFilterExpr(dialect string, outerRunIDCol string, runType cqrs.RunTypeFilter) sq.Expression {
-	if runType == cqrs.RunTypeFilterAny {
+func runTypeFilterExpr(dialect string, outerRunIDCol string, runTypes []enums.RunType) sq.Expression {
+	wantPrimary := slices.Contains(runTypes, enums.RunTypePrimary)
+	wantDefer := slices.Contains(runTypes, enums.RunTypeDefer)
+	// Neither selected or both selected ⇒ no narrowing needed.
+	if wantPrimary == wantDefer {
 		return nil
 	}
 
@@ -2135,7 +2138,7 @@ func runTypeFilterExpr(dialect string, outerRunIDCol string, runType cqrs.RunTyp
 		Select(sq.L("1")).
 		Where(sq.I("dt.run_id").Eq(sq.I(outerRunIDCol)), jsonPred)
 
-	if runType == cqrs.RunTypeFilterDefer {
+	if wantDefer {
 		return sq.L("EXISTS ?", sub)
 	}
 	return sq.L("NOT EXISTS ?", sub)
