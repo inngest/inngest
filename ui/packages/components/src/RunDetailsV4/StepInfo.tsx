@@ -31,6 +31,7 @@ import { UserlandAttrs } from './UserlandAttrs';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
 import {
   isExperimentMetadata,
+  isScoreMetadata,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
@@ -248,12 +249,12 @@ export const StepInfo = ({
     ? trace.metadata?.filter(
         (md) =>
           md.kind !== 'inngest.response_headers' &&
-          md.kind !== 'inngest.score' &&
+          !isScoreMetadata(md) &&
           !isExperimentMetadata(md)
       ) ?? []
     : [];
 
-  const scoreMetadataList = trace.metadata?.filter((md) => md.kind === 'inngest.score') ?? [];
+  const scoreMetadataList = trace.metadata?.filter(isScoreMetadata) ?? [];
 
   const experimentMetadataList = metadataIsEnabled
     ? trace.metadata?.filter(isExperimentMetadata) ?? []
@@ -283,7 +284,7 @@ export const StepInfo = ({
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
-      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
+      <div className="min-h-11 flex w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}

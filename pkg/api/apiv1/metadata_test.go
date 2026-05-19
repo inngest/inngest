@@ -236,9 +236,9 @@ func TestAddRunMetadataAllowsScoreMetadata(t *testing.T) {
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Target: RunMetadataTarget{StepID: &stepID},
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore,
+			Kind:   metadata.KindInngestScore + ".passed",
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"passed": json.RawMessage(`true`)},
+			Values: metadata.Values{"value": json.RawMessage(`true`)},
 		}}},
 	})
 	require.NoError(t, err)
@@ -269,9 +269,9 @@ func TestAddRunMetadataRejectsInvalidScoreMetadata(t *testing.T) {
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore,
+			Kind:   metadata.KindInngestScore + ".score",
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"score": json.RawMessage(`{"value":1}`)},
+			Values: metadata.Values{"value": json.RawMessage(`{"nested":1}`)},
 		}}},
 	})
 	require.ErrorIs(t, err, metadata.ErrScoreValueInvalid)
@@ -311,9 +311,9 @@ func TestAddRunMetadataAllowsRunScopedScoreMetadata(t *testing.T) {
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore,
+			Kind:   metadata.KindInngestScore + ".accuracy",
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"accuracy": json.RawMessage(`1`)},
+			Values: metadata.Values{"value": json.RawMessage(`1`)},
 		}}},
 	})
 	require.NoError(t, err)
