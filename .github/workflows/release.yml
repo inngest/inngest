@@ -142,9 +142,9 @@ jobs:
           npm version ${{ github.ref_name }}
 
           if [ -z "${{ needs.check-release-type.outputs.prerelease }}" ]; then
-            npm publish --access public
+            npm publish --access public --provenance=false
           else
-            npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public
+            npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public --provenance=false
           fi
 
   linear-release:
