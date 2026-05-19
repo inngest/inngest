@@ -3225,11 +3225,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				e.log.Debug("error creating span for next step after resume", "error", err)
 			}
 
-			// Retry the Enqueue inline to avoid transient errors causing
-			// this pause job to fail. We can't rely on retrying the pause
-			// job itself: the pause has already been consumed above, and
-			// it may also be consumed by a timeout job, so future attempts
-			// of this pause job would skip the Enqueue entirely.
+			// The Enqueue is retried inline here to avoid transient errors causing
+			// this pause job to fail. If the Enqueue fails after consuming the pause
+			// above, retries of this pause job will notice that the pause has been
+			// consumed and skip the subsequent Enqueue.
+			// It is possible for the pause to be consumed by a timeout job as well,
+			//  so we cannot just retry the Enqueue on future attempts of this pause job
+			// without knowing if the pause was consumed by an event or by the timeout.
 			_, err = util.WithRetry(ctx, "executor.resume.enqueue", func(ctx context.Context) (any, error) {
 				return nil, e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 			}, util.NewRetryConf(util.WithRetryConfRetryableErrors(func(err error) bool {
