@@ -16,6 +16,7 @@ export const getDocPage = createServerFn()
     if (!page) return null;
     return {
       path: page.path,
+      url: page.url,
       // getPageTree() returns ReactNode names per the TypeScript type, but
       // for this content (API docs from OpenAPI) all names are plain strings
       // and serialize cleanly via TanStack Start's SuperJSON transport.
