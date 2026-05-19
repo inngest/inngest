@@ -112,7 +112,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   npm:
-    runs-on: depot-ubuntu-22.04
+    runs-on: ubuntu-22.04
     needs: [goreleaser, check-release-type]
     permissions:
       contents: read
@@ -142,9 +142,9 @@ jobs:
           npm version ${{ github.ref_name }}
 
           if [ -z "${{ needs.check-release-type.outputs.prerelease }}" ]; then
-            npm publish --access public --provenance=false
+            npm publish --access public --provenance
           else
-            npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public --provenance=false
+            npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public --provenance
           fi
 
   linear-release:
