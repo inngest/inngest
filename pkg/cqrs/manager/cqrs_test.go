@@ -1815,6 +1815,145 @@ func TestSpanAttributesRoundTrip(t *testing.T) {
 	assert.Equal(t, "0.1.0", result.RawOtelSpan.Attributes["sdk.version"])
 }
 
+// TestSpanAttributeClobberOnDynamicSpanIDMerge reproduces the attribute-merge
+// race that breaks the StepPlanned leading-edge feature (EXE-1547).
+//
+// Two physical rows share one dynamic_span_id (this is by design — the
+// leading-edge "Running" row created at StepPlanned and the completion
+// "Completed" row created at StepRun are meant to roll up into one logical
+// span). They write *different* values for the same conflict-prone attribute,
+// `_inngest.dynamic.status`. The intended final value is "Completed" — once
+// the completion arm lands, that's the authoritative status for the span.
+//
+// The current merge in mapSpanFromRow iterates fragments and `maps.Copy`s
+// each fragment's attrs over the running map. Fragment order inside
+// json_group_array is not guaranteed, so whichever row appears last wins
+// non-deterministically. When the leading-edge row wins, the merged span
+// reports Status=Running and consumers querying by status:COMPLETED (the
+// inngest-js example test suite's runHasTimeline helper, the run-list
+// trigger view, etc.) can't find the step.
+//
+// This test asserts the *intended* outcome — regardless of how the two rows
+// happen to be aggregated under the hood, the merged span must report the
+// completion's status. It fails today; fixing it likely involves either
+// dropping DynamicStatus from the leading-edge attrs (preferring single-
+// writer for conflict-prone attributes), ordering fragments deterministically
+// in SQL, or applying explicit status precedence in mapSpanFromRow.
+func TestSpanAttributeClobberOnDynamicSpanIDMerge(t *testing.T) {
+	type rowCfg struct {
+		startOffset time.Duration
+		status      string // _inngest.dynamic.status value
+		stepName    string // "" → don't write StepName attr
+	}
+
+	type subcase struct {
+		name        string
+		insertOrder []int   // indices into rows
+		rows        []rowCfg
+	}
+
+	subcases := []subcase{
+		{
+			name:        "leading earlier start, inserted first",
+			insertOrder: []int{0, 1},
+			rows: []rowCfg{
+				{startOffset: 10 * time.Millisecond, status: "Running"},
+				{startOffset: 20 * time.Millisecond, status: "Completed", stepName: "Get blue team score"},
+			},
+		},
+		{
+			name:        "leading earlier start, inserted second",
+			insertOrder: []int{1, 0},
+			rows: []rowCfg{
+				{startOffset: 10 * time.Millisecond, status: "Running"},
+				{startOffset: 20 * time.Millisecond, status: "Completed", stepName: "Get blue team score"},
+			},
+		},
+		{
+			name:        "leading later start than completion (timing reversed)",
+			insertOrder: []int{0, 1},
+			rows: []rowCfg{
+				{startOffset: 30 * time.Millisecond, status: "Running"},
+				{startOffset: 20 * time.Millisecond, status: "Completed", stepName: "Get blue team score"},
+			},
+		},
+	}
+
+	for _, tc := range subcases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm, cleanup := initCQRS(t)
+			defer cleanup()
+
+			runULID := ulid.MustNew(ulid.Now(), rand.Reader)
+			runID := runULID.String()
+
+			// Both step rows share the same trace_id and parent_span_id, the
+			// way the executor produces them in production: both spans inherit
+			// from the same Parent (RunSpanRefFromMetadata) so they land in
+			// one GROUP BY bucket. The SQL aggregates them via json_group_array
+			// into one row with multiple fragments, which is what triggers the
+			// merge path in mapSpanFromRow.
+			traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+			// Root span — required so GetSpansByRunID has a root to return.
+			rootStart := time.Now()
+			insertTestSpan(t, cm, testSpanFields{
+				RunID:         runID,
+				TraceID:       traceID,
+				DynamicSpanID: "dyn-root",
+				Name:          "executor.run",
+				StartTime:     rootStart,
+				Attributes: []byte(
+					`{"_inngest.run.id":"` + runID + `"}`,
+				),
+			})
+
+			rows := make([]testSpanFields, len(tc.rows))
+			for i, r := range tc.rows {
+				attrs := `{"_inngest.dynamic.status":"` + r.status + `","_inngest.step.started_at":"2026-01-01T00:00:00Z"`
+				if r.stepName != "" {
+					attrs += `,"_inngest.step.name":"` + r.stepName + `"`
+				}
+				attrs += `}`
+				rows[i] = testSpanFields{
+					RunID:         runID,
+					TraceID:       traceID,
+					DynamicSpanID: "dyn-step-shared",
+					ParentSpanID:  "dyn-root",
+					Name:          "executor.step",
+					StartTime:     rootStart.Add(r.startOffset),
+					Attributes:    []byte(attrs),
+				}
+			}
+
+			for _, idx := range tc.insertOrder {
+				insertTestSpan(t, cm, rows[idx])
+			}
+
+			result, err := cm.GetSpansByRunID(t.Context(), runULID)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Len(t, result.Children, 1, "root should have one merged step child")
+
+			merged := result.Children[0]
+
+			// Single-writer attribute (StepName lives only on the completion
+			// row). This will always survive the merge — included as a sanity
+			// check that the merge actually happened.
+			require.NotNil(t, merged.Attributes.StepName, "merged span lost the completion's StepName")
+			assert.Equal(t, "Get blue team score", *merged.Attributes.StepName)
+
+			// Conflict-prone attribute: both rows write _inngest.dynamic.status,
+			// with different values. The completion's "Completed" must win;
+			// otherwise downstream consumers querying status=Completed can't
+			// find the step.
+			assert.Equal(t, enums.StepStatusCompleted, merged.Status,
+				"merged span status must be Completed after both leading-edge and completion arms land; "+
+					"a Running result indicates the leading-edge fragment clobbered the completion's status during merge")
+		})
+	}
+}
+
 // TestSpanOutputReadBack verifies that span output stored as []byte can be
 // read back via GetSpanOutput without corruption. This is a regression test
 // for double-encoding where json.Marshal(stringValue) would wrap the JSON
@@ -1857,6 +1996,7 @@ type testSpanFields struct {
 	RunID          string    // required
 	DynamicSpanID  string    // required for GROUP BY tests
 	ParentSpanID   string    // for child spans (references parent's DynamicSpanID)
+	TraceID        string    // default: random ulid (override to share a trace across rows)
 	DebugRunID     string    // for debug run tests
 	DebugSessionID string    // for debug session tests
 	Name           string    // default: "test-span"
@@ -1876,7 +2016,10 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 	t.Helper()
 
 	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := spanFields.TraceID
+	if traceID == "" {
+		traceID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
 
 	// Apply defaults
 	if spanFields.Name == "" {
