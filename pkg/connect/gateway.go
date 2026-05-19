@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
+	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 )
@@ -94,6 +95,13 @@ type connectionHandler struct {
 	log        logger.Logger
 
 	remoteAddr string
+
+	// controlCh carries high-priority messages (heartbeats, pause, ready).
+	// dataCh carries data messages (replies, acks, lease extensions).
+	// Separate consumer goroutines service each channel so control messages
+	// are never queued behind slow data handlers.
+	controlCh chan *connectpb.ConnectMessage
+	dataCh    chan *connectpb.ConnectMessage
 
 	// draining is set to true when a WORKER_PAUSE message is received.
 	// Once set, heartbeats must not reset the connection status to READY.
@@ -293,6 +301,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			updateLock:     sync.Mutex{},
 			remoteAddr:     remoteAddr,
 			stopForwarding: make(chan struct{}),
+			controlCh:      make(chan *connectpb.ConnectMessage, 10),
+			dataCh:         make(chan *connectpb.ConnectMessage, 50),
 		}
 
 		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
@@ -562,6 +572,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		eg := errgroup.Group{}
 		eg.Go(func() error {
+			// Unblock consumer goroutines as soon as this is over
+			defer cancelRunLoopContext()
 			for {
 				// We already handle context cancellations in a goroutine above.
 				// If we timed out the read loop, the connection would be closed. This is bad because
@@ -648,10 +660,56 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					Tags:    tags,
 				})
 
-				serr := ch.handleIncomingWebSocketMessage(&msg)
-				if serr != nil {
-					c.closeWithConnectError(ws, serr)
-					return serr
+				switch msg.Kind {
+				case connectpb.GatewayMessageType_WORKER_HEARTBEAT,
+					connectpb.GatewayMessageType_WORKER_PAUSE,
+					connectpb.GatewayMessageType_WORKER_READY:
+					select {
+					case ch.controlCh <- &msg:
+					case <-runLoopCtx.Done():
+						return nil
+					}
+				default:
+					select {
+					case ch.dataCh <- &msg:
+					case <-runLoopCtx.Done():
+						return nil
+					}
+				}
+			}
+		})
+
+		// dedicated goroutine for heartbeats, pause, and ready
+		eg.Go(func() error {
+			for {
+				select {
+				case <-runLoopCtx.Done():
+					return nil
+				case msg := <-ch.controlCh:
+					if serr := ch.handleIncomingWebSocketMessage(msg); serr != nil {
+						c.closeWithConnectError(ws, serr)
+						cancelRunLoopContext()
+						return serr
+					}
+				}
+			}
+		})
+
+		eg.Go(func() error {
+			p := pool.New().WithErrors().WithFirstError().WithMaxGoroutines(5)
+			for {
+				select {
+				case <-runLoopCtx.Done():
+					return p.Wait()
+				case msg := <-ch.dataCh:
+					p.Go(func() error {
+						if serr := ch.handleIncomingWebSocketMessage(msg); serr != nil {
+							c.closeWithConnectError(ws, serr)
+							cancelRunLoopContext()
+							return serr
+						}
+						return nil
+					})
 				}
 			}
 		})
