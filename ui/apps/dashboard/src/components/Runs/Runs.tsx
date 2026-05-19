@@ -6,7 +6,9 @@ import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedS
 import {
   useSearchParam,
   useStringArraySearchParam,
+  useValidatedSearchParam,
 } from '@inngest/components/hooks/useSearchParams';
+import { isRunType } from '@inngest/components/types/functionRun';
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -15,7 +17,7 @@ import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AppFilterDocument, CountRunsDocument } from './queries';
 import { useRunsPagination } from './useRunsPagination';
-import { toRunStatuses, toTimeField } from './utils';
+import { toRunStatuses, toRunType, toTimeField } from './utils';
 
 export const DEFAULT_POLL_INTERVAL = 1000;
 
@@ -79,6 +81,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
+  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -104,6 +107,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       status: filteredStatus.length > 0 ? filteredStatus : null,
       timeField,
       celQuery: search,
+      runType: filterRunType ? toRunType(filterRunType) : null,
     }),
     [
       appIDs,
@@ -114,6 +118,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       filteredStatus,
       timeField,
       search,
+      filterRunType,
     ],
   );
 
@@ -172,7 +177,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         history: features.data?.history ?? 7,
         tracesPreview: tracePreviewEnabled,
         runDetailsV4: v4Enabled,
-        runType: false,
+        runType: true,
       }}
       hasMore={hasNextPage}
       isLoadingInitial={isLoadingInitial}

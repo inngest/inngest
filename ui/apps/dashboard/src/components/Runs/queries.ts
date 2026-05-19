@@ -12,6 +12,7 @@ export const GetRunsDocument = graphql(`
     $functionRunCursor: String = null
     $celQuery: String = null
     $preview: Boolean = false
+    $runType: RunType = null
   ) {
     environment: workspace(id: $environmentID) {
       runs(
@@ -23,6 +24,7 @@ export const GetRunsDocument = graphql(`
           timeField: $timeField
           fnSlug: $functionSlug
           query: $celQuery
+          runType: $runType
         }
         orderBy: [{ field: $timeField, direction: DESC }]
         after: $functionRunCursor
@@ -47,6 +49,15 @@ export const GetRunsDocument = graphql(`
             startedAt
             status
             hasAI
+            runType
+            deferredFrom {
+              parentRun {
+                function {
+                  name
+                  slug
+                }
+              }
+            }
           }
         }
         pageInfo {
@@ -70,6 +81,7 @@ export const CountRunsDocument = graphql(`
     $timeField: RunsOrderByField!
     $functionSlug: String
     $celQuery: String = null
+    $runType: RunType = null
   ) {
     environment: workspace(id: $environmentID) {
       runs(
@@ -81,6 +93,7 @@ export const CountRunsDocument = graphql(`
           timeField: $timeField
           fnSlug: $functionSlug
           query: $celQuery
+          runType: $runType
         }
         orderBy: [{ field: $timeField, direction: DESC }]
       ) {

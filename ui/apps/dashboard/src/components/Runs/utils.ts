@@ -2,12 +2,14 @@ import type { Run } from '@inngest/components/RunsPage/types';
 import {
   isFunctionRunStatus,
   type FunctionRunStatus,
+  type RunType,
 } from '@inngest/components/types/functionRun';
 import { toMaybeDate } from '@inngest/components/utils/date';
 
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
   RunsOrderByField as FunctionRunTimeFieldEnum,
+  RunType as RunTypeEnum,
   type FunctionRunV2,
 } from '@/gql/graphql';
 
@@ -54,6 +56,15 @@ export function toRunStatuses(statuses: string[]): FunctionRunStatusEnum[] {
   return newValue;
 }
 
+export function toRunType(runType: RunType): RunTypeEnum {
+  switch (runType) {
+    case 'PRIMARY':
+      return RunTypeEnum.Primary;
+    case 'DEFER':
+      return RunTypeEnum.Defer;
+  }
+}
+
 /**
  * Convert a time field union type into an enum. This is necessary because
  * TypeScript treats as enums as nominal types, which causes silly type errors.
@@ -83,6 +94,7 @@ type PickedFunctionRunV2 = Pick<
   | 'eventName'
   | 'isBatch'
   | 'cronSchedule'
+  | 'runType'
 >;
 type PickedFunctionRunV2EdgeWithNode = {
   node: PickedFunctionRunV2 & {
@@ -94,6 +106,14 @@ type PickedFunctionRunV2EdgeWithNode = {
       name: string;
       slug: string;
     };
+    deferredFrom: {
+      parentRun: {
+        function: {
+          name: string;
+          slug: string;
+        };
+      } | null;
+    } | null;
   };
 };
 
@@ -116,8 +136,6 @@ export function parseRunsData(
       return {
         ...edge.node,
         durationMS,
-        // Cloud GraphQL schema doesn't surface runType yet; default to PRIMARY.
-        runType: 'PRIMARY' as const,
       };
     }) ?? []
   );
