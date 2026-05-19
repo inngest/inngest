@@ -14,7 +14,6 @@ import (
 	"io"
 	"net"
 	"net/url"
-	"sync/atomic"
 	"time"
 )
 
@@ -113,7 +112,7 @@ type connection struct {
 	heartbeatInterval   time.Duration
 	extendLeaseInterval time.Duration
 
-	retired atomic.Bool
+	lifecycle connLifecycle
 }
 
 func (c *connection) logAttrs() []any {
@@ -122,14 +121,6 @@ func (c *connection) logAttrs() []any {
 		"gateway_group", c.gatewayGroupName,
 		"gateway_endpoint", c.gatewayEndpoint,
 	}
-}
-
-func (c *connection) retire() bool {
-	return c.retired.CompareAndSwap(false, true)
-}
-
-func (c *connection) isRetired() bool {
-	return c.retired.Load()
 }
 
 func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData, excludeGateways []string) (*connection, error) {
@@ -184,6 +175,15 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 
 	h.logger.Debug("websocket connection established", "gateway_host", gatewayHost)
 
+	preparedConn := &connection{
+		ws:               ws,
+		gatewayGroupName: startRes.GetGatewayGroup(),
+		gatewayEndpoint:  gatewayHost.String(),
+		connectionId:     connectionId.String(),
+	}
+	preparedConn.initLifecycle(h.logger, h.notifyFlushChan)
+	_ = preparedConn.transition(connPhaseHandshaking, "websocket dialed")
+
 	readyPayload, err := h.performConnectHandshake(ctx, connectionId.String(), ws, startRes, data, startTime)
 	if err != nil {
 		return nil, newReconnectErr(fmt.Errorf("could not perform connect handshake: %w", err))
@@ -199,14 +199,13 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		return nil, newReconnectErr(fmt.Errorf("could not parse extend lease interval: %w", err))
 	}
 
-	return &connection{
-		ws:                  ws,
-		gatewayGroupName:    startRes.GetGatewayGroup(),
-		gatewayEndpoint:     gatewayHost.String(),
-		connectionId:        connectionId.String(),
-		heartbeatInterval:   heartbeatInterval,
-		extendLeaseInterval: extendLeaseInterval,
-	}, nil
+	preparedConn.heartbeatInterval = heartbeatInterval
+	preparedConn.extendLeaseInterval = extendLeaseInterval
+	if err := preparedConn.markActive("gateway connection ready"); err != nil {
+		return nil, newReconnectErr(fmt.Errorf("could not mark connection active: %w", err))
+	}
+
+	return preparedConn, nil
 }
 
 func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, preparedConn *connection) error {
@@ -218,7 +217,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	defer func() {
 		// This is a fallback safeguard to always close the WebSocket connection at the end of the function
 		// Usually, we provide a specific reason, so this is only necessary for unhandled errors
-		_ = preparedConn.ws.CloseNow()
+		preparedConn.closeNow("handle connection ended")
 	}()
 
 	// Send buffered but unsent messages if connection was re-established
@@ -308,6 +307,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				// Stop the read loop: We will not receive any further messages and should establish a new connection
 				// We can still use the old connection to send replies to the gateway
 				l.Info("gateway requested connection drain")
+				if err := preparedConn.beginDrain("gateway closing"); err != nil {
+					l.Error("could not mark connection draining", "err", err)
+				}
 				return errGatewayDraining
 			case connectproto.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
 				// Handle invoke in a non-blocking way to allow for other messages to be processed
@@ -372,14 +374,13 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			}
 
 			// Send a proper close frame
-			preparedConn.retire()
-			_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
+			preparedConn.closeNormal(connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String(), "reason", "gateway drain complete")
 
 			return errGatewayDraining
 		}
 
 		l.Debug("read loop ended with error", "err", err)
-		preparedConn.retire()
+		preparedConn.retire("read loop ended with error", "err", err)
 
 		// In case the gateway intentionally closed the connection, we'll receive a close error
 		cerr := websocket.CloseError{}
@@ -406,6 +407,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	}
 
 	// Perform graceful shutdown routine (parent context was cancelled)
+	if err := preparedConn.beginClose("worker context canceled"); err != nil {
+		l.Error("could not mark connection closing", "err", err)
+	}
 
 	// Signal gateway that we won't process additional messages!
 	{
@@ -425,8 +429,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	h.workerPool.Wait()
 
 	// Attempt to shut down connection if not already done
-	preparedConn.retire()
-	_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
+	preparedConn.closeNormal(connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String(), "reason", "worker shutdown")
 
 	// Attempt to flush leftover messages before closing
 	if h.messageBuffer.hasMessages() {

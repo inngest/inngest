@@ -138,7 +138,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		Kind:    connectproto.GatewayMessageType_WORKER_REQUEST_ACK,
 		Payload: ackPayload,
 	}); err != nil {
-		preparedConn.retire()
+		preparedConn.retire("request ack write failed", "err", err)
 		l.Error("error sending request ack", "error", err)
 		return nil, publicerr.Wrap(err, 400, "failed to ack worker request")
 	}

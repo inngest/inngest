@@ -67,6 +67,7 @@ func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker
 		notifyConnectDoneChan:  make(chan connectReport),
 		notifyConnectedChan:    make(chan struct{}),
 		initiateConnectionChan: make(chan struct{}),
+		notifyFlushChan:        make(chan struct{}, 1),
 		apiClient:              apiClient,
 		messageBuffer:          newMessageBuffer(apiClient, logger),
 		state:                  ConnectionStateConnecting,
@@ -153,6 +154,9 @@ type connectHandler struct {
 
 	// Channel to imperatively initiate a connection
 	initiateConnectionChan chan struct{}
+
+	// Notify the manager that retired generations may have buffered replies to flush.
+	notifyFlushChan chan struct{}
 
 	apiClient *workerApiClient
 

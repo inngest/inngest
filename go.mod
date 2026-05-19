@@ -44,7 +44,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20260518151108-6e2f3dcb8667
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
-	github.com/inngest/inngestgo v0.15.2-0.20260519011110-aacfe952b8d0
+	github.com/inngest/inngestgo v0.15.2-0.20260519032058-8314f2dc738b
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jinzhu/copier v0.4.0
 	github.com/jonboulle/clockwork v0.5.0
