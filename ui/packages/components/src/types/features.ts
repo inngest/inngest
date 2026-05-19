@@ -11,4 +11,10 @@ export type Features = {
    * Whether to use the V4 run details UI (composable timeline bar).
    */
   runDetailsV4?: boolean;
+
+  /**
+   * Whether the data source surfaces deferred-run linkage (`runType`,
+   * `deferredFrom`).
+   */
+  runType?: boolean;
 };

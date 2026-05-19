@@ -29,7 +29,7 @@ import {
 } from '@inngest/components/types/functionRun';
 import { toMaybeDate } from '@inngest/components/utils/date';
 import { parseCelSearchError } from '@inngest/components/utils/searchErrorParser';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
@@ -62,7 +62,6 @@ function RunsComponent() {
   const [preview, setPreview] = useState(false);
 
   const [filterApp] = useStringArraySearchParam('filterApp');
-  const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam(
     'filterStatus',
     isFunctionRunStatus,
@@ -160,11 +159,19 @@ function RunsComponent() {
       },
     });
 
-  const searchError = parseCelSearchError(error);
-
-  const getTotalCount = useCallback(async () => {
-    setTotalCount(undefined);
-    (async () => {
+  const { data: totalCount, refetch: refetchTotalCount } = useQuery({
+    queryKey: [
+      'runs-count',
+      {
+        calculatedStartTime,
+        endTime,
+        filteredStatus,
+        timeField,
+        search,
+        filterRunType,
+      },
+    ],
+    queryFn: async () => {
       const data: CountRunsQuery = await client.request(CountRunsDocument, {
         startTime: calculatedStartTime,
         endTime,
@@ -173,25 +180,17 @@ function RunsComponent() {
         celQuery: search,
         runType: filterRunType ?? null,
       });
-      setTotalCount(data.runs.totalCount);
-    })();
-  }, [
-    calculatedStartTime,
-    endTime,
-    filteredStatus,
-    timeField,
-    search,
-    filterRunType,
-  ]);
+      return data.runs.totalCount;
+    },
+    retry: false,
+  });
 
-  useEffect(() => {
-    getTotalCount();
-  }, [getTotalCount]);
+  const searchError = parseCelSearchError(error);
 
   const onRefresh = useCallback(() => {
     fetchNextPage();
-    getTotalCount();
-  }, [fetchNextPage, getTotalCount]);
+    refetchTotalCount();
+  }, [fetchNextPage, refetchTotalCount]);
 
   const runs = useMemo(() => {
     if (!data?.pages) {
@@ -253,6 +252,7 @@ function RunsComponent() {
           history: Number.MAX_SAFE_INTEGER,
           tracesPreview: tracesPreviewEnabled,
           runDetailsV4: v4Enabled,
+          runType: true,
         }}
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}

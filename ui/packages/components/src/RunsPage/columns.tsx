@@ -217,15 +217,18 @@ const columns = [
  * single function's runs then we shouldn't show the app or function columns
  * since every row will have the same values
  */
-export function useScopedColumns(scope: ViewScope) {
+export function useScopedColumns(scope: ViewScope, showRunType: boolean) {
   return useMemo(() => {
     return columns.filter((column) => {
       if ('accessorKey' in column) {
+        if (!showRunType && column.accessorKey === 'runType') {
+          return false;
+        }
         if (scope === 'fn') {
           return column.accessorKey !== 'app' && column.accessorKey !== 'function';
         }
       }
       return true;
     });
-  }, [scope]);
+  }, [scope, showRunType]);
 }

@@ -43,7 +43,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'runType'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -89,7 +89,7 @@ export function RunsPage({
   searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const columns = useScopedColumns(scope);
+  const columns = useScopedColumns(scope, features.runType ?? false);
   const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
@@ -371,10 +371,12 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-            <RunsTypeFilter
-              selectedRunType={filterRunType}
-              onRunTypeChange={onRunTypeFilterChange}
-            />
+            {features.runType && (
+              <RunsTypeFilter
+                selectedRunType={filterRunType}
+                onRunTypeChange={onRunTypeFilterChange}
+              />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <TotalCount totalCount={totalCount} />
@@ -417,13 +419,13 @@ export function RunsPage({
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
+          columns={columns}
           isLoading={isLoadingInitial}
           error={error}
           onRefresh={onRefresh}
           renderSubComponent={renderSubComponent}
           getRowCanExpand={() => true}
           visibleColumns={columnVisibility}
-          scope={scope}
         />
         {infiniteScrollTrigger?.(containerRef.current)}
         {!hasMore && data.length > 1 && (
