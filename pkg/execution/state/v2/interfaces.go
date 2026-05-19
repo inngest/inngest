@@ -53,9 +53,9 @@ type RunService interface {
 	// the Input from the aggregate budget; the meta entry stays.
 	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
 	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
-	// No-op if any defer already exists for hashedID. Returns
+	// No-op if any defer already exists for d.HashedID. Returns
 	// ErrDeferLimitExceeded if no room.
-	SaveRejectedDefer(ctx context.Context, id ID, fnSlug, userlandID, hashedID string) error
+	SaveRejectedDefer(ctx context.Context, id ID, d Defer) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for

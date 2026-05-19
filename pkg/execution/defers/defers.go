@@ -44,7 +44,11 @@ func SaveFromOp(
 		}
 		// Best-effort sentinel so SDK retransmits dedupe.
 		if opts != nil && opts.FnSlug != "" {
-			if rerr := rs.SaveRejectedDefer(ctx, id, opts.FnSlug, userlandID, op.ID); rerr != nil {
+			if rerr := rs.SaveRejectedDefer(ctx, id, statev2.Defer{
+				FnSlug:     opts.FnSlug,
+				HashedID:   op.ID,
+				UserlandID: userlandID,
+			}); rerr != nil {
 				log.Warn("failed to save rejected defer sentinel; SDK retransmits will not dedupe",
 					"step_id", sanitizeLogValue(op.ID),
 					"run_id", id.RunID,

@@ -13,6 +13,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -126,11 +127,7 @@ func TestBuildDeferEvents_EmitsExecutorDeferSpan(t *testing.T) {
 	require.Equal(t, consts.FnDeferScheduleName, events[0].Name)
 }
 
-// TestSchedule_DeterministicRunIDForDeferredScheduleEvent unit-tests the
-// deferredScheduleFromEvents helper that Schedule uses to decide whether the
-// child run ID should be deterministically derived from the parent. Full
-// Schedule wiring is exercised by the integration suite under tests/golang/;
-// here we just lock down the helper's contract.
+// Full Schedule wiring is exercised by the integration suite under tests/golang/.
 func TestSchedule_DeterministicRunIDForDeferredScheduleEvent(t *testing.T) {
 	ctx := context.Background()
 	parentRunID := ulid.MustNew(ulid.Now(), nil)
@@ -160,21 +157,14 @@ func TestSchedule_DeterministicRunIDForDeferredScheduleEvent(t *testing.T) {
 		}
 		evts := []event.TrackedEvent{makeDeferredEvent(t, md)}
 
-		gotMeta, gotParent, ok := deferredScheduleFromEvents(logger.From(ctx), evts)
-		require.True(t, ok)
-		require.NotNil(t, gotMeta)
-		require.Equal(t, hashedID, gotMeta.HashedDeferID)
-		require.Equal(t, parentRunID, gotParent)
+		got := findDeferredChild(logger.From(ctx), evts)
+		require.NotNil(t, got)
+		require.Equal(t, hashedID, got.meta.HashedDeferID)
+		require.Equal(t, parentRunID, got.parentRunID)
+		require.Equal(t, util.DeterministicChildRunID(parentRunID, hashedID), got.runID)
 	})
 
-	t.Run("empty events returns false", func(t *testing.T) {
-		gotMeta, gotParent, ok := deferredScheduleFromEvents(logger.From(ctx), nil)
-		require.False(t, ok)
-		require.Nil(t, gotMeta)
-		require.Equal(t, ulid.ULID{}, gotParent)
-	})
-
-	t.Run("non-deferred-schedule events return false", func(t *testing.T) {
+	t.Run("non-deferred-schedule events return nil", func(t *testing.T) {
 		id := ulid.MustNew(ulid.Now(), nil)
 		evts := []event.TrackedEvent{event.BaseTrackedEvent{
 			ID: id,
@@ -183,10 +173,7 @@ func TestSchedule_DeterministicRunIDForDeferredScheduleEvent(t *testing.T) {
 				Name: "user/something.happened",
 			},
 		}}
-		gotMeta, gotParent, ok := deferredScheduleFromEvents(logger.From(ctx), evts)
-		require.False(t, ok)
-		require.Nil(t, gotMeta)
-		require.Equal(t, ulid.ULID{}, gotParent)
+		require.Nil(t, findDeferredChild(logger.From(ctx), evts))
 	})
 
 	t.Run("two deferred.schedule events in same batch bails out", func(t *testing.T) {
@@ -200,27 +187,10 @@ func TestSchedule_DeterministicRunIDForDeferredScheduleEvent(t *testing.T) {
 			makeDeferredEvent(t, md),
 			makeDeferredEvent(t, md),
 		}
-		gotMeta, gotParent, ok := deferredScheduleFromEvents(logger.From(ctx), evts)
-		require.False(t, ok, "two deferred.schedule events must bail rather than guess")
-		require.Nil(t, gotMeta)
-		require.Equal(t, ulid.ULID{}, gotParent)
+		require.Nil(t, findDeferredChild(logger.From(ctx), evts), "two deferred.schedule events must bail rather than guess")
 	})
 
-	t.Run("malformed metadata missing ParentRunID returns false", func(t *testing.T) {
-		md := event.DeferredScheduleMetadata{
-			FnSlug:        "app-fn",
-			ParentFnSlug:  "app-parent",
-			HashedDeferID: hashedID,
-			// ParentRunID intentionally omitted to fail Validate().
-		}
-		evts := []event.TrackedEvent{makeDeferredEvent(t, md)}
-		gotMeta, gotParent, ok := deferredScheduleFromEvents(logger.From(ctx), evts)
-		require.False(t, ok)
-		require.Nil(t, gotMeta)
-		require.Equal(t, ulid.ULID{}, gotParent)
-	})
-
-	t.Run("bad parent run id format returns false", func(t *testing.T) {
+	t.Run("bad parent run id format returns nil", func(t *testing.T) {
 		md := event.DeferredScheduleMetadata{
 			FnSlug:        "app-fn",
 			ParentFnSlug:  "app-parent",
@@ -228,9 +198,6 @@ func TestSchedule_DeterministicRunIDForDeferredScheduleEvent(t *testing.T) {
 			HashedDeferID: hashedID,
 		}
 		evts := []event.TrackedEvent{makeDeferredEvent(t, md)}
-		gotMeta, gotParent, ok := deferredScheduleFromEvents(logger.From(ctx), evts)
-		require.False(t, ok)
-		require.Nil(t, gotMeta)
-		require.Equal(t, ulid.ULID{}, gotParent)
+		require.Nil(t, findDeferredChild(logger.From(ctx), evts))
 	})
 }

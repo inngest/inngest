@@ -998,23 +998,23 @@ func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnI
 // SaveRejectedDefer idempotently writes a Rejected meta sentinel. No-op if
 // any defer already exists for the hashedID. Returns ErrDeferLimitExceeded
 // if the run is at MaxDefersPerRun.
-func (m shardedMgr) SaveRejectedDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, fnSlug, userlandID, hashedID string) error {
+func (m shardedMgr) SaveRejectedDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, d statev2.Defer) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveRejectedDefer"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
 	metaJSON, err := json.Marshal(deferMeta{
-		FnSlug:         fnSlug,
-		HashedID:       hashedID,
-		UserlandID:     userlandID,
+		FnSlug:         d.FnSlug,
+		HashedID:       d.HashedID,
+		UserlandID:     d.UserlandID,
 		ScheduleStatus: int(enums.DeferStatusRejected),
 	})
 	if err != nil {
 		return err
 	}
 
-	args, err := StrSlice([]any{hashedID, string(metaJSON), consts.MaxDefersPerRun})
+	args, err := StrSlice([]any{d.HashedID, string(metaJSON), consts.MaxDefersPerRun})
 	if err != nil {
 		return err
 	}

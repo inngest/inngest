@@ -17,19 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type savedRejected struct {
-	fnSlug     string
-	userlandID string
-	hashedID   string
-}
-
 type fakeRunService struct {
 	statev2.RunService
 
 	saveDeferErr         error
 	savedDefer           *statev2.Defer
 	savedDeferCalls      int
-	savedRejected        *savedRejected
+	savedRejected        *statev2.Defer
 	savedRejectedCalls   int
 	setDeferStatusHashed string
 	setDeferStatusValue  enums.DeferStatus
@@ -41,9 +35,9 @@ func (f *fakeRunService) SaveDefer(_ context.Context, _ statev2.ID, d statev2.De
 	return f.saveDeferErr
 }
 
-func (f *fakeRunService) SaveRejectedDefer(_ context.Context, _ statev2.ID, fnSlug, userlandID, hashedID string) error {
+func (f *fakeRunService) SaveRejectedDefer(_ context.Context, _ statev2.ID, d statev2.Defer) error {
 	f.savedRejectedCalls++
-	f.savedRejected = &savedRejected{fnSlug: fnSlug, userlandID: userlandID, hashedID: hashedID}
+	f.savedRejected = &d
 	return nil
 }
 
@@ -124,7 +118,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, fake.savedDeferCalls)
 		require.Equal(t, 1, fake.savedRejectedCalls)
-		require.Equal(t, "user-defer-id", fake.savedRejected.userlandID)
+		require.Equal(t, "user-defer-id", fake.savedRejected.UserlandID)
 	})
 
 	t.Run("invalid_opts with FnSlug present writes sentinel", func(t *testing.T) {
@@ -138,7 +132,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, fake.savedDeferCalls)
 		require.Equal(t, 1, fake.savedRejectedCalls)
-		require.Equal(t, "user-defer-id", fake.savedRejected.userlandID)
+		require.Equal(t, "user-defer-id", fake.savedRejected.UserlandID)
 	})
 
 	t.Run("invalid_opts without FnSlug absorbs without sentinel", func(t *testing.T) {

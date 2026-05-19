@@ -399,7 +399,10 @@ func TestDeferFinalize(t *testing.T) {
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          json.RawMessage(`{"x":1}`),
 		}))
-		r.NoError(infra.smv2.SaveRejectedDefer(ctx, run.ID, "onDefer-score", "hash-rejected"))
+		r.NoError(infra.smv2.SaveRejectedDefer(ctx, run.ID, statev2.Defer{
+			FnSlug:   "onDefer-score",
+			HashedID: "hash-rejected",
+		}))
 
 		r.NoError(exec.Finalize(ctx, execution.FinalizeOpts{
 			Metadata: *run,
