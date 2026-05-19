@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -5005,10 +5006,23 @@ func (e *executor) buildSingleInvokeItem(ctx context.Context, i *runInstance, in
 
 	carrier := e.buildInvokeTraceCarrier(ctx, now)
 
+	// Use a deterministic event ID derived from runID + gen.ID so that retries
+	// produce identical events. This makes duplicate publishes idempotent at any
+	// layer that deduplicates by event ID.
+	// The ID must be a valid ULID because downstream code (e.g. lifecycle.OnInvokeFunction)
+	// uses ulid.MustParse on event IDs.
+	payload := *opts.Payload
+	evtHash := sha256.Sum256([]byte(i.md.ID.RunID.String() + gen.ID + ":evt"))
+	detEvtID, err := ulid.New(i.md.ID.RunID.Time(), bytes.NewReader(evtHash[:10]))
+	if err != nil {
+		return batchInvokeItem{}, fmt.Errorf("failed to generate deterministic event ID: %w", err)
+	}
+	payload.ID = detEvtID.String()
+
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
 		AccountID:       i.md.ID.Tenant.AccountID,
 		EnvID:           i.md.ID.Tenant.EnvID,
-		Event:           *opts.Payload,
+		Event:           payload,
 		FnID:            opts.FunctionID,
 		CorrelationID:   &correlationID,
 		TraceCarrier:    carrier,
@@ -5180,9 +5194,17 @@ func dropUnprocessedSpans(items []batchInvokeItem, fromIdx int) {
 }
 
 // enqueueAndPublishBatch enqueues all timeout jobs via batch pipeline, then publishes
-// events for newly-enqueued items. Uses EnqueueBatch (single Redis pipeline) when
-// available, falling back to per-item enqueue.
-// Returns a skip mask indicating which items already existed (from previous attempts).
+// events for ALL items. Uses EnqueueBatch (single Redis pipeline) when available,
+// falling back to per-item enqueue.
+//
+// IMPORTANT: Events are always published for every item regardless of whether the
+// timeout queue item already existed (ErrQueueItemExists). This is critical for
+// retry safety: if a previous attempt successfully enqueued timeouts but failed
+// during event publishing, the retry must still publish events. Skipping publish
+// for "already enqueued" items would permanently orphan child function invocations.
+//
+// Returns a skip mask indicating which items already existed (used only for span
+// tracking and lifecycle hooks — NOT for event publishing).
 func (e *executor) enqueueAndPublishBatch(ctx context.Context, i *runInstance, items []batchInvokeItem) ([]bool, error) {
 	skipItem, err := e.enqueueBatchTimeouts(ctx, items)
 	if err != nil {
@@ -5193,7 +5215,7 @@ func (e *executor) enqueueAndPublishBatch(ctx context.Context, i *runInstance, i
 		return skipItem, err
 	}
 
-	if err := e.publishBatchEvents(ctx, items, skipItem); err != nil {
+	if err := e.publishBatchEvents(ctx, items); err != nil {
 		return skipItem, err
 	}
 
@@ -5289,14 +5311,16 @@ func (e *executor) sendSpansForBatch(items []batchInvokeItem, skipItem []bool) e
 	return nil
 }
 
-// publishBatchEvents publishes invocation events for non-skipped items using batch
-// publish when available, falling back to per-item publish.
-func (e *executor) publishBatchEvents(ctx context.Context, items []batchInvokeItem, skipItem []bool) error {
+// publishBatchEvents publishes invocation events for ALL items using batch publish
+// when available, falling back to per-item publish.
+//
+// This function intentionally publishes events for every item regardless of whether
+// the item's timeout queue entry already existed. Publishing a duplicate invocation
+// event is safe (child function deduplication is handled at the pause/correlation
+// layer), but failing to publish leaves child functions permanently un-triggered.
+func (e *executor) publishBatchEvents(ctx context.Context, items []batchInvokeItem) error {
 	evts := make([]event.TrackedEvent, 0, len(items))
 	for idx := range items {
-		if skipItem[idx] {
-			continue
-		}
 		evts = append(evts, items[idx].evt)
 	}
 	if len(evts) == 0 {
