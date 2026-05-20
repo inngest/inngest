@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -224,6 +225,12 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
 	_, isSystemFn := q.queueKindMapping[p.Queue()]
+	// Function-scoped batch partitions ("schedule-batch:<fnID>") still get
+	// parallel within-partition processing even though the suffixed name is
+	// not in queueKindMapping.
+	if strings.HasPrefix(p.Queue(), KindScheduleBatch) {
+		isSystemFn = true
+	}
 	_, parallelFn := q.disableFifoForFunctions[p.Queue()]
 	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
 
