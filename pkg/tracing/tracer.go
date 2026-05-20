@@ -131,12 +131,32 @@ func (tp *otelTracerProvider) CreateSpan(
 		return nil, fmt.Errorf("failed to CreateSpan: %w", err)
 	}
 
-	err = ds.Send()
-	if err != nil {
-		return nil, fmt.Errorf("failed to send span during creation: %w", err)
-	}
+	// CreateSpan records a span for an event with caller-known timing, so
+	// the stored end_time must reflect that timing — not wall-clock at
+	// processing. Without WithTimestamp, OTel defaults End() to time.Now(),
+	// which lets a late leading-edge RUNNING POST land with a larger
+	// end_time than the COMPLETED row it raced against and break
+	// MAX(end_time) / argmax(status, end_time) on read.
+	ds.span.End(trace.WithTimestamp(resolveSpanEndTime(opts)))
 
 	return ds.Ref, nil
+}
+
+// resolveSpanEndTime returns the timestamp to stamp on the OTel span when
+// CreateSpan finalizes it. Prefer the caller-supplied EndTime; fall back to
+// StartTime for not-yet-ended events (e.g. leading-edge RUNNING from
+// OpcodeStepPlanned) so the row lands with end_time == start_time instead of
+// processing-time-now; only synthesize a wall-clock value when the caller
+// supplied neither.
+func resolveSpanEndTime(opts *CreateSpanOptions) time.Time {
+	switch {
+	case !opts.EndTime.IsZero():
+		return opts.EndTime
+	case !opts.StartTime.IsZero():
+		return opts.StartTime
+	default:
+		return time.Now()
+	}
 }
 
 // CreateDroppableSpan creates a span that can be dropped and relies on us
