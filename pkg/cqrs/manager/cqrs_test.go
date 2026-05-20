@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,9 @@ import (
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -1763,6 +1767,108 @@ func TestCQRSGetSpan(t *testing.T) {
 	})
 }
 
+// TestCQRSTracerWritesEndTimeFromOpts verifies that the
+// tracer's CreateSpan stamps the stored end_time from caller-supplied
+// timing rather than wall-clock-at-processing.
+//
+// This test exercises the actual tracer write path (CreateSpan ->
+// dbExporter -> InsertSpan) end-to-end, then reads the on-disk rows to
+// confirm the late RUNNING row's end_time matches its caller-supplied
+// start_time, not the (much later) moment we invoked CreateSpan.
+func TestCQRSTracerWritesEndTimeFromOpts(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	// Build the real sqlc-backed tracer against the same DB the manager
+	// reads from.
+	q := cm.(wrapper).q
+	tp := tracing.NewSqlcTracerProvider(q)
+
+	runIDULID := ulid.MustNew(ulid.Now(), rand.Reader)
+	runID := runIDULID.String()
+	const dynID = "dyn-step-race"
+	t0 := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	t1 := t0.Add(10 * time.Millisecond) // step body finishes
+
+	mkExecCtx := func() context.Context {
+		return tracing.WithExecutionContext(t.Context(), tracing.ExecutionContext{
+			Identifier: statev2.ID{RunID: runIDULID},
+		})
+	}
+
+	// COMPLETED step span — arrives first, caller supplies both timings.
+	_, err := tp.CreateSpan(mkExecCtx(), meta.SpanNameStep, &tracing.CreateSpanOptions{
+		DynamicSpanIDOverride: dynID,
+		StartTime:             t0,
+		EndTime:               t1,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.RunID, &runIDULID),
+		),
+	})
+	require.NoError(t, err)
+
+	// Simulate the executor handling the late leading-edge POST well after
+	// the step body has finished. The SDK-supplied StartTime is still t0
+	// (captured before the step body ran); EndTime is intentionally omitted
+	// because the leading-edge POST represents a span that hasn't ended.
+	//
+	// Sleep so wall-clock now is decisively past t1: if the tracer ever
+	// regresses back to stamping wall-clock, the row's end_time will exceed
+	// t1 and the assertion below catches it.
+	time.Sleep(20 * time.Millisecond)
+	_, err = tp.CreateSpan(mkExecCtx(), meta.SpanNameStep, &tracing.CreateSpanOptions{
+		DynamicSpanIDOverride: dynID,
+		StartTime:             t0,
+		// no EndTime — this is the leading-edge OpcodeStepPlanned shape.
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.RunID, &runIDULID),
+		),
+	})
+	require.NoError(t, err)
+
+	// Read the raw on-disk rows for this dynamic_span_id. We expect two
+	// rows (no upsert): one with end_time=t1, one with end_time=t0.
+	rawRows, err := q.GetSpansByRunID(t.Context(), runID)
+	require.NoError(t, err)
+	require.NotEmpty(t, rawRows, "expected the tracer to have written rows for this run")
+
+	// GetSpansByRunID groups by dynamic_span_id and aggregates end_time with
+	// MAX. Find the row for our dynamic span; its MAX(end_time) must not
+	// exceed t1 — if it does, the tracer regressed to stamping wall-clock.
+	var maxEnd time.Time
+	for _, r := range rawRows {
+		if !r.DynamicSpanID.Valid || r.DynamicSpanID.String != dynID {
+			continue
+		}
+		parsed, parseErr := parseRowEndTime(r.EndTime)
+		require.NoError(t, parseErr)
+		if parsed.After(maxEnd) {
+			maxEnd = parsed
+		}
+	}
+	require.False(t, maxEnd.IsZero(), "no rows matched dynamic_span_id=%s", dynID)
+
+	// Tolerance: t1 is the completion timestamp, the largest legitimate
+	// end_time. A regression would push past wall-clock (>> t1 + 20ms).
+	assert.False(t, maxEnd.After(t1),
+		"tracer must stamp end_time from caller timing: MAX(end_time)=%s, expected <= %s (sleep + late POST should not bleed into end_time)",
+		maxEnd, t1)
+}
+
+// parseRowEndTime handles the time/string column shapes the sqlite driver
+// hands back (see mapSpanFromRow for the read-path equivalent).
+func parseRowEndTime(v any) (time.Time, error) {
+	switch x := v.(type) {
+	case time.Time:
+		return x, nil
+	case string:
+		s := strings.Split(x, " m=")[0]
+		return time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", s)
+	default:
+		return time.Time{}, fmt.Errorf("unexpected end_time type %T", v)
+	}
+}
+
 // TestSpanWithAttributesAndOutput is a regression test ensuring that spans
 // with JSON attributes and output can be inserted and queried without
 // "JSON cannot hold BLOB values" errors. This catches the bug where []byte
@@ -1855,6 +1961,7 @@ func TestSpanOutputReadBack(t *testing.T) {
 
 type testSpanFields struct {
 	RunID          string    // required
+	TraceID        string    // optional; default: fresh ULID per call
 	DynamicSpanID  string    // required for GROUP BY tests
 	ParentSpanID   string    // for child spans (references parent's DynamicSpanID)
 	DebugRunID     string    // for debug run tests
@@ -1862,6 +1969,7 @@ type testSpanFields struct {
 	Name           string    // default: "test-span"
 	Status         string    // default: "" (NULL)
 	StartTime      time.Time // default: time.Now()
+	EndTime        time.Time // default: StartTime + 100ms
 	AccountID      string    // default: "acct"
 	AppID          string    // default: "app"
 	FunctionID     string    // default: "fn"
@@ -1876,7 +1984,10 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 	t.Helper()
 
 	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := spanFields.TraceID
+	if traceID == "" {
+		traceID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
 
 	// Apply defaults
 	if spanFields.Name == "" {
@@ -1897,6 +2008,10 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 	if spanFields.EnvID == "" {
 		spanFields.EnvID = "env"
 	}
+	endTime := spanFields.EndTime
+	if endTime.IsZero() {
+		endTime = spanFields.StartTime.Add(100 * time.Millisecond)
+	}
 
 	// TODO: ideally we should not have to do this type assertion to wrapper to write a span
 	q := cm.(wrapper).q
@@ -1907,7 +2022,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		Name:           spanFields.Name,
 		Status:         sql.NullString{String: spanFields.Status, Valid: spanFields.Status != ""},
 		StartTime:      spanFields.StartTime,
-		EndTime:        spanFields.StartTime.Add(100 * time.Millisecond),
+		EndTime:        endTime,
 		RunID:          spanFields.RunID,
 		AccountID:      spanFields.AccountID,
 		AppID:          spanFields.AppID,

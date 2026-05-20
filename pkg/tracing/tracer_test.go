@@ -1,11 +1,41 @@
 package tracing
 
 import (
+	"context"
+	"sync"
 	"testing"
 	"time"
 
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// captureExporter records every span passed to ExportSpans. SimpleSpanProcessor
+// invokes the exporter synchronously on End(), so by the time CreateSpan
+// returns, the captured slice has the finalized span with its EndTime set.
+type captureExporter struct {
+	mu    sync.Mutex
+	spans []sdktrace.ReadOnlySpan
+}
+
+func (c *captureExporter) ExportSpans(_ context.Context, spans []sdktrace.ReadOnlySpan) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.spans = append(c.spans, spans...)
+	return nil
+}
+
+func (c *captureExporter) Shutdown(_ context.Context) error { return nil }
+
+func (c *captureExporter) only(t *testing.T) sdktrace.ReadOnlySpan {
+	t.Helper()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	require.Len(t, c.spans, 1, "expected exactly one captured span")
+	return c.spans[0]
+}
 
 func TestDeterministicTraceID(t *testing.T) {
 	ctx := t.Context()
@@ -85,6 +115,112 @@ func TestRandomSpanIDGeneration(t *testing.T) {
 	require.Len(t, traceIDs, 10)
 	require.Len(t, dynamicSpanIDs, 10)
 	require.Len(t, traceParents, 10)
+}
+
+// TestCreateSpanEndTime documents the invariant that the OTel span's stored
+// end_time reflects caller-supplied timing rather than wall-clock at
+// processing.
+func TestCreateSpanEndTime(t *testing.T) {
+	t.Run("uses caller-supplied EndTime when set", func(t *testing.T) {
+		exp := &captureExporter{}
+		tp := NewOtelTracerProvider(exp, time.Millisecond)
+
+		start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+		end := start.Add(250 * time.Millisecond)
+
+		_, err := tp.CreateSpan(t.Context(), "completed-step", &CreateSpanOptions{
+			StartTime: start,
+			EndTime:   end,
+		})
+		require.NoError(t, err)
+
+		span := exp.only(t)
+		assert.Equal(t, start, span.StartTime())
+		assert.Equal(t, end, span.EndTime())
+	})
+
+	t.Run("falls back to StartTime when EndTime is zero", func(t *testing.T) {
+		// Models the leading-edge OpcodeStepPlanned case: the executor
+		// supplies start_time = op.Timing.Start() but no EndTime, because
+		// the step hasn't ended. Without this fallback, OTel would stamp
+		// end_time = time.Now() at processing.
+		exp := &captureExporter{}
+		tp := NewOtelTracerProvider(exp, time.Millisecond)
+
+		start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+
+		_, err := tp.CreateSpan(t.Context(), "leading-edge-step", &CreateSpanOptions{
+			StartTime: start,
+			// no EndTime
+		})
+		require.NoError(t, err)
+
+		span := exp.only(t)
+		assert.Equal(t, start, span.StartTime())
+		assert.Equal(t, start, span.EndTime(),
+			"a span with no caller-supplied EndTime must land with end_time = start_time, not wall-clock-now")
+	})
+
+	t.Run("uses wall-clock now when neither is set", func(t *testing.T) {
+		exp := &captureExporter{}
+		tp := NewOtelTracerProvider(exp, time.Millisecond)
+
+		before := time.Now()
+		_, err := tp.CreateSpan(t.Context(), "instant-span", &CreateSpanOptions{})
+		require.NoError(t, err)
+		after := time.Now()
+
+		span := exp.only(t)
+		// Both start and end should be in the [before, after] window and
+		// equal to each other (resolveSpanEndTime returns the same value
+		// CreateDroppableSpan computed for st).
+		assert.False(t, span.StartTime().Before(before))
+		assert.False(t, span.EndTime().After(after))
+	})
+}
+
+func TestResolveSpanEndTime(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	start := now.Add(10 * time.Millisecond)
+	end := now.Add(20 * time.Millisecond)
+
+	cases := []struct {
+		name   string
+		opts   *CreateSpanOptions
+		want   func(time.Time) bool // nil => exact compare against `expect`
+		expect time.Time
+	}{
+		{
+			name:   "EndTime wins when both set",
+			opts:   &CreateSpanOptions{StartTime: start, EndTime: end},
+			expect: end,
+		},
+		{
+			name:   "falls back to StartTime when EndTime zero",
+			opts:   &CreateSpanOptions{StartTime: start},
+			expect: start,
+		},
+		{
+			name: "falls back to time.Now when both zero",
+			opts: &CreateSpanOptions{},
+			want: func(got time.Time) bool {
+				return !got.IsZero()
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveSpanEndTime(tc.opts)
+			if tc.want != nil {
+				assert.True(t, tc.want(got), "got %v", got)
+				return
+			}
+			assert.Equal(t, tc.expect, got)
+		})
+	}
+
+	_ = now
 }
 
 func TestSeededSpanThenReuseContext(t *testing.T) {
