@@ -108,6 +108,43 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	return mapRootSpansFromRows(ctx, spans)
 }
 
+// GetSpansByRunIDsAndName returns spans by name with their current attribute
+// values, merging in any updates applied later via UpdateSpan. The self-join
+// on dynamic_span_id picks up follow-up rows (e.g. status flips, post-emit
+// attribute stamps) that don't carry the span name and would otherwise be
+// filtered out.
+func (w wrapper) GetSpansByRunIDsAndName(
+	ctx context.Context,
+	runIDs []ulid.ULID,
+	name string,
+) (map[ulid.ULID][]*cqrs.OtelSpan, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+
+	strIDs := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		strIDs[i] = id.String()
+	}
+
+	rows, err := w.q.GetSpansByRunIDsAndName(ctx, strIDs, name)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by run IDs and name", "error", err)
+		return nil, err
+	}
+
+	out := make(map[ulid.ULID][]*cqrs.OtelSpan, len(runIDs))
+	for _, row := range rows {
+		span, err := mapSpanFromRow(ctx, row, nil)
+		if err != nil {
+			return nil, err
+		}
+		out[span.RunID] = append(out[span.RunID], span)
+	}
+
+	return out, nil
+}
+
 func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
 	if err != nil {
@@ -500,7 +537,11 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			return nil, err
 		}
 
-		if newSpan.Name == meta.SpanNameMetadata {
+		// Skip spans that are read separately and shouldn't appear in the run's
+		// trace tree. Metadata is attached to other spans. Defers are surfaced
+		// in their own view.
+		switch newSpan.Name {
+		case meta.SpanNameMetadata, meta.SpanNameDefer:
 			continue
 		}
 
@@ -1064,7 +1105,7 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 }
 
 // UpsertAppByName upserts on the partial unique index apps_name_active_key
-// (name) WHERE archived_at IS NULL AND name <> ''. The id provided in arg is
+// (name) WHERE archived_at IS NULL AND name <> "". The id provided in arg is
 // only used for fresh inserts; on conflict, the existing row's id is kept,
 // so SDK re-syncs adopt legacy URL-derived ids in place.
 func (w wrapper) UpsertAppByName(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
@@ -1745,6 +1786,12 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		return fmt.Errorf("error parsing runID as ULID: %w", err)
 	}
 
+	runType := run.RunType
+	if runType == enums.RunTypeUnknown {
+		// Back compat
+		runType = enums.RunTypePrimary
+	}
+
 	params := dbpkg.InsertTraceRunParams{
 		AccountID:   run.AccountID,
 		WorkspaceID: run.WorkspaceID,
@@ -1761,6 +1808,7 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		Output:      run.Output,
 		IsDebounce:  run.IsDebounce,
 		HasAi:       run.HasAI,
+		RunType:     int64(runType),
 	}
 
 	if run.BatchID != nil {
@@ -1877,47 +1925,8 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 		return nil, err
 	}
 	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
-	// dedupe this conversion
 	for i, run := range sqlcTraceRuns {
-		start := time.UnixMilli(run.StartedAt)
-		end := time.UnixMilli(run.EndedAt)
-		triggerIDS := strings.Split(string(run.TriggerIds), ",")
-
-		var (
-			isBatch bool
-			batchID *ulid.ULID
-			cron    *string
-		)
-
-		if !run.BatchID.IsZero() {
-			isBatch = true
-			batchID = &run.BatchID
-		}
-
-		if run.CronSchedule.Valid {
-			cron = &run.CronSchedule.String
-		}
-
-		cqrsTraceRuns[i] = &cqrs.TraceRun{
-			AccountID:    run.AccountID,
-			WorkspaceID:  run.WorkspaceID,
-			AppID:        run.AppID,
-			FunctionID:   run.FunctionID,
-			TraceID:      string(run.TraceID),
-			RunID:        run.RunID.String(),
-			QueuedAt:     time.UnixMilli(run.QueuedAt),
-			StartedAt:    start,
-			EndedAt:      end,
-			Duration:     end.Sub(start),
-			SourceID:     run.SourceID,
-			TriggerIDs:   triggerIDS,
-			Output:       run.Output,
-			Status:       enums.RunCodeToStatus(run.Status),
-			BatchID:      batchID,
-			IsBatch:      isBatch,
-			CronSchedule: cron,
-			HasAI:        run.HasAi,
-		}
+		cqrsTraceRuns[i] = traceRunToCQRS(run)
 	}
 	return cqrsTraceRuns, nil
 }
@@ -1928,9 +1937,29 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		return nil, err
 	}
 
+	return traceRunToCQRS(run), nil
+}
+
+func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return map[ulid.ULID]*cqrs.TraceRun{}, nil
+	}
+
+	rows, err := w.q.GetTraceRunsByRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[ulid.ULID]*cqrs.TraceRun, len(rows))
+	for _, row := range rows {
+		out[row.RunID] = traceRunToCQRS(row)
+	}
+	return out, nil
+}
+
+func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 	start := time.UnixMilli(run.StartedAt)
 	end := time.UnixMilli(run.EndedAt)
-	triggerIDS := strings.Split(string(run.TriggerIds), ",")
 
 	var (
 		isBatch bool
@@ -1947,28 +1976,27 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		cron = &run.CronSchedule.String
 	}
 
-	trun := cqrs.TraceRun{
+	return &cqrs.TraceRun{
 		AccountID:    run.AccountID,
 		WorkspaceID:  run.WorkspaceID,
 		AppID:        run.AppID,
 		FunctionID:   run.FunctionID,
 		TraceID:      string(run.TraceID),
-		RunID:        id.RunID.String(),
+		RunID:        run.RunID.String(),
 		QueuedAt:     time.UnixMilli(run.QueuedAt),
 		StartedAt:    start,
 		EndedAt:      end,
 		Duration:     end.Sub(start),
 		SourceID:     run.SourceID,
-		TriggerIDs:   triggerIDS,
+		TriggerIDs:   run.EventIDs(),
 		Output:       run.Output,
 		Status:       enums.RunCodeToStatus(run.Status),
+		RunType:      enums.RunType(run.RunType),
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
 		HasAI:        run.HasAi,
 	}
-
-	return &trun, nil
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
@@ -2135,6 +2163,32 @@ type runsQueryBuilder struct {
 	order        []sqexp.OrderedExpression
 	cursor       *cqrs.TracePageCursor
 	cursorLayout *cqrs.TracePageCursor
+}
+
+// outerRunIDCol is the run_id column of the caller's FROM. When the caller is
+// already querying trace_runs we filter the column directly; otherwise we
+// subquery into trace_runs so the spans-path callers don't have to JOIN.
+func runTypeFilterExpr(dialect string, outerRunIDCol string, runTypes []enums.RunType) sq.Expression {
+	wantPrimary := slices.Contains(runTypes, enums.RunTypePrimary)
+	wantDefer := slices.Contains(runTypes, enums.RunTypeDefer)
+	if wantPrimary == wantDefer {
+		return nil
+	}
+
+	target := int64(enums.RunTypePrimary)
+	if wantDefer {
+		target = int64(enums.RunTypeDefer)
+	}
+
+	if outerRunIDCol == "trace_runs.run_id" {
+		return sq.I("trace_runs.run_type").Eq(target)
+	}
+
+	sub := sq.Dialect(dialect).
+		From("trace_runs").
+		Select(sq.C("run_id")).
+		Where(sq.C("run_type").Eq(target))
+	return sq.I(outerRunIDCol).In(sub)
 }
 
 func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
@@ -2315,6 +2369,10 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	reqcursor := builder.cursor
 	resCursorLayout := builder.cursorLayout
 
+	if rtf := runTypeFilterExpr(w.dialect(), "trace_runs.run_id", opt.Filter.RunType); rtf != nil {
+		filter = append(filter, rtf)
+	}
+
 	// read from database
 	// TODO:
 	// change this to a continuous loop with limits instead of just attempting to grab everything.
@@ -2338,6 +2396,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"is_debounce",
 			"cron_schedule",
 			"has_ai",
+			"run_type",
 		).
 		Where(filter...).
 		Order(order...).
@@ -2371,6 +2430,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.IsDebounce,
 			&data.CronSchedule,
 			&data.HasAi,
+			&data.RunType,
 		)
 		if err != nil {
 			return nil, err
@@ -2450,6 +2510,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			Triggers:     [][]byte{},
 			Output:       data.Output,
 			Status:       enums.RunCodeToStatus(data.Status),
+			RunType:      enums.RunType(data.RunType),
 			IsBatch:      isBatch,
 			BatchID:      batchID,
 			IsDebounce:   data.IsDebounce,
@@ -3071,6 +3132,9 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	allFilters := append(builder.filter, celFilters...)
+	if rtf := runTypeFilterExpr(w.dialect(), "spans.run_id", opt.Filter.RunType); rtf != nil {
+		allFilters = append(allFilters, rtf)
+	}
 	// The inner subquery is bounded by Until (an executor.run always precedes
 	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
 	// also apply the From floor so the inner scan stops growing O(total
@@ -3259,6 +3323,33 @@ func (w wrapper) convertSpanRunRows(
 		// We have filled a page's worth of requests, so break
 		if itemLimit > 0 && count >= itemLimit {
 			break
+		}
+	}
+
+	// Stitch run_type from trace_runs table. Necessary because run_type isn't
+	// in spans. We may want to add run_type to spans in the future, but for now
+	// it's OK to stitch it in code. Don't replace with a SQL JOIN:
+	// trace_runs.run_id is stored as binary and spans.run_id as text, so the
+	// comparison silently matches nothing.
+	if len(res) > 0 {
+		ids := make([]ulid.ULID, 0, len(res))
+		for _, r := range res {
+			if id, err := ulid.Parse(r.RunID); err == nil {
+				ids = append(ids, id)
+			}
+		}
+		if traceRuns, err := w.GetTraceRunsByRunIDs(ctx, ids); err == nil {
+			for _, r := range res {
+				id, err := ulid.Parse(r.RunID)
+				if err != nil {
+					continue
+				}
+				if tr, ok := traceRuns[id]; ok {
+					r.RunType = tr.RunType
+				}
+			}
+		} else {
+			l.Warn("could not stitch run_type into preview run list", "error", err)
 		}
 	}
 

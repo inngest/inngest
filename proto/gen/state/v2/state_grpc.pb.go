@@ -19,22 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RunService_Create_FullMethodName            = "/state.v2.RunService/Create"
-	RunService_Delete_FullMethodName            = "/state.v2.RunService/Delete"
-	RunService_Exists_FullMethodName            = "/state.v2.RunService/Exists"
-	RunService_UpdateMetadata_FullMethodName    = "/state.v2.RunService/UpdateMetadata"
-	RunService_SaveStep_FullMethodName          = "/state.v2.RunService/SaveStep"
-	RunService_SavePending_FullMethodName       = "/state.v2.RunService/SavePending"
-	RunService_ConsumePause_FullMethodName      = "/state.v2.RunService/ConsumePause"
-	RunService_SaveDefer_FullMethodName         = "/state.v2.RunService/SaveDefer"
-	RunService_SetDeferStatus_FullMethodName    = "/state.v2.RunService/SetDeferStatus"
-	RunService_SaveRejectedDefer_FullMethodName = "/state.v2.RunService/SaveRejectedDefer"
-	RunService_LoadMetadata_FullMethodName      = "/state.v2.RunService/LoadMetadata"
-	RunService_LoadEvents_FullMethodName        = "/state.v2.RunService/LoadEvents"
-	RunService_LoadSteps_FullMethodName         = "/state.v2.RunService/LoadSteps"
-	RunService_LoadState_FullMethodName         = "/state.v2.RunService/LoadState"
-	RunService_LoadDefers_FullMethodName        = "/state.v2.RunService/LoadDefers"
-	RunService_LoadDefersMeta_FullMethodName    = "/state.v2.RunService/LoadDefersMeta"
+	RunService_Create_FullMethodName         = "/state.v2.RunService/Create"
+	RunService_Delete_FullMethodName         = "/state.v2.RunService/Delete"
+	RunService_Exists_FullMethodName         = "/state.v2.RunService/Exists"
+	RunService_UpdateMetadata_FullMethodName = "/state.v2.RunService/UpdateMetadata"
+	RunService_SaveStep_FullMethodName       = "/state.v2.RunService/SaveStep"
+	RunService_SavePending_FullMethodName    = "/state.v2.RunService/SavePending"
+	RunService_ConsumePause_FullMethodName   = "/state.v2.RunService/ConsumePause"
+	RunService_SaveDefer_FullMethodName      = "/state.v2.RunService/SaveDefer"
+	RunService_SetDeferStatus_FullMethodName = "/state.v2.RunService/SetDeferStatus"
+	RunService_LoadMetadata_FullMethodName   = "/state.v2.RunService/LoadMetadata"
+	RunService_LoadEvents_FullMethodName     = "/state.v2.RunService/LoadEvents"
+	RunService_LoadSteps_FullMethodName      = "/state.v2.RunService/LoadSteps"
+	RunService_LoadState_FullMethodName      = "/state.v2.RunService/LoadState"
+	RunService_LoadDefers_FullMethodName     = "/state.v2.RunService/LoadDefers"
+	RunService_LoadDefersMeta_FullMethodName = "/state.v2.RunService/LoadDefersMeta"
 )
 
 // RunServiceClient is the client API for RunService service.
@@ -50,7 +49,6 @@ type RunServiceClient interface {
 	ConsumePause(ctx context.Context, in *ConsumePauseRequest, opts ...grpc.CallOption) (*ConsumePauseResponse, error)
 	SaveDefer(ctx context.Context, in *SaveDeferRequest, opts ...grpc.CallOption) (*SaveDeferResponse, error)
 	SetDeferStatus(ctx context.Context, in *SetDeferStatusRequest, opts ...grpc.CallOption) (*SetDeferStatusResponse, error)
-	SaveRejectedDefer(ctx context.Context, in *SaveRejectedDeferRequest, opts ...grpc.CallOption) (*SaveRejectedDeferResponse, error)
 	LoadMetadata(ctx context.Context, in *LoadMetadataRequest, opts ...grpc.CallOption) (*LoadMetadataResponse, error)
 	LoadEvents(ctx context.Context, in *LoadEventsRequest, opts ...grpc.CallOption) (*LoadEventsResponse, error)
 	LoadSteps(ctx context.Context, in *LoadStepsRequest, opts ...grpc.CallOption) (*LoadStepsResponse, error)
@@ -157,16 +155,6 @@ func (c *runServiceClient) SetDeferStatus(ctx context.Context, in *SetDeferStatu
 	return out, nil
 }
 
-func (c *runServiceClient) SaveRejectedDefer(ctx context.Context, in *SaveRejectedDeferRequest, opts ...grpc.CallOption) (*SaveRejectedDeferResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SaveRejectedDeferResponse)
-	err := c.cc.Invoke(ctx, RunService_SaveRejectedDefer_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *runServiceClient) LoadMetadata(ctx context.Context, in *LoadMetadataRequest, opts ...grpc.CallOption) (*LoadMetadataResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LoadMetadataResponse)
@@ -240,7 +228,6 @@ type RunServiceServer interface {
 	ConsumePause(context.Context, *ConsumePauseRequest) (*ConsumePauseResponse, error)
 	SaveDefer(context.Context, *SaveDeferRequest) (*SaveDeferResponse, error)
 	SetDeferStatus(context.Context, *SetDeferStatusRequest) (*SetDeferStatusResponse, error)
-	SaveRejectedDefer(context.Context, *SaveRejectedDeferRequest) (*SaveRejectedDeferResponse, error)
 	LoadMetadata(context.Context, *LoadMetadataRequest) (*LoadMetadataResponse, error)
 	LoadEvents(context.Context, *LoadEventsRequest) (*LoadEventsResponse, error)
 	LoadSteps(context.Context, *LoadStepsRequest) (*LoadStepsResponse, error)
@@ -283,9 +270,6 @@ func (UnimplementedRunServiceServer) SaveDefer(context.Context, *SaveDeferReques
 }
 func (UnimplementedRunServiceServer) SetDeferStatus(context.Context, *SetDeferStatusRequest) (*SetDeferStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetDeferStatus not implemented")
-}
-func (UnimplementedRunServiceServer) SaveRejectedDefer(context.Context, *SaveRejectedDeferRequest) (*SaveRejectedDeferResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SaveRejectedDefer not implemented")
 }
 func (UnimplementedRunServiceServer) LoadMetadata(context.Context, *LoadMetadataRequest) (*LoadMetadataResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadMetadata not implemented")
@@ -488,24 +472,6 @@ func _RunService_SetDeferStatus_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RunService_SaveRejectedDefer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SaveRejectedDeferRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RunServiceServer).SaveRejectedDefer(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RunService_SaveRejectedDefer_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RunServiceServer).SaveRejectedDefer(ctx, req.(*SaveRejectedDeferRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _RunService_LoadMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LoadMetadataRequest)
 	if err := dec(in); err != nil {
@@ -656,10 +622,6 @@ var RunService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetDeferStatus",
 			Handler:    _RunService_SetDeferStatus_Handler,
-		},
-		{
-			MethodName: "SaveRejectedDefer",
-			Handler:    _RunService_SaveRejectedDefer_Handler,
 		},
 		{
 			MethodName: "LoadMetadata",

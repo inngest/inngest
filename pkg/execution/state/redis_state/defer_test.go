@@ -432,10 +432,14 @@ func TestSetDeferStatus(t *testing.T) {
 	})
 }
 
-func TestSaveRejectedDefer(t *testing.T) {
+// SaveDefer is also the entry point for writing a Rejected sentinel: caller
+// passes ScheduleStatus=Rejected and an empty Input. The script's HEXISTS
+// no-op (insert-only) then makes the sentinel idempotent against any earlier
+// entry, and terminal against any later one.
+func TestSaveDefer_RejectedSentinel(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("idempotent against existing entry", func(t *testing.T) {
+	t.Run("late rejection doesn't downgrade an existing AfterRun entry", func(t *testing.T) {
 		r := require.New(t)
 		v2svc, id := newDeferTestRunService(t)
 
@@ -447,8 +451,11 @@ func TestSaveRejectedDefer(t *testing.T) {
 		}
 		r.NoError(v2svc.SaveDefer(ctx, id, original))
 
-		// Late rejection signal must not downgrade the accepted defer.
-		r.NoError(v2svc.SaveRejectedDefer(ctx, id, original.FnSlug, original.HashedID))
+		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         original.FnSlug,
+			HashedID:       original.HashedID,
+			ScheduleStatus: enums.DeferStatusRejected,
+		}))
 
 		defers, err := v2svc.LoadDefers(ctx, id)
 		r.NoError(err)
@@ -461,7 +468,11 @@ func TestSaveRejectedDefer(t *testing.T) {
 		r := require.New(t)
 		v2svc, id := newDeferTestRunService(t)
 
-		r.NoError(v2svc.SaveRejectedDefer(ctx, id, "onDefer-score", "hash-rejected"))
+		r.NoError(v2svc.SaveDefer(ctx, id, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-rejected",
+			ScheduleStatus: enums.DeferStatusRejected,
+		}))
 
 		defers, err := v2svc.LoadDefers(ctx, id)
 		r.NoError(err)

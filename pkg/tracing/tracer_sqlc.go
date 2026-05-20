@@ -268,6 +268,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			)
 			continue
 		}
+
 	}
 	return nil
 }

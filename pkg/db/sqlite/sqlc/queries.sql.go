@@ -1547,6 +1547,91 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpan
 	return items, nil
 }
 
+const getSpansByRunIDsAndName = `-- name: GetSpansByRunIDsAndName :many
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_group_array(json_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = ?
+  AND m.run_id IN (/*SLICE:run_ids*/?)
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time
+`
+
+type GetSpansByRunIDsAndNameParams struct {
+	Name   string
+	RunIds []string
+}
+
+type GetSpansByRunIDsAndNameRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	SpanStartTime interface{}
+	SpanEndTime   interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+// Returns spans by name with their current attribute values, merging in any
+// updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+// up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+// carry the span name and would otherwise be filtered out.
+func (q *Queries) GetSpansByRunIDsAndName(ctx context.Context, arg GetSpansByRunIDsAndNameParams) ([]*GetSpansByRunIDsAndNameRow, error) {
+	query := getSpansByRunIDsAndName
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Name)
+	if len(arg.RunIds) > 0 {
+		for _, v := range arg.RunIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(arg.RunIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByRunIDsAndNameRow
+	for rows.Next() {
+		var i GetSpansByRunIDsAndNameRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.TraceID,
+			&i.DynamicSpanID,
+			&i.SpanStartTime,
+			&i.SpanEndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStepSpanByStepID = `-- name: GetStepSpanByStepID :one
 SELECT
   run_id,
@@ -1638,7 +1723,7 @@ func (q *Queries) GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStep
 }
 
 const getTraceRun = `-- name: GetTraceRun :one
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id = ?1
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE run_id = ?1
 `
 
 func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error) {
@@ -1662,12 +1747,69 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, 
 		&i.BatchID,
 		&i.CronSchedule,
 		&i.HasAi,
+		&i.RunType,
 	)
 	return &i, err
 }
 
+const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE run_id IN (/*SLICE:run_ids*/?)
+`
+
+func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*TraceRun, error) {
+	query := getTraceRunsByRunIDs
+	var queryParams []interface{}
+	if len(runIds) > 0 {
+		for _, v := range runIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(runIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TraceRun
+	for rows.Next() {
+		var i TraceRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.FunctionID,
+			&i.TraceID,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Status,
+			&i.SourceID,
+			&i.TriggerIds,
+			&i.Output,
+			&i.IsDebounce,
+			&i.BatchID,
+			&i.CronSchedule,
+			&i.HasAi,
+			&i.RunType,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), ?1) > 0
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), ?1) > 0
 `
 
 func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error) {
@@ -1697,6 +1839,7 @@ func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) (
 			&i.BatchID,
 			&i.CronSchedule,
 			&i.HasAi,
+			&i.RunType,
 		); err != nil {
 			return nil, err
 		}
@@ -2239,9 +2382,9 @@ const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT INTO trace_runs (
     run_id, account_id, workspace_id, app_id, function_id, trace_id,
     queued_at, started_at, ended_at, status, source_id, trigger_ids,
-    output, batch_id, is_debounce, cron_schedule, has_ai
+    output, batch_id, is_debounce, cron_schedule, has_ai, run_type
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(run_id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -2262,7 +2405,8 @@ DO UPDATE SET
     has_ai = CASE
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
-             END
+             END,
+    run_type = excluded.run_type
 `
 
 type InsertTraceRunParams struct {
@@ -2283,6 +2427,7 @@ type InsertTraceRunParams struct {
 	IsDebounce   bool
 	CronSchedule sql.NullString
 	HasAi        bool
+	RunType      int64
 }
 
 func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error {
@@ -2304,6 +2449,7 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.IsDebounce,
 		arg.CronSchedule,
 		arg.HasAi,
+		arg.RunType,
 	)
 	return err
 }

@@ -228,18 +228,13 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
-		// Deterministic event ID so any duplicate-publish path dedupes on the
-		// runner side (runner.go uses event.ID as the schedule idempotency key).
-		// Time prefix is the parent run's start so the ULID stays well-formed.
-		seed := []byte(opts.Metadata.ID.RunID.String() + d.HashedID)
-		eventID, err := util.DeterministicULID(ulid.Time(opts.Metadata.ID.RunID.Time()), seed)
+		eventID, err := event.DeferEventID(opts.Metadata.ID.RunID, d.HashedID)
 		if err != nil {
-			// Unreachable
 			logger.StdlibLogger(ctx).Error(
-				"error generating deferred event ID",
+				"failed to create defer event ID",
 				"error", err,
+				"hashed_id", d.HashedID,
 				"run_id", opts.Metadata.ID.RunID,
-				"unreachable", true,
 			)
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
@@ -263,14 +258,11 @@ func (e *executor) buildDeferEvents(
 			}
 		}
 
-		// Local variable name avoids shadowing the imported `meta` package
-		// (see top of file). A future addition that uses meta.NewAttrSet
-		// or similar inside this loop would otherwise fail to compile in
-		// a non-obvious way.
 		deferredMeta := event.DeferredScheduleMetadata{
-			FnSlug:       d.FnSlug,
-			ParentFnSlug: fnSlug,
-			ParentRunID:  opts.Metadata.ID.RunID.String(),
+			FnSlug:          d.FnSlug,
+			ParentDeferSpan: tracing.DeferSpanRef(opts.Metadata.ID.RunID, d.HashedID),
+			ParentFnSlug:    fnSlug,
+			ParentRunID:     opts.Metadata.ID.RunID,
 		}
 		if err := deferredMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(

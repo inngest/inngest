@@ -88,6 +88,17 @@ func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 			}
 		}
 
+		runTypeStr := spanAttr(span.SpanAttributes, consts.OtelSysFunctionRunType)
+		if runTypeStr != "" {
+			runTypeInt, err := strconv.Atoi(runTypeStr)
+			if err == nil {
+				runType := enums.RunType(runTypeInt)
+				if runType.IsARunType() {
+					run.RunType = runType
+				}
+			}
+		}
+
 		// assign output
 		if len(run.Output) == 0 {
 			for _, e := range span.Events {

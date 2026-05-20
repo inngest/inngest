@@ -404,6 +404,59 @@ func ULIDAttr(key string) attr[*ulid.ULID] {
 	}
 }
 
+// DeferParentLinkSliceAttr stores a slice of (RunID, FnSlug) pairs as a
+// []string where each entry is a JSON-encoded link. The single attribute
+// guarantees the run ID and fn slug stay co-located — no risk of drift
+// between parallel slices.
+func DeferParentLinkSliceAttr(key string) attr[*[]DeferParentLink] {
+	return attr[*[]DeferParentLink]{
+		key: withPrefix(key),
+		serialize: func(v *[]DeferParentLink) attribute.KeyValue {
+			if v == nil || len(*v) == 0 {
+				return BlankAttr
+			}
+			strs := make([]string, len(*v))
+			for i, link := range *v {
+				encoded, err := json.Marshal(link)
+				if err != nil {
+					return BlankAttr
+				}
+				strs[i] = string(encoded)
+			}
+			return attribute.StringSlice(withPrefix(key), strs)
+		},
+		// Handles both []string (OTel attribute value) and []any (JSON
+		// unmarshalling into map[string]any yields []any for arrays).
+		deserialize: func(v any) (*[]DeferParentLink, bool) {
+			var raw []string
+			switch v := v.(type) {
+			case []string:
+				raw = v
+			case []any:
+				raw = make([]string, 0, len(v))
+				for _, x := range v {
+					s, ok := x.(string)
+					if !ok {
+						return nil, false
+					}
+					raw = append(raw, s)
+				}
+			default:
+				return nil, false
+			}
+			out := make([]DeferParentLink, 0, len(raw))
+			for _, s := range raw {
+				var link DeferParentLink
+				if err := json.Unmarshal([]byte(s), &link); err != nil {
+					return nil, false
+				}
+				out = append(out, link)
+			}
+			return &out, true
+		},
+	}
+}
+
 func UUIDAttr(key string) attr[*uuid.UUID] {
 	return attr[*uuid.UUID]{
 		key: withPrefix(key),

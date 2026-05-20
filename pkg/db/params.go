@@ -218,6 +218,7 @@ type InsertTraceRunParams struct {
 	IsDebounce   bool
 	CronSchedule sql.NullString
 	HasAi        bool
+	RunType      int64
 }
 
 // InsertWorkerConnectionParams are the parameters for inserting/upserting a worker connection.

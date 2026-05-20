@@ -44,9 +44,13 @@ type traceLifecycle struct {
 func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts []event.TrackedEvent) {
 	runID := md.ID.RunID
 	evtIDs := []string{}
+	runType := enums.RunTypePrimary
 	for _, e := range evts {
 		id := e.GetInternalID()
 		evtIDs = append(evtIDs, id.String())
+		if e.GetEvent().Name == consts.FnDeferScheduleName {
+			runType = enums.RunTypeDefer
+		}
 	}
 
 	// span that tells when the function was queued
@@ -65,6 +69,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
 			attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusScheduled.ToCode()),
 			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
+			attribute.Int(consts.OtelSysFunctionRunType, int(runType)),
 		),
 	)
 	defer span.End()
@@ -84,6 +89,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 	if md.Config.DebounceFlag() {
 		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
 	}
+
 	if md.Config.Context != nil {
 		if val, ok := md.Config.Context[consts.OtelPropagationLinkKey]; ok {
 			if link, ok := val.(string); ok {

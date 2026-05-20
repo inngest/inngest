@@ -306,6 +306,11 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 				d.ScheduleStatus == enums.DeferStatusAfterRun &&
 				string(d.Input) == `{"user_id":"u_123"}`
 		})).Return(nil)
+		// defers.SaveFromOp emits an executor.defer span on the accepted
+		// DeferAdd so the run's defer list is visible before finalize.
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
 		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
@@ -334,6 +339,10 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		mocks, testData := setupAsyncCheckpointTest(t, op)
 
 		mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
+		// defers.AbortFromOp updates the existing defer span to status=Aborted.
+		mocks.tracer.
+			On("UpdateSpan", mock.Anything, mock.AnythingOfType("*tracing.UpdateSpanOptions")).
+			Return(nil)
 		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
@@ -552,11 +561,6 @@ func (m *mockRunService) LoadDefersMeta(ctx context.Context, id state.ID) (map[s
 
 func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
 	args := m.Called(ctx, id, hashedID, status)
-	return args.Error(0)
-}
-
-func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
-	args := m.Called(ctx, id, fnSlug, hashedID)
 	return args.Error(0)
 }
 

@@ -463,6 +463,28 @@ func (sq *sqliteQuerier) GetSpansByRunID(ctx context.Context, runID string) ([]*
 	return out, nil
 }
 
+func (sq *sqliteQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []string, name string) ([]*db.SpanRow, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := sq.q.GetSpansByRunIDsAndName(ctx, sqlc.GetSpansByRunIDsAndNameParams{
+		RunIds: runIDs,
+		Name:   name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.SpanRow, len(rows))
+	for i, r := range rows {
+		out[i] = &db.SpanRow{
+			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
+			StartTime: toTime(r.SpanStartTime), EndTime: toTime(r.SpanEndTime), ParentSpanID: r.ParentSpanID,
+			SpanFragments: toBytes(r.SpanFragments),
+		}
+	}
+	return out, nil
+}
+
 func (sq *sqliteQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*db.SpanRow, error) {
 	rows, err := sq.q.GetSpansByDebugRunID(ctx, debugRunID)
 	if err != nil {
@@ -595,7 +617,7 @@ func (sq *sqliteQuerier) InsertTraceRun(ctx context.Context, arg db.InsertTraceR
 		QueuedAt: arg.QueuedAt, StartedAt: arg.StartedAt, EndedAt: arg.EndedAt,
 		Status: arg.Status, SourceID: arg.SourceID, TriggerIds: arg.TriggerIds,
 		Output: arg.Output, BatchID: arg.BatchID, IsDebounce: arg.IsDebounce,
-		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi,
+		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi, RunType: arg.RunType,
 	})
 }
 
@@ -605,6 +627,17 @@ func (sq *sqliteQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.
 		return nil, err
 	}
 	return traceRunFromSQLite(r), nil
+}
+
+func (sq *sqliteQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := sq.q.GetTraceRunsByRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, traceRunFromSQLite), nil
 }
 
 func (sq *sqliteQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {

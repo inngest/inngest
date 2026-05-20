@@ -367,6 +367,7 @@ type TraceRun struct {
 	Triggers     [][]byte        `json:"triggers"`
 	Output       []byte          `json:"output,omitempty"`
 	Status       enums.RunStatus `json:"status"`
+	RunType      enums.RunType   `json:"run_type"`
 	IsBatch      bool            `json:"is_batch"`
 	IsDebounce   bool            `json:"is_debounce"`
 	HasAI        bool            `json:"has_ai"`
@@ -412,6 +413,9 @@ type TraceReader interface {
 	GetTraceRunsCount(ctx context.Context, opt GetTraceRunOpt) (int, error)
 	// GetTraceRun retrieve the specified run
 	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
+	// GetTraceRunsByRunIDs retrieves multiple runs in a single query, keyed by
+	// run ID. Missing runs are simply absent from the returned map.
+	GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*TraceRun, error)
 	// GetTraceSpansByRun retrieves all the spans related to the trace
 	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
 	// LegacyGetSpanOutput retrieves the output for the specified span
@@ -492,6 +496,7 @@ type GetTraceRunFilter struct {
 	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
+	RunType     []enums.RunType
 }
 
 type GetTraceRunOrder struct {

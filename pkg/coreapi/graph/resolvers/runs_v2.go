@@ -79,6 +79,10 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 		if err != nil {
 			continue
 		}
+		runType, err := models.ToRunType(r.RunType)
+		if err != nil {
+			continue
+		}
 
 		if r.BatchID != nil {
 			ts := ulid.Time(r.BatchID.Time())
@@ -100,6 +104,7 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 			BatchCreatedAt: batchTime,
 			CronSchedule:   r.CronSchedule,
 			HasAi:          r.HasAI,
+			RunType:        runType,
 		}
 
 		triggerIDS := []ulid.ULID{}
@@ -202,6 +207,10 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 	if err != nil {
 		return nil, fmt.Errorf("error parsing status: %w", err)
 	}
+	runType, err := models.ToRunType(run.RunType)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing run type: %w", err)
+	}
 
 	if run.StartedAt.UnixMilli() > 0 {
 		startedAt = &run.StartedAt
@@ -233,6 +242,7 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 		CronSchedule:   run.CronSchedule,
 		Output:         output,
 		HasAi:          run.HasAI,
+		RunType:        runType,
 	}
 
 	return &res, nil
@@ -505,6 +515,16 @@ func toRunsQueryOpt(
 		items = num
 	}
 
+	var runTypes []enums.RunType
+	if filter.RunType != nil {
+		switch *filter.RunType {
+		case models.RunTypePrimary:
+			runTypes = []enums.RunType{enums.RunTypePrimary}
+		case models.RunTypeDefer:
+			runTypes = []enums.RunType{enums.RunTypeDefer}
+		}
+	}
+
 	return cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			AppID:      filter.AppIDs,
@@ -514,6 +534,7 @@ func toRunsQueryOpt(
 			Until:      until,
 			Status:     statuses,
 			CEL:        cel,
+			RunType:    runTypes,
 		},
 		Order:   orderBy,
 		Cursor:  cursor,

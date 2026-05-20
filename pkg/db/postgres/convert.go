@@ -100,7 +100,7 @@ func traceRunFromPG(s *sqlc.TraceRun) *db.TraceRun {
 		QueuedAt: s.QueuedAt, StartedAt: s.StartedAt, EndedAt: s.EndedAt,
 		Status: int64(s.Status), SourceID: s.SourceID, TriggerIds: s.TriggerIds,
 		Output: s.Output, IsDebounce: s.IsDebounce, BatchID: s.BatchID,
-		CronSchedule: s.CronSchedule, HasAi: s.HasAi,
+		CronSchedule: s.CronSchedule, HasAi: s.HasAi, RunType: int64(s.RunType),
 	}
 }
 

@@ -256,9 +256,9 @@ VALUES
 INSERT INTO trace_runs (
     run_id, account_id, workspace_id, app_id, function_id, trace_id,
     queued_at, started_at, ended_at, status, source_id, trigger_ids,
-    output, batch_id, is_debounce, cron_schedule, has_ai
+    output, batch_id, is_debounce, cron_schedule, has_ai, run_type
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(run_id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -279,10 +279,14 @@ DO UPDATE SET
     has_ai = CASE
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
-             END;
+             END,
+    run_type = excluded.run_type;
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
+
+-- name: GetTraceRunsByRunIDs :many
+SELECT * FROM trace_runs WHERE run_id IN (sqlc.slice('run_ids'));
 
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;
@@ -651,3 +655,31 @@ WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
+
+
+-- name: GetSpansByRunIDsAndName :many
+-- Returns spans by name with their current attribute values, merging in any
+-- updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+-- up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+-- carry the span name and would otherwise be filtered out.
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_group_array(json_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = ?
+  AND m.run_id IN (sqlc.slice('run_ids'))
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time;

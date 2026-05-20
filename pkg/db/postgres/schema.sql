@@ -237,7 +237,8 @@ CREATE TABLE public.trace_runs (
     is_debounce boolean NOT NULL,
     batch_id bytea,
     cron_schedule text,
-    has_ai boolean DEFAULT false NOT NULL
+    has_ai boolean DEFAULT false NOT NULL,
+    run_type integer DEFAULT 1 NOT NULL
 );
 
 --

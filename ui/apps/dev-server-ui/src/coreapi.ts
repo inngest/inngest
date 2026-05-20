@@ -1,5 +1,21 @@
 import { gql } from 'graphql-request';
 
+export const RUN_DEFER_SUMMARY_FRAGMENT = gql`
+  fragment RunDeferSummaryFields on RunDefer {
+    hashedDeferID
+    deferID
+    function {
+      name
+      slug
+    }
+    status
+    run {
+      id
+      status
+    }
+  }
+`;
+
 export const EVENT = gql`
   query GetEvent($id: ID!) {
     event(query: { eventId: $id }) {
@@ -262,6 +278,7 @@ export const GET_RUNS = gql`
     $functionRunCursor: String = null
     $celQuery: String = null
     $preview: Boolean = false
+    $runType: RunType = null
   ) {
     runs(
       filter: {
@@ -270,6 +287,7 @@ export const GET_RUNS = gql`
         status: $status
         timeField: $timeField
         query: $celQuery
+        runType: $runType
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
@@ -294,6 +312,13 @@ export const GET_RUNS = gql`
           startedAt
           status
           hasAI
+          runType
+          deferredFrom {
+            function {
+              name
+              slug
+            }
+          }
         }
       }
       pageInfo {
@@ -312,9 +337,15 @@ export const COUNT_RUNS = gql`
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $preview: Boolean = false
+    $runType: RunType = null
   ) {
     runs(
-      filter: { from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        from: $startTime
+        status: $status
+        timeField: $timeField
+        runType: $runType
+      }
       orderBy: [{ field: $timeField, direction: DESC }]
       preview: $preview
     ) {
@@ -420,6 +451,30 @@ export const GET_RUN = gql`
         }
       }
       hasAI
+    }
+  }
+`;
+
+export const GET_RUN_LINKAGE = gql`
+  query GetRunLinkage($runID: String!) {
+    run(runID: $runID) {
+      defers {
+        ...RunDeferSummaryFields
+      }
+      siblingDefers {
+        ...RunDeferSummaryFields
+      }
+      deferredFrom {
+        function {
+          name
+          slug
+        }
+        runID
+        run {
+          id
+          status
+        }
+      }
     }
   }
 `;

@@ -11,7 +11,9 @@ import {
   FunctionRunTimeField,
   isFunctionRunStatus,
   isFunctionTimeField,
+  isRunType,
   type FunctionRunStatus,
+  type RunType,
 } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
@@ -34,13 +36,14 @@ import {
 import type { Features } from '../types/features';
 import RunsStatusFilter from './RunsStatusFilter';
 import RunsTable from './RunsTable';
+import RunsTypeFilter from './RunsTypeFilter';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
 
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'runType'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -86,7 +89,7 @@ export function RunsPage({
   searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const columns = useScopedColumns(scope);
+  const columns = useScopedColumns(scope, features.runType ?? false);
   const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
@@ -129,6 +132,8 @@ export function RunsPage({
     'timeField',
     isFunctionTimeField
   );
+
+  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
 
   const [search, setSearch, removeSearch] = useSearchParam('search');
 
@@ -192,6 +197,14 @@ export function RunsPage({
       setTimeField(value);
     },
     [scrollToTop, setTimeField]
+  );
+
+  const onRunTypeFilterChange = useCallback(
+    (value: RunType | undefined) => {
+      scrollToTop();
+      batchUpdate({ filterRunType: value ?? null });
+    },
+    [batchUpdate, scrollToTop]
   );
 
   const onDaysChange = useCallback(
@@ -358,6 +371,12 @@ export function RunsPage({
                 entities={functions}
               />
             )}
+            {features.runType && (
+              <RunsTypeFilter
+                selectedRunType={filterRunType}
+                onRunTypeChange={onRunTypeFilterChange}
+              />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <TotalCount totalCount={totalCount} />
@@ -400,13 +419,13 @@ export function RunsPage({
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
+          columns={columns}
           isLoading={isLoadingInitial}
           error={error}
           onRefresh={onRefresh}
           renderSubComponent={renderSubComponent}
           getRowCanExpand={() => true}
           visibleColumns={columnVisibility}
-          scope={scope}
         />
         {infiniteScrollTrigger?.(containerRef.current)}
         {!hasMore && data.length > 1 && (
