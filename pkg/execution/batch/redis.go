@@ -305,7 +305,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	jobID := opts.JobID()
 	maxAttempts := consts.MaxRetries + 1
 
-	queueName := queue.KindScheduleBatch
+	queueName := fmt.Sprintf("%s:%s", queue.KindScheduleBatch, opts.WorkspaceID)
 	err := b.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
