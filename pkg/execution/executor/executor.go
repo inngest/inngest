@@ -3234,16 +3234,23 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				e.log.Debug("error creating span for next step after resume", "error", err)
 			}
 
-			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			if err != nil {
+			var itemAlreadyExists bool
+			_, enqueueErr := util.WithRetry(ctx, "enqueue-after-pause", func(ctx context.Context) (struct{}, error) {
+				err := e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 				if err == queue.ErrQueueItemExists {
-					nextStepSpan.Drop()
-				} else {
-					_ = nextStepSpan.Send()
-					return fmt.Errorf("error enqueueing after pause: %w", err)
+					itemAlreadyExists = true
+					return struct{}{}, nil
 				}
+				return struct{}{}, err
+			}, util.NewRetryConf())
+			if enqueueErr != nil {
+				_ = nextStepSpan.Send()
+				return fmt.Errorf("error enqueueing after pause: %w", enqueueErr)
 			}
 
+			if itemAlreadyExists {
+				nextStepSpan.Drop()
+			}
 			_ = nextStepSpan.Send()
 		}
 
