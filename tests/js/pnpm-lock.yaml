@@ -8,7 +8,7 @@ overrides:
   h3@<1.15.6: '>=1.15.6 <2'
   cjs-module-lexer@<=2.2.0: 2.2.0
   next@<16.2.6: 16.2.6
-  protobufjs@<=8.0.2: 8.0.2
+  protobufjs@<=8.2.0: 8.2.0
 
 importers:
 
@@ -1167,8 +1167,8 @@ packages:
     resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
     engines: {node: '>=0.10.0'}
 
-  protobufjs@8.0.2:
-    resolution: {integrity: sha512-TNF0rhMsp+g21us9R2aj3iA7JY9pG7G/3zyRiULl6NS+AurvgQ7iWA203QcykDGSosHxMsV+K6GTR15RBWw1bA==}
+  protobufjs@8.2.0:
+    resolution: {integrity: sha512-oI+GC9iPxrQEr6wragljFKH46/r3rNsm6eg7F2fp6kBUMnf6/mesDRdBuF4gK+OyaKJ8N4C1B9s9cCeYdqFikg==}
     engines: {node: '>=12.0.0'}
 
   radix3@1.1.2:
@@ -1331,7 +1331,7 @@ snapshots:
     dependencies:
       lodash.camelcase: 4.3.0
       long: 5.3.2
-      protobufjs: 8.0.2
+      protobufjs: 8.2.0
       yargs: 17.7.2
 
   '@img/colour@1.1.0':
@@ -2571,7 +2571,7 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  protobufjs@8.0.2:
+  protobufjs@8.2.0:
     dependencies:
       '@types/node': 18.13.0
       long: 5.3.2
