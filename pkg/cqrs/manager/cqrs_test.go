@@ -1869,6 +1869,76 @@ func parseRowEndTime(v any) (time.Time, error) {
 	}
 }
 
+// TestCQRSGetSpansByRunID_OrdersFragmentsByEndTime verifies that
+// GetSpansByRunID orders fragments inside its json_group_array by end_time
+// so the read-path merge in mapSpanFromRow (which is last-write-wins via
+// maps.Copy) deterministically resolves status by causal order, mirroring
+// the property the monorepo's CH AggregatingMergeTree gets for free.
+//
+// The simulated on-disk state is what TestCQRSTracerWritesEndTimeFromOpts
+// already proved the tracer produces: a RUNNING fragment with
+// end_time = start_time = T0, a COMPLETED fragment with end_time = T1 > T0.
+// Critically, the RUNNING row is inserted LAST — i.e. its rowid is larger,
+// which is the order json_group_array would emit without an ORDER BY. The
+// fix exists only if the read path actively re-sorts by end_time.
+func TestCQRSGetSpansByRunID_OrdersFragmentsByEndTime(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	const dynID = "dyn-step-race"
+	t0 := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	t1 := t0.Add(10 * time.Millisecond)
+
+	// Root run span.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		TraceID:       traceID,
+		DynamicSpanID: "dyn-run-" + runID,
+		Name:          meta.SpanNameRun,
+		StartTime:     t0,
+		EndTime:       t0.Add(time.Millisecond),
+		Attributes:    []byte(fmt.Sprintf(`{"_inngest.run.id":%q}`, runID)),
+	})
+
+	// COMPLETED fragment FIRST — earlier insertion order.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		TraceID:       traceID,
+		DynamicSpanID: dynID,
+		ParentSpanID:  "dyn-run-" + runID,
+		Name:          meta.SpanNameStep,
+		StartTime:     t0,
+		EndTime:       t1,
+		Attributes:    []byte(`{"_inngest.dynamic.status":"Completed"}`),
+	})
+
+	// Late RUNNING fragment LAST — larger rowid, smaller end_time. Without
+	// ORDER BY end_time inside json_group_array, this fragment comes last
+	// in the JSON array and maps.Copy lets its DynamicStatus override.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		TraceID:       traceID,
+		DynamicSpanID: dynID,
+		ParentSpanID:  "dyn-run-" + runID,
+		Name:          meta.SpanNameStep,
+		StartTime:     t0,
+		EndTime:       t0, // tracer-fix shape: RUNNING ends at start.
+		Attributes:    []byte(`{"_inngest.dynamic.status":"Running"}`),
+	})
+
+	root, err := cm.GetSpansByRunID(t.Context(), ulid.MustParse(runID))
+	require.NoError(t, err)
+	require.NotNil(t, root)
+	require.Len(t, root.Children, 1, "expected one merged step span as a child of the run")
+
+	step := root.Children[0]
+	assert.Equal(t, dynID, step.SpanID)
+	assert.Equal(t, enums.StepStatusCompleted, step.Status,
+		"GetSpansByRunID must order fragments by end_time so the merged status is the causally-latest one")
+}
+
 // TestSpanWithAttributesAndOutput is a regression test ensuring that spans
 // with JSON attributes and output can be inserted and queried without
 // "JSON cannot hold BLOB values" errors. This catches the bug where []byte
