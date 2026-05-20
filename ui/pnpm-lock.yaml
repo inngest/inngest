@@ -253,7 +253,7 @@ importers:
         version: 2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       sql-formatter:
         specifier: ^15.7.1
-        version: 15.7.4
+        version: 15.8.0
       srvx:
         specifier: 0.11.15
         version: 0.11.15
@@ -733,7 +733,7 @@ importers:
         version: 2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       sql-formatter:
         specifier: ^15.6.10
-        version: 15.7.4
+        version: 15.8.0
       tailwind-merge:
         specifier: ^1.10.0
         version: 1.14.0
@@ -10265,8 +10265,8 @@ packages:
   sponge-case@2.0.3:
     resolution: {integrity: sha512-i4h9ZGRfxV6Xw3mpZSFOfbXjf0cQcYmssGWutgNIfFZ2VM+YIWfD71N/kjjwK6X/AAHzBr+rciEcn/L34S8TGw==}
 
-  sql-formatter@15.7.4:
-    resolution: {integrity: sha512-87VsXfl9ng7oNZlV0p3c/DfraFneH4EPYZ1F7v+ZbGTdddtI0FHcqRRshJx6/Sy7saXOiCwstw0J2cP4Z6Xj5A==}
+  sql-formatter@15.8.0:
+    resolution: {integrity: sha512-HnjdRHlSsO4Ap2erB5YXAvWggrnk/S4TezUn8zmpq9J/hEKn9+6gGaqiKPyDtI10Xf4zJmHYPREGjMjZmmP1fg==}
     hasBin: true
 
   srvx@0.11.15:
@@ -22702,7 +22702,7 @@ snapshots:
 
   sponge-case@2.0.3: {}
 
-  sql-formatter@15.7.4:
+  sql-formatter@15.8.0:
     dependencies:
       argparse: 2.0.1
       nearley: 2.20.1
