@@ -546,7 +546,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2 AND name != 'userland'
@@ -1059,7 +1060,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans b
 WHERE b.run_id = CAST($1 AS CHAR(26)) AND b.account_id = $2 AND b.name != 'userland'
@@ -1192,7 +1194,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2 AND (parent_span_id IS NULL OR parent_span_id = '0000000000000000')
@@ -1246,7 +1249,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND span_id = $2 AND account_id = $3
@@ -1338,7 +1342,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE debug_run_id = CAST($1 AS CHAR(26))
@@ -1404,7 +1409,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE debug_session_id = CAST($1 AS CHAR(26))
@@ -1469,7 +1475,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))
@@ -1532,7 +1539,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE span_id IN (
@@ -1564,7 +1572,8 @@ SELECT
     'attributes', attributes,
     'links', links,
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END,
+    'end_time', end_time
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2 AND name != 'userland'

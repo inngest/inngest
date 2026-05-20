@@ -267,6 +267,27 @@ func fragmentAttributesJSON(raw any) ([]byte, bool) {
 	}
 }
 
+// fragmentEndTime extracts the end_time field from a decoded span fragment.
+//
+// Missing or unparseable values return the zero time so fragments without
+// end_time sort before any real value.
+func fragmentEndTime(fragment map[string]any) time.Time {
+	raw, ok := fragment["end_time"].(string)
+	if !ok || raw == "" {
+		return time.Time{}
+	}
+	s := strings.Split(raw, " m=")[0]
+	for _, layout := range []string{
+		"2006-01-02 15:04:05.999999999 -0700 MST",
+		time.RFC3339Nano,
+	} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
 func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRollupInfo) (*cqrs.OtelSpan, error) {
 	// Use interface methods to get the fields directly
 	traceID := span.GetTraceID()
@@ -361,6 +382,16 @@ func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRol
 	}
 
 	_ = json.Unmarshal(spanFragmentsBytes, &fragments)
+
+	// Sort fragments by end_time ascending so the maps.Copy merge below
+	// resolves status deterministically by causal order rather than row
+	// insertion order.
+	//
+	// We sort these fragments in Go rather than sql, as sqlc's SQL parser
+	// doesn't accept `ORDER BY end_time` inside `json_group_array(...)`.
+	sort.SliceStable(fragments, func(i, j int) bool {
+		return fragmentEndTime(fragments[i]).Before(fragmentEndTime(fragments[j]))
+	})
 
 fragmentLoop:
 	for _, fragment := range fragments {
