@@ -5,7 +5,7 @@ import type {
   RunDeferSummary,
   RunDeferredFromSummary,
   RunInvokedFromSummary,
-} from '../SharedContext/useGetRun';
+} from '../SharedContext/useGetRunLinkage';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { IDCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';

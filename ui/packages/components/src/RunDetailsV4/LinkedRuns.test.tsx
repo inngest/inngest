@@ -5,7 +5,7 @@ import type {
   RunDeferSummary,
   RunDeferredFromSummary,
   RunInvokedFromSummary,
-} from '../SharedContext/useGetRun';
+} from '../SharedContext/useGetRunLinkage';
 import { LinkedRuns } from './LinkedRuns';
 
 // @inngest/components/* self-imports don't resolve in vitest without a workspace

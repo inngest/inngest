@@ -19,7 +19,7 @@ import type {
   RunDeferSummary,
   RunDeferredFromSummary,
   RunInvokedFromSummary,
-} from '../SharedContext/useGetRun';
+} from '../SharedContext/useGetRunLinkage';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';

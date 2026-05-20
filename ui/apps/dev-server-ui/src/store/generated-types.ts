@@ -1816,6 +1816,17 @@ export type GetRunQuery = {
         headers: any;
       } | null;
     } | null;
+  } | null;
+};
+
+export type GetRunLinkageQueryVariables = Exact<{
+  runID: Scalars['String'];
+}>;
+
+export type GetRunLinkageQuery = {
+  __typename?: 'Query';
+  run: {
+    __typename?: 'FunctionRunV2';
     defers: Array<{
       __typename?: 'RunDefer';
       id: string;

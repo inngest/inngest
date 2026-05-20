@@ -1127,15 +1127,19 @@ export type FunctionRunV2 = {
   appID: Scalars['UUID']['output'];
   batchCreatedAt: Maybe<Scalars['Time']['output']>;
   cronSchedule: Maybe<Scalars['String']['output']>;
+  deferredFrom: Maybe<RunDeferredFrom>;
+  defers: Array<RunDefer>;
   endedAt: Maybe<Scalars['Time']['output']>;
   eventName: Maybe<Scalars['String']['output']>;
   function: Workflow;
   functionID: Scalars['UUID']['output'];
   hasAI: Scalars['Boolean']['output'];
   id: Scalars['ULID']['output'];
+  invokedFrom: Maybe<RunInvokedFrom>;
   isBatch: Scalars['Boolean']['output'];
   output: Maybe<Scalars['Bytes']['output']>;
   queuedAt: Scalars['Time']['output'];
+  runType: RunType;
   sourceID: Maybe<Scalars['String']['output']>;
   startedAt: Maybe<Scalars['Time']['output']>;
   status: FunctionRunStatus;
@@ -2031,6 +2035,33 @@ export type RetryConfiguration = {
   value: Scalars['Int']['output'];
 };
 
+export type RunDefer = {
+  __typename?: 'RunDefer';
+  fnSlug: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  run: Maybe<FunctionRunV2>;
+  status: RunDeferStatus;
+  userDeferID: Scalars['String']['output'];
+};
+
+export enum RunDeferStatus {
+  Aborted = 'ABORTED',
+  Scheduled = 'SCHEDULED'
+}
+
+export type RunDeferredFrom = {
+  __typename?: 'RunDeferredFrom';
+  parentRun: Maybe<FunctionRunV2>;
+  parentRunID: Scalars['ULID']['output'];
+};
+
+export type RunInvokedFrom = {
+  __typename?: 'RunInvokedFrom';
+  parentRun: Maybe<FunctionRunV2>;
+  parentRunID: Scalars['ULID']['output'];
+  stepName: Maybe<Scalars['String']['output']>;
+};
+
 export type RunTraceSpan = {
   __typename?: 'RunTraceSpan';
   account: Account;
@@ -2101,6 +2132,11 @@ export type RunTraceTrigger = {
   timestamp: Scalars['Time']['output'];
 };
 
+export enum RunType {
+  Defer = 'DEFER',
+  Primary = 'PRIMARY'
+}
+
 export type RunsConnection = {
   __typename?: 'RunsConnection';
   edges: Array<FunctionRunV2Edge>;
@@ -2121,6 +2157,7 @@ export type RunsFilterV2 = {
   from: Scalars['Time']['input'];
   functionIDs?: InputMaybe<Array<Scalars['UUID']['input']>>;
   query?: InputMaybe<Scalars['String']['input']>;
+  runType?: InputMaybe<RunType>;
   status?: InputMaybe<Array<FunctionRunStatus>>;
   timeField?: InputMaybe<RunsOrderByField>;
   until?: InputMaybe<Scalars['Time']['input']>;

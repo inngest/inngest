@@ -12,6 +12,7 @@ import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
+import { useGetRunLinkage } from '../SharedContext/useGetRunLinkage';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
@@ -212,6 +213,8 @@ export const RunDetailsV4 = ({
     refetchInterval: pollInterval,
   });
 
+  const { data: linkageData } = useGetRunLinkage({ runID });
+
   const outputID = runData?.trace?.outputID;
   const {
     data: resultData,
@@ -293,7 +296,7 @@ export const RunDetailsV4 = ({
               standalone={standalone}
               result={resultData}
               isDurableEndpoint={runData?.isDurableEndpoint}
-              isDeferred={Boolean(runData?.deferredFrom)}
+              isDeferred={Boolean(linkageData?.deferredFrom)}
             />
             {showError && (
               <ErrorCard
@@ -364,9 +367,9 @@ export const RunDetailsV4 = ({
               result={resultData}
               trace={runData?.trace}
               isDurableEndpoint={runData?.isDurableEndpoint}
-              defers={runData?.defers}
-              deferredFrom={runData?.deferredFrom}
-              invokedFrom={runData?.invokedFrom}
+              defers={linkageData?.defers}
+              deferredFrom={linkageData?.deferredFrom}
+              invokedFrom={linkageData?.invokedFrom}
             />
           )}
         </div>

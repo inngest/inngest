@@ -454,6 +454,13 @@ export const GET_RUN = gql`
         }
       }
       hasAI
+    }
+  }
+`;
+
+export const GET_RUN_LINKAGE = gql`
+  query GetRunLinkage($runID: String!) {
+    run(runID: $runID) {
       defers {
         ...RunDeferSummaryFields
       }
