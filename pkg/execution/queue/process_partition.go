@@ -228,7 +228,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// Workspace-scoped batch partitions ("schedule-batch:<wsID>") still get
 	// parallel within-partition processing even though the suffixed name is
 	// not in queueKindMapping.
-	if strings.HasPrefix(p.Queue(), KindScheduleBatch+":") {
+	if strings.HasPrefix(p.Queue(), KindScheduleBatch) {
 		isSystemFn = true
 	}
 	_, parallelFn := q.disableFifoForFunctions[p.Queue()]
