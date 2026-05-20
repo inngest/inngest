@@ -31,9 +31,10 @@ func (h *connectHandler) handleInvokeMessage(ctx context.Context, preparedConn *
 		if errors.Is(err, errConnectionRetired) {
 			// This is a pre-ACK skip. Once ACK succeeds, connectInvoke invokes
 			// the function with context.Background() and must let it finish.
+			logAttrs := append(preparedConn.logAttrs(), "phase", preparedConn.phase())
 			h.logger.Debug(
 				"skipping sdk request because connection phase does not allow request ack",
-				"phase", preparedConn.phase(),
+				logAttrs...,
 			)
 			return nil
 		}
@@ -59,29 +60,7 @@ func (h *connectHandler) handleInvokeMessage(ctx context.Context, preparedConn *
 	// that the message was truly passed on to the executor _unless_ we receive the ack message.
 	h.messageBuffer.addPending(ctx, resp, ResponseAcknowlegeDeadline)
 
-	if !preparedConn.canWriteReply() {
-		h.messageBuffer.append(resp)
-		h.logger.Debug(
-			"buffering sdk response because connection phase does not allow reply write",
-			"request_id", resp.RequestId,
-			"phase", preparedConn.phase(),
-		)
-		return nil
-	}
-
-	err = wsproto.Write(ctx, preparedConn.ws, responseMessage)
-	if err != nil {
-		// We received an error, the message definitely was not sent: Buffer message to retry
-		// Phase 2 preserves the existing policy: reply write failure does not retire
-		// the generation. The ACKed function has already completed, so the reply is
-		// buffered for API flush and connection retirement remains a separate decision.
-		h.messageBuffer.append(resp)
-		h.logger.Debug("buffering sdk response after websocket write failure", "err", err, "request_id", resp.RequestId)
-
-		return nil
-	}
-
-	return nil
+	return h.writeReply(ctx, preparedConn, resp, responseMessage)
 }
 
 // connectInvoke is the counterpart to invoke for connect
@@ -102,6 +81,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		"app_id", body.AppId,
 		"function_slug", body.FunctionSlug,
 	}
+	logAttrs = append(logAttrs, preparedConn.logAttrs()...)
 	l := h.logger.With(logAttrs...)
 
 	invoker, ok := h.invokers[body.AppName]
@@ -139,18 +119,8 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		return nil, publicerr.Wrap(err, 400, "malformed input")
 	}
 
-	// ACK is the ownership boundary. If this generation is already retired,
-	// do not ACK and do not invoke; the gateway/executor can retry elsewhere.
-	if !preparedConn.canWriteRequestAck() {
-		return nil, errConnectionRetired
-	}
-	if err := wsproto.Write(ctx, preparedConn.ws, &connectproto.ConnectMessage{
-		Kind:    connectproto.GatewayMessageType_WORKER_REQUEST_ACK,
-		Payload: ackPayload,
-	}); err != nil {
-		preparedConn.retire("request ack write failed", "err", err)
-		l.Error("error sending request ack", "error", err)
-		return nil, publicerr.Wrap(err, 400, "failed to ack worker request")
+	if err := h.writeRequestAck(ctx, preparedConn, ackPayload, l); err != nil {
+		return nil, err
 	}
 
 	// TODO Should we wait for a gateway response before starting to process? What if the gateway fails acking and we start too early?
@@ -201,9 +171,10 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				cancelExtendLeaseCtx()
 				return
 			}
-			if !preparedConn.canWriteExtendLease() {
+			if !canExtendRequestLease(preparedConn) {
 				// ACKed work remains owned through Draining and Closing, so this
 				// only stops at the hard no-write boundary: Retired or Closed.
+				l.Debug("stopping lease extension because connection phase does not allow lease extension", "phase", preparedConn.phase())
 				cancelExtendLeaseCtx()
 				return
 			}

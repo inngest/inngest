@@ -130,15 +130,6 @@ func (c *connection) closeNow(reason string, attrs ...any) bool {
 	return true
 }
 
-func (c *connection) isRetired() bool {
-	switch c.phase() {
-	case connPhaseRetired, connPhaseClosed:
-		return true
-	default:
-		return false
-	}
-}
-
 // transition applies a validated phase change and its lifecycle side effects.
 // All phase mutations go through this path so write permissions, no-write
 // notification, manager flush notification, and transition logs stay coupled.

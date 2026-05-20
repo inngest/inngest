@@ -88,3 +88,4 @@ with Inngest step primitives from Go code.
   consistent.
 - Commit in small logical chunks so each commit is self-reviewable.
 - If working with a plan, update checklist statuses as you go.
+- Add comments to clarify intent

@@ -3,8 +3,8 @@ package connect
 import connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 
 // These helpers centralize websocket write policy for one connection
-// generation. Phase 2 keeps request behavior unchanged; it only makes each
-// protocol write ask lifecycle state before attempting the websocket write.
+// generation. Every non-handshake protocol write should pass through this
+// phase policy before attempting to use the websocket.
 func (c *connection) canWriteHeartbeat() bool {
 	return c.canWrite(connectproto.GatewayMessageType_WORKER_HEARTBEAT)
 }

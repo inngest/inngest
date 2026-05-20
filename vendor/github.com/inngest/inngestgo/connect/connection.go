@@ -82,7 +82,8 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 		l.Error("could not handle connection", "err", err, "reconnect", shouldReconnect(err))
 
 		if errors.Is(err, errGatewayDraining) {
-			// if the gateway is draining, the original connection was closed, and we already reconnected inside handleConnection
+			// Gateway drain owns its replacement and old-generation close work
+			// inside handleConnection; the manager loop remains ACTIVE.
 			return
 		}
 
@@ -217,8 +218,10 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	l := h.logger.With(preparedConn.logAttrs()...)
 
 	defer func() {
-		// This is a fallback safeguard to always close the WebSocket connection at the end of the function
-		// Usually, we provide a specific reason, so this is only necessary for unhandled errors
+		// Fallback safeguard for exits that do not reach the explicit drain,
+		// shutdown, or read-error close paths. closeNow is idempotent, so this
+		// does not duplicate side effects after a lifecycle helper already
+		// closed the transport.
 		preparedConn.closeNow("handle connection ended")
 	}()
 
@@ -357,9 +360,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 	l.Debug("waiting for read loop to end")
 
-	// If read loop ends, this can be for two reasons
-	// - Connection loss (io.EOF), read loop terminated intentionally (CloseError), other error (unexpected), missed heartbeat (readerLifetimeContext canceled)
-	// - Worker shutdown, parent context got cancelled
+	// When the read loop exits before local shutdown, the websocket generation
+	// is no longer a reliable writer. Gateway drain is the one exception: it
+	// keeps this generation in Draining while a replacement connects.
 	if err := eg.Wait(); err != nil && ctx.Err() == nil {
 		if errors.Is(err, errGatewayDraining) {
 			// Gateway is draining this generation. Establish a replacement on
@@ -382,6 +385,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 		}
 
 		l.Debug("read loop ended with error", "err", err)
+		// Unexpected read termination retires the generation before the manager
+		// decides whether to reconnect. That prevents queued request work from
+		// attempting stale ACKs on this websocket.
 		preparedConn.retire("read loop ended with error", "err", err)
 
 		// In case the gateway intentionally closed the connection, we'll receive a close error
@@ -439,7 +445,8 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 	preparedConn.retire("worker pool drained")
 
-	// Attempt to shut down connection if not already done
+	// Close through the lifecycle helper after the worker pool drains. The
+	// deferred closeNow remains only as a fallback for unhandled exits.
 	preparedConn.closeNormal(connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String(), "reason", "worker shutdown")
 
 	// Attempt to flush leftover messages before closing
