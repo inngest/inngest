@@ -19,7 +19,7 @@
     "@tanstack/react-start": "^1.158.1",
     "fumadocs-core": "^16.0.0",
     "fumadocs-mdx": "^15.0.0",
-    "fumadocs-openapi": "10.8.4",
+    "fumadocs-openapi": "10.8.5",
     "fumadocs-ui": "^16.0.0",
     "lucide-react": "^1.16.0",
     "react": "^19.1.0",
