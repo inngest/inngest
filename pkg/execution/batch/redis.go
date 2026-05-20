@@ -76,6 +76,18 @@ func WithoutBuffer() RedisBatchManagerOpt {
 	}
 }
 
+// WithSplitBatchPartitionByWorkspace registers a gate that controls whether
+// scheduled batch jobs are enqueued to a workspace-scoped system partition
+// (queue.KindScheduleBatch:<workspaceID>) instead of the single shared
+// schedule-batch partition. When the gate returns true for an accountID, that
+// account's workspaces each get their own batch schedule partition, avoiding
+// cross-workspace head-of-line blocking on the shared system queue.
+func WithSplitBatchPartitionByWorkspace(fn func(ctx context.Context, accountID uuid.UUID) (enable bool)) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.splitBatchPartitionByWorkspace = fn
+	}
+}
+
 // NewRedisBatchManager creates a new redis batch manager, using Redis as the backing manager.
 //
 // Note that this buffers in-memory using the defaults via [DefaultMaxBufferDuration] and
@@ -114,6 +126,12 @@ type redisBatchManager struct {
 	// When nil, appends go directly to Redis. When set, appends are buffered
 	// and flushed periodically or when the buffer is full.
 	buffer *appendBuffer
+
+	// splitBatchPartitionByWorkspace, when non-nil and returning true for a
+	// given accountID, causes ScheduleExecution to enqueue the batch-scheduling
+	// job to a workspace-scoped system partition rather than the shared
+	// schedule-batch partition.
+	splitBatchPartitionByWorkspace func(ctx context.Context, accountID uuid.UUID) (enable bool)
 }
 
 func (b *redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
@@ -305,7 +323,10 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	jobID := opts.JobID()
 	maxAttempts := consts.MaxRetries + 1
 
-	queueName := fmt.Sprintf("%s:%s", queue.KindScheduleBatch, opts.WorkspaceID)
+	queueName := queue.KindScheduleBatch
+	if b.splitBatchPartitionByWorkspace != nil && b.splitBatchPartitionByWorkspace(ctx, opts.AccountID) {
+		queueName = fmt.Sprintf("%s:%s", queue.KindScheduleBatch, opts.WorkspaceID)
+	}
 	err := b.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
