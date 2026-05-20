@@ -1,4 +1,4 @@
-package base_cqrs
+package manager
 
 import (
 	"context"
@@ -115,10 +115,10 @@ func (w wrapper) FunctionsByTrigger(ctx context.Context, eventName string) ([]in
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Generate matching patterns once for efficient trigger matching
 	matchingPatterns := event_trigger_patterns.GenerateMatchingPatterns(eventName)
-	
+
 	all := []inngest.Function{}
 	for _, fn := range fns {
 		for _, t := range fn.Triggers {
@@ -130,4 +130,3 @@ func (w wrapper) FunctionsByTrigger(ctx context.Context, eventName string) ([]in
 	}
 	return all, nil
 }
-

@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -131,12 +131,12 @@ func TestScheduleRaceCondition(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -297,12 +297,12 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stateRedis, shardedRc, err := createInmemoryRedis(t)
@@ -469,12 +469,12 @@ func TestFinalize(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, accountID, wsID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -720,11 +720,11 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up database and function loader
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -924,11 +924,11 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1108,10 +1108,10 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
-	dbcqrs := base_cqrs.NewCQRS(dbsqlite.New(db))
+	dbcqrs := cqrsmanager.New(dbsqlite.New(db))
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1285,11 +1285,11 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 func TestExecutorScheduleRateLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1486,11 +1486,11 @@ func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context
 func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1675,11 +1675,11 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -1792,11 +1792,11 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(ctx, base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
 	require.NoError(t, err)
 
 	adapter := dbsqlite.New(db)
-	dbcqrs := base_cqrs.NewCQRS(adapter)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)

@@ -989,6 +989,7 @@ func TestQueuePeek(t *testing.T) {
 			ia.EnqueuedAt = items[0].EnqueuedAt
 			require.EqualValues(t, int64(1), items[0].ScavengeCount, "ScavengeCount should be 1 after first scavenge/requeue")
 			ia.ScavengeCount = 1
+			ia.GenerationID = items[0].GenerationID
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 
@@ -1607,7 +1608,7 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	paused = true
 
-	peeked, err := shard.PeekGlobalPartitions(ctx, 100, now.Add(5*time.Minute), true)
+	peeked, err := shard.PartitionPeek(ctx, true, now.Add(5*time.Minute), 100)
 	require.NoError(t, err)
 	require.Len(t, peeked, 0)
 
@@ -1616,7 +1617,7 @@ func TestQueueFunctionPause(t *testing.T) {
 	err = q.UnpauseFunction(ctx, shard.Name(), uuid.Nil, uuid.Nil, idA)
 	require.NoError(t, err)
 
-	peeked, err = shard.PeekGlobalPartitions(ctx, 100, now.Add(5*time.Minute), true)
+	peeked, err = shard.PartitionPeek(ctx, true, now.Add(5*time.Minute), 100)
 	require.NoError(t, err)
 	require.Len(t, peeked, 1)
 	require.Equal(t, idA, *peeked[0].FunctionID)

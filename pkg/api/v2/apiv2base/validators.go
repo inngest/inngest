@@ -335,10 +335,7 @@ func getProtoMessageForPath(path, method string) proto.Message {
 			inputDesc := methodDesc.Input()
 
 			// Create a new instance of the input message
-			inputMsg := createMessageFromDescriptor(inputDesc)
-			if inputMsg != nil {
-				return inputMsg
-			}
+			return createMessageFromDescriptor(inputDesc)
 		}
 	}
 

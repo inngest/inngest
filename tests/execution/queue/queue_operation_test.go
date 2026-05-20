@@ -178,8 +178,12 @@ func TestQueueOperations(t *testing.T) {
 	})
 
 	t.Run("Requeue", func(t *testing.T) {
+		preRequeue, err := shard.LoadQueueItem(ctx, item.ID)
+		require.NoError(t, err)
+		preGenerationID := preRequeue.GenerationID
+
 		requeueAt := clock.Now().Add(20 * time.Second)
-		err := shard.Requeue(ctx, *item, requeueAt)
+		err = shard.Requeue(ctx, *item, requeueAt)
 		require.NoError(t, err)
 
 		item.WallTimeMS = requeueAt.UnixMilli()
@@ -190,6 +194,9 @@ func TestQueueOperations(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Nil(t, loaded.LeaseID)
+		require.Equal(t, preGenerationID+1, loaded.GenerationID,
+			"Requeue must bump GenerationID to invalidate stale in-flight dispatches (EXE-1552)")
+		item.GenerationID = loaded.GenerationID
 		require.Equal(t, *item, *loaded)
 
 		t.Run("should find item in queue when peeking", func(t *testing.T) {

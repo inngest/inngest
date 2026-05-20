@@ -16,7 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
@@ -470,12 +470,12 @@ func newTestDevServer(t *testing.T) *devserver {
 	t.Helper()
 
 	// Create in-memory database
-	db, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{Persist: false, ForTest: true})
+	db, err := dbsqlite.Open(t.Context(), dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
 
 	// Initialize CQRS manager
 	adapter := dbsqlite.New(db)
-	data := base_cqrs.NewCQRS(adapter)
+	data := cqrsmanager.New(adapter)
 
 	ds := &devserver{
 		Data:        data,

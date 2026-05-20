@@ -158,6 +158,7 @@ func (q *queue) traceEnqueueItem(ctx context.Context, l logger.Logger, i *osqueu
 		l.Warn("attempting to enqueue item to non-system partition without account ID", "item", *i)
 	}
 
+
 	var shadowPartition osqueue.QueueShadowPartition
 	enqueueToBacklogs := q.QueueOptions.ItemEnableKeyQueues(ctx, *i)
 	if enqueueToBacklogs {
@@ -281,6 +282,12 @@ func (q *queue) normalizeQueueItem(ctx context.Context, i *osqueue.QueueItem, at
 	}
 	if i.Data.JobID == nil {
 		i.Data.JobID = &i.ID
+	}
+
+	// Start GenerationID at 1 so the very first dispatch carries a non-zero
+	// value to the SDK. The validator treats 0 as "no value sent"
+	if i.GenerationID == 0 {
+		i.GenerationID = 1
 	}
 
 	partitionTime := at
@@ -1211,7 +1218,19 @@ func (q *queue) PartitionLease(
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*osqueue.QueuePartition, error) {
-	return q.partitionPeek(ctx, q.RedisClient.kg.GlobalPartitionIndex(), sequential, until, limit, nil)
+	partitionKey := q.RedisClient.kg.GlobalPartitionIndex()
+
+	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
+	partitions, err := osqueue.DurationWithTags(ctx, q.name, "partition_peek", q.Clock.Now(), func(ctx context.Context) ([]*osqueue.QueuePartition, error) {
+		return q.partitionPeek(ctx, partitionKey, sequential, until, limit, nil)
+	}, map[string]any{
+		"is_global_partition_peek": true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return partitions, nil
 }
 
 func (q *queue) PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error) {

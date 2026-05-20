@@ -16,7 +16,7 @@ import (
 	gqlmodels "github.com/inngest/inngest/pkg/coreapi/graph/models"
 	gqlresolvers "github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
@@ -377,7 +377,7 @@ func TestFunctionRunWithoutFinish(t *testing.T) {
 }
 
 // TestGetFunctionRunFinishesByRunIDsMultiple reproduces a sqlc slice-generation
-// bug on Postgres: the generated query at pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql.go
+// bug on Postgres: the generated query at pkg/db/postgres/sqlc/queries.sql.go
 // contains a literal "WHERE run_id IN ($1)" placeholder instead of the
 // "/*SLICE:run_ids*/?" marker, so the runtime parameter expansion is a no-op
 // and pgx rejects multi-ID calls with "mismatched param and argument count".
@@ -1076,7 +1076,7 @@ func TestEventListFiltering(t *testing.T) {
 func newSQLiteTestAdapter(t *testing.T) (db.Adapter, func()) {
 	t.Helper()
 
-	conn, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{
+	conn, err := dbsqlite.Open(t.Context(), dbsqlite.Options{
 		Persist: false,
 		ForTest: true,
 	})
@@ -1093,7 +1093,7 @@ func newTestManagerAndResolverCtx(t *testing.T) (cqrs.Manager, context.Context, 
 	helperAdapter, ok := adapter.(adapterWithHelpers)
 	require.True(t, ok, "test adapter must expose dialect helpers")
 
-	manager := base_cqrs.NewCQRS(helperAdapter)
+	manager := cqrsmanager.New(helperAdapter)
 	ctx := gqlloader.ToCtx(context.Background(), gqlloader.NewLoaders(gqlloader.LoaderParams{DB: manager}))
 	return manager, ctx, cleanup
 }

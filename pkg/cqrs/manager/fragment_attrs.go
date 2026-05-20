@@ -1,4 +1,4 @@
-package base_cqrs
+package manager
 
 import (
 	"encoding/json"

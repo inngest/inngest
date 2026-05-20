@@ -21,9 +21,11 @@
     "fumadocs-mdx": "^15.0.0",
     "fumadocs-openapi": "10.8.4",
     "fumadocs-ui": "^16.0.0",
+    "lucide-react": "^1.16.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "shiki": "^4.0.0"
+    "shiki": "^4.0.0",
+    "yaml": "^2.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.0",
@@ -35,7 +37,6 @@
     "@vitejs/plugin-react": "6.0.2",
     "tailwindcss": "4.3.0",
     "tsx": "4.22.1",
-    "yaml": "2.9.0",
     "typescript": "5.9.3",
     "vite": "8.0.13",
     "vite-tsconfig-paths": "6.1.1"

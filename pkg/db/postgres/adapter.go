@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 )

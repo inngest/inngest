@@ -1,4 +1,4 @@
-package base_cqrs
+package manager
 
 import (
 	"cmp"
@@ -55,12 +55,17 @@ type adapterWithHelpers interface {
 	Helpers() driverhelp.DialectHelpers
 }
 
-func NewCQRS(adapter adapterWithHelpers) cqrs.Manager {
+func New(adapter dbpkg.Adapter) cqrs.Manager {
+	helperAdapter, ok := adapter.(adapterWithHelpers)
+	if !ok {
+		panic("bug: manager adapter does not implement dialect helpers")
+	}
+
 	// Force goqu to use prepared statements for consistency with sqlc
 	sq.SetDefaultPrepared(true)
 	return wrapper{
-		adapter: adapter,
-		q:       adapter.Q(),
+		adapter: helperAdapter,
+		q:       helperAdapter.Q(),
 		fnCache: &functionsCache{ttl: 60 * time.Second},
 	}
 }
@@ -73,6 +78,11 @@ type wrapper struct {
 	noFnCache   bool  // true for tx wrappers: disables cache read/write in Functions() but allows invalidation
 	fnMutated   *bool // non-nil for tx wrappers: set to true when function mutations occur
 }
+
+var (
+	_ cqrs.Manager   = wrapper{}
+	_ cqrs.TxManager = wrapper{}
+)
 
 func (w wrapper) dialect() string {
 	return w.adapter.Helpers().GoquDialect()
