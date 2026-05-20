@@ -3233,7 +3233,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 			// on successful enqueue, send the span
 			_ = nextStepSpan.Send()
-		
+		}
+
 		// Only run lifecycles if we consumed the pause and enqueued next step.
 		switch pause.GetOpcode() {
 		case enums.OpcodeInvokeFunction:
