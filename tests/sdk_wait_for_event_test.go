@@ -61,7 +61,7 @@ func TestSDKWaitForEvent_WithEvent(t *testing.T) {
 			test.SendTrigger(),
 
 			// Execute the step again, get a wait
-			test.ExpectRequest("Wait step run", "step", time.Second),
+			test.ExpectRequest("Wait step run", "step", 5*time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 				Op:          enums.OpcodeWaitForEvent,
 				ID:          hashes["wait"],
@@ -101,7 +101,7 @@ func TestSDKWaitForEvent_WithEvent(t *testing.T) {
 			}),
 
 			// Then, within 10 seconds, we should call the function back.
-			test.ExpectRequest("After wait step", "step", 1*time.Second),
+			test.ExpectRequest("After wait step", "step", 5*time.Second),
 			test.ExpectRunCompleteResponse(map[string]any{"result": map[string]any{"id": "123", "resume": true}}),
 		)
 

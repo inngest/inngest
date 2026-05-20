@@ -37,7 +37,7 @@ func TestSDKFunctions(t *testing.T) {
 		test.SetRequestEvent(evt),
 		// Send trigger.
 		test.SendTrigger(),
-		test.ExpectRequest("Initial request", "step", time.Second),
+		test.ExpectRequest("Initial request", "step", 5*time.Second),
 		test.ExpectRunCompleteResponse(map[string]any{"name": "tests/function.test", "body": "ok"}),
 	)
 

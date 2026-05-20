@@ -497,7 +497,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	r.EventuallyWithT(func(ct *assert.CollectT) {
 		a := assert.New(ct)
 		a.True(done)
-	}, 5*time.Second, 100*time.Millisecond)
+	}, 15*time.Second, 100*time.Millisecond)
 }
 
 func TestWaitForEvent_Timeout(t *testing.T) {

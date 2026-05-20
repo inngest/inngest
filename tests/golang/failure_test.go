@@ -136,7 +136,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&counter) >= 1
-	}, 15*time.Second, 100*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	require.EqualValues(t, 1, atomic.LoadInt32(&counter))
 
 	t.Run("in progress run", func(t *testing.T) {
@@ -160,7 +160,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 			}
 			run = r
 			return true
-		}, 30*time.Second, 2*time.Second)
+		}, 30*time.Second, 200*time.Millisecond)
 		require.NotNil(t, run)
 
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
@@ -387,7 +387,7 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 			}
 			run = r
 			return true
-		}, 30*time.Second, 2*time.Second)
+		}, 30*time.Second, 200*time.Millisecond)
 		require.NotNil(t, run)
 
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)

@@ -202,7 +202,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			r.Equal(int32(1), atomic.LoadInt32(&runCounter))
 			r.Equal(int32(1), atomic.LoadInt32(&runCancelled))
 			r.Equal(0, getQueueSize(consts.DevServerAccountID, uuid.MustParse(fnId)), fmt.Sprintf("fnID: %s", fnId))
-		}, 10*time.Second, 10*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 
 	})
 

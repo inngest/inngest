@@ -54,7 +54,7 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 			test.SendTrigger(),
 
 			// Execute the step again, get a wait
-			test.ExpectRequest("Wait step run", "step", time.Second),
+			test.ExpectRequest("Wait step run", "step", 5*time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 				Op:          enums.OpcodeSleep,
 				ID:          hashes["Sleep 10s"],

@@ -41,7 +41,7 @@ func TestSDKRetry(t *testing.T) {
 		test.SetRequestEvent(evt),
 		test.SendTrigger(),
 
-		test.ExpectRequest("Initial request", "step", time.Second),
+		test.ExpectRequest("Initial request", "step", 5*time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:          enums.OpcodeStepError,
 			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",

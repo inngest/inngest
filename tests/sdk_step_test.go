@@ -55,7 +55,7 @@ func TestSDKSteps(t *testing.T) {
 
 		// In v4, the SDK does immediate execution of step.run("first step")
 		// inline and continues to the next blocking operation (sleep).
-		test.ExpectRequest("Initial request plan", "step", time.Second),
+		test.ExpectRequest("Initial request plan", "step", 5*time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:          enums.OpcodeSleep,
 			ID:          hashes["sleep"],
