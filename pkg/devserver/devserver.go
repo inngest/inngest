@@ -407,7 +407,19 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create the batch manager. In production, a second BatchClient can be provided
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
+	//
+	// EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_WORKSPACE controls the
+	// schedule-batch routing experiment: when "true", schedule-batch jobs go to
+	// a workspace-scoped system partition; otherwise they share the global
+	// schedule-batch partition.
+	splitBatchPartitionByWorkspace := os.Getenv("EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_WORKSPACE") == "true"
+	batchOpts := []batch.RedisBatchManagerOpt{batch.WithLogger(l)}
+	if splitBatchPartitionByWorkspace {
+		batchOpts = append(batchOpts, batch.WithSplitBatchPartitionByWorkspace(func(_ context.Context, _ uuid.UUID) bool {
+			return true
+		}))
+	}
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batchOpts...)
 	debouncer, err := debounce.NewDebouncer(shardRegistry, queueShard.Name(), rq)
 	if err != nil {
 		return fmt.Errorf("could not create debounce manager: %w", err)
