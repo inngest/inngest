@@ -3158,12 +3158,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			"consumed", consumeResult,
 		)
 
-		if !consumeResult.DidConsume {
-			// We don't need to do anything here.  This could be a dupe;  consuming a pause
-			// is transactional / atomic, so ignore this.
-			return nil
-		}
-
 		status := enums.StepStatusCompleted
 		if r.IsTimeout {
 			status = enums.StepStatusTimedOut
@@ -3226,15 +3220,18 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			if err != nil {
-				if err == queue.ErrQueueItemExists {
-					nextStepSpan.Drop()
-				} else {
-					_ = nextStepSpan.Send()
-					return fmt.Errorf("error enqueueing after pause: %w", err)
-				}
+			// if we did not consume the pause, it implies another handler raced to consume
+			// the pause first. Drop the span and exit and let the other handler write spans.
+			if !consumeResult.DidConsume {
+				nextStepSpan.Drop()
+				return nil
 			}
 
+			if err != nil && err != queue.ErrQueueItemExists {
+				nextStepSpan.Drop()
+				return fmt.Errorf("error enqueueing after pause: %w", err)
+			}
+			// on successful enqueue, send the span
 			_ = nextStepSpan.Send()
 		}
 
