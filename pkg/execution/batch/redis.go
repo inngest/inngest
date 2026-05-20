@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -86,7 +87,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts
 		q:                 q,
 		sizeLimit:         defaultBatchSizeLimit,
 		idempotenceSetTTL: defaultEventIdempotenceSetTTL,
-		log:                                logger.StdlibLogger(context.Background()),
+		log:               logger.StdlibLogger(context.Background()),
 	}
 
 	// add default buffer
@@ -228,8 +229,6 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 
 // RetrieveItems retrieve the data associated with the specified batch.
 func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
-	empty := make([]BatchItem, 0)
-
 	itemStrList, err := retriableScripts["retrieve"].Exec(
 		ctx,
 		b.b.Client(),
@@ -237,16 +236,22 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 		[]string{},
 	).AsStrSlice()
 	if err != nil {
-		return empty, fmt.Errorf("failed to retrieve list of events for batch '%s': %v", batchID, err)
+		return nil, fmt.Errorf("failed to retrieve list of events for batch '%s': %v", batchID, err)
 	}
 
-	items := []BatchItem{}
-	for _, str := range itemStrList {
-		item := &BatchItem{}
-		if err := json.Unmarshal([]byte(str), &item); err != nil {
-			return empty, fmt.Errorf("failed to decode item for batch '%s': %v", batchID, err)
-		}
-		items = append(items, *item)
+	items := make([]BatchItem, len(itemStrList))
+	var eg errgroup.Group
+	eg.SetLimit(20)
+	for i, str := range itemStrList {
+		eg.Go(func() error {
+			if err := json.Unmarshal([]byte(str), &items[i]); err != nil {
+				return fmt.Errorf("failed to decode item for batch '%s': %v", batchID, err)
+			}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
 	return items, nil
