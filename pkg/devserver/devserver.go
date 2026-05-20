@@ -408,14 +408,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
 	//
-	// EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_WORKSPACE controls the
+	// EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION controls the
 	// schedule-batch routing experiment: when "true", schedule-batch jobs go to
-	// a workspace-scoped system partition; otherwise they share the global
+	// a function-scoped system partition; otherwise they share the global
 	// schedule-batch partition.
-	splitBatchPartitionByWorkspace := os.Getenv("EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_WORKSPACE") == "true"
+	splitBatchPartitionByFunction := os.Getenv("EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION") == "true"
 	batchOpts := []batch.RedisBatchManagerOpt{batch.WithLogger(l)}
-	if splitBatchPartitionByWorkspace {
-		batchOpts = append(batchOpts, batch.WithSplitBatchPartitionByWorkspace(func(_ context.Context, _ uuid.UUID) bool {
+	if splitBatchPartitionByFunction {
+		batchOpts = append(batchOpts, batch.WithSplitBatchPartitionByFunction(func(_ context.Context, _ uuid.UUID) bool {
 			return true
 		}))
 	}

@@ -254,7 +254,7 @@ jobs:
           TEST_MODE: true
           TEST_DATABASE: ${{ matrix.database }}
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
-          EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_WORKSPACE: "${{ matrix.splitBatchPartition }}"
+          EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION: "${{ matrix.splitBatchPartition }}"
 
       - name: Convert coverage for tooling
         run: |
