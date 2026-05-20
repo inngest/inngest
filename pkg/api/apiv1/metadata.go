@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -118,10 +120,43 @@ type AddRunMetadataRequest struct {
 }
 
 func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
-	parentSpan, scope, err := a.getParentSpan(ctx, auth, runID, &req.Target)
+	var parentSpan *cqrs.OtelSpan
+	var scope metadata.Scope
+	var err error
+	var attempts int
+	start := time.Now()
+
+	// This retry only exists because of eventual consistency in ClickHouse
+	// data. There's a race condition where the parent span may not be queryable
+	// when the metadata update arrives.
+	//
+	// There's also a related race where a successful retry span isn't queryable
+	// yet, which causes us to mistakenly update metadata on a prior failed
+	// attempt.
+	//
+	// TODO: We should replace this hack with a proper fix. But a proper fix
+	// likely requires changes in our ClickHouse trace schema.
+	_, err = util.WithRetry(
+		ctx,
+		"apiv1.AddRunMetadata.getParentSpan",
+		func(ctx context.Context) (any, error) {
+			attempts++
+			parentSpan, scope, err = a.getParentSpan(ctx, auth, runID, &req.Target)
+			return nil, err
+		},
+		util.NewRetryConf(),
+	)
 	if err != nil {
 		return err
 	}
+	metrics.HistogramMetadataGetParentSpanDuration(
+		ctx,
+		time.Since(start),
+		attempts,
+		metrics.HistogramOpt{
+			PkgName: pkgName,
+		},
+	)
 
 	// Load run metadata to enforce the per-run cumulative size limit against
 	// metadata that already exists in the run, not just this request.
