@@ -3220,18 +3220,20 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			if err != nil {
-				if err == queue.ErrQueueItemExists {
-					nextStepSpan.Drop()
-				} else {
-					_ = nextStepSpan.Send()
-					return fmt.Errorf("error enqueueing after pause: %w", err)
-				}
+			// if we did not consume the pause, it implies another handler raced to consume
+			// the pause first. Drop the span and exit and let the other handler write spans.
+			if !consumeResult.DidConsume {
+				nextStepSpan.Drop()
+				return nil
 			}
 
+			if err != nil && err != queue.ErrQueueItemExists {
+				nextStepSpan.Drop()
+				return fmt.Errorf("error enqueueing after pause: %w", err)
+			}
+			// on successful enqueue, send the span
 			_ = nextStepSpan.Send()
-		}
-
+		
 		// Only run lifecycles if we consumed the pause and enqueued next step.
 		switch pause.GetOpcode() {
 		case enums.OpcodeInvokeFunction:
