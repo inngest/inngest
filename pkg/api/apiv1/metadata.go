@@ -147,6 +147,14 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		util.NewRetryConf(),
 	)
 	if err != nil {
+		logger.StdlibLogger(ctx).ErrorSample(
+			1,
+			"failed to get parent span for metadata",
+			"error", err,
+			"attempts", attempts,
+			"run_id", runID,
+			"target", req.Target,
+		)
 		return err
 	}
 	metrics.HistogramMetadataGetParentSpanDuration(
