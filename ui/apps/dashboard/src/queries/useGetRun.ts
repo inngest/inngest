@@ -96,57 +96,6 @@ const query = graphql(`
           }
         }
         hasAI
-        defers {
-          id
-          userDeferID
-          fnSlug
-          status
-          run {
-            id
-            status
-            function {
-              name
-              slug
-            }
-          }
-        }
-        deferredFrom {
-          parentRunID
-          parentRun {
-            id
-            status
-            function {
-              name
-              slug
-            }
-            defers {
-              id
-              userDeferID
-              fnSlug
-              status
-              run {
-                id
-                status
-                function {
-                  name
-                  slug
-                }
-              }
-            }
-          }
-        }
-        invokedFrom {
-          parentRunID
-          stepName
-          parentRun {
-            id
-            status
-            function {
-              name
-              slug
-            }
-          }
-        }
       }
     }
   }
