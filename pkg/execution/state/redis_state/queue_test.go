@@ -1282,6 +1282,44 @@ func TestQueuePartitionPeek(t *testing.T) {
 		assert.Contains(t, apIds, idB.String())
 		assert.Contains(t, apIds, idC.String())
 	})
+
+	t.Run("Cleans up missing partitions in global queue", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithPartitionPriorityFinder(func(_ context.Context, _ osqueue.QueuePartition) uint {
+				return osqueue.PriorityDefault
+			}),
+		)
+		enqueue(shard, now)
+
+		// Create inconsistency: leave the stale global partition pointer but
+		// drop the backing partition metadata.
+		err = rc.Do(ctx, rc.B().Hdel().Key(shard.Client().kg.PartitionItem()).Field(idA.String()).Build()).Error()
+		require.NoError(t, err)
+
+		items, err := shard.PeekGlobalPartitions(ctx, osqueue.PartitionPeekMax, time.Now().Add(time.Hour), true)
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+		require.EqualValues(t, []*osqueue.QueuePartition{
+			{ID: idB.String(), AccountID: accountId, FunctionID: &idB},
+			{ID: idC.String(), AccountID: accountId, FunctionID: &idC},
+		}, items)
+
+		globalPartitionIDs, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
+		require.NoError(t, err)
+		assert.Equal(t, 2, len(globalPartitionIDs))
+		assert.NotContains(t, globalPartitionIDs, idA.String())
+		assert.Contains(t, globalPartitionIDs, idB.String())
+		assert.Contains(t, globalPartitionIDs, idC.String())
+	})
 }
 
 func TestQueuePartitionRequeue(t *testing.T) {
