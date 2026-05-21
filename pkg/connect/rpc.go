@@ -36,6 +36,7 @@ func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest)
 				"conn_id", req.ConnectionID,
 				"req_id", req.Data.RequestId,
 				"run_id", req.Data.RunId,
+				"phase", handler.phase().String(),
 			)
 			select {
 			case <-handler.stopForwarding:
@@ -46,11 +47,12 @@ func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest)
 				"conn_id", req.ConnectionID,
 				"req_id", req.Data.RequestId,
 				"run_id", req.Data.RunId,
+				"phase", handler.phase().String(),
 			)
 			return &pb.ForwardResponse{Success: false}, nil
 		}
 
-		l.Trace("found ws connection by connectionID")
+		l.Trace("found ws connection by connectionID", "phase", handler.phase().String())
 		msgChan := handler.messageChan
 
 		resultCh := make(chan error, 1)

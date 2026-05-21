@@ -105,7 +105,8 @@ type connectionHandler struct {
 
 	// draining is set to true when a WORKER_PAUSE message is received.
 	// Once set, heartbeats must not reset the connection status to READY.
-	draining atomic.Bool
+	draining  atomic.Bool
+	connPhase atomic.Int32
 
 	// messageChan receives forwarded requests from the router.
 	messageChan chan forwardMessage
@@ -227,6 +228,7 @@ func (c *connectionHandler) logConnStatusLocked(status connectpb.ConnectionStatu
 		"from", from,
 		"to", status.String(),
 		"reason", reason,
+		"phase", c.phase().String(),
 	}
 	logAttrs = append(logAttrs, attrs...)
 
@@ -304,6 +306,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			controlCh:      make(chan *connectpb.ConnectMessage, 10),
 			dataCh:         make(chan *connectpb.ConnectMessage, 50),
 		}
+		ch.markHandshaking("websocket accepted")
 
 		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
 		var closeReasonPtr atomic.Pointer[string]
@@ -319,6 +322,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
+			defer ch.markClosed("connection cleanup complete", "close_reason", *closeReasonPtr.Load())
 			ch.log.Debug("Closing WebSocket connection", "reason", *closeReasonPtr.Load())
 			c.logger.Trace("worker disconnected")
 
@@ -397,7 +401,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// heartbeats from marking it as ready, but do NOT update Redis
 			// yet, the connection stays READY for routing to give the worker
 			// enough time to reconnect to a different gateway.
-			ch.draining.Store(true)
+			ch.beginDrain("gateway drain started", "active_connections", c.connectionCount.Count())
 
 			setCloseReason(connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String())
 
@@ -457,6 +461,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		// regardless of whether it's permanent or temporary
 		defer func() {
 			// Ensure receiveRouterMessagesFromGRPC exits on any disconnect.
+			ch.beginDisconnect("connection cleanup", "close_reason", *closeReasonPtr.Load())
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
 			ch.logConnStatus(connectpb.ConnectionStatus_DISCONNECTED, "connection cleanup", "close_reason", *closeReasonPtr.Load())
 
@@ -582,6 +587,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				err := wsproto.Read(runLoopCtx, ws, &msg)
 				if err != nil {
 					// immediately stop routing messages to this connection
+					ch.beginDisconnect("websocket read loop ended", "err", err)
 					if err := ch.updateConnStatus(connectpb.ConnectionStatus_DISCONNECTING, "websocket read loop ended", "err", err); err != nil {
 						ch.log.ReportError(err, "could not update connection status after read error")
 					}
@@ -781,6 +787,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 				return
 			}
+			ch.markReady("automatic readiness")
 
 			for _, l := range c.lifecycles {
 				go l.OnReady(context.Background(), conn)
@@ -901,6 +908,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				"step_id", data.StepId,
 				"run_id", data.RunId,
 				"transport", "grpc",
+				"phase", c.phase().String(),
 			)
 
 			// Block forwards while draining — wait for the new connection

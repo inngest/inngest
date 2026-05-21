@@ -35,6 +35,7 @@ func (c *connectionHandler) handleWorkerReady() *connecterrors.SocketError {
 	if serr := c.handleConnStatusUpdateResult(err, "failed to update connection status after worker ready"); serr != nil {
 		return serr
 	}
+	c.markReady("worker ready message")
 
 	if c.conn.Data.InstanceId == "" {
 		return &connecterrors.SocketError{
