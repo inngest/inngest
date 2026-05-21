@@ -2484,6 +2484,10 @@ ON CONFLICT (run_id) DO UPDATE SET
                 WHEN trace_runs.has_ai = TRUE THEN TRUE
                 ELSE excluded.has_ai
              END
+WHERE NOT (
+    trace_runs.status IN (50, 300, 400, 500, 600)
+    AND excluded.status NOT IN (50, 300, 400, 500, 600)
+)
 `
 
 type InsertTraceRunParams struct {

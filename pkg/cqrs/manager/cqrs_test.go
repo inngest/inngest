@@ -1552,6 +1552,67 @@ func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
 	})
 }
 
+func TestCQRSInsertTraceRun_PreservesTerminalStateAgainstStaleNonTerminalWrite(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	terminalOutput := []byte(`{"status":"done"}`)
+
+	terminal := &cqrs.TraceRun{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-terminal-" + runID.String(),
+		RunID:       runID.String(),
+		QueuedAt:    now.Add(-2 * time.Minute),
+		StartedAt:   now.Add(-1 * time.Minute),
+		EndedAt:     now,
+		SourceID:    "terminal-source",
+		TriggerIDs:  []string{"evt-terminal"},
+		Output:      terminalOutput,
+		Status:      enums.RunStatusCompleted,
+	}
+
+	stale := &cqrs.TraceRun{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-stale-" + runID.String(),
+		RunID:       runID.String(),
+		QueuedAt:    now.Add(-3 * time.Minute),
+		StartedAt:   now.Add(-2 * time.Minute),
+		SourceID:    "stale-source",
+		TriggerIDs:  []string{"evt-stale"},
+		Status:      enums.RunStatusRunning,
+	}
+
+	require.NoError(t, cm.InsertTraceRun(ctx, terminal))
+	require.NoError(t, cm.InsertTraceRun(ctx, stale))
+
+	got, err := cm.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+	require.NoError(t, err)
+
+	assert.Equal(t, terminal.TraceID, got.TraceID)
+	assert.Equal(t, terminal.QueuedAt.UnixMilli(), got.QueuedAt.UnixMilli())
+	assert.Equal(t, terminal.StartedAt.UnixMilli(), got.StartedAt.UnixMilli())
+	assert.Equal(t, terminal.EndedAt.UnixMilli(), got.EndedAt.UnixMilli())
+	assert.Equal(t, terminal.SourceID, got.SourceID)
+	assert.Equal(t, terminal.TriggerIDs, got.TriggerIDs)
+	assert.Equal(t, terminalOutput, got.Output)
+	assert.Equal(t, enums.RunStatusCompleted, got.Status)
+}
+
 func TestCQRSGetTraceRunsPagination(t *testing.T) {
 	// This test verifies that cursor-based pagination works correctly for the GetSpanRuns
 	ctx := context.Background()

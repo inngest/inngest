@@ -2545,6 +2545,10 @@ DO UPDATE SET
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
              END
+WHERE NOT (
+    trace_runs.status IN (50, 300, 400, 500, 600)
+    AND excluded.status NOT IN (50, 300, 400, 500, 600)
+)
 `
 
 type InsertTraceRunParams struct {
