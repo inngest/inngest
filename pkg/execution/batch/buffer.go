@@ -328,10 +328,7 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	// naturally flow into freshly-created batches after the previous one is filled
 	// and its pointer rotated — without relying on Lua-level overflow handling.
 	for start := 0; start < len(items); start += batchMaxSize {
-		end := start + batchMaxSize
-		if end > len(items) {
-			end = len(items)
-		}
+		end := min(start+batchMaxSize, len(items))
 		chunk := items[start:end]
 		chunkPending := pending[start:end]
 
@@ -355,18 +352,24 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 			continue
 		}
 
+		if bulkResult == nil {
+			continue
+		}
+
 		ab.handleScheduling(bulkResult, fn, chunk[0], mgr)
 
-		metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": bulkResult.Status},
-		})
-		if bulkResult.Committed > 0 {
-			metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
-		}
-		if bulkResult.Duplicates > 0 {
-			metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
-		}
+		go func() {
+			metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"status": bulkResult.Status},
+			})
+			if bulkResult.Committed > 0 {
+				metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
+			}
+			if bulkResult.Duplicates > 0 {
+				metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
+			}
+		}()
 
 		for i, p := range chunkPending {
 			p.pending.result = &BatchAppendResult{
