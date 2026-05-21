@@ -16,6 +16,24 @@ import (
 
 const cmdName = "gotesplit"
 
+type listMode int
+
+const (
+	listModeGotest listMode = iota
+	listModeAST
+)
+
+func parseListMode(s string) (listMode, error) {
+	switch s {
+	case "", "gotest":
+		return listModeGotest, nil
+	case "ast":
+		return listModeAST, nil
+	default:
+		return 0, fmt.Errorf("unknown -list-mode: %q (must be gotest or ast)", s)
+	}
+}
+
 // Run the gotesplit
 func Run(ctx context.Context, argv []string, outStream, errStream io.Writer) error {
 	log.SetOutput(errStream)
@@ -41,6 +59,7 @@ Options:
 	index := fs.Uint("index", 0, "zero-based index number of test splits (CIRCLE_NODE_INDEX is used if set)")
 	junitDir := fs.String("junit-dir", "", "directory to store test result in JUnit format")
 	coverprofileDir := fs.String("coverprofile-dir", ".cover", "temporary directory for collecting coverprofile")
+	listModeStr := fs.String("list-mode", "gotest", "test listing mode: gotest (use 'go test -list') or ast (use static AST analysis)")
 	fs.VisitAll(func(f *flag.Flag) {
 		if f.Name == "index" || f.Name == "total" {
 			if s := os.Getenv("CIRCLE_NODE_" + strings.ToUpper(f.Name)); s != "" {
@@ -51,14 +70,18 @@ Options:
 	if err := fs.Parse(argv); err != nil {
 		return err
 	}
+	mode, err := parseListMode(*listModeStr)
+	if err != nil {
+		return err
+	}
 	argv = fs.Args()
 	if len(argv) > 0 {
-		rnr, ok := dispatch[argv[0]]
+		rnr, ok := dispatch(mode)[argv[0]]
 		if ok {
 			return rnr.run(ctx, argv[1:], outStream, errStream)
 		}
 	}
-	return run(ctx, *total, *index, *junitDir, *coverprofileDir, argv, outStream, errStream)
+	return run(ctx, *total, *index, mode, *junitDir, *coverprofileDir, argv, outStream, errStream)
 }
 
 func getTestListsFromPkgs(pkgs []string, tags string, withRace bool) ([]testList, error) {

@@ -21,7 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func run(_ context.Context, total, idx uint, junitDir string, coverprofilesDir string, argv []string, outStream io.Writer, errStream io.Writer) error {
+func run(_ context.Context, total, idx uint, mode listMode, junitDir string, coverprofilesDir string, argv []string, outStream io.Writer, errStream io.Writer) error {
 	if idx >= total {
 		return fmt.Errorf("`index` should be the range from 0 to `total`-1, but: %d (total:%d)", idx, total)
 	}
@@ -54,7 +54,14 @@ func run(_ context.Context, total, idx uint, junitDir string, coverprofilesDir s
 		}
 	}
 
-	testLists, err := getTestListsFromPkgs(pkgs, detectTags(testOpts), detectRace(testOpts))
+	var testLists []testList
+	var err error
+	switch mode {
+	case listModeAST:
+		testLists, err = getTestListsFromPkgsAST(pkgs, detectTags(testOpts), detectRace(testOpts))
+	default:
+		testLists, err = getTestListsFromPkgs(pkgs, detectTags(testOpts), detectRace(testOpts))
+	}
 	if err != nil {
 		return err
 	}

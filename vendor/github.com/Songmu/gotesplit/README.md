@@ -36,6 +36,23 @@ gotesplit splits the testng in Go into a subset and run it
 go test -v -short -run ^(?:TestAA|TestBB)$
 ```
 
+### -list-mode
+
+`-list-mode` selects how `gotesplit` enumerates test names:
+
+- `gotest` (default): runs `go test -list .`, which compiles each package and executes `TestMain`.
+- `ast`: parses each `_test.go` statically with `go/ast` and `go/doc.Examples`. No compilation, so it tends to be faster on large codebases.
+
+```
+gotesplit -list-mode=ast -total=10 -index=0 ./... -- -short
+```
+
+The flag also applies to the `regexp` subcommand:
+
+```
+gotesplit -list-mode=ast regexp 10 0 ./...
+```
+
 ## Description
 
 The gotesplit splits the testng in Go into a subset and run it.

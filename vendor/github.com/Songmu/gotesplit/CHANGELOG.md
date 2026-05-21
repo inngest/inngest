@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.0](https://github.com/Songmu/gotesplit/compare/v0.4.0...v0.5.0) - 2026-05-21
+- Add -list-mode=ast for AST-based test enumeration by @soh335 in https://github.com/Songmu/gotesplit/pull/34
+- Modernize GitHub Actions workflows and CI configuration by @Songmu in https://github.com/Songmu/gotesplit/pull/36
+
 ## [v0.4.0](https://github.com/Songmu/gotesplit/compare/v0.3.1...v0.4.0) - 2024-09-22
 - docs: add the installation guide with aqua by @suzuki-shunsuke in https://github.com/Songmu/gotesplit/pull/29
 - merge coverprofiles instead of overwriting them by @CubicrootXYZ in https://github.com/Songmu/gotesplit/pull/31

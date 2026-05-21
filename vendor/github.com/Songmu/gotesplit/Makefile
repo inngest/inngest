@@ -5,13 +5,12 @@ u := $(if $(update),-u)
 
 .PHONY: deps
 deps:
-	go get ${u} -d
+	go get ${u}
 	go mod tidy
 
 .PHONY: devel-deps
 devel-deps:
 	go install github.com/Songmu/godzil/cmd/godzil@latest
-	go install github.com/tcnksm/ghr@latest
 
 .PHONY: test
 test:
@@ -39,7 +38,3 @@ crossbuild: CREDITS
 	env CGO_ENABLED=0 godzil crossbuild -pv=v$(VERSION) -build-ldflags=$(BUILD_LDFLAGS) \
       -os=linux,darwin,windows -d=$(DIST_DIR) ./cmd/*
 	cd $(DIST_DIR) && shasum -a 256 $$(find * -type f -maxdepth 0) > SHA256SUMS
-
-.PHONY: upload
-upload:
-	ghr v$(VERSION) $(DIST_DIR)

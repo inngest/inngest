@@ -36,7 +36,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "tailwindcss": "4.3.0",
-    "tsx": "4.22.1",
+    "tsx": "4.22.2",
     "typescript": "5.9.3",
     "vite": "8.0.13",
     "vite-tsconfig-paths": "6.1.1"
@@ -45,5 +45,5 @@
     "node": "24.x",
     "pnpm": "11.x"
   },
-  "packageManager": "pnpm@11.1.2"
+  "packageManager": "pnpm@11.1.3"
 }

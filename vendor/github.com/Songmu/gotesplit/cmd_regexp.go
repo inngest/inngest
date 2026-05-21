@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-type cmdRegexp struct{}
+type cmdRegexp struct {
+	mode listMode
+}
 
 func (c *cmdRegexp) run(ctx context.Context, argv []string, outStream io.Writer, errStream io.Writer) error {
 	// FIXME:
@@ -26,7 +28,7 @@ func (c *cmdRegexp) run(ctx context.Context, argv []string, outStream io.Writer,
 		return fmt.Errorf("invalid index: %s", err)
 	}
 
-	str, err := getOut(pkgs, detectTags(argv), detectRace(argv), total, idx)
+	str, err := getOut(pkgs, detectTags(argv), detectRace(argv), total, idx, c.mode)
 	if err != nil {
 		return err
 	}
@@ -34,14 +36,21 @@ func (c *cmdRegexp) run(ctx context.Context, argv []string, outStream io.Writer,
 	return err
 }
 
-func getOut(pkgs []string, tags string, withRace bool, total, idx int) (string, error) {
+func getOut(pkgs []string, tags string, withRace bool, total, idx int, mode listMode) (string, error) {
 	if total < 1 {
 		return "", fmt.Errorf("invalid total: %d", total)
 	}
 	if idx >= total {
 		return "", fmt.Errorf("index shoud be between 0 to total-1, but: %d (total:%d)", idx, total)
 	}
-	testLists, err := getTestListsFromPkgs(pkgs, tags, withRace)
+	var testLists []testList
+	var err error
+	switch mode {
+	case listModeAST:
+		testLists, err = getTestListsFromPkgsAST(pkgs, tags, withRace)
+	default:
+		testLists, err = getTestListsFromPkgs(pkgs, tags, withRace)
+	}
 	if err != nil {
 		return "", err
 	}

@@ -68,8 +68,8 @@ github.com/RaduBerinde/axisds v0.1.0 h1:YItk/RmU5nvlsv/awo2Fjx97Mfpt4JfgtEVAGPrL
 github.com/RaduBerinde/axisds v0.1.0/go.mod h1:UHGJonU9z4YYGKJxSaC6/TNcLOBptpmM5m2Cksbnw0Y=
 github.com/RaduBerinde/btreemap v0.0.0-20250419174037-3d62b7205d54 h1:bsU8Tzxr/PNz75ayvCnxKZWEYdLMPDkUgticP4a4Bvk=
 github.com/RaduBerinde/btreemap v0.0.0-20250419174037-3d62b7205d54/go.mod h1:0tr7FllbE9gJkHq7CVeeDDFAFKQVy5RnCSSNBOvdqbc=
-github.com/Songmu/gotesplit v0.4.0 h1:RzIGk1/28fPH3zwl7+kgFP9oKaI83K1ewfsaIn01piI=
-github.com/Songmu/gotesplit v0.4.0/go.mod h1:2AXZuGAQkGaik5J2/HwM4jxYrT9ECul8aW437wCK8aQ=
+github.com/Songmu/gotesplit v0.5.0 h1:L+44bsEEjRzab9+Tqe/c81VRa6KGf4wyQrXoJJfP6ZA=
+github.com/Songmu/gotesplit v0.5.0/go.mod h1:hRqR60z/JDsQsKq8j8b/US1+VehjqzVo5jU+z2QomGM=
 github.com/VividCortex/ewma v1.2.0 h1:f58SaIzcDXrSy3kWaHNvuJgJ3Nmz59Zji6XoJR/q1ow=
 github.com/VividCortex/ewma v1.2.0/go.mod h1:nz4BbCtbLyFDeC9SUHbtcT5644juEuWfUAUnGx7j5l4=
 github.com/aclements/go-perfevent v0.0.0-20240301234650-f7843625020f h1:JjxwchlOepwsUWcQwD2mLUAGE9aCp0/ehy6yCHFBOvo=

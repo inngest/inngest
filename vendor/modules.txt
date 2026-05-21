@@ -281,8 +281,8 @@ github.com/RaduBerinde/axisds/regiontree
 # github.com/RaduBerinde/btreemap v0.0.0-20250419174037-3d62b7205d54
 ## explicit; go 1.23
 github.com/RaduBerinde/btreemap
-# github.com/Songmu/gotesplit v0.4.0
-## explicit; go 1.23
+# github.com/Songmu/gotesplit v0.5.0
+## explicit; go 1.25.0
 github.com/Songmu/gotesplit
 github.com/Songmu/gotesplit/cmd/gotesplit
 # github.com/VividCortex/ewma v1.2.0
