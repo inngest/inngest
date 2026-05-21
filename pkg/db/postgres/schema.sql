@@ -14,18 +14,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
---
-
-CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-
---
--- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
-
---
 -- Name: trigger_ids_as_text(bytea); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -501,12 +489,6 @@ CREATE INDEX idx_spans_span_id ON public.spans USING btree (span_id);
 --
 
 CREATE INDEX idx_spans_start_time ON public.spans USING btree (start_time);
-
---
--- Name: idx_trace_runs_trigger_ids_trgm; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_trace_runs_trigger_ids_trgm ON public.trace_runs USING gin (public.trigger_ids_as_text(trigger_ids) public.gin_trgm_ops);
 
 --
 -- Name: idx_traces_timestamp; Type: INDEX; Schema: public; Owner: -

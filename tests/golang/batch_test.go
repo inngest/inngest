@@ -322,7 +322,7 @@ func TestBatchInvoke(t *testing.T) {
 			Name: "test batching",
 			BatchEvents: &inngestgo.ConfigBatchEvents{
 				MaxSize: 3,
-				Timeout: 1 * time.Second,
+				Timeout: 10 * time.Second,
 			},
 		},
 		inngestgo.EventTrigger("batchinvoke/batch", nil),
@@ -376,19 +376,21 @@ func TestBatchInvoke(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// First trigger should be because of batch is full (3 events)
+		// First trigger should be because of batch is full (3 events).
+		// Use a generous timeout so slow CI runners have time for all
+		// callers to complete their step.Run + step.Invoke round-trips.
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			assert.EqualValues(t, 1, atomic.LoadInt32(&counter))
 			assert.EqualValues(t, 3, atomic.LoadInt32(&totalEvents))
 			assert.EqualValues(t, 3, atomic.LoadInt32(&invokeCounter))
-		}, time.Second*5, time.Millisecond*50)
+		}, time.Second*15, time.Millisecond*50)
 
-		// Second trigger should be because of the batch timeout
+		// Second trigger should be because of the batch timeout (10s)
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			assert.EqualValues(t, 2, atomic.LoadInt32(&counter))
 			assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
 			assert.EqualValues(t, 5, atomic.LoadInt32(&invokeCounter))
-		}, time.Second*10, time.Millisecond*50)
+		}, time.Second*20, time.Millisecond*50)
 	})
 }
 

@@ -7,22 +7,17 @@
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_spans_span_id
   ON spans (span_id);
 
--- GetTraceRunsByTriggerId does a full table scan with
--- POSITION(event_id IN convert_from(trigger_ids, 'UTF8')) > 0.
--- 220 calls, 32.3 s total, 147 ms mean in dev pg_stat_statements.
--- Enable pg_trgm and add a GIN index so the rewritten LIKE query can use it.
---
--- convert_from is STABLE (not IMMUTABLE) in Postgres, so we wrap it in a
--- thin IMMUTABLE function. The encoding literal 'UTF8' never changes, making
--- this safe to mark immutable.
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
+-- IMMUTABLE wrapper around convert_from for use in queries (and in a GIN
+-- index once pg_trgm is available). The function itself does not require
+-- any extension.
 CREATE OR REPLACE FUNCTION trigger_ids_as_text(val bytea) RETURNS text
   LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
 AS $$ SELECT convert_from(val, 'UTF8') $$;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_trace_runs_trigger_ids_trgm
-  ON trace_runs USING gin (trigger_ids_as_text(trigger_ids) gin_trgm_ops);
+-- NOTE: The GIN trigram index for GetTraceRunsByTriggerId is NOT created
+-- here because pg_trgm is not allow-listed on Azure Database for
+-- PostgreSQL. A follow-up migration will add the index once pg_trgm is
+-- enabled in the Azure infrastructure configuration.
 
 -- +goose Down
 
