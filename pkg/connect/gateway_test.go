@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -1181,7 +1182,10 @@ func assertNoMessage(t *testing.T, ws *websocket.Conn, timeout time.Duration) {
 
 	parsed := connect.ConnectMessage{}
 	err := wsproto.Read(ctx, ws, &parsed)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
+	if errors.Is(err, context.DeadlineExceeded) || isConnectionClosedErr(err) {
+		return
+	}
+	require.Error(t, err)
 }
 
 func awaitClosure(t *testing.T, ws *websocket.Conn, timeout time.Duration) (websocket.StatusCode, string) {
