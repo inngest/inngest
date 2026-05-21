@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/redis/rueidis"
 )
 
 func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
@@ -197,6 +199,47 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 		AccountID:   id.Tenant.AccountID,
 		WorkspaceID: id.Tenant.EnvID,
 	})
+}
+
+// ClaimFinalization atomically marks a run as finalized and returns true only
+// for the first caller allowed to emit finish effects.
+func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (bool, error) {
+	fnRunState := v.mgr.s.FunctionRunState()
+	v1id := statev1.Identifier{
+		RunID:       md.ID.RunID,
+		WorkflowID:  md.ID.FunctionID,
+		AccountID:   md.ID.Tenant.AccountID,
+		WorkspaceID: md.ID.Tenant.EnvID,
+		AppID:       md.ID.Tenant.AppID,
+		Key:         md.Config.Idempotency,
+	}
+
+	r, isSharded := fnRunState.Client(ctx, v1id.AccountID, v1id.RunID)
+	key := fnRunState.kg.Idempotency(ctx, isSharded, v1id)
+	val := fmt.Sprintf("%s%s", string(consts.FunctionIdempotencyTombstone), v1id.RunID)
+
+	prev, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().
+			Set().
+			Key(key).
+			Value(val).
+			Xx().
+			Get().
+			Keepttl().
+			Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("error claiming finalization: %w", err)
+	}
+
+	if len(prev) > 0 && prev[0] == consts.FunctionIdempotencyTombstone {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {

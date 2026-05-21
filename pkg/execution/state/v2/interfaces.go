@@ -58,6 +58,14 @@ type RunService interface {
 	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
 }
 
+// FinalizationClaimer is an optional extension for state backends that can
+// atomically decide whether a run's finish effects should be emitted.
+type FinalizationClaimer interface {
+	// ClaimFinalization returns true only for the first caller allowed to emit
+	// finish effects for the given run.
+	ClaimFinalization(ctx context.Context, md Metadata) (bool, error)
+}
+
 // MetadataSizeIncrementer is an optional extension to RunService for
 // implementations that support atomic metadata size tracking. Callers should
 // use TryIncrementMetadataSize to safely attempt the operation.

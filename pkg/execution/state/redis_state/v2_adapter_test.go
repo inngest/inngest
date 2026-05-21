@@ -481,6 +481,89 @@ func TestV2Adapter(t *testing.T) {
 	})
 }
 
+func TestV2AdapterClaimFinalization(t *testing.T) {
+	ctx := context.Background()
+
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	defer mr.Close()
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{mr.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+	pauseStore := NewPauseStore(unshardedClient)
+
+	mgr, err := New(
+		ctx,
+		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
+	)
+	require.NoError(t, err)
+
+	v2svc := MustRunServiceV2(mgr)
+	claimer, ok := v2svc.(statev2.FinalizationClaimer)
+	require.True(t, ok)
+
+	functionID := uuid.New()
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	rawEvent, err := json.Marshal(map[string]any{
+		"name": "test.event",
+		"id":   eventID.String(),
+		"data": map[string]any{"ok": true},
+	})
+	require.NoError(t, err)
+
+	md := statev2.Metadata{
+		ID: statev2.ID{
+			RunID:      runID,
+			FunctionID: functionID,
+			Tenant: statev2.Tenant{
+				AccountID: accountID,
+				EnvID:     workspaceID,
+				AppID:     appID,
+			},
+		},
+		Config: *statev2.InitConfig(&statev2.Config{
+			EventIDs:        []ulid.ULID{eventID},
+			Idempotency:     fmt.Sprintf("claim-finalize-%s", runID.String()),
+			FunctionVersion: 1,
+			RequestVersion:  1,
+		}),
+	}
+
+	_, err = v2svc.Create(ctx, statev2.CreateState{
+		Metadata: md,
+		Events:   []json.RawMessage{rawEvent},
+	})
+	require.NoError(t, err)
+
+	claimed, err := claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.True(t, claimed)
+
+	claimed, err = claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.False(t, claimed)
+}
+
 func TestV2AdapterWithDisabledRetries(t *testing.T) {
 	ctx := context.Background()
 
