@@ -43,6 +43,19 @@ func TestConnectionHandlerPhaseHelpers(t *testing.T) {
 	require.Equal(t, gatewayConnPhaseClosed, ch.phase())
 }
 
+func TestConnectionHandlerTransitionDoesNotMovePhaseBackward(t *testing.T) {
+	ch := &connectionHandler{
+		log: logger.StdlibLogger(context.Background(), logger.WithLoggerLevel(logger.LevelEmergency)),
+	}
+
+	ch.markReady("test ready")
+	ch.beginDisconnect("test disconnect")
+
+	ch.transition(gatewayConnPhaseDraining, "stale drain transition")
+
+	require.Equal(t, gatewayConnPhaseDisconnecting, ch.phase())
+}
+
 func TestConnectionHandlerPhaseEligibility(t *testing.T) {
 	ch := &connectionHandler{
 		log: logger.StdlibLogger(context.Background(), logger.WithLoggerLevel(logger.LevelEmergency)),
