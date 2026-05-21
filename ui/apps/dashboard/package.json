@@ -31,7 +31,7 @@
     "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
-    "@clerk/tanstack-react-start": "^0.29.1",
+    "@clerk/tanstack-react-start": "^0.29.11",
     "@graphql-typed-document-node/core": "^3.2.0",
     "@headlessui/react": "^1.7.18",
     "@headlessui/tailwindcss": "^0.1.2",
@@ -49,10 +49,10 @@
     "@tanstack/query-core": "5.90.2",
     "@tanstack/react-query": "^5.66.5",
     "@tanstack/react-query-devtools": "^5.84.2",
-    "@tanstack/react-router": "^1.158.1",
-    "@tanstack/react-router-devtools": "^1.158.1",
-    "@tanstack/react-router-ssr-query": "^1.158.1",
-    "@tanstack/react-start": "^1.158.1",
+    "@tanstack/react-router": "^1.168.26",
+    "@tanstack/react-router-devtools": "^1.167.0",
+    "@tanstack/react-router-ssr-query": "^1.167.0",
+    "@tanstack/react-start": "^1.168.8",
     "@tanstack/react-table": "^8.21.3",
     "@team-plain/typescript-sdk": "^3.0.1",
     "@unpic/react": "^1.0.1",

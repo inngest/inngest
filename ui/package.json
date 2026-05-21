@@ -84,7 +84,7 @@
       "nodemon": ">=3.0.0",
       "nodemon>minimatch": "3.1.2",
       "nodemon>brace-expansion": "1.1.11",
-      "@clerk/shared@<3.47.4": "3.47.4",
+      "@clerk/shared@<3.47.5": "3.47.5",
       "protobufjs@<7.5.5": "7.5.5"
     },
     "onlyBuiltDependencies": [
