@@ -81,6 +81,9 @@ type CheckpointAPIOpts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
+	// The default is to always enforce the limits.
+	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 }
 
 // checkpointAPI is the base implementation.
@@ -102,14 +105,15 @@ type checkpointAPI struct {
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	c := checkpoint.New(checkpoint.Opts{
-		State:             o.State,
-		FnReader:          o.FunctionReader,
-		Executor:          o.Executor,
-		TracerProvider:    o.TracerProvider,
-		Queue:             o.Queue,
-		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
-		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
-		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
+		State:                 o.State,
+		FnReader:              o.FunctionReader,
+		Executor:              o.Executor,
+		TracerProvider:        o.TracerProvider,
+		Queue:                 o.Queue,
+		MetricsProvider:       o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:           o.CheckpointOpts.BackoffFunc,
+		AllowStepMetadata:     o.CheckpointOpts.AllowStepMetadata,
+		EnforceStepSizeLimits: o.CheckpointOpts.EnforceStepSizeLimits,
 	})
 
 	api := checkpointAPI{
