@@ -1,4 +1,4 @@
-// Copyright 2021-2025 The Connect Authors
+// Copyright 2021-2026 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1056,21 +1056,33 @@ func (m *connectUnaryRequestMarshaler) marshalWithGet(message any) *Error {
 }
 
 func (m *connectUnaryRequestMarshaler) buildGetURL(data []byte, compressed bool) *url.URL {
-	url := *m.duplexCall.URL()
-	query := url.Query()
-	query.Set(connectUnaryConnectQueryParameter, connectUnaryConnectQueryValue)
-	query.Set(connectUnaryEncodingQueryParameter, m.codec.Name())
-	if m.stableCodec.IsBinary() || compressed {
-		query.Set(connectUnaryMessageQueryParameter, encodeBinaryQueryValue(data))
-		query.Set(connectUnaryBase64QueryParameter, "1")
-	} else {
-		query.Set(connectUnaryMessageQueryParameter, string(data))
+	var query strings.Builder
+	appendQueryParam(&query, false, connectUnaryConnectQueryParameter, connectUnaryConnectQueryValue)
+	binary := m.stableCodec.IsBinary() || compressed
+	if binary {
+		appendQueryParam(&query, true, connectUnaryBase64QueryParameter, "1")
 	}
 	if compressed {
-		query.Set(connectUnaryCompressionQueryParameter, m.compressionName)
+		appendQueryParam(&query, true, connectUnaryCompressionQueryParameter, url.QueryEscape(m.compressionName))
 	}
-	url.RawQuery = query.Encode()
-	return &url
+	appendQueryParam(&query, true, connectUnaryEncodingQueryParameter, url.QueryEscape(m.codec.Name()))
+	if binary {
+		appendQueryParam(&query, true, connectUnaryMessageQueryParameter, encodeBinaryQueryValue(data))
+	} else {
+		appendQueryParam(&query, true, connectUnaryMessageQueryParameter, url.QueryEscape(string(data)))
+	}
+	target := *m.duplexCall.URL()
+	target.RawQuery = query.String()
+	return &target
+}
+
+func appendQueryParam(query *strings.Builder, withSeparator bool, key, escapedValue string) {
+	if withSeparator {
+		query.WriteByte('&')
+	}
+	query.WriteString(key)
+	query.WriteByte('=')
+	query.WriteString(escapedValue)
 }
 
 func (m *connectUnaryRequestMarshaler) writeWithGet(url *url.URL) {

@@ -43,8 +43,8 @@ cloud.google.com/go/pubsub/internal
 # cloud.google.com/go/pubsub/v2 v2.3.0
 ## explicit; go 1.24.0
 cloud.google.com/go/pubsub/v2/apiv1/pubsubpb
-# connectrpc.com/connect v1.19.2
-## explicit; go 1.24.0
+# connectrpc.com/connect v1.20.0
+## explicit; go 1.25.0
 connectrpc.com/connect
 connectrpc.com/connect/internal/gen/connectext/grpc/status/v1
 # cuelabs.dev/go/oci/ociregistry v0.0.0-20251212221603-3adeb8663819

@@ -6,7 +6,7 @@ replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => gith
 
 require (
 	charm.land/lipgloss/v2 v2.0.3
-	connectrpc.com/connect v1.19.2
+	connectrpc.com/connect v1.20.0
 	cuelang.org/go v0.16.1
 	github.com/99designs/gqlgen v0.17.90
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.1
