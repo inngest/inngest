@@ -721,7 +721,7 @@ func (c checkpointer) processMetadata(
 	}
 
 	for _, spanMd := range metadataEntries {
-		if err := spanMd.Validate(); err != nil {
+		if err := spanMd.ValidateAllowed(); err != nil {
 			l.Warn("invalid metadata in checkpoint step",
 				"error", err,
 				"run_id", md.ID.RunID,
