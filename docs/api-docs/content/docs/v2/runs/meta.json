@@ -1,0 +1,8 @@
+{
+  "title": "Runs",
+  "description": "Inspect function runs",
+  "pages": [
+    "GetFunctionRun",
+    "GetFunctionTrace"
+  ]
+}

@@ -3,7 +3,7 @@ package internal
 import (
 	"context"
 
-	"github.com/inngest/inngestgo/internal/middleware"
+	"github.com/inngest/inngestgo/middleware"
 )
 
 type eventSenderCtxKeyType struct{}

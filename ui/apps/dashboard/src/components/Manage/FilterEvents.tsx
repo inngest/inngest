@@ -37,7 +37,10 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
     if (isDisabled) return;
 
     let filter = newFilter;
-    if (newFilter.events?.length === 0 && newFilter.ips?.length === 0) {
+    if (
+      (newFilter.events?.length ?? 0) === 0 &&
+      (newFilter.ips?.length ?? 0) === 0
+    ) {
       // If there are no event or IPs then we need to switch to a denylist. The
       // backend rejects empty allowlists because that means "reject
       // everything".

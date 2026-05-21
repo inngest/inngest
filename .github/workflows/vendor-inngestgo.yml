@@ -1,0 +1,131 @@
+name: Vendor inngestgo
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+  UPSTREAM_REPOSITORY: inngest/inngestgo
+  VENDOR_BRANCH: automated/vendor-inngestgo
+
+concurrency:
+  group: vendor-inngestgo
+  cancel-in-progress: true
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+
+      - name: Resolve latest inngestgo commit
+        id: upstream
+        run: |
+          latest_sha="$(git ls-remote "https://github.com/${UPSTREAM_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+
+          if [ -z "${latest_sha}" ]; then
+            echo "::error title=Unable to resolve upstream::No commit found for ${UPSTREAM_REPOSITORY}@main."
+            exit 1
+          fi
+
+          echo "sha=${latest_sha}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${latest_sha:0:12}" >> "$GITHUB_OUTPUT"
+
+      - name: Vendor latest inngestgo
+        id: vendor
+        env:
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.sha }}
+        run: |
+          before_version="$(go list -m -f '{{ .Version }}' github.com/inngest/inngestgo)"
+
+          go get "github.com/inngest/inngestgo@${UPSTREAM_SHA}"
+          make vendor
+
+          after_version="$(go list -m -f '{{ .Version }}' github.com/inngest/inngestgo)"
+
+          echo "before_version=${before_version}" >> "$GITHUB_OUTPUT"
+          echo "after_version=${after_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "inngestgo is already vendored at the latest upstream commit."
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git status --short
+
+      - name: Commit changes
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          UPSTREAM_SHORT_SHA: ${{ steps.upstream.outputs.short_sha }}
+        run: |
+          git checkout -B "${VENDOR_BRANCH}"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add go.mod go.sum vendor
+          git commit -m "chore(deps): vendor inngestgo ${UPSTREAM_SHORT_SHA}"
+          git push --force-with-lease origin "${VENDOR_BRANCH}"
+
+      - name: Open or update PR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          AFTER_VERSION: ${{ steps.vendor.outputs.after_version }}
+          BEFORE_VERSION: ${{ steps.vendor.outputs.before_version }}
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.sha }}
+          UPSTREAM_SHORT_SHA: ${{ steps.upstream.outputs.short_sha }}
+        run: |
+          cat > /tmp/vendor-inngestgo-pr-body.md <<EOF
+          ## Description
+
+          Vendors \`github.com/inngest/inngestgo\` at [\`${UPSTREAM_SHORT_SHA}\`](https://github.com/${UPSTREAM_REPOSITORY}/commit/${UPSTREAM_SHA}).
+
+          Module version: \`${BEFORE_VERSION}\` -> \`${AFTER_VERSION}\`
+
+          ## Release note
+
+          None
+
+          ## Migration note
+
+          None
+          EOF
+
+          pr_number="$(gh pr list \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head "${VENDOR_BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          title="chore(deps): vendor inngestgo ${UPSTREAM_SHORT_SHA}"
+
+          if [ -n "${pr_number}" ]; then
+            gh pr edit "${pr_number}" \
+              --title "${title}" \
+              --body-file /tmp/vendor-inngestgo-pr-body.md
+          else
+            gh pr create \
+              --base "${{ github.event.repository.default_branch }}" \
+              --head "${VENDOR_BRANCH}" \
+              --title "${title}" \
+              --body-file /tmp/vendor-inngestgo-pr-body.md
+          fi

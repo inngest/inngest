@@ -368,8 +368,10 @@ func TestSemaphoreManager(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("set and get capacity", func(t *testing.T) {
-		err := sm.SetCapacity(ctx, accountID, name, "set-1", 10)
+		res, err := sm.SetCapacity(ctx, accountID, name, "set-1", 10)
 		require.NoError(t, err)
+		require.True(t, res.Applied)
+		require.Equal(t, int64(10), res.Capacity)
 
 		cap, usage, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
@@ -378,11 +380,15 @@ func TestSemaphoreManager(t *testing.T) {
 	})
 
 	t.Run("set capacity idempotency", func(t *testing.T) {
-		err := sm.SetCapacity(ctx, accountID, name, "set-idem", 20)
+		res, err := sm.SetCapacity(ctx, accountID, name, "set-idem", 20)
 		require.NoError(t, err)
-		// Same idempotency key — should not change
-		err = sm.SetCapacity(ctx, accountID, name, "set-idem", 99)
+		require.True(t, res.Applied)
+		require.Equal(t, int64(20), res.Capacity)
+		// Same idempotency key — should not change, and Applied should be false
+		res, err = sm.SetCapacity(ctx, accountID, name, "set-idem", 99)
 		require.NoError(t, err)
+		require.False(t, res.Applied, "replay should not be applied")
+		require.Equal(t, int64(20), res.Capacity, "replay returns the cached capacity")
 
 		cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
@@ -391,11 +397,13 @@ func TestSemaphoreManager(t *testing.T) {
 
 	t.Run("adjust capacity", func(t *testing.T) {
 		name := fmt.Sprintf("app:%s", uuid.New())
-		err := sm.SetCapacity(ctx, accountID, name, "adj-set", 5)
+		_, err := sm.SetCapacity(ctx, accountID, name, "adj-set", 5)
 		require.NoError(t, err)
 
-		err = sm.AdjustCapacity(ctx, accountID, name, "adj-1", 3)
+		res, err := sm.AdjustCapacity(ctx, accountID, name, "adj-1", 3)
 		require.NoError(t, err)
+		require.True(t, res.Applied)
+		require.Equal(t, int64(8), res.Capacity)
 
 		cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
@@ -404,14 +412,18 @@ func TestSemaphoreManager(t *testing.T) {
 
 	t.Run("adjust capacity idempotency", func(t *testing.T) {
 		name := fmt.Sprintf("app:%s", uuid.New())
-		err := sm.SetCapacity(ctx, accountID, name, "adj-idem-set", 5)
+		_, err := sm.SetCapacity(ctx, accountID, name, "adj-idem-set", 5)
 		require.NoError(t, err)
 
-		err = sm.AdjustCapacity(ctx, accountID, name, "adj-idem-1", 3)
+		res, err := sm.AdjustCapacity(ctx, accountID, name, "adj-idem-1", 3)
 		require.NoError(t, err)
-		// Same idempotency key — should not double-add
-		err = sm.AdjustCapacity(ctx, accountID, name, "adj-idem-1", 3)
+		require.True(t, res.Applied)
+		require.Equal(t, int64(8), res.Capacity)
+		// Same idempotency key — should not double-add, and Applied should be false
+		res, err = sm.AdjustCapacity(ctx, accountID, name, "adj-idem-1", 3)
 		require.NoError(t, err)
+		require.False(t, res.Applied, "replay should not be applied")
+		require.Equal(t, int64(8), res.Capacity, "replay returns the cached capacity")
 
 		cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
 		require.NoError(t, err)
@@ -657,12 +669,14 @@ func TestSemaphoreAdjustCapacityClampsToZero(t *testing.T) {
 	name := "app:" + uuid.New().String()
 
 	// Set capacity to 5
-	err = sm.SetCapacity(ctx, accountID, name, "set-1", 5)
+	_, err = sm.SetCapacity(ctx, accountID, name, "set-1", 5)
 	require.NoError(t, err)
 
 	// Adjust by -10, should clamp to 0
-	err = sm.AdjustCapacity(ctx, accountID, name, "adj-1", -10)
+	res, err := sm.AdjustCapacity(ctx, accountID, name, "adj-1", -10)
 	require.NoError(t, err)
+	require.True(t, res.Applied)
+	require.Equal(t, int64(0), res.Capacity, "clamped capacity should be reported in the result")
 
 	cap, _, err := sm.GetCapacity(ctx, accountID, name, "")
 	require.NoError(t, err)

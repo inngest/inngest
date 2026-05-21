@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/db"
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
@@ -31,9 +30,9 @@ func newTestAdapter(t *testing.T) (db.Adapter, func()) {
 		pc, err := testutil.StartPostgres(t)
 		require.NoError(t, err)
 
-		conn, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{
-			PostgresURI: pc.URI,
-			ForTest:     true,
+		conn, err := dbpostgres.Open(t.Context(), dbpostgres.Options{
+			URI:     pc.URI,
+			ForTest: true,
 		})
 		require.NoError(t, err)
 
@@ -44,7 +43,7 @@ func newTestAdapter(t *testing.T) (db.Adapter, func()) {
 		}
 	}
 
-	conn, err := base_cqrs.New(t.Context(), base_cqrs.BaseCQRSOptions{
+	conn, err := dbsqlite.Open(t.Context(), dbsqlite.Options{
 		Persist: false,
 		ForTest: true,
 	})

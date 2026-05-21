@@ -12,6 +12,8 @@ const (
 	HeaderKeyEventIDSeed        = "x-inngest-event-id-seed"
 	HeaderKeyExpectedServerKind = "X-Inngest-Expected-Server-Kind"
 	HeaderKeyNoRetry            = "X-Inngest-No-Retry"
+	HeaderKeyRequestID          = "x-request-id"
+	HeaderKeyJobID              = "x-inngest-job-id"
 	HeaderKeyReqVersion         = "x-inngest-req-version"
 	HeaderKeyRetryAfter         = "Retry-After"
 	HeaderKeySDK                = "X-Inngest-SDK"

@@ -9,10 +9,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -450,6 +454,50 @@ func TestCheckpointSyncSteps(t *testing.T) {
 		mocks.queue.AssertExpectations(t)
 		mocks.executor.AssertExpectations(t)
 	})
+
+	t.Run("step output too large", func(t *testing.T) {
+		// A single step whose output exceeds MaxStepOutputSize causes
+		// CheckpointSyncSteps to return ErrStepOutputTooLarge without
+		// attempting to save state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		// A JSON string of MaxStepOutputSize 'x' characters: when wrapped in
+		// {"data": ...} the total output exceeds the 4 MiB per-step limit.
+		largeData := json.RawMessage(`"` + strings.Repeat("x", consts.MaxStepOutputSize) + `"`)
+		op := state.GeneratorOpcode{
+			ID:   "big-step",
+			Op:   enums.OpcodeStepRun,
+			Data: largeData,
+			Name: "Big Step",
+		}
+
+		_, testData := setupSyncCheckpointTest(t, op)
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStepOutputTooLarge)
+	})
+
+	t.Run("cumulative state overflow", func(t *testing.T) {
+		// When accumulated state already equals the 32 MiB limit, any
+		// additional step output causes CheckpointSyncSteps to return
+		// ErrStateOverflowed before saving state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`"small"`),
+			Name: "Step 1",
+		}
+
+		_, testData := setupSyncCheckpointTest(t, op)
+		testData.syncCheckpoint.Metadata.Metrics.StateSize = consts.DefaultMaxStateSizeLimit
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStateOverflowed)
+	})
 }
 
 func TestSyncStepMetadata(t *testing.T) {
@@ -841,6 +889,139 @@ func TestSyncStepMetadata(t *testing.T) {
 	})
 }
 
+// TestCheckpointSyncSteps_RunComplete asserts that an OpcodeRunComplete op:
+//   - is forwarded to Executor.Finalize with the correct StatusCode/Headers/Body;
+//   - fires Executor.RunFunctionFinishedLifecycle with the same StatusCode so the
+//     legacy OTel pipeline emits a terminal status
+func TestCheckpointSyncSteps_RunComplete(t *testing.T) {
+	cases := []struct {
+		name       string
+		statusCode int
+		wantErr    string
+	}{
+		{name: "success", statusCode: 200, wantErr: ""},
+		{name: "server error", statusCode: 500, wantErr: "invalid status code: 500"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			require := require.New(t)
+
+			body := `{"hello":"world"}`
+			headers := map[string]string{"content-type": "application/json"}
+
+			wire, err := json.Marshal(apiresult.APIResult{
+				StatusCode: tc.statusCode,
+				Headers:    headers,
+				Body:       body,
+			})
+			require.NoError(err)
+
+			ops := []state.GeneratorOpcode{{
+				ID:   "run-complete-1",
+				Op:   enums.OpcodeRunComplete,
+				Data: wire,
+			}}
+
+			mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+			// matchAPIResult validates the StatusCode/Headers/Body that the
+			// checkpoint path forwards into Finalize and the lifecycle. This
+			// is the assertion the original bug needed: without it, a
+			// zero-valued APIResult passes silently.
+			matchAPIResult := func(want apiresult.APIResult) func(apiresult.APIResult) bool {
+				return func(got apiresult.APIResult) bool {
+					return got.StatusCode == want.StatusCode &&
+						got.Body == want.Body &&
+						got.Headers["content-type"] == want.Headers["content-type"]
+				}
+			}
+			expected := apiresult.APIResult{
+				StatusCode: tc.statusCode,
+				Headers:    headers,
+				Body:       body,
+			}
+
+			mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
+				return opts.Response.Type == execution.FinalizeResponseAPI &&
+					matchAPIResult(expected)(opts.Response.APIResponse)
+			})).Return(nil).Once()
+
+			mocks.executor.On(
+				"RunFunctionFinishedLifecycle",
+				ctx,
+				testData.metadata,
+				mock.AnythingOfType("queue.Item"),
+				mock.AnythingOfType("[]json.RawMessage"),
+				mock.MatchedBy(func(resp state.DriverResponse) bool {
+					if resp.StatusCode != tc.statusCode {
+						return false
+					}
+					out, ok := resp.Output.(string)
+					if !ok || out != body {
+						return false
+					}
+					if tc.wantErr == "" {
+						return resp.Err == nil
+					}
+					return resp.Err != nil && *resp.Err == tc.wantErr
+				}),
+			).Once()
+
+			// OnFnFinished is dispatched in a goroutine; signal via a channel
+			fnFinished := make(chan struct{}, 1)
+			mocks.metrics.On(
+				"OnFnFinished",
+				mock.Anything,
+				mock.AnythingOfType("checkpoint.MetricCardinality"),
+				enums.RunStatusCompleted,
+			).Run(func(args mock.Arguments) {
+				fnFinished <- struct{}{}
+			}).Once()
+
+			err = testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+			require.NoError(err)
+
+			select {
+			case <-fnFinished:
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for OnFnFinished")
+			}
+
+			mocks.executor.AssertExpectations(t)
+			mocks.metrics.AssertExpectations(t)
+		})
+	}
+}
+
+// On a duplicate save, the OnStepFinished metric must be suppressed —
+// otherwise the same step gets counted twice (once by whichever path
+// originally persisted it, once by this checkpoint).
+func TestCheckpointSyncSteps_DuplicateSaveSuppressesStepFinishedMetric(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result": "step 1 output"}`),
+		Name: "Step 1",
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, op)
+
+	expectedData := map[string]any{"data": json.RawMessage(op.Data)}
+	expectedOutputBytes, _ := json.Marshal(expectedData)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedOutputBytes).
+		Return(false, state.ErrDuplicateResponse)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	mocks.metrics.AssertNotCalled(t, "OnStepFinished")
+}
+
 //
 //
 // Testing utils.
@@ -948,6 +1129,24 @@ func (m *mockExecutor) HandleGenerator(ctx context.Context, runCtx execution.Run
 func (m *mockExecutor) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
 	args := m.Called(ctx, opts)
 	return args.Error(0)
+}
+
+func (m *mockExecutor) RunFunctionFinishedLifecycle(
+	ctx context.Context,
+	md state.Metadata,
+	item queue.Item,
+	evts []json.RawMessage,
+	resp state.DriverResponse,
+) {
+	// Only record if a test has registered an expectation; otherwise no-op.
+	// This keeps existing tests (which don't exercise OpcodeRunComplete) from
+	// having to declare the call.
+	for _, c := range m.ExpectedCalls {
+		if c.Method == "RunFunctionFinishedLifecycle" {
+			m.Called(ctx, md, item, evts, resp)
+			return
+		}
+	}
 }
 
 // mockFnReader mocks the function reader interface

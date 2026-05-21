@@ -7,7 +7,7 @@ on:
 
 jobs:
   check-release-type:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04
     outputs:
       prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
@@ -16,8 +16,9 @@ jobs:
         run: |
           prerelease=$(echo ${{ github.ref_name }} | awk -F '-' '{print $2}' | awk -F '.' '{print $1}')
           echo "prerelease=$prerelease" >> $GITHUB_OUTPUT
+
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04-4
     needs: [check-release-type]
     steps:
       - name: Login to Docker Hub
@@ -47,15 +48,71 @@ jobs:
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
+      - name: Collect PR release notes
+        if: needs.check-release-type.outputs.prerelease == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous_tag="$(git tag --list 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${GITHUB_REF_NAME}$" | head -n1 || true)"
+
+          if [ -n "${previous_tag}" ]; then
+            release_range="${previous_tag}..${GITHUB_REF_NAME}"
+          else
+            release_range="${GITHUB_REF_NAME}"
+          fi
+
+          scripts/release/collect-pr-notes \
+            --range "${release_range}" \
+            --repo "${{ github.repository }}" \
+            --output /tmp/release-pr-notes.json
+      - name: Build release notes
+        if: needs.check-release-type.outputs.prerelease == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --state merged \
+            --search "${GITHUB_REF_NAME} type:pr in:title" \
+            --json number,title,mergeCommit \
+            --jq "map(select(.title == \"chore(release): ${GITHUB_REF_NAME}\" and .mergeCommit.oid == \"${GITHUB_SHA}\")) | .[0].number // empty")"
+
+          release_pr_body_arg=()
+          if [ -n "${pr_number}" ]; then
+            gh pr view "${pr_number}" \
+              --repo "${{ github.repository }}" \
+              --json body \
+              --jq '.body // ""' > /tmp/release-pr-body.md
+            release_pr_body_arg=(--release-pr-body /tmp/release-pr-body.md)
+          else
+            echo "No merged release PR found for ${GITHUB_REF_NAME} at ${GITHUB_SHA}; building release notes without manual release PR blocks."
+          fi
+
+          scripts/release/build-release-notes \
+            --notes /tmp/release-pr-notes.json \
+            --changelog CHANGELOG.md \
+            --tag "${GITHUB_REF_NAME}" \
+            "${release_pr_body_arg[@]}" \
+            --output /tmp/RELEASE_NOTES.md
+      - name: Build prerelease notes
+        if: needs.check-release-type.outputs.prerelease != ''
+        run: |
+          {
+            echo "## Prerelease"
+            echo
+            echo "This prerelease was built from \`${GITHUB_REF_NAME}\`."
+            echo
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
+          } > /tmp/RELEASE_NOTES.md
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: "~> 2"
-          args: release --clean --verbose
+          version: "~> v2"
+          args: release --clean --verbose --release-notes=/tmp/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   npm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [goreleaser, check-release-type]
     permissions:
       contents: read
@@ -85,13 +142,13 @@ jobs:
           npm version ${{ github.ref_name }}
 
           if [ -z "${{ needs.check-release-type.outputs.prerelease }}" ]; then
-            npm publish --access public
+            npm publish --access public --provenance
           else
-            npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public
+            npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public --provenance
           fi
 
   linear-release:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04
     permissions:
       contents: read
     # We block on goreleaser to not track any failed releases
@@ -101,9 +158,11 @@ jobs:
         with:
           fetch-depth: 0 # required for commit history
 
-      - uses: linear/linear-release-action@v0
+      - uses: linear/linear-release-action@0917777589db006387af296dde440385f88d6ac4 # v0
         if: needs.check-release-type.outputs.prerelease == ''
+        continue-on-error: true
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY_INNGEST }}
-          version: ${{ github.ref_name }}
+          # version: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           command: complete

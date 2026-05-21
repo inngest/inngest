@@ -493,5 +493,19 @@
         ]
       }
     }
+  },
+  "/runs/{runId}": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /runs/{runId} 200"
+      }
+    }
+  },
+  "/runs/{runId}/trace": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /runs/{runId}/trace 200"
+      }
+    }
   }
 }

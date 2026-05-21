@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/inngest/inngest/cmd/debug/debugflags"
 	debugpkg "github.com/inngest/inngest/pkg/debug"
 	dbgpb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"github.com/urfave/cli/v3"
@@ -16,6 +17,10 @@ func DeleteByIDCommand() *cli.Command {
 		Aliases:   []string{"rmid"},
 		Usage:     "Delete debounces directly by their IDs",
 		ArgsUsage: "<debounce-id> [debounce-id...]",
+		Flags: append(
+			debugflags.AccountEnvFlags(),
+			debugflags.FunctionFlag(),
+		),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.NArg() == 0 {
 				return fmt.Errorf("at least one debounce ID is required")
@@ -26,6 +31,16 @@ func DeleteByIDCommand() *cli.Command {
 				ids[i] = cmd.Args().Get(i)
 			}
 
+			accountID, envID, err := debugflags.AccountEnv(cmd)
+			if err != nil {
+				return err
+			}
+
+			functionID, err := debugflags.RequiredUUID(cmd, "function-id")
+			if err != nil {
+				return err
+			}
+
 			debugCtx, ok := ctx.Value(debugpkg.CtxKey).(*debugpkg.Context)
 			if !ok {
 				return fmt.Errorf("debug context not found")
@@ -33,6 +48,9 @@ func DeleteByIDCommand() *cli.Command {
 
 			req := &dbgpb.DeleteDebounceByIDRequest{
 				DebounceIds: ids,
+				AccountId:   accountID,
+				EnvId:       envID,
+				FunctionId:  functionID,
 			}
 
 			resp, err := debugCtx.Client.DeleteDebounceByID(ctx, req)

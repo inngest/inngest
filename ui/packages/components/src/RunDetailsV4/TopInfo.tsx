@@ -15,6 +15,7 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import { ScoresAttrs, collectScoreMetadata } from '../RunDetails/ScoresAttrs';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -25,7 +26,7 @@ import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
-import type { Trace } from './types';
+import { isScoreMetadata, type Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
@@ -113,6 +114,9 @@ export const TopInfo = ({
   });
 
   const metadataIsEnabled = true;
+  const scoreMetadata = useMemo(() => collectScoreMetadata(trace), [trace]);
+  const nonScoreMetadata = trace?.metadata?.filter((md) => !isScoreMetadata(md)) ?? [];
+  const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   const prettyPayload = useMemo(() => {
     try {
@@ -282,7 +286,9 @@ export const TopInfo = ({
       {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
       <div className="flex-1">
         <Tabs
-          defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
+          defaultActive={
+            result?.error ? 'error' : prettyPayload ? 'input' : prettyOutput ? 'output' : ''
+          }
           tabs={[
             ...(prettyPayload
               ? [
@@ -327,12 +333,21 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(metadataIsEnabled && trace?.metadata?.length
+            ...(scoreMetadata.length
+              ? [
+                  {
+                    label: 'Scores',
+                    id: 'scores',
+                    node: <ScoresAttrs metadata={scoreMetadata} />,
+                  },
+                ]
+              : []),
+            ...(hasMetadataTab
               ? [
                   {
                     label: 'Metadata',
                     id: 'metadata',
-                    node: <MetadataAttrs metadata={trace.metadata} />,
+                    node: <MetadataAttrs metadata={nonScoreMetadata} />,
                   },
                 ]
               : []),

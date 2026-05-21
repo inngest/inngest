@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/oklog/ulid/v2"
 )
@@ -94,6 +94,27 @@ func (sq *sqliteQuerier) UpsertApp(ctx context.Context, arg db.UpsertAppParams) 
 		SdkVersion: arg.SdkVersion, Framework: arg.Framework, Metadata: arg.Metadata,
 		Status: arg.Status, Error: arg.Error, Checksum: arg.Checksum,
 		Url: arg.Url, Method: arg.Method, AppVersion: arg.AppVersion,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return appFromSQLite(r), nil
+}
+
+func (sq *sqliteQuerier) UpsertAppByName(ctx context.Context, arg db.UpsertAppParams) (*db.App, error) {
+	r, err := sq.q.UpsertAppByName(ctx, sqlc.UpsertAppByNameParams{
+		ID:          arg.ID,
+		Name:        arg.Name,
+		SdkLanguage: arg.SdkLanguage,
+		SdkVersion:  arg.SdkVersion,
+		Framework:   arg.Framework,
+		Metadata:    arg.Metadata,
+		Status:      arg.Status,
+		Error:       arg.Error,
+		Checksum:    arg.Checksum,
+		Url:         arg.Url,
+		Method:      arg.Method,
+		AppVersion:  arg.AppVersion,
 	})
 	if err != nil {
 		return nil, err

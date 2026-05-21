@@ -5,15 +5,15 @@ import (
 	"strings"
 )
 
-// normalizedSpan accessor methods on SpanRow for use in base_cqrs span processing.
+// normalizedSpan accessor methods on SpanRow for use in manager span processing.
 
 func (r *SpanRow) GetTraceID() string               { return r.TraceID }
-func (r *SpanRow) GetRunID() string                  { return r.RunID }
-func (r *SpanRow) GetDynamicSpanID() sql.NullString  { return r.DynamicSpanID }
-func (r *SpanRow) GetParentSpanID() sql.NullString   { return r.ParentSpanID }
-func (r *SpanRow) GetStartTime() interface{}         { return r.StartTime }
-func (r *SpanRow) GetEndTime() interface{}           { return r.EndTime }
-func (r *SpanRow) GetSpanFragments() any             { return r.SpanFragments }
+func (r *SpanRow) GetRunID() string                 { return r.RunID }
+func (r *SpanRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }
+func (r *SpanRow) GetParentSpanID() sql.NullString  { return r.ParentSpanID }
+func (r *SpanRow) GetStartTime() interface{}        { return r.StartTime }
+func (r *SpanRow) GetEndTime() interface{}          { return r.EndTime }
+func (r *SpanRow) GetSpanFragments() any            { return r.SpanFragments }
 
 // EventIDs parses the comma-separated trigger IDs from a TraceRun.
 func (tr *TraceRun) EventIDs() []string {

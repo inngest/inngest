@@ -1,8 +1,5 @@
 {
   "openapi": "3.1.0",
-  "x-stoplight": {
-    "id": "l4npshyzgv77t"
-  },
   "info": {
     "title": "API v1",
     "version": "1.0",
@@ -26,22 +23,9 @@
       "description": "Dev Server"
     }
   ],
-  "tags": [
+  "security": [
     {
-      "name": "Events"
-    },
-    {
-      "name": "Function runs",
-      "x-displayName": "Function runs"
-    },
-    {
-      "name": "Signals"
-    },
-    {
-      "name": "Cancellations"
-    },
-    {
-      "name": "Webhooks"
+      "your-signing-key": []
     }
   ],
   "paths": {
@@ -2877,9 +2861,25 @@
       }
     }
   },
-  "security": [
+  "tags": [
     {
-      "your-signing-key": []
+      "name": "Events"
+    },
+    {
+      "name": "Function runs",
+      "x-displayName": "Function runs"
+    },
+    {
+      "name": "Signals"
+    },
+    {
+      "name": "Cancellations"
+    },
+    {
+      "name": "Webhooks"
     }
-  ]
+  ],
+  "x-stoplight": {
+    "id": "l4npshyzgv77t"
+  }
 }

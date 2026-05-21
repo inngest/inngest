@@ -132,6 +132,7 @@ func NewPauseClient(r rueidis.Client, stateDefaultKey string) *PauseClient {
 
 type QueueClient struct {
 	kg          QueueKeyGenerator
+	debounceKg  DebounceKeyGenerator
 	unshardedRc rueidis.Client
 }
 
@@ -144,10 +145,19 @@ func (q *QueueClient) Client() rueidis.Client {
 }
 
 func NewQueueClient(r rueidis.Client, queueDefaultKey string) *QueueClient {
+	itemKg := queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}
 	return &QueueClient{
-		kg:          queueKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: queueItemKeyGenerator{queueDefaultKey: queueDefaultKey}},
+		kg:          queueKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: itemKg},
+		debounceKg:  debounceKeyGenerator{queueDefaultKey: queueDefaultKey, queueItemKeyGenerator: itemKg},
 		unshardedRc: r,
 	}
+}
+
+// DebounceKeyGenerator returns a key generator for debounce state co-located
+// with this queue client's keyspace. Debounce keys share the queue's hash
+// slot so debounce state lives on the same shard as its timeout queue item.
+func (q *QueueClient) DebounceKeyGenerator() DebounceKeyGenerator {
+	return q.debounceKg
 }
 
 type DebounceClient struct {

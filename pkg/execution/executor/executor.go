@@ -548,6 +548,18 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
 }
 
+func (e *executor) RunFunctionFinishedLifecycle(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	evts []json.RawMessage,
+	resp state.DriverResponse,
+) {
+	for _, l := range e.lifecycles {
+		go l.OnFunctionFinished(context.WithoutCancel(ctx), md, item, evts, resp)
+	}
+}
+
 func (e *executor) CloseLifecycleListeners(ctx context.Context) {
 	var eg errgroup.Group
 
@@ -1176,7 +1188,11 @@ func (e *executor) schedule(
 			// the lock becomes available to any competing run. If a faster run acquires it before
 			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
 			// behaving as if the singleton mode were set to skip.
-			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton, req.AccountID)
+			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, queue.Scope{
+				AccountID:  req.AccountID,
+				EnvID:      req.WorkspaceID,
+				FunctionID: req.Function.ID,
+			}, singletonKey, *req.Function.Singleton)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1447,6 +1463,10 @@ func (e *executor) schedule(
 		}
 	}
 
+	// If this run was triggered by an invoke, write the invoked run's ID back
+	// onto the invoking function's invoke span so the in-progress trace shows it.
+	e.updateInvokeSpanWithInvokedRunID(ctx, l, req.Events, metadata.ID.RunID)
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -1487,6 +1507,61 @@ func (e *executor) schedule(
 	}
 
 	return &metadata.ID.RunID, &metadata, nil
+}
+
+func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logger.Logger, events []event.TrackedEvent, invokedRunID ulid.ULID) {
+	// We should only have one Invoke event at most, but this technically handles a batch of invoke events
+	if len(events) == 0 || events[0].GetEvent().Name != consts.FnInvokeName {
+		return
+	}
+	for _, trackedEvent := range events {
+		invocationEvtID := trackedEvent.GetInternalID()
+		raw, ok := trackedEvent.GetEvent().Data[consts.InngestEventDataPrefix]
+		if !ok {
+			l.Debug("invocation event missing inngest metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		invocationMeta := event.InngestMetadata{}
+		if err := invocationMeta.Decode(raw); err != nil {
+			l.Debug("failed to decode invocation metadata; skipping invoke span update", "invocation_evt_id", invocationEvtID, "error", err)
+			continue
+		}
+		if invocationMeta.InvokeSpanRef == nil {
+			l.Debug("invocation event missing invoke span ref; skipping invoke span update", "invocation_evt_id", invocationEvtID)
+			continue
+		}
+		sourceRunID := invocationMeta.RunID()
+		if sourceRunID == nil {
+			l.Debug("invocation event has unparseable correlation id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "correlation_id", invocationMeta.InvokeCorrelationId)
+			continue
+		}
+		sourceFnID, err := uuid.Parse(invocationMeta.SourceFnID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source fn id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_fn_id", invocationMeta.SourceFnID, "error", err)
+			continue
+		}
+		sourceAppID, err := uuid.Parse(invocationMeta.SourceAppID)
+		if err != nil {
+			l.Debug("invocation event has unparseable source app id; skipping invoke span update", "invocation_evt_id", invocationEvtID, "source_app_id", invocationMeta.SourceAppID, "error", err)
+			continue
+		}
+		sourceAccountID := trackedEvent.GetAccountID()
+		sourceEnvID := trackedEvent.GetWorkspaceID()
+		if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.Schedule.invokeRunID"},
+			TargetSpan: invocationMeta.InvokeSpanRef,
+			Attributes: meta.NewAttrSet(
+				meta.Attr(meta.Attrs.StepInvokeRunID, &invokedRunID),
+				meta.Attr(meta.Attrs.RunID, sourceRunID),
+				meta.Attr(meta.Attrs.AccountID, &sourceAccountID),
+				meta.Attr(meta.Attrs.EnvID, &sourceEnvID),
+				meta.Attr(meta.Attrs.FunctionID, &sourceFnID),
+				meta.Attr(meta.Attrs.AppID, &sourceAppID),
+			),
+		}); err != nil {
+			l.Debug("error updating invoke span with invoked runID", "error", err)
+		}
+	}
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
@@ -1860,13 +1935,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			l := l.With("step_metadata", true)
 			for _, opcode := range resp.Generator {
 				for _, md := range opcode.Metadata {
-					if err := md.Validate(); err != nil {
-						l.Warn("invalid metadata in driver response", "error", err)
-						continue
-					}
-
-					if err := md.Kind().ValidateAllowed(); err != nil {
-						l.Warn("disallowed metadata kind in driver response", "error", err, "kind", md.Kind())
+					// SDK metadata is untrusted; validate before creating spans.
+					if err := md.ValidateAllowed(); err != nil {
+						l.Warn("invalid metadata in driver response", "error", err, "kind", md.Kind())
 						continue
 					}
 
@@ -2810,6 +2881,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
+		if r.ForceLifecycleHook {
+			l.Warn(
+				"cancel: metadata not found while force lifecycle hook was requested",
+				"error", err,
+				"cancellation_id", r.CancellationID,
+			)
+		}
 		return nil
 	}
 	if err != nil {
@@ -2825,7 +2903,17 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if errors.Is(err, state.ErrEventNotFound) {
 		// If the event has gone, another thread cancelled the function.
-		l.Warn("cancel: events not found but metadata exists, skipping finalize")
+		l.Warn(
+			"cancel: events not found but metadata exists",
+			"force_lifecycle_hook", r.ForceLifecycleHook,
+			"cancellation_id", r.CancellationID,
+		)
+		if r.ForceLifecycleHook {
+			for _, e := range e.lifecycles {
+				// Emit cancellation lifecycles so history and traces can mark this run cancelled even though event payloads are gone.
+				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
+			}
+		}
 		return nil
 	}
 	if err != nil {
@@ -3066,12 +3154,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			"consumed", consumeResult,
 		)
 
-		if !consumeResult.DidConsume {
-			// We don't need to do anything here.  This could be a dupe;  consuming a pause
-			// is transactional / atomic, so ignore this.
-			return nil
-		}
-
 		status := enums.StepStatusCompleted
 		if r.IsTimeout {
 			status = enums.StepStatusTimedOut
@@ -3134,15 +3216,18 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			if err != nil {
-				if err == queue.ErrQueueItemExists {
-					nextStepSpan.Drop()
-				} else {
-					_ = nextStepSpan.Send()
-					return fmt.Errorf("error enqueueing after pause: %w", err)
-				}
+			// if we did not consume the pause, it implies another handler raced to consume
+			// the pause first. Drop the span and exit and let the other handler write spans.
+			if !consumeResult.DidConsume {
+				nextStepSpan.Drop()
+				return nil
 			}
 
+			if err != nil && err != queue.ErrQueueItemExists {
+				nextStepSpan.Drop()
+				return fmt.Errorf("error enqueueing after pause: %w", err)
+			}
+			// on successful enqueue, send the span
 			_ = nextStepSpan.Send()
 		}
 
@@ -3647,9 +3732,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-		// This is fine.
-		// XXX: we should totally attach a warning to the function run here.
-		return nil
+		// A prior attempt can persist output then fail before enqueueing discovery.
+		// Keep going so pending steps still enqueue; duplicate work is bounded.
+		e.log.Warn("step output already persisted; keeping existing output", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
+		err = nil
 	}
 	if err != nil {
 		return err
@@ -4928,6 +5014,13 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	if span != nil {
 		_ = span.Send()
+	}
+
+	// Attach the v2 invoke span ref to the invocation event so the invoked
+	// function's Schedule can call UpdateSpan to write its runID onto this
+	// invoke span while the invoke is still in progress.
+	if span != nil && span.Ref != nil {
+		evt.Event.SetInvokeSpanRef(span.Ref)
 	}
 
 	// Send the event.

@@ -780,29 +780,28 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
-# github.com/inngest/expr v0.0.0-20260504155224-a6e988c15b55
+# github.com/inngest/expr v0.0.0-20260516032105-f2cf85864a0e
 ## explicit; go 1.24
 github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 ## explicit; go 1.23.2
 github.com/inngest/go-httpstat
-# github.com/inngest/inngestgo v0.15.2-0.20260508201256-daaf24a3ed44
+# github.com/inngest/inngestgo v0.15.2-0.20260520031312-b99bf75e7302
 ## explicit; go 1.25.9
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/connect
 github.com/inngest/inngestgo/errors
-github.com/inngest/inngestgo/experimental
 github.com/inngest/inngestgo/group
 github.com/inngest/inngestgo/internal
 github.com/inngest/inngestgo/internal/checkpoint
 github.com/inngest/inngestgo/internal/event
 github.com/inngest/inngestgo/internal/fn
 github.com/inngest/inngestgo/internal/logger
-github.com/inngest/inngestgo/internal/middleware
 github.com/inngest/inngestgo/internal/opcode
 github.com/inngest/inngestgo/internal/sdkrequest
 github.com/inngest/inngestgo/internal/types
 github.com/inngest/inngestgo/internal/util
+github.com/inngest/inngestgo/middleware
 github.com/inngest/inngestgo/pkg/checkpoint
 github.com/inngest/inngestgo/pkg/env
 github.com/inngest/inngestgo/pkg/httputil

@@ -554,26 +554,6 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 	return atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), nil
 }
 
-func (q *queue) ItemByID(ctx context.Context, jobID string) (*osqueue.QueueItem, error) {
-	rc := q.RedisClient.Client()
-	kg := q.RedisClient.kg
-
-	cmd := rc.B().Hget().Key(kg.QueueItem()).Field(jobID).Build()
-	byt, err := rc.Do(ctx, cmd).AsBytes()
-	if err != nil {
-		if rueidis.IsRedisNil(err) {
-			return nil, osqueue.ErrQueueItemNotFound
-		}
-	}
-
-	var item osqueue.QueueItem
-	if err := json.Unmarshal(byt, &item); err != nil {
-		return nil, fmt.Errorf("error unmarshalling queue item: %w", err)
-	}
-
-	return &item, nil
-}
-
 func (q *queue) ItemExists(ctx context.Context, jobID string) (bool, error) {
 	rc := q.RedisClient.Client()
 	kg := q.RedisClient.kg

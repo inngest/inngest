@@ -22,7 +22,7 @@ func valueToStringImpl(value any, jsonFallback bool, indent int) string {
 	// Check for nil interfaces and pointers before type switching
 	rv := reflect.ValueOf(value)
 	switch rv.Kind() {
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface, reflect.Pointer:
 		if rv.IsNil() {
 			return nilString
 		}

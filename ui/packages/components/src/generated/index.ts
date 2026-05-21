@@ -4,6 +4,10 @@ type error = string;
 
 // Span metadata kind types (derived from generated constants)
 export type SpanMetadataKindUserland = `userland.${string}`;
+// Score kinds embed the user-supplied score name in the suffix
+// (e.g. `inngest.score.accuracy`). The KindInngestScore constant is
+// the base prefix, not a complete kind.
+export type SpanMetadataKindInngestScore = `${typeof KindInngestScore}.${string}`;
 export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestHTTP
@@ -12,11 +16,16 @@ export type SpanMetadataKind =
   | typeof KindInngestTiming
   | typeof KindInngestExperiment
   | typeof KindInngestWarnings
+  | SpanMetadataKindInngestScore
   | SpanMetadataKindUserland;
 
 //////////
 // source: types_gen.go
 
+/**
+ * From score.go
+ */
+export const KindInngestScore = 'inngest.score';
 /**
  * From warning.go
  */

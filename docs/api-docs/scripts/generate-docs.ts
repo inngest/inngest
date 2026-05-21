@@ -106,6 +106,33 @@ function cleanSpec(doc: OpenAPIDocument): OpenAPIDocument {
 }
 
 /**
+ * Order the top-level keys of an OpenAPI document deterministically so that
+ * regenerated specs produce stable diffs. Listed keys appear first in this
+ * order; anything else falls through sorted alphabetically.
+ */
+const TOP_LEVEL_KEY_ORDER = [
+  'openapi',
+  'swagger',
+  'info',
+  'servers',
+  'security',
+  'paths',
+  'components',
+] as const;
+
+function sortTopLevelKeys<T extends Record<string, unknown>>(doc: T): T {
+  const out: Record<string, unknown> = {};
+  for (const key of TOP_LEVEL_KEY_ORDER) {
+    if (key in doc) out[key] = doc[key];
+  }
+  const known = new Set<string>(TOP_LEVEL_KEY_ORDER);
+  for (const key of Object.keys(doc).filter((k) => !known.has(k)).sort()) {
+    out[key] = doc[key];
+  }
+  return out as T;
+}
+
+/**
  * fumadocs-openapi's `groupBy: 'tag'` looks up each operation's tag in the
  * top-level `tags` array. If a referenced tag isn't declared there,
  * `builder.fromTagName(tag)` returns undefined and generation crashes with an
@@ -157,11 +184,15 @@ async function main() {
   assertTagsDeclared(v2Doc, 'v2 spec');
 
   // Write filtered specs to public/ so the API playground sees the same view as the docs.
+  // sortTopLevelKeys keeps the on-disk output ordered (openapi → info → servers
+  // → security → paths → components → …) for stable diffs across regenerations.
+  const v1Sorted = sortTopLevelKeys(v1Doc);
+  const v2Sorted = sortTopLevelKeys(v2Doc);
   const publicSpecsDir = join(appRoot, 'public/api-specs');
   mkdirSync(publicSpecsDir, { recursive: true });
-  writeFileSync(join(publicSpecsDir, 'v1.yaml'), stringifyYaml(v1Doc));
-  writeFileSync(join(publicSpecsDir, 'v1.json'), JSON.stringify(v1Doc, null, 2));
-  writeFileSync(join(publicSpecsDir, 'v2.json'), JSON.stringify(v2Doc, null, 2));
+  writeFileSync(join(publicSpecsDir, 'v1.yaml'), stringifyYaml(v1Sorted));
+  writeFileSync(join(publicSpecsDir, 'v1.json'), JSON.stringify(v1Sorted, null, 2));
+  writeFileSync(join(publicSpecsDir, 'v2.json'), JSON.stringify(v2Sorted, null, 2));
   console.log('Wrote public/api-specs/');
 
   // Separate instances so generation stays isolated per version.

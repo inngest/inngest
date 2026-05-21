@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/inngest/inngest/cmd/devserver"
@@ -11,9 +12,21 @@ import (
 	"github.com/inngest/inngest/pkg/api/tel"
 	inncli "github.com/inngest/inngest/pkg/cli"
 	inngestversion "github.com/inngest/inngest/pkg/inngest/version"
+	"github.com/inngest/inngest/pkg/update"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v3"
 )
+
+func init() {
+	// Wrap urfave/cli's default help printer so help output is followed by an
+	// update notice (when applicable). Covers `inngest help`, bare `inngest`,
+	// and `inngest <subcmd> --help`.
+	defaultHelp := cli.HelpPrinter
+	cli.HelpPrinter = func(w io.Writer, templ string, data interface{}) {
+		defaultHelp(w, templ, data)
+		update.Notify(os.Stderr, inngestversion.Version)
+	}
+}
 
 // globalFlags are the flags that should be available on all commands
 var globalFlags = []cli.Flag{
@@ -64,6 +77,12 @@ func execute() {
 			m := tel.NewMetadata(ctx)
 			m.SetCliContext(cmd)
 			tel.SendMetadata(ctx, m)
+
+			// Best-effort background refresh of the cached "latest version"
+			// record. Dedup'd by the cache TTL, so cheap on every invocation.
+			// Check honors the same opt-out gates as Notify.
+			go update.Check(context.Background(), inngestversion.Version)
+
 			return ctx, nil
 		},
 		After: func(ctx context.Context, cmd *cli.Command) error {

@@ -15,6 +15,8 @@ import (
 var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
+	ErrScoreNameInvalid        = errors.New("score name contains invalid characters")
+	ErrScoreValueInvalid       = errors.New("score value must be a finite number or boolean")
 )
 
 type Opcode = enums.MetadataOpcode
@@ -137,9 +139,38 @@ func (m Update) Serialize() (Values, error) {
 	return m.RawUpdate.Values, nil
 }
 
-func (m Update) Validate() error {
+func (m Update) validate() error {
 	if err := m.RawUpdate.Kind.Validate(); err != nil {
 		return fmt.Errorf("invalid kind: %w", err)
+	}
+
+	return nil
+}
+
+// ValidateAllowed checks generic shape, reserved kind allowlists, and reserved
+// value formats.
+func (m Update) ValidateAllowed() error {
+	if err := m.validate(); err != nil {
+		return err
+	}
+
+	if err := m.Kind().ValidateAllowed(); err != nil {
+		return err
+	}
+
+	if m.Kind().IsScoped(KindInngestScore) {
+		return validateNamedScoreValue(m.Kind(), m.RawUpdate.Values)
+	}
+
+	return nil
+}
+
+// ValidateUpdatesAllowed applies reserved-kind rules to each update.
+func ValidateUpdatesAllowed(updates []Update) error {
+	for _, update := range updates {
+		if err := update.ValidateAllowed(); err != nil {
+			return err
+		}
 	}
 
 	return nil

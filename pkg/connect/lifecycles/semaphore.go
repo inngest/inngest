@@ -64,10 +64,11 @@ func (s *semaphoreLifecycles) OnSynced(ctx context.Context, conn *state.Connecti
 		}
 
 		semID := constraintapi.SemaphoreIDApp(*group.AppID)
-		idempotencyKey := fmt.Sprintf("connect-%s", conn.ConnectionId)
+		idempotencyKey := fmt.Sprintf("connect-%s-%s", conn.ConnectionId, semID)
 
 		_, err := util.WithRetry(ctx, "adjust-semaphore-capacity-connect", func(ctx context.Context) (struct{}, error) {
-			return struct{}{}, s.sm.AdjustCapacity(ctx, conn.AccountID, semID, idempotencyKey, maxConcurrency)
+			_, err := s.sm.AdjustCapacity(ctx, conn.AccountID, semID, idempotencyKey, maxConcurrency)
+			return struct{}{}, err
 		}, util.NewRetryConf())
 		if err != nil {
 			l.Error("failed to adjust semaphore capacity on worker sync after retries",
@@ -101,10 +102,11 @@ func (s *semaphoreLifecycles) OnDisconnected(ctx context.Context, conn *state.Co
 
 		semID := constraintapi.SemaphoreIDApp(*group.AppID)
 		// Different idempotency key from connect so both operations can execute
-		idempotencyKey := fmt.Sprintf("disconnect-%s", conn.ConnectionId)
+		idempotencyKey := fmt.Sprintf("disconnect-%s-%s", conn.ConnectionId, semID)
 
 		_, err := util.WithRetry(ctx, "adjust-semaphore-capacity-disconnect", func(ctx context.Context) (struct{}, error) {
-			return struct{}{}, s.sm.AdjustCapacity(ctx, conn.AccountID, semID, idempotencyKey, -maxConcurrency)
+			_, err := s.sm.AdjustCapacity(ctx, conn.AccountID, semID, idempotencyKey, -maxConcurrency)
+			return struct{}{}, err
 		}, util.NewRetryConf())
 		if err != nil {
 			l.Error("failed to adjust semaphore capacity on worker disconnect after retries",

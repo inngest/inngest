@@ -226,7 +226,7 @@ func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uu
 
 // ScanGlobalPartitions scans the partiton of partitions across all fns.
 func (q *queueProcessor) ScanGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64) error {
-	partitions, err := q.Shard().PeekGlobalPartitions(ctx, peekLimit, peekUntil, q.isSequential())
+	partitions, err := q.Shard().PartitionPeek(ctx, q.isSequential(), peekUntil, peekLimit)
 	if err != nil {
 		return fmt.Errorf("could not peek global partitions: %w", err)
 	}

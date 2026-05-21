@@ -41,9 +41,9 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/inngest/expr v0.0.0-20260504155224-a6e988c15b55
+	github.com/inngest/expr v0.0.0-20260516032105-f2cf85864a0e
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
-	github.com/inngest/inngestgo v0.15.2-0.20260508201256-daaf24a3ed44
+	github.com/inngest/inngestgo v0.15.2-0.20260520031312-b99bf75e7302
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.5.0

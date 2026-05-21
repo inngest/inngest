@@ -1,8 +1,10 @@
 package main
 
 import (
+	"github.com/inngest/inngest/cmd/apiv2cli"
 	"github.com/inngest/inngest/cmd/conformance"
 	"github.com/inngest/inngest/cmd/debug"
+	"github.com/inngest/inngest/cmd/doctor"
 	"github.com/urfave/cli/v3"
 )
 
@@ -12,8 +14,10 @@ func alpha() *cli.Command {
 		Hidden: true,
 		Usage:  "experimental CLI commands",
 		Commands: []*cli.Command{
+			apiv2cli.Command(),
 			conformance.Command(),
 			debug.Command(),
+			doctor.Command(),
 		},
 	}
 }

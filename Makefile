@@ -67,7 +67,7 @@ schema-dump: ## Dump SQLite and Postgres schema files from migrations
 
 .PHONY: snapshot
 snapshot: ## Build release snapshot
-	goreleaser release --snapshot --skip publish --clean
+	goreleaser release --snapshot --skip=publish --clean
 
 .PHONY: build-ui
 build-ui: ## Build dev server UI
@@ -101,7 +101,7 @@ gql: ## Generate GraphQL code
 .PHONY: tygo
 tygo: ## Generate TypeScript types from Go structs
 	go run github.com/gzuidhof/tygo@latest generate
-	cd ui && pnpx prettier@2.8.8 --write --no-config --single-quote "packages/components/src/generated/**/*.ts"
+	cd ui && pnpx prettier@2.8.8 --write --no-config --single-quote --print-width 100 "packages/components/src/generated/**/*.ts"
 
 .PHONY: constraintapi-snapshots
 constraintapi-snapshots: ## Regenerate constraint API Lua snapshots
