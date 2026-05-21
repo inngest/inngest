@@ -85,6 +85,8 @@
       "nodemon>minimatch": "3.1.2",
       "nodemon>brace-expansion": "1.1.11",
       "@clerk/shared@<3.47.5": "3.47.5",
+      "next@<15.5.18": "15.5.18",
+      "postcss@<8.5.10": "8.5.10",
       "protobufjs@<7.5.5": "7.5.5"
     },
     "onlyBuiltDependencies": [
