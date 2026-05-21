@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -111,10 +113,59 @@ type AddRunMetadataRequest struct {
 }
 
 func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
-	parentSpan, scope, err := a.getParentSpan(ctx, auth, runID, &req.Target)
+	var parentSpan *cqrs.OtelSpan
+	var scope metadata.Scope
+	var err error
+	var attempts int
+	start := time.Now()
+
+	// This retry only exists because of eventual consistency in ClickHouse
+	// data. There's a race condition where the parent span may not be queryable
+	// when the metadata update arrives.
+	//
+	// There's also a related race where a successful retry span isn't queryable
+	// yet, which causes us to mistakenly update metadata on a prior failed
+	// attempt.
+	//
+	// The retry config is sized so that the cumulative backoff covers roughly
+	// one minute, which gives the Kafka→ClickHouse pipeline time to land the
+	// span.
+	//
+	// TODO: We should replace this hack with a proper fix. But a proper fix
+	// likely requires changes in our ClickHouse trace schema.
+	_, err = util.WithRetry(
+		ctx,
+		"apiv1.AddRunMetadata.getParentSpan",
+		func(ctx context.Context) (any, error) {
+			attempts++
+			parentSpan, scope, err = a.getParentSpan(ctx, auth, runID, &req.Target)
+			return nil, err
+		},
+		// 2s → 4s → 8s → 15s → 15s → 15s
+		util.NewRetryConf(
+			util.WithRetryConfMaxAttempts(7),
+			util.WithRetryConfInitialBackoff(2*time.Second),
+			util.WithRetryConfMaxBackoff(15*time.Second),
+		),
+	)
 	if err != nil {
+		logger.StdlibLogger(ctx).Error(
+			"failed to get parent span for metadata",
+			"error", err,
+			"attempts", attempts,
+			"run_id", runID,
+			"target", req.Target,
+		)
 		return err
 	}
+	metrics.HistogramMetadataGetParentSpanDuration(
+		ctx,
+		time.Since(start),
+		attempts,
+		metrics.HistogramOpt{
+			PkgName: pkgName,
+		},
+	)
 
 	if err := metadata.ValidateUpdatesAllowed(req.Metadata); err != nil {
 		return publicerr.Wrap(err, 400, "Invalid metadata")
@@ -242,6 +293,9 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 	// TODO: specific err cases
 	case err != nil:
 		return nil, 0, publicerr.Wrap(err, 404, "Unable to find metadata target")
+	case span == nil:
+		// Cloud's GetRunSpanByRunID implementation can return `(nil, nil)`
+		return nil, 0, publicerr.Errorf(404, "Unable to find metadata target")
 	}
 
 	return span, scope, nil
