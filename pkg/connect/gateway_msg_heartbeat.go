@@ -14,7 +14,10 @@ import (
 )
 
 func (c *connectionHandler) handleWorkerHeartbeat() *connecterrors.SocketError {
-	status := connectpb.ConnectionStatus_READY
+	status := connectpb.ConnectionStatus_CONNECTED
+	if c.phase() == gatewayConnPhaseReady {
+		status = connectpb.ConnectionStatus_READY
+	}
 	if c.svc.isDraining.Load() || c.phase() == gatewayConnPhaseDraining {
 		status = connectpb.ConnectionStatus_DRAINING
 
