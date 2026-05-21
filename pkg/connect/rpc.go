@@ -26,29 +26,33 @@ func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest)
 	if val, ok := c.wsConnections.Load(req.ConnectionID); ok {
 		handler := val.(*connectionHandler)
 
-		if handler.draining.Load() {
+		if !handler.canForward() {
 			// Block until DRAINING is written to Redis, so the proxy
 			// re-route finds the new connection as READY.
 
 			accID, _ := uuid.Parse(req.Data.AccountId)
 
-			l.Optional(accID, "connect").Debug("forward blocked, connection draining",
+			l.Optional(accID, "connect").Debug("forward rejected, connection not ready",
 				"conn_id", req.ConnectionID,
 				"req_id", req.Data.RequestId,
 				"run_id", req.Data.RunId,
 				"phase", handler.phase().String(),
 			)
-			select {
-			case <-handler.stopForwarding:
-			case <-ctx.Done():
-				return nil, ctx.Err()
+
+			if handler.phase() == gatewayConnPhaseDraining {
+				select {
+				case <-handler.stopForwarding:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+				l.Optional(accID, "connect").Debug("forward released after drain complete",
+					"conn_id", req.ConnectionID,
+					"req_id", req.Data.RequestId,
+					"run_id", req.Data.RunId,
+					"phase", handler.phase().String(),
+				)
 			}
-			l.Optional(accID, "connect").Debug("forward released after drain complete",
-				"conn_id", req.ConnectionID,
-				"req_id", req.Data.RequestId,
-				"run_id", req.Data.RunId,
-				"phase", handler.phase().String(),
-			)
+
 			return &pb.ForwardResponse{Success: false}, nil
 		}
 

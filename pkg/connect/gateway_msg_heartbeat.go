@@ -15,17 +15,17 @@ import (
 
 func (c *connectionHandler) handleWorkerHeartbeat() *connecterrors.SocketError {
 	status := connectpb.ConnectionStatus_READY
-	if c.svc.isDraining.Load() || c.draining.Load() {
+	if c.svc.isDraining.Load() || c.phase() == gatewayConnPhaseDraining {
 		status = connectpb.ConnectionStatus_DRAINING
 
 		c.log.Warn("worker heartbeat received during draining sequence",
-			"conn_draining", c.draining.Load(),
+			"phase", c.phase().String(),
 			"svc_draining", c.svc.isDraining.Load(),
 		)
 	}
 
 	err := c.updateConnStatus(status, "worker heartbeat",
-		"conn_draining", c.draining.Load(),
+		"phase", c.phase().String(),
 		"svc_draining", c.svc.isDraining.Load(),
 	)
 	if serr := c.handleConnStatusUpdateResult(err, "failed to update connection status after heartbeat"); serr != nil {
@@ -55,6 +55,12 @@ func (c *connectionHandler) handleWorkerHeartbeat() *connecterrors.SocketError {
 		go l.OnHeartbeat(context.Background(), c.conn)
 	}
 
+	c.setLastHeartbeat(time.Now())
+	if !c.canWrite(connectpb.GatewayMessageType_GATEWAY_HEARTBEAT) {
+		c.log.Trace("worker heartbeat response skipped", "status", status.String(), "phase", c.phase().String())
+		return nil
+	}
+
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
 	defer writeCancel()
 	if err := wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
@@ -64,7 +70,6 @@ func (c *connectionHandler) handleWorkerHeartbeat() *connecterrors.SocketError {
 		return nil
 	}
 
-	c.setLastHeartbeat(time.Now())
 	c.log.Trace("worker heartbeat processed", "status", status.String())
 
 	return nil

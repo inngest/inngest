@@ -28,9 +28,7 @@ func (c *connectionHandler) handleWorkerRequestAck(msg *connectpb.ConnectMessage
 		}
 	}
 
-	if ackCh, ok := c.pendingAcks.LoadAndDelete(data.RequestId); ok {
-		close(ackCh.(chan struct{}))
-	} else {
+	if !c.completePendingAck(data.RequestId, nil) {
 		c.log.Warn(
 			"worker request ack received for unknown request ID",
 			"conn_id", c.conn.ConnectionId.String(),

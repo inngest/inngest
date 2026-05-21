@@ -20,14 +20,14 @@ func (c *connectionHandler) handleWorkerReady() *connecterrors.SocketError {
 			"account_id", c.conn.AccountID.String(),
 			"gateway_id", c.conn.GatewayId.String(),
 			"connection_id", c.conn.ConnectionId.String(),
-			"conn_draining", c.draining.Load(),
+			"phase", c.phase().String(),
 		)
 
 		return &ErrDraining
 	}
 
-	if c.draining.Load() {
-		c.log.Warn("ignoring worker ready as connection is marked as draining")
+	if !c.canForward() && c.phase() != gatewayConnPhaseHandshaking {
+		c.log.Warn("ignoring worker ready as connection is not routable", "phase", c.phase().String())
 		return nil
 	}
 

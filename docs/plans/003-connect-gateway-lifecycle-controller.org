@@ -512,31 +512,31 @@ Purpose: make routing and websocket writes consult connection phase.
 
 *** Implementation checklist
 
-- [ ] Add =canForward= and =canWrite= helpers.
-- [ ] Require =Ready= before accepting a new =Forward= into =messageChan=.
-- [ ] Require =Ready= before writing =GATEWAY_EXECUTOR_REQUEST=.
-- [ ] Allow =WORKER_REPLY_ACK= only for a message already read by the run loop,
+- [X] Add =canForward= and =canWrite= helpers.
+- [X] Require =Ready= before accepting a new =Forward= into =messageChan=.
+- [X] Require =Ready= before writing =GATEWAY_EXECUTOR_REQUEST=.
+- [X] Allow =WORKER_REPLY_ACK= only for a message already read by the run loop,
   and keep write failure non-fatal after persistence.
-- [ ] Allow heartbeat responses only when not draining/disconnecting.
-- [ ] Replace direct =draining.Load()= checks where a phase check is clearer.
-- [ ] Release =pendingAcks= explicitly when transitioning out of =Ready=.
+- [X] Allow heartbeat responses only when not draining/disconnecting.
+- [X] Replace direct =draining.Load()= checks where a phase check is clearer.
+- [X] Release =pendingAcks= explicitly when transitioning out of =Ready=.
 
 *** Test checklist
 
-- [ ] no new =Forward= succeeds outside =Ready=;
-- [ ] =GATEWAY_EXECUTOR_REQUEST= is not written outside =Ready=;
-- [ ] =pendingAcks= waiters are released when connection starts disconnecting;
-- [ ] heartbeat cannot revive a draining connection;
-- [ ] reply handling after persistence stays non-fatal.
+- [X] no new =Forward= succeeds outside =Ready=;
+- [X] =GATEWAY_EXECUTOR_REQUEST= is not written outside =Ready=;
+- [X] =pendingAcks= waiters are released when connection starts disconnecting;
+- [X] heartbeat cannot revive a draining connection;
+- [X] reply handling after persistence stays non-fatal.
 
 *** Validation checklist
 
-- [ ] =go test ./pkg/connect -count=1=
+- [X] =go test ./pkg/connect -count=1=
 
 *** Exit criteria
 
-- [ ] New router work cannot be sent to a draining or disconnecting websocket.
-- [ ] Pending ACK cleanup is lifecycle-driven, not only timeout-driven.
+- [X] New router work cannot be sent to a draining or disconnecting websocket.
+- [X] Pending ACK cleanup is lifecycle-driven, not only timeout-driven.
 
 ** Phase 3: Decide and encode =WORKER_REQUEST_ACK= semantics
 

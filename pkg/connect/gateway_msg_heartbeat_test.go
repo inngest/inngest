@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/syscode"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,11 +32,15 @@ func TestHandleWorkerHeartbeatKeepsDrainingStatus(t *testing.T) {
 	handshake(t, res)
 
 	sendWorkerPauseMessage(t, res.ws)
-	exchangeHeartbeat(t, res.ws, 2*time.Second)
+	sendWorkerHeartbeatMessage(t, res.ws)
 
-	conn, err := res.stateManager.GetConnection(t.Context(), res.envID, res.connID)
-	require.NoError(t, err)
-	require.Equal(t, connectpb.ConnectionStatus_DRAINING, conn.Status)
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		conn, err := res.stateManager.GetConnection(t.Context(), res.envID, res.connID)
+		assert.NoError(ct, err)
+		if conn != nil {
+			assert.Equal(ct, connectpb.ConnectionStatus_DRAINING, conn.Status)
+		}
+	}, 2*time.Second, 100*time.Millisecond)
 
 	res.lifecycles.Assert(t, testRecorderAssertion{
 		onConnectedCount:     1,

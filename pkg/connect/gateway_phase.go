@@ -1,5 +1,11 @@
 package connect
 
+import (
+	"fmt"
+
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
+)
+
 // gatewayConnPhase tracks the in-memory lifecycle of a single websocket
 // handler. It is intentionally separate from Redis connection status: Redis is
 // router-visible state, while this phase answers what the local handler may do.
@@ -37,9 +43,38 @@ func (c *connectionHandler) phase() gatewayConnPhase {
 	return gatewayConnPhase(c.connPhase.Load())
 }
 
-// transition records phase movement without owning external side effects yet.
-// Phase 1 keeps behavior unchanged, so Redis writes, lifecycle callbacks, and
-// transport closes still happen at their existing call sites.
+func (c *connectionHandler) canForward() bool {
+	return c.phase() == gatewayConnPhaseReady
+}
+
+func (c *connectionHandler) canWrite(kind connectpb.GatewayMessageType) bool {
+	phase := c.phase()
+
+	switch kind {
+	case connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
+		return phase == gatewayConnPhaseReady
+	case connectpb.GatewayMessageType_GATEWAY_HEARTBEAT:
+		return phase == gatewayConnPhaseReady
+	case connectpb.GatewayMessageType_WORKER_REPLY_ACK:
+		// Replies are only handled after the run loop has read a worker message.
+		// Allow the ACK while cleanup is starting, but never after final close.
+		return phase == gatewayConnPhaseReady ||
+			phase == gatewayConnPhaseDraining ||
+			phase == gatewayConnPhaseDisconnecting
+	case connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK:
+		return phase == gatewayConnPhaseReady ||
+			phase == gatewayConnPhaseDraining
+	case connectpb.GatewayMessageType_GATEWAY_CLOSING:
+		return phase == gatewayConnPhaseReady ||
+			phase == gatewayConnPhaseDraining
+	default:
+		return phase != gatewayConnPhaseClosed
+	}
+}
+
+// transition records phase movement. Most external side effects still live at
+// existing call sites so phase checks can be introduced without collapsing the
+// Redis, lifecycle listener, and transport-close responsibilities together.
 func (c *connectionHandler) transition(to gatewayConnPhase, reason string, attrs ...any) gatewayConnPhase {
 	from := gatewayConnPhase(c.connPhase.Swap(int32(to)))
 
@@ -64,14 +99,15 @@ func (c *connectionHandler) markHandshaking(reason string, attrs ...any) {
 }
 
 func (c *connectionHandler) markReady(reason string, attrs ...any) {
-	// Keep the legacy draining flag in sync until routing/write eligibility can
-	// move fully to phase checks in a later plan phase.
+	// Keep the legacy draining flag in sync while it remains part of the
+	// handler state observed by tests and drain cleanup.
 	c.draining.Store(false)
 	c.transition(gatewayConnPhaseReady, reason, attrs...)
 }
 
 func (c *connectionHandler) beginDrain(reason string, attrs ...any) {
-	switch c.phase() {
+	from := c.phase()
+	switch from {
 	case gatewayConnPhaseDisconnecting, gatewayConnPhaseClosed:
 		// Drain is a routing concern. Once disconnect cleanup has started, do not
 		// move the observable phase backward or revive legacy drain behavior.
@@ -79,10 +115,13 @@ func (c *connectionHandler) beginDrain(reason string, attrs ...any) {
 			append([]any{"phase", c.phase().String(), "reason", reason}, attrs...)...)
 		return
 	default:
-		// During Phase 1 the existing Forward and heartbeat paths still read
-		// c.draining, so set it as part of entering the drain phase.
+		// Keep c.draining synchronized with the phase for compatibility with
+		// existing drain state observers.
 		c.draining.Store(true)
 		c.transition(gatewayConnPhaseDraining, reason, attrs...)
+		if from == gatewayConnPhaseReady {
+			c.releasePendingAcks(fmt.Errorf("connection entered drain: %s", reason))
+		}
 	}
 }
 
@@ -95,9 +134,15 @@ func (c *connectionHandler) beginDisconnect(reason string, attrs ...any) {
 		return
 	}
 
+	if c.phase() == gatewayConnPhaseReady {
+		c.releasePendingAcks(fmt.Errorf("connection started disconnecting: %s", reason))
+	}
 	c.transition(gatewayConnPhaseDisconnecting, reason, attrs...)
 }
 
 func (c *connectionHandler) markClosed(reason string, attrs ...any) {
+	if c.phase() == gatewayConnPhaseReady {
+		c.releasePendingAcks(fmt.Errorf("connection closed: %s", reason))
+	}
 	c.transition(gatewayConnPhaseClosed, reason, attrs...)
 }

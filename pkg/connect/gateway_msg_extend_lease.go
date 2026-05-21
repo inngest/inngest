@@ -119,6 +119,10 @@ func (c *connectionHandler) writeWorkerRequestExtendLeaseAck(data *connectpb.Wor
 
 	ackWriteCtx, ackWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
 	defer ackWriteCancel()
+	if !c.canWrite(connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK) {
+		c.log.Trace("skipping worker request extend lease ack because connection phase cannot write", "phase", c.phase().String())
+		return nil
+	}
 	if err := wsproto.Write(ackWriteCtx, c.ws, &connectpb.ConnectMessage{
 		Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
 		Payload: ackPayload,

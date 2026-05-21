@@ -118,8 +118,9 @@ type connectionHandler struct {
 	stopForwardingOnce sync.Once
 
 	// pendingAcks tracks request IDs waiting for WORKER_REQUEST_ACK.
-	// Forward blocks until the ACK arrives or times out.
-	pendingAcks sync.Map // requestID -> chan struct{}
+	// Forward blocks until the ACK arrives, the connection leaves Ready, or
+	// the request times out.
+	pendingAcks sync.Map // requestID -> chan error
 
 	consecutiveConnStatusUpdateFailures atomic.Int64
 
@@ -131,6 +132,25 @@ type connectionHandler struct {
 
 	connectionStatus   connectpb.ConnectionStatus
 	connectionStatusOK bool
+}
+
+func (c *connectionHandler) completePendingAck(requestID string, err error) bool {
+	ackCh, ok := c.pendingAcks.LoadAndDelete(requestID)
+	if !ok {
+		return false
+	}
+
+	ackCh.(chan error) <- err
+	return true
+}
+
+func (c *connectionHandler) releasePendingAcks(err error) {
+	c.pendingAcks.Range(func(key, value any) bool {
+		if c.pendingAcks.CompareAndDelete(key, value) {
+			value.(chan error) <- err
+		}
+		return true
+	})
 }
 
 func (c *connectionHandler) setLastHeartbeat(time time.Time) {
@@ -416,6 +436,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			drainStart := time.Now()
 			closingWriteCtx, closingWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
 			defer closingWriteCancel()
+			if !ch.canWrite(connectpb.GatewayMessageType_GATEWAY_CLOSING) {
+				ch.log.Debug("skipping gateway closing message because connection phase cannot write", "phase", ch.phase().String())
+				return
+			}
 			err := wsproto.Write(closingWriteCtx, ws, &connectpb.ConnectMessage{
 				Kind: connectpb.GatewayMessageType_GATEWAY_CLOSING,
 			})
@@ -917,7 +941,12 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 
 			// Block forwards while draining — wait for the new connection
 			// to be READY before failing so the proxy re-route succeeds.
-			if c.draining.Load() {
+			if !c.canForward() {
+				if c.phase() != gatewayConnPhaseDraining {
+					msg.Result <- fmt.Errorf("connection is not ready: phase=%s", c.phase().String())
+					continue
+				}
+
 				<-c.stopForwarding
 				log.Debug("rejecting forward, connection finished draining")
 				msg.Result <- fmt.Errorf("connection is draining")
@@ -940,7 +969,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 			// block the message loop from processing other requests.
 			// IMPORTANT: Store before writing to the WebSocket to avoid a race
 			// condition.
-			ackCh := make(chan struct{})
+			ackCh := make(chan error, 1)
 			c.pendingAcks.Store(data.RequestId, ackCh)
 
 			// Use a fresh context instead of the connection ctx. During a
@@ -953,6 +982,13 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				context.Background(),
 				5*time.Second,
 			)
+			if !c.canWrite(connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST) {
+				writeCancel()
+				c.pendingAcks.Delete(data.RequestId)
+				msg.Result <- fmt.Errorf("connection cannot write executor request: phase=%s", c.phase().String())
+				continue
+			}
+
 			err = wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
 				Kind:    connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
 				Payload: rawBytes,
@@ -970,12 +1006,15 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 
 			go func() {
 				select {
-				case <-ackCh:
-					msg.Result <- nil
+				case err := <-ackCh:
+					msg.Result <- err
 				case <-time.After(consts.ConnectWorkerRequestLeaseDuration + consts.ConnectWorkerRequestGracePeriod):
-					c.pendingAcks.Delete(data.RequestId)
-					msg.Result <- fmt.Errorf("worker did not ACK request %s", data.RequestId)
-					log.Warn("worker did not ACK request in time", "req_id", data.RequestId)
+					if c.pendingAcks.CompareAndDelete(data.RequestId, ackCh) {
+						msg.Result <- fmt.Errorf("worker did not ACK request %s", data.RequestId)
+						log.Warn("worker did not ACK request in time", "req_id", data.RequestId)
+					} else {
+						msg.Result <- <-ackCh
+					}
 				}
 			}()
 		}
@@ -1276,6 +1315,10 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
 	defer writeCancel()
+	if !c.canWrite(connectpb.GatewayMessageType_WORKER_REPLY_ACK) {
+		l.Warn("skipping worker reply ack because connection phase cannot write", "phase", c.phase().String())
+		return nil
+	}
 	if err := wsproto.Write(writeCtx, c.ws, &connectpb.ConnectMessage{
 		Kind:    connectpb.GatewayMessageType_WORKER_REPLY_ACK,
 		Payload: replyAck,
