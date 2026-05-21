@@ -274,7 +274,7 @@ SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND run_id = sqlc.arg
 SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND span_id = sqlc.arg('span_id') ORDER BY timestamp_unix_ms DESC, duration DESC;
 
 -- name: GetTraceRunsByTriggerId :many
-SELECT * FROM trace_runs WHERE POSITION(sqlc.arg('event_id') IN convert_from(trigger_ids, 'UTF8')) > 0;
+SELECT * FROM trace_runs WHERE trigger_ids_as_text(trigger_ids) LIKE '%' || sqlc.arg('event_id') || '%';
 
 --
 -- Queue snapshots

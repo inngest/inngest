@@ -1111,6 +1111,23 @@ func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, ap
 }
 
 func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
+	// Try the cache first. The cache only contains active (non-archived)
+	// functions, so a miss falls through to the DB which returns all rows.
+	// Skip the cache when noFnCache is set (transactional wrapper) to avoid
+	// a full table scan when we only need a single-row index lookup.
+	if w.fnCache != nil && !w.noFnCache {
+		cached, cacheErr := w.cachedGetFunctions(ctx)
+		if cacheErr != nil {
+			logger.StdlibLogger(ctx).Debug("functions cache lookup failed, falling back to DB", "error", cacheErr, "function_id", fnID)
+		} else {
+			for _, fn := range cached {
+				if fn.ID == fnID {
+					return fn, nil
+				}
+			}
+		}
+	}
+
 	fn, err := w.q.GetFunctionByID(ctx, fnID)
 	if err != nil {
 		return nil, err
@@ -1129,15 +1146,28 @@ func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appName stri
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
-	fns, err := w.q.GetFunctions(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return domainToCQRSList(fns, domainFunction), nil
+	return w.cachedGetFunctions(ctx)
 }
 
 func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
+	// When the cache is active, derive results from the raw functions cache.
+	// When noFnCache is set (transactional wrapper), skip the cache and use
+	// the targeted GetAppFunctions query to avoid a full table scan.
+	if w.fnCache != nil && !w.noFnCache {
+		cached, cacheErr := w.cachedGetFunctions(ctx)
+		if cacheErr != nil {
+			logger.StdlibLogger(ctx).Debug("functions cache lookup failed, falling back to DB", "error", cacheErr, "app_id", appID)
+		} else {
+			var result []*cqrs.Function
+			for _, fn := range cached {
+				if fn.AppID == appID {
+					result = append(result, fn)
+				}
+			}
+			return result, nil
+		}
+	}
+
 	fns, err := w.q.GetAppFunctions(ctx, appID)
 	if err != nil {
 		return nil, err

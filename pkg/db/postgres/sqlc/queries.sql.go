@@ -1638,10 +1638,10 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 }
 
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE POSITION($1 IN convert_from(trigger_ids, 'UTF8')) > 0
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE trigger_ids_as_text(trigger_ids) LIKE '%' || $1 || '%'
 `
 
-func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID interface{}) ([]*TraceRun, error) {
+func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID sql.NullString) ([]*TraceRun, error) {
 	rows, err := q.db.QueryContext(ctx, getTraceRunsByTriggerId, eventID)
 	if err != nil {
 		return nil, err

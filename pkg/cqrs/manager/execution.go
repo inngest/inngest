@@ -8,19 +8,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event_trigger_patterns"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
-// functionsCache provides a short-TTL in-memory cache for the parsed
-// []inngest.Function slice returned by Functions(). This eliminates
-// repeated full table scans of the functions table on every incoming event.
+// functionsCache provides a short-TTL in-memory cache for the functions
+// table. It caches both the raw []*cqrs.Function rows (used by
+// GetFunctions) and the parsed []inngest.Function slice (used by
+// Functions). This eliminates repeated full table scans on every
+// incoming event, GraphQL query, and dev-server UI poll.
 type functionsCache struct {
-	mu         sync.Mutex
-	functions  []inngest.Function
-	updatedAt  time.Time
-	ttl        time.Duration
-	generation uint64 // incremented on invalidate; prevents stale write-back
+	mu            sync.Mutex
+	rawFunctions  []*cqrs.Function   // cached GetFunctions result
+	rawUpdatedAt  time.Time
+	functions     []inngest.Function // cached Functions (parsed) result
+	updatedAt     time.Time
+	ttl           time.Duration
+	generation    uint64 // incremented on invalidate; prevents stale write-back
 }
 
 func (c *functionsCache) invalidate() {
@@ -28,6 +33,8 @@ func (c *functionsCache) invalidate() {
 		return
 	}
 	c.mu.Lock()
+	c.rawFunctions = nil
+	c.rawUpdatedAt = time.Time{}
 	c.functions = nil
 	c.updatedAt = time.Time{}
 	c.generation++
@@ -87,6 +94,57 @@ func (w wrapper) Functions(ctx context.Context) ([]inngest.Function, error) {
 	}
 
 	return funcs, nil
+}
+
+// cachedGetFunctions returns all functions using the raw cache layer.
+// This is the cache-aware counterpart to the direct DB call in
+// wrapper.GetFunctions (cqrs.go), used by all read paths including
+// GraphQL resolvers, the dev-server UI, and MCP handlers.
+func (w wrapper) cachedGetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
+	var genAtMiss uint64
+	if w.fnCache != nil && !w.noFnCache {
+		w.fnCache.mu.Lock()
+		if !w.fnCache.rawUpdatedAt.IsZero() && time.Since(w.fnCache.rawUpdatedAt) < w.fnCache.ttl {
+			result := deepCopyFunctions(w.fnCache.rawFunctions)
+			w.fnCache.mu.Unlock()
+			return result, nil
+		}
+		genAtMiss = w.fnCache.generation
+		w.fnCache.mu.Unlock()
+	}
+
+	fns, err := w.q.GetFunctions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := domainToCQRSList(fns, domainFunction)
+
+	if w.fnCache != nil && !w.noFnCache {
+		w.fnCache.mu.Lock()
+		if w.fnCache.generation == genAtMiss {
+			w.fnCache.rawFunctions = deepCopyFunctions(result)
+			w.fnCache.rawUpdatedAt = time.Now()
+		}
+		w.fnCache.mu.Unlock()
+	}
+
+	return result, nil
+}
+
+// deepCopyFunctions returns a new slice where each *cqrs.Function is a
+// distinct copy, so callers cannot mutate cached structs.
+func deepCopyFunctions(src []*cqrs.Function) []*cqrs.Function {
+	dst := make([]*cqrs.Function, len(src))
+	for i, f := range src {
+		cp := *f
+		if f.Config != nil {
+			cp.Config = make(json.RawMessage, len(f.Config))
+			copy(cp.Config, f.Config)
+		}
+		dst[i] = &cp
+	}
+	return dst
 }
 
 // FunctionsScheduled returns all scheduled functions available.

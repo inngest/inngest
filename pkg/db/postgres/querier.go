@@ -725,8 +725,7 @@ func (pq *pgQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.Trac
 }
 
 func (pq *pgQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {
-	// Postgres sqlc expects interface{} for this query.
-	rows, err := pq.q.GetTraceRunsByTriggerId(ctx, eventID)
+	rows, err := pq.q.GetTraceRunsByTriggerId(ctx, sql.NullString{String: eventID, Valid: true})
 	if err != nil {
 		return nil, err
 	}
