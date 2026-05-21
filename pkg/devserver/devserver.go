@@ -36,7 +36,11 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
+	dbpkg "github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/db/driverhelp"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/devutil"
@@ -87,7 +91,7 @@ const (
 	DefaultPollInterval = 5
 	DefaultQueueWorkers = 100
 
-	DefaultConnectGatewayPort      = 8289
+	DefaultConnectGatewayPort      = connect.DefaultGatewayPort
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
 
@@ -179,44 +183,43 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	services := []service.Service{}
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
-		Persist:     opts.Persist,
-		PostgresURI: opts.PostgresURI,
-		Directory:   opts.SQLiteDir,
-	})
-	if err != nil {
-		return err
-	}
-
 	if opts.Tick == 0 {
 		opts.Tick = DefaultTickDuration
 	}
 
+	var err error
+
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	if opts.PostgresURI != "" {
-		dbDriver = "postgres"
+	var adapter interface {
+		dbpkg.Adapter
+		Helpers() driverhelp.DialectHelpers
 	}
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	})
-	hd := base_cqrs.NewHistoryDriver(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	})
+	if opts.PostgresURI != "" {
+		db, err := dbpostgres.Open(ctx, dbpostgres.Options{URI: opts.PostgresURI})
+		if err != nil {
+			return err
+		}
+		adapter = dbpostgres.New(db)
+	} else {
+		db, err := dbsqlite.Open(ctx, dbsqlite.Options{
+			Persist:   opts.Persist,
+			Directory: opts.SQLiteDir,
+		})
+		if err != nil {
+			return err
+		}
+		adapter = dbsqlite.New(db)
+	}
+	dbcqrs := cqrsmanager.New(adapter)
+	hd := base_cqrs.NewHistoryDriver(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 	pauseOverrides := make(map[uuid.UUID]bool)
 
-	var shardedRc, unshardedRc, connectRc rueidis.Client
-	var shardedCluster, unshardedCluster, connectCluster *miniredis.Miniredis
+	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
+	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
 
 	if opts.RedisURI != "" {
 		// Use external Redis
@@ -243,6 +246,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		if err != nil {
 			return err
 		}
+		realtimePubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		realtimeSubRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
 	} else {
 		// Use in-memory Redis
 		shardedRc, shardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
@@ -254,6 +265,21 @@ func start(ctx context.Context, opts StartOpts) error {
 			return err
 		}
 		connectRc, connectCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+
+		// Realtime MUST use separate Redis clients for publishing and
+		// subscribing. This is because a Redis client cannot publish once it
+		// enters subscribe mode.
+		realtimePubRc, realtimeCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+		realtimeSubRc, err = rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{realtimeCluster.Addr()},
+			DisableCache: true,
+		})
 		if err != nil {
 			return err
 		}
@@ -278,8 +304,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	smv2 := redis_state.MustRunServiceV2(sm)
 
-	// Create a new broadcaster which lets us broadcast realtime messages.
-	broadcaster := realtime.NewInProcessBroadcaster()
+	broadcaster := realtime.NewRedisBroadcaster(realtimePubRc, realtimeSubRc)
+	defer func() {
+		realtimePubRc.Close()
+		realtimeSubRc.Close()
+		if realtimeCluster != nil {
+			realtimeCluster.Close()
+		}
+	}()
 
 	runMode := queue.QueueRunMode{
 		Sequential:    true,
@@ -288,7 +320,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		Continuations: true,
 	}
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
-	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") == "true"
+	// Step metadata is enabled by default in the dev server; set EXPERIMENTAL_STEP_METADATA=false to disable.
+	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") != "false"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
@@ -300,6 +333,20 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
+
+	// Instantiate Constraint API
+	semaphores := constraintapi.NewRedisSemaphoreManager(unshardedRc)
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clockwork.NewRealClock()),
+		constraintapi.WithShardName("default"),
+		constraintapi.WithClient(unshardedRc),
+		constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
+			return false
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("could not create constraint API: %w", err)
+	}
 
 	queueOpts := []queue.QueueOpt{
 		queue.WithRunMode(runMode),
@@ -330,42 +377,13 @@ func start(ctx context.Context, opts StartOpts) error {
 			return queue.PartitionPausedInfo{}
 		}),
 		queue.WithConditionalTracer(conditionalQueueTracer),
+		queue.WithCapacityManager(cm),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		queue.WithCapacityManager(cm),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 	}
 
-	const rateLimitPrefix = "ratelimit"
-
-	// Instantiate Constraint API
-	var capacityManager constraintapi.CapacityManager
-	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
-	if enableConstraintAPI {
-		cm, err := constraintapi.NewRedisCapacityManager(
-			constraintapi.WithClock(clockwork.NewRealClock()),
-			constraintapi.WithShardName("default"),
-			constraintapi.WithClient(unshardedRc),
-			constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-				return false
-			}),
-		)
-		if err != nil {
-			return fmt.Errorf("could not create contraint API: %w", err)
-		}
-
-		queueOpts = append(
-			queueOpts,
-			queue.WithCapacityManager(cm),
-			// Always use Constraint API
-			queue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
-			queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-		)
-
-		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
-
-		capacityManager = cm
-
-		l.Warn("EXPERIMENTAL: Enabling Constraint API")
-	}
+	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
 
 	var retryBackoff backoff.BackoffFunc
 	if opts.RetryInterval > 0 {
@@ -374,39 +392,41 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	if err != nil {
+		return fmt.Errorf("could not create shard registry: %w", err)
 	}
 
-	queueShards := map[string]queue.QueueShard{
-		consts.DefaultQueueShardName: queueShard,
-	}
-
-	rq, err := queue.New(
-		ctx,
-		"queue",
-		queueShard,
-		queueShards,
-		shardSelector,
-		queueOpts...,
-	)
+	rq, err := queue.New(ctx, "queue", shardRegistry, queueOpts...)
 	if err != nil {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
 
-	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
+	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
 	// Create the batch manager. In production, a second BatchClient can be provided
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
-	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
-	croner := cron.NewRedisCronManager(queueShard, rq, l)
+	//
+	// EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION controls the
+	// schedule-batch routing experiment: when "true", schedule-batch jobs go to
+	// a function-scoped system partition; otherwise they share the global
+	// schedule-batch partition.
+	splitBatchPartitionByFunction := os.Getenv("EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION") == "true"
+	batchOpts := []batch.RedisBatchManagerOpt{batch.WithLogger(l)}
+	if splitBatchPartitionByFunction {
+		batchOpts = append(batchOpts, batch.WithSplitBatchPartitionByFunction(func(_ context.Context, _ uuid.UUID) bool {
+			return true
+		}))
+	}
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batchOpts...)
+	debouncer, err := debounce.NewDebouncer(shardRegistry, queueShard.Name(), rq)
+	if err != nil {
+		return fmt.Errorf("could not create debounce manager: %w", err)
+	}
+	croner := cron.NewManager(queueShard, rq, l)
 
-	sn := singleton.New(ctx, map[string]*redis_state.QueueClient{
-		consts.DefaultQueueShardName: unshardedClient.Queue(),
-	}, shardSelector)
+	sn := singleton.New(ctx, shardRegistry)
 
 	conditionalConnectTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
@@ -466,12 +486,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
-	tp := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns:    opts.PostgresMaxIdleConns,
-		MaxOpenConns:    opts.PostgresMaxOpenConns,
-		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
-		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
-	}))
+	tp := tracing.NewSqlcTracerProvider(adapter.Q())
 
 	url := opts.Config.CoreAPI.Addr
 	if url == "0.0.0.0" {
@@ -498,17 +513,19 @@ func start(ctx context.Context, opts StartOpts) error {
 			return []byte(*opts.SigningKey), nil
 		}),
 		executor.WithLifecycleListeners(
-			history.NewLifecycleListener(
-				nil,
-				hd,
-				hmw,
-			),
-			Lifecycle{
-				Cqrs:       dbcqrs,
-				Pb:         pb,
-				EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
-			},
-			run.NewTraceLifecycleListener(nil),
+			append([]execution.LifecycleListener{
+				history.NewLifecycleListener(
+					nil,
+					hd,
+					hmw,
+				),
+				Lifecycle{
+					Cqrs:       dbcqrs,
+					Pb:         pb,
+					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
+				},
+				run.NewTraceLifecycleListener(nil),
+			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
@@ -531,8 +548,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDebouncer(debouncer),
 		executor.WithSingletonManager(sn),
 		executor.WithBatcher(batcher),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
@@ -543,17 +559,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableStepMetadata
 		}),
-	}
-
-	if capacityManager != nil {
-		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
-		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
+		executor.WithCapacityManager(cm),
+		executor.WithSemaphoreManager(semaphores),
+		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return true
-		}))
+		}),
+		executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
+			return false
+		}),
 	}
-	executorOpts = append(executorOpts, executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
-		return false
-	}))
 
 	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
@@ -571,7 +585,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceDebouncer(debouncer),
 		executor.WithServiceCroner(croner),
 		executor.WithServiceLogger(l),
-		executor.WithServiceShardSelector(shardSelector),
+		executor.WithServiceShardRegistry(shardRegistry),
 		executor.WithServicePublisher(pb),
 		executor.WithServiceEnableKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
@@ -597,6 +611,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
+	ds.SemaphoreManager = semaphores
 	ds.CronSyncer = croner
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
@@ -640,15 +655,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
-			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
-			CachingMiddleware:  caching,
-			FunctionReader:     ds.Data,
-			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
-			Executor:           ds.Executor,
-			Queue:              rq,
-			QueueShardSelector: shardSelector,
-			Broadcaster:        broadcaster,
-			TraceReader:        ds.Data,
+			AuthMiddleware:    authn.SigningKeyMiddleware(opts.SigningKey),
+			CachingMiddleware: caching,
+			FunctionReader:    ds.Data,
+			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
+			Executor:          ds.Executor,
+			Queue:             rq,
+			QueueShards:       shardRegistry,
+			Broadcaster:       broadcaster,
+			TraceReader:       ds.Data,
 
 			AppCreator:        dbcqrs,
 			FunctionCreator:   dbcqrs,
@@ -661,6 +676,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
 				BackoffFunc:     retryBackoff,
+				AllowStepMetadata: func(ctx context.Context, acctID uuid.UUID) bool {
+					return enableStepMetadata
+				},
 			},
 
 			MetadataOpts: apiv1.MetadataOpts{
@@ -682,14 +700,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{
 				lifecycles.NewHistoryLifecycle(dbcqrs),
+				lifecycles.NewSemaphoreLifecycleListener(semaphores, time.Time{}),
 			}),
 	)
 
 	// Initialize metrics API for Prometheus-compatible metrics endpoint.
 	// This provides system queue depth metrics via /metrics endpoint.
 	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
-		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		QueueManager:   queueShard,
+		QueueManager: queueShard,
 	})
 	if err != nil {
 		return err
@@ -700,6 +718,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Functions:           NewFunctionProvider(dbcqrs),
+		FunctionRuns:        NewFunctionRunReader(dbcqrs),
+		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
 	}
@@ -729,10 +749,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if testapi.ShouldEnable() {
 		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
-			QueueShardSelector: shardSelector,
-			Queue:              rq,
-			Executor:           exec,
-			StateManager:       smv2,
+			QueueShards:  shardRegistry,
+			Queue:        rq,
+			Executor:     exec,
+			StateManager: smv2,
 			ResetAll: func() {
 				// Only flush in-memory clusters if they exist
 				if shardedCluster != nil {
@@ -743,6 +763,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				}
 				if connectCluster != nil {
 					connectCluster.FlushAll()
+				}
+				if realtimeCluster != nil {
+					realtimeCluster.FlushAll()
 				}
 			},
 			PauseFunction: func(id uuid.UUID) {
@@ -770,14 +793,13 @@ func start(ctx context.Context, opts StartOpts) error {
 			Queue:           rq,
 			State:           ds.State,
 			Cron:            croner,
-			ShardSelector:   shardSelector,
+			ShardRegistry:   shardRegistry,
 			Port:            ds.Opts.DebugAPIPort,
 			PauseManager:    pauseMgr,
-			CapacityManager: capacityManager,
-			// Dependencies for batching, singleton, and debounce insights
-			BatchManager:   batcher,
-			SingletonStore: sn,
-			Debouncer:      debouncer,
+			CapacityManager: cm,
+			// Dependencies for batching and debounce insights
+			BatchManager: batcher,
+			Debouncer:    debouncer,
 		}))
 	}
 
@@ -1015,6 +1037,11 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 				Period:                    int(fn.Throttle.Period.Seconds()),
 			}
 		}
+
+		// NOTE: Manual-release semaphores (fn concurrency) are NOT added to the partition config.
+		// They are only embedded on the start job's queue item. Subsequent steps don't need them —
+		// the semaphore is already held for the run and released on finalization.
+		// Worker concurrency (auto-release) would go here when implemented.
 
 		return constraints
 	}

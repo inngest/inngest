@@ -117,7 +117,7 @@ export function useFunctionVolume() {
 
       const usage = {
         dailyVolumeSlots,
-        totalVolume: dailyFinishedCount,
+        totalVolume: workflow.dailyStarts.total,
       };
 
       return {

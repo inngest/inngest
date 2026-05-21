@@ -141,6 +141,17 @@ func DriverResponseAttrs(
 		rawAttrs = rawAttrs.Merge(GeneratorAttrs(op))
 	}
 
+	// always add all steps received as a debugging attie
+	steps := make(meta.ResponseOps, len(resp.Generator))
+	for n, s := range resp.Generator {
+		steps[n] = meta.ResponseOp{
+			Op:   s.Op,
+			ID:   s.ID,
+			Name: s.Name,
+		}
+	}
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseSteps, &steps)
+
 	return rawAttrs
 }
 
@@ -172,6 +183,10 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	if op.Userland != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandID, &op.Userland.ID)
 		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandIndex, &op.Userland.Index)
+	}
+
+	if stepType := op.StepType(); stepType != enums.StepTypeUnknown {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepType, &stepType)
 	}
 
 	switch op.Op {

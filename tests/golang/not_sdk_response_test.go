@@ -104,9 +104,8 @@ func TestNotSDKResponse(t *testing.T) {
 				// Function output includes the HTML response.
 				r.Equal("<html>hi</html>", run.Output)
 			} else {
-				// Step output is empty. We should probably change this in the
-				// future.
-				r.Equal("", run.Output)
+				// 206 with a non-JSON body surfaces a parse error.
+				r.Contains(run.Output, "error reading generator opcode response")
 			}
 		})
 	}

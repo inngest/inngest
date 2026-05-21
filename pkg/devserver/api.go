@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -21,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/headers"
@@ -28,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -105,7 +108,6 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 		// Everything else loads the UI (SPA fallback)
 		a.NotFound(a.UI)
 	}
-
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
@@ -162,6 +164,10 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	// TODO: Remove once we drop the run-details-v4 feature flag.
 	if os.Getenv("run-details-v4") == "" {
 		features["run-details-v4"] = true
+	}
+	// Enable step metadata (including experiments) by default in dev server.
+	if os.Getenv("enable-step-metadata") == "" {
+		features["enable-step-metadata"] = true
 	}
 
 	//
@@ -247,28 +253,102 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
 	syncID := uuid.New()
 
-	// Clean up URL-based placeholder apps before the checksum check to ensure
-	// zombie placeholders are always removed, even if the checksum matches and
-	// we return early below.
+	method := enums.AppMethodServe
+	if r.IsConnect() {
+		method = enums.AppMethodConnect
+	}
+
+	if len(r.AppName) == 0 {
+		return nil, publicerr.Wrap(err, 400, "App ID required")
+	}
+
+	// Candidate id for a fresh INSERT. UpsertAppByName uses the partial unique
+	// index apps_name_unique_key (name) WHERE name <> '' as the conflict
+	// target, so on conflict the existing row's id is preserved. This is what
+	// makes upgrades from <v1.15 (when register() derived ids from r.URL
+	// instead of r.AppName) keep their original id and the function rows
+	// hanging off it. The placeholder paths (-u startup, autodiscovery, UI
+	// add-by-URL) all upsert with name='' and so are excluded from the index
+	// — they continue to use UpsertApp keyed by id.
+	appID := inngest.DeterministicAppUUID(r.AppName)
+	appParams := cqrs.UpsertAppParams{
+		ID:          appID,
+		Name:        r.AppName,
+		SdkLanguage: r.SDKLanguage(),
+		SdkVersion:  r.SDKVersion(),
+		Framework: sql.NullString{
+			String: r.Framework,
+			Valid:  r.Framework != "",
+		},
+		Url:        r.URL,
+		Checksum:   sum,
+		Method:     method.String(),
+		AppVersion: r.AppVersion,
+	}
+
+	// Reconcile any URL-matched empty-name row sharing this URL before the
+	// checksum check. Two shapes can land here:
 	//
-	// We iterate all apps rather than using GetAppByURL because that query
-	// returns LIMIT 1 and may find the real (named) app instead of the
-	// placeholder when both share the same URL.
-	if allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID); err == nil {
+	//   1. A true placeholder (UI add-app flow, -u startup, autodiscovery)
+	//      with no functions attached. Soft-delete it; UpsertAppByName below
+	//      can't reach it (the partial unique index excludes name='').
+	//
+	//   2. A legacy SDK row whose name was blanked by the v1.15 ON
+	//      CONFLICT(id) clobber before the CASE WHEN excluded.name = '' guard
+	//      shipped, with the original functions still attached. Deleting it
+	//      would orphan those function rows (their app_id points at the
+	//      now-archived placeholder; the join in GetActiveFunctionByAppAndSlug
+	//      filters archived apps, so the SDK-resolved slugs miss them and
+	//      fresh SDK-minted uuids replace the originals). Adopt it instead:
+	//      UpsertApp by id with name = r.AppName so the row re-enters the
+	//      active universe under the correct name, and UpsertAppByName below
+	//      then finds it by name and refreshes its mutable fields.
+	//
+	// Iterate all apps rather than using GetAppByURL because that query
+	// returns LIMIT 1 and may find the real (named) app instead when both
+	// share the same URL.
+	allApps, err := a.devserver.Data.GetAllApps(ctx, consts.DevServerEnvID)
+	if err != nil {
+		l.Error("error loading existing apps", err)
+	}
+	if len(allApps) > 0 {
 		normalizedURL := util.NormalizeAppURL(r.URL, false)
 		for _, app := range allApps {
-			if app.Name == "" && util.NormalizeAppURL(app.Url, false) == normalizedURL {
-				// Since there's an app with the same URL but no name, we can
-				// assume it was a failed sync. We should delete it since we're
-				// in the process of syncing a replacement app.
-				//
-				// This situation happens when a user enters an unreachable URL
-				// in the UI. It'll still create an app, but in a placeholder
-				// state.
-				if err := a.devserver.Data.DeleteApp(ctx, app.ID); err != nil {
-					l.Error("error deleting app", "error", err)
-				}
+			if app.Name != "" || util.NormalizeAppURL(app.Url, false) != normalizedURL {
+				continue
 			}
+			fns, fnsErr := a.devserver.Data.GetFunctionsByAppInternalID(ctx, app.ID)
+			if fnsErr == nil && len(fns) > 0 {
+				// Legacy row with attached functions — adopt the row by id
+				// rather than deleting and starting over.
+				adopt := appParams
+				adopt.ID = app.ID
+				if _, err := a.devserver.Data.UpsertApp(ctx, adopt); err != nil {
+					l.Error("error adopting URL-keyed legacy app row", "appID", app.ID, "error", err)
+				}
+				continue
+			}
+			if err := a.devserver.Data.DeleteApp(ctx, app.ID); err != nil {
+				l.Error("error deleting app", "error", err)
+			}
+		}
+	}
+
+	if deploy.HasBlockedSDKVersion(r.SDKLanguage(), r.SDKVersion()) {
+		appParams.Error = sql.NullString{
+			String: deploy.DeployErrBlockedSDKVersion.Error(),
+			Valid:  true,
+		}
+
+		if _, err := a.devserver.Data.UpsertAppByName(ctx, appParams); err != nil {
+			return nil, publicerr.Wrap(err, 500, "Error updating app error")
+		}
+
+		return nil, publicerr.Error{
+			Code:    deploy.DeployErrBlockedSDKVersion.Error(),
+			Message: deploy.BlockedSDKVersionMessage(),
+			Status:  http.StatusBadRequest,
+			Err:     deploy.DeployErrBlockedSDKVersion,
 		}
 	}
 
@@ -299,43 +379,35 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// setup a list of crons to be upserted into the queue for scheduling
 	var crons []cron.CronItem
 
-	appID := inngest.DeterministicAppUUID(r.AppName)
-
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
 		return nil, publicerr.Wrap(err, 500, "Error starting registration tx")
 	}
 
+	// Resolve the canonical app row first so the function-insert loop below
+	// uses the correct app_id. UpsertAppByName conflicts on the partial unique
+	// index apps_name_active_key, so an existing active row with this name is
+	// adopted and the legacy id is returned in `app.ID` regardless of how it
+	// was originally minted.
+	app, err := tx.UpsertAppByName(ctx, appParams)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return nil, publicerr.Wrap(err, 500, "Error upserting app")
+	}
+	appID = app.ID
+	appParams.ID = app.ID
+
 	defer func() {
-		method := enums.AppMethodServe
-		if r.IsConnect() {
-			method = enums.AppMethodConnect
-		}
-
-		appParams := cqrs.UpsertAppParams{
-			// Use a deterministic ID for the app in dev.
-			ID:          appID,
-			Name:        r.AppName,
-			SdkLanguage: r.SDKLanguage(),
-			SdkVersion:  r.SDKVersion(),
-			Framework: sql.NullString{
-				String: r.Framework,
-				Valid:  r.Framework != "",
-			},
-			Url:        r.URL,
-			Checksum:   sum,
-			Method:     method.String(),
-			AppVersion: r.AppVersion,
-		}
-
-		// We want to save an app at the end, after handling each error.
+		// On error, persist the message to the row by re-upserting. On
+		// success the earlier UpsertAppByName call has already written the
+		// canonical state, so the deferred upsert is a no-op idempotent update.
 		if err != nil {
 			appParams.Error = sql.NullString{
 				String: err.Error(),
 				Valid:  true,
 			}
+			_, _ = tx.UpsertAppByName(ctx, appParams)
 		}
-		_, _ = tx.UpsertApp(ctx, appParams)
 		err = tx.Commit(ctx)
 		if err != nil {
 			l.Error("error registering functions", "error", err)
@@ -351,24 +423,67 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 	// Get a list of all functions
 	existing, _ := tx.GetFunctionsByAppInternalID(ctx, appID)
-	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
-	// this set.
-	seen := map[uuid.UUID]struct{}{}
 
-	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
-	// signing key and warn if the user has an invalid key.
-	funcs, err := r.Parse(ctx)
+	// Parse, validate, and enrich functions via the shared registration pipeline.
+	processed, err := registration.ProcessFunctions(ctx, r, registration.ProcessOpts{
+		AccountID:           consts.DevServerAccountID,
+		EnvironmentID:       consts.DevServerEnvID,
+		AppID:               appID,
+		UseDeterministicIDs: true,
+	})
 	if err != nil && err != sdk.ErrNoFunctions {
 		return nil, publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 
-	// For each function,
-	for _, fn := range funcs {
-		// Create a new UUID for the function.
-		fn.ID = fn.DeterministicUUID()
-
-		// Mark as seen.
+	// Resolve each new function to its persisted row by (app_id, slug) — the
+	// natural identity per the partial unique index — and rewrite the SDK's
+	// freshly-minted UUID to whatever was persisted. This makes URL rotation
+	// (which changes the deterministic UUID via Function.URI) a no-op: the
+	// existing row is reused and the old UUID stays the canonical handle for
+	// any function_runs / history rows that already reference it.
+	//
+	// After resolution, the seen set is used to archive functions that are
+	// no longer present in this sync. Doing the archival before the
+	// insert/update loop also guards against a cross-product edge case
+	// (slug rename combined with URL change) where the predecessor would
+	// otherwise still be active when the new row's INSERT runs.
+	seen := make(map[uuid.UUID]struct{}, len(processed.Functions))
+	for i := range processed.Functions {
+		df := &processed.Functions[i]
+		fn := &df.Function
+		persisted, err := tx.GetActiveFunctionByAppAndSlug(ctx, r.AppName, fn.Slug)
+		switch {
+		case err == nil && persisted != nil:
+			df.ID = persisted.ID
+			fn.ID = persisted.ID
+		case errors.Is(err, sql.ErrNoRows):
+			// Not persisted yet — keep the SDK-minted UUID.
+		default:
+			// A transient lookup failure here would silently leave fn.ID as the
+			// SDK UUID, archive the persisted row via the earlyDeletes loop
+			// below, and insert a fresh row — orphaning function_runs and
+			// history that reference the old UUID. Abort the sync instead.
+			return nil, publicerr.Wrap(err, 500, "Error resolving persisted function by slug")
+		}
 		seen[fn.ID] = struct{}{}
+	}
+	earlyDeletes := []uuid.UUID{}
+	for _, fn := range existing {
+		if _, ok := seen[fn.ID]; !ok {
+			earlyDeletes = append(earlyDeletes, fn.ID)
+		}
+	}
+	if len(earlyDeletes) > 0 {
+		if err = tx.DeleteFunctionsByIDs(ctx, earlyDeletes); err != nil {
+			return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
+		}
+	}
+
+	for _, df := range processed.Functions {
+		fn := &df.Function
+
+		// Ensure function version is at least 1 and incremented on re-sync
+		fn.FunctionVersion = max(fn.FunctionVersion, 1)
 
 		fnExists := false
 		var currentFn *inngest.Function
@@ -381,11 +496,10 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				return nil, publicerr.Wrap(fmt.Errorf("function config empty"), 500, "Error unmarshalling function config")
 			}
 			fnExists = true
-		}
 
-		if fnExists {
 			fn.FunctionVersion = currentFn.FunctionVersion + 1
 		}
+
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
@@ -417,7 +531,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			continue
 		}
 
-		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = tx.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fn.ID,
 			Name:      fn.Name,
 			Slug:      fn.Slug,
@@ -442,29 +556,18 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				Expression:      cronExpr,
 				Op:              enums.CronOpNew,
 			})
-
 		}
+
 	}
+
+	// Set semaphore capacity for all fn-scoped concurrency limits after DB storage.
+	processed.SetSemaphoreCapacity(ctx, a.devserver.SemaphoreManager)
 
 	reply := &sync.Reply{
 		OK:       true,
 		Modified: true,
 		AppID:    &appID,
 		SyncID:   &syncID,
-	}
-
-	// Remove all unseen functions.
-	deletes := []uuid.UUID{}
-	for _, fn := range existing {
-		if _, ok := seen[fn.ID]; !ok {
-			deletes = append(deletes, fn.ID)
-		}
-	}
-	if len(deletes) == 0 {
-		return reply, nil
-	}
-	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
-		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
 	return reply, nil
 }

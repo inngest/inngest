@@ -236,6 +236,60 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		meta.Attr(meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID())),
 	)
 
+	// By default, the parent span is the trace ref we found.
+	parent := tr
+
+	if (scope.Name != "inngest" || s.Name != "inngest.execution") && len(s.ParentSpanId) == 12 {
+		// If this is not the "root" span created by an SDK, we need to listen to
+		// the parent span ID that they have set so we can preserve whatever
+		// lineage they're passing us.
+		parent, err = tr.SetParentSpanID(trace.SpanID(s.ParentSpanId))
+		if err != nil {
+			return fmt.Errorf("failed to set parent span ID: %w", err)
+		}
+	}
+
+	// Filter out/handle special inngest-defined attributes sent from the SDK
+	var userAttrs []attribute.KeyValue
+	for _, kv := range attrs {
+		switch kv.Key {
+		case consts.OtelAttrSDKRunID:
+		case consts.OtelSysFunctionID:
+		case consts.OtelSysAppID:
+		case "inngest.traceparent":
+		case "inngest.traceref":
+		case "inngest.step.parentSpanId":
+			// If the SDK has set a deterministic step parent span ID (used during
+			// checkpointing to match the executor.step span), use it to override
+			// the parent so userland spans are correctly parented under their step.
+
+			sid, sidErr := trace.SpanIDFromHex(kv.Value.AsString())
+			if sidErr == nil {
+				parent, err = tr.SetParentSpanID(sid)
+				if err != nil {
+					return fmt.Errorf("failed to set step parent span ID: %w", err)
+				}
+			}
+		case "inngest.step.id":
+			stepID := kv.Value.AsString()
+			meta.AddAttr(tenantAttrs, meta.Attrs.StepUserlandID, &stepID)
+		case "inngest.step.index":
+			stepIndex := int(kv.Value.AsInt64())
+			meta.AddAttr(tenantAttrs, meta.Attrs.StepUserlandIndex, &stepIndex)
+		case "inngest.step.hash":
+			stepHash := kv.Value.AsString()
+			meta.AddAttr(tenantAttrs, meta.Attrs.StepID, &stepHash)
+		case "inngest.step.attempt":
+			stepAttempt := int(kv.Value.AsInt64())
+			meta.AddAttr(tenantAttrs, meta.Attrs.StepAttempt, &stepAttempt)
+		default:
+			userAttrs = append(userAttrs, kv)
+		}
+	}
+
+	// Use attrs with inngest-specific attrs filtered out that would otherwise be duplicated
+	attrs = userAttrs
+
 	ourAttrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.IsUserland, &isUserland),
 		meta.Attr(meta.Attrs.UserlandSpanID, &spanID),
@@ -250,35 +304,6 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 
 	// Add some additional attributes on top
 	attrs = append(attrs, ourAttrs.Serialize()...)
-
-	// By default, the parent span is the trace ref we found.
-	parent := tr
-
-	if (scope.Name != "inngest" || s.Name != "inngest.execution") && len(s.ParentSpanId) == 12 {
-		// If this is not the "root" span created by an SDK, we need to listen to
-		// the parent span ID that they have set so we can preserve whatever
-		// lineage they're passing us.
-		parent, err = tr.SetParentSpanID(trace.SpanID(s.ParentSpanId))
-		if err != nil {
-			return fmt.Errorf("failed to set parent span ID: %w", err)
-		}
-	}
-
-	// If the SDK has set a deterministic step parent span ID (used during
-	// checkpointing to match the executor.step span), use it to override
-	// the parent so userland spans are correctly parented under their step.
-	for _, kv := range s.Attributes {
-		if kv.Key == "inngest.step.parentSpanId" {
-			sid, sidErr := trace.SpanIDFromHex(kv.GetValue().GetStringValue())
-			if sidErr == nil {
-				parent, err = tr.SetParentSpanID(sid)
-				if err != nil {
-					return fmt.Errorf("failed to set step parent span ID: %w", err)
-				}
-			}
-			break
-		}
-	}
 
 	span, err := a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},

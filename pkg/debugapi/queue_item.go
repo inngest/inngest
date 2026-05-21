@@ -20,13 +20,13 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 		shardName = req.QueueShard
 	}
 
-	shard, ok := d.shards[shardName]
-	if !ok {
+	shard, err := d.shards.ByName(shardName)
+	if err != nil {
 		return nil, fmt.Errorf("could not find queue shard %q", shardName)
 	}
 
 	if itemID := req.GetItemId(); itemID != "" {
-		queueItem, err := d.queue.ItemByID(ctx, shard, itemID)
+		queueItem, err := d.queue.LoadQueueItem(ctx, shard.Name(), itemID)
 		if err != nil {
 			if errors.Is(err, queue.ErrQueueItemNotFound) {
 				return nil, status.Error(codes.NotFound, "no item found with id")

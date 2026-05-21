@@ -38,8 +38,14 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		return []osqueue.JobResponse{}, nil
 	}
 
+	// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+	members := make([]string, 0, len(jobIDs.Elements)/2)
+	for i := 0; i < len(jobIDs.Elements); i += 2 {
+		members = append(members, jobIDs.Elements[i])
+	}
+
 	// Get all job items.
-	jsonItems, err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hmget().Key(q.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
+	jsonItems, err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hmget().Key(q.RedisClient.kg.QueueItem()).Field(members...).Build()).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading jobs: %w", err)
 	}
@@ -165,6 +171,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 	}
 
 	l = l.With("account_id", pt.AccountID.String())
+	if pt.EnvID != nil {
+		l = l.With("env_id", pt.EnvID.String())
+	}
 
 	return func(yield func(*osqueue.QueueItem) bool) {
 		ptFrom := from
@@ -173,7 +182,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 			var iterated int
 
 			// peek function partition
-			items, err := q.peek(ctx, peekOpts{
+			result, err := q.peek(ctx, peekOpts{
 				From:         &ptFrom,
 				Until:        until,
 				Limit:        opt.BatchSize,
@@ -186,9 +195,10 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 				return
 			}
+			l.Info("peeked partition items", "raw_count", result.RawCount, "last_score", result.LastScore, "item_count", len(result.Items))
 
 			var start, end time.Time
-			for _, qi := range items {
+			for _, qi := range result.Items {
 				if qi == nil {
 					continue
 				}
@@ -202,7 +212,6 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 					start = at
 				}
 				end = at
-				ptFrom = at
 				iterated++
 			}
 
@@ -212,11 +221,35 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				"end", end.Format(time.StampMilli),
 			)
 
-			// didn't process anything, exit loop
-			if iterated == 0 {
+			// No raw items were fetched from the sorted set — the partition
+			// range is exhausted.
+			if result.RawCount == 0 {
+				l.Info("no more items to iterate on in partition", "raw_count", result.RawCount, "last_score", result.LastScore, "item_count", len(result.Items))
 				break
 			}
 
+			// Advance the cursor using the sorted set score of the last
+			// fetched item (LastScore), NOT qi.AtMS.  AtMS can diverge from
+			// the sorted set score when items are retried/rescheduled, which
+			// would cause the cursor to jump past remaining items.
+			if result.LastScore <= 0 {
+				l.Warn("breaking partition iterator: last score is invalid",
+					"last_score", result.LastScore,
+					"raw_count", result.RawCount,
+				)
+				break
+			}
+
+			if iterated == 0 {
+				// Raw items were fetched but none were usable (all leased or
+				// missing from hash). Advance the cursor past the last fetched
+				// item's score and continue to the next batch.
+				ptFrom = time.UnixMilli(result.LastScore).Add(time.Millisecond)
+				<-time.After(opt.Interval)
+				continue
+			}
+
+			ptFrom = time.UnixMilli(result.LastScore)
 			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
@@ -268,14 +301,13 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				return
 			}
 
-			latestTimes := []time.Time{}
+			latestCursors := []int64{}
 			for _, backlog := range backlogs {
 				errTags := map[string]string{
 					"backlog_id": backlog.BacklogID,
 				}
 
-				var last time.Time
-				items, _, err := q.BacklogPeek(ctx, backlog, backlogFrom, until, opt.BatchSize)
+				peekRes, err := q.BacklogPeek(ctx, backlog, backlogFrom, until, opt.BatchSize)
 				if err != nil {
 					l.ReportError(err, "error retrieving queue items from backlog",
 						logger.WithErrorReportTags(errTags),
@@ -284,7 +316,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 
 				var start, end time.Time
-				for _, qi := range items {
+				for _, qi := range peekRes.Items {
 					if qi == nil {
 						continue
 					}
@@ -299,7 +331,6 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 						start = at
 					}
 					end = at
-					last = at
 				}
 
 				l.Debug("iterated items in backlog",
@@ -307,7 +338,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 					"start", start.Format(time.StampMilli),
 					"end", end.Format(time.StampMilli),
 				)
-				latestTimes = append(latestTimes, last)
+				latestCursors = append(latestCursors, peekRes.Cursor)
 
 				// didn't process anything, meaning there's nothing left to do
 				// exit loop
@@ -316,19 +347,28 @@ func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from t
 				}
 			}
 
-			// find the earliest time within the last item timestamp of the previously processed backlogs
-			var earliest time.Time
-			for _, t := range latestTimes {
-				if earliest.IsZero() || t.Before(earliest) {
-					earliest = t
+			// Find the earliest cursor (sorted set score) across the
+			// processed backlogs so we don't skip items in any backlog.
+			var earliestCursor int64
+			for _, c := range latestCursors {
+				if earliestCursor == 0 || (c > 0 && c < earliestCursor) {
+					earliestCursor = c
 				}
 			}
 
-			if opt.EnableMillisecondIncrease {
-				// shift the starting point 1ms so it doesn't try to grab the same stuff again
-				// NOTE: this could result skipping items if the previous batch of items are all on
-				// the same millisecond
-				backlogFrom = earliest.Add(time.Millisecond)
+			if earliestCursor > 0 {
+				backlogFrom = time.UnixMilli(earliestCursor)
+				if opt.EnableMillisecondIncrease {
+					// shift the starting point 1ms so it doesn't try to grab the same stuff again
+					// NOTE: this could result skipping items if the previous batch of items are all on
+					// the same millisecond
+					backlogFrom = backlogFrom.Add(time.Millisecond)
+				}
+			} else {
+				// All cursors are 0 (epoch) — we cannot advance the cursor
+				// any further back, so continuing would re-fetch the same
+				// items forever. Break to avoid an infinite loop.
+				break
 			}
 
 			// wait a little before proceeding
@@ -375,7 +415,7 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 			var iterated int
 
 			// peek items for backlog
-			items, _, err := q.BacklogPeek(ctx, &backlog, backlogFrom, until, opt.BatchSize)
+			peekRes, err := q.BacklogPeek(ctx, &backlog, backlogFrom, until, opt.BatchSize)
 			if err != nil {
 				l.ReportError(err, "error retrieving queue items from backlog",
 					logger.WithErrorReportTags(map[string]string{
@@ -388,7 +428,7 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 			}
 
 			var start, end time.Time
-			for _, qi := range items {
+			for _, qi := range peekRes.Items {
 				if !yield(qi) {
 					return
 				}
@@ -399,7 +439,6 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 					start = at
 				}
 				end = at
-				backlogFrom = at
 			}
 
 			l.Debug("iterated items in backlog",
@@ -414,10 +453,16 @@ func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.
 				return
 			}
 
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			backlogFrom = backlogFrom.Add(time.Millisecond)
+			// Advance cursor using the sorted set score from the peek result,
+			// NOT qi.AtMS which can diverge from the sorted set score.
+			if peekRes.Cursor > 0 {
+				backlogFrom = time.UnixMilli(peekRes.Cursor).Add(time.Millisecond)
+			} else {
+				// Cursor is 0 (epoch) — we cannot advance the cursor any
+				// further back, so continuing would re-fetch the same items
+				// forever. Break to avoid an infinite loop.
+				break
+			}
 
 			<-time.After(opt.Interval)
 		}
@@ -509,26 +554,6 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 	return atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), nil
 }
 
-func (q *queue) ItemByID(ctx context.Context, jobID string) (*osqueue.QueueItem, error) {
-	rc := q.RedisClient.Client()
-	kg := q.RedisClient.kg
-
-	cmd := rc.B().Hget().Key(kg.QueueItem()).Field(jobID).Build()
-	byt, err := rc.Do(ctx, cmd).AsBytes()
-	if err != nil {
-		if rueidis.IsRedisNil(err) {
-			return nil, osqueue.ErrQueueItemNotFound
-		}
-	}
-
-	var item osqueue.QueueItem
-	if err := json.Unmarshal(byt, &item); err != nil {
-		return nil, fmt.Errorf("error unmarshalling queue item: %w", err)
-	}
-
-	return &item, nil
-}
-
 func (q *queue) ItemExists(ctx context.Context, jobID string) (bool, error) {
 	rc := q.RedisClient.Client()
 	kg := q.RedisClient.kg
@@ -566,12 +591,18 @@ func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.Q
 		return []*osqueue.QueueItem{}, nil
 	}
 
+	// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
+	members := make([]string, 0, len(itemIDs.Elements)/2)
+	for i := 0; i < len(itemIDs.Elements); i += 2 {
+		members = append(members, itemIDs.Elements[i])
+	}
+
 	items, err := rc.Do(
 		ctx,
 		rc.B().
 			Hmget().
 			Key(kg.QueueItem()).
-			Field(itemIDs.Elements...).
+			Field(members...).
 			Build(),
 	).AsStrSlice()
 	if err != nil {

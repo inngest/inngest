@@ -15,6 +15,7 @@ type Float64 interface {
 	Dgeev(jobvl LeftEVJob, jobvr RightEVJob, n int, a []float64, lda int, wr, wi []float64, vl []float64, ldvl int, vr []float64, ldvr int, work []float64, lwork int) (first int)
 	Dgels(trans blas.Transpose, m, n, nrhs int, a []float64, lda int, b []float64, ldb int, work []float64, lwork int) bool
 	Dgelqf(m, n int, a []float64, lda int, tau, work []float64, lwork int)
+	Dgeqp3(m, n int, a []float64, lda int, jpvt []int, tau, work []float64, lwork int)
 	Dgeqrf(m, n int, a []float64, lda int, tau, work []float64, lwork int)
 	Dgesvd(jobU, jobVT SVDJob, m, n int, a []float64, lda int, s, u []float64, ldu int, vt []float64, ldvt int, work []float64, lwork int) (ok bool)
 	Dgetrf(m, n int, a []float64, lda int, ipiv []int) (ok bool)
@@ -26,7 +27,9 @@ type Float64 interface {
 	Dlansy(norm MatrixNorm, uplo blas.Uplo, n int, a []float64, lda int, work []float64) float64
 	Dlapmr(forward bool, m, n int, x []float64, ldx int, k []int)
 	Dlapmt(forward bool, m, n int, x []float64, ldx int, k []int)
+	Dorgqr(m, n, k int, a []float64, lda int, tau, work []float64, lwork int)
 	Dormqr(side blas.Side, trans blas.Transpose, m, n, k int, a []float64, lda int, tau, c []float64, ldc int, work []float64, lwork int)
+	Dorglq(m, n, k int, a []float64, lda int, tau, work []float64, lwork int)
 	Dormlq(side blas.Side, trans blas.Transpose, m, n, k int, a []float64, lda int, tau, c []float64, ldc int, work []float64, lwork int)
 	Dpbcon(uplo blas.Uplo, n, kd int, ab []float64, ldab int, anorm float64, work []float64, iwork []int) float64
 	Dpbtrf(uplo blas.Uplo, n, kd int, ab []float64, ldab int) (ok bool)
@@ -218,11 +221,20 @@ const (
 	EVSelected EVHowMany = 'S' // Compute selected right and/or left eigenvectors.
 )
 
-// MaximizeNormX specifies the heuristic method for computing a contribution to
+// MaximizeNormXJob specifies the heuristic method for computing a contribution to
 // the reciprocal Dif-estimate in Dlatdf.
 type MaximizeNormXJob byte
 
 const (
 	LocalLookAhead       MaximizeNormXJob = 0 // Solve Z*x=h-f where h is a vector of ±1.
 	NormalizedNullVector MaximizeNormXJob = 2 // Compute an approximate null-vector e of Z, normalize e and solve Z*x=±e-f.
+)
+
+// OrthoComp specifies whether and how the orthogonal matrix is computed in Dgghrd.
+type OrthoComp byte
+
+const (
+	OrthoNone     OrthoComp = 'N' // Do not compute the orthogonal matrix.
+	OrthoExplicit OrthoComp = 'I' // The orthogonal matrix is formed explicitly and returned in the argument.
+	OrthoPostmul  OrthoComp = 'V' // The orthogonal matrix is post-multiplied into the matrix stored in the argument on entry.
 )

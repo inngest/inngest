@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
-var ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
@@ -81,8 +79,7 @@ type PauseGetter interface {
 
 // ConsumePauseOpts are the options to be passed in for consuming a pause
 type ConsumePauseOpts struct {
-	IdempotencyKey string
-	Data           any
+	Data any
 }
 
 type ConsumePauseResult struct {
@@ -262,6 +259,16 @@ type Pause struct {
 	// timeframes are based on this timestamp (previously only available as the
 	// sort score in pause indexes).
 	CreatedAt time.Time `json:"ca"`
+}
+
+// CreatedAfter reports whether this pause was created after the given
+// timestamp (with a small fudge factor). It returns false if either
+// timestamp is zero, allowing older pauses through.
+func (p Pause) CreatedAfter(t time.Time) bool {
+	if p.CreatedAt.IsZero() || t.IsZero() {
+		return false
+	}
+	return p.CreatedAt.After(t.Add(5 * time.Second))
 }
 
 func (p Pause) GetOpcode() enums.Opcode {

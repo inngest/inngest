@@ -178,6 +178,11 @@ func TestConstraintKindConversion(t *testing.T) {
 			input:    ConstraintKindThrottle,
 			expected: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE,
 		},
+		{
+			name:     "semaphore",
+			input:    ConstraintKindSemaphore,
+			expected: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE,
+		},
 	}
 
 	for _, tt := range tests {
@@ -190,6 +195,41 @@ func TestConstraintKindConversion(t *testing.T) {
 			assert.Equal(t, tt.input, backConverted)
 		})
 	}
+}
+
+func TestSemaphoreReleaseModeConversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    SemaphoreReleaseMode
+		expected pb.ConstraintApiSemaphoreReleaseMode
+	}{
+		{
+			name:     "auto",
+			input:    SemaphoreReleaseAuto,
+			expected: pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_AUTO,
+		},
+		{
+			name:     "manual",
+			input:    SemaphoreReleaseManual,
+			expected: pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_MANUAL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SemaphoreReleaseModeToProto(tt.input)
+			assert.Equal(t, tt.expected, result)
+
+			backConverted := SemaphoreReleaseModeFromProto(result)
+			assert.Equal(t, tt.input, backConverted)
+		})
+	}
+
+	// Unspecified maps to auto
+	t.Run("unspecified from proto", func(t *testing.T) {
+		result := SemaphoreReleaseModeFromProto(pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_UNSPECIFIED)
+		assert.Equal(t, SemaphoreReleaseAuto, result)
+	})
 }
 
 func TestRunProcessingModeConversion(t *testing.T) {
@@ -663,6 +703,53 @@ func TestConstraintConfigConversion(t *testing.T) {
 				Throttle: []*pb.ThrottleConfig{},
 			},
 		},
+		{
+			name: "config with semaphores",
+			input: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit:       []RateLimitConfig{},
+				Concurrency: ConcurrencyConfig{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{},
+				},
+				Throttle: []ThrottleConfig{},
+				Semaphores: []Semaphore{
+					{
+						ID:         "app:test-app",
+						UsageValue: "run-abc",
+						Weight:     2,
+						Release:    SemaphoreReleaseAuto,
+					},
+					{
+						ID:         "fn:test-fn",
+						UsageValue: "run-def",
+						Weight:     1,
+						Release:    SemaphoreReleaseManual,
+					},
+				},
+			},
+			expected: &pb.ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit:       []*pb.RateLimitConfig{},
+				Concurrency: &pb.ConcurrencyConfig{
+					CustomConcurrencyKeys: []*pb.CustomConcurrencyLimit{},
+				},
+				Throttle: []*pb.ThrottleConfig{},
+				Semaphores: []*pb.Semaphore{
+					{
+						Id:         "app:test-app",
+						UsageValue: "run-abc",
+						Weight:     2,
+						Release:    pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_AUTO,
+					},
+					{
+						Id:         "fn:test-fn",
+						UsageValue: "run-def",
+						Weight:     1,
+						Release:    pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_MANUAL,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -687,6 +774,7 @@ func TestConstraintItemConversion(t *testing.T) {
 	kindRateLimit := ConstraintKindRateLimit
 	kindConcurrency := ConstraintKindConcurrency
 	kindThrottle := ConstraintKindThrottle
+	kindSemaphore := ConstraintKindSemaphore
 
 	tests := []struct {
 		name     string
@@ -776,6 +864,36 @@ func TestConstraintItemConversion(t *testing.T) {
 					Scope:             pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_ACCOUNT,
 					KeyExpressionHash: "throttle_hash",
 					EvaluatedKeyHash:  "eval_throttle",
+				},
+			},
+		},
+		{
+			name: "semaphore constraint",
+			input: ConstraintItem{
+				Kind: kindSemaphore,
+			},
+			expected: &pb.ConstraintItem{
+				Kind: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE,
+			},
+		},
+		{
+			name: "semaphore constraint with details",
+			input: ConstraintItem{
+				Kind: kindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					ID:         "app:test-id",
+					UsageValue: "run-123",
+					Weight:     3,
+					Release:    SemaphoreReleaseManual,
+				},
+			},
+			expected: &pb.ConstraintItem{
+				Kind: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE,
+				Semaphore: &pb.SemaphoreConstraint{
+					Id:         "app:test-id",
+					UsageValue: "run-123",
+					Weight:     3,
+					Release:    pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_MANUAL,
 				},
 			},
 		},
@@ -1271,6 +1389,7 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 func TestCapacityAcquireRequestConversion(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
+	appID := uuid.New()
 	functionID := uuid.New()
 	currentTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	kindConcurrency := ConstraintKindConcurrency
@@ -1286,6 +1405,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "test-key-123",
 				AccountID:      accountID,
 				EnvID:          envID,
+				AppID:          appID,
 				FunctionID:     functionID,
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
@@ -1324,6 +1444,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "test-key-123",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
+				AppId:          appID.String(),
 				FunctionId:     functionID.String(),
 				Configuration: &pb.ConstraintConfig{
 					FunctionVersion: 1,
@@ -1357,6 +1478,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
+				RequestTime: timestamppb.New(time.Time{}),
 			},
 		},
 		{
@@ -1365,6 +1487,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "minimal",
 				AccountID:      accountID,
 				EnvID:          envID,
+				AppID:          appID,
 				FunctionID:     functionID,
 				Configuration: ConstraintConfig{
 					RateLimit: []RateLimitConfig{},
@@ -1381,6 +1504,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				IdempotencyKey: "minimal",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
+				AppId:          appID.String(),
 				FunctionId:     functionID.String(),
 				Configuration: &pb.ConstraintConfig{
 					FunctionVersion: 0,
@@ -1402,6 +1526,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
+				RequestTime: timestamppb.New(time.Time{}),
 			},
 		},
 		{

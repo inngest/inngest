@@ -19,12 +19,12 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
-	defaultBatchSizeLimit                = 10 * 1024 * 1024 // 10MiB
-	defaultEventIdempotenceCleanupCutOff = 120              // 120 seconds
-	defaultEventIdempotenceSetTTL        = 1800             // 30 minutes
+	defaultBatchSizeLimit         = 10 * 1024 * 1024 // 10MiB
+	defaultEventIdempotenceSetTTL = 1800             // 30 minutes
 )
 
 type RedisBatchManagerOpt func(m *redisBatchManager)
@@ -32,12 +32,6 @@ type RedisBatchManagerOpt func(m *redisBatchManager)
 func WithRedisBatchSizeLimit(l int) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.sizeLimit = l
-	}
-}
-
-func WithRedisBatchIdempotenceSetCleanupCutoff(l int64) RedisBatchManagerOpt {
-	return func(m *redisBatchManager) {
-		m.idempotenceSetCleanupCutoffSeconds = l
 	}
 }
 
@@ -82,6 +76,18 @@ func WithoutBuffer() RedisBatchManagerOpt {
 	}
 }
 
+// WithSplitBatchPartitionByFunction registers a gate that controls whether
+// scheduled batch jobs are enqueued to a function-scoped system partition
+// (queue.KindScheduleBatch:<functionID>) instead of the single shared
+// schedule-batch partition. When the gate returns true for an accountID, that
+// account's functions each get their own batch schedule partition, avoiding
+// cross-function head-of-line blocking on the shared system queue.
+func WithSplitBatchPartitionByFunction(fn func(ctx context.Context, accountID uuid.UUID) (enable bool)) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.splitBatchPartitionByFunction = fn
+	}
+}
+
 // NewRedisBatchManager creates a new redis batch manager, using Redis as the backing manager.
 //
 // Note that this buffers in-memory using the defaults via [DefaultMaxBufferDuration] and
@@ -89,12 +95,11 @@ func WithoutBuffer() RedisBatchManagerOpt {
 // or [WithoutBuffer].
 func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := &redisBatchManager{
-		b:                                  b,
-		q:                                  q,
-		sizeLimit:                          defaultBatchSizeLimit,
-		idempotenceSetCleanupCutoffSeconds: defaultEventIdempotenceCleanupCutOff,
-		idempotenceSetTTL:                  defaultEventIdempotenceSetTTL,
-		log:                                logger.StdlibLogger(context.Background()),
+		b:                 b,
+		q:                 q,
+		sizeLimit:         defaultBatchSizeLimit,
+		idempotenceSetTTL: defaultEventIdempotenceSetTTL,
+		log:               logger.StdlibLogger(context.Background()),
 	}
 
 	// add default buffer
@@ -113,10 +118,7 @@ type redisBatchManager struct {
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
-	// All event IDs appended to a batch are tracked in a set to ensure idempotence to guard against processsing of duplicate eventIDs.
-	// This cutoff denotes the last X seconds of eventsIDs to keep active in the idempotence set.
-	idempotenceSetCleanupCutoffSeconds int64
-	// Every append call sets the TTL to this value to ensure that after this amount of inactivity, this set gets cleared.
+	// idempotenceSetTTL is the TTL in seconds for per-event idempotence keys.
 	idempotenceSetTTL int64
 	log               logger.Logger
 
@@ -124,6 +126,12 @@ type redisBatchManager struct {
 	// When nil, appends go directly to Redis. When set, appends are buffered
 	// and flushed periodically or when the buffer is full.
 	buffer *appendBuffer
+
+	// splitBatchPartitionByFunction, when non-nil and returning true for a
+	// given accountID, causes ScheduleExecution to enqueue the batch-scheduling
+	// job to a function-scoped system partition rather than the shared
+	// schedule-batch partition.
+	splitBatchPartitionByFunction func(ctx context.Context, accountID uuid.UUID) (enable bool)
 }
 
 func (b *redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
@@ -239,8 +247,6 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 
 // RetrieveItems retrieve the data associated with the specified batch.
 func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
-	empty := make([]BatchItem, 0)
-
 	itemStrList, err := retriableScripts["retrieve"].Exec(
 		ctx,
 		b.b.Client(),
@@ -248,16 +254,22 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 		[]string{},
 	).AsStrSlice()
 	if err != nil {
-		return empty, fmt.Errorf("failed to retrieve list of events for batch '%s': %v", batchID, err)
+		return nil, fmt.Errorf("failed to retrieve list of events for batch '%s': %v", batchID, err)
 	}
 
-	items := []BatchItem{}
-	for _, str := range itemStrList {
-		item := &BatchItem{}
-		if err := json.Unmarshal([]byte(str), &item); err != nil {
-			return empty, fmt.Errorf("failed to decode item for batch '%s': %v", batchID, err)
-		}
-		items = append(items, *item)
+	items := make([]BatchItem, len(itemStrList))
+	var eg errgroup.Group
+	eg.SetLimit(20)
+	for i, str := range itemStrList {
+		eg.Go(func() error {
+			if err := json.Unmarshal([]byte(str), &items[i]); err != nil {
+				return fmt.Errorf("failed to decode item for batch '%s': %v", batchID, err)
+			}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
 	return items, nil
@@ -312,6 +324,9 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	maxAttempts := consts.MaxRetries + 1
 
 	queueName := queue.KindScheduleBatch
+	if b.splitBatchPartitionByFunction != nil && b.splitBatchPartitionByFunction(ctx, opts.AccountID) {
+		queueName = fmt.Sprintf("%s:%s", queue.KindScheduleBatch, opts.FunctionID)
+	}
 	err := b.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
@@ -347,21 +362,12 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
 	}
-	nowUnixSeconds := time.Now().Unix()
 
-	args, err := redis_state.StrSlice([]any{
-		b.b.KeyGenerator().BatchIdempotenceKey(ctx, functionId),
-		nowUnixSeconds - b.idempotenceSetCleanupCutoffSeconds,
-	})
-	if err != nil {
-		return fmt.Errorf("error constructing batch deletion: %w", err)
-	}
-
-	if _, err = retriableScripts["drop_keys"].Exec(
+	if _, err := retriableScripts["drop_keys"].Exec(
 		ctx,
 		b.b.Client(),
 		keys,
-		args,
+		[]string{},
 	).AsInt64(); err != nil {
 		return fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
 	}

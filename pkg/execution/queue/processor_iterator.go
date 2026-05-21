@@ -27,11 +27,6 @@ type ProcessorIterator struct {
 	// Queue is the Queue that owns this processor.
 	Queue QueueProcessor
 
-	// Denies records a denylist as keys hit concurrency and throttling limits.
-	// this lets us prevent lease attempts for consecutive keys, as soon as the first
-	// key is denied.
-	Denies *LeaseDenies
-
 	// error returned when processing
 	Err error
 
@@ -60,13 +55,19 @@ type ProcessorIterator struct {
 	// to attempt to find other possible functions outside of the key(s) with issues.
 	// This field must be accessed atomically as it may be modified concurrently when Parallel=true.
 	IsCustomKeyLimitOnly atomic.Bool
+
+	// IsSemaphoreLimitOnly records whether all concurrency hits were from semaphore limits only.
+	// When true, we use a shorter partition requeue delay since semaphore-blocked items stay in
+	// the ready queue and can be picked up quickly once capacity is freed.
+	IsSemaphoreLimitOnly atomic.Bool
 }
 
 func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	var err error
 
-	// set flag to true to begin with
+	// set flags to true to begin with
 	p.IsCustomKeyLimitOnly.Store(true)
+	p.IsSemaphoreLimitOnly.Store(true)
 
 	eg := errgroup.Group{}
 	for _, i := range p.Items {
@@ -133,15 +134,13 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
+	span.SetAttributes(attribute.String("item_kind", item.Data.Kind))
 	span.SetAttributes(attribute.String("run_id", item.Data.Identifier.RunID.String()))
 	span.SetAttributes(attribute.String("item_id", item.ID))
 	if item.Data.JobID != nil {
 		span.SetAttributes(attribute.String("job_id", *item.Data.JobID))
 	}
 
-	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
-	//       and don't bother to process if the queue item has a limited key.  This
-	//       lessens work done in the queue, as we can `continue` immediately.
 	if item.IsLeased(p.Queue.Clock().Now()) {
 		span.SetAttributes(attribute.String("skip_reason", "already_leased"))
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
@@ -181,16 +180,29 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		release()
 	}()
 
+	//
+	// Before we can do any work on the queue item, we need to check if all the constraints have capacity.
+	// This was previously done in Lease and has since been moved to the Constraint API.
+	//
+	// The Constraint API employs in-memory caching for a subset of constraints, ensuring low-latency
+	// responses on hit constraints and avoiding overloading the API.
+	//
+
 	backlog := ItemBacklog(ctx, *item)
 	partition := ItemShadowPartition(ctx, *item)
 	constraints := p.Queue.Options().PartitionConstraintConfigGetter(ctx, partition.Identifier())
 
+	// The following lease options simply specify some objects that are required during lease but were already generated
 	leaseOptions := []LeaseOptionFn{
 		LeaseBacklog(backlog),
 		LeaseShadowPartition(partition),
 		LeaseConstraints(constraints),
 	}
 
+	// Acquire capacity lease, in case the Constraint API is enabled and the current queue item should use capacity leases.
+	// We only ignore capacity leases for system queues and items missing account ID / env ID / function ID combinations.
+	// When the Constraint API is enabled, it will handle concurrency and throttle checks on the queue item.
+	// This is for an individual lease. If a constraint is at capacity, no leases will be returned and we will handle the missing capacity accordingly.
 	constraintRes, err := p.Queue.ItemLeaseConstraintCheck(
 		ctx,
 		&partition,
@@ -204,15 +216,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		l.ReportError(err, "could not check constraints to lease item")
 		// Stop iterator but don't quit the queue
 		return ErrProcessStopIterator
-	}
-
-	constraintCheckSource := "lease"
-	if constraintRes.SkipConstraintChecks || constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
-		constraintCheckSource = "constraint-api"
-	}
-
-	if constraintRes.SkipConstraintChecks {
-		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
 	}
 
 	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
@@ -241,7 +244,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 				*item,
 				QueueLeaseDuration,
 				p.StaticTime,
-				p.Denies,
 				leaseOptions...,
 			)
 		})
@@ -263,6 +265,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(1))
 	case enums.QueueConstraintCustomConcurrencyKey2:
 		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(2))
+	case enums.QueueConstraintSemaphore:
+		err = ErrSemaphoreLimit
 	default:
 		l.ReportError(errors.New("unhandled queue constraint type"), fmt.Sprintf("constraint type: %s", constraintRes.LimitingConstraint))
 		// Limited but the constraint is unknown?
@@ -326,15 +330,12 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	switch cause {
 	case ErrQueueItemThrottled:
 		p.IsCustomKeyLimitOnly.Store(false)
-		// Here we denylist each throttled key that's been limited here, then ignore
-		// any other jobs from being leased as we continue to iterate through the loop.
-		// This maintains FIFO ordering amongst all custom concurrency keys.
-		p.Denies.AddThrottled(err)
+		p.IsSemaphoreLimitOnly.Store(false)
 
 		p.CtrRateLimit.Add(1)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -359,6 +360,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return nil
 	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
 		p.IsCustomKeyLimitOnly.Store(false)
+		p.IsSemaphoreLimitOnly.Store(false)
 
 		p.CtrConcurrency.Add(1)
 		// Since the queue is at capacity on a fn or account level, no
@@ -393,7 +395,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -417,15 +419,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		return fmt.Errorf("concurrency hit: %w", ErrProcessStopIterator)
 	case ErrConcurrencyLimitCustomKey:
+		p.IsSemaphoreLimitOnly.Store(false)
 		p.CtrConcurrency.Add(1)
-
-		// Custom concurrency keys are different.  Each job may have a different key,
-		// so we cannot break the loop in case the next job has a different key and
-		// has capacity.
-		//
-		// Here we denylist each concurrency key that's been limited here, then ignore
-		// any other jobs from being leased as we continue to iterate through the loop.
-		p.Denies.AddConcurrency(err)
 
 		// For backwards compatibility, we report on the function level as well
 		if p.Partition.FunctionID != nil {
@@ -437,7 +432,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
 		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
@@ -459,12 +454,22 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			})
 		}
 		return nil
+	case ErrSemaphoreLimit:
+		// Semaphore capacity exhausted for this specific item (e.g., start job with fn concurrency).
+		// Skip this item and continue scanning — other items without semaphores (step 2, etc.)
+		// can still be processed.
+		p.CtrConcurrency.Add(1)
+		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
+		})
+		return nil
 	case ErrQueueItemNotFound:
 		// This is an okay error.  Move to the next job item.
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
 	case ErrQueueItemAlreadyLeased:
@@ -472,7 +477,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
 	}
@@ -483,32 +488,30 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		p.Err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return p.Err
 	}
 
 	// Assign the lease ID and pass this to be handled by the available worker.
 	// There should always be capacity on this queue as we track capacity via
-	// a semaphore.
+	// a semaphore. GenerationID was loaded from the queue hash on Peek and is
+	// preserved across Lease (the Lua script does not touch it).
 	item.LeaseID = leaseID
 
 	// increase success counter.
 	p.CtrSuccess.Add(1)
 	metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": constraintCheckSource},
+		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 	})
 	p.Queue.Workers() <- ProcessItem{
 		P:    *p.Partition,
 		I:    *item,
 		PCtr: p.PartitionContinueCtr,
 
-		CapacityLease: constraintRes.CapacityLease,
-		// Disable constraint updates in case we skipped constraint checks.
-		// This should always be linked, as we want consistent behavior while
-		// processing a queue item.
-		DisableConstraintUpdates: constraintRes.SkipConstraintChecks,
+		CapacityLease:       constraintRes.CapacityLease,
+		ConditionalTraceCtx: context.WithoutCancel(ctx),
 	}
 	commitSemaphoreAcquire = true
 

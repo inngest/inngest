@@ -335,6 +335,7 @@ type UsageItem = {
   name: string;
   values: {
     totalRuns: number;
+    totalFinished: number;
     successes: number;
     failures: number;
   };
@@ -369,12 +370,13 @@ export const useFunctionUsage = ({
   // Combine usage arrays into single array
   let usage: UsageItem[] = [];
 
+  const started = data?.workspace.workflow?.dailyStarts;
   const completed = data?.workspace.workflow?.dailyCompleted;
   const cancelled = data?.workspace.workflow?.dailyCancelled;
   const failed = data?.workspace.workflow?.dailyFailures;
 
-  if (completed && cancelled && failed) {
-    usage = completed.data.map((d, idx) => {
+  if (started && completed && cancelled && failed) {
+    usage = started.data.map((d, idx) => {
       const failureCount = failed.data[idx]?.count || 0;
       const finishedCount =
         (completed.data[idx]?.count || 0) +
@@ -384,7 +386,8 @@ export const useFunctionUsage = ({
       return {
         name: d.slot,
         values: {
-          totalRuns: finishedCount,
+          totalRuns: d.count,
+          totalFinished: finishedCount,
           successes: finishedCount - failureCount,
           failures: failureCount,
         },

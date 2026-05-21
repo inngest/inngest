@@ -31,9 +31,9 @@ func TestParallelSteps(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngestgo.ConfigStepConcurrency{
+		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: &inngestgo.ConfigConcurrency{Step: []inngestgo.ConfigStepConcurrency{
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
-		}},
+		}}},
 		inngestgo.EventTrigger("test/parallel", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -319,8 +319,13 @@ func TestParallelSequential(t *testing.T) {
 	r.Equal(int32(1), atomic.LoadInt32(&counterB2))
 
 	// a2 completes after b1 because "optimized parallelism" doesn't continue
-	// until all parallel steps end
-	r.Equal([]string{"a1", "b1", "a2", "b2", "end"}, stepOrder)
+	// until all parallel steps end.  The trailing "end" evaluation can replay
+	// during discovery, so only the step ordering itself is stable.
+	r.GreaterOrEqual(len(stepOrder), 5)
+	r.Equal([]string{"a1", "b1", "a2", "b2"}, stepOrder[:4])
+	for _, item := range stepOrder[4:] {
+		r.Equal("end", item)
+	}
 }
 
 func TestParallelDisabledOptimization(t *testing.T) {
@@ -538,9 +543,7 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
 	defer server.Close()
 
-	var (
-		counter int32
-	)
+	var counter int32
 	rid := NewRunID()
 	eventName := randomSuffix("event")
 	_, err := inngestgo.CreateFunction(

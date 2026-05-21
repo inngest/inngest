@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/enums"
@@ -18,9 +19,25 @@ const (
 	ResponseAcknowlegeDeadline = time.Second * 5
 )
 
+// errConnectionRetired is only returned before WORKER_REQUEST_ACK is sent.
+// At that point the SDK has not claimed ownership of the request, so skipping
+// invocation lets the gateway/executor retry or reroute it instead of risking
+// duplicate execution.
+var errConnectionRetired = errors.New("connection retired")
+
 func (h *connectHandler) handleInvokeMessage(ctx context.Context, preparedConn *connection, msg *connectproto.ConnectMessage) error {
 	resp, err := h.connectInvoke(ctx, preparedConn, msg)
 	if err != nil {
+		if errors.Is(err, errConnectionRetired) {
+			// This is a pre-ACK skip. Once ACK succeeds, connectInvoke invokes
+			// the function with context.Background() and must let it finish.
+			logAttrs := append(preparedConn.logAttrs(), "phase", preparedConn.phase())
+			h.logger.Debug(
+				"skipping sdk request because connection phase does not allow request ack",
+				logAttrs...,
+			)
+			return nil
+		}
 		h.logger.Error("failed to handle sdk request", "err", err)
 		// TODO Should we drop the connection? Continue receiving messages?
 		return fmt.Errorf("could not handle sdk request: %w", err)
@@ -43,17 +60,7 @@ func (h *connectHandler) handleInvokeMessage(ctx context.Context, preparedConn *
 	// that the message was truly passed on to the executor _unless_ we receive the ack message.
 	h.messageBuffer.addPending(ctx, resp, ResponseAcknowlegeDeadline)
 
-	err = wsproto.Write(ctx, preparedConn.ws, responseMessage)
-	if err != nil {
-		h.logger.Error("failed to send sdk response", "err", err)
-
-		// We received an error, the message definitely was not sent: Buffer message to retry
-		h.messageBuffer.append(resp)
-
-		return fmt.Errorf("could not send sdk response: %w", err)
-	}
-
-	return nil
+	return h.writeReply(ctx, preparedConn, resp, responseMessage)
 }
 
 // connectInvoke is the counterpart to invoke for connect
@@ -68,6 +75,14 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	if body.AppName == "" {
 		return nil, fmt.Errorf("missing app name in executor request")
 	}
+	logAttrs := []any{
+		"request_id", body.RequestId,
+		"run_id", body.RunId,
+		"app_id", body.AppId,
+		"function_slug", body.FunctionSlug,
+	}
+	logAttrs = append(logAttrs, preparedConn.logAttrs()...)
+	l := h.logger.With(logAttrs...)
 
 	invoker, ok := h.invokers[body.AppName]
 	if !ok {
@@ -79,8 +94,13 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	var request sdkrequest.Request
 	if err := json.Unmarshal(body.RequestPayload, &request); err != nil {
 		// TODO Should we send this back to the gateway? Previously this was a status code 400 public error with "malformed input"
-		h.logger.Error("error decoding sdk request", "error", err)
+		l.Error("error decoding sdk request", "error", err)
 		return nil, fmt.Errorf("invalid SDK request payload: %w", err)
+	}
+	request.CallCtx.RequestID = body.RequestId
+	request.CallCtx.JobID = body.JobId
+	if request.CallCtx.JobID != "" {
+		l = l.With("job_id", request.CallCtx.JobID)
 	}
 
 	ackPayload, err := proto.Marshal(&connectproto.WorkerRequestAckData{
@@ -95,24 +115,12 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		RunId:          body.RunId,
 	})
 	if err != nil {
-		h.logger.Error("error marshaling request ack", "error", err)
-		return nil, publicerr.Error{
-			Message: "malformed input",
-			Status:  400,
-		}
+		l.Error("error marshaling request ack", "error", err)
+		return nil, publicerr.Wrap(err, 400, "malformed input")
 	}
 
-	// Ack message
-	// If we're shutting down (context is canceled) we will not ack, which is desired!
-	if err := wsproto.Write(ctx, preparedConn.ws, &connectproto.ConnectMessage{
-		Kind:    connectproto.GatewayMessageType_WORKER_REQUEST_ACK,
-		Payload: ackPayload,
-	}); err != nil {
-		h.logger.Error("error sending request ack", "error", err)
-		return nil, publicerr.Error{
-			Message: "failed to ack worker request",
-			Status:  400,
-		}
+	if err := h.writeRequestAck(ctx, preparedConn, ackPayload, l); err != nil {
+		return nil, err
 	}
 
 	// TODO Should we wait for a gateway response before starting to process? What if the gateway fails acking and we start too early?
@@ -163,6 +171,13 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				cancelExtendLeaseCtx()
 				return
 			}
+			if !canExtendRequestLease(preparedConn) {
+				// ACKed work remains owned through Draining and Closing, so this
+				// only stops at the hard no-write boundary: Retired or Closed.
+				l.Debug("stopping lease extension because connection phase does not allow lease extension", "phase", preparedConn.phase())
+				cancelExtendLeaseCtx()
+				return
+			}
 
 			// TODO Extend once more before finishing (to ensure write reaches executor in time)
 			extendPayload, err := proto.Marshal(&connectproto.WorkerRequestExtendLeaseData{
@@ -178,7 +193,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				LeaseId:        currentLeaseID,
 			})
 			if err != nil {
-				h.logger.Error("error marshaling extend payload", "error", err)
+				l.Error("error marshaling extend payload", "error", err)
 				continue
 			}
 
@@ -186,7 +201,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				Kind:    connectproto.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
 				Payload: extendPayload,
 			}); err != nil {
-				h.logger.Error("error sending extend request", "error", err)
+				l.Error("error sending extend request", "error", err)
 			}
 		}
 	}()
@@ -228,7 +243,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	}
 
 	if err != nil {
-		h.logger.Error("error calling function", "error", err)
+		l.Error("error calling function", "error", err)
 		return &connectproto.SDKResponse{
 			RequestId:      body.RequestId,
 			AccountId:      body.AccountId,

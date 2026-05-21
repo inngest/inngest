@@ -18,8 +18,10 @@ import { Route as ApiInngestRouteImport } from './routes/api/inngest'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup'
+import { Route as authSwitchOrganizationRouteImport } from './routes/(auth)/switch-organization'
 import { Route as authSignOutRouteImport } from './routes/(auth)/sign-out'
 import { Route as authOrganizationSetupRouteImport } from './routes/(auth)/organization-setup'
+import { Route as authAgentDeepLinkRouteImport } from './routes/(auth)/agent-deep-link'
 import { Route as AuthedSettingsRouteRouteImport } from './routes/_authed/settings/route'
 import { Route as AuthedIntentRouteRouteImport } from './routes/_authed/intent/route'
 import { Route as AuthedBillingRouteRouteImport } from './routes/_authed/billing/route'
@@ -33,6 +35,7 @@ import { Route as authSignInSplatRouteImport } from './routes/(auth)/sign-in.$'
 import { Route as authOrganizationListSplatRouteImport } from './routes/(auth)/organization-list.$'
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from './routes/_authed/env/$envSlug/route'
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from './routes/_authed/settings/integrations/index'
+import { Route as AuthedSettingsApiKeysIndexRouteImport } from './routes/_authed/settings/api-keys/index'
 import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from './routes/_authed/intent/setup-aws-marketplace/index'
 import { Route as AuthedIntentCreateWebhookIndexRouteImport } from './routes/_authed/intent/create-webhook/index'
 import { Route as AuthedIntegrationsVercelIndexRouteImport } from './routes/_authed/integrations/vercel/index'
@@ -57,6 +60,7 @@ import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_auth
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
 import { Route as AuthedEnvEnvSlugInsightsIndexRouteImport } from './routes/_authed/env/$envSlug/insights/index'
 import { Route as AuthedEnvEnvSlugFunctionsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/index'
+import { Route as AuthedEnvEnvSlugExperimentsIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/index'
 import { Route as AuthedEnvEnvSlugEventsIndexRouteImport } from './routes/_authed/env/$envSlug/events/index'
 import { Route as AuthedEnvEnvSlugEventTypesIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/index'
 import { Route as AuthedEnvEnvSlugDebuggerIndexRouteImport } from './routes/_authed/env/$envSlug/debugger/index'
@@ -93,6 +97,7 @@ import { Route as AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport } from '
 import { Route as AuthedEnvEnvSlugFunctionsSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/runs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/cancellations/index'
+import { Route as AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/index'
 import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/$eventTypeName/events/index'
 import { Route as AuthedEnvEnvSlugAppsExternalIDSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/apps/$externalID/syncs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/$replayID/index'
@@ -141,6 +146,11 @@ const authUserSetupRoute = authUserSetupRouteImport.update({
   path: '/user-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const authSwitchOrganizationRoute = authSwitchOrganizationRouteImport.update({
+  id: '/(auth)/switch-organization',
+  path: '/switch-organization',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const authSignOutRoute = authSignOutRouteImport.update({
   id: '/(auth)/sign-out',
   path: '/sign-out',
@@ -149,6 +159,11 @@ const authSignOutRoute = authSignOutRouteImport.update({
 const authOrganizationSetupRoute = authOrganizationSetupRouteImport.update({
   id: '/(auth)/organization-setup',
   path: '/organization-setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authAgentDeepLinkRoute = authAgentDeepLinkRouteImport.update({
+  id: '/(auth)/agent-deep-link',
+  path: '/agent-deep-link',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
@@ -218,6 +233,12 @@ const AuthedSettingsIntegrationsIndexRoute =
   AuthedSettingsIntegrationsIndexRouteImport.update({
     id: '/integrations/',
     path: '/integrations/',
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any)
+const AuthedSettingsApiKeysIndexRoute =
+  AuthedSettingsApiKeysIndexRouteImport.update({
+    id: '/api-keys/',
+    path: '/api-keys/',
     getParentRoute: () => AuthedSettingsRouteRoute,
   } as any)
 const AuthedIntentSetupAwsMarketplaceIndexRoute =
@@ -359,6 +380,12 @@ const AuthedEnvEnvSlugFunctionsIndexRoute =
   AuthedEnvEnvSlugFunctionsIndexRouteImport.update({
     id: '/functions/',
     path: '/functions/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
+const AuthedEnvEnvSlugExperimentsIndexRoute =
+  AuthedEnvEnvSlugExperimentsIndexRouteImport.update({
+    id: '/experiments/',
+    path: '/experiments/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
 const AuthedEnvEnvSlugEventsIndexRoute =
@@ -577,6 +604,12 @@ const AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute =
     path: '/cancellations/',
     getParentRoute: () => AuthedEnvEnvSlugFunctionsSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute =
+  AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport.update({
+    id: '/experiments/$functionSlug/$experimentName/',
+    path: '/experiments/$functionSlug/$experimentName/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute =
   AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRouteImport.update({
     id: '/events/',
@@ -601,8 +634,10 @@ export interface FileRoutesByFullPath {
   '/billing': typeof AuthedBillingRouteRouteWithChildren
   '/intent': typeof AuthedIntentRouteRouteWithChildren
   '/settings': typeof AuthedSettingsRouteRouteWithChildren
+  '/agent-deep-link': typeof authAgentDeepLinkRoute
   '/organization-setup': typeof authOrganizationSetupRoute
   '/sign-out': typeof authSignOutRoute
+  '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -631,6 +666,7 @@ export interface FileRoutesByFullPath {
   '/integrations/vercel/': typeof AuthedIntegrationsVercelIndexRoute
   '/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
+  '/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
   '/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
@@ -644,6 +680,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -677,6 +714,7 @@ export interface FileRoutesByFullPath {
   '/settings/integrations/vercel/connect/': typeof AuthedSettingsIntegrationsVercelConnectIndexRoute
   '/env/$envSlug/apps/$externalID/syncs/': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/env/$envSlug/event-types/$eventTypeName/events/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
+  '/env/$envSlug/experiments/$functionSlug/$experimentName/': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
   '/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -688,8 +726,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/intent': typeof AuthedIntentRouteRouteWithChildren
   '/settings': typeof AuthedSettingsRouteRouteWithChildren
+  '/agent-deep-link': typeof authAgentDeepLinkRoute
   '/organization-setup': typeof authOrganizationSetupRoute
   '/sign-out': typeof authSignOutRoute
+  '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -715,11 +755,13 @@ export interface FileRoutesByTo {
   '/integrations/vercel': typeof AuthedIntegrationsVercelIndexRoute
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
+  '/settings/api-keys': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute
   '/env/$envSlug/apps': typeof AuthedEnvEnvSlugAppsIndexRoute
   '/env/$envSlug/debugger': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/env/$envSlug/event-types': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/events': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/env/$envSlug/experiments': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/env/$envSlug/functions': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/insights': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -753,6 +795,7 @@ export interface FileRoutesByTo {
   '/settings/integrations/vercel/connect': typeof AuthedSettingsIntegrationsVercelConnectIndexRoute
   '/env/$envSlug/apps/$externalID/syncs': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/env/$envSlug/event-types/$eventTypeName/events': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
+  '/env/$envSlug/experiments/$functionSlug/$experimentName': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
   '/env/$envSlug/functions/$slug/cancellations': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -767,8 +810,10 @@ export interface FileRoutesById {
   '/_authed/billing': typeof AuthedBillingRouteRouteWithChildren
   '/_authed/intent': typeof AuthedIntentRouteRouteWithChildren
   '/_authed/settings': typeof AuthedSettingsRouteRouteWithChildren
+  '/(auth)/agent-deep-link': typeof authAgentDeepLinkRoute
   '/(auth)/organization-setup': typeof authOrganizationSetupRoute
   '/(auth)/sign-out': typeof authSignOutRoute
+  '/(auth)/switch-organization': typeof authSwitchOrganizationRoute
   '/(auth)/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -797,6 +842,7 @@ export interface FileRoutesById {
   '/_authed/integrations/vercel/': typeof AuthedIntegrationsVercelIndexRoute
   '/_authed/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/_authed/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
+  '/_authed/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/_authed/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
   '/_authed/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/_authed/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
@@ -810,6 +856,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/debugger/': typeof AuthedEnvEnvSlugDebuggerIndexRoute
   '/_authed/env/$envSlug/event-types/': typeof AuthedEnvEnvSlugEventTypesIndexRoute
   '/_authed/env/$envSlug/events/': typeof AuthedEnvEnvSlugEventsIndexRoute
+  '/_authed/env/$envSlug/experiments/': typeof AuthedEnvEnvSlugExperimentsIndexRoute
   '/_authed/env/$envSlug/functions/': typeof AuthedEnvEnvSlugFunctionsIndexRoute
   '/_authed/env/$envSlug/insights/': typeof AuthedEnvEnvSlugInsightsIndexRoute
   '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
@@ -843,6 +890,7 @@ export interface FileRoutesById {
   '/_authed/settings/integrations/vercel/connect/': typeof AuthedSettingsIntegrationsVercelConnectIndexRoute
   '/_authed/env/$envSlug/apps/$externalID/syncs/': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/_authed/env/$envSlug/event-types/$eventTypeName/events/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
+  '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
   '/_authed/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/_authed/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/_authed/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -857,8 +905,10 @@ export interface FileRouteTypes {
     | '/billing'
     | '/intent'
     | '/settings'
+    | '/agent-deep-link'
     | '/organization-setup'
     | '/sign-out'
+    | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
     | '/api/csp-report'
@@ -887,6 +937,7 @@ export interface FileRouteTypes {
     | '/integrations/vercel/'
     | '/intent/create-webhook/'
     | '/intent/setup-aws-marketplace/'
+    | '/settings/api-keys/'
     | '/settings/integrations/'
     | '/env/$envSlug/apps/$externalID'
     | '/env/$envSlug/apps/sync-new'
@@ -900,6 +951,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/debugger/'
     | '/env/$envSlug/event-types/'
     | '/env/$envSlug/events/'
+    | '/env/$envSlug/experiments/'
     | '/env/$envSlug/functions/'
     | '/env/$envSlug/insights/'
     | '/env/$envSlug/manage/'
@@ -933,6 +985,7 @@ export interface FileRouteTypes {
     | '/settings/integrations/vercel/connect/'
     | '/env/$envSlug/apps/$externalID/syncs/'
     | '/env/$envSlug/event-types/$eventTypeName/events/'
+    | '/env/$envSlug/experiments/$functionSlug/$experimentName/'
     | '/env/$envSlug/functions/$slug/cancellations/'
     | '/env/$envSlug/functions/$slug/replays/'
     | '/env/$envSlug/functions/$slug/runs/'
@@ -944,8 +997,10 @@ export interface FileRouteTypes {
     | '/'
     | '/intent'
     | '/settings'
+    | '/agent-deep-link'
     | '/organization-setup'
     | '/sign-out'
+    | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
     | '/api/csp-report'
@@ -971,11 +1026,13 @@ export interface FileRouteTypes {
     | '/integrations/vercel'
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
+    | '/settings/api-keys'
     | '/settings/integrations'
     | '/env/$envSlug/apps'
     | '/env/$envSlug/debugger'
     | '/env/$envSlug/event-types'
     | '/env/$envSlug/events'
+    | '/env/$envSlug/experiments'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/insights'
     | '/env/$envSlug/manage'
@@ -1009,6 +1066,7 @@ export interface FileRouteTypes {
     | '/settings/integrations/vercel/connect'
     | '/env/$envSlug/apps/$externalID/syncs'
     | '/env/$envSlug/event-types/$eventTypeName/events'
+    | '/env/$envSlug/experiments/$functionSlug/$experimentName'
     | '/env/$envSlug/functions/$slug/cancellations'
     | '/env/$envSlug/functions/$slug/replays'
     | '/env/$envSlug/functions/$slug/runs'
@@ -1022,8 +1080,10 @@ export interface FileRouteTypes {
     | '/_authed/billing'
     | '/_authed/intent'
     | '/_authed/settings'
+    | '/(auth)/agent-deep-link'
     | '/(auth)/organization-setup'
     | '/(auth)/sign-out'
+    | '/(auth)/switch-organization'
     | '/(auth)/user-setup'
     | '/api/chat'
     | '/api/csp-report'
@@ -1052,6 +1112,7 @@ export interface FileRouteTypes {
     | '/_authed/integrations/vercel/'
     | '/_authed/intent/create-webhook/'
     | '/_authed/intent/setup-aws-marketplace/'
+    | '/_authed/settings/api-keys/'
     | '/_authed/settings/integrations/'
     | '/_authed/env/$envSlug/apps/$externalID'
     | '/_authed/env/$envSlug/apps/sync-new'
@@ -1065,6 +1126,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/debugger/'
     | '/_authed/env/$envSlug/event-types/'
     | '/_authed/env/$envSlug/events/'
+    | '/_authed/env/$envSlug/experiments/'
     | '/_authed/env/$envSlug/functions/'
     | '/_authed/env/$envSlug/insights/'
     | '/_authed/env/$envSlug/manage/'
@@ -1098,6 +1160,7 @@ export interface FileRouteTypes {
     | '/_authed/settings/integrations/vercel/connect/'
     | '/_authed/env/$envSlug/apps/$externalID/syncs/'
     | '/_authed/env/$envSlug/event-types/$eventTypeName/events/'
+    | '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/'
     | '/_authed/env/$envSlug/functions/$slug/cancellations/'
     | '/_authed/env/$envSlug/functions/$slug/replays/'
     | '/_authed/env/$envSlug/functions/$slug/runs/'
@@ -1109,8 +1172,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
+  authAgentDeepLinkRoute: typeof authAgentDeepLinkRoute
   authOrganizationSetupRoute: typeof authOrganizationSetupRoute
   authSignOutRoute: typeof authSignOutRoute
+  authSwitchOrganizationRoute: typeof authSwitchOrganizationRoute
   authUserSetupRoute: typeof authUserSetupRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
@@ -1190,6 +1255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authUserSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(auth)/switch-organization': {
+      id: '/(auth)/switch-organization'
+      path: '/switch-organization'
+      fullPath: '/switch-organization'
+      preLoaderRoute: typeof authSwitchOrganizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(auth)/sign-out': {
       id: '/(auth)/sign-out'
       path: '/sign-out'
@@ -1202,6 +1274,13 @@ declare module '@tanstack/react-router' {
       path: '/organization-setup'
       fullPath: '/organization-setup'
       preLoaderRoute: typeof authOrganizationSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/agent-deep-link': {
+      id: '/(auth)/agent-deep-link'
+      path: '/agent-deep-link'
+      fullPath: '/agent-deep-link'
+      preLoaderRoute: typeof authAgentDeepLinkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/settings': {
@@ -1293,6 +1372,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/settings/integrations/'
       preLoaderRoute: typeof AuthedSettingsIntegrationsIndexRouteImport
+      parentRoute: typeof AuthedSettingsRouteRoute
+    }
+    '/_authed/settings/api-keys/': {
+      id: '/_authed/settings/api-keys/'
+      path: '/api-keys'
+      fullPath: '/settings/api-keys/'
+      preLoaderRoute: typeof AuthedSettingsApiKeysIndexRouteImport
       parentRoute: typeof AuthedSettingsRouteRoute
     }
     '/_authed/intent/setup-aws-marketplace/': {
@@ -1461,6 +1547,13 @@ declare module '@tanstack/react-router' {
       path: '/functions'
       fullPath: '/env/$envSlug/functions/'
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/experiments/': {
+      id: '/_authed/env/$envSlug/experiments/'
+      path: '/experiments'
+      fullPath: '/env/$envSlug/experiments/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugExperimentsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/events/': {
@@ -1715,6 +1808,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugFunctionsSlugRouteRoute
     }
+    '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/': {
+      id: '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/'
+      path: '/experiments/$functionSlug/$experimentName'
+      fullPath: '/env/$envSlug/experiments/$functionSlug/$experimentName/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
     '/_authed/env/$envSlug/event-types/$eventTypeName/events/': {
       id: '/_authed/env/$envSlug/event-types/$eventTypeName/events/'
       path: '/events'
@@ -1803,6 +1903,7 @@ const AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren =
 interface AuthedSettingsRouteRouteChildren {
   AuthedSettingsOrganizationSplatRoute: typeof AuthedSettingsOrganizationSplatRoute
   AuthedSettingsUserSplatRoute: typeof AuthedSettingsUserSplatRoute
+  AuthedSettingsApiKeysIndexRoute: typeof AuthedSettingsApiKeysIndexRoute
   AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute
   AuthedSettingsIntegrationsNeonStepRouteRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren
   AuthedSettingsIntegrationsSupabaseStepRouteRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren
@@ -1823,6 +1924,7 @@ interface AuthedSettingsRouteRouteChildren {
 const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
   AuthedSettingsOrganizationSplatRoute: AuthedSettingsOrganizationSplatRoute,
   AuthedSettingsUserSplatRoute: AuthedSettingsUserSplatRoute,
+  AuthedSettingsApiKeysIndexRoute: AuthedSettingsApiKeysIndexRoute,
   AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
   AuthedSettingsIntegrationsNeonStepRouteRoute:
     AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren,
@@ -2048,6 +2150,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugDebuggerIndexRoute: typeof AuthedEnvEnvSlugDebuggerIndexRoute
   AuthedEnvEnvSlugEventTypesIndexRoute: typeof AuthedEnvEnvSlugEventTypesIndexRoute
   AuthedEnvEnvSlugEventsIndexRoute: typeof AuthedEnvEnvSlugEventsIndexRoute
+  AuthedEnvEnvSlugExperimentsIndexRoute: typeof AuthedEnvEnvSlugExperimentsIndexRoute
   AuthedEnvEnvSlugFunctionsIndexRoute: typeof AuthedEnvEnvSlugFunctionsIndexRoute
   AuthedEnvEnvSlugInsightsIndexRoute: typeof AuthedEnvEnvSlugInsightsIndexRoute
   AuthedEnvEnvSlugMetricsIndexRoute: typeof AuthedEnvEnvSlugMetricsIndexRoute
@@ -2055,6 +2158,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute: typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   AuthedEnvEnvSlugEventsEventIDIndexRoute: typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
   AuthedEnvEnvSlugRunsRunIDIndexRoute: typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute: typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
 }
 
 const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
@@ -2072,6 +2176,7 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugDebuggerIndexRoute: AuthedEnvEnvSlugDebuggerIndexRoute,
   AuthedEnvEnvSlugEventTypesIndexRoute: AuthedEnvEnvSlugEventTypesIndexRoute,
   AuthedEnvEnvSlugEventsIndexRoute: AuthedEnvEnvSlugEventsIndexRoute,
+  AuthedEnvEnvSlugExperimentsIndexRoute: AuthedEnvEnvSlugExperimentsIndexRoute,
   AuthedEnvEnvSlugFunctionsIndexRoute: AuthedEnvEnvSlugFunctionsIndexRoute,
   AuthedEnvEnvSlugInsightsIndexRoute: AuthedEnvEnvSlugInsightsIndexRoute,
   AuthedEnvEnvSlugMetricsIndexRoute: AuthedEnvEnvSlugMetricsIndexRoute,
@@ -2081,6 +2186,8 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugEventsEventIDIndexRoute:
     AuthedEnvEnvSlugEventsEventIDIndexRoute,
   AuthedEnvEnvSlugRunsRunIDIndexRoute: AuthedEnvEnvSlugRunsRunIDIndexRoute,
+  AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute:
+    AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute,
 }
 
 const AuthedEnvEnvSlugRouteRouteWithChildren =
@@ -2120,8 +2227,10 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  authAgentDeepLinkRoute: authAgentDeepLinkRoute,
   authOrganizationSetupRoute: authOrganizationSetupRoute,
   authSignOutRoute: authSignOutRoute,
+  authSwitchOrganizationRoute: authSwitchOrganizationRoute,
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
   ApiCspReportRoute: ApiCspReportRoute,

@@ -57,7 +57,13 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 		t.Helper()
 		req, err := http.NewRequest(http.MethodPut, server.LocalURL(), nil)
 		require.NoError(t, err)
-		resp, err := http.DefaultClient.Do(req)
+		req.Close = true
+		// Registration updates are infrequent and CI occasionally reuses a stale
+		// idle connection here. Use a one-off transport to avoid surfacing that
+		// socket reuse as a flaky test failure.
+		resp, err := (&http.Client{
+			Transport: &http.Transport{DisableKeepAlives: true},
+		}).Do(req)
 		require.NoError(t, err)
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -126,24 +132,21 @@ func NewHTTPServer(f http.Handler) *HTTPServer {
 		log.Fatal(err)
 	}
 	port := l.Addr().(*net.TCPAddr).Port
-	l.Close()
 
 	s := &http.Server{
-		Addr:           fmt.Sprintf("0.0.0.0:%d", port),
 		Handler:        f,
 		ReadTimeout:    60 * time.Second,
 		WriteTimeout:   60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {
-		err := s.ListenAndServe()
-		// Check if server is closed error
+		err := s.Serve(l)
 		if err != nil && err != http.ErrServerClosed {
 			panic(err)
 		}
 	}()
 
-	// Give it ime to start.
+	// Give it time to start.
 	<-time.After(20 * time.Millisecond)
 
 	return &HTTPServer{Server: s, Port: int32(port)}

@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
+	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -29,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
@@ -130,12 +131,13 @@ func TestScheduleRaceCondition(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -161,9 +163,8 @@ func TestScheduleRaceCondition(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -178,13 +179,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -196,10 +191,9 @@ func TestScheduleRaceCondition(t *testing.T) {
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
 
@@ -304,12 +298,13 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stateRedis, shardedRc, err := createInmemoryRedis(t)
@@ -335,9 +330,8 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -352,13 +346,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -370,8 +358,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
 	)
 	require.NoError(t, err)
@@ -484,12 +471,13 @@ func TestFinalize(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, accountID, wsID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -510,7 +498,7 @@ func TestFinalize(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -542,9 +530,8 @@ func TestFinalize(t *testing.T) {
 	}
 
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -559,13 +546,7 @@ func TestFinalize(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -579,8 +560,7 @@ func TestFinalize(t *testing.T) {
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
 	)
 	require.NoError(t, err)
@@ -719,6 +699,7 @@ func TestFinalize(t *testing.T) {
 // mockDriverV1 implements driver.DriverV1 for testing
 type mockDriverV1 struct {
 	response *state.DriverResponse
+	err      error
 	t        *testing.T
 }
 
@@ -734,7 +715,7 @@ func (m *mockDriverV1) Execute(
 	stackIndex int,
 	attempt int,
 ) (*state.DriverResponse, error) {
-	return m.response, nil
+	return m.response, m.err
 }
 
 // This tests a scenario where a run used to hang when retrying an invoke and the invoke's pause was already created.
@@ -742,11 +723,12 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up database and function loader
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -786,7 +768,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -795,7 +777,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     targetFnID,
 		AppID:  appID,
 		Name:   targetFn.Name,
@@ -828,9 +810,8 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -845,13 +826,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -881,8 +856,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithInvokeEventHandler(func(ctx context.Context, evt event.TrackedEvent) error {
 			if evt.GetEvent().Name == "inngest/function.invoked" {
@@ -954,11 +928,12 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -986,7 +961,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -1018,9 +993,8 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -1035,13 +1009,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -1065,8 +1033,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithDriverV1(nonRetriableDriver),
 	)
@@ -1139,14 +1106,197 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	require.ErrorContains(t, err, state.ErrRunNotFound.Error())
 }
 
+// TestCapacityErrorRetriesWhenAttemptsExhausted reproduces the bug where a capacity
+// error (AlwaysRetryError) fails to retry after a function has exhausted its retry
+// attempts from real errors. The executor incorrectly sets NoRetry=true because it
+// calls ShouldRetry(nil, ...) instead of passing the actual error.
+func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
+	ctx := context.Background()
+
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	dbcqrs := cqrsmanager.New(dbsqlite.New(db))
+	loader := dbcqrs.(state.FunctionLoader)
+
+	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	retries := 3
+	fn := inngest.Function{
+		ID:              fnID,
+		FunctionVersion: 1,
+		Name:            "test-fn",
+		Slug:            "test-fn",
+		Steps: []inngest.Step{
+			{
+				ID:      "step",
+				Name:    "step",
+				URI:     "/step",
+				Retries: &retries,
+			},
+		},
+	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:   appID,
+		Name: "test-app",
+	})
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+		ID:     fnID,
+		AppID:  appID,
+		Name:   fn.Name,
+		Slug:   fn.Slug,
+		Config: string(config),
+	})
+	require.NoError(t, err)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueOpts := []queue.QueueOpt{
+		queue.WithIdempotencyTTL(time.Hour),
+	}
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
+
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
+	var sm state.Manager
+	sm, err = redis_state.New(ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	rq, err := queue.New(
+		context.Background(),
+		"test-queue",
+		shardRegistry,
+		queueOpts...,
+	)
+	require.NoError(t, err)
+
+	// Mock driver that returns a capacity error (syscode.Error), simulating
+	// a connect worker at capacity.
+	capacityDriver := &mockDriverV1{
+		t: t,
+		err: syscode.Error{
+			Code:    syscode.CodeConnectAllWorkersAtCapacity,
+			Message: "All workers are at capacity",
+		},
+	}
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauseMgr),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithShardRegistry(shardRegistry),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithDriverV1(capacityDriver),
+	)
+	require.NoError(t, err)
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			event.NewBaseTrackedEventWithID(event.Event{
+				Name: "test/event",
+			}, evtID),
+		},
+	})
+	require.NoError(t, err)
+
+	jobsAfterSchedule, err := rq.RunJobs(
+		ctx,
+		queueShard.Name(),
+		run.ID.Tenant.EnvID,
+		run.ID.FunctionID,
+		run.ID.RunID,
+		1000,
+		0,
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, jobsAfterSchedule)
+
+	jobCtx := queue.WithJobID(ctx, jobsAfterSchedule[0].JobID)
+
+	// Execute with attempts exhausted (attempt 3 of max 4, which is retries+1).
+	// This simulates a function that already failed 3 times from real errors,
+	// and now hits a capacity error on what would be its final attempt.
+	maxAttempts := retries + 1
+	resp, err := exec.Execute(jobCtx, state.Identifier{
+		WorkflowID: fnID,
+		RunID:      run.ID.RunID,
+		AccountID:  aID,
+	}, queue.Item{
+		WorkspaceID: wsID,
+		Kind:        queue.KindStart,
+		Identifier: state.Identifier{
+			WorkflowID: fnID,
+			RunID:      run.ID.RunID,
+			AccountID:  aID,
+		},
+		Attempt:     maxAttempts - 1, // 0-indexed, so this is the last attempt
+		MaxAttempts: &maxAttempts,
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: "step"}},
+	}, inngest.Edge{
+		Incoming: "$trigger",
+		Outgoing: "step",
+	})
+
+	// The error should be retryable — capacity errors must always retry.
+	require.Error(t, err)
+	require.True(t, queue.IsAlwaysRetryable(err),
+		"capacity error should be wrapped as AlwaysRetryError, got: %v", err)
+
+	// The response should NOT have NoRetry set for capacity errors.
+	require.NotNil(t, resp)
+	require.True(t, resp.Retryable(),
+		"response should be retryable for capacity errors even when attempts are exhausted")
+}
+
 func TestExecutorScheduleRateLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1182,7 +1332,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -1214,9 +1364,8 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -1231,13 +1380,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -1250,8 +1393,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithRateLimiter(rl),
 	)
@@ -1351,11 +1493,12 @@ func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context
 func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -1383,7 +1526,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:     fnID,
 		AppID:  appID,
 		Name:   fn.Name,
@@ -1415,9 +1558,8 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -1432,13 +1574,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -1451,8 +1587,7 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 
 		executor.WithLifecycleListeners(fll),
@@ -1548,11 +1683,12 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -1578,9 +1714,8 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -1595,13 +1730,7 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -1613,10 +1742,9 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
 
@@ -1673,11 +1801,12 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
-	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	adapter := dbsqlite.New(db)
+	dbcqrs := cqrsmanager.New(adapter)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -1703,9 +1832,8 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	}
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
 
-	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
-		return queueShard, nil
-	}
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
 
 	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
 
@@ -1720,13 +1848,7 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	rq, err := queue.New(
 		context.Background(),
 		"test-queue",
-		queueShard,
-		map[string]queue.QueueShard{
-			queueShard.Name(): queueShard,
-		},
-		func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			return queueShard, nil
-		},
+		shardRegistry,
 		queueOpts...,
 	)
 	require.NoError(t, err)
@@ -1738,10 +1860,9 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(newFakeLifecycle(work)),
-		executor.WithAssignedQueueShard(queueShard),
-		executor.WithShardSelector(shardSelector),
+		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
 	)
 	require.NoError(t, err)
 

@@ -1,0 +1,5 @@
+{
+  "title": "Inngest API",
+  "pages": ["index", "authentication", "v1", "v2"],
+  "root": true
+}

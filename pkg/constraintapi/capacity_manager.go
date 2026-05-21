@@ -84,6 +84,9 @@ type CapacityAcquireRequest struct {
 	// FunctionID is used for identifying the function.
 	FunctionID uuid.UUID
 
+	// AppID is included for lifecycle reporting.
+	AppID uuid.UUID
+
 	// Configuration represents the latest known constraint configuration (a subset of the function config).
 	//
 	// The server _may_ reject calls if it has recently seen a newer configuration. This is expected for a short
@@ -147,6 +150,18 @@ type CapacityAcquireRequest struct {
 	// RequestAttempt is the current request attempt. For retries, this should be > 0.
 	// This is mainly used for instrumentation.
 	RequestAttempt int
+
+	// RequestTime is the time at which the underlying work was originally received
+	// (e.g. the event ReceivedAt for run scheduling). Unlike CurrentTime, it is
+	// stable across retries of the same work item.
+	//
+	// The in-process constraint cache uses RequestTime to bypass entries that
+	// were populated after the work was received, allowing the capacity manager's
+	// idempotency handling to take effect even when the cache is deployed.
+	//
+	// May be zero, in which case the cache treats the request as unanchored and
+	// honors any non-expired entry.
+	RequestTime time.Time
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).

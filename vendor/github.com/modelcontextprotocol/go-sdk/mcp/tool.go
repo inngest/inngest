@@ -8,8 +8,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
+	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
 )
 
 // A ToolHandler handles a call to tools/call.
@@ -82,7 +84,7 @@ func applySchema(data json.RawMessage, resolved *jsonschema.Resolved) (json.RawM
 	if resolved != nil {
 		v := make(map[string]any)
 		if len(data) > 0 {
-			if err := json.Unmarshal(data, &v); err != nil {
+			if err := internaljson.Unmarshal(data, &v); err != nil {
 				return nil, fmt.Errorf("unmarshaling arguments: %w", err)
 			}
 		}
@@ -100,4 +102,39 @@ func applySchema(data json.RawMessage, resolved *jsonschema.Resolved) (json.RawM
 		}
 	}
 	return data, nil
+}
+
+// validateToolName checks whether name is a valid tool name, reporting a
+// non-nil error if not.
+func validateToolName(name string) error {
+	if name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+	if len(name) > 128 {
+		return fmt.Errorf("tool name exceeds maximum length of 128 characters (current: %d)", len(name))
+	}
+	// For consistency with other SDKs, report characters in the order the appear
+	// in the name.
+	var invalidChars []string
+	seen := make(map[rune]bool)
+	for _, r := range name {
+		if !validToolNameRune(r) {
+			if !seen[r] {
+				invalidChars = append(invalidChars, fmt.Sprintf("%q", string(r)))
+				seen[r] = true
+			}
+		}
+	}
+	if len(invalidChars) > 0 {
+		return fmt.Errorf("tool name contains invalid characters: %s", strings.Join(invalidChars, ", "))
+	}
+	return nil
+}
+
+// validToolNameRune reports whether r is valid within tool names.
+func validToolNameRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '_' || r == '-' || r == '.'
 }

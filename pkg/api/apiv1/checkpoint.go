@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
@@ -20,6 +21,9 @@ import (
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
+
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -75,6 +79,8 @@ type CheckpointAPIOpts struct {
 	RunJWTSecret []byte
 	// BackoffFunc computes retry timing. If nil, uses the default backoff table.
 	BackoffFunc backoff.BackoffFunc
+	// AllowStepMetadata controls whether step metadata is allowed for a given account.
+	AllowStepMetadata executor.AllowStepMetadata
 }
 
 // checkpointAPI is the base implementation.
@@ -96,13 +102,14 @@ type checkpointAPI struct {
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	c := checkpoint.New(checkpoint.Opts{
-		State:           o.State,
-		FnReader:        o.FunctionReader,
-		Executor:        o.Executor,
-		TracerProvider:  o.TracerProvider,
-		Queue:           o.Queue,
-		MetricsProvider: o.CheckpointOpts.CheckpointMetrics,
-		BackoffFunc:     o.CheckpointOpts.BackoffFunc,
+		State:             o.State,
+		FnReader:          o.FunctionReader,
+		Executor:          o.Executor,
+		TracerProvider:    o.TracerProvider,
+		Queue:             o.Queue,
+		MetricsProvider:   o.CheckpointOpts.CheckpointMetrics,
+		BackoffFunc:       o.CheckpointOpts.BackoffFunc,
+		AllowStepMetadata: o.CheckpointOpts.AllowStepMetadata,
 	})
 
 	api := checkpointAPI{
@@ -176,11 +183,11 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// SHOULD automatically have a timeout after 60 minutes;  we should auomatically ensure
 	// that functions are marked as FAILED if we do not get a call to finalize them.
 	_, md, err := a.Executor.Schedule(ctx, execution.ScheduleRequest{
-		RunID:       &input.RunID,
-		Function:    fn,
-		AccountID:   auth.AccountID(),
-		WorkspaceID: auth.WorkspaceID(),
-		AppID:       input.AppID(auth.WorkspaceID()),
+		RunID:          &input.RunID,
+		Function:       fn,
+		AccountID:      auth.AccountID(),
+		WorkspaceID:    auth.WorkspaceID(),
+		AppID:          input.AppID(auth.WorkspaceID()),
 		RunMode:        enums.RunModeSync,
 		Events:         []event.TrackedEvent{evt},
 		URL:            input.URL(),
@@ -243,11 +250,50 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 
 	}
 
+	// This is for DurableEndpoint streaming. It gives the DurableEndpoint a
+	// realtime JWT that it can pass back to its client (e.g. the browser). The
+	// client needs a realtime JWT to redirect to the Inngest Server so it can
+	// subscribe to the new stream after the run goes async.
+	var realtimeToken string
+	if len(a.Opts.RealtimeJWTSecret) > 0 {
+		rt, err := realtime.NewJWT(
+			ctx,
+			a.Opts.RealtimeJWTSecret,
+			auth.AccountID(),
+			auth.WorkspaceID(),
+			[]realtime.Topic{{
+				Channel: md.ID.RunID.String(),
+				Name:    streamingtypes.TopicNameStream,
+				Kind:    streamingtypes.TopicKindRun,
+				EnvID:   auth.WorkspaceID(),
+			}},
+			realtime.NewJWTOpts{
+				// Add a minute buffer just in case.
+				Expiry: util.ToPtr(realtime.MaxDurpStreamingRun + time.Minute),
+			},
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Warn(
+				"error creating realtime subscribe JWT",
+				"error", err,
+				"account_id", auth.AccountID(),
+				"env_id", auth.WorkspaceID(),
+				"run_id", md.ID.RunID,
+			)
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(
+				err, 500, "error creating realtime subscribe JWT",
+			))
+			return
+		}
+		realtimeToken = rt
+	}
+
 	_ = WriteResponse(w, CheckpointNewRunResponse{
-		RunID: md.ID.RunID.String(),
-		FnID:  fn.ID,
-		AppID: appID,
-		Token: jwt,
+		RunID:         md.ID.RunID.String(),
+		FnID:          fn.ID,
+		AppID:         appID,
+		Token:         jwt,
+		RealtimeToken: realtimeToken,
 	})
 }
 
@@ -281,7 +327,16 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 		Steps:     input.Steps,
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
+		if errors.Is(err, state.ErrStepOutputTooLarge) || errors.Is(err, state.ErrStateOverflowed) {
+			logger.StdlibLogger(ctx).Error("sync checkpoint skipped: step output too large",
+				"run_id", input.RunID,
+				"fn_id", input.FnID,
+				"step_count", len(input.Steps),
+				"error", err,
+			)
+		} else {
+			logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
+		}
 	}
 }
 
@@ -321,13 +376,24 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		EnvID:        auth.WorkspaceID(),
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+		status := http.StatusBadRequest
+		if errors.Is(err, state.ErrStepOutputTooLarge) || errors.Is(err, state.ErrStateOverflowed) {
+			logger.StdlibLogger(ctx).Error("async checkpoint rejected",
+				"run_id", input.RunID,
+				"fn_id", input.FnID,
+				"step_count", len(input.Steps),
+				"error", err,
+			)
+			status = http.StatusRequestEntityTooLarge
+		} else {
+			logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+		}
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
-			Message: "Failed to checkpoint steps",
+			Message: err.Error(),
 			Data: map[string]any{
 				"run_id": input.RunID,
 			},
-			Status: 400,
+			Status: status,
 		})
 	}
 }
@@ -376,7 +442,7 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set(k, v)
 			}
 			w.WriteHeader(res.Data.StatusCode)
-			_, _ = w.Write(res.Data.Body)
+			_, _ = w.Write([]byte(res.Data.Body))
 			return
 		}
 
@@ -432,30 +498,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		return
 	}
 
-	// We may have already added this function, so check if it exists prior to inserting and updating.
-	// XXX: It would be good to add an upsert method to the function CQRS layer.
-	fn, err := a.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
-	if err == nil && fn != nil {
-		if string(fn.Config) == config {
-			return // no need to update
-		}
-		_, err = a.FunctionCreator.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
-			Config:    config,
-			ID:        fnID,
-			AccountID: auth.AccountID(),
-			EnvID:     auth.WorkspaceID(),
-			AppID:     app.ID,
-		})
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("failed to update fn config",
-				"error", err,
-				"app_id", input.AppID(auth.WorkspaceID()),
-			)
-		}
-		return
-	}
-
-	_, err = a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
+	_, err = a.FunctionCreator.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 		ID:        fnID,
 		AccountID: auth.AccountID(),
 		EnvID:     auth.WorkspaceID(),
@@ -466,7 +509,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		CreatedAt: time.UnixMilli(input.Event.Timestamp),
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("failed to insert function",
+		logger.StdlibLogger(ctx).Error("failed to upsert function",
 			"error", err,
 			"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
 			"app_id", app.ID,

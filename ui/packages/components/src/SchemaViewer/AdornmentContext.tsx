@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react';
 
-import type { ValueNode } from './types';
+import type { TypedNode } from './types';
 
-export type RenderAdornmentFn = (node: ValueNode, typeLabel: string) => React.ReactNode;
+export type RenderAdornmentFn = (node: TypedNode, typeLabel: string) => React.ReactNode;
 
 const defaultRenderAdornment: RenderAdornmentFn = () => null;
 

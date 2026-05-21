@@ -199,12 +199,25 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 				rec.Key = []byte(id.GetRunId())
 			case id.GetFunctionId() != "":
 				l.Warn("missing run_id, falling back to function_id", "span", sp)
+				metrics.IncrSpanExportMissingRunID(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"fallback": "function_id"},
+				})
 				rec.Key = []byte(id.GetFunctionId())
 			case id.GetEnvId() != "":
-				l.Warn("missing run_id, falling back to env_id", "span", sp)
+				// No logging as it's expected to happen with some of the v1 traces
+				// not having run ids.
+				metrics.IncrSpanExportMissingRunID(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"fallback": "env_id"},
+				})
 				rec.Key = []byte(id.GetEnvId())
 			case id.GetAccountId() != "":
 				l.Warn("missing run_id, falling back to acct_id", "span", sp)
+				metrics.IncrSpanExportMissingRunID(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"fallback": "acct_id"},
+				})
 				rec.Key = []byte(id.GetAccountId())
 			default:
 				l.Error("missing run_id, no other identifier to fallback to", "span", sp)

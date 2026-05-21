@@ -25,13 +25,13 @@ import (
 
 // getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
 func getItemIDsFromBacklog(ctx context.Context, mgr queue.ShardOperations, backlog *queue.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
-	items, _, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
+	res, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	itemIDs := make([]string, len(items))
-	for i, item := range items {
+	itemIDs := make([]string, len(res.Items))
+	for i, item := range res.Items {
 		itemIDs[i] = item.ID
 	}
 	return itemIDs, nil
@@ -129,16 +129,12 @@ func TestLuaCompatibility(t *testing.T) {
 				shard := setup(t)
 
 				// Initialize queue
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
 				q, err := queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					})
+					shardRegistry)
 				require.NoError(t, err)
 
 				// Test data setup
@@ -189,7 +185,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// - Lease item
 				leaseDuration := 30 * time.Second
-				leaseID, err := shard.Lease(ctx, enqueuedItem, leaseDuration, now, nil)
+				leaseID, err := shard.Lease(ctx, enqueuedItem, leaseDuration, now)
 				require.NoError(t, err, "Failed to lease item on %s", serverType)
 				require.NotNil(t, leaseID, "Lease ID should not be nil on %s", serverType)
 
@@ -244,16 +240,12 @@ func TestLuaCompatibility(t *testing.T) {
 				keyHash := util.XXHash(throttleKey)
 
 				// Initialize queue
-				_, err := queue.New(
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
+				_, err = queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					},
+					shardRegistry,
 					opts...,
 				)
 				require.NoError(t, err)
@@ -281,7 +273,7 @@ func TestLuaCompatibility(t *testing.T) {
 				qi, err := shard.EnqueueItem(ctx, queueItem, now, queue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				leaseID, err := shard.Lease(ctx, qi, 5*time.Second, now, nil)
+				leaseID, err := shard.Lease(ctx, qi, 5*time.Second, now)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 			})
@@ -318,16 +310,12 @@ func TestLuaCompatibility(t *testing.T) {
 
 				shard := setup(t, opts...)
 
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
 				q, err := queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					},
+					shardRegistry,
 					opts...,
 				)
 				require.NoError(t, err)
@@ -364,11 +352,10 @@ func TestLuaCompatibility(t *testing.T) {
 				refillItems, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 10)
 				require.NoError(t, err)
 
-				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
+				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill, *res)
-				require.Equal(t, 1, res.Refilled)
+				require.Equal(t, 1, len(res.RefilledItems))
 
 				// Add second item with capacity lease
 				capacityLeaseID := ulid.MustNew(ulid.Timestamp(refillUntil.Add(5*time.Second)), rand.Reader)
@@ -405,20 +392,17 @@ func TestLuaCompatibility(t *testing.T) {
 					&sp,
 					refillUntil,
 					refillItems,
-					constraints,
-					queue.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
-					queue.WithBacklogRefillDisableConstraintChecks(true),
 					queue.WithBacklogRefillItemCapacityLeases([]queue.CapacityLease{{
 						LeaseID: capacityLeaseID,
 					}}),
 				)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill)
-				require.Equal(t, 1, res.Refilled)
+				require.Equal(t, 1, len(res.RefilledItems))
 
-				refilled, err := q.ItemByID(ctx, shard, qi2.ID)
+				refilled, err := q.LoadQueueItem(ctx, shard.Name(), qi2.ID)
 				require.NoError(t, err)
+				require.NotNil(t, refilled.CapacityLease)
 				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLease.LeaseID.String())
 			})
 

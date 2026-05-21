@@ -1109,7 +1109,7 @@ func TestBacklogsByPartition(t *testing.T) {
 	defer rc.Close()
 
 	ctx := context.Background()
-	clock := clockwork.NewFakeClock()
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -1141,7 +1141,7 @@ func TestBacklogsByPartition(t *testing.T) {
 			from:          clock.Now(),
 			until:         clock.Now().Add(7 * time.Second).Truncate(time.Second),
 			interval:      time.Second,
-			expectedItems: 7,
+			expectedItems: 8,
 		},
 		{
 			name:          "with batch size",
@@ -1323,25 +1323,21 @@ func TestPartitionBacklogSize(t *testing.T) {
 			r1.FlushAll()
 			r2.FlushAll()
 
+			registry1, err := osqueue.NewShardRegistry(queueShards, osqueue.WithShardSelector(alwaysSelectShard(shard1)), osqueue.WithPrimary(shard1))
+			require.NoError(t, err)
 			q1, err := osqueue.New(
 				ctx,
 				"q1",
-				shard1,
-				queueShards,
-				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
-					return shard1, nil
-				},
+				registry1,
 				opts...,
 			)
+			require.NoError(t, err)
+			registry2, err := osqueue.NewShardRegistry(queueShards, osqueue.WithShardSelector(alwaysSelectShard(shard2)), osqueue.WithPrimary(shard2))
 			require.NoError(t, err)
 			q2, err := osqueue.New(
 				ctx,
 				"q2",
-				shard2,
-				queueShards,
-				func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
-					return shard2, nil
-				},
+				registry2,
 				opts...,
 			)
 			require.NoError(t, err)

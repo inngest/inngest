@@ -60,7 +60,19 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		enableDebugLogsVal = "1"
 	}
 
+	enableCacheInvalidation := "0"
+	if r.enableAcquireCache != nil {
+		enableCacheInvalidation = "1"
+	}
+
 	scopedKeyPrefix := fmt.Sprintf("{cs}:%s", accountScope(req.AccountID))
+
+	// Force-release semaphores when the scavenger is reclaiming an expired lease.
+	// Without this, manual-release semaphores would be permanently held after a crash.
+	forceReleaseSemaphores := "0"
+	if req.Source.Location == CallerLocationLeaseScavenge {
+		forceReleaseSemaphores = "1"
+	}
 
 	args, err := strSlice([]any{
 		scopedKeyPrefix,
@@ -68,6 +80,8 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		req.LeaseID.String(),
 		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
+		forceReleaseSemaphores,
+		enableCacheInvalidation,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
@@ -135,29 +149,25 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	switch parsedResponse.Status {
 	case 1, 2:
 		l.Trace("capacity lease already cleaned up in release")
-
-		// TODO: Track status (1: cleaned up, 2: cleaned up)
-		return res, nil
 	case 3:
 		if r.enableHighCardinalityInstrumentation != nil && r.enableHighCardinalityInstrumentation(ctx, req.AccountID, uuid.Nil, uuid.Nil) {
 			l.Debug("capacity released")
 		}
-
-		if len(r.lifecycles) > 0 {
-			for _, hook := range r.lifecycles {
-				err := hook.OnCapacityLeaseReleased(ctx, OnCapacityLeaseReleasedData{
-					AccountID: req.AccountID,
-					LeaseID:   req.LeaseID,
-				})
-				if err != nil {
-					return nil, errs.Wrap(0, false, "release lifecycle failed: %w", err)
-				}
-			}
-		}
-
-		// TODO: track success
-		return res, nil
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
+
+	if len(r.lifecycles) > 0 {
+		for _, hook := range r.lifecycles {
+			err := hook.OnCapacityLeaseReleased(ctx, OnCapacityLeaseReleasedData{
+				AccountID: req.AccountID,
+				LeaseID:   req.LeaseID,
+			})
+			if err != nil {
+				return nil, errs.Wrap(0, false, "release lifecycle failed: %w", err)
+			}
+		}
+	}
+
+	return res, nil
 }

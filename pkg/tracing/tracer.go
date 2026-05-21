@@ -60,16 +60,20 @@ type CreateSpanOptions struct {
 	Seed   []byte
 	SpanID trace.SpanID
 
-	// DynamicSeed is optional and used for CreateOrUpdate operations
-	// This differs from Seed in that seed creates a deterministic trace and span ID while
-	// dynamic seed only creates a deterministic dynamic span ID while leaving the concrete span ID random.
-	DynamicSeed []byte
+	// DynamicSpanIDOverride, if non-empty, sets the persisted DynamicSpanID
+	// attribute to exactly this value, leaving the concrete OTel span_id
+	// random.
+	//
+	// Use this when multiple physical span rows must share one
+	// logical identity but have have unique span_ids.
+	DynamicSpanIDOverride string
 }
 
 type UpdateSpanOptions struct {
 	Attributes         *meta.SerializableAttrs
 	Debug              *SpanDebugData
 	EndTime            time.Time
+	EndTimeOffset      time.Duration
 	Metadata           *statev2.Metadata
 	QueueItem          *queue.Item
 	RawOtelSpanOptions []trace.SpanStartOption
@@ -231,8 +235,8 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	}
 
 	spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
-	if opts.DynamicSeed != nil {
-		spanRef.DynamicSpanID = DeterministicSpanID(opts.DynamicSeed).String()
+	if opts.DynamicSpanIDOverride != "" {
+		spanRef.DynamicSpanID = opts.DynamicSpanIDOverride
 	}
 
 	if opts.Parent != nil {
@@ -341,10 +345,12 @@ func (tp *otelTracerProvider) UpdateSpan(
 		attrs = attrs.Merge(opts.Attributes)
 	}
 
+	tsWithOffset := ts.Add(opts.EndTimeOffset)
+
 	spanOpts := append(
 		[]trace.SpanStartOption{
 			trace.WithAttributes(attrs.Serialize()...),
-			trace.WithTimestamp(ts),
+			trace.WithTimestamp(tsWithOffset),
 		},
 		opts.RawOtelSpanOptions...,
 	)
@@ -352,7 +358,7 @@ func (tp *otelTracerProvider) UpdateSpan(
 	tracer := tp.getTracer(opts.Metadata)
 	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)
 
-	span.End()
+	span.End(trace.WithTimestamp(tsWithOffset))
 	return nil
 }
 

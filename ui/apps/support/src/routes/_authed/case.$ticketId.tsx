@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useUser } from "@clerk/tanstack-react-start";
 import {
@@ -45,10 +46,34 @@ export const Route = createFileRoute("/_authed/case/$ticketId")({
 });
 
 function TicketDetailPage() {
-  const { ticket, timelineEntries } = Route.useLoaderData();
-  const router = useRouter();
+  const { ticket, timelineEntries: initialTimelineEntries } =
+    Route.useLoaderData();
+  const params = Route.useParams();
   const { user } = useUser();
   const timelineEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: serverEntries, refetch: refetchTimeline } = useQuery({
+    queryKey: ["timeline", params.ticketId],
+    queryFn: () =>
+      getTimelineEntriesForTicket({ data: { ticketId: params.ticketId } }),
+    initialData: initialTimelineEntries,
+    staleTime: 30_000,
+  });
+
+  const [pendingEntries, setPendingEntries] = useState<TimeLineEntryEdge[]>([]);
+
+  const timelineEntries = useMemo(() => {
+    const real = serverEntries ?? [];
+    const pending = pendingEntries.filter((pending) => {
+      const pendingTime = new Date(pending.node.timestamp.iso8601).getTime();
+      return !real.some(
+        (real) =>
+          real.node.actor.__typename === "CustomerActor" &&
+          new Date(real.node.timestamp.iso8601).getTime() >= pendingTime,
+      );
+    });
+    return [...real, ...pending];
+  }, [serverEntries, pendingEntries]);
 
   if (!ticket || !timelineEntries) {
     return <div>Error loading ticket</div>;
@@ -59,10 +84,9 @@ function TicketDetailPage() {
   const userEmail = user?.primaryEmailAddress?.emailAddress;
 
   const scrollToBottom = () => {
-    // Wait for the DOM to update after invalidation, then scroll
     setTimeout(() => {
       timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 500);
+    }, 100);
   };
 
   // Find the first Slack message link for the "Reply in Slack" button
@@ -189,9 +213,41 @@ function TicketDetailPage() {
             <ReplyForm
               ticketId={ticket.id}
               userEmail={userEmail}
-              onSuccess={async () => {
-                await router.invalidate();
+              onSuccess={(sentMessage: string) => {
+                const now = new Date().toISOString();
+                const optimistic: TimeLineEntryEdge = {
+                  cursor: `pending-${Date.now()}`,
+                  node: {
+                    id: `pending-${Date.now()}`,
+                    timestamp: { __typename: "DateTime", iso8601: now },
+                    actor: {
+                      __typename: "CustomerActor",
+                      customer: {
+                        fullName: user?.fullName || userEmail || "You",
+                        avatarUrl: user?.imageUrl || "",
+                        email: { email: userEmail || "" },
+                      },
+                    },
+                    entry: {
+                      __typename: "EmailEntry",
+                      emailId: `pending-${Date.now()}`,
+                      subject: "",
+                      textContent: sentMessage,
+                      markdownContent: sentMessage,
+                      hasMoreMarkdownContent: false,
+                      fullMarkdownContent: sentMessage,
+                      sentAt: {
+                        unixTimestamp: String(Math.floor(Date.now() / 1000)),
+                        iso8601: now,
+                      },
+                      attachments: [],
+                    },
+                  },
+                };
+                setPendingEntries((prev) => [...prev, optimistic]);
                 scrollToBottom();
+                setTimeout(() => refetchTimeline(), 3000);
+                setTimeout(() => refetchTimeline(), 8000);
               }}
             />
           ) : null}
@@ -297,7 +353,7 @@ function ReplyForm({
 }: {
   ticketId: string;
   userEmail: string;
-  onSuccess: () => void;
+  onSuccess: (message: string) => void;
 }) {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -316,6 +372,15 @@ function ReplyForm({
     userEmail,
     onError: setError,
   });
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [message]);
+
   const hasContent =
     message.trim().length > 0 || uploadedAttachmentIds.length > 0;
 
@@ -340,9 +405,10 @@ function ReplyForm({
       });
 
       if (result.success) {
+        const sentMessage = message.trim();
         setMessage("");
         clearAttachments();
-        onSuccess();
+        onSuccess(sentMessage);
       } else {
         setError(result.error || "Failed to send message");
       }
@@ -359,11 +425,12 @@ function ReplyForm({
       <form onSubmit={handleSubmit}>
         <div className="border-muted bg-canvasBase flex flex-col gap-2 rounded-lg border px-4 py-3 shadow-sm">
           <textarea
+            ref={textareaRef}
             placeholder="Add new message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={1}
-            className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
+            className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
             disabled={isSubmitting}
           />
 
@@ -441,8 +508,6 @@ function TimelineEntry({
       ? entry.node.entry.components
           .map((component) => component.text)
           .join("\n")
-      : entry.node.entry.__typename === "ChatEntry"
-      ? entry.node.entry.chatText || ""
       : entry.node.entry.text || "";
 
   return (
@@ -517,8 +582,7 @@ function TimelineEntry({
 
         {(entry.node.entry.__typename === "EmailEntry" ||
           entry.node.entry.__typename === "SlackMessageEntry" ||
-          entry.node.entry.__typename === "SlackReplyEntry" ||
-          entry.node.entry.__typename === "ChatEntry") &&
+          entry.node.entry.__typename === "SlackReplyEntry") &&
           entry.node.entry.attachments.length > 0 && (
             <div className="flex flex-row flex-wrap gap-1">
               {entry.node.entry.attachments.map((attachment) => (

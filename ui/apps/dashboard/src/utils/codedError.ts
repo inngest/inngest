@@ -27,6 +27,7 @@ const codes = [
   'sig_verification_failed',
   'signing_key_invalid',
   'signing_key_unspecified',
+  'sdk_version_denied',
   'too_many_pings',
   'unknown',
   'url_invalid',

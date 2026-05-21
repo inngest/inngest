@@ -40,7 +40,7 @@ func (q *queueProcessor) enqueueLatencyJob(ctx context.Context, partition int) e
 		QueueName: &queueName,
 	}, q.Clock().Now(), EnqueueOpts{
 		IdempotencyPeriod:   &idempotency,
-		ForceQueueShardName: q.primaryQueueShard.Name(),
+		ForceQueueShardName: q.Shard().Name(),
 	})
 }
 

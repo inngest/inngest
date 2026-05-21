@@ -32,10 +32,5 @@ go.work.sum
 # IntelliJ-based editor files
 .idea
 
-# Release
-node_modules
-.npmrc
-
 # AI
-CLAUDE.md
 /.claude/

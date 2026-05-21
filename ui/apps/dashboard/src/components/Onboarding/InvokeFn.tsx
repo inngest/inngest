@@ -29,12 +29,10 @@ const initialCode = JSON.stringify(
 
 interface FunctionOption extends Option {
   slug: string;
-  current: {
-    triggers: {
-      type: string;
-      value: string;
-    }[];
-  };
+  triggers: {
+    type: string;
+    value: string;
+  }[];
 }
 
 export default function InvokeFn() {
@@ -53,7 +51,7 @@ export default function InvokeFn() {
   const isOnboardingCompleted = lastCompletedStep?.isFinalStep;
 
   const hasEventTrigger =
-    selectedFunction?.current.triggers.some(
+    selectedFunction?.triggers.some(
       (trigger) => trigger.type == FunctionTriggerTypes.Event,
     ) ?? false;
 

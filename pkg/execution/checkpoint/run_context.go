@@ -36,6 +36,13 @@ func (c *checkpointRunContext) DriverResponse() *state.DriverResponse {
 	return nil
 }
 
+func (c *checkpointRunContext) OnlyHasLazyOps() bool {
+	// Checkpoint dispatches DeferAdd/DeferAbort via defers.SaveFromOp /
+	// defers.AbortFromOp before reaching the executor's lazy handlers, so
+	// this predicate is unreachable from a checkpoint runCtx.
+	return false
+}
+
 func (c *checkpointRunContext) Events() []json.RawMessage {
 	return c.events
 }
@@ -122,4 +129,9 @@ func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
 
 func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
 	return tracing.RunSpanRefFromMetadata(&c.md)
+}
+
+func (c *checkpointRunContext) ReleaseCapacityLease() error {
+	// TODO: Implement this once capacity leases are supported in Checkpointing
+	return nil
 }

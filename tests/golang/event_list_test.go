@@ -597,7 +597,7 @@ func TestEventList(t *testing.T) {
 			} `json:"data"`
 		}
 		expectedFunctionId := "internal-events-fn"
-		r.EventuallyWithT(func(t *assert.CollectT) {
+		r.EventuallyWithT(func(ct *assert.CollectT) {
 			// Explicitly include internal events.
 			res, err := c.GetEvents(ctx, client.GetEventsOpts{
 				PageSize: 50,
@@ -607,23 +607,26 @@ func TestEventList(t *testing.T) {
 					IncludeInternalEvents: true,
 				},
 			})
-			r.NoError(err)
+			if !assert.NoError(ct, err) {
+				return
+			}
 
 			// Theoretically we want exactly equals to 2 but don't always get it due to poor test isolation
-			r.GreaterOrEqual(res.TotalCount, 2)
+			assert.GreaterOrEqual(ct, res.TotalCount, 2)
 			// Also due to poor test isolation, if there are more events in the last minute than a single page size
 			// this might fail. Possibly remove this
-			r.Equal(len(res.Edges), res.TotalCount)
+			assert.Equal(ct, len(res.Edges), res.TotalCount)
 
 			// Guarantee that at least one of the events we saw was from eventName and another from inngest/function.finished
-			r.True(slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
+			assert.True(ct, slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
 				return e.Node.Name == eventName
 			}))
-			r.True(slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
+			assert.True(ct, slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
 				if e.Node.Name == "inngest/function.finished" {
 					var raw Raw
-					err := json.Unmarshal([]byte(e.Node.Raw), &raw)
-					r.NoError(err)
+					if err := json.Unmarshal([]byte(e.Node.Raw), &raw); err != nil {
+						return false
+					}
 
 					return raw.Data.FunctionID == expectedFunctionId
 				}

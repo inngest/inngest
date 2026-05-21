@@ -47,7 +47,7 @@ var (
 	// Such failures do not indicate that the connection is broken, but rather
 	// should be returned to the caller to indicate that the specific request is
 	// invalid in the current context.
-	ErrRejected = NewError(-32004, "rejected by transport")
+	ErrRejected = NewError(-32005, "rejected by transport")
 )
 
 const wireVersion = "2.0"

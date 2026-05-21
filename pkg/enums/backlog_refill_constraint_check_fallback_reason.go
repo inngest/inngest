@@ -7,6 +7,6 @@ type BacklogRefillConstraintCheckReason int
 const (
 	BacklogRefillConstraintCheckReasonConstraintAPIUninitialized BacklogRefillConstraintCheckReason = iota
 	BacklogRefillConstraintCheckReasonIDNil
-	BacklogRefillConstraintCheckReasonFeatureFlagDisabled
+	BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled
 	BacklogRefillConstraintCheckReasonConstraintAPIError
 )

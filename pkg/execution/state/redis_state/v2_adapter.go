@@ -5,15 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/redis/rueidis"
 )
 
 func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
@@ -84,6 +83,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			ReplayID:              s.Metadata.Config.ReplayID,
 			PriorityFactor:        s.Metadata.Config.PriorityFactor,
 			CustomConcurrencyKeys: s.Metadata.Config.CustomConcurrencyKeys,
+			Semaphores:            s.Metadata.Config.Semaphores,
 			BatchID:               s.Metadata.Config.BatchID,
 		},
 		EventBatchData: batchData,
@@ -173,6 +173,9 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			"account_id": s.Metadata.ID.Tenant.AccountID,
 		},
 	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(stateSize), metrics.HistogramOpt{
+		PkgName: "redis_state",
+	})
 
 	steps := make(map[string]json.RawMessage)
 	for _, step := range s.Steps {
@@ -198,6 +201,14 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 
 func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {
 	return v.mgr.Exists(ctx, id.Tenant.AccountID, id.RunID)
+}
+
+func (v v2) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer, error) {
+	return v.mgr.LoadDefers(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+func (v v2) LoadDefersMeta(ctx context.Context, id state.ID) (map[string]state.DeferMeta, error) {
+	return v.mgr.LoadDefersMeta(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // LoadEvents returns all events for a run.
@@ -245,9 +256,16 @@ func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 	return state, nil
 }
 
-// StreamState returns all state without loading in-memory
-func (v v2) StreamState(ctx context.Context, id state.ID) (io.Reader, error) {
-	return nil, fmt.Errorf("not implemented")
+func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
+	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
+}
+
+func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
+	return v.mgr.SetDeferStatus(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hashedID, status)
+}
+
+func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
+	return v.mgr.SaveRejectedDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, fnSlug, hashedID)
 }
 
 // Metadata returns metadata for a given run
@@ -289,15 +307,18 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			OriginalRunID:         md.Identifier.OriginalRunID,
 			PriorityFactor:        md.Identifier.PriorityFactor,
 			CustomConcurrencyKeys: md.Identifier.CustomConcurrencyKeys,
+			Semaphores:            md.Identifier.Semaphores,
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
 			HasAI:                 md.HasAI,
 		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
-			EventSize: md.EventSize,
-			StateSize: md.StateSize,
-			StepCount: md.StepCount,
+			EventSize:          md.EventSize,
+			StateSize:          md.StateSize,
+			StepCount:          md.StepCount,
+			MetadataSize:       md.MetadataSize,
+			MetadataSizeLoaded: md.MetadataSize,
 		},
 	}
 
@@ -305,13 +326,6 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 	_ = result.Config.FunctionTrace()
 
 	return result, nil
-}
-
-// LoadV1Metadata returns the v1 Metadata for a given run, which includes
-// extended fields like Status, Debugger, RunType, and Version that are
-// not part of the v2 Metadata struct.
-func (v v2) LoadV1Metadata(ctx context.Context, id state.ID) (*statev1.Metadata, error) {
-	return v.mgr.Metadata(ctx, id.Tenant.AccountID, id.RunID)
 }
 
 // LoadStack returns the current stack for a run.
@@ -399,6 +413,9 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 			"account_id": id.Tenant.AccountID,
 		},
 	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(len(data)), metrics.HistogramOpt{
+		PkgName: "redis_state",
+	})
 
 	return hasPending, err
 }
@@ -439,99 +456,10 @@ func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.Cons
 	return r, err
 }
 
-// Duplicate creates a copy of the given state in this store,
-// preserving all metadata fields exactly including metrics, config, etc.
-// rawMeta is the v1 Metadata from the source, containing extended fields like
-// Status, Debugger, RunType, Version that aren't in v2 Metadata.
-// stepInputs must be loaded separately from the source backend via LoadStepInputs.
-func (v v2) Duplicate(ctx context.Context, source state.State, destID state.ID, rawMeta *statev1.Metadata, stepInputs map[string]json.RawMessage) error {
-	sourceMetadata := source.Metadata
-
-	// Convert step inputs map to slice (order doesn't matter for inputs - they don't go to stack)
-	stepInputsSlice := make([]statev1.MemoizedStep, 0, len(stepInputs))
-	for id, data := range stepInputs {
-		stepInputsSlice = append(stepInputsSlice, statev1.MemoizedStep{ID: id, Data: data})
-	}
-
-	// Step 1: Create state with NO steps - only events, metadata, and step inputs
-	// We'll add steps individually via SaveStep to preserve Stack ordering
-	destInput := state.CreateState{
-		Metadata: state.Metadata{
-			ID: destID,
-			Config: *state.InitConfig(&state.Config{
-				SpanID:                sourceMetadata.Config.SpanID,
-				Idempotency:           sourceMetadata.Config.Idempotency,
-				FunctionVersion:       sourceMetadata.Config.FunctionVersion,
-				RequestVersion:        sourceMetadata.Config.RequestVersion,
-				EventIDs:              sourceMetadata.Config.EventIDs,
-				PriorityFactor:        sourceMetadata.Config.PriorityFactor,
-				CustomConcurrencyKeys: sourceMetadata.Config.CustomConcurrencyKeys,
-				BatchID:               sourceMetadata.Config.BatchID,
-				ReplayID:              sourceMetadata.Config.ReplayID,
-				OriginalRunID:         sourceMetadata.Config.OriginalRunID,
-				Context:               sourceMetadata.Config.Context,
-			}),
-		},
-		Events:     source.Events,
-		StepInputs: stepInputsSlice,
-		Steps:      nil, // No steps - we'll add them individually
-	}
-
-	_, err := v.Create(ctx, destInput)
-	if err != nil {
-		return fmt.Errorf("failed to create destination state: %w", err)
-	}
-
-	// Step 2: Save each step individually in Stack order
-	// This ensures the Stack is built correctly via SaveStep -> saveResponse.lua -> RPUSH
-	for _, stepID := range sourceMetadata.Stack {
-		stepData, ok := source.Steps[stepID]
-		if !ok {
-			return fmt.Errorf("step %q in Stack not found in Steps map", stepID)
-		}
-		_, err := v.SaveStep(ctx, destID, stepID, stepData)
-		if err != nil {
-			return fmt.Errorf("failed to save step %s: %w", stepID, err)
-		}
-	}
-
-	// Step 3: Use UpdateMetadata to set mutable fields (hasAI, die, sat, rv)
-	// This ensures consistent behavior with the rest of the codebase
-	err = v.UpdateMetadata(ctx, destID, state.MutableConfig{
-		StartedAt:      rawMeta.StartedAt,
-		RequestVersion: rawMeta.RequestVersion,
-		ForceStepPlan:  rawMeta.DisableImmediateExecution,
-		HasAI:          rawMeta.HasAI,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update metadata: %w", err)
-	}
-
-	// Step 4: Set extended metadata fields that aren't covered by UpdateMetadata
-	// These are v1-specific fields: status, debugger, version, runType
-	// Note: ReplayID is already stored inside the `id` JSON blob via Config.ReplayID
-	fnRunState := v.mgr.s.FunctionRunState()
-	client, isSharded := fnRunState.Client(ctx, destID.Tenant.AccountID, destID.RunID)
-	metadataKey := fnRunState.KeyGenerator().RunMetadata(ctx, isSharded, destID.RunID)
-
-	fields := map[string]string{
-		"status":   fmt.Sprintf("%d", rawMeta.Status),
-		"debugger": fmt.Sprintf("%t", rawMeta.Debugger),
-		"version":  fmt.Sprintf("%d", rawMeta.Version),
-	}
-
-	if rawMeta.RunType != nil && *rawMeta.RunType != "" {
-		fields["runType"] = *rawMeta.RunType
-	}
-
-	// Use HSET for the remaining fields
-	return client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
-		cmd := c.B().Hset().Key(metadataKey).FieldValue()
-		for k, val := range fields {
-			cmd = cmd.FieldValue(k, val)
-		}
-		return cmd.Build()
-	}).Error()
+// IncrementMetadataSize atomically increments the cumulative metadata size
+// counter for a run via HINCRBY.
+func (v v2) IncrementMetadataSize(ctx context.Context, id state.ID, delta int) error {
+	return v.mgr.IncrementMetadataSize(ctx, id.Tenant.AccountID, id.RunID, delta)
 }
 
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {

@@ -94,9 +94,9 @@ func WithServiceLogger(l logger.Logger) func(s *svc) {
 	}
 }
 
-func WithServiceShardSelector(sl queue.ShardSelector) func(s *svc) {
+func WithServiceShardRegistry(shards queue.ShardRegistry) func(s *svc) {
 	return func(s *svc) {
-		s.findShard = sl
+		s.shards = shards
 	}
 }
 
@@ -123,9 +123,8 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	for _, o := range opts {
 		o(svc)
 	}
-	// don't proceed if shard selector is not set
-	if svc.findShard == nil {
-		panic("shard selector need to be provided for executor service")
+	if svc.shards == nil {
+		panic("shard registry must be provided for executor service")
 	}
 
 	return svc
@@ -140,17 +139,16 @@ type svc struct {
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
 	// exec runs the specific actions.
-	exec          execution.Executor
-	debouncer     debounce.Debouncer
-	batcher       batch.BatchManager
-	croner        cron.CronManager
-	log           logger.Logger
-	shardSelector queue.ShardSelector
+	exec      execution.Executor
+	debouncer debounce.Debouncer
+	batcher   batch.BatchManager
+	croner    cron.CronManager
+	log       logger.Logger
 
 	wg sync.WaitGroup
 
-	opts      []ExecutorOpt
-	findShard queue.ShardSelector
+	opts   []ExecutorOpt
+	shards queue.ShardRegistry
 
 	publisher pubsub.Publisher
 
@@ -447,7 +445,12 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 
 	for _, f := range all {
 		if f.ID == d.FunctionID {
-			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID, d.AccountID)
+			scope := queue.Scope{
+				AccountID:  d.AccountID,
+				EnvID:      d.WorkspaceID,
+				FunctionID: d.FunctionID,
+			}
+			di, err := s.debouncer.GetDebounceItem(ctx, scope, d.DebounceID)
 			if err != nil {
 				if errors.Is(err, debounce.ErrDebounceNotFound) {
 					// This is expected after migrating items to a new primary cluster
@@ -514,7 +517,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				if errors.Is(err, state.ErrIdentifierExists) ||
 					errors.Is(err, ErrFunctionSkipped) ||
 					errors.Is(err, ErrFunctionSkippedIdempotency) {
-					if err := s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID); err != nil {
+					if err := s.debouncer.DeleteDebounceItem(ctx, scope, d.DebounceID, *di); err != nil {
 						logger.StdlibLogger(ctx).ReportError(err, "error deleting debounce item")
 					}
 
@@ -527,7 +530,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 			}
 
-			if err := s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID); err != nil {
+			if err := s.debouncer.DeleteDebounceItem(ctx, scope, d.DebounceID, *di); err != nil {
 				logger.StdlibLogger(ctx).ReportError(err, "error deleting debounce item")
 			}
 		}
@@ -746,7 +749,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
@@ -847,7 +850,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		return fmt.Errorf("expected queue manager for cancellation")
 	}
 
-	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
@@ -1050,8 +1053,21 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	// now actually schedule the cron run
-	at := ci.ID.Timestamp()
+	// Compute fireAt from the live function config so jitter changes take effect
+	// immediately, rather than waiting for the next cron cycle.
+	scheduledAt := ci.ID.Timestamp()
+	jitter := conf.CronJitter(ci.Expression)
+	fireAt := scheduledAt
+	if jitter > 0 {
+		jobID := ci.JobID
+		if jobID == "" {
+			l.Error("CronItem.JobID is empty, using fallback seed for jitter")
+			jobID = fmt.Sprintf("%s:%s:%d", ci.FunctionID, ci.Expression, scheduledAt.UnixMilli())
+		}
+		fireAt = scheduledAt.Add(cron.DeterministicJitter(jobID, inngest.MinCronJitter, jitter))
+	}
+
+	l = l.With("jitter", jitter, "fireAt", fireAt)
 
 	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
@@ -1059,9 +1075,11 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		ID:   idempotencyKey,
 		Name: consts.FnCronName,
 		Data: map[string]any{
-			"cron": ci.Expression,
+			"cron":        ci.Expression,
+			"scheduledAt": scheduledAt.UTC().Format(time.RFC3339),
+			"fireAt":      fireAt.UTC().Format(time.RFC3339),
 		},
-		Timestamp: time.Now().UnixMilli(),
+		Timestamp: fireAt.UnixMilli(),
 	}, nil)
 
 	// publish cron event to pubsub
@@ -1094,7 +1112,8 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
 			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
 			attribute.String(consts.OtelSysCronExpr, ci.Expression),
-			attribute.Int64(consts.OtelSysCronTimestamp, at.UnixMilli()),
+			attribute.Int64(consts.OtelSysCronTimestamp, scheduledAt.UnixMilli()),
+			attribute.Int64(consts.OtelSysCronFireAt, fireAt.UnixMilli()),
 		),
 	)
 	defer span.End()
@@ -1108,7 +1127,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		AppID:          ci.AppID,
 		Function:       *conf,
 		Events:         []event.TrackedEvent{evt},
-		At:             &at,
+		At:             &fireAt,
 		IdempotencyKey: &idempotencyKey,
 	})
 
@@ -1162,7 +1181,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 
 	// Retrieve current queue shard for sleep item. The account might have been migrated
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
-	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
+	shard, err := s.shards.Resolve(ctx, item.Identifier.AccountID, nil)
 	if err != nil {
 		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
 	}

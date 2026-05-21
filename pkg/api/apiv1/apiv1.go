@@ -44,8 +44,8 @@ type Opts struct {
 	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
-	// QueueShardSelector determines the queue shard to use
-	QueueShardSelector queue.ShardSelector
+	// QueueShards exposes the shard topology and selector for the API.
+	QueueShards queue.ShardRegistry
 	// Broadcaster is used to handle realtime via APIv1
 	Broadcaster realtime.Broadcaster
 	// TraceReader reads traces from a backing store.

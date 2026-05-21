@@ -38,8 +38,8 @@ func mapFromShards(shards ...osqueue.QueueShard) map[string]osqueue.QueueShard {
 	return shardMap
 }
 
-func alwaysSelectShard(shard osqueue.QueueShard) osqueue.ShardSelector {
-	return func(ctx context.Context, accountId uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+func alwaysSelectShard(shard osqueue.QueueShard) func(ctx context.Context, accountID uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+	return func(ctx context.Context, accountID uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
 		return shard, nil
 	}
 }
@@ -54,12 +54,13 @@ func newQueue(t testing.TB, rc rueidis.Client, opts ...osqueue.QueueOpt) (queueI
 
 	shard := shardFromClient(consts.DefaultQueueShardName, rc, opts...)
 
+	shardRegistry, err := osqueue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
 	queue, err := osqueue.New(
 		ctx,
 		"test-queue",
-		shard,
-		mapFromShards(shard),
-		alwaysSelectShard(shard),
+		shardRegistry,
 		opts...)
 	require.NoError(t, err)
 

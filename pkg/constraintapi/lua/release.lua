@@ -23,6 +23,8 @@ local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
 local operationIdempotencyTTL = tonumber(ARGV[4])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[5]) == 1
+local forceReleaseSemaphores = tonumber(ARGV[6]) == 1
+local enableCacheInvalidation = ARGV[7] == "1"
 
 ---@type string[]
 local debugLogs = {}
@@ -34,6 +36,13 @@ local function debug(...)
 	end
 end
 
+--- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
+---@param value number
+---@return integer
+local function toInteger(value)
+	return math.floor(value + 0.5) -- Round to nearest integer
+end
+
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
@@ -43,7 +52,10 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	return opIdempotency
 end
 
--- Check if lease details still exist
+-- Release is idempotent by lease ID. If another caller (e.g. the lease
+-- scavenger or a concurrent ItemLeaseConstraintCheck) already released this
+-- lease, the details will be gone and we return a no-op (status 1). This
+-- means multiple Release calls for the same lease are safe.
 local requestID = call("HGET", keyLeaseDetails, "req")
 if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
@@ -84,6 +96,18 @@ for _, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
+	elseif c.k == 4 then
+		-- semaphore: decrement for auto-release, or when force-released by the scavenger
+		if c.sem.rel == 0 or forceReleaseSemaphores then
+			local weight = c.sem.w
+			if not weight or weight <= 0 then
+				weight = 1
+			end
+			local newVal = call("DECRBY", c.sem.k, toInteger(weight))
+			if tonumber(newVal) < 0 then
+				call("SET", c.sem.k, "0")
+			end
+		end
 	end
 end
 
@@ -125,5 +149,30 @@ local encoded = cjson.encode(res)
 
 -- Set operation idempotency TTL
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+
+-- Invalidate concurrency constraint cache on release
+if enableCacheInvalidation then
+	local cacheKeysToDelete = {}
+	for _, c in ipairs(constraints) do
+		if c.k == 2 and c.c then
+			local scope = c.c.s or 0
+			local sl = (scope == 2 and "a") or (scope == 1 and "e") or "f"
+			local cacheKey
+			if c.c.h ~= nil and c.c.h ~= "" then
+				cacheKey = accountID .. ":c:" .. sl .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+			elseif scope == 0 then
+				cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.f
+			elseif scope == 1 then
+				cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.e
+			else
+				cacheKey = accountID .. ":c:" .. sl
+			end
+			table.insert(cacheKeysToDelete, scopedKeyPrefix .. ":cache:" .. cacheKey)
+		end
+	end
+	if #cacheKeysToDelete > 0 then
+		call("DEL", unpack(cacheKeysToDelete))
+	end
+end
 
 return encoded

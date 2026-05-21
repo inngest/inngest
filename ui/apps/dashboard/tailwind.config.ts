@@ -1,3 +1,5 @@
+import containerQueries from '@tailwindcss/container-queries';
+
 import baseConfig from '../../packages/components/tailwind.config';
 //
 // re-exporting baseConfig for upstream use by resolveConfig which does not traverse that
@@ -10,4 +12,5 @@ export default {
     '../../packages/components/src/**/*.{ts,tsx}',
   ],
   presets: [baseConfig],
+  plugins: [containerQueries],
 };

@@ -4,17 +4,28 @@ type error = string;
 
 // Span metadata kind types (derived from generated constants)
 export type SpanMetadataKindUserland = `userland.${string}`;
+// Score kinds embed the user-supplied score name in the suffix
+// (e.g. `inngest.score.accuracy`). The KindInngestScore constant is
+// the base prefix, not a complete kind.
+export type SpanMetadataKindInngestScore = `${typeof KindInngestScore}.${string}`;
 export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestHTTP
   | typeof KindInngestHTTPTiming
   | typeof KindInngestResponseHeaders
+  | typeof KindInngestTiming
+  | typeof KindInngestExperiment
   | typeof KindInngestWarnings
+  | SpanMetadataKindInngestScore
   | SpanMetadataKindUserland;
 
 //////////
 // source: types_gen.go
 
+/**
+ * From score.go
+ */
+export const KindInngestScore = 'inngest.score';
 /**
  * From warning.go
  */
@@ -39,6 +50,20 @@ export interface AIMetadata {
   latency_ms?: number /* int64 */;
   total_tokens?: number /* int64 */;
   estimated_cost?: number /* float64 */;
+}
+/**
+ * From experiment.go
+ */
+export const KindInngestExperiment = 'inngest.experiment';
+/**
+ * From experiment.go
+ */
+export interface ExperimentMetadata {
+  experiment_name: string;
+  variant: string;
+  selection_strategy: string;
+  available_variants?: string[];
+  variant_weights?: { [key: string]: number /* float64 */ };
 }
 /**
  * From http.go
@@ -101,3 +126,33 @@ export const KindInngestResponseHeaders = 'inngest.response_headers';
  * From response_headers.go
  */
 export type ResponseHeaderMetadata = { [key: string]: string };
+/**
+ * From timing.go
+ */
+export const KindInngestTiming = 'inngest.timing';
+/**
+ * From timing.go
+ * TimingMetadata contains high-level timing categories for a step execution:
+ * queue delay, system processing overhead, and network total.
+ */
+export interface TimingMetadata {
+  /**
+   * QueueDelayMs is the sojourn delay caused by concurrency limits, throttle,
+   * or other user-defined concurrency constraints.
+   */
+  queue_delay_ms?: number /* int64 */;
+  /**
+   * SystemLatencyMs is the processing delay excluding sojourn latency
+   * (time from queue lease to execution start).
+   */
+  system_latency_ms?: number /* int64 */;
+  /**
+   * NetworkTotalMs is the total HTTP request duration from httpstat,
+   * covering the full SDK call lifecycle.
+   */
+  network_total_ms?: number /* int64 */;
+  /**
+   * TotalInngestMs is the sum of Inngest-side overhead (queue delay + system latency).
+   */
+  total_inngest_ms?: number /* int64 */;
+}

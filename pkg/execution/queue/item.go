@@ -27,8 +27,9 @@ import (
 type jobIDValType struct{ int }
 
 var (
-	jobCtxVal   = jobIDValType{0}
-	shardCtxVal = jobIDValType{1}
+	jobCtxVal          = jobIDValType{0}
+	shardCtxVal        = jobIDValType{1}
+	generationIDCtxVal = jobIDValType{2}
 )
 
 // WithJobID returns a context that stores the given job ID inside.
@@ -41,6 +42,13 @@ func WithShardID(ctx context.Context, shardID string) context.Context {
 	return context.WithValue(ctx, shardCtxVal, shardID)
 }
 
+// WithGenerationID stores the queue item's monotonic dispatch generation. The
+// driver forwards this to the SDK so async checkpoint POSTs can be fenced
+// against requeues that supersede the original dispatch.
+func WithGenerationID(ctx context.Context, generationID int) context.Context {
+	return context.WithValue(ctx, generationIDCtxVal, generationID)
+}
+
 // JobIDFromContext returns the job ID given the current context, or an
 // empty string if there's no job ID.
 func JobIDFromContext(ctx context.Context) string {
@@ -51,6 +59,13 @@ func JobIDFromContext(ctx context.Context) string {
 func ShardIDFromContext(ctx context.Context) string {
 	str, _ := ctx.Value(shardCtxVal).(string)
 	return str
+}
+
+// GenerationIDFromContext returns the dispatch generation for the current job,
+// or 0 if not set.
+func GenerationIDFromContext(ctx context.Context) int {
+	v, _ := ctx.Value(generationIDCtxVal).(int)
+	return v
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -88,6 +103,9 @@ type QueueItem struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
 	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
+	// GenerationID is a monotonic counter bumped by Requeue; mismatch fences
+	// a stale dispatch.
+	GenerationID int `json:"genID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
 	Data Item `json:"data"`
@@ -123,6 +141,20 @@ type QueueItem struct {
 type CapacityLease struct {
 	LeaseID    ulid.ULID `json:"l,omitempty"`
 	IssuedAtMS int64     `json:"i,omitempty"`
+
+	// release is a handle to invoke the Constraint API.
+	// This is passed during item processing.
+	release func() error
+}
+
+// Release frees up all acquired capacity that is not time-bound (i.e. concurrency capacity).
+//
+// This function is idempotent and can be called multiple times.
+func (c *CapacityLease) Release() error {
+	if c.release != nil {
+		return c.release()
+	}
+	return nil
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
@@ -340,6 +372,11 @@ type Item struct {
 	// ParallelMode controls discovery step scheduling after a parallel step
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
+
+	// Semaphores stores evaluated semaphore constraints for this queue item.
+	// Only present on start jobs for function concurrency, or on all items
+	// for worker concurrency (app-scoped semaphores).
+	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {
@@ -455,6 +492,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
 		PriorityFactor        *int64                    `json:"pf,omitempty"`
 		ParallelMode          enums.ParallelMode        `json:"pm,omitempty"`
+		Semaphores            []constraintapi.Semaphore `json:"sem,omitempty"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -476,6 +514,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.PriorityFactor = temp.PriorityFactor
 	i.QueueName = temp.QueueName
 	i.ParallelMode = temp.ParallelMode
+	i.Semaphores = temp.Semaphores
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
@@ -639,7 +678,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 	}
 }
 
-func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency []inngest.Concurrency, evtMap map[string]any) []state.CustomConcurrency {
+func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency []inngest.StepConcurrency, evtMap map[string]any) []state.CustomConcurrency {
 	if len(customConcurrency) == 0 {
 		return nil
 	}

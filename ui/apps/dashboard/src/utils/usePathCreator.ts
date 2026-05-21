@@ -18,6 +18,18 @@ export const usePathCreator = () => {
         internalPathCreator.eventPopout({ envSlug: env.slug, eventID }),
       eventType: ({ eventName }: { eventName: string }) =>
         internalPathCreator.eventType({ envSlug: env.slug, eventName }),
+      experiment: ({
+        experimentName,
+        functionSlug,
+      }: {
+        experimentName: string;
+        functionSlug: string;
+      }) =>
+        internalPathCreator.functionExperiment({
+          envSlug: env.slug,
+          functionSlug,
+          experimentName,
+        }),
       function: (params: { functionSlug: string }) =>
         internalPathCreator.function({
           envSlug: env.slug,

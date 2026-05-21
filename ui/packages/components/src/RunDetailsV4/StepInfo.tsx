@@ -14,8 +14,8 @@ import {
 } from '../DetailsCard/Element';
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
+import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
 import { useShared } from '../SharedContext/SharedContext';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -30,6 +30,8 @@ import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
 import {
+  isExperimentMetadata,
+  isScoreMetadata,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
@@ -188,8 +190,7 @@ export const StepInfo = ({
     preview: tracesPreviewEnabled,
   });
 
-  const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const metadataIsEnabled = true;
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -245,10 +246,34 @@ export const StepInfo = ({
     : [];
 
   const nonHeaderMetadata = metadataIsEnabled
-    ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
-    : undefined;
+    ? trace.metadata?.filter(
+        (md) =>
+          md.kind !== 'inngest.response_headers' &&
+          !isScoreMetadata(md) &&
+          !isExperimentMetadata(md)
+      ) ?? []
+    : [];
 
-  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+  const scoreMetadataList = trace.metadata?.filter(isScoreMetadata) ?? [];
+
+  const experimentMetadataList = metadataIsEnabled
+    ? trace.metadata?.filter(isExperimentMetadata) ?? []
+    : [];
+
+  const experimentMetadata = experimentMetadataList[0];
+  const hasHeadersTab = responseHeaderData.length > 0;
+  const hasExperimentTab = experimentMetadataList.length > 0;
+  const hasScoresTab = scoreMetadataList.length > 0;
+  const hasMetadataTab = nonHeaderMetadata.length > 0;
+
+  const hasNoData =
+    !prettyInput &&
+    !prettyOutput &&
+    !result?.error &&
+    !hasHeadersTab &&
+    !hasExperimentTab &&
+    !hasScoresTab &&
+    !hasMetadataTab;
 
   let emptyStateMessage = 'No output available';
   if (loading) {
@@ -259,7 +284,7 @@ export const StepInfo = ({
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
-      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
+      <div className="min-h-11 flex w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
@@ -271,14 +296,14 @@ export const StepInfo = ({
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
-          {trace.attempts !== null && (trace.attempts > 0 || trace.status === 'FAILED') && (
+          {trace.attempts !== null && trace.attempts > 0 && (
             <span data-testid="retry-attempt-badge">
               <Pill
                 className={`${getStatusBackgroundClass(trace.status)} ${getStatusTextClass(
                   trace.status
                 )}`}
               >
-                Attempt {trace.attempts + 1}
+                {trace.attempts} {trace.attempts === 1 ? 'retry' : 'retries'}
               </Pill>
             </span>
           )}
@@ -345,6 +370,17 @@ export const StepInfo = ({
 
           {stepKindInfo}
 
+          {experimentMetadata && (
+            <>
+              <ElementWrapper label="Experiment name">
+                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+              </ElementWrapper>
+              <ElementWrapper label="Variant">
+                <TextElement>{experimentMetadata.values.variant}</TextElement>
+              </ElementWrapper>
+            </>
+          )}
+
           {debug && trace.debugRunID && (
             <ElementWrapper label="Debug Run ID">
               <IDElement>{trace.debugRunID}</IDElement>
@@ -365,7 +401,7 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(responseHeaderData?.length
+              ...(hasHeadersTab
                 ? [
                     {
                       label: 'Headers',
@@ -374,7 +410,25 @@ export const StepInfo = ({
                     },
                   ]
                 : []),
-              ...(nonHeaderMetadata?.length
+              ...(hasExperimentTab
+                ? [
+                    {
+                      label: 'Experiment',
+                      id: 'experiment',
+                      node: <MetadataAttrs metadata={experimentMetadataList} />,
+                    },
+                  ]
+                : []),
+              ...(hasScoresTab
+                ? [
+                    {
+                      label: 'Scores',
+                      id: 'scores',
+                      node: <ScoresAttrs metadata={scoreMetadataList} />,
+                    },
+                  ]
+                : []),
+              ...(hasMetadataTab
                 ? [
                     {
                       label: 'Metadata',
@@ -396,7 +450,7 @@ export const StepInfo = ({
               </div>
             ) : (
               <Tabs
-                defaultActive={result?.error ? 'error' : 'output'}
+                defaultActive={result?.error ? 'error' : prettyOutput ? 'output' : ''}
                 tabs={[
                   ...(prettyInput
                     ? [
@@ -432,7 +486,7 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(responseHeaderData?.length
+                  ...(hasHeadersTab
                     ? [
                         {
                           label: 'Headers',
@@ -441,7 +495,25 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(nonHeaderMetadata?.length
+                  ...(hasExperimentTab
+                    ? [
+                        {
+                          label: 'Experiment',
+                          id: 'experiment',
+                          node: <MetadataAttrs metadata={experimentMetadataList} />,
+                        },
+                      ]
+                    : []),
+                  ...(hasScoresTab
+                    ? [
+                        {
+                          label: 'Scores',
+                          id: 'scores',
+                          node: <ScoresAttrs metadata={scoreMetadataList} />,
+                        },
+                      ]
+                    : []),
+                  ...(hasMetadataTab
                     ? [
                         {
                           label: 'Metadata',

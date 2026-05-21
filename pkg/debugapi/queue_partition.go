@@ -35,7 +35,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		return nil, status.Error(codes.Unknown, fmt.Errorf("error retrieving function: %w", err).Error())
 	}
 
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, fmt.Errorf("error finding shard: %w", err).Error())
 	}
@@ -80,7 +80,7 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		queueName = &req.Id
 	}
 
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, queueName)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, queueName)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard for GetPartition: %w", err)
 	}
@@ -99,11 +99,9 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		Paused:  pt.Paused,
 		Migrate: pt.Migrate,
 
-		AccountActive:     int64(pt.AccountActive),
 		AccountInProgress: int64(pt.AccountInProgress),
 		Ready:             int64(pt.Ready),
 		InProgress:        int64(pt.InProgress),
-		Active:            int64(pt.Active),
 		Future:            int64(pt.Future),
 		Backlogs:          int64(pt.Backlogs),
 	}, nil

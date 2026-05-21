@@ -24,10 +24,11 @@ import (
 	"github.com/inngest/inngestgo/internal"
 	"github.com/inngest/inngestgo/internal/event"
 	"github.com/inngest/inngestgo/internal/fn"
-	"github.com/inngest/inngestgo/internal/middleware"
+	"github.com/inngest/inngestgo/internal/logger"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/internal/util"
+	"github.com/inngest/inngestgo/middleware"
 	"github.com/inngest/inngestgo/pkg/env"
 	"github.com/inngest/inngestgo/pkg/httputil"
 	"github.com/inngest/inngestgo/step"
@@ -248,12 +249,14 @@ func (h handlerOpts) isDev() bool {
 // newHandler returns a new Handler for serving Inngest functions.
 func newHandler(c Client, opts handlerOpts) *handler {
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
 
 	if opts.MaxBodySize == 0 {
 		opts.MaxBodySize = DefaultMaxBodySize
 	}
+
+	opts.Logger = opts.Logger.With("mode", "serve")
 
 	return &handler{
 		handlerOpts: opts,
@@ -286,14 +289,15 @@ func (h *handler) GetFunctions() []ServableFunction {
 }
 
 func (h *handler) SetOptions(opts handlerOpts) *handler {
-	h.handlerOpts = opts
-
 	if opts.MaxBodySize == 0 {
 		opts.MaxBodySize = DefaultMaxBodySize
 	}
 	if opts.Logger == nil {
-		opts.Logger = slog.Default()
+		opts.Logger = logger.Default()
 	}
+
+	opts.Logger = opts.Logger.With("mode", "serve")
+	h.handlerOpts = opts
 
 	return h
 }
@@ -785,6 +789,8 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		h.Logger.Error("error decoding function request", "error", err)
 		return fmt.Errorf("%w: %s", errBadRequest, err)
 	}
+	request.CallCtx.RequestID = r.Header.Get(HeaderKeyRequestID)
+	request.CallCtx.JobID = r.Header.Get(HeaderKeyJobID)
 
 	if request.UseAPI {
 		// TODO: implement this
@@ -809,58 +815,100 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("%w: %s", errFunctionMissing, fnID)
 	}
 
-	l := h.Logger.With("fn", fnID, "call_ctx", request.CallCtx)
-	l.Debug("calling function")
-
-	stream, streamCancel := context.WithCancel(context.Background())
-	if h.UseStreaming {
-		w.WriteHeader(201)
-		go func() {
-			for {
-				if stream.Err() != nil {
-					return
-				}
-				_, _ = w.Write([]byte(" "))
-				<-time.After(5 * time.Second)
-			}
-		}()
+	logAttrs := []any{"fn", fnID, "call_ctx", request.CallCtx}
+	if request.CallCtx.RequestID != "" {
+		logAttrs = append(logAttrs, "request_id", request.CallCtx.RequestID)
 	}
+	if request.CallCtx.JobID != "" {
+		logAttrs = append(logAttrs, "job_id", request.CallCtx.JobID)
+	}
+	l := h.Logger.With(logAttrs...)
+	l.Debug("calling function")
 
 	var stepID *string
 	if rawStepID := r.URL.Query().Get("stepId"); rawStepID != "" && rawStepID != "step" {
 		stepID = &rawStepID
 	}
 
-	// Invoke the function, then immediately stop the streaming buffer.
-	resp, ops, err := invoke(
-		r.Context(),
-		h.client,
-		mw,
-		fn,
-		h.GetSigningKey(),
-		h.GetSigningKeyFallback(),
-		request,
-		stepID,
+	var (
+		resp      any
+		ops       []sdkrequest.GeneratorOpcode
+		invokeErr error
 	)
-	streamCancel()
+
+	if h.UseStreaming {
+		type invokeResult struct {
+			resp any
+			ops  []sdkrequest.GeneratorOpcode
+			err  error
+		}
+
+		w.WriteHeader(201)
+
+		results := make(chan invokeResult, 1)
+		go func() {
+			resp, ops, err := invoke(
+				r.Context(),
+				h.client,
+				mw,
+				fn,
+				h.GetSigningKey(),
+				h.GetSigningKeyFallback(),
+				request,
+				stepID,
+			)
+			results <- invokeResult{resp: resp, ops: ops, err: err}
+		}()
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		done := false
+		for !done {
+			select {
+			case result := <-results:
+				resp, ops, invokeErr = result.resp, result.ops, result.err
+				done = true
+			case <-r.Context().Done():
+				invokeErr = r.Context().Err()
+				done = true
+			case <-ticker.C:
+				_, _ = w.Write([]byte(" "))
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
+				}
+			}
+		}
+	} else {
+		resp, ops, invokeErr = invoke(
+			r.Context(),
+			h.client,
+			mw,
+			fn,
+			h.GetSigningKey(),
+			h.GetSigningKeyFallback(),
+			request,
+			stepID,
+		)
+	}
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
 	// within ops alongside an error.  We can safely ignore that error, as it's
 	// only used for checking whether the step used a NoRetryError or RetryAtError
 	//
 	// For that reason, we check those values first.
-	noRetry := sdkerrors.IsNoRetryError(err)
-	retryAt := sdkerrors.GetRetryAtTime(err)
+	noRetry := sdkerrors.IsNoRetryError(invokeErr)
+	retryAt := sdkerrors.GetRetryAtTime(invokeErr)
 
 	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepError {
 		// Now we've handled error types we can ignore step
 		// errors safely.
-		err = nil
+		invokeErr = nil
 	}
 
 	// Handle OpcodeStepFailed for permanent step failures
 	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepFailed {
-		err = nil
+		invokeErr = nil
 		noRetry = true
 	}
 
@@ -872,17 +920,17 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	// 	if err != nil {
 	// 	     return err
 	// 	}
-	if sdkerrors.IsStepError(err) {
-		err = fmt.Errorf("unhandled step error: %s", err)
+	if sdkerrors.IsStepError(invokeErr) {
+		invokeErr = fmt.Errorf("unhandled step error: %s", invokeErr)
 		noRetry = true
 	}
 
 	if h.UseStreaming {
-		if err != nil {
+		if invokeErr != nil {
 			// TODO: Add retry-at.
 			return json.NewEncoder(w).Encode(StreamResponse{
 				StatusCode: 500,
-				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
+				Body:       fmt.Sprintf("error calling function: %s", invokeErr.Error()),
 				NoRetry:    noRetry,
 				RetryAt:    retryAt,
 			})
@@ -907,9 +955,9 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add(HeaderKeyRetryAfter, retryAt.Format(time.RFC3339))
 	}
 
-	if err != nil {
-		l.Error("error calling function", "error", err)
-		return err
+	if invokeErr != nil {
+		l.Error("error calling function", "error", invokeErr)
+		return invokeErr
 	}
 
 	if len(ops) > 0 {
@@ -1234,6 +1282,8 @@ func invoke(
 		RunID:      input.CallCtx.RunID,
 		StepID:     input.CallCtx.StepID,
 		Attempt:    input.CallCtx.Attempt,
+		RequestID:  input.CallCtx.RequestID,
+		JobID:      input.CallCtx.JobID,
 	}
 	inputVal.FieldByName("InputCtx").Set(reflect.ValueOf(callCtx))
 
@@ -1282,7 +1332,7 @@ func invoke(
 			for i, rawjson := range input.Events {
 				var evt event.Event
 				if err := json.Unmarshal(rawjson, &evt); err != nil {
-					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					mgr.SetErr(sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err)))
 					panic(sdkrequest.ControlHijack{})
 				}
 				evts[i] = &evt
@@ -1384,7 +1434,7 @@ func updateInput(
 			newEvent := reflect.New(eventType).Interface()
 
 			if err := json.Unmarshal(byt, newEvent); err != nil {
-				return fmt.Errorf("error unmarshalling event for function: %w", err)
+				return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent).Elem())
 		}
@@ -1404,7 +1454,7 @@ func updateInput(
 				// The same type as the event.
 				newEvent := reflect.New(eventType).Interface()
 				if err := json.Unmarshal(byt, newEvent); err != nil {
-					return fmt.Errorf("error unmarshalling event for function: %w", err)
+					return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 				}
 
 				newEvents = reflect.Append(newEvents, reflect.ValueOf(newEvent).Elem())
@@ -1421,7 +1471,7 @@ func updateInput(
 
 			newEvent := map[string]any{}
 			if err := json.Unmarshal(byt, &newEvent); err != nil {
-				return fmt.Errorf("error unmarshalling event for function: %w", err)
+				return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent))
 		}
@@ -1437,7 +1487,7 @@ func updateInput(
 
 				var newEvent map[string]any
 				if err := json.Unmarshal(byt, &newEvent); err != nil {
-					return fmt.Errorf("error unmarshalling event for function: %w", err)
+					return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 				}
 
 				newEvents[i] = newEvent

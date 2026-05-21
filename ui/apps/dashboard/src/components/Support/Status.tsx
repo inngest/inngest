@@ -27,6 +27,7 @@ const incidentSchema = statusEventSchema.extend({
     'partial_outage',
     'degraded_performance',
     'full_outage',
+    'operational', // undocumented status for worst impact
   ]),
 });
 
@@ -75,7 +76,10 @@ const mapStatus = (
   const incident = res.ongoing_incidents[0];
   const maintenance = res.in_progress_maintenances[0];
   const impact: Indicator =
-    incident?.current_worst_impact || (maintenance ? 'maintenance' : 'none');
+    (incident?.current_worst_impact === 'operational'
+      ? 'none'
+      : incident?.current_worst_impact) ||
+    (maintenance ? 'maintenance' : 'none');
   return {
     indicatorColor: indicatorColor[impact],
     impact,

@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, type UIEventHandler } from 'react';
-import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@inngest/components/Button';
 import {
   IDCell,
@@ -12,13 +11,13 @@ import {
   RiCloseCircleLine,
   RiDeleteBinLine,
   RiExternalLinkLine,
-  RiRefreshLine,
 } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
+import { CancelFunctionModal } from './CancelFunction/CancelFunctionModal';
 import { DeleteCancellationModal } from './DeleteCancellationModal';
 import { useCancellations } from './useCancellations';
-import { pathCreator } from '@/utils/urls';
+import { useEnvironment } from '@/components/Environments/environment-context';
 
 type Cancellation = {
   createdAt: string;
@@ -41,8 +40,9 @@ type PendingDelete = {
 
 export function CancellationTable({ envSlug, fnSlug }: Props) {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>();
+  const [cancelOpen, setCancelOpen] = useState(false);
   const columns = useColumns({ setPendingDelete });
-  const navigate = useNavigate();
+  const env = useEnvironment();
 
   const {
     data: items,
@@ -80,20 +80,13 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
                 actions={
                   <>
                     <Button
-                      appearance="outlined"
-                      label="Refresh"
-                      onClick={() =>
-                        navigate({
-                          to: pathCreator.functionCancellations({
-                            envSlug,
-                            functionSlug: fnSlug,
-                          }),
-                        })
-                      }
-                      icon={<RiRefreshLine />}
+                      label="New cancellation"
+                      onClick={() => setCancelOpen(true)}
+                      icon={<RiCloseCircleLine />}
                       iconSide="left"
                     />
                     <Button
+                      appearance="outlined"
                       label="Go to docs"
                       href="https://www.inngest.com/docs/platform/manage/bulk-cancellation"
                       target="_blank"
@@ -114,6 +107,14 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
         onClose={() => setPendingDelete(undefined)}
         pendingDelete={pendingDelete}
       />
+      {cancelOpen && (
+        <CancelFunctionModal
+          envID={env.id}
+          functionSlug={fnSlug}
+          isOpen={cancelOpen}
+          onClose={() => setCancelOpen(false)}
+        />
+      )}
     </>
   );
 }

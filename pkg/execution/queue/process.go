@@ -21,6 +21,7 @@ func (q *queueProcessor) ProcessItem(
 	i ProcessItem,
 	f RunFunc,
 ) error {
+	shard := q.Shard()
 	accountID, envID, fnID, runID := i.I.Data.Identifier.AccountID, i.I.Data.Identifier.WorkspaceID, i.I.Data.Identifier.WorkflowID, i.I.Data.Identifier.RunID
 
 	l := logger.StdlibLogger(ctx).With(
@@ -36,6 +37,7 @@ func (q *queueProcessor) ProcessItem(
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", i.P.ID))
 	span.SetAttributes(attribute.String("item_id", i.I.ID))
+	span.SetAttributes(attribute.String("item_kind", i.I.Data.Kind))
 	span.SetAttributes(attribute.String("run_id", runID.String()))
 	if i.I.Data.JobID != nil {
 		span.SetAttributes(attribute.String("job_id", *i.I.Data.JobID))
@@ -55,8 +57,6 @@ func (q *queueProcessor) ProcessItem(
 	q.wg.Add(1)
 	defer q.wg.Done()
 
-	disableConstraintUpdates := i.DisableConstraintUpdates
-
 	errCh := make(chan error, 1)
 
 	// XXX: Add a max job time here, configurable.
@@ -69,8 +69,9 @@ func (q *queueProcessor) ProcessItem(
 	//
 	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
 	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
-	jobCtx = WithShardID(jobCtx, q.primaryQueueShard.Name())
+	jobCtx = WithShardID(jobCtx, shard.Name())
 	jobCtx = WithJobID(jobCtx, qi.ID)
+	jobCtx = WithGenerationID(jobCtx, qi.GenerationID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
@@ -98,13 +99,11 @@ func (q *queueProcessor) ProcessItem(
 				}
 
 				// Once a job has started, use a BG context to always renew.
-				leaseID, err = q.primaryQueueShard.ExtendLease(
+				leaseID, err = shard.ExtendLease(
 					context.Background(),
 					qi,
 					*leaseID,
 					QueueLeaseDuration,
-					// When holding a capacity lease, do not update constraint state
-					ExtendLeaseOptionDisableConstraintUpdates(disableConstraintUpdates),
 				)
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -130,6 +129,49 @@ func (q *queueProcessor) ProcessItem(
 	// We will not expect a lease when
 	// - the item is enqueued to a system queue
 	// - the Constraint API is disabled or the current account is not enrolled
+	extendCapacityLeaseCtx, cancelExtendCapacityLease := context.WithCancel(jobCtx)
+	defer cancelExtendCapacityLease()
+
+	releaseCapacityLease := func() {
+		cancelExtendCapacityLease()
+
+		currentLeaseID := capacityLeaseID.get()
+		if currentLeaseID == nil {
+			return
+		}
+
+		leaseIssuedAt := capacityLeaseID.issuedAt()
+
+		res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+			AccountID:      p.AccountID,
+			IdempotencyKey: qi.ID,
+			LeaseID:        *currentLeaseID,
+			Source: constraintapi.LeaseSource{
+				Location:          constraintapi.CallerLocationItemLease,
+				Service:           constraintapi.ServiceExecutor,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			LeaseIssuedAt: leaseIssuedAt,
+		})
+		if err != nil {
+			l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+				"account_id":      p.AccountID.String(),
+				"lease_id":        currentLeaseID.String(),
+				"function_id":     p.FunctionID.String(),
+				"lease_issued_at": leaseIssuedAt.String(),
+			}))
+			return
+		}
+
+		if instrumentCapacityLease {
+			l.Debug(
+				"released capacity lease",
+				"res", res,
+				"lease_id", currentLeaseID.String(),
+			)
+		}
+	}
+
 	if capacityLeaseID.has() {
 		extendCapacityLeaseTick = q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
 		defer extendCapacityLeaseTick.Stop()
@@ -138,7 +180,7 @@ func (q *queueProcessor) ProcessItem(
 			lastCapacityLeaseExtension := time.Now()
 			for {
 				select {
-				case <-jobCtx.Done():
+				case <-extendCapacityLeaseCtx.Done():
 					return
 				case <-extendCapacityLeaseTick.Chan():
 					if ctx.Err() != nil {
@@ -215,43 +257,7 @@ func (q *queueProcessor) ProcessItem(
 		// When capacity is leased, release it after the job function has completed.
 		// This is optional and best-effort to free up concurrency capacity as quickly as possible
 		// for the next worker to lease a queue item.
-		defer service.Go(func() {
-			currentLeaseID := capacityLeaseID.get()
-			if currentLeaseID == nil {
-				return
-			}
-
-			leaseIssuedAt := capacityLeaseID.issuedAt()
-
-			res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-				AccountID:      p.AccountID,
-				IdempotencyKey: qi.ID,
-				LeaseID:        *currentLeaseID,
-				Source: constraintapi.LeaseSource{
-					Location:          constraintapi.CallerLocationItemLease,
-					Service:           constraintapi.ServiceExecutor,
-					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
-				LeaseIssuedAt: leaseIssuedAt,
-			})
-			if err != nil {
-				l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id":      p.AccountID.String(),
-					"lease_id":        currentLeaseID.String(),
-					"function_id":     p.FunctionID.String(),
-					"lease_issued_at": leaseIssuedAt.String(),
-				}))
-				return
-			}
-
-			if instrumentCapacityLease {
-				l.Debug(
-					"released capacity lease",
-					"res", res,
-					"lease_id", currentLeaseID.String(),
-				)
-			}
-		})
+		defer service.Go(releaseCapacityLease)
 	}
 
 	startedAt := q.Clock().Now()
@@ -314,27 +320,45 @@ func (q *queueProcessor) ProcessItem(
 			latencyAvg.Add(float64(latency))
 			metrics.GaugeQueueItemLatencyEWMA(ctx, int64(latencyAvg.Value()/1e6), metrics.GaugeOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": q.primaryQueueShard.Name()},
+				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": shard.Name()},
 			})
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
 			metrics.HistogramQueueItemLatency(ctx, latency.Milliseconds(), metrics.HistogramOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": q.primaryQueueShard.Name()},
+				Tags:    map[string]any{"kind": qi.Data.Kind, "queue_shard": shard.Name()},
 			})
 		}()
 
 		metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "started", "queue_shard": q.primaryQueueShard.Name()},
+			Tags:    map[string]any{"status": "started", "queue_shard": shard.Name()},
 		})
+
+		// If a capacity lease was acquired for this item,
+		// we want to allow the called function to invoke Release
+		// early.
+		// In this case, we need to stop extending the lease,
+		// and call Release() in a non-blocking way.
+		if i.CapacityLease != nil {
+			// Provide the release handle
+			i.CapacityLease.release = func() error {
+				// Stop extending capacity lease
+				cancelExtendCapacityLease()
+
+				// Release capacity lease, if acquired
+				service.Go(releaseCapacityLease)
+
+				return nil
+			}
+		}
 
 		runInfo := RunInfo{
 			Latency:             latency,
 			SojournDelay:        sojourn,
 			Priority:            q.PartitionPriorityFinder(ctx, p),
-			QueueShardName:      q.primaryQueueShard.Name(),
+			QueueShardName:      shard.Name(),
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
 			CapacityLease:       i.CapacityLease,
@@ -368,7 +392,7 @@ func (q *queueProcessor) ProcessItem(
 
 		metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": status, "queue_shard": q.primaryQueueShard.Name()},
+			Tags:    map[string]any{"status": status, "queue_shard": shard.Name()},
 		})
 
 		// NOTE:  We only want to clean up the jobDone channel here on success.
@@ -399,7 +423,7 @@ func (q *queueProcessor) ProcessItem(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.primaryQueueShard.Requeue(context.WithoutCancel(ctx), qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+			if err := shard.Requeue(context.WithoutCancel(ctx), qi, at); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
@@ -417,7 +441,7 @@ func (q *queueProcessor) ProcessItem(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := shard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -431,7 +455,7 @@ func (q *queueProcessor) ProcessItem(
 			return err
 		}
 	case <-jobCtx.Done():
-		if err := q.primaryQueueShard.Dequeue(context.WithoutCancel(ctx), qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
+		if err := shard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil

@@ -23,6 +23,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   href?: LinkComponentProps['href'];
   to?: LinkComponentProps['to'];
   target?: string;
+  rel?: string;
   tooltip?: ReactNode;
   label?: ReactNode;
   icon?: ReactNode;
@@ -38,14 +39,15 @@ type LinkWrapperProps = {
   href?: LinkComponentProps['href'];
   to?: LinkComponentProps['to'];
   target?: string;
+  rel?: string;
   prefetch?: false | 'intent' | 'viewport' | 'render';
   scroll?: boolean;
 } & Omit<LinkComponentProps, 'href'>;
 
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
-  ({ children, href, to, target, prefetch = false, scroll = true, ...props }, ref) =>
+  ({ children, href, to, target, rel, prefetch = false, scroll = true, ...props }, ref) =>
     href ? (
-      <a href={href} target={target} {...props}>
+      <a href={href} target={target} rel={rel} {...props}>
         {children}
       </a>
     ) : to ? (
@@ -92,6 +94,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       tooltip,
       disabled,
       target,
+      rel,
       prefetch = false,
       scroll = true,
       raw = false,
@@ -152,7 +155,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <TooltipWrapper tooltip={tooltip}>
-        <LinkWrapper href={href} to={to} target={target} prefetch={prefetch} scroll={scroll}>
+        <LinkWrapper
+          href={href}
+          to={to}
+          target={target}
+          rel={rel}
+          prefetch={prefetch}
+          scroll={scroll}
+        >
           {buttonElement}
         </LinkWrapper>
       </TooltipWrapper>

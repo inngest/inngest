@@ -9,7 +9,6 @@ import {
   useEventTypeVolume as getEventTypeVolume,
   useEventType,
 } from '@/components/EventTypes/useEventTypes';
-import LatestLogsList from '@/components/Events/LatestLogsList';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute(
@@ -57,7 +56,6 @@ function EventTypeDashboard() {
           totalDescription="24 Hour Volume"
           loading={isLoadingVolume}
         />
-        <LatestLogsList environmentSlug={envSlug} eventName={eventTypeName} />
       </main>
       <aside className="border-subtle bg-canvasSubtle overflow-y-auto border border-t-0 px-6 py-4">
         <Block title="Triggered Functions">

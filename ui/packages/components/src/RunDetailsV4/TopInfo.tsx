@@ -15,17 +15,18 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
+import { ScoresAttrs, collectScoreMetadata } from '../RunDetails/ScoresAttrs';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
+import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
-import type { Trace } from './types';
+import { isScoreMetadata, type Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
@@ -112,8 +113,10 @@ export const TopInfo = ({
     retry: 3,
   });
 
-  const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const metadataIsEnabled = true;
+  const scoreMetadata = useMemo(() => collectScoreMetadata(trace), [trace]);
+  const nonScoreMetadata = trace?.metadata?.filter((md) => !isScoreMetadata(md)) ?? [];
+  const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   const prettyPayload = useMemo(() => {
     try {
@@ -124,6 +127,11 @@ export const TopInfo = ({
       return undefined;
     }
   }, [trigger?.payloads]);
+
+  const cronMetadata = useMemo(
+    () => getCronTriggerMetadata(trigger?.payloads),
+    [trigger?.payloads]
+  );
 
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
@@ -236,6 +244,20 @@ export const TopInfo = ({
                   <TimeElement date={new Date(trigger.timestamp)} />
                 )}
               </ElementWrapper>
+              {cronMetadata.scheduledAt && (
+                <ElementWrapper label="Scheduled for">
+                  {isPending ? (
+                    <SkeletonElement />
+                  ) : (
+                    <TimeElement date={cronMetadata.scheduledAt} />
+                  )}
+                </ElementWrapper>
+              )}
+              {cronMetadata.fireAt && (
+                <ElementWrapper label="Fired at">
+                  {isPending ? <SkeletonElement /> : <TimeElement date={cronMetadata.fireAt} />}
+                </ElementWrapper>
+              )}
             </>
           )}
           {type === 'BATCH' && (
@@ -264,7 +286,9 @@ export const TopInfo = ({
       {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
       <div className="flex-1">
         <Tabs
-          defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
+          defaultActive={
+            result?.error ? 'error' : prettyPayload ? 'input' : prettyOutput ? 'output' : ''
+          }
           tabs={[
             ...(prettyPayload
               ? [
@@ -309,12 +333,21 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(metadataIsEnabled && trace?.metadata?.length
+            ...(scoreMetadata.length
+              ? [
+                  {
+                    label: 'Scores',
+                    id: 'scores',
+                    node: <ScoresAttrs metadata={scoreMetadata} />,
+                  },
+                ]
+              : []),
+            ...(hasMetadataTab
               ? [
                   {
                     label: 'Metadata',
                     id: 'metadata',
-                    node: <MetadataAttrs metadata={trace.metadata} />,
+                    node: <MetadataAttrs metadata={nonScoreMetadata} />,
                   },
                 ]
               : []),

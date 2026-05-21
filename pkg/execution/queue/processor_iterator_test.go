@@ -82,12 +82,11 @@ func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 	// This method is no longer called by ProcessorIterator since the logic
 	// moved to QueueProcessor.ItemLeaseConstraintCheck
 	return ItemLeaseConstraintCheckResult{
-		LimitingConstraint:   enums.QueueConstraintNotLimited,
-		SkipConstraintChecks: true,
+		LimitingConstraint: enums.QueueConstraintNotLimited,
 	}, nil
 }
 
-func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, denies *LeaseDenies, options ...LeaseOptionFn) (*ulid.ULID, error) {
+func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error) {
 	id := ulid.Make()
 	return &id, nil
 }
@@ -125,8 +124,8 @@ func (m *mockShardForIterator) PartitionPeek(ctx context.Context, sequential boo
 	return nil, nil
 }
 
-func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, int, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error) {
+	return nil, nil
 }
 
 func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
@@ -134,10 +133,6 @@ func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePar
 }
 
 func (m *mockShardForIterator) Scavenge(ctx context.Context, limit int) (int, error) {
-	return 0, nil
-}
-
-func (m *mockShardForIterator) ActiveCheck(ctx context.Context) (int, error) {
 	return 0, nil
 }
 
@@ -181,6 +176,50 @@ func (m *mockShardForIterator) ShardLease(ctx context.Context, key string, durat
 	return nil, nil
 }
 
+func (m *mockShardForIterator) SingletonGetRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) DebounceCreate(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) DebounceUpdate(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration, jobID string, now time.Time, eventTimestamp int64) (int64, DebounceUpdateStatus, error) {
+	return 0, DebounceUpdateOK, nil
+}
+
+func (m *mockShardForIterator) DebounceStartExecution(ctx context.Context, scope Scope, key string, newDebounceID, debounceID ulid.ULID) (DebounceStartStatus, error) {
+	return DebounceStartStarted, nil
+}
+
+func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockShardForIterator) DebounceGetItem(ctx context.Context, scope Scope, debounceID ulid.ULID) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) DebounceDeleteItems(ctx context.Context, scope Scope, debounceIDs ...ulid.ULID) error {
+	return nil
+}
+
+func (m *mockShardForIterator) DebounceDeleteMigratingFlag(ctx context.Context, scope Scope, debounceID ulid.ULID) error {
+	return nil
+}
+
+func (m *mockShardForIterator) DebounceGetPointer(ctx context.Context, scope Scope, key string) (string, error) {
+	return "", nil
+}
+
+func (m *mockShardForIterator) DebounceDeletePointer(ctx context.Context, scope Scope, key string) error {
+	return nil
+}
+
 func (m *mockShardForIterator) ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error {
 	return nil
 }
@@ -193,16 +232,16 @@ func (m *mockShardForIterator) PeekAccountPartitions(ctx context.Context, accoun
 	return nil, nil
 }
 
-func (m *mockShardForIterator) PeekGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, sequential bool) ([]*QueuePartition, error) {
-	return nil, nil
-}
-
 func (m *mockShardForIterator) BacklogRefillConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, items []*QueueItem, operationIdempotencyKey string, now time.Time) (*BacklogRefillConstraintCheckResult, error) {
 	return nil, nil
 }
 
 func (m *mockShardForIterator) RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error {
 	return nil
+}
+
+func (m *mockShardForIterator) CleanupStatusIndexes(ctx context.Context, fnID uuid.UUID) (int64, error) {
+	return 0, nil
 }
 
 func (m *mockShardForIterator) LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error) {
@@ -253,11 +292,11 @@ func (m *mockShardForIterator) BacklogPrepareNormalize(ctx context.Context, b *Q
 	return nil
 }
 
-func (m *mockShardForIterator) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueItem, int, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) (*BacklogPeekResult, error) {
+	return &BacklogPeekResult{}, nil
 }
 
-func (m *mockShardForIterator) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig, options ...BacklogRefillOptionFn) (*BacklogRefillResult, error) {
+func (m *mockShardForIterator) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, options ...BacklogRefillOptionFn) (*BacklogRefillResult, error) {
 	return nil, nil
 }
 
@@ -291,10 +330,6 @@ func (m *mockShardForIterator) TotalSystemQueueDepth(ctx context.Context) (int64
 
 func (m *mockShardForIterator) DequeueByJobID(ctx context.Context, jobID string) error {
 	return nil
-}
-
-func (m *mockShardForIterator) ItemByID(ctx context.Context, jobID string) (*QueueItem, error) {
-	return nil, nil
 }
 
 func (m *mockShardForIterator) ItemExists(ctx context.Context, jobID string) (bool, error) {
@@ -351,8 +386,7 @@ func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shado
 	}
 
 	return ItemLeaseConstraintCheckResult{
-		LimitingConstraint:   constraint,
-		SkipConstraintChecks: true,
+		LimitingConstraint: constraint,
 	}, nil
 }
 
@@ -439,7 +473,6 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true, // Enable parallel processing
 	}
@@ -550,7 +583,6 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true,
 	}
@@ -653,7 +685,6 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		Denies:               NewLeaseDenyList(),
 		StaticTime:           time.Now(),
 		Parallel:             true,
 	}

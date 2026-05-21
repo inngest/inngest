@@ -57,6 +57,22 @@ var (
 		4 * 1024 * 1024, // 4 MiB
 	}
 
+	stateStoreBytesWrittenBoundaries = []float64{
+		32,              // 32 bytes
+		128,             // 128 bytes
+		512,             // 512 bytes
+		1024,            // 1 KiB
+		4 * 1024,        // 4 KiB
+		16 * 1024,       // 16 KiB
+		64 * 1024,       // 64 KiB
+		256 * 1024,      // 256 KiB
+		512 * 1024,      // 512 KiB
+		1024 * 1024,     // 1 MiB
+		2 * 1024 * 1024, // 2 MiB
+		3 * 1024 * 1024, // 3 MiB
+		4 * 1024 * 1024, // 4 MiB
+	}
+
 	ConstraintAPIDurationBoundaries = []float64{
 		5,
 		10,
@@ -138,16 +154,6 @@ func HistogramQueueOperationDelay(ctx context.Context, delay time.Duration, opts
 	})
 }
 
-func HistogramQueueActiveCheckDuration(ctx context.Context, delay time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_duration",
-		Description: "Distribution of active check durations",
-		Tags:        opts.Tags,
-		Boundaries:  DefaultBoundaries,
-	})
-}
-
 func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, value, HistogramOpt{
 		PkgName:     opts.PkgName,
@@ -189,6 +195,17 @@ func HistogramConnectProxyAckTime(ctx context.Context, dur int64, opts Histogram
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConnectGatewayDrainDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.drain_duration",
+		Description: "Duration from sending GATEWAY_CLOSING to the worker until the WebSocket is closed.",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
 	})
 }
 
@@ -593,5 +610,74 @@ func HistogramQueueBacklogGroupingDuration(ctx context.Context, dur int64, opts 
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramStateWrittenCounter(ctx context.Context, bytes int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, bytes, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "state_store_bytes_written_hist",
+		Description: "Distribution of bytes written to the state store",
+		Tags:        opts.Tags,
+		Unit:        "bytes",
+		Boundaries:  stateStoreBytesWrittenBoundaries,
+	})
+}
+
+func HistogramConstraintAPISemaphoreDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_semaphore_duration",
+		Description: "Distribution of semaphore manager operation duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  ConstraintAPIDurationBoundaries,
+	})
+}
+
+func HistogramDefersLoadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_load_duration",
+		Description: "Distribution of LoadDefers latency in run finalize, including retries",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramDefersPerRun(ctx context.Context, count int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_per_run",
+		Description: "Distribution of the number of defers loaded per finalized run",
+		Tags:        opts.Tags,
+		Boundaries:  []float64{1, 2, 5, 10, 15, 20},
+	})
+}
+
+func HistogramMetadataGetParentSpanDuration(
+	ctx context.Context,
+	dur time.Duration,
+	attempts int,
+	opts HistogramOpt,
+) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	// Always be true, but we'll add this check to protect cardinality just in
+	// case
+	if attempts < 10 {
+		opts.Tags["attempts"] = attempts
+	}
+
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_get_parent_span_duration",
+		Description: "Distribution of latency when getting parent span in metadata endpoint",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 120_000},
 	})
 }

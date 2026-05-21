@@ -6,9 +6,11 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +22,8 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util/rueidisconn"
@@ -486,6 +490,17 @@ func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.
 	}).AsBool()
 }
 
+func (m shardedMgr) IncrementMetadataSize(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, delta int) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IncrementMetadataSize"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	_, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hincrby().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Field("metadata_size").Increment(int64(delta)).Build()
+	}).AsInt64()
+	return err
+}
+
 func (m shardedMgr) metadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (*runMetadata, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "metadata"), redis_telemetry.ScopeFnRunState)
 
@@ -531,6 +546,144 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 	}
 	meta := metadata.Metadata()
 	return &meta, nil
+}
+
+// deferMeta is the cjson-safe subset of statev2.Defer stored as the value of
+// each field in the defers-meta hash. Input lives in a separate defers-input
+// hash and is never decoded by Lua, sidestepping cjson's empty-object → array
+// and >2^53 integer precision bugs.
+//
+// DO NOT add fields here without first verifying they are cjson-safe. Safe
+// field types are strings and small ints (status enums, bounded counts).
+type deferMeta struct {
+	FnSlug   string
+	HashedID string
+
+	// Must stay int, not enums.DeferStatus: the enum's MarshalJSON renders
+	// as a string, but saveDefer.lua/setDeferStatus.lua compare and rewrite
+	// this field as a number via cjson. Conversion to the typed enum happens
+	// at the LoadDefers/SaveDefer boundary.
+	ScheduleStatus int
+}
+
+// LoadDefersMeta returns each defer's metadata without loading Input. Use this
+// from any path that only needs FnSlug / HashedID / ScheduleStatus
+func (m shardedMgr) LoadDefersMeta(
+	ctx context.Context,
+	accountId uuid.UUID,
+	fnID uuid.UUID,
+	runID ulid.ULID,
+) (map[string]statev2.DeferMeta, error) {
+	ctx = redis_telemetry.WithScope(
+		redis_telemetry.WithOpName(ctx, "LoadDefersMeta"),
+		redis_telemetry.ScopeFnRunState,
+	)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(
+			fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID),
+		).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, err
+	}
+
+	hashedIDs := make([]string, 0, len(rmap))
+	for hashedID := range rmap {
+		hashedIDs = append(hashedIDs, hashedID)
+	}
+	if len(hashedIDs) > consts.MaxDefersPerRun {
+		// Unreachable: SaveDefer enforces the cap at write time. Defensive
+		// truncate; sort first so the result is deterministic across calls.
+		logger.StdlibLogger(ctx).Error(
+			"defer count exceeds per-run limit",
+			"account_id", accountId,
+			"fn_id", fnID,
+			"hash_field_count", len(rmap),
+			"limit", consts.MaxDefersPerRun,
+			"run_id", runID,
+			"unreachable", true,
+		)
+
+		// Sort the hashedIDs to make the truncation deterministic. However,
+		// this is still flawed. If we do mistakenly insert past the limit and
+		// hit this code path, it's possible that a new defer's (past the limit)
+		// hashed ID is sorted before an existing defer. We felt this downside
+		// was acceptable because the chance is extremely rare (either a
+		// SaveDefer bug or the limit changing during the life of a function
+		// run).
+		//
+		// We should rethink this tradeoff if MaxDefersPerRun becomes dynamic
+		// (e.g. an entitlement). If we did that, the best solution might be to
+		// "pin" it at the start of the function run (e.g. add it to run state).
+		slices.Sort(hashedIDs)
+		hashedIDs = hashedIDs[:consts.MaxDefersPerRun]
+	}
+
+	metas := make(map[string]statev2.DeferMeta, len(hashedIDs))
+	for _, hashedID := range hashedIDs {
+		var meta deferMeta
+		if err := json.Unmarshal([]byte(rmap[hashedID]), &meta); err != nil {
+			return nil, err
+		}
+		metas[hashedID] = statev2.DeferMeta{
+			FnSlug:         meta.FnSlug,
+			HashedID:       meta.HashedID,
+			ScheduleStatus: enums.DeferStatus(meta.ScheduleStatus),
+		}
+	}
+	return metas, nil
+}
+
+// LoadDefers loads all defers for a given run, including their metadata and
+// input data. This is the full view of a defer, including input data.
+func (m shardedMgr) LoadDefers(
+	ctx context.Context,
+	accountId uuid.UUID,
+	fnID uuid.UUID,
+	runID ulid.ULID,
+) (map[string]statev2.Defer, error) {
+	ctx = redis_telemetry.WithScope(
+		redis_telemetry.WithOpName(ctx, "LoadDefers"),
+		redis_telemetry.ScopeFnRunState,
+	)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	metas, err := m.LoadDefersMeta(ctx, accountId, fnID, runID)
+	if err != nil {
+		return nil, err
+	}
+	if len(metas) == 0 {
+		return map[string]statev2.Defer{}, nil
+	}
+
+	inputs, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(
+			fnRunState.kg.DefersInput(ctx, isSharded, fnID, runID),
+		).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, err
+	}
+
+	defers := make(map[string]statev2.Defer, len(metas))
+	for hashedID, meta := range metas {
+		d := statev2.Defer{
+			FnSlug:         meta.FnSlug,
+			HashedID:       meta.HashedID,
+			ScheduleStatus: meta.ScheduleStatus,
+		}
+		if raw, ok := inputs[hashedID]; ok && len(raw) > 0 {
+			d.Input = json.RawMessage(raw)
+		}
+		defers[hashedID] = d
+	}
+	return defers, nil
 }
 
 func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) ([]json.RawMessage, error) {
@@ -759,6 +912,123 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 	return stack, nil
 }
 
+func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, d statev2.Defer) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveDefer"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	metaJSON, err := json.Marshal(deferMeta{
+		FnSlug:         d.FnSlug,
+		HashedID:       d.HashedID,
+		ScheduleStatus: int(d.ScheduleStatus),
+	})
+	if err != nil {
+		return err
+	}
+
+	args, err := StrSlice([]any{
+		d.HashedID,
+		string(metaJSON),
+		string(d.Input),
+		consts.MaxDefersPerRun,
+		consts.MaxDeferInputAggregateSize,
+		int(enums.DeferStatusRejected),
+	})
+	if err != nil {
+		return err
+	}
+
+	result, err := retriableScripts["saveDefer"].Exec(
+		redis_telemetry.WithScriptName(ctx, "saveDefer"),
+		r,
+		[]string{
+			fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID),
+			fnRunState.kg.DefersInput(ctx, isSharded, fnID, runID),
+			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
+		},
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error saving defer: %w", err)
+	}
+	if result == -1 {
+		return fmt.Errorf("%w: %d", statev2.ErrDeferLimitExceeded, consts.MaxDefersPerRun)
+	}
+	if result == -2 {
+		return fmt.Errorf("%w: %d bytes", statev2.ErrDeferInputAggregateExceeded, consts.MaxDeferInputAggregateSize)
+	}
+	return nil
+}
+
+func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hashedID string, status enums.DeferStatus) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetDeferStatus"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	args, err := StrSlice([]any{hashedID, int(status), int(enums.DeferStatusAborted)})
+	if err != nil {
+		return err
+	}
+
+	result, err := retriableScripts["setDeferStatus"].Exec(
+		redis_telemetry.WithScriptName(ctx, "setDeferStatus"),
+		r,
+		[]string{
+			fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID),
+			fnRunState.kg.DefersInput(ctx, isSharded, fnID, runID),
+			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
+		},
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error setting defer status: %w", err)
+	}
+	if result == 0 {
+		return fmt.Errorf("defer not found for hashedID %q", hashedID)
+	}
+	return nil
+}
+
+// SaveRejectedDefer idempotently writes a Rejected meta sentinel. No-op if
+// any defer already exists for the hashedID. Returns ErrDeferLimitExceeded
+// if the run is at MaxDefersPerRun.
+func (m shardedMgr) SaveRejectedDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, fnSlug string, hashedID string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveRejectedDefer"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	metaJSON, err := json.Marshal(deferMeta{
+		FnSlug:         fnSlug,
+		HashedID:       hashedID,
+		ScheduleStatus: int(enums.DeferStatusRejected),
+	})
+	if err != nil {
+		return err
+	}
+
+	args, err := StrSlice([]any{hashedID, string(metaJSON), consts.MaxDefersPerRun})
+	if err != nil {
+		return err
+	}
+
+	result, err := retriableScripts["saveRejectedDefer"].Exec(
+		redis_telemetry.WithScriptName(ctx, "saveRejectedDefer"),
+		r,
+		[]string{fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID)},
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error saving rejected defer sentinel: %w", err)
+	}
+	if result == -1 {
+		return fmt.Errorf("%w: %d", statev2.ErrDeferLimitExceeded, consts.MaxDefersPerRun)
+	}
+	return nil
+}
+
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveResponse"), redis_telemetry.ScopeFnRunState)
 
@@ -773,7 +1043,8 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 	}
-	args := []string{stepID, marshalledOuptut}
+	metadataSizeDelta := state.MetadataSizeDeltaFromContext(ctx)
+	args := []string{stepID, marshalledOuptut, strconv.Itoa(metadataSizeDelta)}
 
 	indexes, err := retriableScripts["saveResponse"].Exec(
 		redis_telemetry.WithScriptName(ctx, "saveResponse"),
@@ -838,7 +1109,9 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
 func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
-	err := m.shardedMgr.delete(ctx, ctx, i)
+	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+	defer cancel()
+	err := m.shardedMgr.delete(ctx, callCtx, i)
 	if err != nil {
 		return err
 	}
@@ -855,6 +1128,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 
 func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "delete"), redis_telemetry.ScopeFnRunState)
+	callCtx = redis_telemetry.WithScope(redis_telemetry.WithOpName(callCtx, "delete"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
@@ -881,6 +1155,8 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
 
 	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
@@ -894,20 +1170,17 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	return nil
 }
 
-// ConsumePause consumes a pause, writing the consumed data to state.
+// ConsumePause consumes a pause, writing the consumed pause to run state
 func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
-	if opts.IdempotencyKey == "" {
-		return state.ConsumePauseResult{}, state.ErrConsumePauseKeyMissing
+	if p.DataKey == "" {
+		// Cancel pauses don't have a DataKey since they don't store data in
+		// run state — they only cancel the function. Skip the write.
+		return state.ConsumePauseResult{DidConsume: true}, nil
 	}
-
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConsumePause"), redis_telemetry.ScopePauses)
-
-	fnRunState := m.s.FunctionRunState()
-	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
 	var marshalledData []byte
 	if b, ok := opts.Data.([]byte); ok && json.Valid(b) {
-		// Already marshalled data we can just use it
+		// Already marshalled data, just use it
 		marshalledData = b
 	} else {
 		var err error
@@ -917,47 +1190,25 @@ func (m shardedMgr) ConsumePause(ctx context.Context, p state.Pause, opts state.
 		}
 	}
 
-	keys := []string{
-		fnRunState.kg.Actions(ctx, isSharded, p.Identifier.FunctionID, p.Identifier.RunID),
-		fnRunState.kg.Stack(ctx, isSharded, p.Identifier.RunID),
-		fnRunState.kg.RunMetadata(ctx, isSharded, p.Identifier.RunID),
-		fnRunState.kg.Pending(ctx, isSharded, state.Identifier{
-			RunID:      p.Identifier.RunID,
-			WorkflowID: p.Identifier.FunctionID,
-		}),
-		fnRunState.kg.PauseConsumeKey(ctx, isSharded, p.Identifier.RunID, p.ID),
+	id := state.Identifier{
+		RunID:      p.Identifier.RunID,
+		WorkflowID: p.Identifier.FunctionID,
+		AccountID:  p.Identifier.AccountID,
 	}
 
-	args, err := StrSlice([]any{
-		p.DataKey,
-		string(marshalledData),
-		opts.IdempotencyKey,
-		int64(consts.FunctionIdempotencyPeriod.Seconds()), // TTL in seconds for Garnet compatibility
-	})
-	if err != nil {
-		return state.ConsumePauseResult{}, err
-	}
-
-	status, err := retriableScripts["consumePause"].Exec(
-		redis_telemetry.WithScriptName(ctx, "consumePause"),
-		client,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
-	}
-
-	switch status {
-	case -1:
-		// This could be an ErrDuplicateResponse;  we're attempting to consume a pause twice.
+	hasPending, err := m.SaveResponse(ctx, id, p.DataKey, string(marshalledData))
+	switch {
+	case err == nil:
+		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: hasPending}, nil
+	case errors.Is(err, state.ErrIdempotentResponse):
+		// Same data already written ensures a safe retry after a transient failure,
+		// caller will likely try to resume a run again.
+		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: hasPending}, nil
+	case errors.Is(err, state.ErrDuplicateResponse):
+		// Different data already exists, this pause was consumed by a different event.
 		return state.ConsumePauseResult{}, nil
-	case 0:
-		return state.ConsumePauseResult{DidConsume: true}, nil
-	case 1:
-		return state.ConsumePauseResult{DidConsume: true, HasPendingSteps: true}, nil
 	default:
-		return state.ConsumePauseResult{}, fmt.Errorf("unknown response leasing pause: %d", status)
+		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
 	}
 }
 
@@ -1214,6 +1465,7 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 	m.StateSize, _ = parseInt("state_size")
 	m.EventSize, _ = parseInt("event_size")
 	m.StepCount, _ = parseInt("step_count")
+	m.MetadataSize, _ = parseInt("metadata_size")
 
 	if val, ok := data["version"]; ok && val != "" {
 		v, err := strconv.Atoi(strings.TrimSuffix(val, ".0"))
@@ -1424,6 +1676,7 @@ type runMetadata struct {
 	StateSize                 int            `json:"state_size"`
 	EventSize                 int            `json:"event_size"`
 	StepCount                 int            `json:"step_count"`
+	MetadataSize              int            `json:"metadata_size"`
 	Debugger                  bool           `json:"debugger"`
 	RunType                   string         `json:"runType,omitempty"`
 	ReplayID                  string         `json:"rID,omitempty"`

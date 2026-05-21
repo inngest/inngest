@@ -32,6 +32,8 @@ type ExtractedValues struct {
 	FunctionID *uuid.UUID
 	FunctionVersion *int
 	RunID *ulid.ULID
+	ReplayOriginalRunID *ulid.ULID
+	RunScheduleType *enums.ScheduleType
 	SkipReason *enums.SkipReason
 	SkipExistingRunID *string
 	IsDurableEndpointRun *bool
@@ -49,6 +51,7 @@ type ExtractedValues struct {
 	StepAttempt *int
 	StepMaxAttempts *int
 	StepCodeLocation *string
+	StepType *enums.StepType
 	StepInput *string
 	StepOutput *string
 	StepOutputRef *string
@@ -56,6 +59,9 @@ type ExtractedValues struct {
 	StepUserlandID *string
 	StepUserlandIndex *int
 	StepRunType *string
+	ExperimentName *string
+	ExperimentStepID *string
+	ExperimentVariant *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time
 	StepInvokeFunctionID *string
@@ -69,10 +75,13 @@ type ExtractedValues struct {
 	StepSignalName *string
 	StepGatewayResponseStatusCode *int
 	StepGatewayResponseOutputSizeBytes *int
+	RequestID *string
+	JobID *string
 	RequestURL *string
 	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	ResponseSteps *ResponseOps
 	IsCheckpoint *bool
 	IsUserland *bool
 	UserlandSpanID *string

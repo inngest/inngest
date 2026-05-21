@@ -6,18 +6,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngestgo/experimental"
 	"github.com/inngest/inngestgo/internal/checkpoint"
 	"github.com/inngest/inngestgo/internal/fn"
-	"github.com/inngest/inngestgo/internal/middleware"
+	"github.com/inngest/inngestgo/internal/logger"
 	"github.com/inngest/inngestgo/internal/opcode"
 	"github.com/inngest/inngestgo/internal/util"
+	"github.com/inngest/inngestgo/middleware"
 )
 
 type ControlHijack struct{}
@@ -72,7 +71,7 @@ type InvocationManager interface {
 	// retrieve creds for eg. publishing or API alls.
 	SigningKey() string
 	// CallContext exposes the call context for middleware calls.
-	CallContext() experimental.CallContext
+	CallContext() middleware.CallContext
 	// StepMode returns how steps should be executed in this context
 	StepMode() StepMode
 	// SetStepMode overrides the step mode.
@@ -304,7 +303,7 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 				}
 				return
 			}
-			slog.Default().Error("error checkpointing state, falling back to async response", "error", err)
+			logger.Default().Warn("error checkpointing state, falling back to async response", "error", err)
 		})
 	default:
 		// Do nothing else.
@@ -326,6 +325,8 @@ func (r *requestCtxManager) CallContext() middleware.CallContext {
 		Env:          r.request.CallCtx.Env,
 		RunID:        r.request.CallCtx.RunID,
 		Attempt:      r.request.CallCtx.Attempt,
+		RequestID:    r.request.CallCtx.RequestID,
+		JobID:        r.request.CallCtx.JobID,
 	}
 }
 
