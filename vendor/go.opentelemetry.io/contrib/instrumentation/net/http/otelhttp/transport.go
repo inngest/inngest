@@ -5,20 +5,22 @@ package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptrace"
 	"sync/atomic"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv"
 )
 
 // Transport implements the http.RoundTripper interface and wraps
@@ -26,17 +28,15 @@ import (
 type Transport struct {
 	rt http.RoundTripper
 
-	tracer            trace.Tracer
-	meter             metric.Meter
-	propagators       propagation.TextMapPropagator
-	spanStartOptions  []trace.SpanStartOption
-	filters           []Filter
-	spanNameFormatter func(string, *http.Request) string
-	clientTrace       func(context.Context) *httptrace.ClientTrace
+	tracer             trace.Tracer
+	propagators        propagation.TextMapPropagator
+	spanStartOptions   []trace.SpanStartOption
+	filters            []Filter
+	spanNameFormatter  func(string, *http.Request) string
+	clientTrace        func(context.Context) *httptrace.ClientTrace
+	metricAttributesFn func(*http.Request) []attribute.KeyValue
 
-	requestBytesCounter  metric.Int64Counter
-	responseBytesCounter metric.Int64Counter
-	latencyMeasure       metric.Float64Histogram
+	semconv semconv.HTTPClient
 }
 
 var _ http.RoundTripper = &Transport{}
@@ -63,43 +63,19 @@ func NewTransport(base http.RoundTripper, opts ...Option) *Transport {
 
 	c := newConfig(append(defaultOpts, opts...)...)
 	t.applyConfig(c)
-	t.createMeasures()
 
 	return &t
 }
 
 func (t *Transport) applyConfig(c *config) {
 	t.tracer = c.Tracer
-	t.meter = c.Meter
 	t.propagators = c.Propagators
 	t.spanStartOptions = c.SpanStartOptions
 	t.filters = c.Filters
 	t.spanNameFormatter = c.SpanNameFormatter
 	t.clientTrace = c.ClientTrace
-}
-
-func (t *Transport) createMeasures() {
-	var err error
-	t.requestBytesCounter, err = t.meter.Int64Counter(
-		clientRequestSize,
-		metric.WithUnit("By"),
-		metric.WithDescription("Measures the size of HTTP request messages."),
-	)
-	handleErr(err)
-
-	t.responseBytesCounter, err = t.meter.Int64Counter(
-		clientResponseSize,
-		metric.WithUnit("By"),
-		metric.WithDescription("Measures the size of HTTP response messages."),
-	)
-	handleErr(err)
-
-	t.latencyMeasure, err = t.meter.Float64Histogram(
-		clientDuration,
-		metric.WithUnit("ms"),
-		metric.WithDescription("Measures the duration of outbound HTTP requests."),
-	)
-	handleErr(err)
+	t.semconv = semconv.NewHTTPClient(c.Meter)
+	t.metricAttributesFn = c.MetricAttributesFn
 }
 
 func defaultTransportFormatter(_ string, r *http.Request) string {
@@ -109,6 +85,8 @@ func defaultTransportFormatter(_ string, r *http.Request) string {
 // RoundTrip creates a Span and propagates its context via the provided request's headers
 // before handing the request to the configured base RoundTripper. The created span will
 // end when the response body is closed or when a read from the body returns io.EOF.
+// If GetBody returns an error, the error is reported via otel.Handle and the request
+// continues with the original Body.
 func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	requestStartTime := time.Now()
 	for _, f := range t.filters {
@@ -143,54 +121,81 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	r = r.Clone(ctx) // According to RoundTripper spec, we shouldn't modify the origin request.
 
-	// use a body wrapper to determine the request size
-	var bw bodyWrapper
-	// if request body is nil or NoBody, we don't want to mutate the body as it
+	// GetBody is preferred over direct access to Body if the function is set.
+	// If the resulting body is nil or is NoBody, we don't want to mutate the body as it
 	// will affect the identity of it in an unforeseeable way because we assert
 	// ReadCloser fulfills a certain interface and it is indeed nil or NoBody.
-	if r.Body != nil && r.Body != http.NoBody {
-		bw.ReadCloser = r.Body
-		// noop to prevent nil panic. not using this record fun yet.
-		bw.record = func(int64) {}
-		r.Body = &bw
+	body := r.Body
+	if r.GetBody != nil {
+		b, err := r.GetBody()
+		if err != nil {
+			otel.Handle(fmt.Errorf("http.Request GetBody returned an error: %w", err))
+		} else {
+			body = b
+		}
 	}
 
-	span.SetAttributes(semconvutil.HTTPClientRequest(r)...)
+	bw := request.NewBodyWrapper(body, func(int64) {})
+	if body != nil && body != http.NoBody {
+		r.Body = bw
+	}
+
+	span.SetAttributes(t.semconv.RequestTraceAttrs(r)...)
 	t.propagators.Inject(ctx, propagation.HeaderCarrier(r.Header))
 
 	res, err := t.rt.RoundTrip(r)
+
+	// Defer metrics recording function to record the metrics on error or no error.
+	defer func() {
+		metricAttributes := semconv.MetricAttributes{
+			Req:                  r,
+			AdditionalAttributes: append(labeler.Get(), t.metricAttributesFromRequest(r)...),
+		}
+
+		if err == nil {
+			metricAttributes.StatusCode = res.StatusCode
+		}
+
+		metricOpts := t.semconv.MetricOptions(metricAttributes)
+
+		metricData := semconv.MetricData{
+			RequestSize: bw.BytesRead(),
+		}
+
+		if err == nil {
+			readRecordFunc := func(int64) {}
+			res.Body = newWrappedBody(span, readRecordFunc, res.Body)
+		}
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedTime := float64(time.Since(requestStartTime)) / float64(time.Millisecond)
+
+		metricData.ElapsedTime = elapsedTime
+
+		t.semconv.RecordMetrics(ctx, metricData, metricOpts)
+	}()
+
 	if err != nil {
-		span.RecordError(err)
+		span.SetAttributes(otelsemconv.ErrorType(err))
 		span.SetStatus(codes.Error, err.Error())
 		span.End()
+
 		return res, err
 	}
 
-	// metrics
-	metricAttrs := append(labeler.Get(), semconvutil.HTTPClientRequestMetrics(r)...)
-	if res.StatusCode > 0 {
-		metricAttrs = append(metricAttrs, semconv.HTTPStatusCode(res.StatusCode))
-	}
-	o := metric.WithAttributeSet(attribute.NewSet(metricAttrs...))
-	addOpts := []metric.AddOption{o} // Allocate vararg slice once.
-	t.requestBytesCounter.Add(ctx, bw.read.Load(), addOpts...)
-	// For handling response bytes we leverage a callback when the client reads the http response
-	readRecordFunc := func(n int64) {
-		t.responseBytesCounter.Add(ctx, n, addOpts...)
-	}
-
 	// traces
-	span.SetAttributes(semconvutil.HTTPClientResponse(res)...)
-	span.SetStatus(semconvutil.HTTPClientStatus(res.StatusCode))
+	span.SetAttributes(t.semconv.ResponseTraceAttrs(res)...)
+	span.SetStatus(t.semconv.Status(res.StatusCode))
 
-	res.Body = newWrappedBody(span, readRecordFunc, res.Body)
+	return res, nil
+}
 
-	// Use floating point division here for higher precision (instead of Millisecond method).
-	elapsedTime := float64(time.Since(requestStartTime)) / float64(time.Millisecond)
-
-	t.latencyMeasure.Record(ctx, elapsedTime, o)
-
-	return res, err
+func (t *Transport) metricAttributesFromRequest(r *http.Request) []attribute.KeyValue {
+	var attributeForRequest []attribute.KeyValue
+	if t.metricAttributesFn != nil {
+		attributeForRequest = t.metricAttributesFn(r)
+	}
+	return attributeForRequest
 }
 
 // newWrappedBody returns a new and appropriately scoped *wrappedBody as an
@@ -231,7 +236,7 @@ func (wb *wrappedBody) Write(p []byte) (int, error) {
 	// This will not panic given the guard in newWrappedBody.
 	n, err := wb.body.(io.Writer).Write(p)
 	if err != nil {
-		wb.span.RecordError(err)
+		wb.span.SetAttributes(otelsemconv.ErrorType(err))
 		wb.span.SetStatus(codes.Error, err.Error())
 	}
 	return n, err
@@ -249,7 +254,7 @@ func (wb *wrappedBody) Read(b []byte) (int, error) {
 		wb.recordBytesRead()
 		wb.span.End()
 	default:
-		wb.span.RecordError(err)
+		wb.span.SetAttributes(otelsemconv.ErrorType(err))
 		wb.span.SetStatus(codes.Error, err.Error())
 	}
 	return n, err
