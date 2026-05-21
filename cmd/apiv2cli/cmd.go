@@ -479,18 +479,37 @@ func resolvePath(cmd *cli.Command, ep endpoint) (string, error) {
 
 		name := parts[1]
 		flagName := kebab(name)
-		if !cmd.IsSet(flagName) || cmd.String(flagName) == "" {
-			firstErr = fmt.Errorf("missing required --%s", flagName)
+		value, ok := pathParamValue(cmd, ep, name)
+		if !ok {
+			firstErr = fmt.Errorf("missing required --%s or positional argument <%s>", flagName, flagName)
 			return match
 		}
 
-		return url.PathEscape(cmd.String(flagName))
+		return url.PathEscape(value)
 	})
 
 	if firstErr != nil {
 		return "", firstErr
 	}
 	return path, nil
+}
+
+func pathParamValue(cmd *cli.Command, ep endpoint, name string) (string, bool) {
+	flagName := kebab(name)
+	if cmd.IsSet(flagName) && cmd.String(flagName) != "" {
+		return cmd.String(flagName), true
+	}
+
+	index := slices.Index(ep.pathParams, name)
+	if index < 0 || cmd.Args().Len() <= index {
+		return "", false
+	}
+
+	value := cmd.Args().Get(index)
+	if value == "" {
+		return "", false
+	}
+	return value, true
 }
 
 func queryParams(cmd *cli.Command, ep endpoint) (url.Values, error) {

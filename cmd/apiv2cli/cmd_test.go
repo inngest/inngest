@@ -118,6 +118,67 @@ func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
 	require.Equal(t, "includeOutput=true", gotQuery)
 }
 
+func TestCommandAcceptsPositionalPathParams(t *testing.T) {
+	var gotPath string
+	var gotQuery string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"get-function-trace",
+		"01J00000000000000000000000",
+		"--include-output",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "/api/v2/runs/01J00000000000000000000000/trace", gotPath)
+	require.Equal(t, "includeOutput=true", gotQuery)
+}
+
+func TestCommandAcceptsMultiplePositionalPathParams(t *testing.T) {
+	var gotPath string
+	var gotBody map[string]any
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"runId":"01J00000000000000000000000"}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"invoke-function",
+		"my app",
+		"hello/world",
+		"--data", `{"message":"hi"}`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/invoke", gotPath)
+	require.Equal(t, map[string]any{
+		"data": map[string]any{"message": "hi"},
+	}, gotBody)
+}
+
 func TestCommandUsesAPIPortForAPIHost(t *testing.T) {
 	var gotPath string
 
