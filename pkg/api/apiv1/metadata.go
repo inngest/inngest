@@ -134,6 +134,10 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	// yet, which causes us to mistakenly update metadata on a prior failed
 	// attempt.
 	//
+	// The retry config is sized so that the cumulative backoff covers roughly
+	// one minute, which gives the Kafka→ClickHouse pipeline time to land the
+	// span.
+	//
 	// TODO: We should replace this hack with a proper fix. But a proper fix
 	// likely requires changes in our ClickHouse trace schema.
 	_, err = util.WithRetry(
@@ -144,11 +148,15 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			parentSpan, scope, err = a.getParentSpan(ctx, auth, runID, &req.Target)
 			return nil, err
 		},
-		util.NewRetryConf(),
+		// 2s → 4s → 8s → 15s → 15s → 15s
+		util.NewRetryConf(
+			util.WithRetryConfMaxAttempts(7),
+			util.WithRetryConfInitialBackoff(2*time.Second),
+			util.WithRetryConfMaxBackoff(15*time.Second),
+		),
 	)
 	if err != nil {
-		logger.StdlibLogger(ctx).ErrorSample(
-			1,
+		logger.StdlibLogger(ctx).Error(
 			"failed to get parent span for metadata",
 			"error", err,
 			"attempts", attempts,
@@ -293,6 +301,9 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 	// TODO: specific err cases
 	case err != nil:
 		return nil, 0, publicerr.Wrap(err, 404, "Unable to find metadata target")
+	case span == nil:
+		// Cloud's GetRunSpanByRunID implementation can return `(nil, nil)`
+		return nil, 0, publicerr.Errorf(404, "Unable to find metadata target")
 	}
 
 	return span, scope, nil

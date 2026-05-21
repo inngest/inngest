@@ -87,11 +87,6 @@ type Logger interface {
 	// Non-sampled logs are logged as a trace.
 	DebugSample(percent int, msg string, args ...any)
 
-	// ErrorSample samples a % of time to produce an error log, between 0-100.
-	// Non-sampled logs are dropped. Use for expected, high-volume errors where
-	// a metric is the primary signal and a log is only useful occasionally.
-	ErrorSample(percent int, msg string, args ...any)
-
 	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
 	ReportError(err error, msg string, opts ...ReportErrorOpt)
 }
@@ -285,14 +280,6 @@ type logger struct {
 func (l *logger) DebugSample(percent int, msg string, args ...any) {
 	if rand.Intn(100) < percent {
 		l.Debug(msg, args...)
-		return
-	}
-	l.Trace(msg, args...)
-}
-
-func (l *logger) ErrorSample(percent int, msg string, args ...any) {
-	if rand.Intn(100) < percent {
-		l.Error(msg, args...)
 		return
 	}
 	l.Trace(msg, args...)
