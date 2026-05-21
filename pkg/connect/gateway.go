@@ -322,6 +322,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
+			// markClosed is paired with the outer connection lifetime so every
+			// accepted websocket has a terminal phase, including handshake failures.
 			defer ch.markClosed("connection cleanup complete", "close_reason", *closeReasonPtr.Load())
 			ch.log.Debug("Closing WebSocket connection", "reason", *closeReasonPtr.Load())
 			c.logger.Trace("worker disconnected")
@@ -461,6 +463,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		// regardless of whether it's permanent or temporary
 		defer func() {
 			// Ensure receiveRouterMessagesFromGRPC exits on any disconnect.
+			// This marks the local handler as disconnecting before the external
+			// metadata is removed so logs show cleanup intent even if Redis fails.
 			ch.beginDisconnect("connection cleanup", "close_reason", *closeReasonPtr.Load())
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
 			ch.logConnStatus(connectpb.ConnectionStatus_DISCONNECTED, "connection cleanup", "close_reason", *closeReasonPtr.Load())

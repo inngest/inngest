@@ -75,3 +75,6 @@ compatible with the sections and placeholders described in
 - Prefer minimal, targeted changes with tests to verify their behavior
 - Commits should be in small logical chunks so each one is self reviewable
 - If operating with a plan, update the checklist items as you go if there are any
+- Add succinct comments when they clarify intent, lifecycle ordering, or
+  behavior-preservation constraints; avoid comments that merely restate the
+  code.
