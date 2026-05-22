@@ -224,14 +224,6 @@ func (c *Config) initContext() {
 	}
 }
 
-// MarshalContextJSON returns the Context map serialized as a JSON string.
-func (c *Config) MarshalContextJSON() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	b, _ := json.Marshal(c.Context)
-	return string(b)
-}
-
 func (c *Config) SetCronSchedule(schedule string) {
 	defer c.mu.Unlock()
 	c.mu.Lock()
