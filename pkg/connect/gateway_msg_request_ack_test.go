@@ -37,16 +37,17 @@ func TestHandleWorkerRequestAckMissingExecutorLeaseIsNonFatalAfterPendingAck(t *
 
 	ch := newTestConnectionHandler(t, res)
 	requestID := "test-missing-executor-lease"
-	ackCh := make(chan struct{})
+	ackCh := make(chan error, 1)
 	ch.pendingAcks.Store(requestID, ackCh)
 
 	serr := ch.handleWorkerRequestAck(workerRequestAckMessage(t, res, requestID))
 	require.Nil(t, serr)
 
 	select {
-	case <-ackCh:
+	case err := <-ackCh:
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("pending ack channel should be closed before executor notification")
+		t.Fatal("pending ack channel should succeed before executor notification")
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 func (c *connectionHandler) handleIncomingWebSocketMessage(msg *connectpb.ConnectMessage) *connecterrors.SocketError {
-	c.log.Trace("received WebSocket message", "kind", msg.Kind.String())
+	c.log.Trace("received WebSocket message", "kind", msg.Kind.String(), "phase", c.phase().String())
 
 	switch msg.Kind {
 	case connectpb.GatewayMessageType_WORKER_READY:
