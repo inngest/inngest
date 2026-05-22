@@ -38,7 +38,7 @@
     "@tanstack/react-router": "^1.168.26",
     "@tanstack/react-router-devtools": "^1.167.0",
     "@tanstack/react-router-ssr-query": "^1.167.0",
-    "@tanstack/react-start": "^1.168.8",
+    "@tanstack/react-start": "1.168.8",
     "@tanstack/react-table": "^8.21.3",
     "graphql": "^16.8.1",
     "graphql-request": "^6.1.0",
