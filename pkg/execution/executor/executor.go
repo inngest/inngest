@@ -2887,6 +2887,24 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 				"error", err,
 				"cancellation_id", r.CancellationID,
 			)
+
+			md := sv2.Metadata{ID: id}
+			if err := e.Finalize(ctx, execution.FinalizeOpts{
+				Metadata: md,
+				Response: execution.FinalizeResponse{
+					Type:           execution.FinalizeResponseDriver,
+					DriverResponse: state.DriverResponse{},
+				},
+				Optional: execution.FinalizeOptional{
+					Cancel: true,
+					Reason: "cancel",
+				},
+			}); err != nil {
+				l.Error("error running synthetic finish handler", "error", err)
+			}
+			for _, e := range e.lifecycles {
+				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
+			}
 		}
 		return nil
 	}
