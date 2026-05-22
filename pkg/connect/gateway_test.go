@@ -1732,10 +1732,10 @@ func TestDrainingConnectionNotKilledByHeartbeatDetector(t *testing.T) {
 	}, 2*time.Second, 50*time.Millisecond)
 
 	// Keep sending heartbeats well past the miss threshold (3 * 200ms = 600ms).
-	// Phase-driven write eligibility skips heartbeat responses during drain, but
-	// the inbound heartbeat still refreshes the detector.
+	// Keep exchanging heartbeat ACKs so the SDK-side pending heartbeat counter
+	// would not treat the draining connection as dead.
 	for range 10 {
-		sendWorkerHeartbeatMessage(t, res.ws)
+		exchangeHeartbeat(t, res.ws, 2*time.Second)
 		time.Sleep(params.heartbeatInterval)
 	}
 

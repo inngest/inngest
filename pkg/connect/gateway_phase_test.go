@@ -72,7 +72,7 @@ func TestConnectionHandlerPhaseEligibility(t *testing.T) {
 	ch.beginDrain("test drain")
 	require.False(t, ch.canForward())
 	require.False(t, ch.canWrite(connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST))
-	require.False(t, ch.canWrite(connectpb.GatewayMessageType_GATEWAY_HEARTBEAT))
+	require.True(t, ch.canWrite(connectpb.GatewayMessageType_GATEWAY_HEARTBEAT))
 	require.True(t, ch.canWrite(connectpb.GatewayMessageType_WORKER_REPLY_ACK))
 	require.True(t, ch.canWrite(connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK))
 

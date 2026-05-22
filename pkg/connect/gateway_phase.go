@@ -54,7 +54,8 @@ func (c *connectionHandler) canWrite(kind connectpb.GatewayMessageType) bool {
 	case connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
 		return phase == gatewayConnPhaseReady
 	case connectpb.GatewayMessageType_GATEWAY_HEARTBEAT:
-		return phase == gatewayConnPhaseReady
+		return phase == gatewayConnPhaseReady ||
+			phase == gatewayConnPhaseDraining
 	case connectpb.GatewayMessageType_WORKER_REPLY_ACK:
 		// Replies are only handled after the run loop has read a worker message.
 		// Allow the ACK while cleanup is starting, but never after final close.

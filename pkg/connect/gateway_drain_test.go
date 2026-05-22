@@ -218,6 +218,10 @@ func TestHeartbeatDuringGatewayDrain_StatusRemainsDraining(t *testing.T) {
 	// Worker sends a heartbeat during drain
 	sendWorkerHeartbeatMessage(t, res.ws)
 
+	// Expect GATEWAY_HEARTBEAT response (heartbeats are still processed)
+	msg = awaitNextMessage(t, res.ws, 3*time.Second)
+	require.Equal(t, connectpb.GatewayMessageType_GATEWAY_HEARTBEAT, msg.Kind)
+
 	// Verify connection status in Redis is DRAINING (not reset to READY)
 	require.EventuallyWithT(t, func(ct *assert.CollectT) {
 		conn, err := res.stateManager.GetConnection(ctx, res.envID, res.connID)
@@ -588,14 +592,9 @@ func TestLeaseExtensionDuringGatewayDrain_IsProcessed(t *testing.T) {
 	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 2*time.Second,
 		"new lease should have a future expiry")
 
-	// Verify the connection is still alive enough to process another inbound
-	// heartbeat. Draining connections no longer receive heartbeat responses.
+	// Verify connection is still alive by exchanging a heartbeat
 	sendWorkerHeartbeatMessage(t, res.ws)
-	require.EventuallyWithT(t, func(ct *assert.CollectT) {
-		res.lifecycles.lock.Lock()
-		defer res.lifecycles.lock.Unlock()
-
-		assert.GreaterOrEqual(ct, len(res.lifecycles.onHeartbeat), 1,
-			"connection should process heartbeat after lease extension during drain")
-	}, 2*time.Second, 100*time.Millisecond)
+	msg = awaitNextMessage(t, res.ws, 3*time.Second)
+	require.Equal(t, connectpb.GatewayMessageType_GATEWAY_HEARTBEAT, msg.Kind,
+		"connection should still be alive after lease extension during drain")
 }
