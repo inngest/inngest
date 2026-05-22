@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -836,11 +837,15 @@ func Walk(r Routes, walkFn WalkFunc) error {
 
 func walk(r Routes, walkFn WalkFunc, parentRoute string, parentMw ...func(http.Handler) http.Handler) error {
 	for _, route := range r.Routes() {
-		mws := make([]func(http.Handler) http.Handler, len(parentMw))
-		copy(mws, parentMw)
-		mws = append(mws, r.Middlewares()...)
+		mws := slices.Concat(parentMw, r.Middlewares())
 
 		if route.SubRoutes != nil {
+			if handler, ok := route.Handlers["*"]; ok {
+				if chain, ok := handler.(*ChainHandler); ok {
+					mws = append(mws, chain.Middlewares...)
+				}
+			}
+
 			if err := walk(route.SubRoutes, walkFn, parentRoute+route.Pattern, mws...); err != nil {
 				return err
 			}
@@ -854,7 +859,7 @@ func walk(r Routes, walkFn WalkFunc, parentRoute string, parentMw ...func(http.H
 			}
 
 			fullRoute := parentRoute + route.Pattern
-			fullRoute = strings.Replace(fullRoute, "/*/", "/", -1)
+			fullRoute = strings.ReplaceAll(fullRoute, "/*/", "/")
 
 			if chain, ok := handler.(*ChainHandler); ok {
 				if err := walkFn(method, fullRoute, chain.Endpoint, append(mws, chain.Middlewares...)...); err != nil {
