@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,50 +21,72 @@ import (
 )
 
 func TestCancelForceLifecycleHookFinalizesWhenMetadataMissing(t *testing.T) {
-	runID := ulid.Make()
-	id := sv2.ID{
-		RunID:      runID,
-		FunctionID: uuid.New(),
-		Tenant: sv2.Tenant{
-			AccountID: uuid.New(),
-			AppID:     uuid.New(),
-			EnvID:     uuid.New(),
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "metadata not found",
+			err:  sv2.ErrMetadataNotFound,
 		},
-	}
+		{
+			name: "run not found",
+			err:  state.ErrRunNotFound,
+		},
+		{
+			name: "wrapped run not found",
+			err:  fmt.Errorf("load metadata: %w", state.ErrRunNotFound),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			runID := ulid.Make()
+			id := sv2.ID{
+				RunID:      runID,
+				FunctionID: uuid.New(),
+				Tenant: sv2.Tenant{
+					AccountID: uuid.New(),
+					AppID:     uuid.New(),
+					EnvID:     uuid.New(),
+				},
+			}
 
-	runState := &missingMetadataRunService{}
-	lifecycle := &recordingCancelLifecycle{
-		cancelled: make(chan sv2.Metadata, 1),
-	}
-	e := &executor{
-		log:            logger.VoidLogger(),
-		smv2:           runState,
-		shards:         missingShardRegistry{},
-		tracerProvider: tracing.NewNoopTracerProvider(),
-		lifecycles:     []execution.LifecycleListener{lifecycle},
-	}
+			runState := &missingMetadataRunService{err: tc.err}
+			lifecycle := &recordingCancelLifecycle{
+				cancelled: make(chan sv2.Metadata, 1),
+			}
+			e := &executor{
+				log:            logger.VoidLogger(),
+				smv2:           runState,
+				shards:         missingShardRegistry{},
+				tracerProvider: tracing.NewOtelTracerProvider(nil, time.Millisecond),
+				lifecycles:     []execution.LifecycleListener{lifecycle},
+			}
 
-	err := e.Cancel(context.Background(), id, execution.CancelRequest{
-		ForceLifecycleHook: true,
-	})
-	require.NoError(t, err)
-	require.True(t, runState.deleted.Load())
+			err := e.Cancel(context.Background(), id, execution.CancelRequest{
+				ForceLifecycleHook: true,
+			})
+			require.NoError(t, err)
+			require.True(t, runState.deleted.Load())
 
-	select {
-	case md := <-lifecycle.cancelled:
-		require.Equal(t, id, md.ID)
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for cancellation lifecycle")
+			select {
+			case md := <-lifecycle.cancelled:
+				require.Equal(t, id, md.ID)
+				require.Nil(t, md.Config.DebugRunID())
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for cancellation lifecycle")
+			}
+		})
 	}
 }
 
 type missingMetadataRunService struct {
 	sv2.RunService
 	deleted atomic.Bool
+	err     error
 }
 
 func (m *missingMetadataRunService) LoadMetadata(context.Context, sv2.ID) (sv2.Metadata, error) {
-	return sv2.Metadata{}, sv2.ErrMetadataNotFound
+	return sv2.Metadata{}, m.err
 }
 
 func (m *missingMetadataRunService) LoadEvents(context.Context, sv2.ID) ([]json.RawMessage, error) {
