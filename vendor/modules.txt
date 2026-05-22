@@ -1079,7 +1079,7 @@ github.com/moby/sys/userns
 ## explicit; go 1.18
 github.com/moby/term
 github.com/moby/term/windows
-# github.com/modelcontextprotocol/go-sdk v1.6.0
+# github.com/modelcontextprotocol/go-sdk v1.6.1
 ## explicit; go 1.25.0
 github.com/modelcontextprotocol/go-sdk/auth
 github.com/modelcontextprotocol/go-sdk/internal/json

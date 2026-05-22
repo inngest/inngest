@@ -61,7 +61,7 @@ require (
 	github.com/mattn/go-isatty v0.0.22
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby/api v1.54.2
-	github.com/modelcontextprotocol/go-sdk v1.6.0
+	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/nats-io/nats.go v1.52.0
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/pkg/errors v0.9.1

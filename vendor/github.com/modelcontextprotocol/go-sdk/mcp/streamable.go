@@ -246,6 +246,12 @@ var disablelocalhostprotection = mcpgodebug.Value("disablelocalhostprotection")
 // The option will be removed in the 1.8.0 version of the SDK.
 var enableoriginverification = mcpgodebug.Value("enableoriginverification")
 
+// disablecontenttypecheck is a compatibility parameter that allows to disable
+// Content-Type validation on POST requests.
+// See the documentation for the mcpgodebug package for instructions how to enable it.
+// The option will be removed in the 1.8.0 version of the SDK.
+var disablecontenttypecheck = mcpgodebug.Value("disablecontenttypecheck")
+
 func (h *StreamableHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// DNS rebinding protection: auto-enabled for localhost servers.
 	// See: https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices#local-mcp-server-compromise
@@ -267,7 +273,7 @@ func (h *StreamableHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 	}
 
 	// Validate 'Content-Type' header.
-	if req.Method == http.MethodPost && baseMediaType(req.Header.Get("Content-Type")) != "application/json" {
+	if disablecontenttypecheck != "1" && req.Method == http.MethodPost && baseMediaType(req.Header.Get("Content-Type")) != "application/json" {
 		http.Error(w, "Content-Type must be 'application/json'", http.StatusUnsupportedMediaType)
 		return
 	}

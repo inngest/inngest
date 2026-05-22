@@ -202,7 +202,7 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Validate 'Content-Type' header.
-	if req.Method == http.MethodPost {
+	if disablecontenttypecheck != "1" && req.Method == http.MethodPost {
 		mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 		if err != nil || mediaType != "application/json" {
 			http.Error(w, "Content-Type must be 'application/json'", http.StatusUnsupportedMediaType)
