@@ -39,7 +39,7 @@ func TestCancelForceLifecycleHookFinalizesWhenMetadataMissing(t *testing.T) {
 		log:            logger.VoidLogger(),
 		smv2:           runState,
 		shards:         missingShardRegistry{},
-		tracerProvider: tracing.NewNoopTracerProvider(),
+		tracerProvider: tracing.NewOtelTracerProvider(nil, time.Millisecond),
 		lifecycles:     []execution.LifecycleListener{lifecycle},
 	}
 
