@@ -201,9 +201,45 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 	})
 }
 
-// ClaimFinalization atomically marks a run as finalized and returns true only
-// for the first caller allowed to emit finish effects.
+// ClaimFinalization atomically claims finish-effect emission for a run and
+// returns true only for the first caller allowed to emit finish effects.
 func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (bool, error) {
+	r, key := v.finalizationClaimHandle(ctx, md)
+	val := md.ID.RunID.String()
+
+	res, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().
+			Set().
+			Key(key).
+			Value(val).
+			Nx().
+			Ex(consts.FunctionIdempotencyPeriod).
+			Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("error claiming finalization: %w", err)
+	}
+
+	return res == "OK", nil
+}
+
+// ReleaseFinalization clears a previously-acquired finalization claim after a
+// failed publish so a retry can attempt finish effects again.
+func (v v2) ReleaseFinalization(ctx context.Context, md state.Metadata) error {
+	r, key := v.finalizationClaimHandle(ctx, md)
+	if err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Del().Key(key).Build()
+	}).Error(); err != nil {
+		return fmt.Errorf("error releasing finalization claim: %w", err)
+	}
+
+	return nil
+}
+
+func (v v2) finalizationClaimHandle(ctx context.Context, md state.Metadata) (RetriableClient, string) {
 	fnRunState := v.mgr.s.FunctionRunState()
 	v1id := statev1.Identifier{
 		RunID:       md.ID.RunID,
@@ -215,31 +251,9 @@ func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (bool, err
 	}
 
 	r, isSharded := fnRunState.Client(ctx, v1id.AccountID, v1id.RunID)
-	key := fnRunState.kg.Idempotency(ctx, isSharded, v1id)
-	val := fmt.Sprintf("%s%s", string(consts.FunctionIdempotencyTombstone), v1id.RunID)
+	baseKey := fnRunState.kg.Idempotency(ctx, isSharded, v1id)
 
-	prev, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().
-			Set().
-			Key(key).
-			Value(val).
-			Xx().
-			Get().
-			Keepttl().
-			Build()
-	}).ToString()
-	if err == rueidis.Nil {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("error claiming finalization: %w", err)
-	}
-
-	if len(prev) > 0 && prev[0] == consts.FunctionIdempotencyTombstone {
-		return false, nil
-	}
-
-	return true, nil
+	return r, fmt.Sprintf("%s:finalize", baseKey)
 }
 
 func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {

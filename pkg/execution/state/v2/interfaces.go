@@ -64,6 +64,9 @@ type FinalizationClaimer interface {
 	// ClaimFinalization returns true only for the first caller allowed to emit
 	// finish effects for the given run.
 	ClaimFinalization(ctx context.Context, md Metadata) (bool, error)
+	// ReleaseFinalization clears a previously-acquired finalization claim so a
+	// later retry can emit finish effects after a publish failure.
+	ReleaseFinalization(ctx context.Context, md Metadata) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for

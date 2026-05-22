@@ -159,7 +159,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
-	emitFinishEffects := e.claimFinalization(ctx, opts.Metadata)
+	emitFinishEffects, claimant := e.claimFinalization(ctx, opts.Metadata)
 
 	// Delete the function state in every case.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
@@ -186,17 +186,30 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	if !emitFinishEffects {
 		return nil
 	}
-	return e.finalizeEvents(ctx, opts, deferEvents)
+	if err := e.finalizeEvents(ctx, opts, deferEvents); err != nil {
+		if claimant != nil {
+			if releaseErr := claimant.ReleaseFinalization(ctx, opts.Metadata); releaseErr != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error releasing finalization claim after failed publish",
+					"error", releaseErr,
+					"run_id", opts.Metadata.ID.RunID,
+				)
+				return errors.Join(err, releaseErr)
+			}
+		}
+		return err
+	}
+	return nil
 }
 
-func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) bool {
+func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) (bool, sv2.FinalizationClaimer) {
 	if e.finishHandler == nil {
-		return false
+		return false, nil
 	}
 
 	claimant, ok := e.smv2.(sv2.FinalizationClaimer)
 	if !ok {
-		return true
+		return true, nil
 	}
 
 	claimed, err := claimant.ClaimFinalization(ctx, md)
@@ -206,7 +219,7 @@ func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) bool 
 			"error", err,
 			"run_id", md.ID.RunID,
 		)
-		return true
+		return true, nil
 	}
 
 	if !claimed {
@@ -214,9 +227,10 @@ func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) bool 
 			"skipping duplicate finalize effects",
 			"run_id", md.ID.RunID,
 		)
+		return false, nil
 	}
 
-	return claimed
+	return true, claimant
 }
 
 // buildDeferEvents constructs the inngest/deferred.schedule events for every

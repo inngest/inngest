@@ -562,6 +562,12 @@ func TestV2AdapterClaimFinalization(t *testing.T) {
 	claimed, err = claimer.ClaimFinalization(ctx, md)
 	require.NoError(t, err)
 	require.False(t, claimed)
+
+	require.NoError(t, claimer.ReleaseFinalization(ctx, md))
+
+	claimed, err = claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.True(t, claimed)
 }
 
 func TestV2AdapterWithDisabledRetries(t *testing.T) {

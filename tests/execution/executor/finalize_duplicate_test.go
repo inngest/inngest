@@ -153,3 +153,137 @@ func TestFinalizePublishesFnFinishedOnce(t *testing.T) {
 	require.Len(t, finishIDs, 1, "duplicate finalize should emit one fn.finished event")
 	require.Equal(t, runID, finishRuns[0])
 }
+
+func TestFinalizeRetriesFnFinishedAfterPublishFailure(t *testing.T) {
+	ctx := context.Background()
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
+	sm, err := redis_state.New(
+		ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithPauseDeleter(pauseMgr),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue())
+	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+	require.NoError(t, err)
+
+	fnID := uuid.New()
+	accountID := uuid.New()
+	wsID := uuid.New()
+	appID := uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	rawEvent, err := json.Marshal(event.Event{
+		ID:   eventID.String(),
+		Name: "test/event",
+		Data: map[string]any{"ok": true},
+	})
+	require.NoError(t, err)
+
+	md := statev2.Metadata{
+		ID: statev2.ID{
+			RunID:      runID,
+			FunctionID: fnID,
+			Tenant: statev2.Tenant{
+				AccountID: accountID,
+				EnvID:     wsID,
+				AppID:     appID,
+			},
+		},
+		Config: *statev2.InitConfig(&statev2.Config{
+			EventIDs:        []ulid.ULID{eventID},
+			Idempotency:     fmt.Sprintf("retry-finalize-%s", runID.String()),
+			FunctionVersion: 1,
+			RequestVersion:  1,
+		}),
+	}
+
+	_, err = smv2.Create(ctx, statev2.CreateState{
+		Metadata: md,
+		Events:   []json.RawMessage{rawEvent},
+	})
+	require.NoError(t, err)
+
+	var (
+		mu        sync.Mutex
+		calls     int
+		finishIDs []string
+	)
+
+	exec, err := executorpkg.NewExecutor(
+		executorpkg.WithStateManager(smv2),
+		executorpkg.WithPauseManager(pauseMgr),
+		executorpkg.WithLogger(logger.StdlibLogger(ctx)),
+		executorpkg.WithShardRegistry(shardRegistry),
+		executorpkg.WithFinalizer(func(ctx context.Context, id statev2.ID, evts []event.Event) error {
+			mu.Lock()
+			defer mu.Unlock()
+
+			calls++
+			if calls == 1 {
+				return fmt.Errorf("synthetic publish failure")
+			}
+
+			for _, evt := range evts {
+				if evt.Name == event.FnFinishedName {
+					finishIDs = append(finishIDs, evt.ID)
+				}
+			}
+			return nil
+		}),
+	)
+	require.NoError(t, err)
+
+	opts := executionpkg.FinalizeOpts{
+		Metadata: md,
+		Response: executionpkg.FinalizeResponse{
+			Type: executionpkg.FinalizeResponseRunComplete,
+			RunComplete: statev2.GeneratorOpcode{
+				Op:   enums.OpcodeRunComplete,
+				Data: json.RawMessage(`{"data":{"ok":true}}`),
+			},
+		},
+		Optional: executionpkg.FinalizeOptional{
+			FnSlug:      "test-fn",
+			InputEvents: []json.RawMessage{rawEvent},
+		},
+	}
+
+	err = exec.Finalize(ctx, opts)
+	require.Error(t, err)
+
+	err = exec.Finalize(ctx, opts)
+	require.NoError(t, err)
+
+	err = exec.Finalize(ctx, opts)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	require.Equal(t, 2, calls, "failed publish should release the claim so one retry can emit finish effects")
+	require.Len(t, finishIDs, 1, "successful retry should still emit fn.finished exactly once")
+}
