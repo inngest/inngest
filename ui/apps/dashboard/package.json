@@ -94,7 +94,7 @@
     "@tailwindcss/container-queries": "0.1.1",
     "@types/mustache": "4.2.6",
     "@types/node": "24.12.4",
-    "@types/react": "19.2.14",
+    "@types/react": "19.2.15",
     "@types/react-dom": "19.2.3",
     "@types/react-syntax-highlighter": "15.5.13",
     "@typescript-eslint/eslint-plugin": "8.59.4",
