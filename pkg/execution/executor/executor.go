@@ -2935,6 +2935,27 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	// We need the function slug.
 	f, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+	if errors.Is(err, state.ErrFunctionNotFound) {
+		// Function was deleted/archived while the run was orphaned (common in
+		// dev mode after a server restart). Without the function definition we
+		// can't finalize; treat this like the ErrEventNotFound branch above and
+		// return nil so callers (e.g. stale-run-recovery) can clean up.
+		//
+		// NOTE: Like the ErrEventNotFound branch, this skips Finalize() and so
+		// does not release account/env-level concurrency semaphores held by
+		// this run; they free when their Redis TTL expires.
+		l.Warn(
+			"cancel: function not found, run is orphaned",
+			"force_lifecycle_hook", r.ForceLifecycleHook,
+			"cancellation_id", r.CancellationID,
+		)
+		if r.ForceLifecycleHook {
+			for _, e := range e.lifecycles {
+				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
+			}
+		}
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to load function: %w", err)
 	}

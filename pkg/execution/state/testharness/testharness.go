@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -70,7 +69,7 @@ func (loader) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.E
 		return fn, nil
 	}
 
-	return nil, fmt.Errorf("workflow not found: %s", fnID)
+	return nil, state.ErrFunctionNotFound
 }
 
 type Generator func() (sm state.Manager, cleanup func())

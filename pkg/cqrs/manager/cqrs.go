@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -785,6 +786,9 @@ func sorter(span *cqrs.OtelSpan) {
 func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.ExecutorFunction, error) {
 	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
 	fn, err := w.GetFunctionByInternalUUID(ctx, fnID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, state.ErrFunctionNotFound
+	}
 	if err != nil {
 		return nil, err
 	}

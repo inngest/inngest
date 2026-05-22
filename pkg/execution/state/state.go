@@ -49,6 +49,7 @@ var (
 	// the same step data multiple times relying on this error for idempotency checking.
 	ErrIdempotentResponse = fmt.Errorf("idempotent response")
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
+	ErrFunctionNotFound   = fmt.Errorf("function not found")
 	ErrFunctionPaused     = fmt.Errorf("function is paused")
 	ErrStateOverflowed    = fmt.Errorf("state is too large")
 	// Error Connect Retry Errors
