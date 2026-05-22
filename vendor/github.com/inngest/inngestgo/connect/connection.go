@@ -17,11 +17,29 @@ import (
 	"time"
 )
 
+// defaultMissedGatewayHeartbeatTolerance allows transient gateway heartbeat
+// gaps without keeping an unhealthy websocket open indefinitely.
+const defaultMissedGatewayHeartbeatTolerance = 3
+
 var (
 	defaultWSReadLimit int64 = 10 * 1024 * 1024 // 10MB
 
 	gatewayDrainReplacementTimeout = 10 * time.Second
 )
+
+func (h *connectHandler) missedGatewayHeartbeatTolerance() int {
+	if h.opts.MissedGatewayHeartbeatTolerance == nil || *h.opts.MissedGatewayHeartbeatTolerance < 0 {
+		return defaultMissedGatewayHeartbeatTolerance
+	}
+
+	return *h.opts.MissedGatewayHeartbeatTolerance
+}
+
+func gatewayHeartbeatTimeout(heartbeatInterval time.Duration, missedTolerance int) time.Duration {
+	// The first interval covers the next expected gateway heartbeat. Each
+	// additional interval is one tolerated miss before disconnecting.
+	return time.Duration(missedTolerance+1) * heartbeatInterval
+}
 
 type connectReport struct {
 	reconnect bool
@@ -262,14 +280,17 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 
 	heartbeatReceived := make(chan struct{}, 1)
 	go func() {
-		// Wait until initial heartbeat was sent out
+		// Start checking only after the worker has had a chance to send its
+		// first heartbeat. The gateway heartbeat deadline is then reset every
+		// time a gateway heartbeat is read below.
 		select {
 		case <-backgroundCtx.Done():
 			return
 		case <-time.After(preparedConn.heartbeatInterval):
 		}
 
-		heartbeatTimeout := 2 * preparedConn.heartbeatInterval
+		missedTolerance := h.missedGatewayHeartbeatTolerance()
+		heartbeatTimeout := gatewayHeartbeatTimeout(preparedConn.heartbeatInterval, missedTolerance)
 		heartbeatReplyTimer := time.NewTimer(heartbeatTimeout)
 		defer heartbeatReplyTimer.Stop()
 		for {
@@ -286,7 +307,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				heartbeatReplyTimer.Reset(heartbeatTimeout)
 			case <-heartbeatReplyTimer.C:
 				// No heartbeat received in time!
-				l.Error("did not receive gateway heartbeat in time", "heartbeat_interval", preparedConn.heartbeatInterval.String(), "heartbeat_timeout", heartbeatTimeout.String())
+				l.Error("did not receive gateway heartbeat in time", "heartbeat_interval", preparedConn.heartbeatInterval.String(), "heartbeat_timeout", heartbeatTimeout.String(), "missed_heartbeat_tolerance", missedTolerance)
 				cancelReaderLifetimeContext()
 				return
 			}
