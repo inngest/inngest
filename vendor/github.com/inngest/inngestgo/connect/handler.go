@@ -126,6 +126,11 @@ type Opts struct {
 	// Set to any positive value to use a custom limit.
 	MessageReadLimit *int64
 
+	// MissedGatewayHeartbeatTolerance is the number of gateway heartbeat periods
+	// that may pass without a gateway heartbeat before reconnecting.
+	// Defaults to 3. Negative values use the default.
+	MissedGatewayHeartbeatTolerance *int
+
 	APIBaseURL string
 	IsDev      bool
 
