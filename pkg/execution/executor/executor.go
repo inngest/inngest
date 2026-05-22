@@ -2888,7 +2888,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 				"cancellation_id", r.CancellationID,
 			)
 
-			md := sv2.Metadata{ID: id}
+			md := sv2.Metadata{ID: id, Config: *sv2.InitConfig(&sv2.Config{})}
 			if err := e.Finalize(ctx, execution.FinalizeOpts{
 				Metadata: md,
 				Response: execution.FinalizeResponse{
