@@ -5,8 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -488,86 +486,19 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	})
 }
 
-type leaseTrackingShard struct {
-	osqueue.QueueShard
-
-	mu          sync.Mutex
-	current     ulid.ULID
-	extended    chan struct{}
-	extendOnce  sync.Once
-	cleanup     chan struct{}
-	cleanupOnce sync.Once
-	cleanupKind string
-}
-
-func newLeaseTrackingShard(inner osqueue.QueueShard, initial ulid.ULID) *leaseTrackingShard {
-	return &leaseTrackingShard{
-		QueueShard: inner,
-		current:    initial,
-		extended:   make(chan struct{}),
-		cleanup:    make(chan struct{}),
-	}
-}
-
-func (s *leaseTrackingShard) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...osqueue.ExtendLeaseOptionFn) (*ulid.ULID, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if leaseID != s.current {
-		return nil, fmt.Errorf("extended stale lease: got %s want %s", leaseID, s.current)
-	}
-
-	next := ulid.MustNew(ulid.Timestamp(leaseID.Timestamp().Add(duration)), rand.Reader)
-	s.current = next
-	s.extendOnce.Do(func() {
-		close(s.extended)
-	})
-
-	return &next, nil
-}
-
-func (s *leaseTrackingShard) Dequeue(ctx context.Context, i osqueue.QueueItem, opts ...osqueue.DequeueOptionFn) error {
-	return s.recordCleanup("dequeue", i)
-}
-
-func (s *leaseTrackingShard) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, opts ...osqueue.RequeueOptionFn) error {
-	return s.recordCleanup("requeue", i)
-}
-
-func (s *leaseTrackingShard) recordCleanup(kind string, i osqueue.QueueItem) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	defer s.cleanupOnce.Do(func() {
-		close(s.cleanup)
-	})
-
-	if i.LeaseID == nil {
-		return fmt.Errorf("%s used nil lease; want %s", kind, s.current)
-	}
-
-	if *i.LeaseID != s.current {
-		return fmt.Errorf("%s used stale lease: got %s want %s", kind, *i.LeaseID, s.current)
-	}
-
-	s.cleanupKind = kind
-	return nil
-}
-
 func TestQueueItemProcessCleanupUsesRenewedLease(t *testing.T) {
 	tests := []struct {
-		name     string
-		runErr   error
-		expected string
+		name    string
+		runErr  error
+		requeue bool
 	}{
 		{
-			name:     "dequeue on success",
-			expected: "dequeue",
+			name: "dequeue on success",
 		},
 		{
-			name:     "requeue on retryable error",
-			runErr:   errors.New("retryable"),
-			expected: "requeue",
+			name:    "requeue on retryable error",
+			runErr:  errors.New("retryable"),
+			requeue: true,
 		},
 	}
 
@@ -584,28 +515,22 @@ func TestQueueItemProcessCleanupUsesRenewedLease(t *testing.T) {
 			require.NoError(t, err)
 			defer rc.Close()
 
-			queueClient := NewQueueClient(rc, QueueDefaultKey)
-			inner := NewQueueShard("test", queueClient, osqueue.WithClock(clock))
-
-			initialLease := ulid.MustNew(ulid.Timestamp(clock.Now().Add(osqueue.QueueLeaseDuration)), rand.Reader)
-			shard := newLeaseTrackingShard(inner, initialLease)
-			shardRegistry, err := osqueue.NewSingleShardRegistry(shard)
-			require.NoError(t, err)
-
-			q, err := osqueue.New(ctx, "test", shardRegistry, osqueue.WithClock(clock))
-			require.NoError(t, err)
+			q, shard := newQueue(
+				t,
+				rc,
+				osqueue.WithClock(clock),
+				osqueue.WithBackoffFunc(func(int) time.Time {
+					return clock.Now().Add(time.Minute)
+				}),
+			)
 
 			accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 			runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
 			jobID := "lease-cleanup-" + tc.name
-			item := osqueue.QueueItem{
+			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 				ID:          jobID,
 				FunctionID:  fnID,
 				WorkspaceID: envID,
-				LeaseID:     &initialLease,
-				AtMS:        clock.Now().UnixMilli(),
-				WallTimeMS:  clock.Now().UnixMilli(),
-				EnqueuedAt:  clock.Now().UnixMilli(),
 				Data: osqueue.Item{
 					JobID:       &jobID,
 					WorkspaceID: envID,
@@ -617,7 +542,14 @@ func TestQueueItemProcessCleanupUsesRenewedLease(t *testing.T) {
 						RunID:       runID,
 					},
 				},
-			}
+			}, clock.Now(), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			leaseID, err := shard.Lease(ctx, item, osqueue.QueueLeaseDuration, clock.Now())
+			require.NoError(t, err)
+			item.LeaseID = leaseID
+			initialLease := *leaseID
+			initialGeneration := item.GenerationID
 
 			started := make(chan struct{})
 			done := make(chan error, 1)
@@ -627,12 +559,24 @@ func TestQueueItemProcessCleanupUsesRenewedLease(t *testing.T) {
 					I: item,
 				}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 					close(started)
-					select {
-					case <-shard.extended:
-					case <-ctx.Done():
-						return osqueue.RunResult{}, ctx.Err()
+					deadline := time.After(time.Second)
+					ticker := time.NewTicker(10 * time.Millisecond)
+					defer ticker.Stop()
+
+					for {
+						loaded, err := shard.LoadQueueItem(ctx, item.ID)
+						if err == nil && loaded.LeaseID != nil && *loaded.LeaseID != initialLease {
+							return osqueue.RunResult{}, tc.runErr
+						}
+
+						select {
+						case <-deadline:
+							return osqueue.RunResult{}, errors.New("timed out waiting for lease renewal")
+						case <-ticker.C:
+						case <-ctx.Done():
+							return osqueue.RunResult{}, ctx.Err()
+						}
 					}
-					return osqueue.RunResult{}, tc.runErr
 				})
 			}()
 
@@ -646,6 +590,7 @@ func TestQueueItemProcessCleanupUsesRenewedLease(t *testing.T) {
 			}, time.Second, 10*time.Millisecond)
 
 			clock.Advance(osqueue.QueueLeaseDuration / 2)
+			r.SetTime(clock.Now())
 
 			select {
 			case err := <-done:
@@ -654,16 +599,17 @@ func TestQueueItemProcessCleanupUsesRenewedLease(t *testing.T) {
 				t.Fatal("timed out waiting for ProcessItem to finish")
 			}
 
-			select {
-			case <-shard.cleanup:
-			default:
-				t.Fatal("expected cleanup to run")
+			loaded, err := shard.LoadQueueItem(ctx, item.ID)
+			if !tc.requeue {
+				require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+				require.Nil(t, loaded)
+				return
 			}
 
-			shard.mu.Lock()
-			cleanupKind := shard.cleanupKind
-			shard.mu.Unlock()
-			require.Equal(t, tc.expected, cleanupKind)
+			require.NoError(t, err)
+			require.Nil(t, loaded.LeaseID)
+			require.Equal(t, initialGeneration+1, loaded.GenerationID)
+			require.Equal(t, 1, loaded.Data.Attempt)
 		})
 	}
 }
