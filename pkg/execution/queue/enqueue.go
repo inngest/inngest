@@ -92,7 +92,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 
 	_, err = shard.EnqueueItem(ctx, qi, next, opts)
 	if err != nil {
-		return fmt.Errorf("could not enqueue item to shard: %w", err)
+		return err
 	}
 
 	// XXX: If we've enqueued a user queue item (sleep, retry, step, etc.) and it's in the future,
