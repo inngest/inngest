@@ -72,5 +72,5 @@ func (discriminator *Discriminator) UnmarshalJSON(data []byte) error {
 func (discriminator *Discriminator) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
 
-	return validateExtensions(ctx, discriminator.Extensions)
+	return validateExtensions(ctx, discriminator.Extensions, discriminator.Origin)
 }

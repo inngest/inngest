@@ -30,12 +30,13 @@ import (
 // Parser, produces a node tree out of a libyaml event stream.
 
 type parser struct {
-	parser   yaml_parser_t
-	event    yaml_event_t
-	doc      *Node
-	anchors  map[string]*Node
-	doneInit bool
-	textless bool
+	parser            yaml_parser_t
+	event             yaml_event_t
+	doc               *Node
+	anchors           map[string]*Node
+	doneInit          bool
+	textless          bool
+	disableTimestamps bool
 }
 
 func newParser(b []byte) *parser {
@@ -175,7 +176,7 @@ func (p *parser) node(kind Kind, defaultTag, tag, value string) *Node {
 	} else if defaultTag != "" {
 		tag = defaultTag
 	} else if kind == ScalarNode {
-		tag, _ = resolve("", value)
+		tag, _ = resolve("", value, p.disableTimestamps)
 	}
 	n := &Node{
 		Kind:  kind,
@@ -318,13 +319,14 @@ type decoder struct {
 	stringMapType  reflect.Type
 	generalMapType reflect.Type
 
-	knownFields bool
-	origin      bool
-	file        string
-	uniqueKeys  bool
-	decodeCount int
-	aliasCount  int
-	aliasDepth  int
+	knownFields       bool
+	origin            bool
+	file              string
+	uniqueKeys        bool
+	decodeCount       int
+	aliasCount        int
+	aliasDepth        int
+	disableTimestamps bool
 
 	mergedFields map[interface{}]bool
 }
@@ -589,7 +591,7 @@ func (d *decoder) scalar(n *Node, out reflect.Value) bool {
 		tag = strTag
 		resolved = n.Value
 	} else {
-		tag, resolved = resolve(n.Tag, n.Value)
+		tag, resolved = resolve(n.Tag, n.Value, d.disableTimestamps)
 		if tag == binaryTag {
 			data, err := base64.StdEncoding.DecodeString(resolved.(string))
 			if err != nil {

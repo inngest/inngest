@@ -3,7 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"maps"
 	"strconv"
 )
@@ -76,19 +75,24 @@ func (responses *Responses) Status(status int) *ResponseRef {
 // Validate returns an error if Responses does not comply with the OpenAPI spec.
 func (responses *Responses) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	if responses.Len() == 0 {
-		return errors.New("the responses object MUST contain at least one response code")
+		if err := me.emit(newResponsesNonEmptyRequired(responses.Origin)); err != nil {
+			return err
+		}
+		// Fall through so validateExtensions still runs and any extension
+		// errors aggregate with the empty-responses finding under multi mode.
 	}
 
 	for _, key := range responses.Keys() {
 		v := responses.Value(key)
-		if err := v.Validate(ctx); err != nil {
+		if err := me.emit(v.Validate(ctx)); err != nil {
 			return err
 		}
 	}
 
-	return validateExtensions(ctx, responses.Extensions)
+	return me.finalize(validateExtensions(ctx, responses.Extensions, responses.Origin))
 }
 
 // Response is specified by OpenAPI/Swagger 3.0 standard.
@@ -179,7 +183,7 @@ func (response *Response) Validate(ctx context.Context, opts ...ValidationOption
 	ctx = WithValidationOptions(ctx, opts...)
 
 	if response.Description == nil {
-		return errors.New("a short description of the response is required")
+		return newResponseDescriptionRequired(response.Origin)
 	}
 	if vo := getValidationOptions(ctx); !vo.examplesValidationDisabled {
 		vo.examplesValidationAsReq, vo.examplesValidationAsRes = false, true
@@ -205,7 +209,7 @@ func (response *Response) Validate(ctx context.Context, opts ...ValidationOption
 		}
 	}
 
-	return validateExtensions(ctx, response.Extensions)
+	return validateExtensions(ctx, response.Extensions, response.Origin)
 }
 
 // UnmarshalJSON sets ResponseBodies to a copy of data.

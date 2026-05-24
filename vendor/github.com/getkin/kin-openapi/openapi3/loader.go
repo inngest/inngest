@@ -20,10 +20,6 @@ import (
 // for backward compatibility but is not safe for concurrent use.
 var IncludeOrigin = false
 
-func foundUnresolvedRef(ref string) error {
-	return fmt.Errorf("found unresolved ref: %q", ref)
-}
-
 func failedToResolveRefFragmentPart(value, what string) error {
 	return fmt.Errorf("failed to resolve %q in fragment in URI: %q", what, value)
 }

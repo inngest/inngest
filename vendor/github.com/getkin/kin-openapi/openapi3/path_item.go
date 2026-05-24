@@ -203,23 +203,25 @@ func (pathItem *PathItem) SetOperation(method string, operation *Operation) {
 // Validate returns an error if PathItem does not comply with the OpenAPI spec.
 func (pathItem *PathItem) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	operations := pathItem.Operations()
 
 	for _, method := range componentNames(operations) {
 		operation := operations[method]
-		if err := operation.Validate(ctx); err != nil {
-			return fmt.Errorf("invalid operation %s: %w", method, err)
-		}
-	}
-
-	if v := pathItem.Parameters; v != nil {
-		if err := v.Validate(ctx); err != nil {
+		wrapOp := func(e error) error { return &OperationValidationError{Method: method, Cause: e} }
+		if err := me.emitWrapped(wrapOp, operation.Validate(ctx)); err != nil {
 			return err
 		}
 	}
 
-	return validateExtensions(ctx, pathItem.Extensions)
+	if v := pathItem.Parameters; v != nil {
+		if err := me.emit(v.Validate(ctx)); err != nil {
+			return err
+		}
+	}
+
+	return me.finalize(validateExtensions(ctx, pathItem.Extensions, pathItem.Origin))
 }
 
 // isEmpty's introduced in 546590b1

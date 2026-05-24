@@ -3,8 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"maps"
 
 	"github.com/go-openapi/jsonpointer"
@@ -125,7 +123,7 @@ func (mediaType *MediaType) Validate(ctx context.Context, opts ...ValidationOpti
 		}
 
 		if mediaType.Example != nil && mediaType.Examples != nil {
-			return errors.New("example and examples are mutually exclusive")
+			return newMediaTypeExampleExamplesExclusive(mediaType.Origin)
 		}
 
 		if vo := getValidationOptions(ctx); !vo.examplesValidationDisabled {
@@ -139,17 +137,19 @@ func (mediaType *MediaType) Validate(ctx context.Context, opts ...ValidationOpti
 				for _, k := range componentNames(examples) {
 					v := examples[k]
 					if err := v.Validate(ctx); err != nil {
-						return fmt.Errorf("example %s: %w", k, err)
+						return &MediaTypeExampleValidationError{ExampleName: k, Cause: err}
 					}
 					if err := validateExampleValue(ctx, v.Value.Value, schema.Value); err != nil {
-						return fmt.Errorf("example %s: %w", k, err)
+						return newSchemaValueError("example",
+							&MediaTypeExampleValidationError{ExampleName: k, Cause: err},
+							exampleValueOrigin(v.Value, mediaType.Origin))
 					}
 				}
 			}
 		}
 	}
 
-	return validateExtensions(ctx, mediaType.Extensions)
+	return validateExtensions(ctx, mediaType.Extensions, mediaType.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable

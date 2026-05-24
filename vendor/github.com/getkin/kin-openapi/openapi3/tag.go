@@ -3,7 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"maps"
 )
 
@@ -22,13 +21,14 @@ func (tags Tags) Get(name string) *Tag {
 // Validate returns an error if Tags does not comply with the OpenAPI spec.
 func (tags Tags) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	for _, v := range tags {
-		if err := v.Validate(ctx); err != nil {
+		if err := me.emit(v.Validate(ctx)); err != nil {
 			return err
 		}
 	}
-	return nil
+	return me.result()
 }
 
 // Tag is specified by OpenAPI/Swagger 3.0 standard.
@@ -88,12 +88,14 @@ func (t *Tag) UnmarshalJSON(data []byte) error {
 // Validate returns an error if Tag does not comply with the OpenAPI spec.
 func (t *Tag) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	if v := t.ExternalDocs; v != nil {
-		if err := v.Validate(ctx); err != nil {
-			return fmt.Errorf("invalid external docs: %w", err)
+		wrap := func(e error) error { return &SectionValidationError{Section: "external docs", Cause: e} }
+		if err := me.emitWrapped(wrap, v.Validate(ctx)); err != nil {
+			return err
 		}
 	}
 
-	return validateExtensions(ctx, t.Extensions)
+	return me.finalize(validateExtensions(ctx, t.Extensions, t.Origin))
 }

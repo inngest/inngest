@@ -3,7 +3,6 @@ package openapi3
 import (
 	"cmp"
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 )
@@ -41,13 +40,20 @@ func WithPath(path string, pathItem *PathItem) NewPathsOption {
 // Validate returns an error if Paths does not comply with the OpenAPI spec.
 func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	normalizedPaths := make(map[string]string, paths.Len())
 
 	for _, path := range paths.Keys() {
 		pathItem := paths.Value(path)
 		if path == "" || path[0] != '/' {
-			return fmt.Errorf("path %q does not start with a forward slash (/)", path)
+			if err := me.emit(newPathMustStartWithSlash(path, paths.Origin)); err != nil {
+				return err
+			}
+			// Skip validating operations under a malformed path key: any
+			// findings below would be addressed under a path that has no
+			// resolution path until the key itself is fixed.
+			continue
 		}
 
 		if pathItem == nil {
@@ -57,9 +63,16 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 
 		normalizedPath, _, varsInPath := normalizeTemplatedPath(path)
 		if oldPath, ok := normalizedPaths[normalizedPath]; ok {
-			return fmt.Errorf("conflicting paths %q and %q", path, oldPath)
+			if err := me.emit(newConflictingPaths(path, oldPath, paths.Origin)); err != nil {
+				return err
+			}
+			// Skip validating operations under a duplicate path: the
+			// first occurrence already validated its operations under the
+			// canonical path, so re-running would surface duplicate-but-
+			// identical findings without new information.
+			continue
 		}
-		normalizedPaths[path] = path
+		normalizedPaths[normalizedPath] = path
 
 		var commonParams []string
 		for _, parameterRef := range pathItem.Parameters {
@@ -99,26 +112,29 @@ func (paths *Paths) Validate(ctx context.Context, opts ...ValidationOption) erro
 					missing[name] = struct{}{}
 				}
 				if len(missing) != 0 {
-					return &PathParametersError{
+					if err := me.emit(&PathParametersError{
 						Path:    path,
 						Method:  method,
 						Missing: componentNames(missing),
 						Origin:  pathItem.Origin,
+					}); err != nil {
+						return err
 					}
 				}
 			}
 		}
 
-		if err := pathItem.Validate(ctx); err != nil {
-			return fmt.Errorf("invalid path %s: %w", path, err)
+		wrapPath := func(e error) error { return &PathValidationError{Path: path, Cause: e} }
+		if err := me.emitWrapped(wrapPath, pathItem.Validate(ctx)); err != nil {
+			return err
 		}
 	}
 
-	if err := paths.validateUniqueOperationIDs(); err != nil {
+	if err := me.emit(paths.validateUniqueOperationIDs()); err != nil {
 		return err
 	}
 
-	return validateExtensions(ctx, paths.Extensions)
+	return me.finalize(validateExtensions(ctx, paths.Extensions, paths.Origin))
 }
 
 // InMatchingOrder returns paths in the order they are matched against URLs.
@@ -201,8 +217,7 @@ func (paths *Paths) validateUniqueOperationIDs() error {
 				if endpoint > endpointDup { // For make error message a bit more deterministic. May be useful for tests.
 					endpoint, endpointDup = endpointDup, endpoint
 				}
-				return fmt.Errorf("operations %q and %q have the same operation id %q",
-					endpoint, endpointDup, operation.OperationID)
+				return newDuplicateOperationID(endpoint, endpointDup, operation.OperationID, operation.Origin)
 			}
 			operationIDs[operation.OperationID] = endpoint
 		}

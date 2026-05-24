@@ -9,16 +9,25 @@
 This fork is an improved version of the invopop/yaml package, designed to include line and column location information for YAML elements during unmarshalling.
 
 Origin tracking uses a two-pass approach:
-1. `UnmarshalWithOriginTree` decodes the YAML and extracts `__origin__` metadata injected by the underlying [oasdiff/yaml3](https://github.com/oasdiff/yaml3) decoder, returning an `*OriginTree` alongside the decoded struct.
+1. `Unmarshal` decodes the YAML and extracts `__origin__` metadata injected by the underlying [oasdiff/yaml3](https://github.com/oasdiff/yaml3) decoder, returning an `*OriginTree` alongside the decoded struct.
 2. The caller walks the `OriginTree` to apply file/line/column information to the decoded Go structs.
 
-To decode without origin tracking, use `Unmarshal` as usual. To decode with origin tracking:
+`Unmarshal` is the single public unmarshal entry point. Pass `DecodeOpts{}` for a plain decode, or set fields to opt into origin tracking or YAML 1.1 timestamp-resolution suppression:
 
 ```go
-tree, err := yaml.UnmarshalWithOriginTree(data, &v, yaml.OriginOpt{Enabled: true, File: "myfile.yaml"})
+// Plain decode (no origin tracking, default YAML 1.1 behaviour):
+_, err := yaml.Unmarshal(data, &v, yaml.DecodeOpts{})
+
+// Decode with origin tracking:
+tree, err := yaml.Unmarshal(data, &v, yaml.DecodeOpts{
+    Origin: yaml.OriginOpt{Enabled: true, File: "myfile.yaml"},
+})
+
+// Decode with timestamp resolution suppressed (date-shaped scalars stay strings):
+_, err := yaml.Unmarshal(data, &v, yaml.DecodeOpts{DisableTimestamps: true})
 ```
 
-The returned `*OriginTree` mirrors the YAML document structure. Each node holds a compact `[]any` sequence with the file, key name, line, column, and locations of scalar fields and sequence items within that mapping. When `Enabled` is false, `nil` is returned for the tree with no overhead.
+The returned `*OriginTree` mirrors the YAML document structure. Each node holds a compact `[]any` sequence with the file, key name, line, column, and locations of scalar fields and sequence items within that mapping. When `Origin.Enabled` is false, `nil` is returned for the tree with no overhead.
 
 ## Introduction
 
@@ -95,7 +104,7 @@ func main() {
 
 	// Unmarshal the YAML back into a Person struct.
 	var p2 Person
-	err = yaml.Unmarshal(y, &p2)
+	_, err = yaml.Unmarshal(y, &p2, yaml.DecodeOpts{})
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
 		return

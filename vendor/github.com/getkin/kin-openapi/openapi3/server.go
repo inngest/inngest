@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"maps"
 	"net/url"
 	"strings"
@@ -16,13 +15,14 @@ type Servers []*Server
 // Validate returns an error if Servers does not comply with the OpenAPI spec.
 func (servers Servers) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	for _, v := range servers {
-		if err := v.Validate(ctx); err != nil {
+		if err := me.emit(v.Validate(ctx)); err != nil {
 			return err
 		}
 	}
-	return nil
+	return me.result()
 }
 
 // BasePath returns the base path of the first server in the list, or /.
@@ -196,33 +196,47 @@ func (server Server) MatchRawURL(input string) ([]string, string, bool) {
 }
 
 // Validate returns an error if Server does not comply with the OpenAPI spec.
-func (server *Server) Validate(ctx context.Context, opts ...ValidationOption) (err error) {
+func (server *Server) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	if server.URL == "" {
-		return newServerURLRequired(server.Origin)
+		if err := me.emit(newServerURLRequired(server.Origin)); err != nil {
+			return err
+		}
 	}
 
 	opening, closing := strings.Count(server.URL, "{"), strings.Count(server.URL, "}")
 	if opening != closing {
-		return errors.New("server URL has mismatched { and }")
+		if err := me.emit(newServerURLMismatchedBraces(server.URL, server.Origin)); err != nil {
+			return err
+		}
 	}
 
 	if opening != len(server.Variables) {
-		return errors.New("server has undeclared variables")
+		if err := me.emit(newServerURLUndeclaredVariables(server.URL, server.Origin)); err != nil {
+			return err
+		}
 	}
 
 	for _, name := range componentNames(server.Variables) {
 		v := server.Variables[name]
 		if !strings.Contains(server.URL, "{"+name+"}") {
-			return errors.New("server has undeclared variables")
+			if err := me.emit(newServerURLUndeclaredVariables(server.URL, server.Origin)); err != nil {
+				return err
+			}
+			// Variable name doesn't appear in the URL template; descending
+			// into its Validate would surface findings under a variable
+			// the URL never references, with no resolution path until the
+			// URL is fixed.
+			continue
 		}
-		if err = v.Validate(ctx); err != nil {
-			return
+		if err := me.emit(v.Validate(ctx)); err != nil {
+			return err
 		}
 	}
 
-	return validateExtensions(ctx, server.Extensions)
+	return me.finalize(validateExtensions(ctx, server.Extensions, server.Origin))
 }
 
 // ServerVariable is specified by OpenAPI/Swagger standard version 3.
@@ -297,8 +311,8 @@ func (serverVariable *ServerVariable) Validate(ctx context.Context, opts ...Vali
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("field default is required in %s", data)
+		return newServerVariableDefaultRequired(string(data), serverVariable.Origin)
 	}
 
-	return validateExtensions(ctx, serverVariable.Extensions)
+	return validateExtensions(ctx, serverVariable.Extensions, serverVariable.Origin)
 }

@@ -30,7 +30,10 @@ func unmarshal(data []byte, v any, includeOrigin bool, location *url.URL) error 
 	if location != nil {
 		file = location.String()
 	}
-	if tree, err := yaml.UnmarshalWithOriginTree(data, v, yaml.OriginOpt{Enabled: includeOrigin, File: file}); err == nil {
+	if tree, err := yaml.Unmarshal(data, v, yaml.DecodeOpts{
+		Origin:            yaml.OriginOpt{Enabled: includeOrigin, File: file},
+		DisableTimestamps: true,
+	}); err == nil {
 		applyOrigins(v, tree)
 		return nil
 	} else {

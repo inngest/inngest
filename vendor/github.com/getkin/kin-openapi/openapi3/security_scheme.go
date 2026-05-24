@@ -3,7 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"net/url"
@@ -164,20 +163,20 @@ func (ss *SecurityScheme) Validate(ctx context.Context, opts ...ValidationOption
 			hasBearerFormat = true
 		case "basic", "negotiate", "digest":
 		default:
-			return fmt.Errorf("security scheme of type 'http' has invalid 'scheme' value %q", scheme)
+			return newInvalidHTTPScheme(scheme, ss.Origin)
 		}
 	case "oauth2":
 		hasFlow = true
 	case "openIdConnect":
 		if ss.OpenIdConnectUrl == "" {
-			return fmt.Errorf("no OIDC URL found for openIdConnect security scheme %q", ss.Name)
+			return newOpenIDConnectURLRequired(ss.Name, ss.Origin)
 		}
 	case "mutualTLS":
 		if !getValidationOptions(ctx).isOpenAPI31OrLater {
 			return errValueOfFieldFor31Plus(ss.Type, "type")
 		}
 	default:
-		return fmt.Errorf("security scheme 'type' can't be %q", ss.Type)
+		return newInvalidSecuritySchemeType(ss.Type, ss.Origin)
 	}
 
 	// Validate "in" and "name"
@@ -185,37 +184,37 @@ func (ss *SecurityScheme) Validate(ctx context.Context, opts ...ValidationOption
 		switch ss.In {
 		case "query", "header", "cookie":
 		default:
-			return fmt.Errorf("security scheme of type 'apiKey' should have 'in'. It can be 'query', 'header' or 'cookie', not %q", ss.In)
+			return newAPIKeyInInvalid(ss.In, ss.Origin)
 		}
 		if ss.Name == "" {
-			return errors.New("security scheme of type 'apiKey' should have 'name'")
+			return newAPIKeySecuritySchemeNameRequired(ss.Origin)
 		}
 	} else if len(ss.In) > 0 {
-		return fmt.Errorf("security scheme of type %q can't have 'in'", ss.Type)
+		return newSecuritySchemeInForbidden(ss.Type, ss.Origin)
 	} else if len(ss.Name) > 0 {
-		return fmt.Errorf("security scheme of type %q can't have 'name'", ss.Type)
+		return newSecuritySchemeNameForbidden(ss.Type, ss.Origin)
 	}
 
 	// Validate "format"
 	// "bearerFormat" is an arbitrary string so we only check if the scheme supports it
 	if !hasBearerFormat && len(ss.BearerFormat) > 0 {
-		return fmt.Errorf("security scheme of type %q can't have 'bearerFormat'", ss.Type)
+		return newSecuritySchemeBearerFormatForbidden(ss.Type, ss.Origin)
 	}
 
 	// Validate "flow"
 	if hasFlow {
 		flow := ss.Flows
 		if flow == nil {
-			return fmt.Errorf("security scheme of type %q should have 'flows'", ss.Type)
+			return newSecuritySchemeFlowsRequired(ss.Type, ss.Origin)
 		}
 		if err := flow.Validate(ctx); err != nil {
-			return fmt.Errorf("security scheme 'flow' is invalid: %w", err)
+			return &SecuritySchemeFlowValidationError{Cause: err}
 		}
 	} else if ss.Flows != nil {
-		return fmt.Errorf("security scheme of type %q can't have 'flows'", ss.Type)
+		return newSecuritySchemeFlowsForbidden(ss.Type, ss.Origin)
 	}
 
-	return validateExtensions(ctx, ss.Extensions)
+	return validateExtensions(ctx, ss.Extensions, ss.Origin)
 }
 
 // OAuthFlows is specified by OpenAPI/Swagger standard version 3.
@@ -292,29 +291,29 @@ func (flows *OAuthFlows) Validate(ctx context.Context, opts ...ValidationOption)
 
 	if v := flows.Implicit; v != nil {
 		if err := v.validate(ctx, oAuthFlowTypeImplicit, opts...); err != nil {
-			return fmt.Errorf("the OAuth flow 'implicit' is invalid: %w", err)
+			return &OAuthFlowValidationError{FlowKind: "implicit", Cause: err}
 		}
 	}
 
 	if v := flows.Password; v != nil {
 		if err := v.validate(ctx, oAuthFlowTypePassword, opts...); err != nil {
-			return fmt.Errorf("the OAuth flow 'password' is invalid: %w", err)
+			return &OAuthFlowValidationError{FlowKind: "password", Cause: err}
 		}
 	}
 
 	if v := flows.ClientCredentials; v != nil {
 		if err := v.validate(ctx, oAuthFlowTypeClientCredentials, opts...); err != nil {
-			return fmt.Errorf("the OAuth flow 'clientCredentials' is invalid: %w", err)
+			return &OAuthFlowValidationError{FlowKind: "clientCredentials", Cause: err}
 		}
 	}
 
 	if v := flows.AuthorizationCode; v != nil {
 		if err := v.validate(ctx, oAuthFlowAuthorizationCode, opts...); err != nil {
-			return fmt.Errorf("the OAuth flow 'authorizationCode' is invalid: %w", err)
+			return &OAuthFlowValidationError{FlowKind: "authorizationCode", Cause: err}
 		}
 	}
 
-	return validateExtensions(ctx, flows.Extensions)
+	return validateExtensions(ctx, flows.Extensions, flows.Origin)
 }
 
 // OAuthFlow is specified by OpenAPI/Swagger standard version 3.
@@ -381,15 +380,15 @@ func (flow *OAuthFlow) Validate(ctx context.Context, opts ...ValidationOption) e
 
 	if v := flow.RefreshURL; v != "" {
 		if _, err := url.Parse(v); err != nil {
-			return fmt.Errorf("field 'refreshUrl' is invalid: %w", err)
+			return &OAuthFlowFieldValidationError{Field: "refreshUrl", Cause: err}
 		}
 	}
 
 	if flow.Scopes == nil {
-		return errors.New("field 'scopes' is missing")
+		return newOAuthFlowScopesRequired(flow.Origin)
 	}
 
-	return validateExtensions(ctx, flow.Extensions)
+	return validateExtensions(ctx, flow.Extensions, flow.Origin)
 }
 
 func (flow *OAuthFlow) validate(ctx context.Context, typ oAuthFlowType, opts ...ValidationOption) error {
@@ -402,9 +401,9 @@ func (flow *OAuthFlow) validate(ctx context.Context, typ oAuthFlowType, opts ...
 	if in := typeIn(oAuthFlowTypeImplicit, oAuthFlowAuthorizationCode); true {
 		switch {
 		case flow.AuthorizationURL == "" && in:
-			return errors.New("field 'authorizationUrl' is empty or missing")
+			return newOAuthFlowAuthorizationURLRequired(flow.Origin)
 		case flow.AuthorizationURL != "" && !in:
-			return errors.New("field 'authorizationUrl' should not be set")
+			return newOAuthFlowAuthorizationURLForbidden(flow.Origin)
 		case flow.AuthorizationURL != "":
 			if _, err := url.Parse(flow.AuthorizationURL); err != nil {
 				return fmt.Errorf("field 'authorizationUrl' is invalid: %w", err)
@@ -415,9 +414,9 @@ func (flow *OAuthFlow) validate(ctx context.Context, typ oAuthFlowType, opts ...
 	if in := typeIn(oAuthFlowTypePassword, oAuthFlowTypeClientCredentials, oAuthFlowAuthorizationCode); true {
 		switch {
 		case flow.TokenURL == "" && in:
-			return errors.New("field 'tokenUrl' is empty or missing")
+			return newOAuthFlowTokenURLRequired(flow.Origin)
 		case flow.TokenURL != "" && !in:
-			return errors.New("field 'tokenUrl' should not be set")
+			return newOAuthFlowTokenURLForbidden(flow.Origin)
 		case flow.TokenURL != "":
 			if _, err := url.Parse(flow.TokenURL); err != nil {
 				return fmt.Errorf("field 'tokenUrl' is invalid: %w", err)

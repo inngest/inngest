@@ -4,7 +4,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -118,7 +117,7 @@ func (x *CallbackRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -134,7 +133,7 @@ func (x *CallbackRef) Validate(ctx context.Context, opts ...ValidationOption) er
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -257,7 +256,7 @@ func (x *ExampleRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -273,7 +272,7 @@ func (x *ExampleRef) Validate(ctx context.Context, opts ...ValidationOption) err
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -396,7 +395,7 @@ func (x *HeaderRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -412,7 +411,7 @@ func (x *HeaderRef) Validate(ctx context.Context, opts ...ValidationOption) erro
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -535,7 +534,7 @@ func (x *LinkRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -551,7 +550,7 @@ func (x *LinkRef) Validate(ctx context.Context, opts ...ValidationOption) error 
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -674,7 +673,7 @@ func (x *ParameterRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -690,7 +689,7 @@ func (x *ParameterRef) Validate(ctx context.Context, opts ...ValidationOption) e
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -813,7 +812,7 @@ func (x *RequestBodyRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -829,7 +828,7 @@ func (x *RequestBodyRef) Validate(ctx context.Context, opts ...ValidationOption)
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -952,7 +951,7 @@ func (x *ResponseRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -968,7 +967,7 @@ func (x *ResponseRef) Validate(ctx context.Context, opts ...ValidationOption) er
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -1111,7 +1110,7 @@ func (x *SchemaRef) validateExtras(ctx context.Context) error {
 
 	if len(extras) != 0 {
 		if !validationOpts.isOpenAPI31OrLater {
-			return fmt.Errorf("extra sibling fields: %+v", extras)
+			return newExtraSiblingFields(extras, x.Origin)
 		}
 	}
 	return nil
@@ -1128,7 +1127,7 @@ func (x *SchemaRef) Validate(ctx context.Context, opts ...ValidationOption) erro
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
@@ -1251,7 +1250,7 @@ func (x *SecuritySchemeRef) validateExtras(ctx context.Context) error {
 	}
 
 	if len(extras) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 	}
 	return nil
 }
@@ -1267,7 +1266,7 @@ func (x *SecuritySchemeRef) Validate(ctx context.Context, opts ...ValidationOpti
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable

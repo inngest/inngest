@@ -38,5 +38,5 @@ func (x Ref) MarshalJSON() ([]byte, error) {
 // Validate returns an error if Extensions does not comply with the OpenAPI spec.
 func (e *Ref) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
-	return validateExtensions(ctx, e.Extensions)
+	return validateExtensions(ctx, e.Extensions, e.Origin)
 }

@@ -3,7 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"maps"
 )
 
@@ -66,18 +65,25 @@ func (license *License) UnmarshalJSON(data []byte) error {
 // Validate returns an error if License does not comply with the OpenAPI spec.
 func (license *License) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	if license.Identifier != "" && !getValidationOptions(ctx).isOpenAPI31OrLater {
-		return newLicenseIdentifierFieldFor31Plus(license.Origin)
+		if err := me.emit(newLicenseIdentifierFieldFor31Plus(license.Origin)); err != nil {
+			return err
+		}
 	}
 
 	if license.Name == "" {
-		return newLicenseNameRequired(license.Origin)
+		if err := me.emit(newLicenseNameRequired(license.Origin)); err != nil {
+			return err
+		}
 	}
 
 	if license.URL != "" && license.Identifier != "" {
-		return errors.New("license must not specify both 'url' and 'identifier'")
+		if err := me.emit(newLicenseURLIdentifierExclusive(license.Origin)); err != nil {
+			return err
+		}
 	}
 
-	return validateExtensions(ctx, license.Extensions)
+	return me.finalize(validateExtensions(ctx, license.Extensions, license.Origin))
 }

@@ -4,7 +4,6 @@ package {{ .Package }}
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -143,10 +142,10 @@ func (x *{{ $type.Name }}Ref) validateExtras(ctx context.Context) error {
 	if len(extras) != 0 {
 {{- if eq $type.Name "Schema" }}
 		if !validationOpts.isOpenAPI31OrLater {
-			return fmt.Errorf("extra sibling fields: %+v", extras)
+			return newExtraSiblingFields(extras, x.Origin)
 		}
 {{- else }}
-		return fmt.Errorf("extra sibling fields: %+v", extras)
+		return newExtraSiblingFields(extras, x.Origin)
 {{- end }}
 	}
 	return nil
@@ -163,7 +162,7 @@ func (x *{{ $type.Name }}Ref) Validate(ctx context.Context, opts ...ValidationOp
 		return v.Validate(ctx)
 	}
 
-	return foundUnresolvedRef(x.Ref)
+	return newUnresolvedRef(x.Ref, x.Origin)
 }
 
 // JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable

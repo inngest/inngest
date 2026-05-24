@@ -74,5 +74,5 @@ func (xml *XML) UnmarshalJSON(data []byte) error {
 func (xml *XML) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
 
-	return validateExtensions(ctx, xml.Extensions)
+	return validateExtensions(ctx, xml.Extensions, xml.Origin)
 }

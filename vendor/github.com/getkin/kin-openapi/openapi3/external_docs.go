@@ -3,8 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"maps"
 	"net/url"
 )
@@ -61,13 +59,18 @@ func (e *ExternalDocs) UnmarshalJSON(data []byte) error {
 // Validate returns an error if ExternalDocs does not comply with the OpenAPI spec.
 func (e *ExternalDocs) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	if e.URL == "" {
-		return errors.New("url is required")
+		if err := me.emit(newExternalDocsURLRequired(e.Origin)); err != nil {
+			return err
+		}
 	}
 	if _, err := url.Parse(e.URL); err != nil {
-		return fmt.Errorf("url is incorrect: %w", err)
+		if err := me.emit(&ExternalDocsURLValidationError{Cause: err}); err != nil {
+			return err
+		}
 	}
 
-	return validateExtensions(ctx, e.Extensions)
+	return me.finalize(validateExtensions(ctx, e.Extensions, e.Origin))
 }

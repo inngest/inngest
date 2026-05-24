@@ -672,7 +672,7 @@ github.com/felixge/httpsnoop
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
 github.com/fsnotify/fsnotify/internal
-# github.com/getkin/kin-openapi v0.138.0
+# github.com/getkin/kin-openapi v0.139.0
 ## explicit; go 1.25
 github.com/getkin/kin-openapi/openapi2
 github.com/getkin/kin-openapi/openapi2conv
@@ -1122,10 +1122,10 @@ github.com/nats-io/nuid
 # github.com/ncruces/go-strftime v1.0.0
 ## explicit; go 1.17
 github.com/ncruces/go-strftime
-# github.com/oasdiff/yaml v0.0.9
+# github.com/oasdiff/yaml v0.1.0
 ## explicit; go 1.22.5
 github.com/oasdiff/yaml
-# github.com/oasdiff/yaml3 v0.0.12
+# github.com/oasdiff/yaml3 v0.0.13
 ## explicit; go 1.22.5
 github.com/oasdiff/yaml3
 # github.com/ohler55/ojg v1.24.1

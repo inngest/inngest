@@ -3,7 +3,6 @@ package openapi2
 import (
 	"encoding/json"
 	"maps"
-	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -255,12 +254,5 @@ func (schema *Schema) UnmarshalJSON(data []byte) error {
 	}
 
 	*schema = Schema(x)
-
-	if schema.Format == "date" {
-		// This is a fix for: https://github.com/getkin/kin-openapi/issues/697
-		if eg, ok := schema.Example.(string); ok {
-			schema.Example = strings.TrimSuffix(eg, "T00:00:00Z")
-		}
-	}
 	return nil
 }

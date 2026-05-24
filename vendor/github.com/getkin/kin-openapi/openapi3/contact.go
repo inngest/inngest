@@ -65,5 +65,5 @@ func (contact *Contact) UnmarshalJSON(data []byte) error {
 func (contact *Contact) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
 
-	return validateExtensions(ctx, contact.Extensions)
+	return validateExtensions(ctx, contact.Extensions, contact.Origin)
 }

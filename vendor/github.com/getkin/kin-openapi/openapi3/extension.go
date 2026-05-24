@@ -2,11 +2,17 @@ package openapi3
 
 import (
 	"context"
-	"fmt"
 	"strings"
 )
 
-func validateExtensions(ctx context.Context, extensions map[string]any) error { // FIXME: newtype + Validate(...)
+// validateExtensions reports any non-`x-` keys in the given extensions
+// map that are not explicitly allowed by the validation context. The
+// origin argument is attached to the resulting ExtraSiblingFieldsError
+// so callers can pin the finding to the parent object that carries the
+// unknown keys; pass nil when the parent has no Origin (the loader was
+// run with IncludeOrigin = false, or the parent was constructed
+// programmatically without an Origin set).
+func validateExtensions(ctx context.Context, extensions map[string]any, origin *Origin) error { // FIXME: newtype + Validate(...)
 	allowed := getValidationOptions(ctx).extraSiblingFieldsAllowed
 
 	var unknowns []string
@@ -23,7 +29,7 @@ func validateExtensions(ctx context.Context, extensions map[string]any) error { 
 	}
 
 	if len(unknowns) != 0 {
-		return fmt.Errorf("extra sibling fields: %+v", unknowns)
+		return newExtraSiblingFields(unknowns, origin)
 	}
 
 	return nil

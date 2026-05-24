@@ -4,8 +4,8 @@ import "fmt"
 
 // ValidationError is the embedded base for every typed validation error
 // emitted by the document validation walker (T.Validate, Info.Validate,
-// Paths.Validate, etc.). Three layers of granularity are exposed; pick
-// whichever the caller needs:
+// Paths.Validate, etc.). Four categories of typed error are exposed;
+// pick whichever the caller needs:
 //
 //  1. Base — *ValidationError. Catchall for "this is a validation
 //     issue, here is the message". Reachable from any leaf via the As
@@ -14,16 +14,35 @@ import "fmt"
 //     *FieldVersionMismatchError. Group families of related failures
 //     and expose the family-level metadata (Field, MinVersion, ...).
 //     Wrap the underlying leaf via Unwrap, so errors.As can still walk
-//     to the leaf.
+//     to the leaf. Some clusters are single-site (e.g. *SchemaTypeError)
+//     and carry only their own fields with no separate leaf.
 //  3. Leaf — one type per call site (e.g. *InfoVersionRequired,
 //     *LicenseIdentifierFieldFor31Plus). Lets callers match an exact
 //     failure point without string comparison.
+//  4. Context wrapper — types like *SectionValidationError,
+//     *PathValidationError, *ParameterFieldValidationError. Add scope
+//     ("which section", "which path", "which parameter") around an
+//     inner error chain but do NOT themselves report a failure
+//     condition — the actual error lives in Cause. Defined in
+//     validation_error_context.go; see that file's header for the
+//     full inventory and conventions.
 //
-// All three are reachable from the same returned error through
+// All four are reachable from the same returned error through
 // standard Go error wrapping (errors.As, errors.Is, errors.Unwrap),
 // so a caller that only needs "is it a validation error?" stops at
 // the base and a caller that wants "is it specifically license.identifier
-// being used in 3.0?" matches the leaf.
+// being used in 3.0?" matches the leaf. A caller that wants "which
+// section did this happen in?" matches the context wrapper and walks
+// further for the cluster/leaf.
+//
+// A canonical error chain therefore looks like:
+//
+//	ComponentValidationError{Section: "schema", Name: "Foo"}
+//	  -> RequiredFieldError{Field: "type"}
+//	    -> SchemaTypeRequired{Message: "..."}
+//
+// Context wrapper carries WHERE, cluster carries WHAT category, leaf
+// carries EXACTLY WHICH case.
 //
 // Backward compatibility: every site that today returns errors.New(msg)
 // migrates to a leaf type that embeds ValidationError with Message set
@@ -155,6 +174,394 @@ type FieldVersionMismatchError struct {
 func (e *FieldVersionMismatchError) Error() string { return e.Cause.Error() }
 func (e *FieldVersionMismatchError) Unwrap() error { return e.Cause }
 
+// ServerURLTemplateError clusters server URL template failures —
+// mismatched braces and undeclared variables (template variables not
+// matched by Server.Variables, or vice versa).
+type ServerURLTemplateError struct {
+	// URL is the server URL whose template failed validation.
+	URL string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+	// Origin is the source location of the offending element when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *ServerURLTemplateError) Error() string { return e.Cause.Error() }
+func (e *ServerURLTemplateError) Unwrap() error { return e.Cause }
+
+// EitherFieldRequiredError clusters "at least one of these fields must
+// be set" failures (example.value vs externalValue, link.operationId
+// vs operationRef).
+type EitherFieldRequiredError struct {
+	// Fields is the set of field names, at least one of which must be
+	// set (e.g. ["value", "externalValue"]).
+	Fields []string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+	// Origin is the source location of the offending element when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *EitherFieldRequiredError) Error() string { return e.Cause.Error() }
+func (e *EitherFieldRequiredError) Unwrap() error { return e.Cause }
+
+// SchemaBothFormsExclusive clusters "this union-typed schema field is
+// set to both its boolean and schema forms simultaneously" failures —
+// additionalProperties, unevaluatedItems, unevaluatedProperties.
+type SchemaBothFormsExclusive struct {
+	// Field is the name of the union-typed schema property
+	// (e.g. "additionalProperties", "unevaluatedItems").
+	Field string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+	// Origin is the source location of the offending element when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *SchemaBothFormsExclusive) Error() string { return e.Cause.Error() }
+func (e *SchemaBothFormsExclusive) Unwrap() error { return e.Cause }
+
+// ExactlyOneFieldError clusters "exactly one of these fields must be
+// set" failures — e.g. a parameter or header where neither content
+// nor schema is set, or both are.
+type ExactlyOneFieldError struct {
+	// Fields is the set of fields, exactly one of which must be set
+	// (e.g. ["content", "schema"]).
+	Fields []string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+	// Origin is the source location of the offending element when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *ExactlyOneFieldError) Error() string { return e.Cause.Error() }
+func (e *ExactlyOneFieldError) Unwrap() error { return e.Cause }
+
+// SingleEntryContentError clusters "the content map must contain at
+// most one entry" failures (parameter.content, header.content).
+type SingleEntryContentError struct {
+	// Subject is the kind of object whose Content map is too large
+	// ("parameter", "header").
+	Subject string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+	// Origin is the source location of the offending element when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *SingleEntryContentError) Error() string { return e.Cause.Error() }
+func (e *SingleEntryContentError) Unwrap() error { return e.Cause }
+
+// WebhookNilError clusters "the value at webhook key X is nil"
+// failures from T.Validate's webhook walk. Carries the offending
+// key name.
+type WebhookNilError struct {
+	// Name is the webhook key whose value was nil.
+	Name string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+}
+
+func (e *WebhookNilError) Error() string { return e.Cause.Error() }
+func (e *WebhookNilError) Unwrap() error { return e.Cause }
+
+// MutuallyExclusiveFieldsError clusters "fields X and Y are both set,
+// only one is allowed" failures (example.value vs externalValue,
+// mediaType.example vs examples, license.url vs identifier,
+// link.operationId vs operationRef). Carries both field names and
+// wraps the per-site leaf.
+type MutuallyExclusiveFieldsError struct {
+	// Field1 and Field2 name the two fields the spec forbids setting
+	// together (e.g. "value", "externalValue").
+	Field1 string
+	Field2 string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+	// Origin is the source location of the offending element when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *MutuallyExclusiveFieldsError) Error() string { return e.Cause.Error() }
+func (e *MutuallyExclusiveFieldsError) Unwrap() error { return e.Cause }
+
+// ForbiddenFieldError clusters "field X must not be set in this
+// context" failures (header.name and header.in inside a Headers map,
+// OAuth flow URLs that don't apply to the chosen flow type).
+type ForbiddenFieldError struct {
+	// Field is the name of the forbidden field (e.g. "name", "in",
+	// "authorizationUrl", "tokenUrl").
+	Field string
+	// Cause is the underlying leaf error. Walked by errors.Unwrap.
+	Cause error
+	// Origin is the source location of the offending element when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *ForbiddenFieldError) Error() string { return e.Cause.Error() }
+func (e *ForbiddenFieldError) Unwrap() error { return e.Cause }
+
+// PathParameterRequiredError clusters "path parameter X must be required"
+// failures: per the OpenAPI spec, every parameter with `in: path` must be
+// declared with `required: true`. Carries the parameter name so callers
+// can render or filter by it.
+type PathParameterRequiredError struct {
+	// Param is the path-parameter name (e.g. "groupId").
+	Param string
+	// Origin is the source location of the offending parameter when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *PathParameterRequiredError) Error() string {
+	return fmt.Sprintf("path parameter %q must be required", e.Param)
+}
+
+// DuplicateOperationIDError clusters "two operations share an operationId"
+// failures. operationIds must be unique across all paths in a document.
+// Endpoints are rendered as "<METHOD> <path>" (e.g. "POST /things").
+type DuplicateOperationIDError struct {
+	// OperationID is the duplicated operationId value.
+	OperationID string
+	// Endpoint1 / Endpoint2 are the two offending endpoints, in
+	// deterministic order (lexicographically) for stable error messages.
+	Endpoint1 string
+	Endpoint2 string
+	// Origin is the source location of the second (offending) operation
+	// when the document was loaded with Loader.IncludeOrigin = true. The
+	// pre-existing Endpoint1 is implicitly fine; the duplicate landed at
+	// Endpoint2's site, which is the natural "go fix this" pointer.
+	Origin *Origin
+}
+
+func (e *DuplicateOperationIDError) Error() string {
+	return fmt.Sprintf("operations %q and %q have the same operation id %q",
+		e.Endpoint1, e.Endpoint2, e.OperationID)
+}
+
+// ExtraSiblingFieldsError clusters "unexpected sibling fields" failures.
+// Most commonly this fires when fields appear alongside a $ref that the
+// OpenAPI spec doesn't allow there, or as unknown keys on objects whose
+// only permitted extras are `x-` extensions. Carries the offending field
+// names so callers can render or filter.
+type ExtraSiblingFieldsError struct {
+	// Fields is the list of unexpected sibling field names.
+	Fields []string
+	// Origin is the source location of the parent object that carries
+	// the extra siblings when the document was loaded with
+	// Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *ExtraSiblingFieldsError) Error() string {
+	return fmt.Sprintf("extra sibling fields: %+v", e.Fields)
+}
+
+// SchemaTypeError clusters "unsupported 'type' value" failures on a
+// Schema. Carries the bad type value so callers can surface it in
+// user-facing output and filter findings by it.
+type SchemaTypeError struct {
+	// Type is the rejected type value (e.g. "bool", "int", "http").
+	Type string
+	// Origin is the source location of the offending schema when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *SchemaTypeError) Error() string {
+	return fmt.Sprintf("unsupported 'type' value %q", e.Type)
+}
+
+// InvalidParameterInError clusters "parameter can't have 'in' value X"
+// failures. The OpenAPI 3.x spec accepts only `path`, `query`, `header`,
+// or `cookie`; this fires when a parameter declares anything else
+// (commonly `body`, a Swagger 2.0 leftover).
+type InvalidParameterInError struct {
+	// Value is the rejected `in:` value (e.g. "body", "formData").
+	Value string
+	// Origin is the source location of the offending parameter when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *InvalidParameterInError) Error() string {
+	return fmt.Sprintf("parameter can't have 'in' value %q", e.Value)
+}
+
+// SchemaPatternRegexError clusters "schema pattern failed to compile"
+// failures. Kin's regex engine is Go's RE2, which rejects Perl features
+// like `(?!...)` lookahead; specs that leak Perl regex patterns (common
+// in AWS-style auto-generated schemas) trip this. Carries the offending
+// pattern as a structured field for typed dispatch, while preserving
+// the underlying SchemaError's rendered message byte-for-byte (Error()
+// delegates to Cause.Error()) so existing string-based consumers and
+// golden fixtures are unaffected.
+type SchemaPatternRegexError struct {
+	// Pattern is the schema's `pattern:` value that failed to compile.
+	Pattern string
+	// Cause is the underlying error (a *SchemaError wrapping the
+	// regexp package's syntax error). Unwrap returns this so callers
+	// walking the error chain see the SchemaError.
+	Cause error
+	// Origin is the source location of the offending schema when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *SchemaPatternRegexError) Error() string { return e.Cause.Error() }
+
+func (e *SchemaPatternRegexError) Unwrap() error { return e.Cause }
+
+// InvalidSecuritySchemeTypeError clusters "security scheme 'type' can't
+// be X" failures. The OpenAPI 3.x spec accepts only `apiKey`, `http`,
+// `oauth2`, `openIdConnect`, and `mutualTLS` (3.1+); this fires when a
+// security scheme declares anything else.
+type InvalidSecuritySchemeTypeError struct {
+	// Type is the rejected type value (e.g. "cookie", "saml").
+	Type string
+	// Origin is the source location of the offending security scheme
+	// when the document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *InvalidSecuritySchemeTypeError) Error() string {
+	return fmt.Sprintf("security scheme 'type' can't be %q", e.Type)
+}
+
+// InvalidHTTPSchemeError clusters "security scheme of type 'http' has
+// invalid 'scheme' value X" failures. The OpenAPI/HTTP-auth registry
+// accepts only `bearer`, `basic`, `negotiate`, `digest`; this fires
+// when an http scheme declares anything else.
+type InvalidHTTPSchemeError struct {
+	// Scheme is the rejected scheme value (e.g. "mutual", "oauth").
+	Scheme string
+	// Origin is the source location of the offending security scheme
+	// when the document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *InvalidHTTPSchemeError) Error() string {
+	return fmt.Sprintf("security scheme of type 'http' has invalid 'scheme' value %q", e.Scheme)
+}
+
+// UnresolvedRefError clusters "found unresolved ref: X" failures fired
+// by the loader when a $ref cannot be resolved against the loaded
+// document. Carries the offending ref string so callers can surface
+// it in user-facing output and filter findings by it.
+type UnresolvedRefError struct {
+	// Ref is the unresolved $ref value (e.g. "#/components/schemas/X"
+	// or "external.yaml#/...").
+	Ref string
+	// Origin is the source location of the ref-bearing object when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *UnresolvedRefError) Error() string {
+	return fmt.Sprintf("found unresolved ref: %q", e.Ref)
+}
+
+// APIKeyInInvalidError clusters "apiKey should have 'in'. It can be
+// 'query', 'header' or 'cookie', not X" failures. Fires when an
+// apiKey security scheme either omits `in:` or sets it to a value
+// outside {query, header, cookie}. Carries the rejected value so
+// callers can render or filter; empty string means the field was
+// missing entirely.
+type APIKeyInInvalidError struct {
+	// Value is the rejected `in:` value (empty when the field was
+	// omitted, otherwise the bad value e.g. "body").
+	Value string
+	// Origin is the source location of the offending security scheme
+	// when the document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *APIKeyInInvalidError) Error() string {
+	return fmt.Sprintf("security scheme of type 'apiKey' should have 'in'. It can be 'query', 'header' or 'cookie', not %q", e.Value)
+}
+
+// PathMustStartWithSlashError clusters "path X does not start with a
+// forward slash" failures. Path keys in the paths object must begin
+// with `/`.
+type PathMustStartWithSlashError struct {
+	// Path is the offending path key (e.g. "users/{id}").
+	Path string
+	// Origin is the source location of the paths object when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *PathMustStartWithSlashError) Error() string {
+	return fmt.Sprintf("path %q does not start with a forward slash (/)", e.Path)
+}
+
+// ConflictingPathsError clusters "conflicting paths X and Y" failures.
+// Fires when two path keys normalize to the same template (e.g.
+// "/users/{a}" and "/users/{b}" both normalize to "/users/{}").
+type ConflictingPathsError struct {
+	// Path1 / Path2 are the two conflicting path keys, in document
+	// order.
+	Path1 string
+	Path2 string
+	// Origin is the source location of the paths object when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *ConflictingPathsError) Error() string {
+	return fmt.Sprintf("conflicting paths %q and %q", e.Path1, e.Path2)
+}
+
+// DuplicateParameterError clusters "more than one X parameter has
+// name Y" failures. Fires when two parameters on an operation (or
+// path item) share the same In + Name combination.
+type DuplicateParameterError struct {
+	// In is the parameter location (e.g. "query", "path", "header").
+	In string
+	// Name is the duplicated parameter name.
+	Name string
+	// Origin is the source location of the offending parameter when
+	// the document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *DuplicateParameterError) Error() string {
+	return fmt.Sprintf("more than one %q parameter has name %q", e.In, e.Name)
+}
+
+// InvalidSerializationMethodError clusters "serialization method with
+// style=X and explode=Y is not supported by Z" failures. Fires for
+// invalid (style, explode) combinations on encodings, parameters,
+// and headers. The Subject discriminates which surface is reporting:
+// "media type" for encoding, the parameter location ("path",
+// "query", etc.) for parameters and "header" for headers.
+type InvalidSerializationMethodError struct {
+	// Subject discriminates the calling surface ("media type",
+	// "path"/"query"/"header"/"cookie" for parameters, or "header"
+	// for the header.go site).
+	Subject string
+	// Style is the offending `style:` value.
+	Style string
+	// Explode is the offending `explode:` value.
+	Explode bool
+	// Origin is the source location of the offending object when the
+	// document was loaded with Loader.IncludeOrigin = true.
+	Origin *Origin
+}
+
+func (e *InvalidSerializationMethodError) Error() string {
+	if e.Subject == "media type" {
+		return fmt.Sprintf("serialization method with style=%q and explode=%v is not supported by media type", e.Style, e.Explode)
+	}
+	return fmt.Sprintf("serialization method with style=%q and explode=%v is not supported by a %s parameter", e.Style, e.Explode, e.Subject)
+}
+
 // ---------------------------------------------------------------------
 // Leaf types — one per call site. Each embeds ValidationError for
 // Error() and As-to-base, and is wrapped in its cluster type when
@@ -195,6 +602,282 @@ func (e *OpenAPIVersionRequired) As(target any) bool {
 type ServerURLRequired struct{ ValidationError }
 
 func (e *ServerURLRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// ServerURLTemplateError leaves.
+
+type ServerURLMismatchedBraces struct{ ValidationError }
+
+func (e *ServerURLMismatchedBraces) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type ServerURLUndeclaredVariables struct{ ValidationError }
+
+func (e *ServerURLUndeclaredVariables) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SchemaItemsRequired struct{ ValidationError }
+
+func (e *SchemaItemsRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// EitherFieldRequiredError leaves.
+
+type ExampleValueOrExternalValueRequired struct{ ValidationError }
+
+func (e *ExampleValueOrExternalValueRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type LinkOperationIDOrRefRequired struct{ ValidationError }
+
+func (e *LinkOperationIDOrRefRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type InfoRequired struct{ ValidationError }
+
+func (e *InfoRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type PathsRequired struct{ ValidationError }
+
+func (e *PathsRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type JSONSchemaDialectAbsoluteURIRequired struct{ ValidationError }
+
+func (e *JSONSchemaDialectAbsoluteURIRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// SchemaBothFormsExclusive leaves.
+
+type SchemaAdditionalPropertiesBothForms struct{ ValidationError }
+
+func (e *SchemaAdditionalPropertiesBothForms) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SchemaUnevaluatedItemsBothForms struct{ ValidationError }
+
+func (e *SchemaUnevaluatedItemsBothForms) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SchemaUnevaluatedPropertiesBothForms struct{ ValidationError }
+
+func (e *SchemaUnevaluatedPropertiesBothForms) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// ExactlyOneFieldError leaves.
+
+type ParameterContentSchemaExactlyOne struct{ ValidationError }
+
+func (e *ParameterContentSchemaExactlyOne) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type HeaderContentSchemaExactlyOne struct{ ValidationError }
+
+func (e *HeaderContentSchemaExactlyOne) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// SingleEntryContentError leaves.
+
+type ParameterContentSingleEntry struct{ ValidationError }
+
+func (e *ParameterContentSingleEntry) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type HeaderContentSingleEntry struct{ ValidationError }
+
+func (e *HeaderContentSingleEntry) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// WebhookNilError leaf.
+
+type WebhookNil struct{ ValidationError }
+
+func (e *WebhookNil) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// SecurityScheme leaves wrapped in RequiredFieldError / ForbiddenFieldError.
+
+type OpenIDConnectURLRequired struct{ ValidationError }
+
+func (e *OpenIDConnectURLRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SecuritySchemeFlowsRequired struct{ ValidationError }
+
+func (e *SecuritySchemeFlowsRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SecuritySchemeInForbidden struct{ ValidationError }
+
+func (e *SecuritySchemeInForbidden) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SecuritySchemeNameForbidden struct{ ValidationError }
+
+func (e *SecuritySchemeNameForbidden) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SecuritySchemeBearerFormatForbidden struct{ ValidationError }
+
+func (e *SecuritySchemeBearerFormatForbidden) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SecuritySchemeFlowsForbidden struct{ ValidationError }
+
+func (e *SecuritySchemeFlowsForbidden) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type ParameterExampleAndExamplesExclusive struct{ ValidationError }
+
+func (e *ParameterExampleAndExamplesExclusive) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type ServerVariableDefaultRequired struct{ ValidationError }
+
+func (e *ServerVariableDefaultRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type ExternalDocsURLRequired struct{ ValidationError }
+
+func (e *ExternalDocsURLRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type OperationResponsesRequired struct{ ValidationError }
+
+func (e *OperationResponsesRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type RequestBodyContentRequired struct{ ValidationError }
+
+func (e *RequestBodyContentRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type ResponseDescriptionRequired struct{ ValidationError }
+
+func (e *ResponseDescriptionRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type OAuthFlowScopesRequired struct{ ValidationError }
+
+func (e *OAuthFlowScopesRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type OAuthFlowAuthorizationURLRequired struct{ ValidationError }
+
+func (e *OAuthFlowAuthorizationURLRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type OAuthFlowTokenURLRequired struct{ ValidationError }
+
+func (e *OAuthFlowTokenURLRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type ParameterNameRequired struct{ ValidationError }
+
+func (e *ParameterNameRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type ResponsesNonEmptyRequired struct{ ValidationError }
+
+func (e *ResponsesNonEmptyRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type APIKeySecuritySchemeNameRequired struct{ ValidationError }
+
+func (e *APIKeySecuritySchemeNameRequired) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// MutuallyExclusiveFieldsError leaves.
+
+type ExampleValueExternalValueExclusive struct{ ValidationError }
+
+func (e *ExampleValueExternalValueExclusive) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type MediaTypeExampleExamplesExclusive struct{ ValidationError }
+
+func (e *MediaTypeExampleExamplesExclusive) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type LicenseURLIdentifierExclusive struct{ ValidationError }
+
+func (e *LicenseURLIdentifierExclusive) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type LinkOperationIDRefExclusive struct{ ValidationError }
+
+func (e *LinkOperationIDRefExclusive) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type SchemaReadOnlyWriteOnlyExclusive struct{ ValidationError }
+
+func (e *SchemaReadOnlyWriteOnlyExclusive) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+// ForbiddenFieldError leaves.
+
+type HeaderNameForbidden struct{ ValidationError }
+
+func (e *HeaderNameForbidden) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type HeaderInForbidden struct{ ValidationError }
+
+func (e *HeaderInForbidden) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type OAuthFlowAuthorizationURLForbidden struct{ ValidationError }
+
+func (e *OAuthFlowAuthorizationURLForbidden) As(target any) bool {
+	return asValidationError(target, &e.ValidationError)
+}
+
+type OAuthFlowTokenURLForbidden struct{ ValidationError }
+
+func (e *OAuthFlowTokenURLForbidden) As(target any) bool {
 	return asValidationError(target, &e.ValidationError)
 }
 
@@ -402,16 +1085,266 @@ func newLicenseNameRequired(origin *Origin) error {
 		&LicenseNameRequired{ValidationError{Message: "value of license name must be a non-empty string"}}, origin)
 }
 
-// newOpenAPIVersionRequired has no Origin parameter: the OpenAPI version
-// string lives on the document root *T, which the loader doesn't track.
-func newOpenAPIVersionRequired() error {
+func newOpenAPIVersionRequired(origin *Origin) error {
 	return newRequiredField("openapi",
-		&OpenAPIVersionRequired{ValidationError{Message: "value of openapi must be a non-empty string"}}, nil)
+		&OpenAPIVersionRequired{ValidationError{Message: "value of openapi must be a non-empty string"}}, origin)
 }
 
 func newServerURLRequired(origin *Origin) error {
 	return newRequiredField("server.url",
 		&ServerURLRequired{ValidationError{Message: "value of url must be a non-empty string"}}, origin)
+}
+
+// newServerURLTemplateError wraps leaf in a *ServerURLTemplateError
+// carrying the offending Server.URL.
+func newServerURLTemplateError(serverURL string, leaf error, origin *Origin) error {
+	return &ServerURLTemplateError{URL: serverURL, Cause: leaf, Origin: origin}
+}
+
+func newServerURLMismatchedBraces(serverURL string, origin *Origin) error {
+	const msg = "server URL has mismatched { and }"
+	return newServerURLTemplateError(serverURL,
+		&ServerURLMismatchedBraces{ValidationError{Message: msg}}, origin)
+}
+
+func newServerURLUndeclaredVariables(serverURL string, origin *Origin) error {
+	const msg = "server has undeclared variables"
+	return newServerURLTemplateError(serverURL,
+		&ServerURLUndeclaredVariables{ValidationError{Message: msg}}, origin)
+}
+
+func newSchemaItemsRequired(origin *Origin) error {
+	const msg = "when schema type is 'array', schema 'items' must be non-null"
+	return newRequiredField("schema.items",
+		&SchemaItemsRequired{ValidationError{Message: msg}}, origin)
+}
+
+// newEitherFieldRequired wraps leaf in an *EitherFieldRequiredError
+// carrying the set of field names, at least one of which must be set.
+func newEitherFieldRequired(fields []string, leaf error, origin *Origin) error {
+	return &EitherFieldRequiredError{Fields: fields, Cause: leaf, Origin: origin}
+}
+
+func newExampleValueOrExternalValueRequired(origin *Origin) error {
+	const msg = "no value or externalValue field"
+	return newEitherFieldRequired([]string{"value", "externalValue"},
+		&ExampleValueOrExternalValueRequired{ValidationError{Message: msg}}, origin)
+}
+
+func newLinkOperationIDOrRefRequired(origin *Origin) error {
+	const msg = "missing operationId or operationRef on link"
+	return newEitherFieldRequired([]string{"operationId", "operationRef"},
+		&LinkOperationIDOrRefRequired{ValidationError{Message: msg}}, origin)
+}
+
+func newInfoRequired(origin *Origin) error {
+	return newRequiredField("info",
+		&InfoRequired{ValidationError{Message: "must be an object"}}, origin)
+}
+
+func newPathsRequired(origin *Origin) error {
+	return newRequiredField("paths",
+		&PathsRequired{ValidationError{Message: "must be an object"}}, origin)
+}
+
+func newJSONSchemaDialectAbsoluteURIRequired(origin *Origin) error {
+	return newRequiredField("jsonSchemaDialect",
+		&JSONSchemaDialectAbsoluteURIRequired{ValidationError{Message: "must be an absolute URI with a scheme"}}, origin)
+}
+
+// newSchemaBothForms wraps leaf in a *SchemaBothFormsExclusive carrying
+// the name of the union-typed schema property.
+func newSchemaBothForms(field string, leaf error, origin *Origin) error {
+	return &SchemaBothFormsExclusive{Field: field, Cause: leaf, Origin: origin}
+}
+
+func newSchemaAdditionalPropertiesBothForms(origin *Origin) error {
+	const msg = "additionalProperties are set to both boolean and schema"
+	return newSchemaBothForms("additionalProperties",
+		&SchemaAdditionalPropertiesBothForms{ValidationError{Message: msg}}, origin)
+}
+
+func newSchemaUnevaluatedItemsBothForms(origin *Origin) error {
+	const msg = "unevaluatedItems is set to both boolean and schema"
+	return newSchemaBothForms("unevaluatedItems",
+		&SchemaUnevaluatedItemsBothForms{ValidationError{Message: msg}}, origin)
+}
+
+func newSchemaUnevaluatedPropertiesBothForms(origin *Origin) error {
+	const msg = "unevaluatedProperties is set to both boolean and schema"
+	return newSchemaBothForms("unevaluatedProperties",
+		&SchemaUnevaluatedPropertiesBothForms{ValidationError{Message: msg}}, origin)
+}
+
+// newExactlyOneField wraps leaf in an *ExactlyOneFieldError carrying
+// the set of fields, exactly one of which must be set.
+func newExactlyOneField(fields []string, leaf error, origin *Origin) error {
+	return &ExactlyOneFieldError{Fields: fields, Cause: leaf, Origin: origin}
+}
+
+func newParameterContentSchemaExactlyOne(origin *Origin) error {
+	const msg = "parameter must contain exactly one of content and schema"
+	return newExactlyOneField([]string{"content", "schema"},
+		&ParameterContentSchemaExactlyOne{ValidationError{Message: msg}}, origin)
+}
+
+// newHeaderContentSchemaExactlyOne formats the same way the existing
+// header.go site does, including the historical "%v" dump of the
+// Header struct, so the Error() string remains byte-identical.
+func newHeaderContentSchemaExactlyOne(header any, origin *Origin) error {
+	msg := fmt.Sprintf("parameter must contain exactly one of content and schema: %v", header)
+	return newExactlyOneField([]string{"content", "schema"},
+		&HeaderContentSchemaExactlyOne{ValidationError{Message: msg}}, origin)
+}
+
+// newSingleEntryContent wraps leaf in a *SingleEntryContentError
+// carrying the Subject ("parameter" or "header") whose Content map
+// has more than one entry.
+func newSingleEntryContent(subject string, leaf error, origin *Origin) error {
+	return &SingleEntryContentError{Subject: subject, Cause: leaf, Origin: origin}
+}
+
+func newParameterContentSingleEntry(origin *Origin) error {
+	const msg = "parameter content must only contain one entry"
+	return newSingleEntryContent("parameter",
+		&ParameterContentSingleEntry{ValidationError{Message: msg}}, origin)
+}
+
+func newHeaderContentSingleEntry(origin *Origin) error {
+	const msg = "parameter content must only contain one entry"
+	return newSingleEntryContent("header",
+		&HeaderContentSingleEntry{ValidationError{Message: msg}}, origin)
+}
+
+func newWebhookNil(name string) error {
+	msg := fmt.Sprintf("webhook %q is nil", name)
+	return &WebhookNilError{
+		Name:  name,
+		Cause: &WebhookNil{ValidationError{Message: msg}},
+	}
+}
+
+func newExternalDocsURLRequired(origin *Origin) error {
+	return newRequiredField("externalDocs.url",
+		&ExternalDocsURLRequired{ValidationError{Message: "url is required"}}, origin)
+}
+
+func newOperationResponsesRequired(origin *Origin) error {
+	return newRequiredField("operation.responses",
+		&OperationResponsesRequired{ValidationError{Message: "value of responses must be an object"}}, origin)
+}
+
+func newRequestBodyContentRequired(origin *Origin) error {
+	return newRequiredField("requestBody.content",
+		&RequestBodyContentRequired{ValidationError{Message: "content of the request body is required"}}, origin)
+}
+
+func newResponseDescriptionRequired(origin *Origin) error {
+	return newRequiredField("response.description",
+		&ResponseDescriptionRequired{ValidationError{Message: "a short description of the response is required"}}, origin)
+}
+
+func newOAuthFlowScopesRequired(origin *Origin) error {
+	return newRequiredField("oAuthFlow.scopes",
+		&OAuthFlowScopesRequired{ValidationError{Message: "field 'scopes' is missing"}}, origin)
+}
+
+func newOAuthFlowAuthorizationURLRequired(origin *Origin) error {
+	return newRequiredField("oAuthFlow.authorizationUrl",
+		&OAuthFlowAuthorizationURLRequired{ValidationError{Message: "field 'authorizationUrl' is empty or missing"}}, origin)
+}
+
+func newOAuthFlowTokenURLRequired(origin *Origin) error {
+	return newRequiredField("oAuthFlow.tokenUrl",
+		&OAuthFlowTokenURLRequired{ValidationError{Message: "field 'tokenUrl' is empty or missing"}}, origin)
+}
+
+// newMutuallyExclusiveFields wraps leaf in a *MutuallyExclusiveFieldsError
+// carrying the two field names the spec forbids setting together.
+func newMutuallyExclusiveFields(field1, field2 string, leaf error, origin *Origin) error {
+	return &MutuallyExclusiveFieldsError{
+		Field1: field1,
+		Field2: field2,
+		Cause:  leaf,
+		Origin: origin,
+	}
+}
+
+func newExampleValueExternalValueExclusive(origin *Origin) error {
+	const msg = "value and externalValue are mutually exclusive"
+	return newMutuallyExclusiveFields("value", "externalValue",
+		&ExampleValueExternalValueExclusive{ValidationError{Message: msg}}, origin)
+}
+
+func newMediaTypeExampleExamplesExclusive(origin *Origin) error {
+	const msg = "example and examples are mutually exclusive"
+	return newMutuallyExclusiveFields("example", "examples",
+		&MediaTypeExampleExamplesExclusive{ValidationError{Message: msg}}, origin)
+}
+
+func newLicenseURLIdentifierExclusive(origin *Origin) error {
+	const msg = "license must not specify both 'url' and 'identifier'"
+	return newMutuallyExclusiveFields("url", "identifier",
+		&LicenseURLIdentifierExclusive{ValidationError{Message: msg}}, origin)
+}
+
+func newLinkOperationIDRefExclusive(operationID, operationRef string, origin *Origin) error {
+	msg := fmt.Sprintf("operationId %q and operationRef %q are mutually exclusive", operationID, operationRef)
+	return newMutuallyExclusiveFields("operationId", "operationRef",
+		&LinkOperationIDRefExclusive{ValidationError{Message: msg}}, origin)
+}
+
+func newSchemaReadOnlyWriteOnlyExclusive(origin *Origin) error {
+	const msg = "a property MUST NOT be marked as both readOnly and writeOnly being true"
+	return newMutuallyExclusiveFields("readOnly", "writeOnly",
+		&SchemaReadOnlyWriteOnlyExclusive{ValidationError{Message: msg}}, origin)
+}
+
+// newForbiddenField wraps leaf in a *ForbiddenFieldError carrying the
+// name of the field that the spec forbids in the current context.
+func newForbiddenField(field string, leaf error, origin *Origin) error {
+	return &ForbiddenFieldError{Field: field, Cause: leaf, Origin: origin}
+}
+
+func newHeaderNameForbidden(origin *Origin) error {
+	const msg = "header 'name' MUST NOT be specified, it is given in the corresponding headers map"
+	return newForbiddenField("name",
+		&HeaderNameForbidden{ValidationError{Message: msg}}, origin)
+}
+
+func newHeaderInForbidden(origin *Origin) error {
+	const msg = "header 'in' MUST NOT be specified, it is implicitly in header"
+	return newForbiddenField("in",
+		&HeaderInForbidden{ValidationError{Message: msg}}, origin)
+}
+
+func newOAuthFlowAuthorizationURLForbidden(origin *Origin) error {
+	const msg = "field 'authorizationUrl' should not be set"
+	return newForbiddenField("authorizationUrl",
+		&OAuthFlowAuthorizationURLForbidden{ValidationError{Message: msg}}, origin)
+}
+
+func newOAuthFlowTokenURLForbidden(origin *Origin) error {
+	const msg = "field 'tokenUrl' should not be set"
+	return newForbiddenField("tokenUrl",
+		&OAuthFlowTokenURLForbidden{ValidationError{Message: msg}}, origin)
+}
+
+func newParameterNameRequired(origin *Origin) error {
+	return newRequiredField("parameter.name",
+		&ParameterNameRequired{ValidationError{Message: "parameter name can't be blank"}}, origin)
+}
+
+func newResponsesNonEmptyRequired(origin *Origin) error {
+	const msg = "the responses object MUST contain at least one response code"
+	return newRequiredField("responses",
+		&ResponsesNonEmptyRequired{ValidationError{Message: msg}}, origin)
+}
+
+func newAPIKeySecuritySchemeNameRequired(origin *Origin) error {
+	const msg = "security scheme of type 'apiKey' should have 'name'"
+	return newRequiredField("securityScheme.name",
+		&APIKeySecuritySchemeNameRequired{ValidationError{Message: msg}}, origin)
 }
 
 // newSchemaValueError wraps the result of schema.VisitJSON in a
@@ -420,6 +1353,21 @@ func newServerURLRequired(origin *Origin) error {
 // either a *SchemaError or a MultiError of them.
 func newSchemaValueError(valueKind string, cause error, origin *Origin) error {
 	return &SchemaValueError{ValueKind: valueKind, Cause: cause, Origin: origin}
+}
+
+// exampleValueOrigin returns an Origin pinned to the example's `value:`
+// field, used when wrapping a plural Examples entry's validation failure.
+// Falls back to the example's struct origin, then the parent fallback
+// origin (parameter or media type), so consumers always have something
+// useful to deep-link to.
+func exampleValueOrigin(ex *Example, fallback *Origin) *Origin {
+	if ex == nil || ex.Origin == nil {
+		return fallback
+	}
+	if loc, ok := ex.Origin.Fields["value"]; ok {
+		return &Origin{Key: &loc}
+	}
+	return ex.Origin
 }
 
 // newFieldVersionMismatch wraps leaf in a FieldVersionMismatchError for the
@@ -452,19 +1400,16 @@ func newLicenseIdentifierFieldFor31Plus(origin *Origin) error {
 		&LicenseIdentifierFieldFor31Plus{ValidationError{Message: msg}}, origin)
 }
 
-// newWebhooksFieldFor31Plus and newJSONSchemaDialectFieldFor31Plus have no
-// Origin parameter: both fields live on the document root *T, which the
-// loader doesn't track.
-func newWebhooksFieldFor31Plus() error {
+func newWebhooksFieldFor31Plus(origin *Origin) error {
 	const msg = "field webhooks is for OpenAPI >=3.1"
 	return newFieldVersionMismatch("webhooks",
-		&WebhooksFieldFor31Plus{ValidationError{Message: msg}}, nil)
+		&WebhooksFieldFor31Plus{ValidationError{Message: msg}}, origin)
 }
 
-func newJSONSchemaDialectFieldFor31Plus() error {
+func newJSONSchemaDialectFieldFor31Plus(origin *Origin) error {
 	const msg = "field jsonschemadialect is for OpenAPI >=3.1"
 	return newFieldVersionMismatch("jsonschemadialect",
-		&JSONSchemaDialectFieldFor31Plus{ValidationError{Message: msg}}, nil)
+		&JSONSchemaDialectFieldFor31Plus{ValidationError{Message: msg}}, origin)
 }
 
 // fieldFor31PlusLeaves maps field names (as passed to errFieldFor31Plus)
@@ -519,4 +1464,105 @@ func newFieldFor31Plus(field string, origin *Origin) error {
 		leaf = &ValidationError{Message: msg}
 	}
 	return newFieldVersionMismatch(field, leaf, origin)
+}
+
+func newPathParameterRequired(param string, origin *Origin) error {
+	return &PathParameterRequiredError{Param: param, Origin: origin}
+}
+
+func newDuplicateOperationID(endpoint1, endpoint2, operationID string, origin *Origin) error {
+	return &DuplicateOperationIDError{
+		Endpoint1:   endpoint1,
+		Endpoint2:   endpoint2,
+		OperationID: operationID,
+		Origin:      origin,
+	}
+}
+
+func newExtraSiblingFields(fields []string, origin *Origin) error {
+	return &ExtraSiblingFieldsError{Fields: fields, Origin: origin}
+}
+
+func newSchemaTypeError(typ string, origin *Origin) error {
+	return &SchemaTypeError{Type: typ, Origin: origin}
+}
+
+func newInvalidParameterIn(value string, origin *Origin) error {
+	return &InvalidParameterInError{Value: value, Origin: origin}
+}
+
+func newSchemaPatternRegexError(pattern string, cause error, origin *Origin) error {
+	return &SchemaPatternRegexError{Pattern: pattern, Cause: cause, Origin: origin}
+}
+
+func newInvalidSecuritySchemeType(typ string, origin *Origin) error {
+	return &InvalidSecuritySchemeTypeError{Type: typ, Origin: origin}
+}
+
+func newInvalidHTTPScheme(scheme string, origin *Origin) error {
+	return &InvalidHTTPSchemeError{Scheme: scheme, Origin: origin}
+}
+
+func newUnresolvedRef(ref string, origin *Origin) error {
+	return &UnresolvedRefError{Ref: ref, Origin: origin}
+}
+
+func newAPIKeyInInvalid(value string, origin *Origin) error {
+	return &APIKeyInInvalidError{Value: value, Origin: origin}
+}
+
+func newOpenIDConnectURLRequired(schemeName string, origin *Origin) error {
+	return newRequiredField("openIdConnectUrl",
+		&OpenIDConnectURLRequired{ValidationError{Message: fmt.Sprintf("no OIDC URL found for openIdConnect security scheme %q", schemeName)}}, origin)
+}
+
+func newSecuritySchemeFlowsRequired(schemeType string, origin *Origin) error {
+	return newRequiredField("flows",
+		&SecuritySchemeFlowsRequired{ValidationError{Message: fmt.Sprintf("security scheme of type %q should have 'flows'", schemeType)}}, origin)
+}
+
+func newSecuritySchemeInForbidden(schemeType string, origin *Origin) error {
+	return newForbiddenField("in",
+		&SecuritySchemeInForbidden{ValidationError{Message: fmt.Sprintf("security scheme of type %q can't have 'in'", schemeType)}}, origin)
+}
+
+func newSecuritySchemeNameForbidden(schemeType string, origin *Origin) error {
+	return newForbiddenField("name",
+		&SecuritySchemeNameForbidden{ValidationError{Message: fmt.Sprintf("security scheme of type %q can't have 'name'", schemeType)}}, origin)
+}
+
+func newSecuritySchemeBearerFormatForbidden(schemeType string, origin *Origin) error {
+	return newForbiddenField("bearerFormat",
+		&SecuritySchemeBearerFormatForbidden{ValidationError{Message: fmt.Sprintf("security scheme of type %q can't have 'bearerFormat'", schemeType)}}, origin)
+}
+
+func newSecuritySchemeFlowsForbidden(schemeType string, origin *Origin) error {
+	return newForbiddenField("flows",
+		&SecuritySchemeFlowsForbidden{ValidationError{Message: fmt.Sprintf("security scheme of type %q can't have 'flows'", schemeType)}}, origin)
+}
+
+func newPathMustStartWithSlash(path string, origin *Origin) error {
+	return &PathMustStartWithSlashError{Path: path, Origin: origin}
+}
+
+func newConflictingPaths(path1, path2 string, origin *Origin) error {
+	return &ConflictingPathsError{Path1: path1, Path2: path2, Origin: origin}
+}
+
+func newDuplicateParameter(in, name string, origin *Origin) error {
+	return &DuplicateParameterError{In: in, Name: name, Origin: origin}
+}
+
+func newInvalidSerializationMethod(subject, style string, explode bool, origin *Origin) error {
+	return &InvalidSerializationMethodError{Subject: subject, Style: style, Explode: explode, Origin: origin}
+}
+
+func newParameterExampleAndExamplesExclusive(parameterName string, origin *Origin) error {
+	return newMutuallyExclusiveFields("example", "examples",
+		&ParameterExampleAndExamplesExclusive{ValidationError{Message: fmt.Sprintf("parameter %q example and examples are mutually exclusive", parameterName)}}, origin)
+}
+
+func newServerVariableDefaultRequired(serverData string, origin *Origin) error {
+	return newRequiredField("default",
+		&ServerVariableDefaultRequired{ValidationError{Message: fmt.Sprintf("field default is required in %s", serverData)}}, origin)
 }

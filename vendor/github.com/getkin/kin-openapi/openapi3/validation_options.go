@@ -15,6 +15,7 @@ type ValidationOptions struct {
 	schemaExtensionsInRefProhibited                  bool
 	jsonSchema2020ValidationEnabled                  bool
 	isOpenAPI31OrLater                               bool
+	multiErrorEnabled                                bool
 	regexCompilerFunc                                RegexCompilerFunc
 	extraSiblingFieldsAllowed                        map[string]struct{}
 }
@@ -121,6 +122,25 @@ func AllowExtensionsWithRef() ValidationOption {
 func ProhibitExtensionsWithRef() ValidationOption {
 	return func(options *ValidationOptions) {
 		options.schemaExtensionsInRefProhibited = true
+	}
+}
+
+// EnableMultiError makes Validate aggregate independent validation errors and
+// return them together as a MultiError instead of returning the first error
+// and stopping. By default, Validate is fail-fast.
+//
+// Not every validator reports more than one error yet. Some, such as Schema,
+// run checks that build on earlier ones, so continuing past a failure can hit
+// a nil dereference or produce nonsense secondary errors.
+// We will keep converting more validators in follow-up changes as each one
+// is analyzed.
+//
+// To pull a specific error type out of the result, use errors.As(err, &target).
+// It walks into the MultiError automatically, so the same call works whether
+// Validate returned one error or many.
+func EnableMultiError() ValidationOption {
+	return func(options *ValidationOptions) {
+		options.multiErrorEnabled = true
 	}
 }
 

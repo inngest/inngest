@@ -108,100 +108,86 @@ func (components *Components) UnmarshalJSON(data []byte) error {
 }
 
 // Validate returns an error if Components does not comply with the OpenAPI spec.
-func (components *Components) Validate(ctx context.Context, opts ...ValidationOption) (err error) {
+func (components *Components) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
-	for _, k := range componentNames(components.Schemas) {
-		v := components.Schemas[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("schema %q: %w", k, err)
+	validateMap := func(label string, names []string, validate func(k string) error) error {
+		for _, k := range names {
+			if idErr := ValidateIdentifier(k); idErr != nil {
+				if err := me.emit(&ComponentValidationError{Section: label, Name: k, Cause: idErr}); err != nil {
+					return err
+				}
+				// Skip validating the component's value when its name is
+				// invalid: any leaf error from validate(k) would surface as
+				// "<bad-name>: <leaf-error>" and has no resolution path
+				// until the name is fixed. The continue keeps the noise
+				// per component bounded to a single, actionable finding.
+				continue
+			}
+			wrap := func(e error) error { return &ComponentValidationError{Section: label, Name: k, Cause: e} }
+			if err := me.emitWrapped(wrap, validate(k)); err != nil {
+				return err
+			}
 		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("schema %q: %w", k, err)
-		}
+		return nil
 	}
 
-	for _, k := range componentNames(components.Parameters) {
-		v := components.Parameters[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("parameter %q: %w", k, err)
-		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("parameter %q: %w", k, err)
-		}
+	if err := validateMap("schema", componentNames(components.Schemas), func(k string) error {
+		return components.Schemas[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	for _, k := range componentNames(components.RequestBodies) {
-		v := components.RequestBodies[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("request body %q: %w", k, err)
-		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("request body %q: %w", k, err)
-		}
+	if err := validateMap("parameter", componentNames(components.Parameters), func(k string) error {
+		return components.Parameters[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	for _, k := range componentNames(components.Responses) {
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("response %q: %w", k, err)
-		}
-		v := components.Responses[k]
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("response %q: %w", k, err)
-		}
+	if err := validateMap("request body", componentNames(components.RequestBodies), func(k string) error {
+		return components.RequestBodies[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	for _, k := range componentNames(components.Headers) {
-		v := components.Headers[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("header %q: %w", k, err)
-		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("header %q: %w", k, err)
-		}
+	if err := validateMap("response", componentNames(components.Responses), func(k string) error {
+		return components.Responses[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	for _, k := range componentNames(components.SecuritySchemes) {
-		v := components.SecuritySchemes[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("security scheme %q: %w", k, err)
-		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("security scheme %q: %w", k, err)
-		}
+	if err := validateMap("header", componentNames(components.Headers), func(k string) error {
+		return components.Headers[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	for _, k := range componentNames(components.Examples) {
-		v := components.Examples[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("example %q: %w", k, err)
-		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("example %q: %w", k, err)
-		}
+	if err := validateMap("security scheme", componentNames(components.SecuritySchemes), func(k string) error {
+		return components.SecuritySchemes[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	for _, k := range componentNames(components.Links) {
-		v := components.Links[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("link %q: %w", k, err)
-		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("link %q: %w", k, err)
-		}
+	if err := validateMap("example", componentNames(components.Examples), func(k string) error {
+		return components.Examples[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	for _, k := range componentNames(components.Callbacks) {
-		v := components.Callbacks[k]
-		if err = ValidateIdentifier(k); err != nil {
-			return fmt.Errorf("callback %q: %w", k, err)
-		}
-		if err = v.Validate(ctx); err != nil {
-			return fmt.Errorf("callback %q: %w", k, err)
-		}
+	if err := validateMap("link", componentNames(components.Links), func(k string) error {
+		return components.Links[k].Validate(ctx)
+	}); err != nil {
+		return err
 	}
 
-	return validateExtensions(ctx, components.Extensions)
+	if err := validateMap("callback", componentNames(components.Callbacks), func(k string) error {
+		return components.Callbacks[k].Validate(ctx)
+	}); err != nil {
+		return err
+	}
+
+	return me.finalize(validateExtensions(ctx, components.Extensions, components.Origin))
 }
 
 var _ jsonpointer.JSONPointable = (*Schemas)(nil)

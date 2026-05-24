@@ -89,10 +89,11 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 
 // A Decoder reads and decodes YAML values from an input stream.
 type Decoder struct {
-	parser      *parser
-	knownFields bool
-	origin      bool
-	file        string
+	parser            *parser
+	knownFields       bool
+	origin            bool
+	file              string
+	disableTimestamps bool
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -118,6 +119,22 @@ func (dec *Decoder) Origin(enable bool, file string) {
 	dec.file = file
 }
 
+// DisableTimestamps controls whether YAML 1.1 implicit-timestamp resolution
+// is applied during decoding.
+//
+// When false (the default), unquoted scalars matching the YAML timestamp
+// grammar (e.g. "1344-08-22") are resolved to time.Time values, including
+// when used as map keys. Setting disable to true skips that branch so such
+// scalars resolve to strings instead.
+//
+// Explicit "!!timestamp" tags in the source continue to resolve to time.Time,
+// because the explicit tag is the caller's intent. Use this flag for input
+// where date-shaped UNTAGGED scalars are intended as strings, for example
+// OpenAPI specs that use "1344-08-22" as a map key.
+func (dec *Decoder) DisableTimestamps(disable bool) {
+	dec.disableTimestamps = disable
+}
+
 // Decode reads the next YAML-encoded value from its input
 // and stores it in the value pointed to by v.
 //
@@ -128,6 +145,8 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 	d.knownFields = dec.knownFields
 	d.origin = dec.origin
 	d.file = dec.file
+	d.disableTimestamps = dec.disableTimestamps
+	dec.parser.disableTimestamps = dec.disableTimestamps
 	defer handleErr(&err)
 	node := dec.parser.parse()
 	if node == nil {
@@ -453,7 +472,7 @@ func (n *Node) ShortTag() string {
 				return n.Alias.ShortTag()
 			}
 		case ScalarNode:
-			tag, _ := resolve("", n.Value)
+			tag, _ := resolve("", n.Value, false)
 			return tag
 		case 0:
 			// Special case to make the zero value convenient.

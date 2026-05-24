@@ -3,7 +3,6 @@ package openapi3
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"maps"
 )
 
@@ -145,8 +144,8 @@ func (encoding *Encoding) Validate(ctx context.Context, opts ...ValidationOption
 		sm.Style == SerializationPipeDelimited && !sm.Explode,
 		sm.Style == SerializationDeepObject && sm.Explode:
 	default:
-		return fmt.Errorf("serialization method with style=%q and explode=%v is not supported by media type", sm.Style, sm.Explode)
+		return newInvalidSerializationMethod("media type", sm.Style, sm.Explode, encoding.Origin)
 	}
 
-	return validateExtensions(ctx, encoding.Extensions)
+	return validateExtensions(ctx, encoding.Extensions, encoding.Origin)
 }

@@ -83,30 +83,37 @@ func (info *Info) UnmarshalJSON(data []byte) error {
 // Validate returns an error if Info does not comply with the OpenAPI spec.
 func (info *Info) Validate(ctx context.Context, opts ...ValidationOption) error {
 	ctx = WithValidationOptions(ctx, opts...)
+	me := newErrCollector(ctx)
 
 	if info.Summary != "" && !getValidationOptions(ctx).isOpenAPI31OrLater {
-		return newInfoSummaryFieldFor31Plus(info.Origin)
+		if err := me.emit(newInfoSummaryFieldFor31Plus(info.Origin)); err != nil {
+			return err
+		}
 	}
 
 	if contact := info.Contact; contact != nil {
-		if err := contact.Validate(ctx); err != nil {
+		if err := me.emit(contact.Validate(ctx)); err != nil {
 			return err
 		}
 	}
 
 	if license := info.License; license != nil {
-		if err := license.Validate(ctx); err != nil {
+		if err := me.emit(license.Validate(ctx)); err != nil {
 			return err
 		}
 	}
 
 	if info.Version == "" {
-		return newInfoVersionRequired(info.Origin)
+		if err := me.emit(newInfoVersionRequired(info.Origin)); err != nil {
+			return err
+		}
 	}
 
 	if info.Title == "" {
-		return newInfoTitleRequired(info.Origin)
+		if err := me.emit(newInfoTitleRequired(info.Origin)); err != nil {
+			return err
+		}
 	}
 
-	return validateExtensions(ctx, info.Extensions)
+	return me.finalize(validateExtensions(ctx, info.Extensions, info.Origin))
 }
