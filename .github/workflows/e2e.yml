@@ -31,7 +31,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
         with:
-          version: 11.2.1
+          version: 11.2.2
 
       - name: Build UI
         run: make build-ui
