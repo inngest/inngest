@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -334,6 +335,12 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				"step_count", len(input.Steps),
 				"error", err,
 			)
+		} else if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
+			logger.StdlibLogger(ctx).Warn("sync checkpoint skipped: run no longer exists",
+				"run_id", input.RunID,
+				"fn_id", input.FnID,
+				"error", err,
+			)
 		} else {
 			logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
 		}
@@ -385,6 +392,13 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 				"error", err,
 			)
 			status = http.StatusRequestEntityTooLarge
+		} else if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
+			logger.StdlibLogger(ctx).Warn("async checkpoint skipped: run no longer exists",
+				"run_id", input.RunID,
+				"fn_id", input.FnID,
+				"error", err,
+			)
+			status = http.StatusNotFound
 		} else {
 			logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
 		}
