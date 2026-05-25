@@ -1,7 +1,6 @@
 packages:
   - 'apps/*'
   - 'packages/*'
-
 allowBuilds:
   "@sentry/cli": true
   esbuild: true
@@ -11,10 +10,8 @@ allowBuilds:
   unrs-resolver: true
   "@clerk/shared": false
   core-js-pure: false
-
 overrides:
   "@babel/runtime@<7.26.10": ">=7.26.10"
-  "@clerk/shared@<3.47.4": "4.13.0"
   "@sentry/browser@<7.119.1": ">=7.119.1"
   "@urql/core": "6.0.1"
   "brace-expansion@>=1.0.0 <=1.1.11": ">=1.1.12"
@@ -77,3 +74,5 @@ overrides:
   "ws@>=6.0.0 <6.2.3": ">=6.2.3"
   "ws@>=8.0.0 <8.17.1": ">=8.17.1"
   "zod@>=3.0.0 <4.0.0": ">=3.25.76 <5.0.0"
+  '@clerk/shared@<=3.47.6': 3.47.6
+  'js-cookie@>=3.0.0 <3.0.7': 3.0.7

@@ -6,7 +6,6 @@ settings:
 
 overrides:
   '@babel/runtime@<7.26.10': '>=7.26.10'
-  '@clerk/shared@<3.47.4': 4.13.0
   '@sentry/browser@<7.119.1': '>=7.119.1'
   '@urql/core': 6.0.1
   brace-expansion@>=1.0.0 <=1.1.11: '>=1.1.12'
@@ -69,6 +68,8 @@ overrides:
   ws@>=6.0.0 <6.2.3: '>=6.2.3'
   ws@>=8.0.0 <8.17.1: '>=8.17.1'
   zod@>=3.0.0 <4.0.0: '>=3.25.76 <5.0.0'
+  '@clerk/shared@<=3.47.6': 3.47.6
+  js-cookie@>=3.0.0 <3.0.7: 3.0.7
 
 importers:
 
@@ -8263,10 +8264,6 @@ packages:
   js-cookie@2.2.1:
     resolution: {integrity: sha512-HvdH2LzI/EAZcUwA8+0nKNtWHqS+ZmijLA30RwZA0bo7ToCckjK5MkGhjED9KoRcXO6BaGI3I9UIzSA1FKFPOQ==}
 
-  js-cookie@3.0.1:
-    resolution: {integrity: sha512-+0rgsUXZu4ncpPxRL+lNEptWMOWl9etvPHc/koSRp6MPwpRYAhmk0dUG00J4bxVV3r9uUzfo24wW0knS07SKSw==}
-    engines: {node: '>=12'}
-
   js-cookie@3.0.7:
     resolution: {integrity: sha512-z/wZZgDrkNV1eA0ULjM/F9/50Ya8fbzgKneSpoPsXSGd0KnpdtHfOZWK+GcwLk+EZbS4F9RBhU+K2RgzuDaItw==}
     engines: {node: '>=20'}
@@ -15591,7 +15588,7 @@ snapshots:
       '@segment/analytics.js-video-plugins': 0.2.1
       '@segment/facade': 3.4.10
       dset: 3.1.4
-      js-cookie: 3.0.1
+      js-cookie: 3.0.7
       node-fetch: 2.7.0
       tslib: 2.8.1
       unfetch: 4.2.0
@@ -20164,8 +20161,6 @@ snapshots:
   jose@6.2.3: {}
 
   js-cookie@2.2.1: {}
-
-  js-cookie@3.0.1: {}
 
   js-cookie@3.0.7: {}
 
