@@ -21,7 +21,7 @@ import (
 )
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.
-func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
+func (q *queue) RunJobs(ctx context.Context, scope osqueue.Scope, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
 	if limit > 1000 || limit <= 0 {
 		limit = 1000
 	}
@@ -60,11 +60,11 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 		if err := json.Unmarshal([]byte(str), qi); err != nil {
 			return nil, fmt.Errorf("error unmarshalling queue item: %w", err)
 		}
-		if qi.Data.Identifier.WorkspaceID != workspaceID {
+		if qi.Data.Identifier.WorkspaceID != scope.EnvID {
 			continue
 		}
 		// TODO Do we need to check backlogs here?
-		cmd := q.RedisClient.unshardedRc.B().Zrank().Key(q.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
+		cmd := q.RedisClient.unshardedRc.B().Zrank().Key(q.RedisClient.kg.FnQueueSet(scope.FunctionID.String())).Member(qi.ID).Build()
 		pos, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 		if !rueidis.IsRedisNil(err) && err != nil {
 			return nil, fmt.Errorf("error reading queue position: %w", err)
@@ -82,7 +82,7 @@ func (q *queue) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, 
 	return resp, nil
 }
 
-func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
+func (q *queue) OutstandingJobCount(ctx context.Context, scope osqueue.Scope, runID ulid.ULID) (int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "OutstandingJobCount"), redis_telemetry.ScopeQueue)
 
 	cmd := q.RedisClient.unshardedRc.B().Zcard().Key(q.RedisClient.kg.RunIndex(runID)).Build()
@@ -93,10 +93,10 @@ func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID
 	return int(count), nil
 }
 
-func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
+func (q *queue) StatusCount(ctx context.Context, scope osqueue.Scope, status string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StatusCount"), redis_telemetry.ScopeQueue)
 
-	key := q.RedisClient.kg.Status(status, workflowID)
+	key := q.RedisClient.kg.Status(status, scope.FunctionID)
 	cmd := q.RedisClient.unshardedRc.B().Zcard().Key(key).Build()
 	count, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 	if err != nil {
@@ -106,7 +106,7 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 	return count, nil
 }
 
-func (q *queue) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error) {
+func (q *queue) RunningCount(ctx context.Context, scope osqueue.Scope) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
 
 	rc := q.RedisClient.unshardedRc
@@ -116,7 +116,7 @@ func (q *queue) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, 
 	// NOTE: We previously used the concurrency ZSET, which will no longer be populated by Lease in case
 	// a valid capacity lease was acquired using the Constraint API. This is to prevent double-counting
 	// concurrency. For this reason, we need to track in progress queue items in a partition using a new index.
-	key := q.RedisClient.kg.PartitionScavengerIndex(functionID.String())
+	key := q.RedisClient.kg.PartitionScavengerIndex(scope.FunctionID.String())
 
 	// Only consider items in the future (do not count expired jobs which will be scavenged)
 	from := fmt.Sprintf("%d", q.Clock.Now().UnixMilli())
@@ -134,7 +134,7 @@ func (q *queue) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	l := logger.StdlibLogger(ctx)
 
 	opt := osqueue.QueueIterOptions{
@@ -554,7 +554,7 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 	return atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), nil
 }
 
-func (q *queue) ItemExists(ctx context.Context, jobID string) (bool, error) {
+func (q *queue) ItemExists(ctx context.Context, scope osqueue.Scope, jobID string) (bool, error) {
 	rc := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
@@ -570,7 +570,7 @@ func (q *queue) ItemExists(ctx context.Context, jobID string) (bool, error) {
 	return exists, nil
 }
 
-func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*osqueue.QueueItem, error) {
+func (q *queue) ItemsByRunID(ctx context.Context, scope osqueue.Scope, runID ulid.ULID) ([]*osqueue.QueueItem, error) {
 	rc := q.RedisClient.Client()
 	kg := q.RedisClient.KeyGenerator()
 

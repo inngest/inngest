@@ -17,10 +17,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-func (q *queue) IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error) {
+func (q *queue) IsMigrationLocked(ctx context.Context, scope osqueue.Scope) (*time.Time, error) {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.KeyGenerator()
-	cmd := client.B().Get().Key(kg.QueueMigrationLock(fnID)).Build()
+	cmd := client.B().Get().Key(kg.QueueMigrationLock(scope.FunctionID)).Build()
 	exists, err := client.Do(ctx, cmd).ToString()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {

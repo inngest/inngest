@@ -611,7 +611,11 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return nil
 	}
 
-	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), ref.JobID()); err != nil {
+	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), queue.Scope{
+		AccountID:  md.ID.Tenant.AccountID,
+		EnvID:      md.ID.Tenant.EnvID,
+		FunctionID: md.ID.FunctionID,
+	}, ref.JobID()); err != nil {
 		l.Error("error resetting queue item attempts", "error", err)
 		return err
 	}

@@ -33,8 +33,12 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 
 	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
-	if shadowPart.FunctionID != nil {
-		lockedUntil, err := shard.IsMigrationLocked(ctx, *shadowPart.FunctionID)
+	if shadowPart.FunctionID != nil && shadowPart.AccountID != nil && shadowPart.EnvID != nil {
+		lockedUntil, err := shard.IsMigrationLocked(ctx, Scope{
+			AccountID:  *shadowPart.AccountID,
+			EnvID:      *shadowPart.EnvID,
+			FunctionID: *shadowPart.FunctionID,
+		})
 		if err != nil {
 			return fmt.Errorf("could not check for migration lock: %w", err)
 		}
