@@ -26,9 +26,9 @@ export function isLazyDone<T>(data: Lazy<T>): data is T {
  * it'll be the loading placeholder, else it'll be the value. Use isLazyDone to
  * type narrow the return value
  */
-export function nullishToLazy<T>(data: T | undefined | null): Lazy<T> {
+export function nullishToLazy<T>(data: T | undefined | null): Lazy<NonNullable<T>> {
   if (data === undefined || data === null) {
     return loadingSentinel;
   }
-  return data;
+  return data as NonNullable<T>;
 }
