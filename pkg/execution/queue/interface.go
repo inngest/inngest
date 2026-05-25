@@ -306,15 +306,16 @@ type ShadowProcessingOperations interface {
 // InsightsOperations is the per-shard surface for queue inspection and metrics.
 type InsightsOperations interface {
 	Instrument(ctx context.Context) error
-	ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
+	ItemsByPartition(ctx context.Context, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context) (int64, error)
 
-	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
-	OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error)
-	RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error)
-	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
+	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
+	OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error)
+	RunningCount(ctx context.Context, scope Scope) (int64, error)
+	StatusCount(ctx context.Context, scope Scope, status string) (int64, error)
+	RunJobs(ctx context.Context, scope Scope, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
 
 type ShardOperations interface {
@@ -340,12 +341,12 @@ type ShardOperations interface {
 
 	Scavenge(ctx context.Context, limit int) (int, error)
 
-	RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error
+	RemoveQueueItem(ctx context.Context, scope Scope, partitionID string, itemID string) error
 
-	SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error
-	ResetAttemptsByJobID(ctx context.Context, jobID string) error
+	SetFunctionMigrate(ctx context.Context, scope Scope, migrateLockUntil *time.Time) error
+	ResetAttemptsByJobID(ctx context.Context, scope Scope, jobID string) error
 
-	PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error)
+	PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error)
 
 	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
@@ -353,15 +354,13 @@ type ShardOperations interface {
 
 	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
 
-	IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error)
+	IsMigrationLocked(ctx context.Context, scope Scope) (*time.Time, error)
 
-	ItemExists(ctx context.Context, jobID string) (bool, error)
-	ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error)
-	PartitionByID(ctx context.Context, partitionID string) (*PartitionInspectionResult, error)
+	ItemExists(ctx context.Context, scope Scope, jobID string) (bool, error)
+	ItemsByRunID(ctx context.Context, scope Scope, runID ulid.ULID) ([]*QueueItem, error)
+	PartitionByID(ctx context.Context, scope Scope, partitionID string) (*PartitionInspectionResult, error)
 
-	UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error
-
-	RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
+	UnpauseFunction(ctx context.Context, scope Scope) error
 }
 
 type BacklogRefillOptions struct {
