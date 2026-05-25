@@ -535,6 +535,7 @@ func (x *QueueItemRequest) GetFunctionId() string {
 type QueueItemResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	QueueShard    string                 `protobuf:"bytes,2,opt,name=queue_shard,json=queueShard,proto3" json:"queue_shard,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -574,6 +575,13 @@ func (x *QueueItemResponse) GetData() []byte {
 		return x.Data
 	}
 	return nil
+}
+
+func (x *QueueItemResponse) GetQueueShard() string {
+	if x != nil {
+		return x.QueueShard
+	}
+	return ""
 }
 
 // Shadow Partition / Backlog (Key Queues)
@@ -1224,9 +1232,11 @@ const file_debug_v1_queue_proto_rawDesc = "" +
 	"account_id\x18\x04 \x01(\tR\taccountId\x12\x15\n" +
 	"\x06env_id\x18\x05 \x01(\tR\x05envId\x12\x1f\n" +
 	"\vfunction_id\x18\x06 \x01(\tR\n" +
-	"functionId\"'\n" +
+	"functionId\"H\n" +
 	"\x11QueueItemResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data\";\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1f\n" +
+	"\vqueue_shard\x18\x02 \x01(\tR\n" +
+	"queueShard\";\n" +
 	"\x16ShadowPartitionRequest\x12!\n" +
 	"\fpartition_id\x18\x01 \x01(\tR\vpartitionId\"\xaa\x02\n" +
 	"\x17ShadowPartitionResponse\x12!\n" +

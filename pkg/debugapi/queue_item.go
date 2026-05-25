@@ -39,7 +39,10 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 			return nil, status.Error(codes.Internal, fmt.Errorf("error marshalling queue item: %w", err).Error())
 		}
 
-		return &pb.QueueItemResponse{Data: byt}, nil
+		return &pb.QueueItemResponse{
+			Data:       byt,
+			QueueShard: shard.Name(),
+		}, nil
 	}
 
 	// use runID
@@ -86,6 +89,7 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 	}
 
 	return &pb.QueueItemResponse{
-		Data: byt,
+		Data:       byt,
+		QueueShard: shard.Name(),
 	}, nil
 }

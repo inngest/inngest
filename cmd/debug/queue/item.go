@@ -104,7 +104,7 @@ func ItemCommand() *cli.Command {
 				return fmt.Errorf("error unmarshalling item: %w", err)
 			}
 
-			return output.TextQueueItem(&item)
+			return output.TextQueueItem(&item, resp.GetQueueShard())
 		},
 	}
 }

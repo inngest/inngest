@@ -64,7 +64,10 @@ message QueueItemRequest {
   string function_id = 6;
 }
 
-message QueueItemResponse { bytes data = 1; }
+message QueueItemResponse {
+  bytes data = 1;
+  string queue_shard = 2;
+}
 
 //
 // Shadow Partition / Backlog (Key Queues)

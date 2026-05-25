@@ -168,6 +168,7 @@ func TestGetQueueItemByRunIDResolvesShardFromScope(t *testing.T) {
 		FunctionId: functionID.String(),
 	})
 	require.NoError(t, err)
+	require.Equal(t, accountShard.Name(), resp.GetQueueShard())
 
 	var item queue.QueueItem
 	require.NoError(t, json.Unmarshal(resp.GetData(), &item))
