@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
@@ -19,7 +20,14 @@ func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartiti
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
 
-	pt, err := d.queue.PartitionByID(ctx, shard, req.GetPartitionId())
+	scope := queue.Scope{
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
+	}
+	if fnID, parseErr := uuid.Parse(req.GetPartitionId()); parseErr == nil {
+		scope.FunctionID = fnID
+	}
+	pt, err := d.queue.PartitionByID(ctx, shard, scope, req.GetPartitionId())
 	if err != nil {
 		if errors.Is(err, queue.ErrPartitionNotFound) {
 			return nil, status.Error(codes.NotFound, queue.ErrPartitionNotFound.Error())

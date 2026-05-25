@@ -600,8 +600,11 @@ func TestFinalize(t *testing.T) {
 	jobs1, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run1.ID.Tenant.EnvID,
-		run1.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run1.ID.Tenant.AccountID,
+			EnvID:      run1.ID.Tenant.EnvID,
+			FunctionID: run1.ID.FunctionID,
+		},
 		run1.ID.RunID,
 		1000,
 		0,
@@ -635,8 +638,11 @@ func TestFinalize(t *testing.T) {
 	jobs2, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run2.ID.Tenant.EnvID,
-		run2.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run2.ID.Tenant.AccountID,
+			EnvID:      run2.ID.Tenant.EnvID,
+			FunctionID: run2.ID.FunctionID,
+		},
 		run2.ID.RunID,
 		1000,
 		0,
@@ -1060,8 +1066,11 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
@@ -1242,8 +1251,11 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
@@ -1429,8 +1441,11 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
@@ -1630,8 +1645,11 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,

@@ -72,7 +72,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		// Expect queue reset to be called with the job ID and shard info.
 		// Without this, a failed queue item that becomes successful will
 		// have an attempt count > 0 on the next retry.
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err)
@@ -91,7 +91,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			require.EqualValues("Completed", capture.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
 		}
 
-		mocks.queue.AssertCalled(t, "ResetAttemptsByJobID", ctx, "shard-1", "job-123")
+		mocks.queue.AssertCalled(t, "ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123")
 
 		mocks.state.AssertExpectations(t)
 		mocks.tracer.AssertExpectations(t)
@@ -176,7 +176,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
 			Return(&meta.SpanReference{}, nil)
 
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err)
@@ -223,7 +223,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
 			Return(&meta.SpanReference{}, nil).
 			Twice()
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err)
@@ -266,7 +266,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
 			Return(&meta.SpanReference{}, fmt.Errorf("simulated tracer outage")).
 			Once()
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err, "best-effort: tracer failure must not surface to caller")
@@ -306,7 +306,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 				d.ScheduleStatus == enums.DeferStatusAfterRun &&
 				string(d.Input) == `{"user_id":"u_123"}`
 		})).Return(nil)
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err)
@@ -334,7 +334,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		mocks, testData := setupAsyncCheckpointTest(t, op)
 
 		mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err)
@@ -453,6 +453,11 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 	appID := uuid.New()
 
 	// Create test metadata
+	scope := queue.Scope{
+		AccountID:  accountID,
+		EnvID:      envID,
+		FunctionID: fnID,
+	}
 	testMetadata := state.Metadata{
 		ID: state.ID{
 			RunID:      runID,
@@ -489,6 +494,7 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 
 	return mocks, &testData{
 		metadata:        testMetadata,
+		scope:           scope,
 		stepOpcodes:     ops,
 		asyncCheckpoint: asyncCheckpoint,
 		checkpointer:    checkpointer,
@@ -613,8 +619,8 @@ type mockQueue struct {
 	mock.Mock
 }
 
-func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID, jobID string) error {
-	args := m.Called(ctx, shardID, jobID)
+func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID string, scope queue.Scope, jobID string) error {
+	args := m.Called(ctx, shardID, scope, jobID)
 	return args.Error(0)
 }
 
@@ -651,6 +657,7 @@ type testMocks struct {
 
 type testData struct {
 	metadata        state.Metadata
+	scope           queue.Scope
 	stepOpcodes     []state.GeneratorOpcode
 	asyncCheckpoint AsyncCheckpoint
 	checkpointer    Checkpointer

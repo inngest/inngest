@@ -761,7 +761,11 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 		return enums.SkipReasonNone, nil
 	}
 
-	scheduledSteps, err := e.queue.StatusCount(ctx, req.Function.ID, "start")
+	scheduledSteps, err := e.queue.StatusCount(ctx, queue.Scope{
+		AccountID:  req.AccountID,
+		EnvID:      req.WorkspaceID,
+		FunctionID: req.Function.ID,
+	}, "start")
 	if err != nil {
 		return enums.SkipReasonNone, fmt.Errorf("could not get scheduled step count: %w", err)
 	}
