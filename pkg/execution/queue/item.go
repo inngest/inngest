@@ -68,18 +68,6 @@ func GenerationIDFromContext(ctx context.Context) int {
 	return v
 }
 
-func ScopeFromQueueItem(i QueueItem) Scope {
-	scope := Scope{
-		AccountID:  i.Data.Identifier.AccountID,
-		EnvID:      i.Data.Identifier.WorkspaceID,
-		FunctionID: i.FunctionID,
-	}
-	if i.QueueName != nil {
-		scope.IsSystem = true
-	}
-	return scope
-}
-
 // QueueItem represents an individually queued work scheduled for some time in the
 // future.
 type QueueItem struct {

@@ -157,14 +157,6 @@ type QueueProcessor interface {
 	) (ItemLeaseConstraintCheckResult, error)
 }
 
-// Scope identifies the tenant/function namespace for queue-owned state.
-type Scope struct {
-	IsSystem   bool
-	AccountID  uuid.UUID
-	EnvID      uuid.UUID
-	FunctionID uuid.UUID
-}
-
 // SingletonOperations is the per-shard surface for singleton lock state.
 // Construct singleton clients against a shard resolved through ShardRegistry.
 type SingletonOperations interface {

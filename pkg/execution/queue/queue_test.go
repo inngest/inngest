@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,4 +77,19 @@ func TestAsRetryAt(t *testing.T) {
 	require.NotNil(t, AsRetryAtError(base))
 	require.NotNil(t, AsRetryAtError(wrapped))
 	require.Nil(t, AsRetryAtError(fmt.Errorf("no")))
+}
+
+func TestMigratePayloadScope(t *testing.T) {
+	payload := MigratePayload{
+		AccountID:  uuid.New(),
+		EnvID:      uuid.New(),
+		FunctionID: uuid.New(),
+	}
+
+	require.Equal(t, Scope{
+		AccountID:  payload.AccountID,
+		EnvID:      payload.EnvID,
+		FunctionID: payload.FunctionID,
+	}, payload.Scope())
+	require.NoError(t, payload.Scope().Validate())
 }

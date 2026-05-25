@@ -243,6 +243,7 @@ type JobQueueReader interface {
 // MigratePayload stores the information to be used when migrating a queue shard to another one
 type MigratePayload struct {
 	AccountID  uuid.UUID
+	EnvID      uuid.UUID
 	FunctionID uuid.UUID
 
 	// Source is the source queue where the migration will occur on
@@ -256,4 +257,12 @@ type MigratePayload struct {
 
 	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
 	Concurrency int
+}
+
+func (p MigratePayload) Scope() Scope {
+	return Scope{
+		AccountID:  p.AccountID,
+		EnvID:      p.EnvID,
+		FunctionID: p.FunctionID,
+	}
 }
