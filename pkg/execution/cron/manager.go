@@ -249,7 +249,7 @@ func (c *manager) EnqueueNextHealthCheck(ctx context.Context) error {
 }
 
 // HealthCheck checks if a "cron" queue item exists system queue for the next expected schedule time
-func (c *manager) HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error) {
+func (c *manager) HealthCheck(ctx context.Context, accountID, envID, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error) {
 	from := time.Now()
 
 	// Get the next schedule time based on the cron expression
@@ -262,7 +262,11 @@ func (c *manager) HealthCheck(ctx context.Context, functionID uuid.UUID, expr st
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, expr, functionID, fnVersion))
 
 	// check if the jobID exists in the system queue.
-	exists, err := c.shard.ItemExists(ctx, jobID)
+	exists, err := c.shard.ItemExists(ctx, queue.Scope{
+		AccountID:  accountID,
+		EnvID:      envID,
+		FunctionID: functionID,
+	}, jobID)
 	if err != nil {
 		return CronHealthCheckStatus{}, fmt.Errorf("failed to check if item exits for health check: %w", err)
 	}

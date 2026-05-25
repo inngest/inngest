@@ -569,7 +569,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 
 			// Delete debounce timeout from old cluster
 			queueItemId := queue.HashID(ctx, debounceID.String())
-			if err := secondary.RemoveQueueItem(ctx, queue.KindDebounce, queueItemId); err != nil {
+			if err := secondary.RemoveQueueItem(ctx, scopeForDebounceItem(di), queue.KindDebounce, queueItemId); err != nil {
 				l.Error("could not remove queue item", "item_id", queueItemId)
 			} else {
 				l.Debug("deleted migrated debounce")
@@ -945,7 +945,7 @@ func (d debouncer) DeleteDebounce(ctx context.Context, scope queue.Scope, deboun
 
 	// Try to remove the queue item (best effort)
 	queueItemId := queue.HashID(ctx, debounceID.String())
-	_ = queueShard.RemoveQueueItem(ctx, queue.KindDebounce, queueItemId)
+	_ = queueShard.RemoveQueueItem(ctx, scope, queue.KindDebounce, queueItemId)
 
 	return &DeleteDebounceResult{
 		Deleted:    true,
@@ -976,7 +976,7 @@ func (d debouncer) DeleteDebounceByID(ctx context.Context, scope queue.Scope, de
 	// Best-effort remove timeout queue items
 	for _, id := range debounceIDs {
 		queueItemId := queue.HashID(ctx, id.String())
-		_ = queueShard.RemoveQueueItem(ctx, queue.KindDebounce, queueItemId)
+		_ = queueShard.RemoveQueueItem(ctx, scope, queue.KindDebounce, queueItemId)
 	}
 
 	return nil

@@ -2270,9 +2270,9 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) osqueue.Queue
 	return i
 }
 
-func requirePartitionInProgress(t *testing.T, q RedisQueueShard, workflowID uuid.UUID, count int) {
+func requirePartitionInProgress(t *testing.T, q RedisQueueShard, scope osqueue.Scope, count int) {
 	t.Helper()
-	actual, err := q.RunningCount(context.Background(), workflowID)
+	actual, err := q.RunningCount(context.Background(), scope)
 	require.NoError(t, err)
 	require.EqualValues(t, count, actual)
 }
@@ -3335,6 +3335,8 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 	ctx := context.Background()
 	fnID := uuid.New()
 	acctID := uuid.New()
+	envID := uuid.New()
+	scope := osqueue.Scope{AccountID: acctID, EnvID: envID, FunctionID: fnID}
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("removes start status index", func(t *testing.T) {
@@ -3345,22 +3347,24 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Verify the status index was created by enqueue.
-		count, err := shard.StatusCount(ctx, fnID, "start")
+		count, err := shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count, "status:start index should have 1 member after enqueue")
 
 		// RemoveQueueItem should clean up the status index.
-		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "start")
+		count, err = shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 0, count, "status:start index should be empty after remove")
 	})
@@ -3373,20 +3377,22 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindEdge,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "in-progress")
+		count, err := shard.StatusCount(ctx, scope, "in-progress")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count, "status:in-progress index should have 1 member after enqueue")
 
-		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "in-progress")
+		count, err = shard.StatusCount(ctx, scope, "in-progress")
 		require.NoError(t, err)
 		require.EqualValues(t, 0, count, "status:in-progress index should be empty after remove")
 	})
@@ -3399,20 +3405,22 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindSleep,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "sleep")
+		count, err := shard.StatusCount(ctx, scope, "sleep")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count, "status:sleep index should have 1 member after enqueue")
 
-		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "sleep")
+		count, err = shard.StatusCount(ctx, scope, "sleep")
 		require.NoError(t, err)
 		require.EqualValues(t, 0, count, "status:sleep index should be empty after remove")
 	})
@@ -3425,7 +3433,9 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -3436,21 +3446,23 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start.Add(time.Second), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "start")
+		count, err := shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 2, count)
 
 		// Remove only itemA.
-		err = shard.RemoveQueueItem(ctx, fnID.String(), itemA.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), itemA.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "start")
+		count, err = shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	})
@@ -3464,23 +3476,25 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "start")
+		count, err := shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 
 		// Calling with a non-UUID partition should not error, but also won't
 		// clean up status indexes (no function ID to derive keys from).
-		err = shard.RemoveQueueItem(ctx, "not-a-uuid", item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, "not-a-uuid", item.ID)
 		require.NoError(t, err)
 
 		// Status index should still contain the item since we used the wrong partition.
-		count, err = shard.StatusCount(ctx, fnID, "start")
+		count, err = shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	})

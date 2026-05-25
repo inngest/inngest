@@ -51,7 +51,10 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 		}
 		runID = id
 	}
-	items, err := d.queue.ItemsByRunID(ctx, shard, runID)
+	items, err := d.queue.ItemsByRunID(ctx, shard, queue.Scope{
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
+	}, runID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Errorf("error retrieving queue items by runID: %w", err).Error())
 	}

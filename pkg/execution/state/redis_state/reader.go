@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -188,6 +187,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 				Limit:        opt.BatchSize,
 				PartitionID:  partitionID,
 				PartitionKey: partitionZsetKey(pt, q.RedisClient.kg),
+				Scope:        scope,
 			})
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {

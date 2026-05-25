@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -23,13 +24,13 @@ type TestAPI struct {
 }
 
 type Options struct {
-	QueueShards        queue.ShardRegistry
-	Queue              queue.Queue
-	Executor           execution.Executor
-	StateManager       statev2.RunService
-	ResetAll           func()
-	PauseFunction      func(id uuid.UUID)
-	UnpauseFunction    func(id uuid.UUID)
+	QueueShards     queue.ShardRegistry
+	Queue           queue.Queue
+	Executor        execution.Executor
+	StateManager    statev2.RunService
+	ResetAll        func()
+	PauseFunction   func(id uuid.UUID)
+	UnpauseFunction func(id uuid.UUID)
 }
 
 func ShouldEnable() bool {
@@ -89,7 +90,11 @@ func (t *TestAPI) GetQueueSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, err := shard.PartitionSize(ctx, parsedFnId.String(), time.Now().Add(2*365*24*time.Hour))
+	count, err := shard.PartitionSize(ctx, queue.Scope{
+		AccountID:  parsedAccountId,
+		EnvID:      consts.DevServerEnvID,
+		FunctionID: parsedFnId,
+	}, parsedFnId.String(), time.Now().Add(2*365*24*time.Hour))
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))

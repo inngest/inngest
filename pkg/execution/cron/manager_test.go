@@ -1058,12 +1058,16 @@ func TestManager(t *testing.T) {
 	t.Run("HealthCheck", func(t *testing.T) {
 		r.FlushAll()
 
+		healthCheck := func(functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error) {
+			return cm.HealthCheck(ctx, consts.DevServerAccountID, consts.DevServerEnvID, functionID, expr, fnVersion)
+		}
+
 		t.Run("should return next scheduled item with valid inputs", func(t *testing.T) {
 			functionID := uuid.New()
 			expr := "0 * * * *" // Every hour
 			fnVersion := 1
 
-			hc, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Verify Next time is set and is after now
@@ -1081,7 +1085,7 @@ func TestManager(t *testing.T) {
 			fnVersion := 1
 
 			beforeCall := time.Now()
-			hc, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			nextTime := hc.Next
@@ -1171,7 +1175,7 @@ func TestManager(t *testing.T) {
 					functionID := uuid.New()
 					fnVersion := 1
 
-					hc, err := cm.HealthCheck(ctx, functionID, tc.expression, fnVersion)
+					hc, err := healthCheck(functionID, tc.expression, fnVersion)
 					require.NoError(t, err)
 
 					nextTime := hc.Next
@@ -1202,7 +1206,7 @@ func TestManager(t *testing.T) {
 					functionID := uuid.New()
 					fnVersion := 1
 
-					hc, err := cm.HealthCheck(ctx, functionID, tc.expression, fnVersion)
+					hc, err := healthCheck(functionID, tc.expression, fnVersion)
 					assert.Error(t, err)
 					assert.Equal(t, CronHealthCheckStatus{}, hc)
 					assert.Contains(t, err.Error(), "failed to get next schedule time for health check")
@@ -1217,7 +1221,7 @@ func TestManager(t *testing.T) {
 			versions := []int{1, 2, 5, 10, 100}
 			for _, version := range versions {
 				t.Run(fmt.Sprintf("version %d", version), func(t *testing.T) {
-					hc, err := cm.HealthCheck(ctx, functionID, expr, version)
+					hc, err := healthCheck(functionID, expr, version)
 					require.NoError(t, err)
 					assert.False(t, hc.Next.IsZero())
 				})
@@ -1231,10 +1235,10 @@ func TestManager(t *testing.T) {
 			functionID1 := uuid.New()
 			functionID2 := uuid.New()
 
-			hc1, err := cm.HealthCheck(ctx, functionID1, expr, fnVersion)
+			hc1, err := healthCheck(functionID1, expr, fnVersion)
 			require.NoError(t, err)
 
-			hc2, err := cm.HealthCheck(ctx, functionID2, expr, fnVersion)
+			hc2, err := healthCheck(functionID2, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Different function IDs should generate different job IDs
@@ -1245,10 +1249,10 @@ func TestManager(t *testing.T) {
 			functionID := uuid.New()
 			fnVersion := 1
 
-			hc1, err := cm.HealthCheck(ctx, functionID, "0 * * * *", fnVersion)
+			hc1, err := healthCheck(functionID, "0 * * * *", fnVersion)
 			require.NoError(t, err)
 
-			hc2, err := cm.HealthCheck(ctx, functionID, "0 0 * * *", fnVersion)
+			hc2, err := healthCheck(functionID, "0 0 * * *", fnVersion)
 			require.NoError(t, err)
 
 			// Different expressions should generate different job IDs
@@ -1260,7 +1264,7 @@ func TestManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			hc, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 			// JobID should still be generated even with zero UUID
 			assert.NotEmpty(t, hc.JobID)
@@ -1272,7 +1276,7 @@ func TestManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 0
 
-			hc, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 			// Version 0 should still work
 			assert.NotEmpty(t, hc.JobID)
@@ -1284,7 +1288,7 @@ func TestManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := -1
 
-			hc, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 			// Negative version should still work
 			assert.NotEmpty(t, hc.JobID)
@@ -1296,7 +1300,7 @@ func TestManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			hc, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Verify Next time is valid and in the future
@@ -1310,7 +1314,7 @@ func TestManager(t *testing.T) {
 			fnVersion := 1
 
 			// First check should show not scheduled
-			hc1, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc1, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 			assert.False(t, hc1.Scheduled)
 
@@ -1326,7 +1330,7 @@ func TestManager(t *testing.T) {
 			require.NoError(t, err)
 
 			// Now the health check should show it as scheduled
-			hc2, err := cm.HealthCheck(ctx, functionID, expr, fnVersion)
+			hc2, err := healthCheck(functionID, expr, fnVersion)
 			require.NoError(t, err)
 			assert.True(t, hc2.Scheduled)
 		})

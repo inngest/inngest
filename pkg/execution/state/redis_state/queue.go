@@ -461,6 +461,7 @@ func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, unt
 			Until:        until,
 			PartitionKey: partitionKey,
 			PartitionID:  partition.ID,
+			Scope:        scopeFromPartition(partition),
 		},
 	)
 	return result.Items, err
@@ -490,15 +491,31 @@ func (q *queue) PeekRandom(ctx context.Context, partition *osqueue.QueuePartitio
 			Until:        until,
 			PartitionKey: partitionKey,
 			PartitionID:  partition.ID,
+			Scope:        scopeFromPartition(partition),
 			Random:       true,
 		},
 	)
 	return result.Items, err
 }
 
+func scopeFromPartition(partition *osqueue.QueuePartition) osqueue.Scope {
+	scope := osqueue.Scope{AccountID: partition.AccountID}
+	if partition.EnvID != nil {
+		scope.EnvID = *partition.EnvID
+	}
+	if partition.FunctionID != nil {
+		scope.FunctionID = *partition.FunctionID
+	}
+	if partition.QueueName != nil {
+		scope.IsSystem = true
+	}
+	return scope
+}
+
 type peekOpts struct {
 	PartitionID  string
 	PartitionKey string
+	Scope        osqueue.Scope
 	Random       bool
 	From         *time.Time
 	Until        time.Time
@@ -629,7 +646,7 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) (peekResult, error) {
 		for _, missingItemId := range missingQueueItems {
 			id := missingItemId
 			eg.Go(func() error {
-				return q.RemoveQueueItem(ctx, opts.PartitionID, id)
+				return q.RemoveQueueItem(ctx, opts.Scope, opts.PartitionID, id)
 			})
 		}
 

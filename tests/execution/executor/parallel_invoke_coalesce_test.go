@@ -226,8 +226,11 @@ func TestParallelPauseBackedOpsCoalesceDiscovery(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
