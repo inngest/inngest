@@ -51,10 +51,13 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 		}
 		runID = id
 	}
-	items, err := d.queue.ItemsByRunID(ctx, shard, queue.Scope{
-		AccountID: consts.DevServerAccountID,
-		EnvID:     consts.DevServerEnvID,
-	}, runID)
+
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	items, err := d.queue.ItemsByRunID(ctx, shard, scope, runID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Errorf("error retrieving queue items by runID: %w", err).Error())
 	}

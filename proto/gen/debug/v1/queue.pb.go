@@ -453,6 +453,9 @@ type QueueItemRequest struct {
 	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
 	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	QueueShard    string                 `protobuf:"bytes,3,opt,name=queue_shard,json=queueShard,proto3" json:"queue_shard,omitempty"`
+	AccountId     string                 `protobuf:"bytes,4,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	EnvId         string                 `protobuf:"bytes,5,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,6,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -504,6 +507,27 @@ func (x *QueueItemRequest) GetRunId() string {
 func (x *QueueItemRequest) GetQueueShard() string {
 	if x != nil {
 		return x.QueueShard
+	}
+	return ""
+}
+
+func (x *QueueItemRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *QueueItemRequest) GetEnvId() string {
+	if x != nil {
+		return x.EnvId
+	}
+	return ""
+}
+
+func (x *QueueItemRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
 	}
 	return ""
 }
@@ -1190,12 +1214,17 @@ const file_debug_v1_queue_proto_rawDesc = "" +
 	"\x04next\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x04next\x12\x15\n" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12\x12\n" +
 	"\x04expr\x18\x03 \x01(\tR\x04expr\x12\x1c\n" +
-	"\tscheduled\x18\x04 \x01(\bR\tscheduled\"c\n" +
+	"\tscheduled\x18\x04 \x01(\bR\tscheduled\"\xba\x01\n" +
 	"\x10QueueItemRequest\x12\x17\n" +
 	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x1f\n" +
 	"\vqueue_shard\x18\x03 \x01(\tR\n" +
-	"queueShard\"'\n" +
+	"queueShard\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x04 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06env_id\x18\x05 \x01(\tR\x05envId\x12\x1f\n" +
+	"\vfunction_id\x18\x06 \x01(\tR\n" +
+	"functionId\"'\n" +
 	"\x11QueueItemResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\";\n" +
 	"\x16ShadowPartitionRequest\x12!\n" +
