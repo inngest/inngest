@@ -100,7 +100,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 	case queue.KindEdge, queue.KindEdgeError, queue.KindStart, queue.KindSleep:
 		break
 	// The following system queues do not have associated state we need to clean up
-	case queue.KindQueueMigrate, queue.KindCancel, queue.KindJobPromote, queue.KindPauseBlockFlush:
+	case queue.KindQueueMigrate, queue.KindCancel, queue.KindJobPromote, queue.KindPauseBlockFlush, queue.KindInvokeComplete:
 		break
 	default:
 		// If the queue item kind is unknown and we have a handler func, execute this to perform external cleanup operations.

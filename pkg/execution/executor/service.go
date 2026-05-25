@@ -296,6 +296,8 @@ func (s *svc) Run(ctx context.Context) error {
 			// Function pausing and unpausing is not implemented in the dev server.
 		case queue.KindJobPromote:
 			err = s.handleJobPromote(ctx, item)
+		case queue.KindInvokeComplete:
+			err = s.handleInvokeComplete(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -359,6 +361,33 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 	}
 
 	return false, nil
+}
+
+// handleInvokeComplete resumes a parent run whose invoked child has finished.
+// The queue is the durable backstop that survives executor pod rotation — if
+// the pod that finalized the child dies before the in-memory pubsub delivers
+// the FnFinished event, any other pod can dequeue and resume the parent here.
+//
+// HandleInvokeFinish itself is idempotent: once the pause is consumed by
+// Resume, a duplicate run returns ErrPauseNotFound which we swallow.
+func (s *svc) handleInvokeComplete(ctx context.Context, item queue.Item) error {
+	payload, ok := item.Payload.(queue.PayloadInvokeComplete)
+	if !ok {
+		return fmt.Errorf("unable to get invoke complete payload from queue item: %T", item.Payload)
+	}
+
+	err := s.exec.HandleInvokeFinish(ctx, payload.TrackedEvent)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ErrNoCorrelationID) ||
+		errors.Is(err, state.ErrInvokePauseNotFound) ||
+		errors.Is(err, state.ErrPauseNotFound) {
+		// Already resumed (likely by the in-process fn.finished subscriber
+		// on whichever pod is still alive). Drop the item.
+		return nil
+	}
+	return err
 }
 
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {

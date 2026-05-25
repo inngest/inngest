@@ -18,6 +18,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -582,6 +583,15 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		i.Payload = *p
 	case KindLatencyTrack:
 		// No payload for latency tracking items.
+	case KindInvokeComplete:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadInvokeComplete{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -634,6 +644,15 @@ type PayloadPauseFunction struct {
 
 	// CancelRunningImmediately determines whether pending jobs should be cancelled immediately or after a set duration.
 	CancelRunningImmediately bool `json:"cri,omitempty"`
+}
+
+// PayloadInvokeComplete is the payload stored when enqueueing a parent-run resume
+// after an invoked child function has finished. The TrackedEvent carries the
+// `inngest/function.finished` event with the InvokeCorrelationID used to locate
+// the parent's pause. This rides the durable Redis-backed queue so that the
+// notification survives the executor pod that finalized the child being rotated.
+type PayloadInvokeComplete struct {
+	TrackedEvent event.BaseTrackedEvent `json:"evt"`
 }
 
 // PayloadUnpauseFunction represents the queue item payload for the internal system queue for

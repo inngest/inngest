@@ -34,6 +34,11 @@ import (
 // that the function's final status is correct.
 const cancelationGracePeriod = 10 * time.Second
 
+// invokeCompleteQueueName is the dedicated system queue for KindInvokeComplete
+// items. Keeping these off the child run's per-function partition prevents
+// finalizeRemoveJobs from dequeueing them when the child run is cleaned up.
+var invokeCompleteQueueName = "invoke-complete"
+
 // Finalize performs run finalization, which involves sending the function
 // finished/failed event and deleting state.
 func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
@@ -159,6 +164,14 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
+	// finalizeEvents creates function finished events and durably enqueues
+	// the parent-resume notification for any invoke pause. This runs BEFORE
+	// Delete so that, if the pod is rotated between the two, the worst case
+	// is that the child state remains (and finalize is retried) rather than
+	// the child being marked complete while the parent never resumes. Defer
+	// events are published as part of the same finishHandler call.
+	feErr := e.finalizeEvents(ctx, opts, deferEvents)
+
 	// Delete the function state in every case.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
@@ -179,10 +192,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	e.finalizeRemoveJobs(ctx, opts)
 	e.finalizeRemoveActiveRun(ctx, opts)
 
-	// finalizeEvents creates function finished events, and also attempts to fast-resume
-	// any parent function that invoked this run. Defer events are published as
-	// part of the same finishHandler call.
-	return e.finalizeEvents(ctx, opts, deferEvents)
+	return feErr
 }
 
 // buildDeferEvents constructs the inngest/deferred.schedule events for every
@@ -484,13 +494,23 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		}
 	}
 
-	// For each event, if this has a correlation ID attempt to resume
-	// the invoke parent within a goroutine.
+	// Two-track invoke completion delivery:
 	//
-	// Note that sending the event will trigger the event handler pub/sub
-	// listener which _also_ attempts to do this;  however, this introduces
-	// some small delay due to message stream latency.
+	//   1. Fast path: an in-process goroutine that calls HandleInvokeFinish
+	//      directly. Low latency, but tied to this pod's lifecycle — can lose
+	//      the notification if the pod is rotated mid-call even with retries.
+	//
+	//   2. Durable path: a KindInvokeComplete queue item written to Redis
+	//      before state Delete. Any pod can dequeue and resume the parent,
+	//      so a rotated pod cannot strand the parent.
+	//
+	// HandleInvokeFinish is idempotent: once the pause is consumed, a duplicate
+	// call returns ErrPauseNotFound which both paths swallow.
 	if isInvoke {
+		if err := e.enqueueInvokeCompletes(ctx, opts, freshEvents); err != nil {
+			logger.From(ctx).Error("error enqueueing invoke completion", "error", err)
+		}
+
 		for _, evt := range freshEvents {
 			tracked := event.BaseTrackedEvent{
 				ID:          ulid.MustParse(evt.ID),
@@ -525,6 +545,62 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		return struct{}{}, e.finishHandler(ctx, opts.Metadata.ID, freshEvents)
 	}, util.NewRetryConf())
 	return publishErr
+}
+
+// enqueueInvokeCompletes enqueues a durable KindInvokeComplete queue item for
+// each FnFinished event that carries an InvokeCorrelationID. The item is
+// processed by any executor pod, which calls HandleInvokeFinish to resume the
+// parent run's pause. The JobID is keyed off the correlation ID so duplicate
+// finalize calls dedupe via the queue's idempotency window.
+func (e *executor) enqueueInvokeCompletes(ctx context.Context, opts execution.FinalizeOpts, events []event.Event) error {
+	if e.queue == nil {
+		return fmt.Errorf("executor queue is nil")
+	}
+
+	now := e.now()
+	wsID := opts.Metadata.ID.Tenant.EnvID
+	accID := opts.Metadata.ID.Tenant.AccountID
+
+	var errs error
+	for _, evt := range events {
+		corrID := evt.CorrelationID()
+		if corrID == "" {
+			continue
+		}
+
+		tracked := event.BaseTrackedEvent{
+			ID:          ulid.MustParse(evt.ID),
+			Event:       evt,
+			AccountID:   accID,
+			WorkspaceID: wsID,
+		}
+
+		jobID := fmt.Sprintf("invoke-complete-%s", corrID)
+		item := queue.Item{
+			JobID:       &jobID,
+			WorkspaceID: wsID,
+			Kind:        queue.KindInvokeComplete,
+			QueueName:   &invokeCompleteQueueName,
+			Payload: queue.PayloadInvokeComplete{
+				TrackedEvent: tracked,
+			},
+		}
+
+		_, err := util.WithRetry(ctx, "queue.EnqueueInvokeComplete",
+			func(ctx context.Context) (struct{}, error) {
+				err := e.queue.Enqueue(ctx, item, now, queue.EnqueueOpts{})
+				if errors.Is(err, queue.ErrQueueItemExists) {
+					return struct{}{}, nil
+				}
+				return struct{}{}, err
+			},
+			util.NewRetryConf(),
+		)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("correlation_id=%s: %w", corrID, err))
+		}
+	}
+	return errs
 }
 
 func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {

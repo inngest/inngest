@@ -20,4 +20,5 @@ const (
 	KindCron            = "cron"              // handles the actual cron workloads
 	KindCronHealthCheck = "cron-health-check" // reconciles cron queues with fn configs from DB
 	KindLatencyTrack    = "ltc"               // latency tracking canary job
+	KindInvokeComplete  = "ic"                // resumes a parent run whose invoked child has finished
 )
