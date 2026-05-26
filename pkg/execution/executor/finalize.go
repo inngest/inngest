@@ -222,10 +222,6 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
-		if d.ScheduleStatus == enums.DeferStatusAfterRun || d.ScheduleStatus == enums.DeferStatusAborted {
-			e.emitDeferSpan(ctx, opts.Metadata, now, d)
-		}
-
 		// TODO: what about an immediate execution mode?
 		if d.ScheduleStatus != enums.DeferStatusAfterRun {
 			metrics.IncrDefersFinalizedCounter(ctx, d.ScheduleStatus.String(), metrics.CounterOpt{PkgName: pkgName})
@@ -279,32 +275,6 @@ func (e *executor) buildDeferEvents(
 	}
 
 	return events, nil
-}
-
-// emitDeferSpan emits the span tracing resolvers use to link a deferred child run to its parent.
-func (e *executor) emitDeferSpan(ctx context.Context, md sv2.Metadata, now time.Time, d sv2.Defer) {
-	_, err := e.tracerProvider.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
-		Debug:     &tracing.SpanDebugData{Location: "executor.emitDeferSpan"},
-		Metadata:  &md,
-		Parent:    tracing.RunSpanRefFromMetadata(&md),
-		StartTime: now,
-		EndTime:   now,
-		Seed:      util.DeterministicDeferSpanSeed(md.ID.RunID, d.HashedID),
-		Attributes: meta.NewAttrSet(
-			meta.Attr(meta.Attrs.DeferHashedID, &d.HashedID),
-			meta.Attr(meta.Attrs.DeferUserID, &d.UserlandID),
-			meta.Attr(meta.Attrs.DeferFnSlug, &d.FnSlug),
-			meta.Attr(meta.Attrs.DeferStatus, &d.ScheduleStatus),
-		),
-	})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error(
-			"error emitting executor.defer span",
-			"error", err,
-			"run_id", md.ID.RunID,
-			"hashed_id", d.HashedID,
-		)
-	}
 }
 
 // finalizeRemoveJobs removes any other jobs for a finalized run, as the function is

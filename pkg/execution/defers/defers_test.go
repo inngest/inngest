@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -80,7 +82,7 @@ func TestSaveFromOp_Accepted(t *testing.T) {
 			Input:  json.RawMessage(`{"x":1}`),
 		})
 
-		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op)
+		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
 		require.Equal(t, 1, fake.savedDeferCalls)
@@ -97,7 +99,7 @@ func TestSaveFromOp_Accepted(t *testing.T) {
 			Input:  json.RawMessage(`{"x":1}`),
 		})
 
-		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op)
+		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
 		require.Equal(t, 1, fake.savedDeferCalls)
@@ -113,7 +115,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			Input:  json.RawMessage(`"` + strings.Repeat("a", consts.MaxDeferInputSize+1) + `"`),
 		})
 
-		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op)
+		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
 		require.Equal(t, 0, fake.savedDeferCalls)
@@ -127,7 +129,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			FnSlug: "child-fn",
 		})
 
-		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op)
+		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
 		require.Equal(t, 0, fake.savedDeferCalls)
@@ -141,7 +143,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			Input: json.RawMessage(`{"x":1}`),
 		})
 
-		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op)
+		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
 		require.Equal(t, 0, fake.savedDeferCalls)
@@ -155,7 +157,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			Input:  json.RawMessage(`{"x":1}`),
 		})
 
-		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op)
+		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
 		require.Equal(t, 1, fake.savedDeferCalls)
@@ -169,7 +171,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			Input:  json.RawMessage(`{"x":1}`),
 		})
 
-		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op)
+		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.Error(t, err)
 	})

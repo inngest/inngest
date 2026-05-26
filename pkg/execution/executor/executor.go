@@ -3668,7 +3668,7 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 }
 
 func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	if err := defers.SaveFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+	if err := defers.SaveFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen, e.tracerProvider, *runCtx.Metadata(), e.now()); err != nil {
 		return err
 	}
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAdd")

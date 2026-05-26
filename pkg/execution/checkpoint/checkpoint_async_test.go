@@ -398,6 +398,15 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 	// Setup mock expectations
 	mocks.state.On("LoadMetadata", ctx, asyncCheckpoint.ID()).Return(testMetadata, nil)
 
+	// Permissive expectation for the executor.defer span emitted from
+	// defers.SaveFromOp on the accepted branch. Defer-add tests don't
+	// otherwise wire CreateSpan and shouldn't have to; non-defer tests
+	// never trigger this path so .Maybe() is a no-op for them.
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.Anything).
+		Return((*meta.SpanReference)(nil), nil).
+		Maybe()
+
 	// Create checkpointer
 	checkpointer := New(Opts{
 		State:           mocks.state,

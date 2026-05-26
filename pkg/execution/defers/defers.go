@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/tracing"
 )
 
 const pkgName = "defers"
@@ -23,6 +25,9 @@ func SaveFromOp(
 	log logger.Logger,
 	id statev2.ID,
 	op state.GeneratorOpcode,
+	tp tracing.TracerProvider,
+	md statev2.Metadata,
+	now time.Time,
 ) error {
 	var (
 		rejected     bool
@@ -59,13 +64,14 @@ func SaveFromOp(
 	}
 
 	if !rejected {
-		saveErr := rs.SaveDefer(ctx, id, statev2.Defer{
+		d := statev2.Defer{
 			FnSlug:         opts.FnSlug,
 			HashedID:       op.ID,
 			UserlandID:     userlandID,
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          opts.Input,
-		})
+		}
+		saveErr := rs.SaveDefer(ctx, id, d)
 		switch {
 		case errors.Is(saveErr, statev2.ErrDeferLimitExceeded):
 			// Count cap binds the sentinel write too. SDK retransmits absorbed.
@@ -77,6 +83,10 @@ func SaveFromOp(
 			rejectReason = "aggregate_size"
 		case saveErr != nil:
 			return fmt.Errorf("error saving defer: %w", saveErr)
+		}
+
+		if !rejected {
+			emitDeferSpan(ctx, tp, md, now, d)
 		}
 	}
 

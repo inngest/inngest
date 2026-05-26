@@ -46,19 +46,20 @@ func (s *loadDefersFailingState) LoadDefers(ctx context.Context, id statev2.ID) 
 // checkpoint-vs-executor consistency tests so each test can spin up 3 runs
 // against the same backing store.
 type deferTestInfra struct {
-	ctx           context.Context
-	fn            inngest.Function
-	fnID          uuid.UUID
-	wsID          uuid.UUID
-	appID         uuid.UUID
-	aID           uuid.UUID
-	smv2          statev2.RunService
-	pauseMgr      pauses.Manager
-	loader        state.FunctionLoader
-	dbcqrs        cqrs.Manager
-	queueShard    redis_state.RedisQueueShard
-	shardRegistry queue.ShardRegistryController
-	rq            queue.Queue
+	ctx            context.Context
+	fn             inngest.Function
+	fnID           uuid.UUID
+	wsID           uuid.UUID
+	appID          uuid.UUID
+	aID            uuid.UUID
+	smv2           statev2.RunService
+	pauseMgr       pauses.Manager
+	loader         state.FunctionLoader
+	dbcqrs         cqrs.Manager
+	tracerProvider tracing.TracerProvider
+	queueShard     redis_state.RedisQueueShard
+	shardRegistry  queue.ShardRegistryController
+	rq             queue.Queue
 }
 
 func newDeferTestInfra(t *testing.T) *deferTestInfra {
@@ -129,19 +130,20 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 	require.NoError(t, err)
 
 	return &deferTestInfra{
-		ctx:           ctx,
-		fn:            fn,
-		fnID:          fnID,
-		wsID:          wsID,
-		appID:         appID,
-		aID:           aID,
-		smv2:          smv2,
-		pauseMgr:      pauseMgr,
-		loader:        loader,
-		dbcqrs:        dbcqrs,
-		queueShard:    queueShard,
-		shardRegistry: shardRegistry,
-		rq:            rq,
+		ctx:            ctx,
+		fn:             fn,
+		fnID:           fnID,
+		wsID:           wsID,
+		appID:          appID,
+		aID:            aID,
+		smv2:           smv2,
+		pauseMgr:       pauseMgr,
+		loader:         loader,
+		dbcqrs:         dbcqrs,
+		tracerProvider: tracing.NewSqlcTracerProvider(adapter.Q()),
+		queueShard:     queueShard,
+		shardRegistry:  shardRegistry,
+		rq:             rq,
 	}
 }
 
@@ -165,7 +167,7 @@ func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, drive
 		executor.WithLogger(logger.StdlibLogger(i.ctx)),
 		executor.WithFunctionLoader(i.loader),
 		executor.WithShardRegistry(i.shardRegistry),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithTracerProvider(i.tracerProvider),
 	}
 	if driver != nil {
 		opts = append(opts, executor.WithDriverV1(driver))
@@ -185,7 +187,7 @@ func (i *deferTestInfra) newCheckpointer(t *testing.T, exec execution.Executor) 
 		State:          i.smv2,
 		FnReader:       i.dbcqrs,
 		Executor:       exec,
-		TracerProvider: tracing.NewOtelTracerProvider(nil, time.Millisecond),
+		TracerProvider: i.tracerProvider,
 		Queue:          i.rq,
 	})
 }
@@ -344,7 +346,7 @@ func TestDeferFinalize(t *testing.T) {
 			executor.WithLogger(logger.StdlibLogger(ctx)),
 			executor.WithFunctionLoader(infra.loader),
 			executor.WithShardRegistry(infra.shardRegistry),
-			executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+			executor.WithTracerProvider(infra.tracerProvider),
 		)
 		r.NoError(err)
 
@@ -525,6 +527,17 @@ func TestDeferAdd(t *testing.T) {
 				r.NoError(err)
 				r.Len(defers, 1)
 				r.Equal(expected, defers[op.ID])
+
+				// The save-time span emit means the defer is queryable via
+				// the resolver path before Finalize runs — that's the
+				// behavior that makes in-flight defers visible in the UI.
+				runDefers, err := infra.dbcqrs.GetRunDefers(ctx, []ulid.ULID{runID.RunID})
+				r.NoError(err)
+				r.Len(runDefers[runID.RunID], 1)
+				got := runDefers[runID.RunID][0]
+				r.Equal(op.ID, got.HashedDeferID)
+				r.Equal(expected.FnSlug, got.FnSlug)
+				r.Equal(enums.DeferStatusAfterRun, got.Status)
 			})
 		}
 	})
@@ -701,7 +714,7 @@ func TestDeferAdd(t *testing.T) {
 			executor.WithLogger(logger.StdlibLogger(ctx)),
 			executor.WithFunctionLoader(infra.loader),
 			executor.WithShardRegistry(infra.shardRegistry),
-			executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+			executor.WithTracerProvider(infra.tracerProvider),
 			executor.WithDriverV1(driver),
 		)
 		r.NoError(err)
