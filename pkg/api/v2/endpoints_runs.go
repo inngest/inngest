@@ -43,8 +43,13 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
 	}
 
+	data := toFunctionRun(run, fn)
+	if req.GetIncludeOutput() {
+		data.Output = s.functionRunOutput(ctx, runID, run.Output)
+	}
+
 	return &apiv2.GetFunctionRunResponse{
-		Data:     toFunctionRun(run, fn, req.GetIncludeOutput()),
+		Data:     data,
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}, nil
 }
@@ -79,7 +84,7 @@ func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTr
 	}, nil
 }
 
-func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOutput bool) *apiv2.FunctionRun {
+func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction) *apiv2.FunctionRun {
 	queuedAt := timestamppb.New(ulid.Time(run.RunID.Time()))
 	startedAt := timestamppb.New(run.RunStartedAt)
 
@@ -113,10 +118,6 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOu
 		result.EndedAt = timestamppb.New(*run.EndedAt)
 		duration := uint64(run.EndedAt.Sub(run.RunStartedAt) / time.Millisecond)
 		result.DurationMs = &duration
-	}
-
-	if includeOutput {
-		result.Output = jsonToStruct(run.Output)
 	}
 
 	return result
@@ -159,17 +160,30 @@ func jsonToStruct(raw json.RawMessage) *structpb.Struct {
 		return nil
 	}
 
-	var value map[string]any
+	var value any
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil
 	}
 
-	result, err := structpb.NewStruct(value)
+	if object, ok := value.(map[string]any); ok {
+		result, err := structpb.NewStruct(object)
+		if err != nil {
+			return nil
+		}
+
+		return result
+	}
+
+	wrapped, err := structpb.NewValue(value)
 	if err != nil {
 		return nil
 	}
 
-	return result
+	return &structpb.Struct{
+		Fields: map[string]*structpb.Value{
+			"data": wrapped,
+		},
+	}
 }
 
 func optionalString(value string) *string {
@@ -354,4 +368,35 @@ func loadTraceOutput(ctx context.Context, reader FunctionTraceReader, encodedID 
 		input:  jsonToStruct(json.RawMessage(data.Input)),
 		output: jsonToStruct(json.RawMessage(data.Data)),
 	}, nil
+}
+
+func (s *Service) functionRunOutput(ctx context.Context, runID ulid.ULID, fallback json.RawMessage) *structpb.Struct {
+	if output := s.traceRunOutput(ctx, runID); output != nil {
+		return output
+	}
+
+	return jsonToStruct(fallback)
+}
+
+func (s *Service) traceRunOutput(ctx context.Context, runID ulid.ULID) *structpb.Struct {
+	if s.traces == nil {
+		return nil
+	}
+
+	root, err := s.traces.GetSpansByRunID(ctx, runID)
+	if err != nil || root == nil {
+		return nil
+	}
+
+	outputID := root.GetOutputID()
+	if outputID == nil {
+		return nil
+	}
+
+	output, err := loadTraceOutput(ctx, s.traces, *outputID)
+	if err != nil || output == nil {
+		return nil
+	}
+
+	return output.output
 }

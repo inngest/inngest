@@ -39,7 +39,6 @@ func TestToFunctionRun(t *testing.T) {
 		Cron:         &cron,
 		Status:       enums.RunStatusCompleted,
 		EndedAt:      &endedAt,
-		Output:       json.RawMessage(`{"ok":true}`),
 	}, inngest.DeployedFunction{
 		AppID:   appID,
 		AppName: "agent-app",
@@ -48,7 +47,7 @@ func TestToFunctionRun(t *testing.T) {
 			Name: "Summarize",
 			Slug: "summary",
 		},
-	}, true)
+	})
 
 	require.Equal(t, runID.String(), result.Id)
 	require.Equal(t, "summary", result.Function.Id)
@@ -63,18 +62,17 @@ func TestToFunctionRun(t *testing.T) {
 	require.True(t, result.Trigger.IsBatch)
 	require.Equal(t, batchID.String(), *result.Trigger.BatchId)
 	require.Equal(t, cron, *result.Trigger.CronSchedule)
-	require.True(t, result.Output.Fields["ok"].GetBoolValue())
+	require.Nil(t, result.Output)
 }
 
-func TestToFunctionRunOmitsOutputWhenNotRequested(t *testing.T) {
+func TestToFunctionRunOmitsOptionalFields(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 
 	result := toFunctionRun(&cqrs.FunctionRun{
 		RunID:        runID,
 		RunStartedAt: time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC),
 		EventID:      runID,
-		Output:       json.RawMessage(`{"ok":true}`),
-	}, inngest.DeployedFunction{}, false)
+	}, inngest.DeployedFunction{})
 
 	require.Nil(t, result.Output)
 	require.Nil(t, result.DurationMs)
@@ -147,10 +145,28 @@ func TestJSONToStruct(t *testing.T) {
 		require.Equal(t, float64(2), result.Fields["count"].GetNumberValue())
 	})
 
+	t.Run("wraps non-object JSON values", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			raw  json.RawMessage
+		}{
+			{name: "string", raw: json.RawMessage(`"hello"`)},
+			{name: "array", raw: json.RawMessage(`[1,2,3]`)},
+			{name: "number", raw: json.RawMessage(`42`)},
+			{name: "boolean", raw: json.RawMessage(`true`)},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				result := jsonToStruct(tc.raw)
+
+				require.NotNil(t, result)
+				require.Contains(t, result.Fields, "data")
+			})
+		}
+	})
+
 	t.Run("returns nil for empty or invalid JSON", func(t *testing.T) {
 		require.Nil(t, jsonToStruct(nil))
 		require.Nil(t, jsonToStruct(json.RawMessage(`not-json`)))
-		require.Nil(t, jsonToStruct(json.RawMessage(`[]`)))
 	})
 }
 

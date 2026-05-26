@@ -359,6 +359,58 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Function not found")
 	})
+
+	t.Run("uses root trace output when requested", func(t *testing.T) {
+		inputSpanID := "input-span"
+		outputIdentifier := cqrs.SpanIdentifier{
+			SpanID:      "output-span",
+			InputSpanID: &inputSpanID,
+			Preview:     boolPtr(true),
+		}
+		outputID, err := outputIdentifier.Encode()
+		require.NoError(t, err)
+
+		runs := &mockFunctionRunReader{}
+		runs.On("GetFunctionRun", mock.Anything, runID).Return(&cqrs.FunctionRun{
+			RunID:        runID,
+			RunStartedAt: startedAt,
+			FunctionID:   functionID,
+			EventID:      runID,
+			Status:       enums.RunStatusCompleted,
+			EndedAt:      &endedAt,
+			Output:       json.RawMessage(`""`),
+		}, nil).Once()
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+		traces := &mockFunctionTraceReader{}
+		traces.On("GetSpansByRunID", mock.Anything, runID).Return(&cqrs.OtelSpan{
+			RunID:    runID,
+			OutputID: &outputID,
+		}, nil).Once()
+		traces.On("GetSpanOutput", mock.Anything, outputIdentifier).Return(&cqrs.SpanOutput{
+			Data: []byte(`{"body":"Hello, World!"}`),
+		}, nil).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+			functions.AssertExpectations(t)
+			traces.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:      functions,
+			FunctionRuns:   runs,
+			FunctionTraces: traces,
+		})
+
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, resp.Data.Output)
+		require.Equal(t, "Hello, World!", resp.Data.Output.Fields["body"].GetStringValue())
+	})
 }
 
 func TestToTraceSpanStatus(t *testing.T) {
