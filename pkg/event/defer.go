@@ -12,9 +12,7 @@ type DeferredScheduleMetadata struct {
 	FnSlug       string `json:"fn_slug"`
 	ParentFnSlug string `json:"parent_fn_slug"`
 	ParentRunID  string `json:"parent_run_id"`
-	// HashedDeferID is the hashed per-run defer ID; the SDK-supplied ID is
-	// hashed inside SaveDefer before reaching this field.
-	HashedDeferID string `json:"defer_id"`
+	HashedDeferID string `json:"hashed_defer_id"`
 }
 
 func (m *DeferredScheduleMetadata) Validate() error {
@@ -29,7 +27,7 @@ func (m *DeferredScheduleMetadata) Validate() error {
 		errs = append(errs, errors.New("parent_run_id is required"))
 	}
 	if m.HashedDeferID == "" {
-		errs = append(errs, errors.New("defer_id is required"))
+		errs = append(errs, errors.New("hashed_defer_id is required"))
 	}
 	return errors.Join(errs...)
 }

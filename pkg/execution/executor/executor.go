@@ -1368,13 +1368,8 @@ func (e *executor) schedule(
 		}
 	}
 
-	// If this run was triggered by a deferred.schedule event, stamp the
-	// parent linkage onto the child's run span. This is the child-side half
-	// of the parent->child join; the parent side lives on the parent's
-	// executor.defer span (see finalize.buildDeferEvents).
 	if deferred != nil {
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentRunID, &deferred.parentRunID)
-		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferHashedID, &deferred.meta.HashedDeferID)
 	}
 
 	// Always the root span.

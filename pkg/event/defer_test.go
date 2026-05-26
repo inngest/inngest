@@ -28,7 +28,7 @@ func TestDeferredScheduleMetadataValidate(t *testing.T) {
 		require.Contains(t, err.Error(), "fn_slug")
 		require.Contains(t, err.Error(), "parent_fn_slug")
 		require.Contains(t, err.Error(), "parent_run_id")
-		require.Contains(t, err.Error(), "defer_id")
+		require.Contains(t, err.Error(), "hashed_defer_id")
 	})
 }
 
@@ -54,7 +54,7 @@ func TestEventDeferredScheduleMetadata(t *testing.T) {
 				"fn_slug":        wantMeta.FnSlug,
 				"parent_fn_slug": wantMeta.ParentFnSlug,
 				"parent_run_id":  wantMeta.ParentRunID,
-				"defer_id":       wantMeta.HashedDeferID,
+				"hashed_defer_id": wantMeta.HashedDeferID,
 			},
 		}}
 		got, err := e.DeferredScheduleMetadata()
