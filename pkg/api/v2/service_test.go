@@ -246,9 +246,6 @@ func TestService_GetFunctionRun(t *testing.T) {
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 	endedAt := startedAt.Add(2 * time.Second)
-	output, err := json.Marshal(map[string]any{"ok": true})
-	require.NoError(t, err)
-
 	fn := inngest.DeployedFunction{
 		ID:      functionID,
 		Slug:    "my-app-test-fn",
@@ -266,7 +263,6 @@ func TestService_GetFunctionRun(t *testing.T) {
 		EventID:      runID,
 		Status:       enums.RunStatusCompleted,
 		EndedAt:      &endedAt,
-		Output:       output,
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
@@ -295,8 +291,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.Equal(t, "test-fn", resp.Data.Function.Id)
 		require.Equal(t, "Test function", resp.Data.Function.Name)
 		require.Equal(t, "my-app", resp.Data.App.Id)
-		require.NotNil(t, resp.Data.Output)
-		require.Equal(t, true, resp.Data.Output.Fields["ok"].GetBoolValue())
+		require.Nil(t, resp.Data.Output)
 		require.NotNil(t, resp.Data.DurationMs)
 		require.Equal(t, uint64(2000), *resp.Data.DurationMs)
 	})
@@ -410,6 +405,38 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Data.Output)
 		require.Equal(t, "Hello, World!", resp.Data.Output.Fields["body"].GetStringValue())
+	})
+
+	t.Run("does not fall back to run output", func(t *testing.T) {
+		runs := &mockFunctionRunReader{}
+		runs.On("GetFunctionRun", mock.Anything, runID).Return(&cqrs.FunctionRun{
+			RunID:        runID,
+			RunStartedAt: startedAt,
+			FunctionID:   functionID,
+			EventID:      runID,
+			Status:       enums.RunStatusCompleted,
+			EndedAt:      &endedAt,
+			Output:       json.RawMessage(`{"old":true}`),
+		}, nil).Once()
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    functions,
+			FunctionRuns: runs,
+		})
+
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+
+		require.NoError(t, err)
+		require.Nil(t, resp.Data.Output)
 	})
 }
 

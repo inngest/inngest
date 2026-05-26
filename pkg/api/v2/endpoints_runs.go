@@ -45,7 +45,7 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 
 	data := toFunctionRun(run, fn)
 	if req.GetIncludeOutput() {
-		data.Output = s.functionRunOutput(ctx, runID, run.Output)
+		data.Output = s.traceRunOutput(ctx, runID)
 	}
 
 	return &apiv2.GetFunctionRunResponse{
@@ -368,14 +368,6 @@ func loadTraceOutput(ctx context.Context, reader FunctionTraceReader, encodedID 
 		input:  jsonToStruct(json.RawMessage(data.Input)),
 		output: jsonToStruct(json.RawMessage(data.Data)),
 	}, nil
-}
-
-func (s *Service) functionRunOutput(ctx context.Context, runID ulid.ULID, fallback json.RawMessage) *structpb.Struct {
-	if output := s.traceRunOutput(ctx, runID); output != nil {
-		return output
-	}
-
-	return jsonToStruct(fallback)
 }
 
 func (s *Service) traceRunOutput(ctx context.Context, runID ulid.ULID) *structpb.Struct {
