@@ -457,14 +457,14 @@ func (q *queueProcessor) ProcessItem(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			qi = itemWithCurrentLease(qi)
-			if err := shard.Requeue(context.WithoutCancel(ctx), qi, at); err != nil {
+			requeueItem := itemWithCurrentLease(qi)
+			if err := shard.Requeue(context.WithoutCancel(ctx), requeueItem, at); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
 				}
 
-				l.Error("error requeuing job", "error", err, "item", qi)
+				l.Error("error requeuing job", "error", err, "item", requeueItem)
 				return err
 			}
 			if _, ok := err.(QuitError); ok {
@@ -476,8 +476,7 @@ func (q *queueProcessor) ProcessItem(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		qi = itemWithCurrentLease(qi)
-		if err := shard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -492,8 +491,7 @@ func (q *queueProcessor) ProcessItem(
 		}
 	case <-jobCtx.Done():
 		stopItemLeaseRenewal()
-		qi = itemWithCurrentLease(qi)
-		if err := shard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
