@@ -15,19 +15,15 @@ type sdkRequestIDCtxKey struct{}
 
 type sdkJobIDCtxKey struct{}
 
-// DispatchRequestID returns the deterministic ULID the executor stamps on
-// outbound SDK requests for a given dispatch. Single source of truth for the
-// producer (executor) and the validator (checkpoint package): a drift in
-// either the seed format or the entropy derivation would silently break
-// fencing for in-flight runs.
+// DispatchRequestID is the single source of truth for the request ID the
+// executor (producer) stamps on outbound SDK requests and the checkpoint
+// validator (consumer) recomputes when fencing stale dispatches.
 func DispatchRequestID(ts time.Time, runID ulid.ULID, generationID int) ulid.ULID {
 	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", runID, generationID))
 }
 
 // DispatchRequestIDEntropy returns the entropy portion of the dispatch
-// RequestID. The validator compares this against the entropy of the
-// SDK-echoed RequestID; the dispatch timestamp doesn't participate in
-// fencing.
+// RequestID; the timestamp doesn't participate in fencing.
 func DispatchRequestIDEntropy(runID ulid.ULID, generationID int) []byte {
 	return DispatchRequestID(time.Unix(0, 0), runID, generationID).Entropy()
 }

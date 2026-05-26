@@ -1,5 +1,3 @@
-// This package is intended to help ensure a consistent, clean way to
-// access feature flags safely
 package flags
 
 import (

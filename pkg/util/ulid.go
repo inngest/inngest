@@ -8,7 +8,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// MustDeterministicULID panics on error; the underlying entropy reader cannot fail.
 func MustDeterministicULID(ts time.Time, seed []byte) ulid.ULID {
 	id, err := DeterministicULID(ts, seed)
 	if err != nil {

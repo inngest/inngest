@@ -196,7 +196,6 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			// Unset the queue ref, too
 			t.requestCtx.QueueItemRef = ""
 			er.Ctx.QueueItemRef = ""
-
 			copyRequestContextFieldIfPresent(&t.requestCtx, er.Ctx, "RequestID")
 			copyRequestContextFieldIfPresent(&t.requestCtx, er.Ctx, "JobID")
 

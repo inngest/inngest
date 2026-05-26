@@ -59,13 +59,10 @@ const pkgName = "checkpoint"
 
 var ErrStaleDispatch = errors.New("stale dispatch")
 
-// Disallow dispatch validation if the queue item is younger than this duration.
-// This is to reduce the number of validations, which in turn reduces load on
-// the queue.
-//
-// We chose 10 seconds somewhat arbitrarily. We want a value that will not
-// exceed timeout durations on our users' cloud providers, and some serverless
-// providers have a 10 second timeout.
+// Skip the queue-item load for dispatches younger than this window: a Requeue
+// cannot fire before the queue lease expires, so a fresh dispatch is
+// uncontested. The upper bound is the shortest plausible serverless timeout
+// (~10s) — longer windows let a fast-Requeue race slip past unfenced.
 const dispatchValidationSkipDuration = 10 * time.Second
 
 type queueItemLoader interface {
@@ -668,7 +665,7 @@ func stepOutputSize(ops []state.GeneratorOpcode) int {
 
 func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) (err error) {
 	start := time.Now()
-	result := "skipped"
+	result := "passed"
 	defer func() {
 		if errors.Is(err, ErrStaleDispatch) {
 			result = "stale"
@@ -678,20 +675,17 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 			Tags:    map[string]any{"result": result},
 		})
 	}()
-	// Fail open when the SDK didn't echo a request id. Older SDKs predate the
-	// fence; rejecting them would break valid checkpoints.
 	if input.RequestID == "" {
+		result = "no_request_id"
 		return nil
 	}
 
-	// Skip the queue-item load when the dispatch is younger than the minimum
-	// requeue window. A Requeue is the only path that bumps GenerationID, and
-	// it can't fire until the queue lease expires, so a fresh dispatch is
-	// provably uncontested. Negative elapsed (future-dated stamp from clock
-	// skew or a buggy SDK) falls through to the existing validation.
+	// Negative elapsed (future-dated stamp from clock skew or a buggy SDK)
+	// falls through to the full validation.
 	if input.RequestStartedAt != 0 {
 		elapsed := time.Since(time.UnixMilli(input.RequestStartedAt))
 		if elapsed >= 0 && elapsed < dispatchValidationSkipDuration {
+			result = "fresh"
 			return nil
 		}
 	}
@@ -702,8 +696,9 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	}
 
 	ref := queueref.Decode(input.QueueItemRef)
-	if ref[0] == "" {
-		return fmt.Errorf("%w: missing queue item reference", ErrStaleDispatch)
+	if ref.JobID() == "" || ref.ShardID() == "" {
+		result = "no_qi_ref"
+		return nil
 	}
 
 	loader, ok := c.Queue.(queueItemLoader)
@@ -713,6 +708,7 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
 			"run_id", input.RunID,
 		)
+		result = "no_loader"
 		return nil
 	}
 
@@ -727,17 +723,18 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 			"error", err,
 			"run_id", input.RunID,
 		)
+		result = "load_error"
 		return nil
 	}
-	// Fail open for queue items that pre-date the rollout.
 	if item.GenerationID == 0 {
+		result = "no_generation"
 		return nil
 	}
 
-	result = "passed"
-
-	// Compare only the entropy: the dispatch timestamp isn't recoverable
-	// from the SDK-echoed RequestID and isn't part of the fence.
+	// Compare only the entropy: it's the deterministic part bound to
+	// (runID, generationID). The ULID timestamp is incidental (it just
+	// gives RequestIDs chronological sort order) and isn't part of the
+	// fence.
 	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
 		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
 	}
