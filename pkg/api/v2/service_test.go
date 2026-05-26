@@ -267,7 +267,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
 	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID).Return(run, nil).Once()
+	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(run, nil).Once()
 
 	service := NewService(ServiceOptions{
 		Functions:    functions,
@@ -314,7 +314,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 	t.Run("returns not found when run is missing", func(t *testing.T) {
 		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID).Return(nil, errors.New("missing")).Once()
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(nil, errors.New("missing")).Once()
 		t.Cleanup(func() {
 			runs.AssertExpectations(t)
 		})
@@ -334,7 +334,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 	t.Run("returns not found when function is missing", func(t *testing.T) {
 		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID).Return(run, nil).Once()
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(run, nil).Once()
 		functions := &mockFunctionProvider{}
 		functions.On("GetFunction", mock.Anything, functionID.String()).Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
 		t.Cleanup(func() {
@@ -366,7 +366,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.NoError(t, err)
 
 		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID).Return(&cqrs.FunctionRun{
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,
@@ -409,7 +409,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 	t.Run("does not fall back to run output", func(t *testing.T) {
 		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID).Return(&cqrs.FunctionRun{
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,

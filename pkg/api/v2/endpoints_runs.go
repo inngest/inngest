@@ -33,7 +33,10 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
 	}
 
-	run, err := s.runs.GetFunctionRun(ctx, runID)
+	includeOutput := req.GetIncludeOutput()
+	run, err := s.runs.GetFunctionRun(ctx, runID, GetFunctionRunOpts{
+		IncludeOutput: includeOutput,
+	})
 	if err != nil {
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Run not found")
 	}
@@ -44,7 +47,7 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 	}
 
 	data := toFunctionRun(run, fn)
-	if req.GetIncludeOutput() {
+	if includeOutput {
 		data.Output = s.traceRunOutput(ctx, runID)
 	}
 
