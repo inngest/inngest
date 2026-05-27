@@ -23,12 +23,12 @@ export type Run = {
   startedAt: string | null;
   hasAI?: boolean;
   runType: RunType;
-  deferredFrom?: {
+  deferredFrom?: Array<{
     parentRun: {
       function: {
         name: string;
         slug: string;
       };
     } | null;
-  } | null;
+  }>;
 };

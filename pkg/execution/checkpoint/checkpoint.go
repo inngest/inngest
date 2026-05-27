@@ -368,7 +368,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		case enums.OpcodeDeferAbort:
-			if err := defers.AbortFromOp(ctx, c.State, l, input.Metadata.ID, op); err != nil {
+			if err := defers.AbortFromOp(ctx, c.State, l, input.Metadata.ID, op, c.TracerProvider, *input.Metadata, time.Now()); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -541,7 +541,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 		case enums.OpcodeDeferAbort:
-			if err := defers.AbortFromOp(ctx, c.State, l, md.ID, op); err != nil {
+			if err := defers.AbortFromOp(ctx, c.State, l, md.ID, op, c.TracerProvider, md, time.Now()); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.

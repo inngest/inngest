@@ -6,13 +6,21 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';
-import { type RunType } from '../types/functionRun';
+import { isRunType, type RunType } from '../types/functionRun';
 import type { Run, ViewScope } from './types';
 
 const runTypePill: Record<RunType, { kind: PillKind; label: string }> = {
   PRIMARY: { kind: 'primary', label: 'Primary' },
   DEFER: { kind: 'info', label: 'Deferred' },
 };
+
+// Fall back to the PRIMARY pill for null/undefined/unexpected run types (e.g.
+// stale cache, a future enum value, or cloud passing something unexpected) so
+// the runs table never crashes on an unknown value.
+const unknownRunTypePill = runTypePill.PRIMARY;
+function getRunTypePill(runType: unknown): { kind: PillKind; label: string } {
+  return isRunType(runType) ? runTypePill[runType] : unknownRunTypePill;
+}
 
 const columnHelper = createColumnHelper<Run>();
 
@@ -107,7 +115,9 @@ const columns = [
         return <AICell>{fnName}</AICell>;
       }
 
-      const parentName = data.deferredFrom?.parentRun?.function?.name;
+      // A batched run can have several parents; show the first for the
+      // list breadcrumb.
+      const parentName = data.deferredFrom?.[0]?.parentRun?.function?.name;
       if (parentName) {
         return (
           <div className="text-nowrap flex items-center gap-1">
@@ -131,11 +141,12 @@ const columns = [
   columnHelper.accessor('runType', {
     cell: (info) => {
       const runType = info.getValue();
-      const pill = runTypePill[runType];
+      const pill = getRunTypePill(runType);
+      const pillType = isRunType(runType) ? runType : 'PRIMARY';
 
       return (
         <div className="flex items-center">
-          <PillCell type={runType} kind={pill.kind} className="bg-transparent">
+          <PillCell type={pillType} kind={pill.kind} className="bg-transparent">
             {pill.label}
           </PillCell>
         </div>

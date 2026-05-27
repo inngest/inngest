@@ -811,6 +811,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	var runID *ulid.ULID
 
+	if req.RunID == nil {
+		id := ulid.MustNew(ulid.Now(), rand.Reader)
+		runID = &id
+	} else {
+		runID = req.RunID
+	}
+
+	key := idempotencyKey(req, *runID)
+
 	if len(req.Events) == 0 {
 		return nil, nil, fmt.Errorf("no events provided in schedule request")
 	}
@@ -822,25 +831,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"fn_id", req.Function.ID,
 		"fn_v", req.Function.FunctionVersion,
 		"evt_id", req.Events[0].GetInternalID(),
+		"run_id", runID,
 		"schedule_req", req,
 	)
-
-	deferred := findDeferredChild(l, req.Events)
-
-	if req.RunID == nil {
-		if deferred != nil {
-			runID = &deferred.runID
-		} else {
-			id := ulid.MustNew(ulid.Now(), rand.Reader)
-			runID = &id
-		}
-	} else {
-		runID = req.RunID
-	}
-
-	key := idempotencyKey(req, *runID)
-
-	l = l.With("run_id", runID)
 
 	span.SetAttributes(attribute.String("event_id", req.Events[0].GetInternalID().String()))
 	span.SetAttributes(attribute.String("run_id", runID.String()))
@@ -872,7 +865,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					md  *sv2.Metadata
 					err error
 				)
-				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks, deferred)
+				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks)
 				return md, err
 			}, util.WithBoundaries(2*time.Second))
 		})
@@ -901,7 +894,6 @@ func (e *executor) schedule(
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
-	deferred *deferredChild,
 ) (*ulid.ULID, *sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
@@ -1368,10 +1360,6 @@ func (e *executor) schedule(
 		}
 	}
 
-	if deferred != nil {
-		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentRunID, &deferred.parentRunID)
-	}
-
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -1479,6 +1467,10 @@ func (e *executor) schedule(
 	// onto the invoking function's invoke span so the in-progress trace shows it.
 	e.updateInvokeSpanWithInvokedRunID(ctx, l, req.Events, metadata.ID.RunID)
 
+	// If this run was scheduled by a parent's `defer`, record the child run ID
+	// onto the parent's defer linkage so both runs can find each other.
+	e.recordDeferChildRun(ctx, l, req.Events, metadata)
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -1576,47 +1568,37 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 	}
 }
 
-type deferredChild struct {
-	meta        *event.DeferredScheduleMetadata
-	parentRunID ulid.ULID
-	runID       ulid.ULID
-}
-
-// findDeferredChild returns nil on missing, malformed, or ambiguous
-// (multi-event) batches; the caller treats nil as "schedule as a normal
-// root run."
-func findDeferredChild(l logger.Logger, events []event.TrackedEvent) *deferredChild {
-	var found *deferredChild
-	for _, te := range events {
-		evt := te.GetEvent()
-		if evt.Name != consts.FnDeferScheduleName {
-			continue
-		}
-		if found != nil {
-			l.Warn("multiple deferred.schedule events in batch; bailing rather than guess", "event_id", evt.ID)
-			return nil
-		}
+// recordDeferChildRun records this run's ID onto its parent's defer linkage when
+// the run was scheduled by a parent's `defer`. It emits a dedicated
+// executor.defer span on the parent run carrying defer.child_run_id;
+// GetRunDefers / GetRunDeferredFrom reconstruct both directions of the linkage
+// from it. Recording linkage in the executor mirrors
+// updateInvokeSpanWithInvokedRunID and, like it, gates on the triggering event
+// name here rather than baking defer logic into run-ID generation.
+func (e *executor) recordDeferChildRun(ctx context.Context, l logger.Logger, events []event.TrackedEvent, childMD sv2.Metadata) {
+	// At most one deferred.schedule event today; a batch is handled defensively.
+	if len(events) == 0 || events[0].GetEvent().Name != consts.FnDeferScheduleName {
+		return
+	}
+	for _, trackedEvent := range events {
+		evt := trackedEvent.GetEvent()
 		m, err := evt.DeferredScheduleMetadata()
 		if err != nil {
-			l.Warn("malformed deferred schedule metadata", "error", err, "event_id", evt.ID)
-			return nil
+			l.Debug("deferred schedule event missing metadata; skipping defer linkage", "event_id", evt.ID, "error", err)
+			continue
 		}
-		if err := m.Validate(); err != nil {
-			l.Warn("invalid deferred schedule metadata", "error", err, "event_id", evt.ID)
-			return nil
-		}
-		pid, err := ulid.Parse(m.ParentRunID)
+		parentRunID, err := ulid.Parse(m.ParentRunID)
 		if err != nil {
-			l.Warn("invalid parent run id on deferred schedule event", "error", err, "parent_run_id", m.ParentRunID, "event_id", evt.ID)
-			return nil
+			l.Debug("deferred schedule event has unparseable parent run id; skipping defer linkage", "event_id", evt.ID, "parent_run_id", m.ParentRunID, "error", err)
+			continue
 		}
-		found = &deferredChild{
-			meta:        m,
-			parentRunID: pid,
-			runID:       util.DeterministicChildRunID(pid, m.HashedDeferID),
-		}
+		// The span is attributed to the PARENT run so GetRunDefers(parent) finds
+		// it. A deferred child shares its parent's tenant (defers schedule within
+		// the same env/account), so reuse the child's tenant for storage.
+		parentMD := sv2.Metadata{ID: sv2.ID{RunID: parentRunID, Tenant: childMD.ID.Tenant}}
+		sv2.InitConfig(&parentMD.Config)
+		defers.EmitChildRunIDSpan(ctx, e.tracerProvider, parentMD, e.now(), m.HashedDeferID, childMD.ID.RunID)
 	}
-	return found
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
@@ -3676,7 +3658,7 @@ func (e *executor) handleGeneratorDeferAbort(ctx context.Context, runCtx executi
 	// cancelled tombstone when the defer is absent) because emitting an
 	// DeferAdd and DeferAbort for the same hashed ID in a single response is
 	// an SDK bug, and the cost of handling it isn't worth the complexity.
-	if err := defers.AbortFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+	if err := defers.AbortFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen, e.tracerProvider, *runCtx.Metadata(), e.now()); err != nil {
 		return err
 	}
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAbort")

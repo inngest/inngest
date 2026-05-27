@@ -56,24 +56,27 @@ func (r *functionRunV2Resolver) Defers(ctx context.Context, fn *models.FunctionR
 	return out, nil
 }
 
-func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.FunctionRunV2) (*models.RunDeferredFrom, error) {
-	df, err := loader.LoadOneWithString[cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
+func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.FunctionRunV2) ([]*models.RunDeferredFrom, error) {
+	dfs, err := loader.LoadOneWithString[[]*cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
 	}
-	if df == nil {
+	if dfs == nil {
 		return nil, nil
 	}
 
-	parentV2, err := models.MakeFunctionRunV2(df.ParentRun)
-	if err != nil {
-		return nil, fmt.Errorf("error converting deferred-from parent run: %w", err)
+	out := make([]*models.RunDeferredFrom, 0, len(*dfs))
+	for _, df := range *dfs {
+		parentV2, err := models.MakeFunctionRunV2(df.ParentRun)
+		if err != nil {
+			return nil, fmt.Errorf("error converting deferred-from parent run: %w", err)
+		}
+		out = append(out, &models.RunDeferredFrom{
+			ParentRunID: df.ParentRunID,
+			ParentRun:   parentV2,
+		})
 	}
-
-	return &models.RunDeferredFrom{
-		ParentRunID: df.ParentRunID,
-		ParentRun:   parentV2,
-	}, nil
+	return out, nil
 }
 
 func (r *functionRunV2Resolver) InvokedFrom(ctx context.Context, fn *models.FunctionRunV2) (*models.RunInvokedFrom, error) {
@@ -98,11 +101,14 @@ func (r *functionRunV2Resolver) InvokedFrom(ctx context.Context, fn *models.Func
 }
 
 func (r *functionRunV2Resolver) RunType(ctx context.Context, fn *models.FunctionRunV2) (models.RunType, error) {
-	df, err := loader.LoadOneWithString[cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
+	dfs, err := loader.LoadOneWithString[[]*cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
 	if err != nil {
-		return "", fmt.Errorf("error retrieving deferred-from linkage: %w", err)
+		// RunType! is a non-null GraphQL enum; "" is not a valid value and
+		// gqlgen rejects it during marshaling. Return a valid default
+		// alongside the error (mirrors models.ToFunctionRunStatus).
+		return models.RunTypePrimary, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
 	}
-	if df != nil {
+	if dfs != nil && len(*dfs) > 0 {
 		return models.RunTypeDefer, nil
 	}
 	return models.RunTypePrimary, nil

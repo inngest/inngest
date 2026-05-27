@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,12 +32,13 @@ func deferSpanAttrs(t *testing.T, hashedID, userID, fnSlug string, status enums.
 	return byt
 }
 
-// Mirrors the parent-linkage attrs a deferred child run's executor.run span carries.
-func runSpanAttrsWithParent(t *testing.T, parentRunID ulid.ULID, hashedID string) []byte {
+// Mirrors the child-run-id executor.defer span the executor emits on the PARENT
+// run when a deferred child is scheduled: hashed ID + child run ID, no status.
+func childRunIDDeferSpanAttrs(t *testing.T, hashedID string, childRunID ulid.ULID) []byte {
 	t.Helper()
 	byt, err := json.Marshal(map[string]any{
-		meta.Attrs.DeferParentRunID.Key(): parentRunID.String(),
-		meta.Attrs.DeferHashedID.Key():    hashedID,
+		meta.Attrs.DeferHashedID.Key():   hashedID,
+		meta.Attrs.DeferChildRunID.Key(): childRunID.String(),
 	})
 	require.NoError(t, err)
 	return byt
@@ -102,9 +102,22 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 		})
 	}
 
-	// Link only the first defer's child.
-	linkedChildRunID := util.DeterministicChildRunID(parentRunID, defers[0].hashedID)
+	// Link only the first defer's child: a child-run-id executor.defer span on
+	// the parent records the scheduled child run, and its TraceRun must exist to
+	// hydrate. The child run ID is now an ordinary random ID recorded on the
+	// span, not derived from (parent, hashedID).
+	linkedChildRunID := ulid.MustNew(ulid.Now(), nil)
 	insertChildTraceRun(t, cm, linkedChildRunID, accountID, workspaceID, appID, fnID)
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         parentRunID.String(),
+		DynamicSpanID: "dyn-defer-child-0",
+		Name:          meta.SpanNameDefer,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    fnID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    childRunIDDeferSpanAttrs(t, defers[0].hashedID, linkedChildRunID),
+	})
 
 	got, err := cm.GetRunDefers(ctx, []ulid.ULID{parentRunID})
 	require.NoError(t, err)
@@ -132,6 +145,110 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 	assert.Equal(t, "hash-bbb", second.HashedDeferID)
 	assert.Equal(t, enums.DeferStatusAborted, second.Status)
 	assert.Nil(t, second.Run, "Aborted/unlinked defer must surface with Run == nil")
+}
+
+// An aborted defer is represented by a SECOND executor.defer span (distinct
+// dynamic span ID) carrying defer.status = aborted alongside the original
+// schedule span (after_run). GetRunDefers must collapse both rows onto a single
+// defer, surfacing the terminal Aborted status — otherwise the UI keeps showing
+// an aborted defer as "Scheduled".
+func TestGetRunDefers_CollapsesAbortSpanOntoSchedule(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	fnID := uuid.New()
+
+	parentRunID := ulid.MustNew(ulid.Now(), nil)
+	const hashedID = "hash-aborted"
+
+	// Schedule span: full attrs, after_run.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         parentRunID.String(),
+		DynamicSpanID: "dyn-defer-schedule",
+		Name:          meta.SpanNameDefer,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    fnID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    deferSpanAttrs(t, hashedID, "user-x", "app-fn-x", enums.DeferStatusAfterRun),
+	})
+	// Abort span: minimal attrs (hashed ID + status), aborted. Distinct
+	// dynamic span ID so it survives as its own row.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         parentRunID.String(),
+		DynamicSpanID: "dyn-defer-abort",
+		Name:          meta.SpanNameDefer,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    fnID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    deferSpanAttrs(t, hashedID, "", "", enums.DeferStatusAborted),
+	})
+
+	got, err := cm.GetRunDefers(ctx, []ulid.ULID{parentRunID})
+	require.NoError(t, err)
+
+	parentDefers := got[parentRunID]
+	require.Len(t, parentDefers, 1, "two spans for the same hashed ID must collapse to one defer")
+
+	d := parentDefers[0]
+	assert.Equal(t, hashedID, d.HashedDeferID)
+	assert.Equal(t, enums.DeferStatusAborted, d.Status, "terminal Aborted status must win over the schedule span's AfterRun")
+	// Richer fields from the schedule span must be preserved even though the
+	// abort span (which won the status) didn't carry them.
+	assert.Equal(t, "user-x", d.UserDeferID)
+	assert.Equal(t, "app-fn-x", d.FnSlug)
+}
+
+// A defer span carrying a status the GraphQL converter can't surface (e.g.
+// Scheduled or Rejected) must be skipped, not error out the whole query. A
+// single odd span must never blank out every defer on the run.
+func TestGetRunDefers_SkipsUnsurfaceableStatus(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	fnID := uuid.New()
+
+	parentRunID := ulid.MustNew(ulid.Now(), nil)
+
+	// A good after_run defer plus a span with an unsurfaceable status.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         parentRunID.String(),
+		DynamicSpanID: "dyn-defer-good",
+		Name:          meta.SpanNameDefer,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    fnID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    deferSpanAttrs(t, "hash-good", "user-good", "fn-good", enums.DeferStatusAfterRun),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         parentRunID.String(),
+		DynamicSpanID: "dyn-defer-weird",
+		Name:          meta.SpanNameDefer,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    fnID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    deferSpanAttrs(t, "hash-weird", "user-weird", "fn-weird", enums.DeferStatusScheduled),
+	})
+
+	got, err := cm.GetRunDefers(ctx, []ulid.ULID{parentRunID})
+	require.NoError(t, err, "an unsurfaceable status must be skipped, not fail the query")
+
+	parentDefers := got[parentRunID]
+	require.Len(t, parentDefers, 1, "only the surfaceable defer should remain")
+	assert.Equal(t, "hash-good", parentDefers[0].HashedDeferID)
 }
 
 // Mirrors the executor.step fragment of an invoke; the invoked run ID lives on the EXTEND fragment.
@@ -213,10 +330,11 @@ func TestGetRunInvokedFrom_ReadsParentInvokeStepSpan(t *testing.T) {
 	assert.Equal(t, parentRunID.String(), rif.ParentRun.RunID)
 }
 
-// The child's own executor.run span is the authoritative parent link for deferred runs (the
-// parent's defer span alone isn't sufficient). If this fails, a deferred child can't render
-// its parent breadcrumb.
-func TestGetRunDeferredFrom_ReadsChildExecutorRunSpan(t *testing.T) {
+// The parent's child-run-id executor.defer span is the authoritative parent
+// link for deferred runs: it lives on the PARENT and records defer.child_run_id.
+// GetRunDeferredFrom queries those spans by child run ID. If this fails, a
+// deferred child can't render its parent breadcrumb.
+func TestGetRunDeferredFrom_ReadsChildRunIDDeferSpan(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
@@ -234,24 +352,75 @@ func TestGetRunDeferredFrom_ReadsChildExecutorRunSpan(t *testing.T) {
 	insertChildTraceRun(t, cm, parentRunID, accountID, workspaceID, appID, fnID)
 	insertChildTraceRun(t, cm, childRunID, accountID, workspaceID, appID, fnID)
 
+	// The linkage span lives on the PARENT run, not the child.
 	insertTestSpan(t, cm, testSpanFields{
-		RunID:         childRunID.String(),
-		DynamicSpanID: "dyn-child-run",
-		Name:          meta.SpanNameRun,
+		RunID:         parentRunID.String(),
+		DynamicSpanID: "dyn-defer-child",
+		Name:          meta.SpanNameDefer,
 		AccountID:     accountID.String(),
 		AppID:         appID.String(),
 		FunctionID:    fnID.String(),
 		EnvID:         workspaceID.String(),
-		Attributes:    runSpanAttrsWithParent(t, parentRunID, "hash-aaa"),
+		Attributes:    childRunIDDeferSpanAttrs(t, "hash-aaa", childRunID),
 	})
 
 	got, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{childRunID})
 	require.NoError(t, err)
 
-	rdf, ok := got[childRunID]
+	rdfs, ok := got[childRunID]
 	require.True(t, ok, "expected entry for child run %s", childRunID)
-	require.NotNil(t, rdf)
-	assert.Equal(t, parentRunID, rdf.ParentRunID)
-	require.NotNil(t, rdf.ParentRun, "ParentRun must be stitched in when the parent's TraceRun exists")
-	assert.Equal(t, parentRunID.String(), rdf.ParentRun.RunID)
+	require.Len(t, rdfs, 1)
+	assert.Equal(t, parentRunID, rdfs[0].ParentRunID)
+	require.NotNil(t, rdfs[0].ParentRun, "ParentRun must be stitched in when the parent's TraceRun exists")
+	assert.Equal(t, parentRunID.String(), rdfs[0].ParentRun.RunID)
+}
+
+// A batched child run can descend from defers on several parents (N events ->
+// 1 run). GetRunDeferredFrom must return every parent, sorted for stable output
+// — collapsing to a single parent would drop linkage the UI needs to show.
+func TestGetRunDeferredFrom_MultipleParents(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	fnID := uuid.New()
+
+	// ulid.Make() is monotonic, so these three IDs are guaranteed distinct even
+	// when created back-to-back (unlike MustNew(Now(), nil), which uses zero
+	// entropy and collides within a millisecond).
+	childRunID := ulid.Make()
+	parentA := ulid.Make()
+	parentB := ulid.Make()
+
+	insertChildTraceRun(t, cm, childRunID, accountID, workspaceID, appID, fnID)
+	insertChildTraceRun(t, cm, parentA, accountID, workspaceID, appID, fnID)
+	insertChildTraceRun(t, cm, parentB, accountID, workspaceID, appID, fnID)
+
+	for i, parent := range []ulid.ULID{parentA, parentB} {
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:         parent.String(),
+			DynamicSpanID: fmt.Sprintf("dyn-defer-child-%d", i),
+			Name:          meta.SpanNameDefer,
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    fnID.String(),
+			EnvID:         workspaceID.String(),
+			Attributes:    childRunIDDeferSpanAttrs(t, fmt.Sprintf("hash-%d", i), childRunID),
+		})
+	}
+
+	got, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{childRunID})
+	require.NoError(t, err)
+
+	rdfs := got[childRunID]
+	require.Len(t, rdfs, 2, "a batched child must surface every parent it descends from")
+
+	gotParents := []ulid.ULID{rdfs[0].ParentRunID, rdfs[1].ParentRunID}
+	wantParents := []ulid.ULID{parentA, parentB}
+	sort.Slice(wantParents, func(i, j int) bool { return wantParents[i].Compare(wantParents[j]) < 0 })
+	assert.Equal(t, wantParents, gotParents, "parents must be returned sorted for stable output")
 }

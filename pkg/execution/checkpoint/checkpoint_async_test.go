@@ -477,8 +477,8 @@ func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashed
 	return args.Error(0)
 }
 
-func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id state.ID, d state.Defer) error {
-	args := m.Called(ctx, id, d)
+func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
+	args := m.Called(ctx, id, fnSlug, hashedID)
 	return args.Error(0)
 }
 

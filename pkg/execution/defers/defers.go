@@ -49,11 +49,7 @@ func SaveFromOp(
 		}
 		// Best-effort sentinel so SDK retransmits dedupe.
 		if opts != nil && opts.FnSlug != "" {
-			if rerr := rs.SaveRejectedDefer(ctx, id, statev2.Defer{
-				FnSlug:     opts.FnSlug,
-				HashedID:   op.ID,
-				UserlandID: userlandID,
-			}); rerr != nil {
+			if rerr := rs.SaveRejectedDefer(ctx, id, opts.FnSlug, op.ID); rerr != nil {
 				log.Warn("failed to save rejected defer sentinel; SDK retransmits will not dedupe",
 					"step_id", sanitizeLogValue(op.ID),
 					"run_id", id.RunID,
@@ -104,12 +100,20 @@ func SaveFromOp(
 
 // AbortFromOp flips the target defer's status to Aborted. Errors are
 // surfaced (no soft-fail).
+//
+// In addition to updating run state, it emits a second executor.defer span
+// carrying the terminal aborted status. Run-to-run linkage is reconstructed
+// purely from these spans (see run_linkage.go), so without this the UI would
+// keep displaying an aborted defer as "Scheduled".
 func AbortFromOp(
 	ctx context.Context,
 	rs statev2.RunService,
 	log logger.Logger,
 	id statev2.ID,
 	op state.GeneratorOpcode,
+	tp tracing.TracerProvider,
+	md statev2.Metadata,
+	now time.Time,
 ) error {
 	opts, err := op.DeferAbortOpts()
 	if err != nil {
@@ -121,6 +125,8 @@ func AbortFromOp(
 		log.Error("error aborting defer", "error", err)
 		return fmt.Errorf("error aborting defer: %w", err)
 	}
+
+	emitAbortedDeferSpan(ctx, tp, md, now, opts.TargetHashedID)
 
 	return nil
 }

@@ -12,19 +12,17 @@ type HistoryManager interface {
 	HistoryReader
 }
 
-type (
-	History              = exechistory.History
-	CancelEvent          = exechistory.CancelEvent
-	CancelUser           = exechistory.CancelUser
-	Sleep                = exechistory.Sleep
-	WaitForEvent         = exechistory.WaitForEvent
-	WaitResult           = exechistory.WaitResult
-	WaitForSignal        = exechistory.WaitForSignal
-	WaitForSignalResult  = exechistory.WaitForSignalResult
-	InvokeFunction       = exechistory.InvokeFunction
-	InvokeFunctionResult = exechistory.InvokeFunctionResult
-	Result               = exechistory.Result
-)
+type History = exechistory.History
+type CancelEvent = exechistory.CancelEvent
+type CancelUser = exechistory.CancelUser
+type Sleep = exechistory.Sleep
+type WaitForEvent = exechistory.WaitForEvent
+type WaitResult = exechistory.WaitResult
+type WaitForSignal = exechistory.WaitForSignal
+type WaitForSignalResult = exechistory.WaitForSignalResult
+type InvokeFunction = exechistory.InvokeFunction
+type InvokeFunctionResult = exechistory.InvokeFunctionResult
+type Result = exechistory.Result
 
 type HistoryWriter interface {
 	InsertHistory(ctx context.Context, h History) error
@@ -55,8 +53,10 @@ type HistoryReader interface {
 	GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDefer, error)
 
 	// GetRunDeferredFrom returns the parent linkage for each deferred child
-	// run, keyed by child run ID. Runs with no linkage are omitted.
-	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*RunDeferredFrom, error)
+	// run, keyed by child run ID. A batched child can descend from multiple
+	// parents, so each child maps to a list of parents. Runs with no linkage
+	// are omitted.
+	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]*RunDeferredFrom, error)
 
 	// GetRunInvokedFrom returns the parent linkage for each child run that
 	// was triggered by a parent's `step.invoke`, keyed by child run ID. Runs

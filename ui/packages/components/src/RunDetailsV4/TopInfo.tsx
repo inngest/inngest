@@ -43,7 +43,7 @@ type TopInfoProps = {
   trace?: Trace;
   isDurableEndpoint?: boolean;
   defers?: RunDeferSummary[];
-  deferredFrom?: RunDeferredFromSummary | null;
+  deferredFrom?: RunDeferredFromSummary[];
   invokedFrom?: RunInvokedFromSummary | null;
 };
 
@@ -147,15 +147,19 @@ export const TopInfo = ({
 
   const invokedRuns = useMemo(() => collectInvokedRuns(trace), [trace]);
   const hasLinkedRuns =
-    Boolean(deferredFrom) ||
+    (deferredFrom?.length ?? 0) > 0 ||
     Boolean(invokedFrom) ||
     (defers?.length ?? 0) > 0 ||
     invokedRuns.length > 0;
 
-  const deferUserID = deferredFrom?.parentRun?.defers?.find(
-    (d) => d.run?.id === runID
-  )?.userDeferID;
-  const headerLabel = deferUserID ?? invokedFrom?.stepName ?? trigger?.eventName;
+  const deferUserID = (deferredFrom ?? [])
+    .flatMap((p) => p.parentRun?.defers ?? [])
+    .find((d) => d.run?.id === runID)?.userDeferID;
+  // Fall back through the linkage/trigger names and finally to the run/function
+  // name so the header title is never blank (e.g. a deferred run with
+  // incomplete linkage and no invoke or trigger name).
+  const headerLabel =
+    deferUserID ?? invokedFrom?.stepName ?? trigger?.eventName ?? trace?.name ?? 'Run';
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 

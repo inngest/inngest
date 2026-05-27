@@ -2122,13 +2122,20 @@ func runTypeFilterExpr(dialect string, outerRunIDCol string, runTypes []enums.Ru
 		return nil
 	}
 
-	key := meta.Attrs.DeferParentRunID.Key()
+	// Match the run-detail classification exactly (GetRunDeferredFrom): a run is
+	// DEFER iff some executor.defer span records it as a child run
+	// (defer.child_run_id == this run). That span lives on the PARENT run, so
+	// this matches by attribute value across all runs rather than on the run's
+	// own spans — there is no run_id correlation to lean on. Keeping it in
+	// lockstep with GetRunDeferredFrom / queryDeferredFromSpans ensures the list
+	// filter and the run detail never disagree on a run's type.
+	key := meta.Attrs.DeferChildRunID.Key()
 	var jsonPred sq.Expression
 	switch dialect {
 	case "postgres":
-		jsonPred = sq.L("jsonb_exists(?, ?)", sq.I("dt.attributes"), key)
+		jsonPred = sq.L("?->>? = ?", sq.I("dt.attributes"), key, sq.I(outerRunIDCol))
 	case "sqlite3":
-		jsonPred = sq.L(`json_extract(?, '$."`+key+`"') IS NOT NULL`, sq.I("dt.attributes"))
+		jsonPred = sq.L(`json_extract(?, '$."`+key+`"') = ?`, sq.I("dt.attributes"), sq.I(outerRunIDCol))
 	default:
 		panic(fmt.Sprintf("runTypeFilterExpr: unsupported dialect %q", dialect))
 	}
@@ -2136,7 +2143,10 @@ func runTypeFilterExpr(dialect string, outerRunIDCol string, runTypes []enums.Ru
 	sub := sq.Dialect(dialect).
 		From(sq.T("spans").As("dt")).
 		Select(sq.L("1")).
-		Where(sq.I("dt.run_id").Eq(sq.I(outerRunIDCol)), jsonPred)
+		Where(
+			sq.I("dt.name").Eq(meta.SpanNameDefer),
+			jsonPred,
+		)
 
 	if wantDefer {
 		return sq.L("EXISTS ?", sub)

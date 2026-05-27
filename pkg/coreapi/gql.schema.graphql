@@ -500,7 +500,7 @@ type FunctionRunV2 {
   trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
   defers: [RunDefer!]!
-  deferredFrom: RunDeferredFrom
+  deferredFrom: [RunDeferredFrom!]!
   invokedFrom: RunInvokedFrom
   runType: RunType!
 }

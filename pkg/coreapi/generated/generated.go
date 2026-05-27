@@ -679,7 +679,7 @@ type FunctionRunV2Resolver interface {
 	Trace(ctx context.Context, obj *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error)
 
 	Defers(ctx context.Context, obj *models.FunctionRunV2) ([]*models.RunDefer, error)
-	DeferredFrom(ctx context.Context, obj *models.FunctionRunV2) (*models.RunDeferredFrom, error)
+	DeferredFrom(ctx context.Context, obj *models.FunctionRunV2) ([]*models.RunDeferredFrom, error)
 	InvokedFrom(ctx context.Context, obj *models.FunctionRunV2) (*models.RunInvokedFrom, error)
 	RunType(ctx context.Context, obj *models.FunctionRunV2) (models.RunType, error)
 }
@@ -4199,7 +4199,7 @@ type FunctionRunV2 {
   trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
   defers: [RunDefer!]!
-  deferredFrom: RunDeferredFrom
+  deferredFrom: [RunDeferredFrom!]!
   invokedFrom: RunInvokedFrom
   runType: RunType!
 }
@@ -12828,11 +12828,14 @@ func (ec *executionContext) _FunctionRunV2_deferredFrom(ctx context.Context, fie
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.RunDeferredFrom)
+	res := resTmp.([]*models.RunDeferredFrom)
 	fc.Result = res
-	return ec.marshalORunDeferredFrom2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDeferredFrom(ctx, field.Selections, res)
+	return ec.marshalNRunDeferredFrom2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDeferredFromᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FunctionRunV2_deferredFrom(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -27580,6 +27583,9 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 					}
 				}()
 				res = ec._FunctionRunV2_deferredFrom(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
 				return res
 			}
 
@@ -31252,6 +31258,60 @@ func (ec *executionContext) marshalNRunDeferStatus2githubᚗcomᚋinngestᚋinng
 	return v
 }
 
+func (ec *executionContext) marshalNRunDeferredFrom2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDeferredFromᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.RunDeferredFrom) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRunDeferredFrom2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDeferredFrom(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRunDeferredFrom2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDeferredFrom(ctx context.Context, sel ast.SelectionSet, v *models.RunDeferredFrom) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RunDeferredFrom(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNRunHistoryItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*history_reader.RunHistory) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -32707,13 +32767,6 @@ func (ec *executionContext) unmarshalORerunFromStepInput2ᚖgithubᚗcomᚋinnge
 	}
 	res, err := ec.unmarshalInputRerunFromStepInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalORunDeferredFrom2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDeferredFrom(ctx context.Context, sel ast.SelectionSet, v *models.RunDeferredFrom) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._RunDeferredFrom(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalORunHistoryCancel2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryCancel(ctx context.Context, sel ast.SelectionSet, v *history_reader.RunHistoryCancel) graphql.Marshaler {

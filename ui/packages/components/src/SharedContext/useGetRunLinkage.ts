@@ -41,7 +41,8 @@ export type RunInvokedFromSummary = {
 
 export type GetRunLinkageData = {
   defers: RunDeferSummary[];
-  deferredFrom: RunDeferredFromSummary | null;
+  // A batched child can descend from several parents, so this is a list.
+  deferredFrom: RunDeferredFromSummary[];
   invokedFrom: RunInvokedFromSummary | null;
 };
 

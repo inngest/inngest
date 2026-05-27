@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -32,23 +31,59 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 	}
 
 	out := make(map[ulid.ULID][]cqrs.RunDefer, len(spansByParent))
+	// childRunIDByParentHashed maps each (parent, hashedID) defer to the child
+	// run scheduled for it, recorded on the child-run-id executor.defer span at
+	// child-schedule time. A defer with no such span yet (still pending, or
+	// aborted before scheduling) is simply absent.
+	childRunIDByParentHashed := make(map[ulid.ULID]map[string]ulid.ULID)
 	var allChildRunIDs []ulid.ULID
 	for parentRunID, spans := range spansByParent {
+		// A single defer can have several executor.defer spans: the original
+		// schedule span (defer.status = after_run), a second abort span
+		// (defer.status = aborted) if it was aborted, and a child-run-id span
+		// (defer.child_run_id, no status) once its child run is scheduled.
+		// Collapse the status-bearing spans by hashed ID — preferring the
+		// terminal status so an aborted defer surfaces as Aborted not Scheduled
+		// — and capture the child run ID separately. See defers/span.go.
+		byHashedID := make(map[string]cqrs.RunDefer)
 		for _, s := range spans {
-			if s.Attributes.DeferHashedID == nil || s.Attributes.DeferStatus == nil {
+			if s.Attributes.DeferHashedID == nil {
 				continue
 			}
-			if *s.Attributes.DeferStatus == enums.DeferStatusUnknown {
+			hashedID := *s.Attributes.DeferHashedID
+
+			// The child-run-id span carries no status; it records the child run
+			// scheduled for this defer. Capture it and move on.
+			if s.Attributes.DeferChildRunID != nil {
+				if childRunIDByParentHashed[parentRunID] == nil {
+					childRunIDByParentHashed[parentRunID] = make(map[string]ulid.ULID)
+				}
+				childRunIDByParentHashed[parentRunID][hashedID] = *s.Attributes.DeferChildRunID
+				allChildRunIDs = append(allChildRunIDs, *s.Attributes.DeferChildRunID)
+				continue
+			}
+
+			if s.Attributes.DeferStatus == nil {
+				continue
+			}
+			status := *s.Attributes.DeferStatus
+			// Defensively skip any status the GraphQL converter
+			// (models.ToRunDeferStatus) can't surface. Today that's everything
+			// except AfterRun and Aborted; an unrecognized status here would
+			// otherwise propagate an error and fail the whole linkage query.
+			if !isSurfaceableDeferStatus(status) {
 				logger.StdlibLogger(ctx).Warn(
-					"skipping defer span with unknown status",
+					"skipping defer span with unsurfaceable status",
 					"run_id", parentRunID.String(),
-					"hashed_id", *s.Attributes.DeferHashedID,
+					"hashed_id", hashedID,
+					"status", status.String(),
 				)
 				continue
 			}
+
 			rd := cqrs.RunDefer{
-				HashedDeferID: *s.Attributes.DeferHashedID,
-				Status:        *s.Attributes.DeferStatus,
+				HashedDeferID: hashedID,
+				Status:        status,
 			}
 			if s.Attributes.DeferUserID != nil {
 				rd.UserDeferID = *s.Attributes.DeferUserID
@@ -56,8 +91,30 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 			if s.Attributes.DeferFnSlug != nil {
 				rd.FnSlug = *s.Attributes.DeferFnSlug
 			}
+
+			existing, ok := byHashedID[hashedID]
+			if !ok {
+				byHashedID[hashedID] = rd
+				continue
+			}
+			// Prefer the terminal (Aborted) status. The abort span only
+			// carries hashed ID + status, so preserve the richer fields
+			// (user/fn slug) from whichever span has them.
+			merged := existing
+			if deferStatusRank(status) > deferStatusRank(existing.Status) {
+				merged.Status = status
+			}
+			if merged.UserDeferID == "" {
+				merged.UserDeferID = rd.UserDeferID
+			}
+			if merged.FnSlug == "" {
+				merged.FnSlug = rd.FnSlug
+			}
+			byHashedID[hashedID] = merged
+		}
+
+		for _, rd := range byHashedID {
 			out[parentRunID] = append(out[parentRunID], rd)
-			allChildRunIDs = append(allChildRunIDs, util.DeterministicChildRunID(parentRunID, rd.HashedDeferID))
 		}
 	}
 
@@ -74,12 +131,12 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 		if err != nil {
 			return nil, fmt.Errorf("error loading deferred child runs: %w", err)
 		}
-		// Hydrate by recomputing the deterministic child run ID from each
-		// defer's HashedDeferID, so this loop doesn't depend on the order
-		// defers were appended above.
 		for parentRunID, defers := range out {
 			for i := range defers {
-				childRunID := util.DeterministicChildRunID(parentRunID, defers[i].HashedDeferID)
+				childRunID, ok := childRunIDByParentHashed[parentRunID][defers[i].HashedDeferID]
+				if !ok {
+					continue
+				}
 				if run, ok := childRuns[childRunID]; ok {
 					defers[i].Run = run
 				}
@@ -90,29 +147,77 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 	return out, nil
 }
 
-func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.RunDeferredFrom, error) {
+// isSurfaceableDeferStatus reports whether the GraphQL converter
+// (models.ToRunDeferStatus) can map this status. That converter errors on
+// anything other than AfterRun and Aborted, and the Defers resolver propagates
+// that error — failing the entire run-linkage query. Keeping this in lockstep
+// with the converter lets a single odd span be skipped instead of poisoning
+// the whole query.
+func isSurfaceableDeferStatus(s enums.DeferStatus) bool {
+	switch s {
+	case enums.DeferStatusAfterRun, enums.DeferStatusAborted:
+		return true
+	default:
+		return false
+	}
+}
+
+// deferStatusRank orders the surfaceable defer statuses so collapsing by hashed
+// ID prefers the terminal one. Aborted is terminal and wins over the
+// still-scheduled AfterRun.
+func deferStatusRank(s enums.DeferStatus) int {
+	switch s {
+	case enums.DeferStatusAborted:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]*cqrs.RunDeferredFrom, error) {
 	if len(runIDs) == 0 {
-		return map[ulid.ULID]*cqrs.RunDeferredFrom{}, nil
+		return map[ulid.ULID][]*cqrs.RunDeferredFrom{}, nil
 	}
 
-	spansByChild, err := w.GetSpansByRunIDsAndName(ctx, runIDs, meta.SpanNameRun)
+	strIDs := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		strIDs[i] = id.String()
+	}
+
+	// The parent->child linkage lives on the PARENT's child-run-id
+	// executor.defer span (defer.child_run_id), so the reverse link queries
+	// those spans by child run ID.
+	rows, err := w.queryDeferredFromSpans(ctx, strIDs)
 	if err != nil {
-		return nil, fmt.Errorf("error loading child executor.run spans: %w", err)
+		return nil, fmt.Errorf("error loading deferred-from spans: %w", err)
 	}
 
-	out := make(map[ulid.ULID]*cqrs.RunDeferredFrom, len(spansByChild))
+	out := make(map[ulid.ULID][]*cqrs.RunDeferredFrom)
+	// Collapse duplicate (child, parent) pairs in case a parent ends up with
+	// more than one child-run-id span pointing at the same child.
+	seen := make(map[ulid.ULID]map[ulid.ULID]struct{})
 	parentRunIDSet := make(map[ulid.ULID]struct{})
-	for childRunID, spans := range spansByChild {
-		// Defer linkage attrs live on the root executor.run span only;
-		// extension spans share the dynamic_span_id but lack them.
-		for _, s := range spans {
-			if !s.GetIsRoot() || s.Attributes.DeferParentRunID == nil {
-				continue
-			}
-			out[childRunID] = &cqrs.RunDeferredFrom{ParentRunID: *s.Attributes.DeferParentRunID}
-			parentRunIDSet[*s.Attributes.DeferParentRunID] = struct{}{}
-			break
+	for _, row := range rows {
+		span, err := mapSpanFromRow(ctx, row, nil)
+		if err != nil {
+			return nil, err
 		}
+		if span.Attributes.DeferChildRunID == nil {
+			continue
+		}
+		childRunID := *span.Attributes.DeferChildRunID
+		parentRunID := span.RunID
+
+		if seen[childRunID] == nil {
+			seen[childRunID] = make(map[ulid.ULID]struct{})
+		}
+		if _, dup := seen[childRunID][parentRunID]; dup {
+			continue
+		}
+		seen[childRunID][parentRunID] = struct{}{}
+
+		out[childRunID] = append(out[childRunID], &cqrs.RunDeferredFrom{ParentRunID: parentRunID})
+		parentRunIDSet[parentRunID] = struct{}{}
 	}
 
 	if len(parentRunIDSet) > 0 {
@@ -120,11 +225,20 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 		if err != nil {
 			return nil, fmt.Errorf("error loading deferred-from parent runs: %w", err)
 		}
-		for _, rdf := range out {
-			if run, ok := parentRuns[rdf.ParentRunID]; ok {
-				rdf.ParentRun = run
+		for _, rdfs := range out {
+			for _, rdf := range rdfs {
+				if run, ok := parentRuns[rdf.ParentRunID]; ok {
+					rdf.ParentRun = run
+				}
 			}
 		}
+	}
+
+	// Stable ordering so repeated queries return identical results.
+	for _, rdfs := range out {
+		slices.SortFunc(rdfs, func(a, b *cqrs.RunDeferredFrom) int {
+			return a.ParentRunID.Compare(b.ParentRunID)
+		})
 	}
 
 	return out, nil
@@ -187,7 +301,7 @@ func (w wrapper) GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map
 
 // Time and fragment columns stay as `any` so mapSpanFromRow's existing
 // decoders own the parsing.
-type invokedFromSpanRow struct {
+type linkageSpanRow struct {
 	runID         string
 	traceID       string
 	dynamicSpanID sql.NullString
@@ -197,25 +311,43 @@ type invokedFromSpanRow struct {
 	spanFragments any
 }
 
-func (r *invokedFromSpanRow) GetTraceID() string               { return r.traceID }
-func (r *invokedFromSpanRow) GetRunID() string                 { return r.runID }
-func (r *invokedFromSpanRow) GetDynamicSpanID() sql.NullString { return r.dynamicSpanID }
-func (r *invokedFromSpanRow) GetParentSpanID() sql.NullString  { return r.parentSpanID }
-func (r *invokedFromSpanRow) GetStartTime() any                { return r.startTime }
-func (r *invokedFromSpanRow) GetEndTime() any                  { return r.endTime }
-func (r *invokedFromSpanRow) GetSpanFragments() any            { return r.spanFragments }
+func (r *linkageSpanRow) GetTraceID() string               { return r.traceID }
+func (r *linkageSpanRow) GetRunID() string                 { return r.runID }
+func (r *linkageSpanRow) GetDynamicSpanID() sql.NullString { return r.dynamicSpanID }
+func (r *linkageSpanRow) GetParentSpanID() sql.NullString  { return r.parentSpanID }
+func (r *linkageSpanRow) GetStartTime() any                { return r.startTime }
+func (r *linkageSpanRow) GetEndTime() any                  { return r.endTime }
+func (r *linkageSpanRow) GetSpanFragments() any            { return r.spanFragments }
 
-var _ normalizedSpan = (*invokedFromSpanRow)(nil)
+var _ normalizedSpan = (*linkageSpanRow)(nil)
 
-// Hand-rolled SQL: sqlc 1.30's SQLite parser can't bind a slice when the
-// LHS is a json_extract(...) call. Narrowing on `name = 'EXTEND'` in the
-// inner subquery keeps the JSON predicate off the full spans table.
-func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string) ([]*invokedFromSpanRow, error) {
-	stepInvokeRunIDKey := meta.Attrs.StepInvokeRunID.Key()
+// queryInvokedFromSpans finds, for each child run ID, the parent's invoke
+// linkage: the invoked run ID lives on an EXTEND fragment (written via
+// UpdateSpan), so it matches step.invoke.run.id on name = 'EXTEND'.
+func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string) ([]*linkageSpanRow, error) {
+	return w.queryLinkageSpansByAttr(ctx, meta.SpanNameDynamicExtension, meta.Attrs.StepInvokeRunID.Key(), childRunIDs)
+}
 
+// queryDeferredFromSpans finds, for each child run ID, the parent's defer
+// linkage: the child run ID lives on a child-run-id executor.defer span
+// (defer.child_run_id), so it matches that attribute on name = 'executor.defer'.
+func (w wrapper) queryDeferredFromSpans(ctx context.Context, childRunIDs []string) ([]*linkageSpanRow, error) {
+	return w.queryLinkageSpansByAttr(ctx, meta.SpanNameDefer, meta.Attrs.DeferChildRunID.Key(), childRunIDs)
+}
+
+// queryLinkageSpansByAttr returns the spans whose dynamic_span_id matches a span
+// named spanName carrying attrKey ∈ runIDs, with all fragments aggregated for
+// mapSpanFromRow's read-time merge. Both reverse-linkage queries (invoked-from,
+// deferred-from) share this shape and differ only in the span name and the
+// attribute matched.
+//
+// Hand-rolled SQL: sqlc 1.30's SQLite parser can't bind a slice when the LHS is
+// a json_extract(...) call. Narrowing the inner subquery on name keeps the JSON
+// predicate off the full spans table.
+func (w wrapper) queryLinkageSpansByAttr(ctx context.Context, spanName, attrKey string, runIDs []string) ([]*linkageSpanRow, error) {
 	var (
 		nameArg      string
-		placeholders = make([]string, len(childRunIDs))
+		placeholders = make([]string, len(runIDs))
 		jsonPath     string
 		jsonObject   string
 		jsonAgg      string
@@ -223,27 +355,27 @@ func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string
 	switch dialect := w.dialect(); dialect {
 	case "postgres":
 		nameArg = "$1"
-		for i := range childRunIDs {
+		for i := range runIDs {
 			placeholders[i] = fmt.Sprintf("$%d", i+2)
 		}
-		jsonPath = fmt.Sprintf(`attributes->>'%s'`, stepInvokeRunIDKey)
+		jsonPath = fmt.Sprintf(`attributes->>'%s'`, attrKey)
 		jsonObject = "json_build_object"
 		jsonAgg = "json_agg"
 	case "sqlite3":
 		nameArg = "?"
-		for i := range childRunIDs {
+		for i := range runIDs {
 			placeholders[i] = "?"
 		}
-		jsonPath = fmt.Sprintf(`json_extract(attributes, '$."%s"')`, stepInvokeRunIDKey)
+		jsonPath = fmt.Sprintf(`json_extract(attributes, '$."%s"')`, attrKey)
 		jsonObject = "json_object"
 		jsonAgg = "json_group_array"
 	default:
-		return nil, fmt.Errorf("queryInvokedFromSpans: unsupported dialect %q", dialect)
+		return nil, fmt.Errorf("queryLinkageSpansByAttr: unsupported dialect %q", dialect)
 	}
 
-	args := make([]any, 0, len(childRunIDs)+1)
-	args = append(args, meta.SpanNameDynamicExtension)
-	for _, id := range childRunIDs {
+	args := make([]any, 0, len(runIDs)+1)
+	args = append(args, spanName)
+	for _, id := range runIDs {
 		args = append(args, id)
 	}
 
@@ -280,9 +412,9 @@ ORDER BY run_id, start_time
 	}
 	defer sqlRows.Close()
 
-	var out []*invokedFromSpanRow
+	var out []*linkageSpanRow
 	for sqlRows.Next() {
-		r := &invokedFromSpanRow{}
+		r := &linkageSpanRow{}
 		if err := sqlRows.Scan(
 			&r.runID,
 			&r.traceID,

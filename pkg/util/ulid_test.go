@@ -86,31 +86,45 @@ func TestDeterministicULID(t *testing.T) {
 	})
 }
 
-func TestDeterministicChildRunID(t *testing.T) {
-	ts := time.UnixMilli(1_700_000_000_000) // 2023-11-14
-	parent, err := DeterministicULID(ts, []byte("parent-seed"))
-	require.NoError(t, err)
-	const hashedID = "abc123-hashed-defer-id"
-
-	t.Run("output preserves the parent's timestamp", func(t *testing.T) {
-		id := DeterministicChildRunID(parent, hashedID)
-		require.Equal(t, parent.Time(), id.Time(),
-			"child run ID must share the parent run's time prefix")
-	})
-
-	t.Run("seed construction is pinned to a golden value", func(t *testing.T) {
-		// Pinned output guards the (parent.String() + hashedID + "r") seed
-		// recipe. Any change to the tag, order, or component will flip this.
-		fixedParent := ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB")
-		require.Equal(t,
-			"01HKQJZ5R7WCQA18WZG4RGCB0X",
-			DeterministicChildRunID(fixedParent, "fixed-hashed-id").String())
-	})
-}
-
 func TestDeterministicDeferEventID(t *testing.T) {
 	fixedParent := ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB")
 	require.Equal(t,
 		"01HKQJZ5R7CYQKSKMYBEBKYTBM",
 		DeterministicDeferEventID(fixedParent, "fixed-hashed-id").String())
+}
+
+func TestDeterministicDeferSpanSeed(t *testing.T) {
+	fixedParent := ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB")
+
+	// The defer seeds share the (parent, hashedID) input and differ only by
+	// the trailing tag. If the schedule span seed ever collided with the
+	// "c"-tag child-run-id span seed, the "a"-tag abort span seed, or the
+	// untagged event ID seed, the deterministic span IDs would clash.
+	span := DeterministicDeferSpanSeed(fixedParent, "fixed-hashed-id")
+	require.NotEqual(t, DeterministicChildRunIDDeferSpanSeed(fixedParent, "fixed-hashed-id"), span)
+	require.NotEqual(t, DeterministicAbortedDeferSpanSeed(fixedParent, "fixed-hashed-id"), span)
+	require.NotEqual(t, []byte(fixedParent.String()+"fixed-hashed-id"), span)
+}
+
+func TestDeterministicAbortedDeferSpanSeed(t *testing.T) {
+	fixedParent := ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB")
+
+	// The abort span MUST get a different dynamic span ID than the schedule
+	// span so both survive as separate rows in the linkage query. If the
+	// "a" and "s" seeds ever collided, the abort span would overwrite the
+	// schedule span instead of being collapsed alongside it.
+	require.NotEqual(t,
+		DeterministicDeferSpanSeed(fixedParent, "fixed-hashed-id"),
+		DeterministicAbortedDeferSpanSeed(fixedParent, "fixed-hashed-id"))
+}
+
+func TestDeterministicChildRunIDDeferSpanSeed(t *testing.T) {
+	fixedParent := ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB")
+
+	// The child-run-id span MUST get a different dynamic span ID than the
+	// schedule and abort spans so all three survive as separate rows in the
+	// linkage query, where GetRunDefers collapses them by hashed ID.
+	child := DeterministicChildRunIDDeferSpanSeed(fixedParent, "fixed-hashed-id")
+	require.NotEqual(t, DeterministicDeferSpanSeed(fixedParent, "fixed-hashed-id"), child)
+	require.NotEqual(t, DeterministicAbortedDeferSpanSeed(fixedParent, "fixed-hashed-id"), child)
 }

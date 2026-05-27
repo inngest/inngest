@@ -288,29 +288,29 @@ type FunctionRunQuery struct {
 }
 
 type FunctionRunV2 struct {
-	ID             ulid.ULID         `json:"id"`
-	AppID          uuid.UUID         `json:"appID"`
-	App            *cqrs.App         `json:"app"`
-	FunctionID     uuid.UUID         `json:"functionID"`
-	Function       *Function         `json:"function"`
-	TraceID        string            `json:"traceID"`
-	QueuedAt       time.Time         `json:"queuedAt"`
-	StartedAt      *time.Time        `json:"startedAt,omitempty"`
-	EndedAt        *time.Time        `json:"endedAt,omitempty"`
-	Status         FunctionRunStatus `json:"status"`
-	SourceID       *string           `json:"sourceID,omitempty"`
-	TriggerIDs     []ulid.ULID       `json:"triggerIDs"`
-	EventName      *string           `json:"eventName,omitempty"`
-	IsBatch        bool              `json:"isBatch"`
-	BatchCreatedAt *time.Time        `json:"batchCreatedAt,omitempty"`
-	CronSchedule   *string           `json:"cronSchedule,omitempty"`
-	Output         *string           `json:"output,omitempty"`
-	Trace          *RunTraceSpan     `json:"trace,omitempty"`
-	HasAi          bool              `json:"hasAI"`
-	Defers         []*RunDefer       `json:"defers"`
-	DeferredFrom   *RunDeferredFrom  `json:"deferredFrom,omitempty"`
-	InvokedFrom    *RunInvokedFrom   `json:"invokedFrom,omitempty"`
-	RunType        RunType           `json:"runType"`
+	ID             ulid.ULID          `json:"id"`
+	AppID          uuid.UUID          `json:"appID"`
+	App            *cqrs.App          `json:"app"`
+	FunctionID     uuid.UUID          `json:"functionID"`
+	Function       *Function          `json:"function"`
+	TraceID        string             `json:"traceID"`
+	QueuedAt       time.Time          `json:"queuedAt"`
+	StartedAt      *time.Time         `json:"startedAt,omitempty"`
+	EndedAt        *time.Time         `json:"endedAt,omitempty"`
+	Status         FunctionRunStatus  `json:"status"`
+	SourceID       *string            `json:"sourceID,omitempty"`
+	TriggerIDs     []ulid.ULID        `json:"triggerIDs"`
+	EventName      *string            `json:"eventName,omitempty"`
+	IsBatch        bool               `json:"isBatch"`
+	BatchCreatedAt *time.Time         `json:"batchCreatedAt,omitempty"`
+	CronSchedule   *string            `json:"cronSchedule,omitempty"`
+	Output         *string            `json:"output,omitempty"`
+	Trace          *RunTraceSpan      `json:"trace,omitempty"`
+	HasAi          bool               `json:"hasAI"`
+	Defers         []*RunDefer        `json:"defers"`
+	DeferredFrom   []*RunDeferredFrom `json:"deferredFrom"`
+	InvokedFrom    *RunInvokedFrom    `json:"invokedFrom,omitempty"`
+	RunType        RunType            `json:"runType"`
 }
 
 type FunctionRunV2Edge struct {

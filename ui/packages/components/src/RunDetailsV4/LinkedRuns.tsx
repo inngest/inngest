@@ -14,23 +14,38 @@ import type { InvokedRun } from './runDetailsUtils';
 type Props = {
   runID: string;
   defers?: RunDeferSummary[];
-  deferredFrom?: RunDeferredFromSummary | null;
+  deferredFrom?: RunDeferredFromSummary[];
   invokedFrom?: RunInvokedFromSummary | null;
   invoked: InvokedRun[];
 };
 
 export const LinkedRuns = ({ runID, defers, deferredFrom, invokedFrom, invoked }: Props) => {
-  const parallelDefers = (deferredFrom?.parentRun?.defers ?? []).filter((d) => d.run?.id !== runID);
+  const parents = deferredFrom ?? [];
+  // Parallel defers are the sibling defers across every parent this run
+  // descends from, excluding the current run. De-duplicate by defer ID so a
+  // defer shared across parents (and React keys) doesn't repeat.
+  const parallelDefers = dedupeById(
+    parents.flatMap((p) => p.parentRun?.defers ?? []).filter((d) => d.run?.id !== runID)
+  );
 
   return (
     <div className="h-full overflow-y-auto">
-      {deferredFrom && <ParentRunSection deferredFrom={deferredFrom} />}
+      {parents.length > 0 && <ParentRunsSection parents={parents} />}
       <DefersSection title="Parallel defers" defers={parallelDefers} />
       {invokedFrom && <InvokedFromSection invokedFrom={invokedFrom} />}
       <InvokedSection invoked={invoked} />
       <DefersSection title="Deferred runs" defers={defers ?? []} />
     </div>
   );
+};
+
+const dedupeById = <T extends { id: string }>(items: T[]): T[] => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
 };
 
 const sectionBorder = 'border-muted mb-2 border-b pb-2';
@@ -113,16 +128,18 @@ const ParentFunctionCell = ({ parent }: { parent: ParentRef }) => {
   );
 };
 
-const ParentRunSection = ({ deferredFrom }: { deferredFrom: RunDeferredFromSummary }) => (
+const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) => (
   <SectionTable
-    title="Parent run"
+    title={parents.length > 1 ? 'Parent runs' : 'Parent run'}
     columns={[{ header: 'Status', width: 'w-36' }, { header: 'Run ID' }, { header: 'Function' }]}
   >
-    <tr>
-      <ParentStatusCell parent={deferredFrom.parentRun} />
-      <ParentRunIDCell runID={deferredFrom.parentRunID} />
-      <ParentFunctionCell parent={deferredFrom.parentRun} />
-    </tr>
+    {parents.map((p) => (
+      <tr key={p.parentRunID}>
+        <ParentStatusCell parent={p.parentRun} />
+        <ParentRunIDCell runID={p.parentRunID} />
+        <ParentFunctionCell parent={p.parentRun} />
+      </tr>
+    ))}
   </SectionTable>
 );
 

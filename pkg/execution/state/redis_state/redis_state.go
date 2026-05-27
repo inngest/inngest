@@ -556,9 +556,8 @@ func (m shardedMgr) Metadata(ctx context.Context, accountId uuid.UUID, runID uli
 // DO NOT add fields here without first verifying they are cjson-safe. Safe
 // field types are strings and small ints (status enums, bounded counts).
 type deferMeta struct {
-	FnSlug     string
-	HashedID   string
-	UserlandID string
+	FnSlug   string
+	HashedID string
 
 	// Must stay int, not enums.DeferStatus: the enum's MarshalJSON renders
 	// as a string, but saveDefer.lua/setDeferStatus.lua compare and rewrite
@@ -633,7 +632,6 @@ func (m shardedMgr) LoadDefersMeta(
 		metas[hashedID] = statev2.DeferMeta{
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
-			UserlandID:     meta.UserlandID,
 			ScheduleStatus: enums.DeferStatus(meta.ScheduleStatus),
 		}
 	}
@@ -678,7 +676,6 @@ func (m shardedMgr) LoadDefers(
 		d := statev2.Defer{
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
-			UserlandID:     meta.UserlandID,
 			ScheduleStatus: meta.ScheduleStatus,
 		}
 		if raw, ok := inputs[hashedID]; ok && len(raw) > 0 {
@@ -924,7 +921,6 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	metaJSON, err := json.Marshal(deferMeta{
 		FnSlug:         d.FnSlug,
 		HashedID:       d.HashedID,
-		UserlandID:     d.UserlandID,
 		ScheduleStatus: int(d.ScheduleStatus),
 	})
 	if err != nil {
@@ -998,23 +994,22 @@ func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnI
 // SaveRejectedDefer idempotently writes a Rejected meta sentinel. No-op if
 // any defer already exists for the hashedID. Returns ErrDeferLimitExceeded
 // if the run is at MaxDefersPerRun.
-func (m shardedMgr) SaveRejectedDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, d statev2.Defer) error {
+func (m shardedMgr) SaveRejectedDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, fnSlug string, hashedID string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveRejectedDefer"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
 	metaJSON, err := json.Marshal(deferMeta{
-		FnSlug:         d.FnSlug,
-		HashedID:       d.HashedID,
-		UserlandID:     d.UserlandID,
+		FnSlug:         fnSlug,
+		HashedID:       hashedID,
 		ScheduleStatus: int(enums.DeferStatusRejected),
 	})
 	if err != nil {
 		return err
 	}
 
-	args, err := StrSlice([]any{d.HashedID, string(metaJSON), consts.MaxDefersPerRun})
+	args, err := StrSlice([]any{hashedID, string(metaJSON), consts.MaxDefersPerRun})
 	if err != nil {
 		return err
 	}
