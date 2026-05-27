@@ -1,26 +1,11 @@
 import { useMemo } from 'react';
-import { type PillKind } from '@inngest/components/Pill';
 import { IDCell, PillCell, TextCell, TimeCell } from '@inngest/components/Table';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';
-import { isRunType, type RunType } from '../types/functionRun';
 import type { Run, ViewScope } from './types';
-
-const runTypePill: Record<RunType, { kind: PillKind; label: string }> = {
-  PRIMARY: { kind: 'primary', label: 'Primary' },
-  DEFER: { kind: 'info', label: 'Deferred' },
-};
-
-// Fall back to the PRIMARY pill for null/undefined/unexpected run types (e.g.
-// stale cache, a future enum value, or cloud passing something unexpected) so
-// the runs table never crashes on an unknown value.
-const unknownRunTypePill = runTypePill.PRIMARY;
-function getRunTypePill(runType: unknown): { kind: PillKind; label: string } {
-  return isRunType(runType) ? runTypePill[runType] : unknownRunTypePill;
-}
 
 const columnHelper = createColumnHelper<Run>();
 
@@ -31,7 +16,6 @@ const columnsIDs = [
   'function',
   'id',
   'queuedAt',
-  'runType',
   'startedAt',
   'status',
   'trigger',
@@ -110,51 +94,35 @@ const columns = [
     cell: (info) => {
       const data = info.row.original;
       const fnName = info.getValue().name;
+      const isDeferred = data.runType === 'DEFER';
 
       if (data.hasAI) {
         return <AICell>{fnName}</AICell>;
       }
 
       // A batched run can have several parents; show the first for the
-      // list breadcrumb.
+      // list breadcrumb. Each name truncates independently so a long parent
+      // name can't crowd out the child the user actually clicked into.
       const parentName = data.deferredFrom?.[0]?.parentRun?.function?.name;
-      if (parentName) {
-        return (
-          <div className="text-nowrap flex items-center gap-1">
-            <span className="text-muted text-sm font-medium">{parentName}</span>
-            <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
-            <TextCell>{fnName}</TextCell>
-          </div>
-        );
-      }
 
       return (
-        <div className="text-nowrap flex items-center">
-          <TextCell>{fnName}</TextCell>
+        <div className="flex max-w-md items-center gap-1">
+          {parentName && (
+            <>
+              <span className="text-muted min-w-0 truncate text-sm font-medium">{parentName}</span>
+              <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
+            </>
+          )}
+          <TextCell className="min-w-0">{fnName}</TextCell>
+          {isDeferred && (
+            <span className="text-light shrink-0 text-xs font-normal">(Deferred)</span>
+          )}
         </div>
       );
     },
     header: 'Function',
     enableSorting: false,
     id: ensureColumnID('function'),
-  }),
-  columnHelper.accessor('runType', {
-    cell: (info) => {
-      const runType = info.getValue();
-      const pill = getRunTypePill(runType);
-      const pillType = isRunType(runType) ? runType : 'PRIMARY';
-
-      return (
-        <div className="flex items-center">
-          <PillCell type={pillType} kind={pill.kind} className="bg-transparent">
-            {pill.label}
-          </PillCell>
-        </div>
-      );
-    },
-    header: 'Type',
-    enableSorting: false,
-    id: ensureColumnID('runType'),
   }),
   columnHelper.accessor('app', {
     cell: (info) => {

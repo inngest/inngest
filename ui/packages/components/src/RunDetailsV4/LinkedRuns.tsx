@@ -119,7 +119,7 @@ const ParentFunctionCell = ({ parent }: { parent: ParentRef }) => {
     <td className={tdClass}>
       {parent ? (
         <Link href={pathCreator.function({ functionSlug: parent.function.slug })}>
-          <PillCell type="FUNCTION">{parent.function.slug}</PillCell>
+          <PillCell type="FUNCTION">{parent.function.name}</PillCell>
         </Link>
       ) : (
         <MutedDash />
@@ -187,6 +187,7 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
     >
       {defers.map((d) => {
         const fnSlug = d.run?.function.slug ?? d.fnSlug;
+        const fnName = d.run?.function.name ?? d.fnSlug;
         return (
           <tr key={d.id}>
             <td className={tdClass}>
@@ -208,7 +209,7 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
             </td>
             <td className={tdClass}>
               <Link href={pathCreator.function({ functionSlug: fnSlug })}>
-                <PillCell type="FUNCTION">{fnSlug}</PillCell>
+                <PillCell type="FUNCTION">{fnName}</PillCell>
               </Link>
             </td>
           </tr>

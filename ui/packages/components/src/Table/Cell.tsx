@@ -20,8 +20,8 @@ export function IDCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-mono')}>{children}</p>;
 }
 
-export function TextCell({ children }: React.PropsWithChildren) {
-  return <p className={cn(cellStyles, 'truncate font-medium')}>{children}</p>;
+export function TextCell({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return <p className={cn(cellStyles, 'truncate font-medium', className)}>{children}</p>;
 }
 
 export function AICell({ children }: React.PropsWithChildren) {

@@ -269,7 +269,7 @@ describe('LinkedRuns', () => {
     expect(screen.getByText('Invoked by')).toBeTruthy();
     expect(screen.getByText('invoke-child')).toBeTruthy();
     expect(screen.getByText('01INVOKER01')).toBeTruthy();
-    expect(screen.getByText('invoker-fn')).toBeTruthy();
+    expect(screen.getByText('Invoker Fn')).toBeTruthy();
   });
 
   it('does not render Invoked by section when invokedFrom is null', () => {
