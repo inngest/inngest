@@ -1575,6 +1575,9 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 // from it. Recording linkage in the executor mirrors
 // updateInvokeSpanWithInvokedRunID and, like it, gates on the triggering event
 // name here rather than baking defer logic into run-ID generation.
+// TODO: we should probably use the event data to pass the information we're using to create the
+// target span, so that we're able to keep the logic of what we're sending there. implementation detaily here
+// TODO: since the pattern is similar to the invoke method, make the name more similar.
 func (e *executor) recordDeferChildRun(ctx context.Context, l logger.Logger, events []event.TrackedEvent, childMD sv2.Metadata) {
 	// At most one deferred.schedule event today; a batch is handled defensively.
 	if len(events) == 0 || events[0].GetEvent().Name != consts.FnDeferScheduleName {

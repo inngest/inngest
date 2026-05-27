@@ -11,9 +11,7 @@ import {
   FunctionRunTimeField,
   isFunctionRunStatus,
   isFunctionTimeField,
-  isRunType,
   type FunctionRunStatus,
-  type RunType,
 } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
@@ -28,6 +26,7 @@ import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
+  useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
   useValidatedArraySearchParam,
@@ -133,7 +132,8 @@ export function RunsPage({
     isFunctionTimeField
   );
 
-  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
+  const [excludeDeferred = false, setExcludeDeferred, removeExcludeDeferred] =
+    useBooleanSearchParam('excludeDeferred');
 
   const [search, setSearch, removeSearch] = useSearchParam('search');
 
@@ -199,12 +199,16 @@ export function RunsPage({
     [scrollToTop, setTimeField]
   );
 
-  const onRunTypeFilterChange = useCallback(
-    (value: RunType | undefined) => {
+  const onExcludeDeferredChange = useCallback(
+    (value: boolean) => {
       scrollToTop();
-      batchUpdate({ filterRunType: value ?? null });
+      if (value) {
+        setExcludeDeferred(true);
+      } else {
+        removeExcludeDeferred();
+      }
     },
-    [batchUpdate, scrollToTop]
+    [removeExcludeDeferred, scrollToTop, setExcludeDeferred]
   );
 
   const onDaysChange = useCallback(
@@ -373,8 +377,8 @@ export function RunsPage({
             )}
             {features.runType && (
               <RunsTypeFilter
-                selectedRunType={filterRunType}
-                onRunTypeChange={onRunTypeFilterChange}
+                excludeDeferred={excludeDeferred}
+                onExcludeDeferredChange={onExcludeDeferredChange}
               />
             )}
           </div>

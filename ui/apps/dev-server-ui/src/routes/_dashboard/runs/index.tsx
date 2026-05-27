@@ -8,10 +8,12 @@ import {
   GetRunsDocument,
   CountRunsQuery,
   CountRunsDocument,
+  RunType,
 } from '@/store/generated';
 import { Header } from '@inngest/components/Header/Header';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
+  useBooleanSearchParam,
   useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
@@ -23,7 +25,6 @@ import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import {
   isFunctionRunStatus,
-  isRunType,
   FunctionRunTimeField,
   isFunctionTimeField,
 } from '@inngest/components/types/functionRun';
@@ -71,7 +72,7 @@ function RunsComponent() {
     'timeField',
     isFunctionTimeField,
   );
-  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
+  const [excludeDeferred] = useBooleanSearchParam('excludeDeferred');
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
@@ -100,7 +101,7 @@ function RunsComponent() {
         timeField,
         celQuery: search,
         preview,
-        runType: filterRunType ?? null,
+        runType: excludeDeferred ? RunType.Primary : null,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -128,7 +129,7 @@ function RunsComponent() {
       timeField,
       search,
       preview,
-      filterRunType,
+      excludeDeferred,
     ],
   );
 
@@ -144,7 +145,7 @@ function RunsComponent() {
           timeField,
           search,
           preview,
-          filterRunType,
+          excludeDeferred,
         },
       ],
       queryFn,
@@ -171,7 +172,7 @@ function RunsComponent() {
         status: filteredStatus,
         timeField,
         celQuery: search,
-        runType: filterRunType ?? null,
+        runType: excludeDeferred ? RunType.Primary : null,
       });
       setTotalCount(data.runs.totalCount);
     })();
@@ -181,7 +182,7 @@ function RunsComponent() {
     filteredStatus,
     timeField,
     search,
-    filterRunType,
+    excludeDeferred,
   ]);
 
   useEffect(() => {

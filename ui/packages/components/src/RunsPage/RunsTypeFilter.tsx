@@ -1,53 +1,26 @@
-import { Select, type Option } from '../Select/Select';
-import { isRunType, runTypes, type RunType } from '../types/functionRun';
+import { Switch, SwitchLabel, SwitchWrapper } from '../Switch';
 
 type RunsTypeFilterProps = {
-  selectedRunType: RunType | undefined;
-  onRunTypeChange: (value: RunType | undefined) => void;
+  excludeDeferred: boolean;
+  onExcludeDeferredChange: (value: boolean) => void;
 };
 
-const ALL_ID = 'ALL';
-
-const labels: Record<RunType | typeof ALL_ID, string> = {
-  ALL: 'All',
-  PRIMARY: 'Primary',
-  DEFER: 'Deferred',
-};
-
-const options: Option[] = [
-  { id: ALL_ID, name: labels[ALL_ID] },
-  ...runTypes.map((field) => ({ id: field, name: labels[field] })),
-];
-
-export default function RunsTypeFilter({ selectedRunType, onRunTypeChange }: RunsTypeFilterProps) {
-  const selectedValue =
-    options.find((option) => option.id === (selectedRunType ?? ALL_ID)) ?? options[0];
-
+// A simple on/off toggle: off shows all runs (no run-type filter), on excludes
+// deferred runs by filtering to PRIMARY runs on the backend.
+export default function RunsTypeFilter({
+  excludeDeferred,
+  onExcludeDeferredChange,
+}: RunsTypeFilterProps) {
   return (
-    <Select
-      value={selectedValue}
-      onChange={(value: Option) => {
-        onRunTypeChange(isRunType(value.id) ? value.id : undefined);
-      }}
-      label="Type"
-      isLabelVisible
-      className="bg-modalBase min-w-[90px]"
-      size="small"
-    >
-      <Select.Button isLabelVisible size="small">
-        <span>{selectedValue?.name}</span>
-      </Select.Button>
-      <Select.Options>
-        {options.map((option) => {
-          return (
-            <Select.Option key={option.id} option={option}>
-              <span className="inline-flex items-center gap-2">
-                <span>{option.name}</span>
-              </span>
-            </Select.Option>
-          );
-        })}
-      </Select.Options>
-    </Select>
+    <SwitchWrapper>
+      <Switch
+        id="exclude-deferred-runs"
+        checked={excludeDeferred}
+        onCheckedChange={onExcludeDeferredChange}
+      />
+      <SwitchLabel htmlFor="exclude-deferred-runs" className="text-sm">
+        Exclude deferred runs
+      </SwitchLabel>
+    </SwitchWrapper>
   );
 }
