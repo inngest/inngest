@@ -43,6 +43,7 @@ type GetFunctionRunOpts struct {
 
 type FunctionRunReader interface {
 	GetFunctionRun(ctx context.Context, runID ulid.ULID, opts GetFunctionRunOpts) (*cqrs.FunctionRun, error)
+	GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.FunctionRun, error)
 }
 
 type FunctionTraceReader interface {

@@ -57,6 +57,45 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 	}, nil
 }
 
+func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsRequest) (*apiv2.GetEventRunsResponse, error) {
+	if req.EventId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Event ID is required")
+	}
+
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetEventRuns_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no event runs were fetched.")
+	}
+
+	if s.runs == nil || s.functions == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get event runs is not yet implemented")
+	}
+
+	eventID, err := ulid.Parse(req.EventId)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Event ID must be a valid ULID")
+	}
+
+	runs, err := s.runs.GetEventRuns(ctx, eventID)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Event runs not found")
+	}
+
+	data := make([]*apiv2.FunctionRun, 0, len(runs))
+	for _, run := range runs {
+		fn, err := s.functions.GetFunction(ctx, run.FunctionID.String())
+		if err != nil {
+			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
+		}
+		data = append(data, toFunctionRun(run, fn, req.GetIncludeOutput()))
+	}
+
+	return &apiv2.GetEventRunsResponse{
+		Data:     data,
+		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
+	}, nil
+}
+
 func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTraceRequest) (*apiv2.GetFunctionTraceResponse, error) {
 	if req.RunId == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")

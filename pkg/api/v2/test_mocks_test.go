@@ -33,6 +33,12 @@ func (m *mockFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.U
 	return run, args.Error(1)
 }
 
+func (m *mockFunctionRunReader) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.FunctionRun, error) {
+	args := m.Called(ctx, eventID)
+	runs, _ := args.Get(0).([]*cqrs.FunctionRun)
+	return runs, args.Error(1)
+}
+
 type mockFunctionTraceReader struct {
 	mock.Mock
 }

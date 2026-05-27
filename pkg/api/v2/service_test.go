@@ -440,6 +440,73 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 }
 
+func TestService_GetEventRuns(t *testing.T) {
+	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+
+	run := &cqrs.FunctionRun{
+		RunID:        runID,
+		RunStartedAt: time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC),
+		FunctionID:   functionID,
+		EventID:      eventID,
+		Status:       enums.RunStatusRunning,
+	}
+	fn := inngest.DeployedFunction{
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+		},
+	}
+
+	t.Run("returns mapped event runs", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+		runs := &mockFunctionRunReader{}
+		runs.On("GetEventRuns", mock.Anything, eventID).Return([]*cqrs.FunctionRun{run}, nil).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+			runs.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    functions,
+			FunctionRuns: runs,
+		})
+
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.Equal(t, runID.String(), resp.Data[0].Id)
+		require.Equal(t, "test-fn", resp.Data[0].Function.Id)
+		require.Equal(t, []string{eventID.String()}, resp.Data[0].Trigger.EventIds)
+	})
+
+	t.Run("requires event id", func(t *testing.T) {
+		service := NewService(ServiceOptions{})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event ID is required")
+	})
+
+	t.Run("validates event id format", func(t *testing.T) {
+		service := NewService(ServiceOptions{
+			Functions:    &mockFunctionProvider{},
+			FunctionRuns: &mockFunctionRunReader{},
+		})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: "not-a-ulid",
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event ID must be a valid ULID")
+	})
+}
+
 func TestToTraceSpanStatus(t *testing.T) {
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, toTraceSpanStatus(models.RunTraceSpanStatusCompleted))
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_FAILED, toTraceSpanStatus(models.RunTraceSpanStatusFailed))

@@ -20,3 +20,7 @@ func NewFunctionRunReader(reader cqrs.APIV1FunctionRunReader) apiv2.FunctionRunR
 func (r *cqrsFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID, _ apiv2.GetFunctionRunOpts) (*cqrs.FunctionRun, error) {
 	return r.reader.GetFunctionRun(ctx, consts.DevServerAccountID, consts.DevServerEnvID, runID)
 }
+
+func (r *cqrsFunctionRunReader) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.FunctionRun, error) {
+	return r.reader.GetFunctionRunsFromEvents(ctx, consts.DevServerAccountID, consts.DevServerEnvID, []ulid.ULID{eventID})
+}
