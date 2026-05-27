@@ -2,8 +2,11 @@ package apiv2
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +20,11 @@ import (
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	defaultEventRunsLimit = 20
+	maxEventRunsLimit     = 40
 )
 
 func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
@@ -78,22 +86,129 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 
 	runs, err := s.runs.GetEventRuns(ctx, eventID)
 	if err != nil {
-		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Event runs not found")
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch event runs")
 	}
 
-	data := make([]*apiv2.FunctionRun, 0, len(runs))
-	for _, run := range runs {
-		fn, err := s.functions.GetFunction(ctx, run.FunctionID.String())
-		if err != nil {
+	// Limit the runs first so we only load function details for the runs we return.
+	pagedRuns, page, err := paginateEventRuns(runs, req.GetCursor(), req.GetLimit())
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
+
+	functions, err := getFunctionsForRuns(ctx, s.functions, pagedRuns)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch functions")
+	}
+
+	data := make([]*apiv2.FunctionRun, 0, len(pagedRuns))
+	for _, run := range pagedRuns {
+		fn, ok := functions[run.FunctionID.String()]
+		if !ok {
 			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
 		}
-		data = append(data, toFunctionRun(run, fn, req.GetIncludeOutput()))
+		mapped := toFunctionRun(run, fn)
+		if req.GetIncludeOutput() {
+			// Event-runs readers already return run output, so we don't need to fetch trace output here.
+			mapped.Output = jsonToStruct(run.Output)
+		}
+		data = append(data, mapped)
 	}
 
 	return &apiv2.GetEventRunsResponse{
 		Data:     data,
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
+		Page:     page,
 	}, nil
+}
+
+func paginateEventRuns(runs []*cqrs.FunctionRun, cursor string, requestedLimit int32) ([]*cqrs.FunctionRun, *apiv2.Page, error) {
+	limit := int(requestedLimit)
+	if limit == 0 {
+		limit = defaultEventRunsLimit
+	}
+	if limit < 1 {
+		return nil, nil, fmt.Errorf("Limit must be at least 1")
+	}
+	if limit > maxEventRunsLimit {
+		return nil, nil, fmt.Errorf("Limit cannot exceed %d", maxEventRunsLimit)
+	}
+
+	offset := 0
+	if cursor != "" {
+		decodedOffset, err := decodeEventRunsCursor(cursor)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Cursor is invalid")
+		}
+		offset = decodedOffset
+	}
+	if offset > len(runs) {
+		offset = len(runs)
+	}
+
+	end := offset + limit
+	if end > len(runs) {
+		end = len(runs)
+	}
+
+	page := &apiv2.Page{
+		HasMore: end < len(runs),
+		Limit:   int32(limit),
+	}
+	if page.HasMore {
+		nextCursor := encodeEventRunsCursor(end)
+		page.Cursor = &nextCursor
+	}
+
+	return runs[offset:end], page, nil
+}
+
+func encodeEventRunsCursor(offset int) string {
+	return base64.StdEncoding.EncodeToString([]byte(strconv.Itoa(offset)))
+}
+
+func decodeEventRunsCursor(cursor string) (int, error) {
+	decoded, err := base64.StdEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, err
+	}
+	offset, err := strconv.Atoi(string(decoded))
+	if err != nil {
+		return 0, err
+	}
+	if offset < 0 {
+		return 0, fmt.Errorf("cursor offset must be positive")
+	}
+	return offset, nil
+}
+
+func getFunctionsForRuns(ctx context.Context, provider FunctionProvider, runs []*cqrs.FunctionRun) (map[string]inngest.DeployedFunction, error) {
+	identifiers := make([]string, 0, len(runs))
+	seen := map[string]struct{}{}
+	for _, run := range runs {
+		identifier := run.FunctionID.String()
+		if _, ok := seen[identifier]; ok {
+			continue
+		}
+		seen[identifier] = struct{}{}
+		identifiers = append(identifiers, identifier)
+	}
+	if len(identifiers) == 0 {
+		return map[string]inngest.DeployedFunction{}, nil
+	}
+
+	if batchProvider, ok := provider.(FunctionBatchProvider); ok {
+		return batchProvider.GetFunctions(ctx, identifiers)
+	}
+
+	functions := make(map[string]inngest.DeployedFunction, len(identifiers))
+	for _, identifier := range identifiers {
+		fn, err := provider.GetFunction(ctx, identifier)
+		if err != nil {
+			return nil, err
+		}
+		functions[identifier] = fn
+	}
+	return functions, nil
 }
 
 func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTraceRequest) (*apiv2.GetFunctionTraceResponse, error) {

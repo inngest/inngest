@@ -1649,11 +1649,23 @@ message GetFunctionRunResponse {
 message GetEventRunsRequest {
   string event_id = 1;
   optional bool include_output = 2;
+  optional string cursor = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of runs to return per page (min: 1, max: 40)"
+      default: "20"
+    }
+  ];
 }
 
 message GetEventRunsResponse {
   repeated FunctionRun data = 1;
   ResponseMetadata metadata = 2;
+  Page page = 3;
 }
 
 message TraceSpanMetadata {

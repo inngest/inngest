@@ -443,7 +443,9 @@ func TestService_GetFunctionRun(t *testing.T) {
 func TestService_GetEventRuns(t *testing.T) {
 	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	nextRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cz")
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	nextFunctionID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 
 	run := &cqrs.FunctionRun{
 		RunID:        runID,
@@ -452,16 +454,31 @@ func TestService_GetEventRuns(t *testing.T) {
 		EventID:      eventID,
 		Status:       enums.RunStatusRunning,
 	}
+	nextRun := &cqrs.FunctionRun{
+		RunID:        nextRunID,
+		RunStartedAt: time.Date(2026, 4, 9, 12, 1, 0, 0, time.UTC),
+		FunctionID:   nextFunctionID,
+		EventID:      eventID,
+		Status:       enums.RunStatusCompleted,
+	}
 	fn := inngest.DeployedFunction{
 		Function: inngest.Function{
 			Name: "Test function",
 			Slug: "test-fn",
 		},
 	}
+	nextFn := inngest.DeployedFunction{
+		Function: inngest.Function{
+			Name: "Next function",
+			Slug: "next-fn",
+		},
+	}
 
 	t.Run("returns mapped event runs", func(t *testing.T) {
 		functions := &mockFunctionProvider{}
-		functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+		functions.On("GetFunctions", mock.Anything, []string{functionID.String()}).Return(map[string]inngest.DeployedFunction{
+			functionID.String(): fn,
+		}, nil).Once()
 		runs := &mockFunctionRunReader{}
 		runs.On("GetEventRuns", mock.Anything, eventID).Return([]*cqrs.FunctionRun{run}, nil).Once()
 		t.Cleanup(func() {
@@ -483,6 +500,82 @@ func TestService_GetEventRuns(t *testing.T) {
 		require.Equal(t, runID.String(), resp.Data[0].Id)
 		require.Equal(t, "test-fn", resp.Data[0].Function.Id)
 		require.Equal(t, []string{eventID.String()}, resp.Data[0].Trigger.EventIds)
+		require.NotNil(t, resp.Page)
+		require.False(t, resp.Page.HasMore)
+		require.Equal(t, int32(defaultEventRunsLimit), resp.Page.Limit)
+	})
+
+	t.Run("paginates event runs before resolving functions", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunctions", mock.Anything, []string{functionID.String()}).Return(map[string]inngest.DeployedFunction{
+			functionID.String(): fn,
+		}, nil).Once()
+		functions.On("GetFunctions", mock.Anything, []string{nextFunctionID.String()}).Return(map[string]inngest.DeployedFunction{
+			nextFunctionID.String(): nextFn,
+		}, nil).Once()
+		runs := &mockFunctionRunReader{}
+		runs.On("GetEventRuns", mock.Anything, eventID).Return([]*cqrs.FunctionRun{run, nextRun}, nil).Twice()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+			runs.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    functions,
+			FunctionRuns: runs,
+		})
+		limit := int32(1)
+
+		first, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Limit:   &limit,
+		})
+		require.NoError(t, err)
+		require.Len(t, first.Data, 1)
+		require.Equal(t, runID.String(), first.Data[0].Id)
+		require.True(t, first.Page.HasMore)
+		require.NotNil(t, first.Page.Cursor)
+		require.Equal(t, int32(1), first.Page.Limit)
+
+		second, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Cursor:  first.Page.Cursor,
+			Limit:   &limit,
+		})
+		require.NoError(t, err)
+		require.Len(t, second.Data, 1)
+		require.Equal(t, nextRunID.String(), second.Data[0].Id)
+		require.False(t, second.Page.HasMore)
+		require.Nil(t, second.Page.Cursor)
+	})
+
+	t.Run("deduplicates function lookups within a page", func(t *testing.T) {
+		duplicateRun := *nextRun
+		duplicateRun.FunctionID = functionID
+
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunctions", mock.Anything, []string{functionID.String()}).Return(map[string]inngest.DeployedFunction{
+			functionID.String(): fn,
+		}, nil).Once()
+		runs := &mockFunctionRunReader{}
+		runs.On("GetEventRuns", mock.Anything, eventID).Return([]*cqrs.FunctionRun{run, &duplicateRun}, nil).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+			runs.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    functions,
+			FunctionRuns: runs,
+		})
+
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 2)
+		require.Equal(t, []string{runID.String(), nextRunID.String()}, []string{resp.Data[0].Id, resp.Data[1].Id})
 	})
 
 	t.Run("requires event id", func(t *testing.T) {
@@ -504,6 +597,47 @@ func TestService_GetEventRuns(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Event ID must be a valid ULID")
+	})
+
+	t.Run("returns internal error when run reader fails", func(t *testing.T) {
+		runs := &mockFunctionRunReader{}
+		runs.On("GetEventRuns", mock.Anything, eventID).Return([]*cqrs.FunctionRun(nil), errors.New("reader failed")).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    &mockFunctionProvider{},
+			FunctionRuns: runs,
+		})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Unable to fetch event runs")
+	})
+
+	t.Run("validates pagination", func(t *testing.T) {
+		runs := &mockFunctionRunReader{}
+		runs.On("GetEventRuns", mock.Anything, eventID).Return([]*cqrs.FunctionRun{run}, nil).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    &mockFunctionProvider{},
+			FunctionRuns: runs,
+		})
+		invalidLimit := int32(maxEventRunsLimit + 1)
+
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Limit:   &invalidLimit,
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Limit cannot exceed 40")
 	})
 }
 

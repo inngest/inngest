@@ -10,6 +10,7 @@ import (
 )
 
 var _ FunctionProvider = (*mockFunctionProvider)(nil)
+var _ FunctionBatchProvider = (*mockFunctionProvider)(nil)
 var _ FunctionRunReader = (*mockFunctionRunReader)(nil)
 var _ FunctionTraceReader = (*mockFunctionTraceReader)(nil)
 
@@ -21,6 +22,12 @@ func (m *mockFunctionProvider) GetFunction(ctx context.Context, identifier strin
 	args := m.Called(ctx, identifier)
 	fn, _ := args.Get(0).(inngest.DeployedFunction)
 	return fn, args.Error(1)
+}
+
+func (m *mockFunctionProvider) GetFunctions(ctx context.Context, identifiers []string) (map[string]inngest.DeployedFunction, error) {
+	args := m.Called(ctx, identifiers)
+	fns, _ := args.Get(0).(map[string]inngest.DeployedFunction)
+	return fns, args.Error(1)
 }
 
 type mockFunctionRunReader struct {
