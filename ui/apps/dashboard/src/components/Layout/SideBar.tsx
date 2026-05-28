@@ -7,7 +7,6 @@ import Navigation from '../Navigation/Navigation';
 import { Profile } from '../Navigation/Profile';
 import { Integrations } from '../Navigation/Integrations';
 import OnboardingGuideTrigger from '../Navigation/OnboardingGuideTrigger';
-import UtilityStrip from '../Navigation/UtilityStrip';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
 import OnboardingWidget from '../Navigation/OnboardingWidget';
@@ -55,10 +54,9 @@ export default function SideBar({
 
   return (
     <nav
-      className={`bg-canvasBase border-subtle group
-         top-0 flex h-screen flex-col justify-start ${
-           collapsed ? 'w-[64px]' : 'w-[224px]'
-         }  sticky z-[51] shrink-0 overflow-visible border-r`}
+      className={`bg-canvasBase border-subtle group flex h-full flex-col justify-start ${
+        collapsed ? 'w-[64px]' : 'w-[224px]'
+      } shrink-0 overflow-visible border-r`}
       ref={navRef}
     >
       <Logo
@@ -81,7 +79,6 @@ export default function SideBar({
             />
           )}
           <Integrations collapsed={collapsed} />
-          <UtilityStrip collapsed={collapsed} />
         </div>
         {profile && <Profile collapsed={collapsed} profile={profile} />}
       </div>
