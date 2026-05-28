@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 
 import type { Environment as EnvType } from '@/utils/environments';
@@ -8,13 +9,16 @@ export default function NavSection({
   group,
   activeEnv,
   collapsed,
+  footer,
 }: {
   group: NavGroupConfig;
   activeEnv: EnvType;
   collapsed: boolean;
+  // Optional extra row rendered after the section's items (e.g. the Keys
+  // popover trigger inside Manage). Counts toward "is this section empty?".
+  footer?: ReactNode;
 }) {
-  // Don't render a section (or its header) when it has no visible items.
-  if (group.items.length === 0) {
+  if (group.items.length === 0 && !footer) {
     return null;
   }
 
@@ -37,6 +41,7 @@ export default function NavSection({
           icon={<item.Icon className="h-[18px] w-[18px]" />}
         />
       ))}
+      {footer}
     </div>
   );
 }

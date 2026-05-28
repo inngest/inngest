@@ -4,7 +4,7 @@ import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import type { Environment as EnvType } from '@/utils/environments';
 import Environments from './Environments';
-import KeysMenu from './KeysMenu';
+import KeysNavItem from './KeysNavItem';
 import NavSection from './NavSection';
 import {
   experimentsItem,
@@ -34,17 +34,9 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
 
   return (
     <div className={`text-basis mx-4 mt-4 flex h-full flex-col`}>
-      <div
-        className={`flex ${
-          collapsed ? 'flex-col' : 'flex-row'
-        } w-full justify-between gap-x-1 gap-y-2`}
-      >
-        <Suspense fallback={<Skeleton className={`h-8 w-full`} />}>
-          <Environments activeEnv={activeEnv} collapsed={collapsed} />
-        </Suspense>
-
-        {activeEnv && <KeysMenu activeEnv={activeEnv} collapsed={collapsed} />}
-      </div>
+      <Suspense fallback={<Skeleton className={`h-8 w-full`} />}>
+        <Environments activeEnv={activeEnv} collapsed={collapsed} />
+      </Suspense>
 
       {activeEnv && (
         <>
@@ -63,6 +55,7 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
             group={manage}
             activeEnv={activeEnv}
             collapsed={collapsed}
+            footer={<KeysNavItem activeEnv={activeEnv} collapsed={collapsed} />}
           />
         </>
       )}
