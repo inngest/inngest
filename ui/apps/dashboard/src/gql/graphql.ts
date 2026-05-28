@@ -101,6 +101,12 @@ export type Account = {
   name: Maybe<Scalars['NullString']['output']>;
   paymentIntents: Array<PaymentIntent>;
   paymentMethods: Maybe<Array<PaymentMethod>>;
+  /**
+   * Collections / payment status for the account. Null when the account is in
+   * good standing (no overdue invoices and no failed payment). Powers the in-app
+   * overdue-invoice banner.
+   */
+  paymentStatus: Maybe<AccountPaymentStatus>;
   plan: Maybe<BillingPlan>;
   quickSearch: QuickSearchResults;
   search: SearchResults;
@@ -131,6 +137,35 @@ export type AccountQuickSearchArgs = {
 
 export type AccountSearchArgs = {
   opts: SearchInput;
+};
+
+export type AccountPaymentStatus = {
+  __typename?: 'AccountPaymentStatus';
+  /** When the pending action takes effect (downgrade/suspension), if scheduled. Null otherwise. */
+  actionDate: Maybe<Scalars['Time']['output']>;
+  /** Total past-due amount across all overdue invoices, in cents. */
+  amountDueCents: Scalars['Int']['output'];
+  /** Pre-formatted amount for display, e.g. "$240.00". */
+  amountDueLabel: Scalars['String']['output'];
+  /** ISO 4217 currency code, e.g. "usd". */
+  currency: Scalars['String']['output'];
+  /** Days the oldest overdue invoice is past due. 0 if a payment failed but nothing is overdue yet. */
+  daysPastDue: Scalars['Int']['output'];
+  /** Whether the most recent payment attempt failed (card declined, etc.). */
+  hasFailedPayment: Scalars['Boolean']['output'];
+  /** Per-invoice detail for the /billing page banner. */
+  overdueInvoices: Array<OverdueInvoice>;
+  /** What happens at actionDate. Null when nothing is scheduled. */
+  pendingAction: Maybe<PaymentPendingAction>;
+  /** Most direct link to resolve payment (hosted invoice URL or billing portal). Must be https. */
+  resolveURL: Scalars['String']['output'];
+  /** Highest severity across all open/overdue invoices. Drives banner color. */
+  severity: PaymentStatusSeverity;
+  /**
+   * Machine-readable collections stage, computed server-side from invoice age and
+   * payment state. Drives banner copy and /billing detail messaging.
+   */
+  stage: PaymentCollectionStage;
 };
 
 export type Addon = {
@@ -1718,6 +1753,26 @@ export type NewWorkspaceInput = {
   name: Scalars['String']['input'];
 };
 
+export type OverdueInvoice = {
+  __typename?: 'OverdueInvoice';
+  amountCents: Scalars['Int']['output'];
+  /** e.g. "$120.00" */
+  amountLabel: Scalars['String']['output'];
+  /** last payment attempt, null if none */
+  attemptedAt: Maybe<Scalars['Time']['output']>;
+  currency: Scalars['String']['output'];
+  daysPastDue: Scalars['Int']['output'];
+  dueAt: Scalars['Time']['output'];
+  /** e.g. "card_declined", null if none */
+  failureReason: Maybe<Scalars['String']['output']>;
+  /** Stripe invoice ID (e.g. "in_123"). Typed as String because IDs in this schema are UUIDs; invoice IDs are not. */
+  id: Scalars['String']['output'];
+  /** hosted invoice / pay link (https), null if none */
+  invoiceURL: Maybe<Scalars['String']['output']>;
+  /** underlying invoice status (open, uncollectible, …) */
+  status: Scalars['String']['output'];
+};
+
 /** The pagination information in a connection. */
 export type PageInfo = {
   __typename?: 'PageInfo';
@@ -1758,6 +1813,21 @@ export type PaginatedWorkflows = {
   page: PageResults;
 };
 
+export enum PaymentCollectionStage {
+  /** already downgraded for non-payment */
+  Downgraded = 'DOWNGRADED',
+  /** scheduled to downgrade on actionDate */
+  DowngradePending = 'DOWNGRADE_PENDING',
+  /** overdue beyond stricter threshold */
+  FinalNotice = 'FINAL_NOTICE',
+  /** overdue, within grace window */
+  PastDue = 'PAST_DUE',
+  /** card declined / retrying, not yet past grace */
+  PaymentFailed = 'PAYMENT_FAILED',
+  /** account suspended for non-payment */
+  Suspended = 'SUSPENDED'
+}
+
 export type PaymentIntent = {
   __typename?: 'PaymentIntent';
   amountLabel: Scalars['String']['output'];
@@ -1776,6 +1846,18 @@ export type PaymentMethod = {
   expYear: Scalars['String']['output'];
   last4: Scalars['String']['output'];
 };
+
+export enum PaymentPendingAction {
+  Downgrade = 'DOWNGRADE',
+  Suspend = 'SUSPEND'
+}
+
+export enum PaymentStatusSeverity {
+  /** past stricter threshold, downgrade/suspension imminent or active */
+  Critical = 'CRITICAL',
+  /** failed payment / within grace window */
+  Warning = 'WARNING'
+}
 
 export type Price = {
   __typename?: 'Price';
@@ -1803,6 +1885,8 @@ export type Query = {
   plans: Array<Maybe<BillingPlan>>;
   runCountTimeSeries: Array<TimeSeries>;
   session: Maybe<Session>;
+  sessionRuns: Array<SessionRun>;
+  sessions: Array<SessionGroup>;
   workspace: Workspace;
   workspaces: Maybe<Array<Workspace>>;
 };
@@ -1892,6 +1976,21 @@ export type QueryMetricsArgs = {
 
 export type QueryRunCountTimeSeriesArgs = {
   timeOptions: TimeSeriesOptions;
+};
+
+
+export type QuerySessionRunsArgs = {
+  sessionId: Scalars['String']['input'];
+  sessionKey: Scalars['String']['input'];
+  timeRange: InputMaybe<TimeRangeInput>;
+  workspaceID: Scalars['ID']['input'];
+};
+
+
+export type QuerySessionsArgs = {
+  sessionKey: Scalars['String']['input'];
+  timeRange: InputMaybe<TimeRangeInput>;
+  workspaceID: Scalars['ID']['input'];
 };
 
 
@@ -2252,6 +2351,34 @@ export type Session = {
   __typename?: 'Session';
   expires: Maybe<Scalars['Time']['output']>;
   user: User;
+};
+
+export type SessionFunction = {
+  __typename?: 'SessionFunction';
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+};
+
+export type SessionGroup = {
+  __typename?: 'SessionGroup';
+  failedRunCount: Scalars['Int']['output'];
+  failureRate: Scalars['Float']['output'];
+  functions: Array<SessionFunction>;
+  lastActiveAt: Scalars['Time']['output'];
+  runCount: Scalars['Int']['output'];
+  sessionId: Scalars['String']['output'];
+  sessionKey: Scalars['String']['output'];
+};
+
+export type SessionRun = {
+  __typename?: 'SessionRun';
+  endedAt: Maybe<Scalars['Time']['output']>;
+  eventName: Maybe<Scalars['String']['output']>;
+  functionSlug: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  queuedAt: Scalars['Time']['output'];
+  startedAt: Maybe<Scalars['Time']['output']>;
+  status: Scalars['String']['output'];
 };
 
 export type SetUpAccountPayload = {
@@ -3670,6 +3797,25 @@ export type SeatOverageCheckQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type SeatOverageCheckQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, entitlements: { __typename?: 'Entitlements', userCount: { __typename?: 'EntitlementUserCount', usage: number, limit: number | null } } } };
 
+export type SessionRunsQueryVariables = Exact<{
+  workspaceID: Scalars['ID']['input'];
+  sessionKey: Scalars['String']['input'];
+  sessionId: Scalars['String']['input'];
+  timeRange: InputMaybe<TimeRangeInput>;
+}>;
+
+
+export type SessionRunsQuery = { __typename?: 'Query', sessionRuns: Array<{ __typename?: 'SessionRun', id: string, functionSlug: string, eventName: string | null, status: string, queuedAt: string, startedAt: string | null, endedAt: string | null }> };
+
+export type SessionsQueryVariables = Exact<{
+  workspaceID: Scalars['ID']['input'];
+  sessionKey: Scalars['String']['input'];
+  timeRange: InputMaybe<TimeRangeInput>;
+}>;
+
+
+export type SessionsQuery = { __typename?: 'Query', sessions: Array<{ __typename?: 'SessionGroup', sessionKey: string, sessionId: string, runCount: number, failedRunCount: number, failureRate: number, lastActiveAt: string, functions: Array<{ __typename?: 'SessionFunction', slug: string, name: string }> }> };
+
 export type CreateSigningKeyMutationVariables = Exact<{
   envID: Scalars['UUID']['input'];
 }>;
@@ -4143,6 +4289,8 @@ export const GetRunsDocument = {"kind":"Document","definitions":[{"kind":"Operat
 export const CountRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CountRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"appIDs"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startTime"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endTime"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"FunctionRunStatus"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"RunsOrderByField"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"celQuery"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}},"defaultValue":{"kind":"NullValue"}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"isDeferred"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}},"defaultValue":{"kind":"NullValue"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"appIDs"},"value":{"kind":"Variable","name":{"kind":"Name","value":"appIDs"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startTime"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"until"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endTime"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"timeField"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"fnSlug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"celQuery"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"isDeferred"},"value":{"kind":"Variable","name":{"kind":"Name","value":"isDeferred"}}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ListValue","values":[{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"field"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeField"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"DESC"}}]}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]}}]} as unknown as DocumentNode<CountRunsQuery, CountRunsQueryVariables>;
 export const AppFilterDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AppFilter"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"env"},"name":{"kind":"Name","value":"envBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"apps"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"externalID"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<AppFilterQuery, AppFilterQueryVariables>;
 export const SeatOverageCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SeatOverageCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"entitlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userCount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"usage"}},{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}}]}}]}}]} as unknown as DocumentNode<SeatOverageCheckQuery, SeatOverageCheckQueryVariables>;
+export const SessionRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SessionRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sessionKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sessionId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeRangeInput"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sessionRuns"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"sessionKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sessionKey"}}},{"kind":"Argument","name":{"kind":"Name","value":"sessionId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sessionId"}}},{"kind":"Argument","name":{"kind":"Name","value":"timeRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"functionSlug"}},{"kind":"Field","name":{"kind":"Name","value":"eventName"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"queuedAt"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}}]}}]}}]} as unknown as DocumentNode<SessionRunsQuery, SessionRunsQueryVariables>;
+export const SessionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Sessions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sessionKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeRangeInput"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sessions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"sessionKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sessionKey"}}},{"kind":"Argument","name":{"kind":"Name","value":"timeRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sessionKey"}},{"kind":"Field","name":{"kind":"Name","value":"sessionId"}},{"kind":"Field","name":{"kind":"Name","value":"runCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedRunCount"}},{"kind":"Field","name":{"kind":"Name","value":"failureRate"}},{"kind":"Field","name":{"kind":"Name","value":"lastActiveAt"}},{"kind":"Field","name":{"kind":"Name","value":"functions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<SessionsQuery, SessionsQueryVariables>;
 export const CreateSigningKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateSigningKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createSigningKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"envID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<CreateSigningKeyMutation, CreateSigningKeyMutationVariables>;
 export const DeleteSigningKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteSigningKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"signingKeyID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteSigningKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"signingKeyID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<DeleteSigningKeyMutation, DeleteSigningKeyMutationVariables>;
 export const RotateSigningKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RotateSigningKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"rotateSigningKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"envID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<RotateSigningKeyMutation, RotateSigningKeyMutationVariables>;

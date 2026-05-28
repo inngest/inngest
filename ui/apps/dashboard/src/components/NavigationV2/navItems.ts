@@ -7,6 +7,7 @@ import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
 import { WebhooksIcon } from '@inngest/components/icons/sections/Webhooks';
 
 export type NavItemConfig = {
@@ -47,6 +48,13 @@ export const experimentsItem: NavItemConfig = {
   label: 'Experiments',
   route: 'experiments',
   Icon: ExperimentsIcon,
+  beta: true,
+};
+
+export const sessionsItem: NavItemConfig = {
+  label: 'Sessions',
+  route: 'sessions',
+  Icon: SessionsIcon,
   beta: true,
 };
 

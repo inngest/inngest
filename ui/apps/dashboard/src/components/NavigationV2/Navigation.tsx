@@ -6,6 +6,7 @@ import {
   experimentsItem,
   manage,
   monitor,
+  sessionsItem,
   workflow,
   type NavGroupConfig,
 } from './navItems';
@@ -22,10 +23,14 @@ export const getNavRoute = (activeEnv: EnvType, link: string) =>
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   const experimentsEnabled = useBooleanFlag('experimentation-steps');
+  const sessionsEnabled = useBooleanFlag('sessions-ui');
 
   const ai: NavGroupConfig = {
     heading: 'AI',
-    items: experimentsEnabled.value ? [experimentsItem] : [],
+    items: [
+      ...(experimentsEnabled.value ? [experimentsItem] : []),
+      ...(sessionsEnabled.value ? [sessionsItem] : []),
+    ],
   };
 
   if (!activeEnv) {
