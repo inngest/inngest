@@ -85,8 +85,8 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 				HashedDeferID: hashedID,
 				Status:        status,
 			}
-			if s.Attributes.DeferUserID != nil {
-				rd.UserDeferID = *s.Attributes.DeferUserID
+			if s.Attributes.DeferUserlandID != nil {
+				rd.UserlandDeferID = *s.Attributes.DeferUserlandID
 			}
 			if s.Attributes.DeferFnSlug != nil {
 				rd.FnSlug = *s.Attributes.DeferFnSlug
@@ -99,13 +99,13 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 			}
 			// Prefer the terminal (Aborted) status. The abort span only
 			// carries hashed ID + status, so preserve the richer fields
-			// (user/fn slug) from whichever span has them.
+			// (userland id/fn slug) from whichever span has them.
 			merged := existing
 			if deferStatusRank(status) > deferStatusRank(existing.Status) {
 				merged.Status = status
 			}
-			if merged.UserDeferID == "" {
-				merged.UserDeferID = rd.UserDeferID
+			if merged.UserlandDeferID == "" {
+				merged.UserlandDeferID = rd.UserlandDeferID
 			}
 			if merged.FnSlug == "" {
 				merged.FnSlug = rd.FnSlug

@@ -59,6 +59,9 @@ func loadByRunID[V any](
 	}
 
 	for _, p := range parsedKeys {
+		// A missing key is not an error: runs with no defers/parents/invokers
+		// are a valid state. Returning Data: nil lets the resolver render an
+		// empty list rather than surfacing an error to the client.
 		v, ok := byRunID[p.runID]
 		if !ok {
 			results[p.index] = &dataloader.Result{Data: nil}

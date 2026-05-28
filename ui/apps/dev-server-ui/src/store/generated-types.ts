@@ -699,7 +699,7 @@ export type RunDefer = {
   id: Scalars['String'];
   run: Maybe<FunctionRunV2>;
   status: RunDeferStatus;
-  userDeferID: Scalars['String'];
+  userlandDeferID: Scalars['String'];
 };
 
 export enum RunDeferStatus {
@@ -1061,7 +1061,7 @@ export type Workspace = {
 export type RunDeferSummaryFieldsFragment = {
   __typename?: 'RunDefer';
   id: string;
-  userDeferID: string;
+  userlandDeferID: string;
   fnSlug: string;
   status: RunDeferStatus;
   run: {
@@ -1830,7 +1830,7 @@ export type GetRunLinkageQuery = {
     defers: Array<{
       __typename?: 'RunDefer';
       id: string;
-      userDeferID: string;
+      userlandDeferID: string;
       fnSlug: string;
       status: RunDeferStatus;
       run: {
@@ -1851,7 +1851,7 @@ export type GetRunLinkageQuery = {
         defers: Array<{
           __typename?: 'RunDefer';
           id: string;
-          userDeferID: string;
+          userlandDeferID: string;
           fnSlug: string;
           status: RunDeferStatus;
           run: {

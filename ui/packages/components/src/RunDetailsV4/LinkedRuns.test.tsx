@@ -46,7 +46,7 @@ afterEach(() => {
 function makeDefer(overrides: Partial<RunDeferSummary> = {}): RunDeferSummary {
   return {
     id: 'hash-1',
-    userDeferID: 'user-id-1',
+    userlandDeferID: 'user-id-1',
     fnSlug: 'child-fn',
     status: 'SCHEDULED',
     run: null,
@@ -113,7 +113,7 @@ describe('LinkedRuns', () => {
   it('parallel defers exclude the current run', () => {
     const sibling = makeDefer({
       id: 'hash-sibling',
-      userDeferID: 'user-sibling',
+      userlandDeferID: 'user-sibling',
       run: {
         id: 'run-sibling',
         status: 'COMPLETED',
@@ -122,7 +122,7 @@ describe('LinkedRuns', () => {
     });
     const self = makeDefer({
       id: 'hash-self',
-      userDeferID: 'user-self',
+      userlandDeferID: 'user-self',
       run: {
         id: 'run-self',
         status: 'COMPLETED',
@@ -143,14 +143,14 @@ describe('LinkedRuns', () => {
     render(<LinkedRuns runID="run-self" invoked={[]} deferredFrom={deferredFrom} />);
     expect(screen.getByText('Parallel defers')).toBeTruthy();
     expect(screen.getByText('user-sibling')).toBeTruthy();
-    // The current run's userDeferID does not appear in the parallel list.
+    // The current run's userlandDeferID does not appear in the parallel list.
     expect(screen.queryByText('user-self')).toBeNull();
   });
 
   it('renders a row per parent and unions parallel defers for a batched child', () => {
     const siblingA = makeDefer({
       id: 'hash-sibling-a',
-      userDeferID: 'user-sibling-a',
+      userlandDeferID: 'user-sibling-a',
       run: {
         id: 'run-sibling-a',
         status: 'COMPLETED',
@@ -159,12 +159,12 @@ describe('LinkedRuns', () => {
     });
     const self = makeDefer({
       id: 'hash-self',
-      userDeferID: 'user-self',
+      userlandDeferID: 'user-self',
       run: { id: 'run-self', status: 'COMPLETED', function: { name: 'Self', slug: 'self' } },
     });
     const siblingB = makeDefer({
       id: 'hash-sibling-b',
-      userDeferID: 'user-sibling-b',
+      userlandDeferID: 'user-sibling-b',
       run: {
         id: 'run-sibling-b',
         status: 'COMPLETED',
@@ -203,12 +203,12 @@ describe('LinkedRuns', () => {
     expect(screen.queryByText('user-self')).toBeNull();
   });
 
-  it('renders the userDeferID, not the hashed id', () => {
+  it('renders the userlandDeferID, not the hashed id', () => {
     render(
       <LinkedRuns
         runID="run-self"
         invoked={[]}
-        defers={[makeDefer({ id: 'sha1-hashed-id', userDeferID: 'order-7' })]}
+        defers={[makeDefer({ id: 'sha1-hashed-id', userlandDeferID: 'order-7' })]}
       />
     );
     expect(screen.getByText('order-7')).toBeTruthy();

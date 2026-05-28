@@ -722,7 +722,7 @@ export type RunDefer = {
   id: Scalars['String'];
   run: Maybe<FunctionRunV2>;
   status: RunDeferStatus;
-  userDeferID: Scalars['String'];
+  userlandDeferID: Scalars['String'];
 };
 
 export enum RunDeferStatus {
@@ -1077,7 +1077,7 @@ export type Workspace = {
   id: Scalars['ID'];
 };
 
-export type RunDeferSummaryFieldsFragment = { __typename?: 'RunDefer', id: string, userDeferID: string, fnSlug: string, status: RunDeferStatus, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null };
+export type RunDeferSummaryFieldsFragment = { __typename?: 'RunDefer', id: string, userlandDeferID: string, fnSlug: string, status: RunDeferStatus, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null };
 
 export type GetEventQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -1208,7 +1208,7 @@ export type GetRunLinkageQueryVariables = Exact<{
 }>;
 
 
-export type GetRunLinkageQuery = { __typename?: 'Query', run: { __typename?: 'FunctionRunV2', defers: Array<{ __typename?: 'RunDefer', id: string, userDeferID: string, fnSlug: string, status: RunDeferStatus, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null }>, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', parentRunID: any, parentRun: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string }, defers: Array<{ __typename?: 'RunDefer', id: string, userDeferID: string, fnSlug: string, status: RunDeferStatus, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null }> } | null }>, invokedFrom: { __typename?: 'RunInvokedFrom', parentRunID: any, stepName: string | null, parentRun: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null } | null } | null };
+export type GetRunLinkageQuery = { __typename?: 'Query', run: { __typename?: 'FunctionRunV2', defers: Array<{ __typename?: 'RunDefer', id: string, userlandDeferID: string, fnSlug: string, status: RunDeferStatus, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null }>, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', parentRunID: any, parentRun: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string }, defers: Array<{ __typename?: 'RunDefer', id: string, userlandDeferID: string, fnSlug: string, status: RunDeferStatus, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null }> } | null }>, invokedFrom: { __typename?: 'RunInvokedFrom', parentRunID: any, stepName: string | null, parentRun: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus, function: { __typename?: 'Function', name: string, slug: string } } | null } | null } | null };
 
 export type GetRunTraceQueryVariables = Exact<{
   runID: Scalars['String'];
@@ -1310,7 +1310,7 @@ export type GetDebugSessionQuery = { __typename?: 'Query', debugSession: { __typ
 export const RunDeferSummaryFieldsFragmentDoc = `
     fragment RunDeferSummaryFields on RunDefer {
   id
-  userDeferID
+  userlandDeferID
   fnSlug
   status
   run {

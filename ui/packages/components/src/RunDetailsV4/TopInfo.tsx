@@ -152,14 +152,14 @@ export const TopInfo = ({
     (defers?.length ?? 0) > 0 ||
     invokedRuns.length > 0;
 
-  const deferUserID = (deferredFrom ?? [])
+  const userlandDeferID = (deferredFrom ?? [])
     .flatMap((p) => p.parentRun?.defers ?? [])
-    .find((d) => d.run?.id === runID)?.userDeferID;
+    .find((d) => d.run?.id === runID)?.userlandDeferID;
   // Fall back through the linkage/trigger names and finally to the run/function
   // name so the header title is never blank (e.g. a deferred run with
   // incomplete linkage and no invoke or trigger name).
   const headerLabel =
-    deferUserID ?? invokedFrom?.stepName ?? trigger?.eventName ?? trace?.name ?? 'Run';
+    userlandDeferID ?? invokedFrom?.stepName ?? trigger?.eventName ?? trace?.name ?? 'Run';
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 

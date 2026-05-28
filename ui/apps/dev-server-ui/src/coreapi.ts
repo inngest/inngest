@@ -3,7 +3,7 @@ import { gql } from 'graphql-request';
 export const RUN_DEFER_SUMMARY_FRAGMENT = gql`
   fragment RunDeferSummaryFields on RunDefer {
     id
-    userDeferID
+    userlandDeferID
     fnSlug
     status
     run {

@@ -9,7 +9,7 @@ export type GetRunLinkagePayload = {
 
 export type RunDeferSummary = {
   id: string;
-  userDeferID: string;
+  userlandDeferID: string;
   fnSlug: string;
   status: string;
   run: {

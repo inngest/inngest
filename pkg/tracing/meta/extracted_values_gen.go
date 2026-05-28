@@ -44,7 +44,7 @@ type ExtractedValues struct {
 	DeferFnSlug *string
 	DeferHashedID *string
 	DeferStatus *enums.DeferStatus
-	DeferUserID *string
+	DeferUserlandID *string
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
 	DynamicTraceID *string

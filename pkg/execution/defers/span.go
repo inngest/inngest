@@ -34,7 +34,7 @@ func emitDeferSpan(ctx context.Context, tp tracing.TracerProvider, md statev2.Me
 		Seed:      util.DeterministicDeferSpanSeed(md.ID.RunID, d.HashedID),
 		Attributes: meta.NewAttrSet(
 			meta.Attr(meta.Attrs.DeferHashedID, &d.HashedID),
-			meta.Attr(meta.Attrs.DeferUserID, &d.UserlandID),
+			meta.Attr(meta.Attrs.DeferUserlandID, &d.UserlandID),
 			meta.Attr(meta.Attrs.DeferFnSlug, &d.FnSlug),
 			meta.Attr(meta.Attrs.DeferStatus, &d.ScheduleStatus),
 		),

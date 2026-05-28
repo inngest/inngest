@@ -200,8 +200,8 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
               <StatusCell status={d.run?.status ?? d.status} />
             </td>
             <td className={tdClass}>
-              <OptionalTooltip tooltip={d.userDeferID}>
-                <IDCell>{d.userDeferID}</IDCell>
+              <OptionalTooltip tooltip={d.userlandDeferID}>
+                <IDCell>{d.userlandDeferID}</IDCell>
               </OptionalTooltip>
             </td>
             <td className={tdClass}>

@@ -8,11 +8,11 @@ import (
 // RunDefer is a single defer attached to a parent function run. Run is nil
 // if the defer was aborted or its child run has not yet been recorded.
 type RunDefer struct {
-	HashedDeferID string            // SHA1-hashed UserDeferID
-	UserDeferID   string            // ID provided by the user, ie `defer("foo", ...)` => "foo"
-	FnSlug        string            // Slug of the deferred function, "foo-defer"
-	Status        enums.DeferStatus // Status of the defer itself, not its associated run
-	Run           *TraceRun
+	HashedDeferID   string            // SHA1-hashed UserlandDeferID
+	UserlandDeferID string            // ID provided by the userland SDK caller, ie `defer("foo", ...)` => "foo"
+	FnSlug          string            // Slug of the deferred function, "foo-defer"
+	Status          enums.DeferStatus // Status of the defer itself, not its associated run
+	Run             *TraceRun
 }
 
 // RunDeferredFrom describes the parent run that scheduled a function run via

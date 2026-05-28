@@ -18,15 +18,15 @@ import (
 )
 
 // Mirrors the attrs an executor.defer span carries in production; keep aligned with the typed Attrs serializers.
-func deferSpanAttrs(t *testing.T, hashedID, userID, fnSlug string, status enums.DeferStatus) []byte {
+func deferSpanAttrs(t *testing.T, hashedID, userlandID, fnSlug string, status enums.DeferStatus) []byte {
 	t.Helper()
 	statusText, err := status.MarshalText()
 	require.NoError(t, err)
 	byt, err := json.Marshal(map[string]any{
-		meta.Attrs.DeferHashedID.Key(): hashedID,
-		meta.Attrs.DeferUserID.Key():   userID,
-		meta.Attrs.DeferFnSlug.Key():   fnSlug,
-		meta.Attrs.DeferStatus.Key():   string(statusText),
+		meta.Attrs.DeferHashedID.Key():   hashedID,
+		meta.Attrs.DeferUserlandID.Key(): userlandID,
+		meta.Attrs.DeferFnSlug.Key():     fnSlug,
+		meta.Attrs.DeferStatus.Key():     string(statusText),
 	})
 	require.NoError(t, err)
 	return byt
@@ -80,10 +80,10 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 
 	// Two defers; only the first will get a child TraceRow.
 	defers := []struct {
-		hashedID string
-		userID   string
-		fnSlug   string
-		status   enums.DeferStatus
+		hashedID   string
+		userlandID string
+		fnSlug     string
+		status     enums.DeferStatus
 	}{
 		{"hash-aaa", "user-aaa", "app-fn-aaa", enums.DeferStatusAfterRun},
 		{"hash-bbb", "user-bbb", "app-fn-bbb", enums.DeferStatusAborted},
@@ -98,14 +98,12 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 			AppID:         appID.String(),
 			FunctionID:    fnID.String(),
 			EnvID:         workspaceID.String(),
-			Attributes:    deferSpanAttrs(t, d.hashedID, d.userID, d.fnSlug, d.status),
+			Attributes:    deferSpanAttrs(t, d.hashedID, d.userlandID, d.fnSlug, d.status),
 		})
 	}
 
-	// Link only the first defer's child: a child-run-id executor.defer span on
-	// the parent records the scheduled child run, and its TraceRun must exist to
-	// hydrate. The child run ID is now an ordinary random ID recorded on the
-	// span, not derived from (parent, hashedID).
+	// Link only the first defer to a scheduled child run. Linkage requires
+	// both a child-run-id span on the parent and an existing TraceRun row.
 	linkedChildRunID := ulid.MustNew(ulid.Now(), nil)
 	insertChildTraceRun(t, cm, linkedChildRunID, accountID, workspaceID, appID, fnID)
 	insertTestSpan(t, cm, testSpanFields{
@@ -134,7 +132,7 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 	// hash-aaa is the linked one.
 	first := parentDefers[0]
 	assert.Equal(t, "hash-aaa", first.HashedDeferID)
-	assert.Equal(t, "user-aaa", first.UserDeferID)
+	assert.Equal(t, "user-aaa", first.UserlandDeferID)
 	assert.Equal(t, "app-fn-aaa", first.FnSlug)
 	assert.Equal(t, enums.DeferStatusAfterRun, first.Status)
 	require.NotNil(t, first.Run, "AfterRun defer with a present child trace run must be stitched in")
@@ -201,7 +199,7 @@ func TestGetRunDefers_CollapsesAbortSpanOntoSchedule(t *testing.T) {
 	assert.Equal(t, enums.DeferStatusAborted, d.Status, "terminal Aborted status must win over the schedule span's AfterRun")
 	// Richer fields from the schedule span must be preserved even though the
 	// abort span (which won the status) didn't carry them.
-	assert.Equal(t, "user-x", d.UserDeferID)
+	assert.Equal(t, "user-x", d.UserlandDeferID)
 	assert.Equal(t, "app-fn-x", d.FnSlug)
 }
 
