@@ -298,12 +298,12 @@ func endpointDescription(ep endpoint) string {
 		fmt.Sprintf("Endpoint: %s %s", ep.method, ep.path),
 		"",
 		"Target, auth, and output flags are inherited from `inngest alpha api`:",
-		"  --prod                 Target Inngest Cloud Production",
+		"  --prod                  Target Inngest Cloud Production",
 		"  --api-host, --api-port  Target a custom API server",
-		"  --api-key              API key, or INNGEST_API_KEY",
-		"  --signing-key          Signing key, or INNGEST_SIGNING_KEY",
-		"  --env                  Environment name, or INNGEST_ENV",
-		"  --raw                  Print the response body without formatting",
+		"  --api-key               API key, or INNGEST_API_KEY",
+		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
+		"  --env                   Environment name, or INNGEST_ENV",
+		"  --raw                   Print the response body without formatting",
 	)
 
 	return strings.Join(lines, "\n")

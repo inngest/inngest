@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"testing"
 
@@ -81,6 +82,30 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["data"].String(), "JSON object containing the input data for the function")
 	require.Contains(t, byName["function-id"].String(), "The ID of the function to invoke")
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
+}
+
+func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {
+	var invoke endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "invoke-function" {
+			invoke = ep
+			break
+		}
+	}
+	require.NotEmpty(t, invoke.name)
+
+	valid := map[string]bool{}
+	for _, flag := range commonFlags() {
+		for _, name := range flag.Names() {
+			valid["--"+name] = true
+		}
+	}
+
+	desc := endpointDescription(invoke)
+	for _, match := range regexp.MustCompile(`--[a-z][a-z0-9-]*`).FindAllString(desc, -1) {
+		require.True(t, valid[match],
+			"endpointDescription references %s, which is not defined in commonFlags(); keep the inherited-flag block in sync", match)
+	}
 }
 
 func TestCommandCallsGeneratedEndpoint(t *testing.T) {
