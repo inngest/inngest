@@ -53,6 +53,13 @@ type Opts struct {
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
 	MetricsMiddleware api.MetricsMiddleware
 
+	// ExtendedTraceCapCheck is consulted at the top of the /v1/traces/userland
+	// handler. Implementations should return a non-nil error to reject the
+	// request (typically because the account is over its extended-trace
+	// bytes-per-period cap); nil to accept. Nil hook means "always accept" —
+	// the right default for self-host, which has no billing relationship.
+	ExtendedTraceCapCheck ExtendedTraceCapChecker
+
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator
 	// FunctionCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.

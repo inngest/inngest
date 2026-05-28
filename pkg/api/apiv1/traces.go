@@ -42,6 +42,12 @@ type TraceParent struct {
 
 type TraceRoot struct{}
 
+// ExtendedTraceCapChecker is consulted at the top of the /v1/traces/userland
+// handler to enforce a per-account ingest cap. Implementations should return
+// a non-nil error (typically ErrExtendedTraceCapExceeded) to reject the
+// request and nil to accept it. Wire this through apiv1.Opts.
+type ExtendedTraceCapChecker func(ctx context.Context, accountID uuid.UUID) error
+
 func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Auth the app
 	auth, err := a.opts.AuthFinder(r.Context())
@@ -59,6 +65,16 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	if !enabled {
 		respondError(w, r, http.StatusUnauthorized, "OTel traces are not enabled for this account")
 		return
+	}
+
+	// Hard-cap gate: reject before we read the body so over-cap accounts pay
+	// neither bandwidth nor CPU. Nil checker = self-host default = always
+	// accept.
+	if a.opts.ExtendedTraceCapCheck != nil {
+		if err := a.opts.ExtendedTraceCapCheck(ctx, auth.AccountID()); err != nil {
+			respondError(w, r, http.StatusTooManyRequests, err.Error())
+			return
+		}
 	}
 
 	// Check that the trace ID is valid and accessible to the app.
