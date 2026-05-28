@@ -6,7 +6,8 @@ import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
 import { Profile } from '../Navigation/Profile';
 import { Integrations } from '../Navigation/Integrations';
-import { Help } from '../Navigation/Help';
+import OnboardingGuideTrigger from '../Navigation/OnboardingGuideTrigger';
+import UtilityStrip from '../Navigation/UtilityStrip';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
 import OnboardingWidget from '../Navigation/OnboardingWidget';
@@ -71,11 +72,16 @@ export default function SideBar({
 
         <div className="mx-4">
           <SeatOverageWidget collapsed={collapsed} />
-          {isWidgetOpen && (
+          {isWidgetOpen ? (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
+          ) : (
+            <OnboardingGuideTrigger
+              collapsed={collapsed}
+              showWidget={showWidget}
+            />
           )}
           <Integrations collapsed={collapsed} />
-          <Help collapsed={collapsed} showWidget={showWidget} />
+          <UtilityStrip collapsed={collapsed} />
         </div>
         {profile && <Profile collapsed={collapsed} profile={profile} />}
       </div>
