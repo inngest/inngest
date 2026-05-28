@@ -32,16 +32,21 @@ export default function KeysNavItem({
           <button
             type="button"
             className={cn(
-              'my-0.5 flex h-8 w-full flex-row items-center rounded px-1.5 text-left',
+              'my-0.5 flex h-6 w-full flex-row items-center gap-3 self-stretch rounded px-1 text-left',
               active
-                ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
-                : 'hover:bg-canvasSubtle text-subtle hover:text-basis',
+                ? 'bg-canvasMuted text-basis'
+                : 'hover:bg-canvasSubtle text-muted',
             )}
           >
-            <RiKey2Line className="h-[18px] w-[18px]" />
-            {!collapsed && (
-              <span className="ml-2.5 text-sm leading-tight">Keys</span>
-            )}
+            <span
+              className={cn(
+                'flex shrink-0',
+                active ? 'text-basis' : 'text-light',
+              )}
+            >
+              <RiKey2Line className="h-[18px] w-[18px]" />
+            </span>
+            {!collapsed && <span className="text-sm leading-tight">Keys</span>}
           </button>
         </PopoverTrigger>
       </OptionalTooltip>

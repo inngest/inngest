@@ -21,12 +21,12 @@ export default function OnboardingGuideTrigger({
   return (
     <Link to={to} onClick={() => showWidget()}>
       <OptionalTooltip tooltip={collapsed ? 'Onboarding guide' : ''}>
-        <div className="hover:bg-canvasSubtle text-subtle hover:text-basis my-0.5 flex h-8 w-full flex-row items-center rounded px-1.5">
-          <RiBookReadLine className="h-[18px] w-[18px]" />
+        <div className="hover:bg-canvasSubtle text-muted my-0.5 flex h-6 w-full flex-row items-center gap-3 self-stretch rounded px-1">
+          <span className="text-light flex shrink-0">
+            <RiBookReadLine className="h-[18px] w-[18px]" />
+          </span>
           {!collapsed && (
-            <span className="ml-2.5 text-sm leading-tight">
-              Onboarding guide
-            </span>
+            <span className="text-sm leading-tight">Onboarding guide</span>
           )}
         </div>
       </OptionalTooltip>

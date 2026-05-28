@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
-import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
 import OnboardingGuideTrigger from '../Navigation/OnboardingGuideTrigger';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
@@ -39,14 +39,38 @@ export default function SideBar({
     }
   }, [serverCollapsed]);
 
+  const toggleCollapsed = () => {
+    const toggled = !collapsed;
+    setCollapsed(toggled);
+
+    if (typeof window !== 'undefined') {
+      window.cookieStore.set('navCollapsed', toggled ? 'true' : 'false');
+      // some downstream things, like charts, may need to redraw themselves
+      setTimeout(() => window.dispatchEvent(new Event('navToggle')), 200);
+    }
+  };
+
   return (
     <nav
-      className={`bg-canvasBase border-subtle group flex h-full flex-col justify-start ${
+      className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start ${
         collapsed ? 'w-[64px]' : 'w-[224px]'
       } shrink-0 overflow-visible border-r-hairline`}
       ref={navRef}
     >
-      <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
+      {/* Floating collapse toggle on the right edge — hover to reveal. */}
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className="bg-canvasBase border-subtle shadow-xs absolute right-0 top-6 z-10 hidden h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-hairline group-hover:flex"
+      >
+        {collapsed ? (
+          <RiContractRightLine className="text-muted h-3.5 w-3.5" />
+        ) : (
+          <RiContractLeftLine className="text-muted h-3.5 w-3.5" />
+        )}
+      </button>
+
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 

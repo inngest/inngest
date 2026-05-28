@@ -37,25 +37,24 @@ export const MenuItem = ({
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={cn(
-            `my-0.5 flex h-8 w-full flex-row items-center rounded px-1.5  ${
-              comingSoon
-                ? 'text-disabled hover:bg-disabled cursor-not-allowed'
-                : active
-                ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
-                : 'hover:bg-canvasSubtle text-subtle hover:text-basis'
-            } `,
+            'my-0.5 flex h-6 w-full flex-row items-center gap-3 self-stretch rounded px-1',
+            comingSoon
+              ? 'text-disabled hover:bg-disabled cursor-not-allowed'
+              : active
+              ? 'bg-canvasMuted text-basis'
+              : 'hover:bg-canvasSubtle text-muted',
             className
           )}
         >
-          {icon}
-          {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}
+          <span className={cn('flex shrink-0', active ? 'text-basis' : 'text-light')}>{icon}</span>
+          {!collapsed && <span className="text-sm leading-tight">{text}</span>}
           {!collapsed && beta && (
-            <Pill kind="primary" appearance="solid" className="ml-2.5">
+            <Pill kind="primary" appearance="solid" className="ml-auto">
               Beta
             </Pill>
           )}
           {!collapsed && error && (
-            <Pill kind="error" className="ml-2.5">
+            <Pill kind="error" className="ml-auto">
               Error
             </Pill>
           )}
