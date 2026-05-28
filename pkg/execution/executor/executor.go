@@ -2,6 +2,7 @@ package executor
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -1023,11 +1024,16 @@ func (e *executor) schedule(
 	var eventName *string
 
 	evts := make([]json.RawMessage, len(req.Events))
+	sessions := meta.EventSessions{}
 	for n, item := range req.Events {
 		evt := item.GetEvent()
 		if eventName == nil {
 			name := evt.Name
 			eventName = &name
+		}
+
+		for name, id := range evt.Sessions {
+			sessions = append(sessions, meta.EventSession{Key: name, ID: id})
 		}
 
 		// serialize this data to the span at the same time
@@ -1036,6 +1042,17 @@ func (e *executor) schedule(
 			return nil, nil, fmt.Errorf("error marshalling event: %w", err)
 		}
 		evts[n] = byt
+	}
+
+	var droppedSessions int
+	sessions, droppedSessions = normalizeRunSessions(sessions)
+	if droppedSessions > 0 {
+		logger.StdlibLogger(ctx).Warn(
+			"dropping sessions over per-run limit",
+			"dropped", droppedSessions,
+			"limit", consts.MaxRunSessions,
+			"function_id", req.Function.ID,
+		)
 	}
 
 	// Evaluate the run priority based off of the input event data.
@@ -1358,6 +1375,9 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.FunctionSlug, &functionSlug),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
+	}
+	if len(sessions) > 0 {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.Sessions, &sessions)
 	}
 	if req.RunMode == enums.RunModeSync {
 		// XXX: If this is a sync run, always add the start time to the span. We do this
@@ -6077,4 +6097,30 @@ func updateDeferSpans(
 			&parentFnSlug,
 		)
 	}
+}
+
+// normalizeRunSessions dedupes, sorts, and caps the session pairs collected
+// from a run's triggering events. Sorting makes the run's session label
+// deterministic across retries, since map and batch iteration order are not.
+// Returns the number of pairs dropped by the cap.
+func normalizeRunSessions(pairs meta.EventSessions) (meta.EventSessions, int) {
+	if len(pairs) == 0 {
+		return nil, 0
+	}
+
+	slices.SortFunc(pairs, func(a, b meta.EventSession) int {
+		if c := cmp.Compare(a.Key, b.Key); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+	pairs = slices.Compact(pairs)
+
+	dropped := 0
+	if len(pairs) > consts.MaxRunSessions {
+		dropped = len(pairs) - consts.MaxRunSessions
+		pairs = pairs[:consts.MaxRunSessions]
+	}
+
+	return pairs, dropped
 }

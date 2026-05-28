@@ -123,6 +123,18 @@ const (
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000
 
+	// MaxEventSessions is the maximum number of sessions on a single event.
+	MaxEventSessions = 5
+	// MaxRunSessions is the maximum number of sessions on a single run. A run
+	// aggregates the sessions of every event that triggered it (eg. when
+	// batching), so its bound is larger than MaxEventSessions. It keeps the
+	// run's session label a small fraction of the span metadata budget.
+	MaxRunSessions = 25
+	// MaxEventSessionKeyLength is the maximum number of bytes in a session key.
+	MaxEventSessionKeyLength = 128
+	// MaxEventSessionIDLength is the maximum number of bytes in a session ID.
+	MaxEventSessionIDLength = 512
+
 	InngestEventDataPrefix = "_inngest"
 	// InvokeSlugKey is the data key used to store the fn name when invoking a function
 	// via an RPC-like call, abstracting event-driven fanout.

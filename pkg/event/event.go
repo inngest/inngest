@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +64,9 @@ type Event struct {
 	Timestamp int64  `json:"ts,omitempty"`
 	Version   string `json:"v,omitempty"`
 
+	// Sessions groups runs triggered by this event.
+	Sessions Sessions `json:"sessions,omitempty"`
+
 	// User represents user-specific information for the event.
 	//
 	// Deprecated:  this will be removed in favour of storing everything within data.
@@ -70,6 +75,60 @@ type Event struct {
 	// size represents the size of the event in bytes, set during
 	// the UnmarshalJSON call.
 	size int
+}
+
+// Sessions maps a session key to a session ID.
+type Sessions map[string]string
+
+func (s *Sessions) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*s = nil
+		return nil
+	}
+
+	raw := map[string]any{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	out := Sessions{}
+	for name, value := range raw {
+		switch v := value.(type) {
+		case string:
+			out[name] = v
+		case float64:
+			out[name] = strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			// Booleans are intentionally rejected: a boolean is only ever two
+			// values, i.e. a low-cardinality label, not a session ID.
+			return fmt.Errorf("event session %q must be a string or number", name)
+		}
+	}
+
+	*s = out
+	return nil
+}
+
+// Validate checks session keys and IDs against size limits.
+func (s Sessions) Validate() error {
+	if len(s) > consts.MaxEventSessions {
+		return fmt.Errorf("event sessions can include at most %d entries", consts.MaxEventSessions)
+	}
+	for name, id := range s {
+		if name == "" {
+			return errors.New("event session keys cannot be empty")
+		}
+		if len(name) > consts.MaxEventSessionKeyLength {
+			return fmt.Errorf("event session key %q exceeds %d bytes", name, consts.MaxEventSessionKeyLength)
+		}
+		if id == "" {
+			return fmt.Errorf("event session %q cannot have an empty ID", name)
+		}
+		if len(id) > consts.MaxEventSessionIDLength {
+			return fmt.Errorf("event session %q exceeds %d bytes", name, consts.MaxEventSessionIDLength)
+		}
+	}
+	return nil
 }
 
 func (e *Event) UnmarshalJSON(data []byte) error {
@@ -125,6 +184,9 @@ func (e Event) Map() map[string]any {
 	if e.Version != "" {
 		data["v"] = e.Version
 	}
+	if len(e.Sessions) > 0 {
+		data["sessions"] = e.Sessions
+	}
 
 	return data
 }
@@ -143,6 +205,10 @@ func (e Event) Validate(ctx context.Context) error {
 		if t.After(endTimestamp) {
 			return errors.New("timestamp is after Jan 1, 2100")
 		}
+	}
+
+	if err := e.Sessions.Validate(); err != nil {
+		return err
 	}
 
 	return nil

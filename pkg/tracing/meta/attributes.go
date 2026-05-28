@@ -29,6 +29,7 @@ var Attrs = struct {
 	EnvID               attr[*uuid.UUID]
 	EventIDs            attr[*[]string]
 	EventsInput         attr[*string]
+	Sessions            attr[*EventSessions]
 	TriggeringEventName attr[*string]
 	FunctionID          attr[*uuid.UUID]
 	FunctionName        attr[*string]
@@ -197,6 +198,7 @@ var Attrs = struct {
 	EnvID:                              UUIDAttr("env.id"),
 	EventIDs:                           StringSliceAttr("event.ids"),
 	EventsInput:                        StringAttr("events.input"),
+	Sessions:                           JsonAttr[EventSessions]("event.sessions"),
 	TriggeringEventName:                StringAttr("event.trigger.name"),
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionName:                       StringAttr("function.name"),
@@ -270,6 +272,19 @@ var Attrs = struct {
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
 }
+
+// EventSession is a single session membership pair on a run. The run-level
+// label is a list of pairs rather than a map so that a run triggered by
+// multiple events (eg. a batch) can belong to several sessions sharing the
+// same key.
+type EventSession struct {
+	Key string `json:"key"`
+	ID  string `json:"id"`
+}
+
+// EventSessions is the run-level form of event.Sessions, which cannot be
+// imported here because pkg/event depends on this package.
+type EventSessions []EventSession
 
 type ResponseOps []ResponseOp
 

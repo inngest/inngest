@@ -11,7 +11,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	t.Run("sets all fields", func(t *testing.T) {
 		r := require.New(t)
 
-		input := `{"id":"evt-1","name":"test/event","data":{"key":"val"},"ts":1700000000000,"v":"2024-01-01","user":{"email":"a@b.com"}}`
+		input := `{"id":"evt-1","name":"test/event","data":{"key":"val"},"ts":1700000000000,"v":"2024-01-01","sessions":{"conversation_id":"conversation_1234","priority":1},"user":{"email":"a@b.com"}}`
 
 		var evt Event
 		err := json.Unmarshal([]byte(input), &evt)
@@ -22,6 +22,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		r.Equal(map[string]any{"key": "val"}, evt.Data)
 		r.Equal(int64(1700000000000), evt.Timestamp)
 		r.Equal("2024-01-01", evt.Version)
+		r.Equal(Sessions{"conversation_id": "conversation_1234", "priority": "1"}, evt.Sessions)
 		r.Equal(map[string]any{"email": "a@b.com"}, evt.User)
 	})
 
@@ -45,6 +46,22 @@ func TestUnmarshalJSON(t *testing.T) {
 		r.Error(err)
 	})
 
+	t.Run("invalid session value type returns error", func(t *testing.T) {
+		r := require.New(t)
+
+		var evt Event
+		err := json.Unmarshal([]byte(`{"name":"test/event","data":{},"sessions":{"conversation_id":null}}`), &evt)
+		r.EqualError(err, `event session "conversation_id" must be a string or number`)
+	})
+
+	t.Run("boolean session value returns error", func(t *testing.T) {
+		r := require.New(t)
+
+		var evt Event
+		err := json.Unmarshal([]byte(`{"name":"test/event","data":{},"sessions":{"active":true}}`), &evt)
+		r.EqualError(err, `event session "active" must be a string or number`)
+	})
+
 	t.Run("Size falls back to marshal when not unmarshalled", func(t *testing.T) {
 		r := require.New(t)
 
@@ -56,5 +73,41 @@ func TestUnmarshalJSON(t *testing.T) {
 		byt, err := json.Marshal(evt)
 		r.NoError(err)
 		r.Equal(len(byt), evt.Size())
+	})
+}
+
+func TestEventValidateSessions(t *testing.T) {
+	t.Run("allows valid sessions", func(t *testing.T) {
+		evt := Event{
+			Name:     "test/event",
+			Sessions: Sessions{"conversation_id": "conversation_1234"},
+		}
+
+		require.NoError(t, evt.Validate(t.Context()))
+	})
+
+	t.Run("rejects too many sessions", func(t *testing.T) {
+		evt := Event{
+			Name: "test/event",
+			Sessions: Sessions{
+				"a": "1",
+				"b": "2",
+				"c": "3",
+				"d": "4",
+				"e": "5",
+				"f": "6",
+			},
+		}
+
+		require.EqualError(t, evt.Validate(t.Context()), "event sessions can include at most 5 entries")
+	})
+
+	t.Run("rejects empty session key", func(t *testing.T) {
+		evt := Event{
+			Name:     "test/event",
+			Sessions: Sessions{"": "conversation_1234"},
+		}
+
+		require.EqualError(t, evt.Validate(t.Context()), "event session keys cannot be empty")
 	})
 }
