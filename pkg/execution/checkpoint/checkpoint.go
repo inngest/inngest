@@ -367,19 +367,6 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				)
 			}
 
-		case enums.OpcodeDeferAbort:
-			if err := defers.AbortFromOp(ctx, c.State, l, input.Metadata.ID, op, c.TracerProvider, *input.Metadata, time.Now()); err != nil {
-				// Log without returning the error: a bad defer must
-				// never fail its parent run. We may rethink this as
-				// the Defer feature matures.
-				l.Error(
-					"error handling defer abort in checkpoint",
-					"error", err,
-					"step_id", sanitizeLogValue(op.ID),
-					"run_id", input.Metadata.ID.RunID.String(),
-				)
-			}
-
 		default:
 			// This is an async opcode (sleep, waitForEvent, invoke, etc.) that causes
 			// the run to transition from sync to async mode. Track this on the run span
@@ -534,19 +521,6 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				// the Defer feature matures.
 				l.Error(
 					"error handling defer add in checkpoint",
-					"error", err,
-					"step_id", sanitizeLogValue(op.ID),
-					"run_id", md.ID.RunID.String(),
-				)
-			}
-
-		case enums.OpcodeDeferAbort:
-			if err := defers.AbortFromOp(ctx, c.State, l, md.ID, op, c.TracerProvider, md, time.Now()); err != nil {
-				// Log without returning the error: a bad defer must
-				// never fail its parent run. We may rethink this as
-				// the Defer feature matures.
-				l.Error(
-					"error handling defer abort in checkpoint",
 					"error", err,
 					"step_id", sanitizeLogValue(op.ID),
 					"run_id", md.ID.RunID.String(),

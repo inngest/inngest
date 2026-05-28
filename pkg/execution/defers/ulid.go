@@ -14,7 +14,6 @@ type SpanKind string
 
 const (
 	SpanSchedule   SpanKind = "s"
-	SpanAborted    SpanKind = "a"
 	SpanChildRunID SpanKind = "c"
 )
 

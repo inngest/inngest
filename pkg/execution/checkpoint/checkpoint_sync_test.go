@@ -309,11 +309,10 @@ func TestCheckpointSyncSteps(t *testing.T) {
 	})
 
 	t.Run("defer add reordered before RunComplete still saves", func(t *testing.T) {
-		// Ordering invariant: DeferAdd/DeferAbort must drain before
-		// RunComplete even when the SDK delivers them in the opposite
-		// order. Without the priority reorder, RunComplete's Finalize
-		// would delete state before SaveDefer ran, silently dropping the
-		// deferred run.
+		// Ordering invariant: DeferAdd must drain before RunComplete even
+		// when the SDK delivers them in the opposite order. Without the
+		// priority reorder, RunComplete's Finalize would delete state
+		// before SaveDefer ran, silently dropping the deferred run.
 		ctx := context.Background()
 		r := require.New(t)
 
@@ -361,93 +360,6 @@ func TestCheckpointSyncSteps(t *testing.T) {
 		r.NotZero(saveDeferAt, "SaveDefer must be called")
 		r.NotZero(finalizeAt, "Finalize must be called")
 		r.Less(saveDeferAt, finalizeAt, "SaveDefer must run before Finalize so LoadDefers can read the record")
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-		mocks.executor.AssertExpectations(t)
-	})
-
-	t.Run("defer abort", func(t *testing.T) {
-		// A sync-checkpointed OpcodeDeferAbort flips the target defer to
-		// Aborted via SetDeferStatus.
-		ctx := context.Background()
-		require := require.New(t)
-
-		op := state.GeneratorOpcode{
-			ID: "step-abort",
-			Op: enums.OpcodeDeferAbort,
-			Opts: map[string]any{
-				"target_hashed_id": "step-defer",
-			},
-		}
-
-		mocks, testData := setupSyncCheckpointTest(t, op)
-
-		mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
-
-		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
-		require.NoError(err)
-
-		mocks.queue.AssertNotCalled(t, "Enqueue")
-		mocks.tracer.AssertNotCalled(t, "UpdateSpan")
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-		mocks.executor.AssertExpectations(t)
-	})
-
-	t.Run("defer abort missing target soft-fails", func(t *testing.T) {
-		// Aborting a hashedID that doesn't exist (e.g. SDK-bug
-		// `[DeferAbort, DeferAdd]` ordering, or aborting an ID never
-		// added in this run) is logged and skipped without failing the
-		// parent run.
-		ctx := context.Background()
-		require := require.New(t)
-
-		op := state.GeneratorOpcode{
-			ID: "step-abort",
-			Op: enums.OpcodeDeferAbort,
-			Opts: map[string]any{
-				"target_hashed_id": "never-added",
-			},
-		}
-
-		mocks, testData := setupSyncCheckpointTest(t, op)
-
-		mocks.state.
-			On("SetDeferStatus", ctx, testData.metadata.ID, "never-added", enums.DeferStatusAborted).
-			Return(fmt.Errorf("defer not found for hashedID %q", "never-added"))
-
-		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
-		require.NoError(err, "missing-target DeferAbort must NOT fail the parent run; soft-fail with log")
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-		mocks.executor.AssertExpectations(t)
-	})
-
-	t.Run("defer abort missing target_hashed_id soft-fails", func(t *testing.T) {
-		// A DeferAbort without target_hashed_id is logged and skipped
-		// without failing the parent run. SetDeferStatus must not be
-		// called because validation fails first.
-		ctx := context.Background()
-		require := require.New(t)
-
-		op := state.GeneratorOpcode{
-			ID:   "step-abort",
-			Op:   enums.OpcodeDeferAbort,
-			Opts: map[string]any{},
-		}
-
-		mocks, testData := setupSyncCheckpointTest(t, op)
-
-		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
-		require.NoError(err, "invalid DeferAbort must NOT fail the parent run; soft-fail with log")
-
-		mocks.state.AssertNotCalled(t, "SetDeferStatus", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		mocks.state.AssertExpectations(t)
 		mocks.tracer.AssertExpectations(t)

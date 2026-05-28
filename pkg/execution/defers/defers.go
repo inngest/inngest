@@ -98,39 +98,6 @@ func SaveFromOp(
 	return nil
 }
 
-// AbortFromOp flips the target defer's status to Aborted. Errors are
-// surfaced (no soft-fail).
-//
-// In addition to updating run state, it emits a second executor.defer span
-// carrying the terminal aborted status. Run-to-run linkage is reconstructed
-// purely from these spans (see run_linkage.go), so without this the UI would
-// keep displaying an aborted defer as "Scheduled".
-func AbortFromOp(
-	ctx context.Context,
-	rs statev2.RunService,
-	log logger.Logger,
-	id statev2.ID,
-	op state.GeneratorOpcode,
-	tp tracing.TracerProvider,
-	md statev2.Metadata,
-	now time.Time,
-) error {
-	opts, err := op.DeferAbortOpts()
-	if err != nil {
-		log.Error("error parsing DeferAbort opts", "error", err)
-		return fmt.Errorf("error parsing DeferAbort opts: %w", err)
-	}
-
-	if err := rs.SetDeferStatus(ctx, id, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
-		log.Error("error aborting defer", "error", err)
-		return fmt.Errorf("error aborting defer: %w", err)
-	}
-
-	emitAbortedDeferSpan(ctx, tp, md, now, opts.TargetHashedID)
-
-	return nil
-}
-
 func sanitizeLogValue(v string) string {
 	v = strings.ReplaceAll(v, "\n", "")
 	v = strings.ReplaceAll(v, "\r", "")

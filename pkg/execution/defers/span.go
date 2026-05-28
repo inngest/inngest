@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/inngest/inngest/pkg/enums"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -37,33 +36,6 @@ func emitDeferSpan(ctx context.Context, tp tracing.TracerProvider, md statev2.Me
 			"error", err,
 			"run_id", md.ID.RunID,
 			"hashed_id", d.HashedID,
-		)
-	}
-}
-
-// emitAbortedDeferSpan writes the executor.defer span carrying the terminal
-// aborted status. GetRunDefers collapses it with the schedule span by hashed
-// ID and prefers this terminal status.
-func emitAbortedDeferSpan(ctx context.Context, tp tracing.TracerProvider, md statev2.Metadata, now time.Time, hashedID string) {
-	status := enums.DeferStatusAborted
-	_, err := tp.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
-		Debug:     &tracing.SpanDebugData{Location: "defers.AbortFromOp"},
-		Metadata:  &md,
-		Parent:    tracing.RunSpanRefFromMetadata(&md),
-		StartTime: now,
-		EndTime:   now,
-		Seed:      SpanSeed(md.ID.RunID, hashedID, SpanAborted),
-		Attributes: meta.NewAttrSet(
-			meta.Attr(meta.Attrs.DeferHashedID, &hashedID),
-			meta.Attr(meta.Attrs.DeferStatus, &status),
-		),
-	})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error(
-			"error emitting aborted executor.defer span",
-			"error", err,
-			"run_id", md.ID.RunID,
-			"hashed_id", hashedID,
 		)
 	}
 }

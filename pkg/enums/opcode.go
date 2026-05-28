@@ -27,7 +27,6 @@ const (
 	OpcodeDiscoveryRequest
 
 	OpcodeDeferAdd
-	OpcodeDeferAbort
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
@@ -39,7 +38,6 @@ var opcodeSyncMap = map[Opcode]struct{}{
 	OpcodeSyncRunComplete: {},
 	OpcodeStepFailed:      {},
 	OpcodeDeferAdd:        {},
-	OpcodeDeferAbort:     {},
 }
 
 // OpcodeIsSync returns whether the given opcode is synchronous.  This
@@ -60,7 +58,7 @@ func OpcodeIsAsync(o Opcode) bool {
 // ForceStepPlan or per-step history grouping.
 func OpcodeIsLazy(o Opcode) bool {
 	switch o {
-	case OpcodeDeferAdd, OpcodeDeferAbort:
+	case OpcodeDeferAdd:
 		return true
 	}
 	return false
@@ -77,7 +75,7 @@ func OpcodeIsPriority(o Opcode) bool {
 		// finish processing the WaitForEvent before the SendEvent does its
 		// thing, then we may miss the event.
 		return true
-	case OpcodeDeferAdd, OpcodeDeferAbort:
+	case OpcodeDeferAdd:
 		// Prioritize in case the SDK returned something like "[DeferAdd,
 		// RunComplete]". If we don't finish processing the DeferAdd before
 		// finalizing the run, then we'll won't send the defer event.

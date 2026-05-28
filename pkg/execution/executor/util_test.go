@@ -144,10 +144,10 @@ func TestOpcodeGroupsAllWithEmptyInput(t *testing.T) {
 	require.EqualValues(t, expected, actual)
 }
 
-// TestOpGroups_DeferOpsArePriority asserts that DeferAdd and DeferAbort are
-// routed into the priority group so they drain before non-lazy ops in the same
-// SDK response — fixing the [DeferAdd, RunComplete] race where Finalize would
-// delete state before SaveDefer ran.
+// TestOpGroups_DeferOpsArePriority asserts that DeferAdd is routed into the
+// priority group so it drains before non-lazy ops in the same SDK response —
+// fixing the [DeferAdd, RunComplete] race where Finalize would delete state
+// before SaveDefer ran.
 func TestOpGroups_DeferOpsArePriority(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -234,45 +234,6 @@ func TestOpGroups_DeferOpsArePriority(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "lone DeferAbort",
-			input: []*state.GeneratorOpcode{
-				{Op: enums.OpcodeDeferAbort, ID: "1"},
-			},
-			expected: OpcodeGroups{
-				PriorityGroup: OpcodeGroup{
-					Opcodes: []*state.GeneratorOpcode{
-						{Op: enums.OpcodeDeferAbort, ID: "1"},
-					},
-					ShouldStartHistoryGroup: false,
-				},
-				OtherGroup: OpcodeGroup{
-					Opcodes:                 []*state.GeneratorOpcode{},
-					ShouldStartHistoryGroup: false,
-				},
-			},
-		},
-		{
-			name: "StepRun with DeferAbort piggyback",
-			input: []*state.GeneratorOpcode{
-				{Op: enums.OpcodeStepRun, ID: "1"},
-				{Op: enums.OpcodeDeferAbort, ID: "2"},
-			},
-			expected: OpcodeGroups{
-				PriorityGroup: OpcodeGroup{
-					Opcodes: []*state.GeneratorOpcode{
-						{Op: enums.OpcodeDeferAbort, ID: "2"},
-					},
-					ShouldStartHistoryGroup: false,
-				},
-				OtherGroup: OpcodeGroup{
-					Opcodes: []*state.GeneratorOpcode{
-						{Op: enums.OpcodeStepRun, ID: "1"},
-					},
-					ShouldStartHistoryGroup: false,
-				},
-			},
-		},
 	}
 
 	for _, tc := range cases {
@@ -283,10 +244,9 @@ func TestOpGroups_DeferOpsArePriority(t *testing.T) {
 	}
 }
 
-// TestNonLazyOpCount asserts that lazy ops (DeferAdd/DeferAbort) don't count
-// toward the parallel-step gating signals (ForceStepPlan, history grouping,
-// per-step trace emission). They piggyback on a host op and aren't standalone
-// steps.
+// TestNonLazyOpCount asserts that lazy ops (DeferAdd) don't count toward the
+// parallel-step gating signals (ForceStepPlan, history grouping, per-step
+// trace emission). They piggyback on a host op and aren't standalone steps.
 func TestNonLazyOpCount(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -296,13 +256,10 @@ func TestNonLazyOpCount(t *testing.T) {
 		{"empty", []*state.GeneratorOpcode{}, 0},
 		{"single StepRun", []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun}}, 1},
 		{"single DeferAdd", []*state.GeneratorOpcode{{Op: enums.OpcodeDeferAdd}}, 0},
-		{"single DeferAbort", []*state.GeneratorOpcode{{Op: enums.OpcodeDeferAbort}}, 0},
-		{"all lazy", []*state.GeneratorOpcode{{Op: enums.OpcodeDeferAdd}, {Op: enums.OpcodeDeferAbort}}, 0},
 		{"StepRun + DeferAdd", []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun}, {Op: enums.OpcodeDeferAdd}}, 1},
 		{"DeferAdd + RunComplete", []*state.GeneratorOpcode{{Op: enums.OpcodeDeferAdd}, {Op: enums.OpcodeRunComplete}}, 1},
 		{"WaitForEvent + StepRun (both non-lazy)", []*state.GeneratorOpcode{{Op: enums.OpcodeWaitForEvent}, {Op: enums.OpcodeStepRun}}, 2},
 		{"WaitForEvent + DeferAdd", []*state.GeneratorOpcode{{Op: enums.OpcodeWaitForEvent}, {Op: enums.OpcodeDeferAdd}}, 1},
-		{"StepRun + DeferAdd + DeferAbort", []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun}, {Op: enums.OpcodeDeferAdd}, {Op: enums.OpcodeDeferAbort}}, 1},
 		{"nil entries skipped", []*state.GeneratorOpcode{nil, {Op: enums.OpcodeStepRun}, nil}, 1},
 	}
 	for _, tc := range cases {
@@ -320,7 +277,7 @@ func TestOpcodeGroups_IDs_ExcludesLazyOps(t *testing.T) {
 	}{
 		{
 			name:  "all lazy yields no IDs",
-			input: []*state.GeneratorOpcode{{Op: enums.OpcodeDeferAdd, ID: "1"}, {Op: enums.OpcodeDeferAbort, ID: "2"}},
+			input: []*state.GeneratorOpcode{{Op: enums.OpcodeDeferAdd, ID: "1"}},
 			want:  []string{},
 		},
 		{
@@ -329,11 +286,10 @@ func TestOpcodeGroups_IDs_ExcludesLazyOps(t *testing.T) {
 			want:  []string{"step-1"},
 		},
 		{
-			name: "StepPlanned + DeferAdd + DeferAbort drops both lazy IDs",
+			name: "StepPlanned + DeferAdd drops the lazy ID",
 			input: []*state.GeneratorOpcode{
 				{Op: enums.OpcodeStepPlanned, ID: "plan-1"},
 				{Op: enums.OpcodeDeferAdd, ID: "defer-add-1"},
-				{Op: enums.OpcodeDeferAbort, ID: "defer-abort-1"},
 			},
 			want: []string{"plan-1"},
 		},

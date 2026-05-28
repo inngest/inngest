@@ -235,34 +235,6 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		mocks.queue.AssertExpectations(t)
 	})
 
-	t.Run("defer abort", func(t *testing.T) {
-		// Async abort path: flip the target defer to Aborted. SDK-side
-		// memoization is carried by the SDKRequest `Defers` map, not
-		// the steps map, so no SaveStep is expected.
-		ctx := context.Background()
-		require := require.New(t)
-
-		op := state.GeneratorOpcode{
-			ID: "step-abort",
-			Op: enums.OpcodeDeferAbort,
-			Opts: map[string]any{
-				"target_hashed_id": "step-defer",
-			},
-		}
-
-		mocks, testData := setupAsyncCheckpointTest(t, op)
-
-		mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
-
-		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
-		require.NoError(err)
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-	})
-
 	t.Run("step output too large", func(t *testing.T) {
 		// A single step whose output exceeds MaxStepOutputSize causes
 		// CheckpointAsyncSteps to return ErrStepOutputTooLarge without
