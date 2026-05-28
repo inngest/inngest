@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { Environment } from '@/utils/environments';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
-import { Integrations } from '../Navigation/Integrations';
 import OnboardingGuideTrigger from '../Navigation/OnboardingGuideTrigger';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
@@ -61,7 +60,6 @@ export default function SideBar({
               showWidget={showWidget}
             />
           )}
-          <Integrations collapsed={collapsed} />
         </div>
       </div>
     </nav>

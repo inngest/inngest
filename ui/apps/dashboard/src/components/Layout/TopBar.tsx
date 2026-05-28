@@ -6,6 +6,7 @@ import type { Environment } from '@/utils/environments';
 import Environments from '../Navigation/Environments';
 import AvatarMenu from './AvatarMenu';
 import OrgButton from './OrgButton';
+import { OrgMenu } from './OrgMenu';
 import SearchTrigger from './SearchTrigger';
 
 export default function TopBar({
@@ -20,7 +21,9 @@ export default function TopBar({
       <div className="flex items-center gap-2">
         {profile && (
           <>
-            <OrgButton profile={profile} />
+            <OrgMenu profile={profile}>
+              <OrgButton profile={profile} />
+            </OrgMenu>
             <span className="text-disabled" aria-hidden>
               |
             </span>
