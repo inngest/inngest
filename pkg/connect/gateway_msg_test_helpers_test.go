@@ -28,13 +28,15 @@ func newTestConnectionHandler(t *testing.T, res testingResources) *connectionHan
 		GatewayId: res.svc.gatewayId,
 	}
 
-	return &connectionHandler{
+	ch := &connectionHandler{
 		svc:            res.svc,
 		conn:           conn,
 		ws:             res.ws,
 		log:            res.svc.logger,
 		stopForwarding: make(chan struct{}),
 	}
+	ch.markReady("test connection handler")
+	return ch
 }
 
 type upsertConnectionErrorStateManager struct {

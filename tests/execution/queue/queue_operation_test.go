@@ -40,6 +40,7 @@ func TestQueueOperations(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	scope := queue.Scope{AccountID: accountID, EnvID: envID, FunctionID: fnID}
 	runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
 
 	options := []queue.QueueOpt{
@@ -122,7 +123,7 @@ func TestQueueOperations(t *testing.T) {
 		partition.LeaseID = leaseID
 		partition.Last = clock.Now().UnixMilli()
 
-		res, err := shard.PartitionByID(ctx, partition.ID)
+		res, err := shard.PartitionByID(ctx, scope, partition.ID)
 		require.NoError(t, err)
 		require.Equal(t, partition, res.QueuePartition)
 	})

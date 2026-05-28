@@ -23,7 +23,7 @@ func AccountEnvFlags() []cli.Flag {
 func FunctionFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "function-id",
-		Usage: "Function UUID that owns the debounce",
+		Usage: "Function UUID for the scoped debug operation",
 	}
 }
 

@@ -47,7 +47,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 
 	var cronSchedules []*pb.CronSchedule
 	for _, cronExpr := range conf.ScheduleExpressions() {
-		if healthCheckStatus, err := d.croner.HealthCheck(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
+		if healthCheckStatus, err := d.croner.HealthCheck(ctx, consts.DevServerAccountID, consts.DevServerEnvID, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
 			cronSchedules = append(cronSchedules, &pb.CronSchedule{
 				Next:      timestamppb.New(healthCheckStatus.Next),
 				JobId:     healthCheckStatus.JobID,
@@ -85,7 +85,14 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		return nil, fmt.Errorf("error finding shard for GetPartition: %w", err)
 	}
 
-	pt, err := d.queue.PartitionByID(ctx, shard, req.GetId())
+	scope := queue.Scope{
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
+	}
+	if fnID, parseErr := uuid.Parse(req.GetId()); parseErr == nil {
+		scope.FunctionID = fnID
+	}
+	pt, err := d.queue.PartitionByID(ctx, shard, scope, req.GetId())
 	if err != nil {
 		if errors.Is(err, queue.ErrPartitionNotFound) {
 			return nil, status.Error(codes.NotFound, queue.ErrPartitionNotFound.Error())

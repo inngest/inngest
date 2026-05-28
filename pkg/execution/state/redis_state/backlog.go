@@ -455,7 +455,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, partitionID string, fro
 	}, nil
 }
 
-func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+func (q *queue) PartitionBacklogSize(ctx context.Context, scope osqueue.Scope, partitionID string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionBacklogSize"), redis_telemetry.ScopeQueue)
 
 	l := logger.StdlibLogger(ctx).With(

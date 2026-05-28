@@ -47,8 +47,68 @@ func TestKind_ValidateAllowed(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name:    "bare inngest.score is rejected (name must live in suffix)",
+			kind:    KindInngestScore,
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.score.<name> with simple suffix is allowed",
+			kind:    "inngest.score.accuracy",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score.<name> with arbitrary characters is allowed",
+			kind:    "inngest.score.checkout success rate (variant A) %",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score. with empty suffix is rejected",
+			kind:    "inngest.score.",
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.score.<name> with a single quote is rejected",
+			kind:    "inngest.score.it's-broken",
+			wantErr: ErrScoreNameInvalid,
+		},
+		{
+			name:    "inngest.score.<name> with a newline is rejected",
+			kind:    "inngest.score.foo\nbar",
+			wantErr: ErrScoreNameInvalid,
+		},
+		{
+			name:    "inngest.score.<name> with a tab is rejected",
+			kind:    "inngest.score.foo\tbar",
+			wantErr: ErrScoreNameInvalid,
+		},
+		{
+			name:    "inngest.score.<name> with DEL (0x7F) is rejected",
+			kind:    "inngest.score.foo\x7fbar",
+			wantErr: ErrScoreNameInvalid,
+		},
+		{
+			name:    "inngest.score.<name> with multi-byte UTF-8 is allowed",
+			kind:    "inngest.score.checkout-✓",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score.<name> with a trailing backslash is allowed",
+			kind:    "inngest.score.trailing\\",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score.<name> with a backtick is allowed",
+			kind:    "inngest.score.has`backtick",
+			wantErr: nil,
+		},
+		{
 			name:    "inngest.unknown is rejected",
 			kind:    "inngest.unknown",
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.ai.suffix is rejected (only score allows suffixes)",
+			kind:    "inngest.ai.gpt4",
 			wantErr: ErrKindNotAllowed,
 		},
 		{

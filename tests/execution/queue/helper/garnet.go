@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/strslice"
 	"github.com/inngest/inngest/tests/testutil"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/strslice"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"

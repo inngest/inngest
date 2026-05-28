@@ -1,5 +1,6 @@
 import type {
   SpanMetadataKind as GeneratedSpanMetadataKind,
+  SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
   SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
   Warnings,
 } from '../generated/index';
@@ -34,6 +35,8 @@ export type ResponseInfo = {
 
 export type SpanMetadataKind = GeneratedSpanMetadataKind;
 
+export type SpanMetadataKindInngestScore = GeneratedSpanMetadataKindInngestScore;
+
 export type SpanMetadataKindUserland = GeneratedSpanMetadataKindUserland;
 
 export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trace';
@@ -45,6 +48,7 @@ export type SpanMetadata =
   | SpanMetadataInngestHTTPTiming
   | SpanMetadataInngestTiming
   | SpanMetadataInngestResponseHeaders
+  | SpanMetadataInngestScore
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
   | SpanMetadataUnknown;
@@ -129,6 +133,13 @@ export type SpanMetadataInngestWarnings = {
   kind: 'inngest.warnings';
   updatedAt: string;
   values: Warnings;
+};
+
+export type SpanMetadataInngestScore = {
+  scope: SpanMetadataScope;
+  kind: SpanMetadataKindInngestScore;
+  updatedAt: string;
+  values: { value: number | boolean };
 };
 
 export type SpanMetadataUserland = {
@@ -228,4 +239,8 @@ export function isStepInfoSignal(stepInfo: Trace['stepInfo']): stepInfo is StepI
 
 export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInngestExperiment {
   return md.kind === 'inngest.experiment';
+}
+
+export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {
+  return md.kind.startsWith('inngest.score.');
 }

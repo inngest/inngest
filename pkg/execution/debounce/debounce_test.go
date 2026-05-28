@@ -2308,7 +2308,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 		// Manually remove the timeout queue item first
 		queueItemId := queue.HashID(ctx, debounceID.String())
-		err := shard.RemoveQueueItem(ctx, queue.KindDebounce, queueItemId)
+		err := shard.RemoveQueueItem(ctx, scope, queue.KindDebounce, queueItemId)
 		require.NoError(t, err)
 
 		// Verify timeout is gone

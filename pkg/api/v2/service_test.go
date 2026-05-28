@@ -246,9 +246,6 @@ func TestService_GetFunctionRun(t *testing.T) {
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 	endedAt := startedAt.Add(2 * time.Second)
-	output, err := json.Marshal(map[string]any{"ok": true})
-	require.NoError(t, err)
-
 	fn := inngest.DeployedFunction{
 		ID:      functionID,
 		Slug:    "my-app-test-fn",
@@ -266,12 +263,11 @@ func TestService_GetFunctionRun(t *testing.T) {
 		EventID:      runID,
 		Status:       enums.RunStatusCompleted,
 		EndedAt:      &endedAt,
-		Output:       output,
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
 	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID).Return(run, nil).Once()
+	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(run, nil).Once()
 
 	service := NewService(ServiceOptions{
 		Functions:    functions,
@@ -295,8 +291,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.Equal(t, "test-fn", resp.Data.Function.Id)
 		require.Equal(t, "Test function", resp.Data.Function.Name)
 		require.Equal(t, "my-app", resp.Data.App.Id)
-		require.NotNil(t, resp.Data.Output)
-		require.Equal(t, true, resp.Data.Output.Fields["ok"].GetBoolValue())
+		require.Nil(t, resp.Data.Output)
 		require.NotNil(t, resp.Data.DurationMs)
 		require.Equal(t, uint64(2000), *resp.Data.DurationMs)
 	})
@@ -319,7 +314,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 	t.Run("returns not found when run is missing", func(t *testing.T) {
 		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID).Return(nil, errors.New("missing")).Once()
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(nil, errors.New("missing")).Once()
 		t.Cleanup(func() {
 			runs.AssertExpectations(t)
 		})
@@ -339,7 +334,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 	t.Run("returns not found when function is missing", func(t *testing.T) {
 		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID).Return(run, nil).Once()
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(run, nil).Once()
 		functions := &mockFunctionProvider{}
 		functions.On("GetFunction", mock.Anything, functionID.String()).Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
 		t.Cleanup(func() {
@@ -358,6 +353,90 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Function not found")
+	})
+
+	t.Run("uses root trace output when requested", func(t *testing.T) {
+		inputSpanID := "input-span"
+		outputIdentifier := cqrs.SpanIdentifier{
+			SpanID:      "output-span",
+			InputSpanID: &inputSpanID,
+			Preview:     boolPtr(true),
+		}
+		outputID, err := outputIdentifier.Encode()
+		require.NoError(t, err)
+
+		runs := &mockFunctionRunReader{}
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+			RunID:        runID,
+			RunStartedAt: startedAt,
+			FunctionID:   functionID,
+			EventID:      runID,
+			Status:       enums.RunStatusCompleted,
+			EndedAt:      &endedAt,
+			Output:       json.RawMessage(`""`),
+		}, nil).Once()
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+		traces := &mockFunctionTraceReader{}
+		traces.On("GetSpansByRunID", mock.Anything, runID).Return(&cqrs.OtelSpan{
+			RunID:    runID,
+			OutputID: &outputID,
+		}, nil).Once()
+		traces.On("GetSpanOutput", mock.Anything, outputIdentifier).Return(&cqrs.SpanOutput{
+			Data: []byte(`{"body":"Hello, World!"}`),
+		}, nil).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+			functions.AssertExpectations(t)
+			traces.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:      functions,
+			FunctionRuns:   runs,
+			FunctionTraces: traces,
+		})
+
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, resp.Data.Output)
+		require.Equal(t, "Hello, World!", resp.Data.Output.Fields["body"].GetStringValue())
+	})
+
+	t.Run("does not fall back to run output", func(t *testing.T) {
+		runs := &mockFunctionRunReader{}
+		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+			RunID:        runID,
+			RunStartedAt: startedAt,
+			FunctionID:   functionID,
+			EventID:      runID,
+			Status:       enums.RunStatusCompleted,
+			EndedAt:      &endedAt,
+			Output:       json.RawMessage(`{"old":true}`),
+		}, nil).Once()
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+		t.Cleanup(func() {
+			runs.AssertExpectations(t)
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Functions:    functions,
+			FunctionRuns: runs,
+		})
+
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId:         runID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+
+		require.NoError(t, err)
+		require.Nil(t, resp.Data.Output)
 	})
 }
 

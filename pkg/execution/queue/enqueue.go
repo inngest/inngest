@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
@@ -91,58 +90,53 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		},
 	})
 
-	switch shard.Kind() {
-	case enums.QueueShardKindRedis:
-		_, err := shard.EnqueueItem(ctx, qi, next, opts)
-		if err != nil {
-			return err
-		}
-
-		// XXX: If we've enqueued a user queue item (sleep, retry, step, etc.) and it's in the future,
-		// we want to ensure that we schedule a rebalance job which takes the queue item and places it
-		// at the correct score based off of the item's run ID when it becomes available.
-		//
-		// Without this, step.sleep or retries for a very old workflow may still lag behind steps from
-		// later workflows when scheduled in the future.  This can, worst case, cause never-ending runs.
-		if !q.enableJobPromotion || !qi.RequiresPromotionJob(q.Clock().Now()) {
-			// scheule a rebalance job automatically.
-			return nil
-		}
-
-		// This is to prevent infinite recursion in case RequiresPromotion is accidentally refactored
-		// to include the below job kind.
-		if qi.Data.Kind == KindJobPromote {
-			return nil
-		}
-
-		// This is the fudge job.  What a name!
-		//
-		// If we're processing a user function and the sleep duration is in the future,
-		// enqueue a sleep scavenge system queue item that will Requeue the original sleep queue item.
-		// We do this to fudge the original queue item at the exact time, the run was scheduled for to ensure
-		// sleeps for existing function runs are picked up earlier than items for later function runs.
-		promoteAt := time.UnixMilli(qi.AtMS).Add(consts.FutureAtLimit * -1)
-		promoteJobID := fmt.Sprintf("promote-%s", qi.ID)
-		promoteQueueName := fmt.Sprintf("job-promote:%s", qi.FunctionID)
-		err = q.Enqueue(ctx, Item{
-			JobID:          &promoteJobID,
-			WorkspaceID:    qi.Data.WorkspaceID,
-			QueueName:      &promoteQueueName,
-			Kind:           KindJobPromote,
-			Identifier:     qi.Data.Identifier,
-			PriorityFactor: qi.Data.PriorityFactor,
-			Attempt:        0,
-			Payload: PayloadJobPromote{
-				PromoteJobID: qi.ID,
-				ScheduledAt:  qi.AtMS,
-			},
-		}, promoteAt, EnqueueOpts{})
-		if err != nil && err != ErrQueueItemExists {
-			// This is best effort, and shouldn't fail the OG enqueue.
-			l.ReportError(err, "error scheduling promotion job")
-		}
-		return nil
-	default:
-		return fmt.Errorf("unknown shard kind: %s", string(shard.Kind()))
+	_, err = shard.EnqueueItem(ctx, qi, next, opts)
+	if err != nil {
+		return err
 	}
+
+	// XXX: If we've enqueued a user queue item (sleep, retry, step, etc.) and it's in the future,
+	// we want to ensure that we schedule a rebalance job which takes the queue item and places it
+	// at the correct score based off of the item's run ID when it becomes available.
+	//
+	// Without this, step.sleep or retries for a very old workflow may still lag behind steps from
+	// later workflows when scheduled in the future.  This can, worst case, cause never-ending runs.
+	if !q.enableJobPromotion || !qi.RequiresPromotionJob(q.Clock().Now()) {
+		// scheule a rebalance job automatically.
+		return nil
+	}
+
+	// This is to prevent infinite recursion in case RequiresPromotion is accidentally refactored
+	// to include the below job kind.
+	if qi.Data.Kind == KindJobPromote {
+		return nil
+	}
+
+	// This is the fudge job.  What a name!
+	//
+	// If we're processing a user function and the sleep duration is in the future,
+	// enqueue a sleep scavenge system queue item that will Requeue the original sleep queue item.
+	// We do this to fudge the original queue item at the exact time, the run was scheduled for to ensure
+	// sleeps for existing function runs are picked up earlier than items for later function runs.
+	promoteAt := time.UnixMilli(qi.AtMS).Add(consts.FutureAtLimit * -1)
+	promoteJobID := fmt.Sprintf("promote-%s", qi.ID)
+	promoteQueueName := fmt.Sprintf("job-promote:%s", qi.FunctionID)
+	err = q.Enqueue(ctx, Item{
+		JobID:          &promoteJobID,
+		WorkspaceID:    qi.Data.WorkspaceID,
+		QueueName:      &promoteQueueName,
+		Kind:           KindJobPromote,
+		Identifier:     qi.Data.Identifier,
+		PriorityFactor: qi.Data.PriorityFactor,
+		Attempt:        0,
+		Payload: PayloadJobPromote{
+			PromoteJobID: qi.ID,
+			ScheduledAt:  qi.AtMS,
+		},
+	}, promoteAt, EnqueueOpts{})
+	if err != nil && err != ErrQueueItemExists {
+		// This is best effort, and shouldn't fail the OG enqueue.
+		l.ReportError(err, "error scheduling promotion job")
+	}
+	return nil
 }

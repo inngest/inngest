@@ -855,7 +855,11 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
 
-	items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID.String(), from, c.StartedBefore)
+	items, err := qm.ItemsByPartition(ctx, shard, queue.Scope{
+		AccountID:  c.AccountID,
+		EnvID:      c.WorkspaceID,
+		FunctionID: c.FunctionID,
+	}, c.FunctionID.String(), from, c.StartedBefore)
 	if err != nil {
 		return fmt.Errorf("error retrieving partition items: %w", err)
 	}
@@ -929,18 +933,21 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		fn := inngest.Function{}
 		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
 
-		// Get AppID
+		accountID := consts.DevServerAccountID
+		envID := cqrsFn.EnvID
 		appID := cqrsFn.AppID
 
 		for _, cronExpr := range fn.ScheduleExpressions() {
 			fn := fn
+			accountID := accountID
+			envID := envID
 			appID := appID
 			cronExpr := cronExpr
 
 			eg.Go(func() error {
 				l := s.log.With("fnID", fn.ID, "cronExpr", cronExpr, "fnVersion", fn.FunctionVersion)
 
-				status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
+				status, err := s.croner.HealthCheck(ctx, accountID, envID, fn.ID, cronExpr, fn.FunctionVersion)
 				if err != nil {
 					atomic.AddInt64(&errored, 1)
 					l.Error("health check failed", "err", err)
@@ -951,8 +958,8 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 					l.Warn("cron health check failed, re-syncing")
 					err = s.croner.Sync(ctx, cron.CronItem{
 						ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-						AccountID:       consts.DevServerAccountID,
-						WorkspaceID:     consts.DevServerEnvID,
+						AccountID:       accountID,
+						WorkspaceID:     envID,
 						AppID:           appID,
 						FunctionID:      fn.ID,
 						FunctionVersion: fn.FunctionVersion,

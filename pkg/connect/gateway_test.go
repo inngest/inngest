@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -1173,6 +1174,20 @@ func awaitNextMessage(t *testing.T, ws *websocket.Conn, timeout time.Duration) *
 	return &parsed
 }
 
+func assertNoMessage(t *testing.T, ws *websocket.Conn, timeout time.Duration) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	parsed := connect.ConnectMessage{}
+	err := wsproto.Read(ctx, ws, &parsed)
+	if errors.Is(err, context.DeadlineExceeded) || isConnectionClosedErr(err) {
+		return
+	}
+	require.Error(t, err)
+}
+
 func awaitClosure(t *testing.T, ws *websocket.Conn, timeout time.Duration) (websocket.StatusCode, string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1717,9 +1732,8 @@ func TestDrainingConnectionNotKilledByHeartbeatDetector(t *testing.T) {
 	}, 2*time.Second, 50*time.Millisecond)
 
 	// Keep sending heartbeats well past the miss threshold (3 * 200ms = 600ms).
-	// Use exchangeHeartbeat to verify the gateway responds with GATEWAY_HEARTBEAT
-	// even while draining. Without a response, the SDK would consider the
-	// connection dead and stop extending leases for in-flight work.
+	// Keep exchanging heartbeat ACKs so the SDK-side pending heartbeat counter
+	// would not treat the draining connection as dead.
 	for range 10 {
 		exchangeHeartbeat(t, res.ws, 2*time.Second)
 		time.Sleep(params.heartbeatInterval)
