@@ -166,14 +166,12 @@ message Defer {
   string      hashed_id       = 2;
   DeferStatus schedule_status = 3;
   bytes       input           = 4;
-  string      userland_id     = 5;
 }
 
 message DeferMeta {
   string      fn_slug         = 1;
   string      hashed_id       = 2;
   DeferStatus schedule_status = 3;
-  string      userland_id     = 4;
 }
 
 message SaveDeferRequest {
@@ -190,6 +188,14 @@ message SetDeferStatusRequest {
 }
 
 message SetDeferStatusResponse {}
+
+message SaveRejectedDeferRequest {
+  ID     id        = 1;
+  string fn_slug   = 2;
+  string hashed_id = 3;
+}
+
+message SaveRejectedDeferResponse {}
 
 message LoadDefersRequest {
   ID id = 1;
@@ -252,6 +258,7 @@ service RunService {
 
   rpc SaveDefer(SaveDeferRequest) returns (SaveDeferResponse) {}
   rpc SetDeferStatus(SetDeferStatusRequest) returns (SetDeferStatusResponse) {}
+  rpc SaveRejectedDefer(SaveRejectedDeferRequest) returns (SaveRejectedDeferResponse) {}
 
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
