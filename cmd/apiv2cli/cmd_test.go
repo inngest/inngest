@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"testing"
 
@@ -43,6 +44,68 @@ func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {
 	require.Equal(t, "get-webhooks", endpointCommandName("ListWebhooks"))
 	require.Equal(t, "get-function-run", endpointCommandName("GetFunctionRun"))
 	require.Equal(t, "create-env", endpointCommandName("CreateEnv"))
+}
+
+func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
+	var invoke *cli.Command
+	for _, cmd := range endpointCommands() {
+		if cmd.Name == "invoke-function" {
+			invoke = cmd
+			break
+		}
+	}
+
+	require.NotNil(t, invoke)
+	require.Equal(t, "Invoke function", invoke.Usage)
+	require.Contains(t, invoke.Description, "Endpoint: POST /apps/{app_id}/functions/{function_id}/invoke")
+	require.Contains(t, invoke.Description, "--prod")
+	require.Contains(t, invoke.Description, "INNGEST_API_KEY")
+	require.Contains(t, invoke.Description, "INNGEST_ENV")
+}
+
+func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
+	var invoke endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "invoke-function" {
+			invoke = ep
+			break
+		}
+	}
+	require.NotEmpty(t, invoke.name)
+
+	flags := endpointFlags(invoke)
+	byName := map[string]cli.Flag{}
+	for _, flag := range flags {
+		byName[flag.Names()[0]] = flag
+	}
+
+	require.Contains(t, byName["data"].String(), "JSON object containing the input data for the function")
+	require.Contains(t, byName["function-id"].String(), "The ID of the function to invoke")
+	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
+}
+
+func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {
+	var invoke endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "invoke-function" {
+			invoke = ep
+			break
+		}
+	}
+	require.NotEmpty(t, invoke.name)
+
+	valid := map[string]bool{}
+	for _, flag := range commonFlags() {
+		for _, name := range flag.Names() {
+			valid["--"+name] = true
+		}
+	}
+
+	desc := endpointDescription(invoke)
+	for _, match := range regexp.MustCompile(`--[a-z][a-z0-9-]*`).FindAllString(desc, -1) {
+		require.True(t, valid[match],
+			"endpointDescription references %s, which is not defined in commonFlags(); keep the inherited-flag block in sync", match)
+	}
 }
 
 func TestCommandCallsGeneratedEndpoint(t *testing.T) {
