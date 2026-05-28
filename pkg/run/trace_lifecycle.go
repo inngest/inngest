@@ -89,7 +89,6 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 	if md.Config.DebounceFlag() {
 		span.SetAttributes(attribute.Bool(consts.OtelSysDebounceTimeout, true))
 	}
-
 	if md.Config.Context != nil {
 		if val, ok := md.Config.Context[consts.OtelPropagationLinkKey]; ok {
 			if link, ok := val.(string); ok {

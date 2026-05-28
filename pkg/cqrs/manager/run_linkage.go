@@ -84,15 +84,34 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 		// Defer linkage attrs live on the root executor.run span only;
 		// extension spans share the dynamic_span_id but lack them.
 		for _, s := range spans {
-			if !s.GetIsRoot() || s.Attributes.DeferParentLinks == nil {
+			if !s.GetIsRoot() || s.Attributes.DeferParentFnSlug == nil {
 				continue
 			}
-			links := *s.Attributes.DeferParentLinks
-			parents := make([]cqrs.RunDeferredFrom, 0, len(links))
-			for _, link := range links {
+
+			if s.Attributes.DeferParentRunIDs == nil {
+				// Unreachable, since we should always have parent run IDs if we
+				// have a parent fn slug.
+				logger.StdlibLogger(ctx).Warn(
+					"skipping defer span with unknown status",
+					"parent_fn_slug", *s.Attributes.DeferParentFnSlug,
+					"run_id", childRunID,
+				)
+				continue
+			}
+
+			parents := make([]cqrs.RunDeferredFrom, 0, len(*s.Attributes.DeferParentRunIDs))
+			for _, runIDStr := range *s.Attributes.DeferParentRunIDs {
+				runID, err := ulid.Parse(runIDStr)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error(
+						"run ID is not a valid ULID",
+						"error", err,
+						"value", runIDStr,
+					)
+				}
 				parents = append(parents, cqrs.RunDeferredFrom{
-					RunID:  link.RunID,
-					FnSlug: link.FnSlug,
+					RunID:  runID,
+					FnSlug: *s.Attributes.DeferParentFnSlug,
 				})
 			}
 			out[childRunID] = parents

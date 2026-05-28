@@ -1364,7 +1364,9 @@ func (e *executor) schedule(
 		}
 	}
 
-	maybeUpdateParentDeferSpans(
+	// IMPORTANT: Do not move this below the CreateDroppableSpan call, since
+	// that would cause us to lose defer-related attributes in the created span
+	updateDeferSpans(
 		logger.WithStdlib(ctx, l),
 		e.tracerProvider,
 		req.Events,
@@ -5804,21 +5806,39 @@ func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 	return false
 }
 
-// maybeUpdateParentDeferSpans links the child run we're about to schedule back
-// to each parent's defer span. For every deferred.schedule event in the batch
-// it:
+// updateDeferSpans links the child run we're about to schedule back
+// to each parent's defer span. For every inngest/deferred.schedule event in the
+// batch it:
 //  1. Puts the child run ID onto the parent's defer span.
 //  2. Collects the parent (run ID, fn slug) pairs to put onto the child's run
 //     span. The fn slugs let read paths resolve the parent's function without
 //     fetching the full parent TraceRun (a perf issue for Cloud).
-func maybeUpdateParentDeferSpans(
+//
+// Additionally, this function adds parent run attributes to the child run's
+// span.
+func updateDeferSpans(
 	ctx context.Context,
 	tp tracing.TracerProvider,
 	events []event.TrackedEvent,
 	spanOpts *tracing.CreateSpanOptions,
 	md sv2.Metadata,
 ) {
-	var parentLinks []meta.DeferParentLink
+	var parentRunIDs []string
+
+	// This probably looks weird to have a single parent function slug despite
+	// possibly many parent run IDs. The reason for this is that when we
+	// introduce deferred function batching, we'll likely implictly use the
+	// parent function slug as a batch key. Therefore, a single child run will
+	// probably never have multiple parent function in its batch.
+	var parentFnSlug string
+
+	// For each event, update the parent run's defer span.
+	// This loop does 2 things:
+	// 1. Updates each parent run's defer span. Note that there's a 1:1 mapping
+	//    between parent run defer spans and event. This is how parent runs will
+	//    know about their children.
+	// 2. Compiling a slice of parent run IDs which will will add to this child
+	//    run's span. This is how child runs will know about their parents.
 	for _, te := range events {
 		evt := te.GetEvent()
 		if evt.Name != consts.FnDeferScheduleName {
@@ -5842,6 +5862,7 @@ func maybeUpdateParentDeferSpans(
 			continue
 		}
 
+		// Update the defer span on the parent run.
 		err = tp.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: meta.NewAttrSet(
 				meta.Attr(meta.Attrs.AccountID, &md.ID.Tenant.AccountID),
@@ -5863,17 +5884,21 @@ func maybeUpdateParentDeferSpans(
 			)
 		}
 
-		parentLinks = append(parentLinks, meta.DeferParentLink{
-			RunID:  m.ParentRunID,
-			FnSlug: m.ParentFnSlug,
-		})
+		parentFnSlug = m.ParentFnSlug
+		parentRunIDs = append(parentRunIDs, m.ParentRunID.String())
 	}
 
-	if len(parentLinks) > 0 {
+	if len(parentRunIDs) > 0 {
+		// Add defer-related attributes to the child run's span.
 		meta.AddAttr(
 			spanOpts.Attributes,
-			meta.Attrs.DeferParentLinks,
-			&parentLinks,
+			meta.Attrs.DeferParentRunIDs,
+			&parentRunIDs,
+		)
+		meta.AddAttr(
+			spanOpts.Attributes,
+			meta.Attrs.DeferParentFnSlug,
+			&parentFnSlug,
 		)
 	}
 }

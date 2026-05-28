@@ -41,12 +41,13 @@ var Attrs = struct {
 	DurableEndpointModeChangedAt attr[*time.Time]
 
 	// Defer attributes
-	DeferChildRunID  attr[*ulid.ULID]
-	DeferFnSlug      attr[*string]
-	DeferHashedID    attr[*string]
-	DeferParentLinks attr[*[]DeferParentLink]
-	DeferStatus      attr[*enums.DeferStatus]
-	DeferUserID      attr[*string]
+	DeferChildRunID   attr[*ulid.ULID]
+	DeferFnSlug       attr[*string]
+	DeferHashedID     attr[*string]
+	DeferParentFnSlug attr[*string]
+	DeferParentRunIDs attr[*[]string]
+	DeferStatus       attr[*enums.DeferStatus]
+	DeferUserID       attr[*string]
 
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
@@ -178,7 +179,8 @@ var Attrs = struct {
 	DeferChildRunID:                    ULIDAttr("defer.child_run_id"),
 	DeferFnSlug:                        StringAttr("defer.fn_slug"),
 	DeferHashedID:                      StringAttr("defer.hashed_id"),
-	DeferParentLinks:                   DeferParentLinkSliceAttr("defer.parent_links"),
+	DeferParentFnSlug:                  StringAttr("defer.parent_fn_slug"),
+	DeferParentRunIDs:                  StringSliceAttr("defer.parent_run_ids"),
 	DeferStatus:                        TextAttr[enums.DeferStatus]("defer.status"),
 	DeferUserID:                        StringAttr("defer.user_id"),
 	DropSpan:                           BoolAttr("executor.drop"),
@@ -257,14 +259,6 @@ var Attrs = struct {
 	MetadataKind:  StringishAttr[metadata.Kind]("metadata.kind"),
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
-}
-
-// DeferParentLink pairs a parent run ID with its function slug. Used as a
-// span attribute on a deferred child's executor.run span so consumers can
-// resolve the parent's function without fetching the full parent TraceRun.
-type DeferParentLink struct {
-	RunID  ulid.ULID `json:"run_id"`
-	FnSlug string    `json:"fn_slug"`
 }
 
 type ResponseOps []ResponseOp

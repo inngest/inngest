@@ -41,7 +41,8 @@ type ExtractedValues struct {
 	DeferChildRunID *ulid.ULID
 	DeferFnSlug *string
 	DeferHashedID *string
-	DeferParentLinks *[]DeferParentLink
+	DeferParentFnSlug *string
+	DeferParentRunIDs *[]string
 	DeferStatus *enums.DeferStatus
 	DeferUserID *string
 	DynamicSpanID *string

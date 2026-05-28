@@ -288,8 +288,20 @@ func StringSliceAttr(key string) attr[*[]string] {
 			return attribute.StringSlice(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*[]string, bool) {
-			if slice, ok := v.([]string); ok {
-				return &slice, true
+			switch v := v.(type) {
+			case []string:
+				// This may be unreachable. At runtime, `v` is of type `[]any`.
+				return &v, true
+			case []any:
+				strings := make([]string, len(v))
+				for i, item := range v {
+					itemStr, ok := item.(string)
+					if !ok {
+						return nil, false
+					}
+					strings[i] = itemStr
+				}
+				return &strings, true
 			}
 
 			return nil, false
@@ -400,59 +412,6 @@ func ULIDAttr(key string) attr[*ulid.ULID] {
 			}
 
 			return nil, false
-		},
-	}
-}
-
-// DeferParentLinkSliceAttr stores a slice of (RunID, FnSlug) pairs as a
-// []string where each entry is a JSON-encoded link. The single attribute
-// guarantees the run ID and fn slug stay co-located — no risk of drift
-// between parallel slices.
-func DeferParentLinkSliceAttr(key string) attr[*[]DeferParentLink] {
-	return attr[*[]DeferParentLink]{
-		key: withPrefix(key),
-		serialize: func(v *[]DeferParentLink) attribute.KeyValue {
-			if v == nil || len(*v) == 0 {
-				return BlankAttr
-			}
-			strs := make([]string, len(*v))
-			for i, link := range *v {
-				encoded, err := json.Marshal(link)
-				if err != nil {
-					return BlankAttr
-				}
-				strs[i] = string(encoded)
-			}
-			return attribute.StringSlice(withPrefix(key), strs)
-		},
-		// Handles both []string (OTel attribute value) and []any (JSON
-		// unmarshalling into map[string]any yields []any for arrays).
-		deserialize: func(v any) (*[]DeferParentLink, bool) {
-			var raw []string
-			switch v := v.(type) {
-			case []string:
-				raw = v
-			case []any:
-				raw = make([]string, 0, len(v))
-				for _, x := range v {
-					s, ok := x.(string)
-					if !ok {
-						return nil, false
-					}
-					raw = append(raw, s)
-				}
-			default:
-				return nil, false
-			}
-			out := make([]DeferParentLink, 0, len(raw))
-			for _, s := range raw {
-				var link DeferParentLink
-				if err := json.Unmarshal([]byte(s), &link); err != nil {
-					return nil, false
-				}
-				out = append(out, link)
-			}
-			return &out, true
 		},
 	}
 }

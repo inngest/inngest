@@ -829,41 +829,6 @@ func TestExtractTypedValues(t *testing.T) {
 	})
 }
 
-func TestDeferParentLinkSliceAttr(t *testing.T) {
-	a := DeferParentLinkSliceAttr("defer.parent_links")
-	links := []DeferParentLink{
-		{RunID: ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB"), FnSlug: "parent-fn-a"},
-		{RunID: ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAC"), FnSlug: "parent-fn-b"},
-	}
-
-	t.Run("round-trip", func(t *testing.T) {
-		r := require.New(t)
-		kv := a.serialize(&links)
-		got, ok := a.deserialize(kv.Value.AsStringSlice())
-		r.True(ok)
-		r.Equal(links, *got)
-	})
-
-	t.Run("round-trips via []any", func(t *testing.T) {
-		r := require.New(t)
-		kv := a.serialize(&links)
-		raw := make([]any, 0, len(kv.Value.AsStringSlice()))
-		for _, s := range kv.Value.AsStringSlice() {
-			raw = append(raw, s)
-		}
-		got, ok := a.deserialize(raw)
-		r.True(ok)
-		r.Equal(links, *got)
-	})
-
-	t.Run("nil and empty", func(t *testing.T) {
-		r := require.New(t)
-		r.Equal(BlankAttr, a.serialize(nil))
-		empty := []DeferParentLink{}
-		r.Equal(BlankAttr, a.serialize(&empty))
-	})
-}
-
 type hexInt int64
 
 func (t hexInt) MarshalText() ([]byte, error) {

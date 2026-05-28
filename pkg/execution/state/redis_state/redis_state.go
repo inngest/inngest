@@ -990,6 +990,44 @@ func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnI
 	return nil
 }
 
+// SaveRejectedDefer idempotently writes a Rejected meta sentinel. No-op if
+// any defer already exists for the hashedID. Returns ErrDeferLimitExceeded
+// if the run is at MaxDefersPerRun.
+func (m shardedMgr) SaveRejectedDefer(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, fnSlug string, hashedID string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveRejectedDefer"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	metaJSON, err := json.Marshal(deferMeta{
+		FnSlug:         fnSlug,
+		HashedID:       hashedID,
+		ScheduleStatus: int(enums.DeferStatusRejected),
+	})
+	if err != nil {
+		return err
+	}
+
+	args, err := StrSlice([]any{hashedID, string(metaJSON), consts.MaxDefersPerRun})
+	if err != nil {
+		return err
+	}
+
+	result, err := retriableScripts["saveRejectedDefer"].Exec(
+		redis_telemetry.WithScriptName(ctx, "saveRejectedDefer"),
+		r,
+		[]string{fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID)},
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error saving rejected defer sentinel: %w", err)
+	}
+	if result == -1 {
+		return fmt.Errorf("%w: %d", statev2.ErrDeferLimitExceeded, consts.MaxDefersPerRun)
+	}
+	return nil
+}
+
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveResponse"), redis_telemetry.ScopeFnRunState)
 
