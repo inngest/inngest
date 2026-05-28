@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
+	"github.com/inngest/inngest/pkg/execution/defers"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -126,7 +127,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	// blocking Finalize. The downstream cleanup (Delete, finalizeRemoveJobs,
 	// finalizeEvents for function.X) must still run regardless.
 	loadDefersStart := e.now()
-	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers",
+	loadedDefers, deferErr := util.WithRetry(ctx, "state.LoadDefers",
 		func(ctx context.Context) (map[string]sv2.Defer, error) {
 			return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
 		},
@@ -142,7 +143,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 			"run_id", opts.Metadata.ID.RunID,
 		)
 	}
-	metrics.HistogramDefersPerRun(ctx, int64(len(defers)), metrics.HistogramOpt{
+	metrics.HistogramDefersPerRun(ctx, int64(len(loadedDefers)), metrics.HistogramOpt{
 		PkgName: pkgName,
 	})
 
@@ -150,7 +151,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	// using the in-memory function loader, not state). The actual publish
 	// happens in finalizeEvents so all finalize-time events go through a
 	// single finishHandler call.
-	deferEvents, err := e.buildDeferEvents(ctx, opts, defers)
+	deferEvents, err := e.buildDeferEvents(ctx, opts, loadedDefers)
 	if err != nil {
 		l.Error(
 			"error building deferred schedule events; continuing without defer events",
@@ -194,9 +195,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 func (e *executor) buildDeferEvents(
 	ctx context.Context,
 	opts execution.FinalizeOpts,
-	defers map[string]sv2.Defer,
+	loadedDefers map[string]sv2.Defer,
 ) ([]event.Event, error) {
-	if len(defers) == 0 {
+	if len(loadedDefers) == 0 {
 		return nil, nil
 	}
 
@@ -211,7 +212,7 @@ func (e *executor) buildDeferEvents(
 	now := e.now()
 	var events []event.Event
 
-	for _, d := range defers {
+	for _, d := range loadedDefers {
 		if err := d.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(
 				"invalid defer",
@@ -228,7 +229,7 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
-		eventID := util.DeterministicDeferEventID(opts.Metadata.ID.RunID, d.HashedID)
+		eventID := defers.EventID(opts.Metadata.ID.RunID, d.HashedID)
 
 		data := map[string]any{}
 		if len(d.Input) > 0 {
