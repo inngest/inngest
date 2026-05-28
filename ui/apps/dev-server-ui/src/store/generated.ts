@@ -726,7 +726,6 @@ export type RunDefer = {
 };
 
 export enum RunDeferStatus {
-  Aborted = 'ABORTED',
   Scheduled = 'SCHEDULED'
 }
 

@@ -64,6 +64,10 @@ A defer must never fail its parent run. Each rejection logs a warning, increment
 
 ## Todo
 
+### Wire up the Abort path
+
+The SDK does not yet emit `OpcodeDeferAbort`. The server-side handlers, `SetDeferStatus`, `setDeferStatus.lua`, and the `Aborted` enum/status were stripped pending SDK support. Proto field `DEFER_STATUS_ABORTED = 3` is reserved.
+
 ### Suppress SDK retransmits after `MaxDefersPerRun` is hit
 
 **Problem.** Once a run reaches the count cap, `saveDefer.lua` can't write a Rejected sentinel for any new hashedID because the meta hash is full. The SDK keeps re-emitting `OpcodeDeferAdd` for that hashedID until the run finalizes. Wasted SDK to server traffic; not a failure.

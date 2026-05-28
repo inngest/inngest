@@ -63,8 +63,8 @@ func insertChildTraceRun(t *testing.T, cm cqrs.Manager, runID ulid.ULID, account
 }
 
 // GetRunDefers must surface every defer on the parent, even when the child run hasn't
-// materialized yet. If this fails, the UI silently drops pending/aborted defers based
-// on child-run progress.
+// materialized yet. If this fails, the UI silently drops pending defers based on
+// child-run progress.
 func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
