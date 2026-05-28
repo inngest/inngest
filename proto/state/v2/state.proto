@@ -157,9 +157,7 @@ enum DeferStatus {
   DEFER_STATUS_UNKNOWN   = 0;
   DEFER_STATUS_SCHEDULED = 1;
   DEFER_STATUS_AFTER_RUN = 2;
-  reserved 3;
-  reserved "DEFER_STATUS_ABORTED";
-  DEFER_STATUS_REJECTED  = 4;
+  DEFER_STATUS_REJECTED  = 3;
 }
 
 message Defer {

@@ -30,7 +30,7 @@ const (
 	DeferStatus_DEFER_STATUS_UNKNOWN   DeferStatus = 0
 	DeferStatus_DEFER_STATUS_SCHEDULED DeferStatus = 1
 	DeferStatus_DEFER_STATUS_AFTER_RUN DeferStatus = 2
-	DeferStatus_DEFER_STATUS_REJECTED  DeferStatus = 4
+	DeferStatus_DEFER_STATUS_REJECTED  DeferStatus = 3
 )
 
 // Enum value maps for DeferStatus.
@@ -39,13 +39,13 @@ var (
 		0: "DEFER_STATUS_UNKNOWN",
 		1: "DEFER_STATUS_SCHEDULED",
 		2: "DEFER_STATUS_AFTER_RUN",
-		4: "DEFER_STATUS_REJECTED",
+		3: "DEFER_STATUS_REJECTED",
 	}
 	DeferStatus_value = map[string]int32{
 		"DEFER_STATUS_UNKNOWN":   0,
 		"DEFER_STATUS_SCHEDULED": 1,
 		"DEFER_STATUS_AFTER_RUN": 2,
-		"DEFER_STATUS_REJECTED":  4,
+		"DEFER_STATUS_REJECTED":  3,
 	}
 )
 
@@ -2513,12 +2513,12 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x05pause\x18\x01 \x01(\v2\x0f.state.v2.PauseR\x05pause\x12.\n" +
 	"\x04opts\x18\x02 \x01(\v2\x1a.state.v2.ConsumePauseOptsR\x04opts\"L\n" +
 	"\x14ConsumePauseResponse\x124\n" +
-	"\x06result\x18\x01 \x01(\v2\x1c.state.v2.ConsumePauseResultR\x06result*\x96\x01\n" +
+	"\x06result\x18\x01 \x01(\v2\x1c.state.v2.ConsumePauseResultR\x06result*z\n" +
 	"\vDeferStatus\x12\x18\n" +
 	"\x14DEFER_STATUS_UNKNOWN\x10\x00\x12\x1a\n" +
 	"\x16DEFER_STATUS_SCHEDULED\x10\x01\x12\x1a\n" +
 	"\x16DEFER_STATUS_AFTER_RUN\x10\x02\x12\x19\n" +
-	"\x15DEFER_STATUS_REJECTED\x10\x04\"\x04\b\x03\x10\x03*\x14DEFER_STATUS_ABORTED2\x8e\t\n" +
+	"\x15DEFER_STATUS_REJECTED\x10\x032\x8e\t\n" +
 	"\n" +
 	"RunService\x12G\n" +
 	"\x06Create\x12\x1c.state.v2.CreateStateRequest\x1a\x1d.state.v2.CreateStateResponse\"\x00\x12G\n" +
