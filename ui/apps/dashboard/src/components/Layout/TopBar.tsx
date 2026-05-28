@@ -18,10 +18,14 @@ export default function TopBar({
   return (
     <header className="bg-canvasSubtle relative z-30 flex h-12 shrink-0 items-center justify-between gap-3 px-3">
       <div className="flex items-center gap-2">
-        {profile && <OrgButton profile={profile} />}
-        <span className="text-disabled" aria-hidden>
-          |
-        </span>
+        {profile && (
+          <>
+            <OrgButton profile={profile} />
+            <span className="text-disabled" aria-hidden>
+              |
+            </span>
+          </>
+        )}
         <Suspense fallback={<Skeleton className="h-8 w-40" />}>
           <Environments activeEnv={activeEnv} collapsed={false} />
         </Suspense>
