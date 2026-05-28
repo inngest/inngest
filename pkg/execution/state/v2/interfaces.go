@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -48,10 +47,6 @@ type RunService interface {
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
 
 	SaveDefer(ctx context.Context, id ID, d Defer) error
-	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when
-	// no defer exists for hashedID. The Aborted transition also releases
-	// the Input from the aggregate budget; the meta entry stays.
-	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
 	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
 	// No-op if any defer already exists for hashedID. Returns
 	// ErrDeferLimitExceeded if no room.

@@ -444,11 +444,6 @@ func (m *mockRunService) LoadDefersMeta(ctx context.Context, id state.ID) (map[s
 	return defers, args.Error(1)
 }
 
-func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
-	args := m.Called(ctx, id, hashedID, status)
-	return args.Error(0)
-}
-
 func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
 	args := m.Called(ctx, id, fnSlug, hashedID)
 	return args.Error(0)

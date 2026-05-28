@@ -58,8 +58,6 @@ type fakeRunService struct {
 	savedRejectedFnSlug   string
 	savedRejectedHashedID string
 	savedRejectedCalls    int
-	setDeferStatusHashed  string
-	setDeferStatusValue   enums.DeferStatus
 }
 
 func (f *fakeRunService) SaveDefer(_ context.Context, _ statev2.ID, d statev2.Defer) error {
@@ -72,12 +70,6 @@ func (f *fakeRunService) SaveRejectedDefer(_ context.Context, _ statev2.ID, fnSl
 	f.savedRejectedCalls++
 	f.savedRejectedFnSlug = fnSlug
 	f.savedRejectedHashedID = hashedID
-	return nil
-}
-
-func (f *fakeRunService) SetDeferStatus(_ context.Context, _ statev2.ID, hashedID string, status enums.DeferStatus) error {
-	f.setDeferStatusHashed = hashedID
-	f.setDeferStatusValue = status
 	return nil
 }
 

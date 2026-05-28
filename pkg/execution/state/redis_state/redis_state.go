@@ -560,9 +560,9 @@ type deferMeta struct {
 	HashedID string
 
 	// Must stay int, not enums.DeferStatus: the enum's MarshalJSON renders
-	// as a string, but saveDefer.lua/setDeferStatus.lua compare and rewrite
-	// this field as a number via cjson. Conversion to the typed enum happens
-	// at the LoadDefers/SaveDefer boundary.
+	// as a string, but saveDefer.lua compares and rewrites this field as a
+	// number via cjson. Conversion to the typed enum happens at the
+	// LoadDefers/SaveDefer boundary.
 	ScheduleStatus int
 }
 
@@ -957,36 +957,6 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 	}
 	if result == -2 {
 		return fmt.Errorf("%w: %d bytes", statev2.ErrDeferInputAggregateExceeded, consts.MaxDeferInputAggregateSize)
-	}
-	return nil
-}
-
-func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hashedID string, status enums.DeferStatus) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetDeferStatus"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, accountId, runID)
-
-	args, err := StrSlice([]any{hashedID, int(status), int(enums.DeferStatusAborted)})
-	if err != nil {
-		return err
-	}
-
-	result, err := retriableScripts["setDeferStatus"].Exec(
-		redis_telemetry.WithScriptName(ctx, "setDeferStatus"),
-		r,
-		[]string{
-			fnRunState.kg.DefersMeta(ctx, isSharded, fnID, runID),
-			fnRunState.kg.DefersInput(ctx, isSharded, fnID, runID),
-			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
-		},
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error setting defer status: %w", err)
-	}
-	if result == 0 {
-		return fmt.Errorf("defer not found for hashedID %q", hashedID)
 	}
 	return nil
 }

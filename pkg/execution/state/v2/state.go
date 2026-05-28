@@ -55,12 +55,9 @@ type Defer struct {
 	// Status for scheduling the deferred run:
 	// - Already scheduled?
 	// - Schedule after the parent run ends?
-	// - Never schedule (i.e. aborted)?
 	//
-	// Aborted is terminal within a run: once a defer transitions to
-	// DeferStatusAborted, it stays there. The Lua-level SaveDefer silently
-	// no-ops any subsequent write for the same hashedID. There is no "unabort"
-	// path: same hashedID + abort is final.
+	// The Lua-level SaveDefer silently no-ops any subsequent write for the
+	// same hashedID, so a Rejected sentinel is sticky for the run.
 	ScheduleStatus enums.DeferStatus
 
 	// Data passed to the defer
