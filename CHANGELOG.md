@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.23.0] - 2026-05-28
+
+### 🚀 Features
+
+- *(queue)* Allow EnqueueItem on other shard types (#4263)
+- Accept positional path params in agentic cli (#4246)
+
+### 🐛 Bug Fixes
+
+- *(executor)* Initialize synthetic cancel metadata config (#4261)
+- *(queue)* Handle renewed item lease during processing (#4267)
+- Get outputs working again with v2 runs (#4273)
+
+### 🚜 Refactor
+
+- *(connect)* Gate gateway routing by connection phase (#4241)
+- *(queue)* Add Scope to more queue methods (#4271)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update go sdk (#4264)
+- Improve agentic api cli help  (#4245)
+
+### ◀️ Revert
+
+- "chore: add a concurrency safe marshal to state configs" (#4257)
+
 ## [v1.22.0] - 2026-05-22
 
 ### 🚀 Features
@@ -34,6 +61,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Add a concurrency safe marshal to state configs (#4256)
+- *(release)* V1.22.0 (#4230)
 
 ### 🛡️ Security
 
