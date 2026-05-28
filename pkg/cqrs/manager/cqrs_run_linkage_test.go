@@ -86,7 +86,7 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 		status     enums.DeferStatus
 	}{
 		{"hash-aaa", "user-aaa", "app-fn-aaa", enums.DeferStatusAfterRun},
-		{"hash-bbb", "user-bbb", "app-fn-bbb", enums.DeferStatusAborted},
+		{"hash-bbb", "user-bbb", "app-fn-bbb", enums.DeferStatusAfterRun},
 	}
 
 	for i, d := range defers {
@@ -141,66 +141,8 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 	// hash-bbb has no child trace row.
 	second := parentDefers[1]
 	assert.Equal(t, "hash-bbb", second.HashedDeferID)
-	assert.Equal(t, enums.DeferStatusAborted, second.Status)
-	assert.Nil(t, second.Run, "Aborted/unlinked defer must surface with Run == nil")
-}
-
-// An aborted defer is represented by a SECOND executor.defer span (distinct
-// dynamic span ID) carrying defer.status = aborted alongside the original
-// schedule span (after_run). GetRunDefers must collapse both rows onto a single
-// defer, surfacing the terminal Aborted status — otherwise the UI keeps showing
-// an aborted defer as "Scheduled".
-func TestGetRunDefers_CollapsesAbortSpanOntoSchedule(t *testing.T) {
-	ctx := context.Background()
-	appID := uuid.New()
-
-	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
-	defer cleanup()
-
-	accountID := uuid.New()
-	workspaceID := uuid.New()
-	fnID := uuid.New()
-
-	parentRunID := ulid.MustNew(ulid.Now(), nil)
-	const hashedID = "hash-aborted"
-
-	// Schedule span: full attrs, after_run.
-	insertTestSpan(t, cm, testSpanFields{
-		RunID:         parentRunID.String(),
-		DynamicSpanID: "dyn-defer-schedule",
-		Name:          meta.SpanNameDefer,
-		AccountID:     accountID.String(),
-		AppID:         appID.String(),
-		FunctionID:    fnID.String(),
-		EnvID:         workspaceID.String(),
-		Attributes:    deferSpanAttrs(t, hashedID, "user-x", "app-fn-x", enums.DeferStatusAfterRun),
-	})
-	// Abort span: minimal attrs (hashed ID + status), aborted. Distinct
-	// dynamic span ID so it survives as its own row.
-	insertTestSpan(t, cm, testSpanFields{
-		RunID:         parentRunID.String(),
-		DynamicSpanID: "dyn-defer-abort",
-		Name:          meta.SpanNameDefer,
-		AccountID:     accountID.String(),
-		AppID:         appID.String(),
-		FunctionID:    fnID.String(),
-		EnvID:         workspaceID.String(),
-		Attributes:    deferSpanAttrs(t, hashedID, "", "", enums.DeferStatusAborted),
-	})
-
-	got, err := cm.GetRunDefers(ctx, []ulid.ULID{parentRunID})
-	require.NoError(t, err)
-
-	parentDefers := got[parentRunID]
-	require.Len(t, parentDefers, 1, "two spans for the same hashed ID must collapse to one defer")
-
-	d := parentDefers[0]
-	assert.Equal(t, hashedID, d.HashedDeferID)
-	assert.Equal(t, enums.DeferStatusAborted, d.Status, "terminal Aborted status must win over the schedule span's AfterRun")
-	// Richer fields from the schedule span must be preserved even though the
-	// abort span (which won the status) didn't carry them.
-	assert.Equal(t, "user-x", d.UserlandDeferID)
-	assert.Equal(t, "app-fn-x", d.FnSlug)
+	assert.Equal(t, enums.DeferStatusAfterRun, second.Status)
+	assert.Nil(t, second.Run, "unlinked defer must surface with Run == nil")
 }
 
 // A defer span carrying a status the GraphQL converter can't surface (e.g.

@@ -4224,7 +4224,6 @@ type RunDefer {
 
 enum RunDeferStatus {
   SCHEDULED
-  ABORTED
 }
 
 enum RunType {

@@ -14,9 +14,6 @@ const (
 	// Schedule after parent run ends
 	DeferStatusAfterRun
 
-	// Will not schedule. Terminal: no transition out.
-	DeferStatusAborted
-
 	// Defer was rejected, either because of validation or exceeding a limit.
 	// Terminal: no transition out.
 	DeferStatusRejected

@@ -989,17 +989,15 @@ type RunDeferStatus string
 
 const (
 	RunDeferStatusScheduled RunDeferStatus = "SCHEDULED"
-	RunDeferStatusAborted   RunDeferStatus = "ABORTED"
 )
 
 var AllRunDeferStatus = []RunDeferStatus{
 	RunDeferStatusScheduled,
-	RunDeferStatusAborted,
 }
 
 func (e RunDeferStatus) IsValid() bool {
 	switch e {
-	case RunDeferStatusScheduled, RunDeferStatusAborted:
+	case RunDeferStatusScheduled:
 		return true
 	}
 	return false

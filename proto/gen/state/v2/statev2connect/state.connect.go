@@ -50,9 +50,6 @@ const (
 	RunServiceConsumePauseProcedure = "/state.v2.RunService/ConsumePause"
 	// RunServiceSaveDeferProcedure is the fully-qualified name of the RunService's SaveDefer RPC.
 	RunServiceSaveDeferProcedure = "/state.v2.RunService/SaveDefer"
-	// RunServiceSetDeferStatusProcedure is the fully-qualified name of the RunService's SetDeferStatus
-	// RPC.
-	RunServiceSetDeferStatusProcedure = "/state.v2.RunService/SetDeferStatus"
 	// RunServiceSaveRejectedDeferProcedure is the fully-qualified name of the RunService's
 	// SaveRejectedDefer RPC.
 	RunServiceSaveRejectedDeferProcedure = "/state.v2.RunService/SaveRejectedDefer"
@@ -81,7 +78,6 @@ type RunServiceClient interface {
 	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
 	ConsumePause(context.Context, *connect.Request[v2.ConsumePauseRequest]) (*connect.Response[v2.ConsumePauseResponse], error)
 	SaveDefer(context.Context, *connect.Request[v2.SaveDeferRequest]) (*connect.Response[v2.SaveDeferResponse], error)
-	SetDeferStatus(context.Context, *connect.Request[v2.SetDeferStatusRequest]) (*connect.Response[v2.SetDeferStatusResponse], error)
 	SaveRejectedDefer(context.Context, *connect.Request[v2.SaveRejectedDeferRequest]) (*connect.Response[v2.SaveRejectedDeferResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
@@ -150,12 +146,6 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("SaveDefer")),
 			connect.WithClientOptions(opts...),
 		),
-		setDeferStatus: connect.NewClient[v2.SetDeferStatusRequest, v2.SetDeferStatusResponse](
-			httpClient,
-			baseURL+RunServiceSetDeferStatusProcedure,
-			connect.WithSchema(runServiceMethods.ByName("SetDeferStatus")),
-			connect.WithClientOptions(opts...),
-		),
 		saveRejectedDefer: connect.NewClient[v2.SaveRejectedDeferRequest, v2.SaveRejectedDeferResponse](
 			httpClient,
 			baseURL+RunServiceSaveRejectedDeferProcedure,
@@ -211,7 +201,6 @@ type runServiceClient struct {
 	savePending       *connect.Client[v2.SavePendingRequest, v2.SavePendingResponse]
 	consumePause      *connect.Client[v2.ConsumePauseRequest, v2.ConsumePauseResponse]
 	saveDefer         *connect.Client[v2.SaveDeferRequest, v2.SaveDeferResponse]
-	setDeferStatus    *connect.Client[v2.SetDeferStatusRequest, v2.SetDeferStatusResponse]
 	saveRejectedDefer *connect.Client[v2.SaveRejectedDeferRequest, v2.SaveRejectedDeferResponse]
 	loadMetadata      *connect.Client[v2.LoadMetadataRequest, v2.LoadMetadataResponse]
 	loadEvents        *connect.Client[v2.LoadEventsRequest, v2.LoadEventsResponse]
@@ -261,11 +250,6 @@ func (c *runServiceClient) SaveDefer(ctx context.Context, req *connect.Request[v
 	return c.saveDefer.CallUnary(ctx, req)
 }
 
-// SetDeferStatus calls state.v2.RunService.SetDeferStatus.
-func (c *runServiceClient) SetDeferStatus(ctx context.Context, req *connect.Request[v2.SetDeferStatusRequest]) (*connect.Response[v2.SetDeferStatusResponse], error) {
-	return c.setDeferStatus.CallUnary(ctx, req)
-}
-
 // SaveRejectedDefer calls state.v2.RunService.SaveRejectedDefer.
 func (c *runServiceClient) SaveRejectedDefer(ctx context.Context, req *connect.Request[v2.SaveRejectedDeferRequest]) (*connect.Response[v2.SaveRejectedDeferResponse], error) {
 	return c.saveRejectedDefer.CallUnary(ctx, req)
@@ -311,7 +295,6 @@ type RunServiceHandler interface {
 	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
 	ConsumePause(context.Context, *connect.Request[v2.ConsumePauseRequest]) (*connect.Response[v2.ConsumePauseResponse], error)
 	SaveDefer(context.Context, *connect.Request[v2.SaveDeferRequest]) (*connect.Response[v2.SaveDeferResponse], error)
-	SetDeferStatus(context.Context, *connect.Request[v2.SetDeferStatusRequest]) (*connect.Response[v2.SetDeferStatusResponse], error)
 	SaveRejectedDefer(context.Context, *connect.Request[v2.SaveRejectedDeferRequest]) (*connect.Response[v2.SaveRejectedDeferResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
@@ -376,12 +359,6 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("SaveDefer")),
 		connect.WithHandlerOptions(opts...),
 	)
-	runServiceSetDeferStatusHandler := connect.NewUnaryHandler(
-		RunServiceSetDeferStatusProcedure,
-		svc.SetDeferStatus,
-		connect.WithSchema(runServiceMethods.ByName("SetDeferStatus")),
-		connect.WithHandlerOptions(opts...),
-	)
 	runServiceSaveRejectedDeferHandler := connect.NewUnaryHandler(
 		RunServiceSaveRejectedDeferProcedure,
 		svc.SaveRejectedDefer,
@@ -442,8 +419,6 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceConsumePauseHandler.ServeHTTP(w, r)
 		case RunServiceSaveDeferProcedure:
 			runServiceSaveDeferHandler.ServeHTTP(w, r)
-		case RunServiceSetDeferStatusProcedure:
-			runServiceSetDeferStatusHandler.ServeHTTP(w, r)
 		case RunServiceSaveRejectedDeferProcedure:
 			runServiceSaveRejectedDeferHandler.ServeHTTP(w, r)
 		case RunServiceLoadMetadataProcedure:
@@ -497,10 +472,6 @@ func (UnimplementedRunServiceHandler) ConsumePause(context.Context, *connect.Req
 
 func (UnimplementedRunServiceHandler) SaveDefer(context.Context, *connect.Request[v2.SaveDeferRequest]) (*connect.Response[v2.SaveDeferResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.SaveDefer is not implemented"))
-}
-
-func (UnimplementedRunServiceHandler) SetDeferStatus(context.Context, *connect.Request[v2.SetDeferStatusRequest]) (*connect.Response[v2.SetDeferStatusResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.SetDeferStatus is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) SaveRejectedDefer(context.Context, *connect.Request[v2.SaveRejectedDeferRequest]) (*connect.Response[v2.SaveRejectedDeferResponse], error) {

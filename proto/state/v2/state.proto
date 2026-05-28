@@ -157,7 +157,8 @@ enum DeferStatus {
   DEFER_STATUS_UNKNOWN   = 0;
   DEFER_STATUS_SCHEDULED = 1;
   DEFER_STATUS_AFTER_RUN = 2;
-  DEFER_STATUS_ABORTED   = 3;
+  reserved 3;
+  reserved "DEFER_STATUS_ABORTED";
   DEFER_STATUS_REJECTED  = 4;
 }
 
@@ -180,14 +181,6 @@ message SaveDeferRequest {
 }
 
 message SaveDeferResponse {}
-
-message SetDeferStatusRequest {
-  ID          id        = 1;
-  string      hashed_id = 2;
-  DeferStatus status    = 3;
-}
-
-message SetDeferStatusResponse {}
 
 message SaveRejectedDeferRequest {
   ID     id        = 1;
@@ -257,7 +250,6 @@ service RunService {
   rpc ConsumePause(ConsumePauseRequest) returns (ConsumePauseResponse) {}
 
   rpc SaveDefer(SaveDeferRequest) returns (SaveDeferResponse) {}
-  rpc SetDeferStatus(SetDeferStatusRequest) returns (SetDeferStatusResponse) {}
   rpc SaveRejectedDefer(SaveRejectedDeferRequest) returns (SaveRejectedDeferResponse) {}
 
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}

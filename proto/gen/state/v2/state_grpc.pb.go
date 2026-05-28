@@ -27,7 +27,6 @@ const (
 	RunService_SavePending_FullMethodName       = "/state.v2.RunService/SavePending"
 	RunService_ConsumePause_FullMethodName      = "/state.v2.RunService/ConsumePause"
 	RunService_SaveDefer_FullMethodName         = "/state.v2.RunService/SaveDefer"
-	RunService_SetDeferStatus_FullMethodName    = "/state.v2.RunService/SetDeferStatus"
 	RunService_SaveRejectedDefer_FullMethodName = "/state.v2.RunService/SaveRejectedDefer"
 	RunService_LoadMetadata_FullMethodName      = "/state.v2.RunService/LoadMetadata"
 	RunService_LoadEvents_FullMethodName        = "/state.v2.RunService/LoadEvents"
@@ -49,7 +48,6 @@ type RunServiceClient interface {
 	SavePending(ctx context.Context, in *SavePendingRequest, opts ...grpc.CallOption) (*SavePendingResponse, error)
 	ConsumePause(ctx context.Context, in *ConsumePauseRequest, opts ...grpc.CallOption) (*ConsumePauseResponse, error)
 	SaveDefer(ctx context.Context, in *SaveDeferRequest, opts ...grpc.CallOption) (*SaveDeferResponse, error)
-	SetDeferStatus(ctx context.Context, in *SetDeferStatusRequest, opts ...grpc.CallOption) (*SetDeferStatusResponse, error)
 	SaveRejectedDefer(ctx context.Context, in *SaveRejectedDeferRequest, opts ...grpc.CallOption) (*SaveRejectedDeferResponse, error)
 	LoadMetadata(ctx context.Context, in *LoadMetadataRequest, opts ...grpc.CallOption) (*LoadMetadataResponse, error)
 	LoadEvents(ctx context.Context, in *LoadEventsRequest, opts ...grpc.CallOption) (*LoadEventsResponse, error)
@@ -147,16 +145,6 @@ func (c *runServiceClient) SaveDefer(ctx context.Context, in *SaveDeferRequest, 
 	return out, nil
 }
 
-func (c *runServiceClient) SetDeferStatus(ctx context.Context, in *SetDeferStatusRequest, opts ...grpc.CallOption) (*SetDeferStatusResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SetDeferStatusResponse)
-	err := c.cc.Invoke(ctx, RunService_SetDeferStatus_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *runServiceClient) SaveRejectedDefer(ctx context.Context, in *SaveRejectedDeferRequest, opts ...grpc.CallOption) (*SaveRejectedDeferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SaveRejectedDeferResponse)
@@ -239,7 +227,6 @@ type RunServiceServer interface {
 	SavePending(context.Context, *SavePendingRequest) (*SavePendingResponse, error)
 	ConsumePause(context.Context, *ConsumePauseRequest) (*ConsumePauseResponse, error)
 	SaveDefer(context.Context, *SaveDeferRequest) (*SaveDeferResponse, error)
-	SetDeferStatus(context.Context, *SetDeferStatusRequest) (*SetDeferStatusResponse, error)
 	SaveRejectedDefer(context.Context, *SaveRejectedDeferRequest) (*SaveRejectedDeferResponse, error)
 	LoadMetadata(context.Context, *LoadMetadataRequest) (*LoadMetadataResponse, error)
 	LoadEvents(context.Context, *LoadEventsRequest) (*LoadEventsResponse, error)
@@ -280,9 +267,6 @@ func (UnimplementedRunServiceServer) ConsumePause(context.Context, *ConsumePause
 }
 func (UnimplementedRunServiceServer) SaveDefer(context.Context, *SaveDeferRequest) (*SaveDeferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveDefer not implemented")
-}
-func (UnimplementedRunServiceServer) SetDeferStatus(context.Context, *SetDeferStatusRequest) (*SetDeferStatusResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetDeferStatus not implemented")
 }
 func (UnimplementedRunServiceServer) SaveRejectedDefer(context.Context, *SaveRejectedDeferRequest) (*SaveRejectedDeferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveRejectedDefer not implemented")
@@ -470,24 +454,6 @@ func _RunService_SaveDefer_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RunService_SetDeferStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetDeferStatusRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RunServiceServer).SetDeferStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RunService_SetDeferStatus_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RunServiceServer).SetDeferStatus(ctx, req.(*SetDeferStatusRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _RunService_SaveRejectedDefer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SaveRejectedDeferRequest)
 	if err := dec(in); err != nil {
@@ -652,10 +618,6 @@ var RunService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SaveDefer",
 			Handler:    _RunService_SaveDefer_Handler,
-		},
-		{
-			MethodName: "SetDeferStatus",
-			Handler:    _RunService_SetDeferStatus_Handler,
 		},
 		{
 			MethodName: "SaveRejectedDefer",

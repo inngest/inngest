@@ -33,18 +33,16 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 	out := make(map[ulid.ULID][]cqrs.RunDefer, len(spansByParent))
 	// childRunIDByParentHashed maps each (parent, hashedID) defer to the child
 	// run scheduled for it, recorded on the child-run-id executor.defer span at
-	// child-schedule time. A defer with no such span yet (still pending, or
-	// aborted before scheduling) is simply absent.
+	// child-schedule time. A defer with no such span yet (still pending) is
+	// simply absent.
 	childRunIDByParentHashed := make(map[ulid.ULID]map[string]ulid.ULID)
 	var allChildRunIDs []ulid.ULID
 	for parentRunID, spans := range spansByParent {
-		// A single defer can have several executor.defer spans: the original
-		// schedule span (defer.status = after_run), a second abort span
-		// (defer.status = aborted) if it was aborted, and a child-run-id span
+		// A single defer can have two executor.defer spans: the schedule span
+		// (defer.status = after_run) and a child-run-id span
 		// (defer.child_run_id, no status) once its child run is scheduled.
-		// Collapse the status-bearing spans by hashed ID — preferring the
-		// terminal status so an aborted defer surfaces as Aborted not Scheduled
-		// — and capture the child run ID separately. See defers/span.go.
+		// Index by hashed ID so the schedule span and any later child-run-id
+		// span share the same RunDefer entry. See defers/span.go.
 		byHashedID := make(map[string]cqrs.RunDefer)
 		for _, s := range spans {
 			if s.Attributes.DeferHashedID == nil {
@@ -69,8 +67,8 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 			status := *s.Attributes.DeferStatus
 			// Defensively skip any status the GraphQL converter
 			// (models.ToRunDeferStatus) can't surface. Today that's everything
-			// except AfterRun and Aborted; an unrecognized status here would
-			// otherwise propagate an error and fail the whole linkage query.
+			// except AfterRun; an unrecognized status here would otherwise
+			// propagate an error and fail the whole linkage query.
 			if !isSurfaceableDeferStatus(status) {
 				logger.StdlibLogger(ctx).Warn(
 					"skipping defer span with unsurfaceable status",
@@ -92,25 +90,7 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 				rd.FnSlug = *s.Attributes.DeferFnSlug
 			}
 
-			existing, ok := byHashedID[hashedID]
-			if !ok {
-				byHashedID[hashedID] = rd
-				continue
-			}
-			// Prefer the terminal (Aborted) status. The abort span only
-			// carries hashed ID + status, so preserve the richer fields
-			// (userland id/fn slug) from whichever span has them.
-			merged := existing
-			if deferStatusRank(status) > deferStatusRank(existing.Status) {
-				merged.Status = status
-			}
-			if merged.UserlandDeferID == "" {
-				merged.UserlandDeferID = rd.UserlandDeferID
-			}
-			if merged.FnSlug == "" {
-				merged.FnSlug = rd.FnSlug
-			}
-			byHashedID[hashedID] = merged
+			byHashedID[hashedID] = rd
 		}
 
 		for _, rd := range byHashedID {
@@ -149,29 +129,12 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 
 // isSurfaceableDeferStatus reports whether the GraphQL converter
 // (models.ToRunDeferStatus) can map this status. That converter errors on
-// anything other than AfterRun and Aborted, and the Defers resolver propagates
-// that error — failing the entire run-linkage query. Keeping this in lockstep
-// with the converter lets a single odd span be skipped instead of poisoning
-// the whole query.
+// anything other than AfterRun, and the Defers resolver propagates that error
+// — failing the entire run-linkage query. Keeping this in lockstep with the
+// converter lets a single odd span be skipped instead of poisoning the whole
+// query.
 func isSurfaceableDeferStatus(s enums.DeferStatus) bool {
-	switch s {
-	case enums.DeferStatusAfterRun, enums.DeferStatusAborted:
-		return true
-	default:
-		return false
-	}
-}
-
-// deferStatusRank orders the surfaceable defer statuses so collapsing by hashed
-// ID prefers the terminal one. Aborted is terminal and wins over the
-// still-scheduled AfterRun.
-func deferStatusRank(s enums.DeferStatus) int {
-	switch s {
-	case enums.DeferStatusAborted:
-		return 1
-	default:
-		return 0
-	}
+	return s == enums.DeferStatusAfterRun
 }
 
 func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]*cqrs.RunDeferredFrom, error) {

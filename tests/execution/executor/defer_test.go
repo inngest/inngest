@@ -273,12 +273,9 @@ func TestDeferFinalize(t *testing.T) {
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          json.RawMessage(nestedInputJSON),
 		}))
-		r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
-			FnSlug:         "onDefer-cleanup",
-			HashedID:       "hash-aborted",
-			ScheduleStatus: enums.DeferStatusAborted,
-			Input:          json.RawMessage(`{}`),
-		}))
+		// Write a Rejected sentinel via the dedicated reject API. Finalize
+		// must skip non-AfterRun statuses.
+		r.NoError(infra.smv2.SaveRejectedDefer(ctx, run.ID, "onDefer-cleanup", "hash-rejected"))
 
 		err := exec.Finalize(ctx, execution.FinalizeOpts{
 			Metadata: *run,
@@ -311,7 +308,7 @@ func TestDeferFinalize(t *testing.T) {
 		}
 
 		r.Equal([]string{"onDefer-score"}, deferredFnSlugs,
-			"only the AfterRun defer should emit deferred.schedule; aborted must not")
+			"only the AfterRun defer should emit deferred.schedule; non-AfterRun must not")
 		r.NotNil(activeData)
 
 		inn := activeData["_inngest"].(map[string]any)
