@@ -84,6 +84,30 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return fmt.Errorf("error leasing partition: %w", err)
 	}
 
+	if !p.IsSystem() {
+		accountExists, err := q.accountExists(ctx, p.AccountID)
+		if err != nil {
+			metrics.IncrQueueDeletedAccountPartitionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": shard.Name(),
+					"action":      deletedAccountPartitionActionCheckError,
+				},
+			})
+			l.Warn("error checking account existence for partition", "error", err, "account_id", p.AccountID.String(), "partition_id", p.ID)
+		} else if !accountExists {
+			metrics.IncrQueueDeletedAccountPartitionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": shard.Name(),
+					"action":      deletedAccountPartitionActionFound,
+				},
+			})
+			span.SetAttributes(attribute.String("status", "deleted_account"))
+			return q.requeueDeletedAccountPartition(ctx, shard, p)
+		}
+	}
+
 	begin := q.Clock().Now()
 	defer func() {
 		metrics.HistogramProcessPartitionDuration(ctx, q.Clock().Since(begin).Milliseconds(), metrics.HistogramOpt{

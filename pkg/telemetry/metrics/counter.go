@@ -94,6 +94,15 @@ func IncrQueuePartitionProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueDeletedAccountPartitionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_deleted_account_partition_total",
+		Description: "The total number of queue partitions found for deleted accounts",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrPartitionGoneCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
