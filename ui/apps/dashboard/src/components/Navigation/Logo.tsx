@@ -1,24 +1,13 @@
 import { Button } from '@inngest/components/Button';
-import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { InngestLogoSmall } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
-import { QuickSearch } from './QuickSearch/QuickSearch';
-import { Link } from '@tanstack/react-router';
 
 type LogoProps = {
   collapsed: boolean;
-  envSlug: string;
-  envName: string;
   setCollapsed: (arg: boolean) => void;
 };
 
-const NavToggle = ({
-  collapsed,
-  setCollapsed,
-}: {
-  collapsed: boolean;
-  setCollapsed: (arg: boolean) => void;
-}) => {
+const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
   const toggle = async () => {
     const toggled = !collapsed;
     setCollapsed(toggled);
@@ -37,7 +26,7 @@ const NavToggle = ({
       appearance="ghost"
       size="small"
       onClick={toggle}
-      className={'hidden group-hover:block'}
+      className="hidden group-hover:block"
       icon={
         collapsed ? (
           <RiContractRightLine className="text-muted h-5 w-5" />
@@ -49,37 +38,15 @@ const NavToggle = ({
   );
 };
 
-export default function Logo({
-  collapsed,
-  envSlug,
-  envName,
-  setCollapsed,
-}: LogoProps) {
+export default function Logo({ collapsed, setCollapsed }: LogoProps) {
   return (
     <div
       className={`${
         collapsed ? 'mx-auto' : 'mx-4'
       } mt-4 flex h-[28px] flex-row items-center justify-between`}
     >
-      <div
-        className={`flex flex-row items-center justify-start ${
-          collapsed ? '' : 'mr-1'
-        } `}
-      >
-        {collapsed ? (
-          <div className="cursor-pointer group-hover:hidden">
-            <InngestLogoSmall className="text-basis" />
-          </div>
-        ) : (
-          <Link to={import.meta.env.VITE_HOME_PATH} preload={false}>
-            <InngestLogo className="text-basis mr-2" width={96} />
-          </Link>
-        )}
-        <QuickSearch
-          collapsed={collapsed}
-          envSlug={envSlug}
-          envName={envName}
-        />
+      <div className="group-hover:hidden">
+        <InngestLogoSmall className="text-basis" />
       </div>
       <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>

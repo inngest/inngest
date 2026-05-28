@@ -1,9 +1,5 @@
-import { Suspense } from 'react';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import type { Environment as EnvType } from '@/utils/environments';
-import Environments from './Environments';
 import KeysNavItem from './KeysNavItem';
 import NavSection from './NavSection';
 import {
@@ -32,33 +28,25 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
     items: experimentsEnabled.value ? [experimentsItem] : [],
   };
 
-  return (
-    <div className={`text-basis mx-4 mt-4 flex h-full flex-col`}>
-      <Suspense fallback={<Skeleton className={`h-8 w-full`} />}>
-        <Environments activeEnv={activeEnv} collapsed={collapsed} />
-      </Suspense>
+  if (!activeEnv) {
+    return null;
+  }
 
-      {activeEnv && (
-        <>
-          <NavSection
-            group={observe}
-            activeEnv={activeEnv}
-            collapsed={collapsed}
-          />
-          <NavSection
-            group={workflow}
-            activeEnv={activeEnv}
-            collapsed={collapsed}
-          />
-          <NavSection group={ai} activeEnv={activeEnv} collapsed={collapsed} />
-          <NavSection
-            group={manage}
-            activeEnv={activeEnv}
-            collapsed={collapsed}
-            footer={<KeysNavItem activeEnv={activeEnv} collapsed={collapsed} />}
-          />
-        </>
-      )}
+  return (
+    <div className="text-basis mx-4 mt-4 flex h-full flex-col">
+      <NavSection group={observe} activeEnv={activeEnv} collapsed={collapsed} />
+      <NavSection
+        group={workflow}
+        activeEnv={activeEnv}
+        collapsed={collapsed}
+      />
+      <NavSection group={ai} activeEnv={activeEnv} collapsed={collapsed} />
+      <NavSection
+        group={manage}
+        activeEnv={activeEnv}
+        collapsed={collapsed}
+        footer={<KeysNavItem activeEnv={activeEnv} collapsed={collapsed} />}
+      />
     </div>
   );
 }

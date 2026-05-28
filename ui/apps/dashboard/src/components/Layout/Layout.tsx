@@ -4,6 +4,7 @@ import { type ProfileDisplayType } from '@/queries/server/profile';
 import type { Environment } from '@/utils/environments';
 import BottomBar from './BottomBar';
 import SideBar from './SideBar';
+import TopBar from './TopBar';
 import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
 import IncidentBanner from '../Incident/IncidentBanner';
 
@@ -22,18 +23,13 @@ export default function Layout({
 }: LayoutProps) {
   return (
     <div className="bg-canvasSubtle flex h-screen w-full flex-col overflow-hidden">
-      {/* TODO Phase 4: top bar (org switcher, env switcher, search, avatar). */}
-      <div className="h-3 shrink-0" />
+      <TopBar activeEnv={activeEnv} profile={profile} />
 
       <div
         id="layout-scroll-container"
         className="border-subtle bg-canvasBase mx-3 flex flex-1 flex-row overflow-hidden rounded border"
       >
-        <SideBar
-          activeEnv={activeEnv}
-          collapsed={collapsed}
-          profile={profile}
-        />
+        <SideBar activeEnv={activeEnv} collapsed={collapsed} />
 
         <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto overflow-x-scroll">
           <IncidentBanner />

@@ -1,32 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { ProfileDisplayType } from '@/queries/server/profile';
 import type { Environment } from '@/utils/environments';
 import Logo from '../Navigation/Logo';
 import Navigation from '../Navigation/Navigation';
-import { Profile } from '../Navigation/Profile';
 import { Integrations } from '../Navigation/Integrations';
 import OnboardingGuideTrigger from '../Navigation/OnboardingGuideTrigger';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
 import OnboardingWidget from '../Navigation/OnboardingWidget';
 
-// Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
-// const OnboardingWidget = dynamic(() => import('../Navigation/OnboardingWidget'), {
-//   ssr: false,
-// });
-// const SeatOverageWidget = dynamic(() => import('../SeatOverage/SeatOverageWidget'), {
-//   ssr: false,
-// });
-
 export default function SideBar({
   collapsed: serverCollapsed,
   activeEnv,
-  profile,
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
-  profile?: ProfileDisplayType;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -59,12 +47,7 @@ export default function SideBar({
       } shrink-0 overflow-visible border-r`}
       ref={navRef}
     >
-      <Logo
-        collapsed={collapsed}
-        envSlug={activeEnv?.slug ?? 'production'}
-        envName={activeEnv?.name ?? 'Production'}
-        setCollapsed={setCollapsed}
-      />
+      <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
@@ -80,7 +63,6 @@ export default function SideBar({
           )}
           <Integrations collapsed={collapsed} />
         </div>
-        {profile && <Profile collapsed={collapsed} profile={profile} />}
       </div>
     </nav>
   );
