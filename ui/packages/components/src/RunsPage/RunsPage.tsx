@@ -88,7 +88,7 @@ export function RunsPage({
   searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const columns = useScopedColumns(scope, features.runType ?? false);
+  const columns = useScopedColumns(scope);
   const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
@@ -268,7 +268,7 @@ export function RunsPage({
         </div>
       );
     },
-    [getTrigger, pollInterval, features.tracesPreview, features.runDetailsV4]
+    [getTrigger, pollInterval, features.runDetailsV4]
   );
 
   const options = useMemo(() => {

@@ -408,7 +408,7 @@ export type FunctionRunV2 = {
   appID: Scalars['UUID'];
   batchCreatedAt: Maybe<Scalars['Time']>;
   cronSchedule: Maybe<Scalars['String']>;
-  deferredFrom: Maybe<RunDeferredFrom>;
+  deferredFrom: Array<RunDeferredFrom>;
   defers: Array<RunDefer>;
   endedAt: Maybe<Scalars['Time']>;
   eventName: Maybe<Scalars['String']>;
@@ -1363,13 +1363,13 @@ export type GetRunsQuery = {
         runType: RunType;
         app: { __typename?: 'App'; externalID: string; name: string };
         function: { __typename?: 'Function'; name: string; slug: string };
-        deferredFrom: {
+        deferredFrom: Array<{
           __typename?: 'RunDeferredFrom';
           parentRun: {
             __typename?: 'FunctionRunV2';
             function: { __typename?: 'Function'; name: string; slug: string };
           } | null;
-        } | null;
+        }>;
       };
     }>;
     pageInfo: {
@@ -1840,7 +1840,7 @@ export type GetRunLinkageQuery = {
         function: { __typename?: 'Function'; name: string; slug: string };
       } | null;
     }>;
-    deferredFrom: {
+    deferredFrom: Array<{
       __typename?: 'RunDeferredFrom';
       parentRunID: any;
       parentRun: {
@@ -1862,7 +1862,7 @@ export type GetRunLinkageQuery = {
           } | null;
         }>;
       } | null;
-    } | null;
+    }>;
     invokedFrom: {
       __typename?: 'RunInvokedFrom';
       parentRunID: any;

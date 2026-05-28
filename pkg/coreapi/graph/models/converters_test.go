@@ -66,4 +66,47 @@ func TestMakeFunctionRunV2(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Nil(t, got.StartedAt)
 	})
+
+	t.Run("RunTypeDefer surfaces as DEFER", func(t *testing.T) {
+		run := &cqrs.TraceRun{
+			RunID:   ulid.Make().String(),
+			Status:  enums.RunStatusRunning,
+			RunType: enums.RunTypeDefer,
+		}
+		got, err := MakeFunctionRunV2(run)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, RunTypeDefer, got.RunType)
+	})
+
+	t.Run("unknown RunType defaults to PRIMARY (never empty)", func(t *testing.T) {
+		// Zero-value enums.RunType is RunTypeUnknown; the GraphQL field is
+		// non-null so the empty string would be invalid. PRIMARY is the
+		// safe default.
+		run := &cqrs.TraceRun{
+			RunID:  ulid.Make().String(),
+			Status: enums.RunStatusRunning,
+		}
+		got, err := MakeFunctionRunV2(run)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, RunTypePrimary, got.RunType)
+	})
+
+	t.Run("Skipped status preserves a real EndedAt", func(t *testing.T) {
+		// Skipped is terminal per enums.RunStatusEnded. The terminal-status
+		// switch must include it or EventV2.runs surfaces endedAt=null for
+		// runs that did, in fact, end.
+		ended := time.UnixMilli(1700000000000)
+		run := &cqrs.TraceRun{
+			RunID:   ulid.Make().String(),
+			Status:  enums.RunStatusSkipped,
+			EndedAt: ended,
+		}
+		got, err := MakeFunctionRunV2(run)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.NotNil(t, got.EndedAt)
+		assert.Equal(t, ended.UnixMilli(), got.EndedAt.UnixMilli())
+	})
 }

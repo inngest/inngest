@@ -246,7 +246,6 @@ function RunsComponent() {
           'id',
           'trigger',
           'function',
-          'runType',
           'queuedAt',
           'endedAt',
         ]}

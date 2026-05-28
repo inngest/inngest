@@ -23,9 +23,15 @@ export const LinkedRuns = ({ runID, defers, deferredFrom, invokedFrom, invoked }
   const parents = deferredFrom ?? [];
   // Parallel defers are the sibling defers across every parent this run
   // descends from, excluding the current run. De-duplicate by defer ID so a
-  // defer shared across parents (and React keys) doesn't repeat.
+  // defer shared across parents (and React keys) doesn't repeat. We require
+  // d.run to be set so this run never lists itself as its own sibling when
+  // its parent-side child-run-id span hasn't (yet) been written — the prior
+  // `d.run?.id !== runID` resolved `undefined !== runID` to true and let the
+  // self-row through.
   const parallelDefers = dedupeById(
-    parents.flatMap((p) => p.parentRun?.defers ?? []).filter((d) => d.run?.id !== runID)
+    parents
+      .flatMap((p) => p.parentRun?.defers ?? [])
+      .filter((d) => d.run != null && d.run.id !== runID)
   );
 
   return (

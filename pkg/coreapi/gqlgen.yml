@@ -99,8 +99,6 @@ models:
         resolver: true
       invokedFrom:
         resolver: true
-      runType:
-        resolver: true
   ConnectV1WorkerConnection:
     fields:
       app:

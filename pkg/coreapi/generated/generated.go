@@ -681,7 +681,6 @@ type FunctionRunV2Resolver interface {
 	Defers(ctx context.Context, obj *models.FunctionRunV2) ([]*models.RunDefer, error)
 	DeferredFrom(ctx context.Context, obj *models.FunctionRunV2) ([]*models.RunDeferredFrom, error)
 	InvokedFrom(ctx context.Context, obj *models.FunctionRunV2) (*models.RunInvokedFrom, error)
-	RunType(ctx context.Context, obj *models.FunctionRunV2) (models.RunType, error)
 }
 type MutationResolver interface {
 	CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error)
@@ -12920,7 +12919,7 @@ func (ec *executionContext) _FunctionRunV2_runType(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRunV2().RunType(rctx, obj)
+		return obj.RunType, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12941,8 +12940,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_runType(ctx context.Conte
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRunV2",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type RunType does not have child fields")
 		},
@@ -27611,25 +27610,12 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 
 			})
 		case "runType":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FunctionRunV2_runType(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._FunctionRunV2_runType(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
 			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

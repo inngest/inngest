@@ -62,7 +62,7 @@ func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.Fun
 		return nil, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
 	}
 	if dfs == nil {
-		return nil, nil
+		return []*models.RunDeferredFrom{}, nil
 	}
 
 	out := make([]*models.RunDeferredFrom, 0, len(*dfs))
@@ -98,20 +98,6 @@ func (r *functionRunV2Resolver) InvokedFrom(ctx context.Context, fn *models.Func
 		ParentRun:   parentV2,
 		StepName:    rif.StepName,
 	}, nil
-}
-
-func (r *functionRunV2Resolver) RunType(ctx context.Context, fn *models.FunctionRunV2) (models.RunType, error) {
-	dfs, err := loader.LoadOneWithString[[]*cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
-	if err != nil {
-		// RunType! is a non-null GraphQL enum; "" is not a valid value and
-		// gqlgen rejects it during marshaling. Return a valid default
-		// alongside the error (mirrors models.ToFunctionRunStatus).
-		return models.RunTypePrimary, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
-	}
-	if dfs != nil && len(*dfs) > 0 {
-		return models.RunTypeDefer, nil
-	}
-	return models.RunTypePrimary, nil
 }
 
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {

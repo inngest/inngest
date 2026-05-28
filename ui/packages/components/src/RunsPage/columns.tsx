@@ -96,14 +96,19 @@ const columns = [
       const fnName = info.getValue().name;
       const isDeferred = data.runType === 'DEFER';
 
-      if (data.hasAI) {
-        return <AICell>{fnName}</AICell>;
-      }
-
       // A batched run can have several parents; show the first for the
       // list breadcrumb. Each name truncates independently so a long parent
       // name can't crowd out the child the user actually clicked into.
       const parentName = data.deferredFrom?.[0]?.parentRun?.function?.name;
+
+      // Compose the name cell inline rather than early-returning the AI
+      // branch — an AI-using deferred run still needs the breadcrumb and
+      // "(Deferred)" suffix to be visible.
+      const nameCell = data.hasAI ? (
+        <AICell>{fnName}</AICell>
+      ) : (
+        <TextCell className="min-w-0">{fnName}</TextCell>
+      );
 
       return (
         <div className="flex max-w-md items-center gap-1">
@@ -113,7 +118,7 @@ const columns = [
               <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
             </>
           )}
-          <TextCell className="min-w-0">{fnName}</TextCell>
+          {nameCell}
           {isDeferred && (
             <span className="text-light shrink-0 text-xs font-normal">(Deferred)</span>
           )}
@@ -196,18 +201,15 @@ const columns = [
  * single function's runs then we shouldn't show the app or function columns
  * since every row will have the same values
  */
-export function useScopedColumns(scope: ViewScope, showRunType: boolean) {
+export function useScopedColumns(scope: ViewScope) {
   return useMemo(() => {
     return columns.filter((column) => {
       if ('accessorKey' in column) {
-        if (!showRunType && column.accessorKey === 'runType') {
-          return false;
-        }
         if (scope === 'fn') {
           return column.accessorKey !== 'app' && column.accessorKey !== 'function';
         }
       }
       return true;
     });
-  }, [scope, showRunType]);
+  }, [scope]);
 }
