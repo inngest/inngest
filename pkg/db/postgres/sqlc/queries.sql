@@ -240,9 +240,9 @@ VALUES
 
 -- name: InsertTraceRun :exec
 INSERT INTO trace_runs
-    (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule, has_ai)
+    (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule, has_ai, run_type)
 VALUES
-    (sqlc.arg('account_id'), sqlc.arg('workspace_id'), sqlc.arg('app_id'), sqlc.arg('function_id'), sqlc.arg('trace_id'), sqlc.arg('run_id')::CHAR(26), sqlc.arg('queued_at'), sqlc.arg('started_at'), sqlc.arg('ended_at'), sqlc.arg('status'), sqlc.arg('source_id'), sqlc.arg('trigger_ids'), sqlc.arg('output'), sqlc.arg('batch_id')::BYTEA, sqlc.arg('is_debounce'), sqlc.arg('cron_schedule'), sqlc.arg('has_ai'))
+    (sqlc.arg('account_id'), sqlc.arg('workspace_id'), sqlc.arg('app_id'), sqlc.arg('function_id'), sqlc.arg('trace_id'), sqlc.arg('run_id')::CHAR(26), sqlc.arg('queued_at'), sqlc.arg('started_at'), sqlc.arg('ended_at'), sqlc.arg('status'), sqlc.arg('source_id'), sqlc.arg('trigger_ids'), sqlc.arg('output'), sqlc.arg('batch_id')::BYTEA, sqlc.arg('is_debounce'), sqlc.arg('cron_schedule'), sqlc.arg('has_ai'), sqlc.arg('run_type'))
 ON CONFLICT (run_id) DO UPDATE SET
     account_id = excluded.account_id,
     workspace_id = excluded.workspace_id,
@@ -262,7 +262,8 @@ ON CONFLICT (run_id) DO UPDATE SET
     has_ai = CASE
                 WHEN trace_runs.has_ai = TRUE THEN TRUE
                 ELSE excluded.has_ai
-             END;
+             END,
+    run_type = excluded.run_type;
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = sqlc.arg('run_id')::CHAR(26);
@@ -435,26 +436,31 @@ GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
 
 -- name: GetSpansByRunIDsAndName :many
+-- Returns spans by name with their current attribute values, merging in any
+-- updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+-- up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+-- carry the span name and would otherwise be filtered out.
 SELECT
-  run_id,
-  trace_id,
-  dynamic_span_id,
-  MIN(start_time) as start_time,
-  MAX(end_time) AS end_time,
-  parent_span_id,
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
   json_agg(json_build_object(
-    'span_id', span_id,
-    'name', name,
-    'attributes', attributes,
-    'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
-    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
   )) AS span_fragments
-FROM spans
-WHERE run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::TEXT[]))
-  AND name = sqlc.arg('name')
-GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
-ORDER BY run_id, start_time;
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = sqlc.arg('name')
+  AND m.run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::TEXT[]))
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time;
 
 -- name: GetSpansByDebugRunID :many
 SELECT

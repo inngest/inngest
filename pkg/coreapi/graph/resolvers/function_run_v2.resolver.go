@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/oklog/ulid/v2"
 )
 
 func (r *functionRunV2Resolver) App(
@@ -37,67 +39,135 @@ func (r *functionRunV2Resolver) Defers(ctx context.Context, fn *models.FunctionR
 
 	out := make([]*models.RunDefer, 0, len(defers))
 	for _, d := range defers {
-		runV2, err := models.MakeFunctionRunV2(d.Run)
-		if err != nil {
-			return nil, fmt.Errorf("error converting defer child run: %w", err)
-		}
 		status, err := models.ToRunDeferStatus(d.Status)
 		if err != nil {
 			return nil, fmt.Errorf("error converting defer status: %w", err)
 		}
 		out = append(out, &models.RunDefer{
-			ID:              d.HashedDeferID,
+			HashedDeferID:   d.HashedDeferID,
 			UserlandDeferID: d.UserlandDeferID,
 			FnSlug:          d.FnSlug,
 			Status:          status,
-			Run:             runV2,
+			RunID:           d.RunID,
 		})
+	}
+	return out, nil
+}
+
+// SiblingDefers returns the defers from this run's parent(s), excluding the
+// entry that scheduled this run. Lets the UI render "parallel defers" without
+// having to fetch the parent's full defer list and filter client-side.
+func (r *functionRunV2Resolver) SiblingDefers(ctx context.Context, fn *models.FunctionRunV2) ([]*models.RunDefer, error) {
+	df, err := loader.LoadOneWithString[[]cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
+	}
+	if df == nil || len(*df) == 0 {
+		return []*models.RunDefer{}, nil
+	}
+
+	parentRunIDs := make([]ulid.ULID, 0, len(*df))
+	for _, p := range *df {
+		parentRunIDs = append(parentRunIDs, p.RunID)
+	}
+
+	defersByParent, err := r.Data.GetRunDefers(ctx, parentRunIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving sibling defers: %w", err)
+	}
+
+	out := []*models.RunDefer{}
+	for _, defers := range defersByParent {
+		for _, d := range defers {
+			// Drop the defer entry that scheduled this run; siblings are
+			// peers, not self.
+			if d.RunID != nil && *d.RunID == fn.ID {
+				continue
+			}
+			status, err := models.ToRunDeferStatus(d.Status)
+			if err != nil {
+				return nil, fmt.Errorf("error converting defer status: %w", err)
+			}
+			out = append(out, &models.RunDefer{
+				HashedDeferID:   d.HashedDeferID,
+				UserlandDeferID: d.UserlandDeferID,
+				FnSlug:          d.FnSlug,
+				Status:          status,
+				RunID:           d.RunID,
+			})
+		}
 	}
 	return out, nil
 }
 
 func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.FunctionRunV2) ([]*models.RunDeferredFrom, error) {
-	dfs, err := loader.LoadOneWithString[[]*cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
+	dfs, err := loader.LoadOneWithString[[]cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
 	}
 	if dfs == nil {
-		return []*models.RunDeferredFrom{}, nil
+		return nil, nil
 	}
 
 	out := make([]*models.RunDeferredFrom, 0, len(*dfs))
 	for _, df := range *dfs {
-		parentV2, err := models.MakeFunctionRunV2(df.ParentRun)
-		if err != nil {
-			return nil, fmt.Errorf("error converting deferred-from parent run: %w", err)
-		}
 		out = append(out, &models.RunDeferredFrom{
-			ParentRunID: df.ParentRunID,
-			ParentRun:   parentV2,
+			RunID:  df.RunID,
+			FnSlug: df.FnSlug,
 		})
 	}
 	return out, nil
 }
 
-func (r *functionRunV2Resolver) InvokedFrom(ctx context.Context, fn *models.FunctionRunV2) (*models.RunInvokedFrom, error) {
-	rif, err := loader.LoadOneWithString[cqrs.RunInvokedFrom](ctx, loader.FromCtx(ctx).RunInvokedFromLoader, fn.ID.String())
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving invoked-from linkage: %w", err)
-	}
-	if rif == nil {
+// RunDefer field resolvers — Function/Run are loaded lazily so list views
+// that only render hashed id + status skip the joins.
+
+func (r *runDeferResolver) Function(ctx context.Context, obj *models.RunDefer) (*models.Function, error) {
+	if obj.FnSlug == "" {
 		return nil, nil
 	}
-
-	parentV2, err := models.MakeFunctionRunV2(rif.ParentRun)
+	fn, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", obj.FnSlug)
 	if err != nil {
-		return nil, fmt.Errorf("error converting invoked-from parent run: %w", err)
+		// Fn slugs that don't resolve are valid: a defer is recorded even
+		// when its target function was deleted or renamed. Surface nil so
+		// the GraphQL field returns null per schema.
+		return nil, nil
 	}
+	return models.MakeFunction(fn)
+}
 
-	return &models.RunInvokedFrom{
-		ParentRunID: rif.ParentRunID,
-		ParentRun:   parentV2,
-		StepName:    rif.StepName,
-	}, nil
+func (r *runDeferResolver) Run(ctx context.Context, d *models.RunDefer) (*models.FunctionRunV2, error) {
+	if d.RunID == nil {
+		return nil, nil
+	}
+	runs, err := r.Data.GetTraceRunsByRunIDs(ctx, []ulid.ULID{*d.RunID})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving defer child run: %w", err)
+	}
+	run, ok := runs[*d.RunID]
+	if !ok || run == nil {
+		return nil, nil
+	}
+	return models.MakeFunctionRunV2(run)
+}
+
+func (r *runDeferredFromResolver) Function(ctx context.Context, obj *models.RunDeferredFrom) (*models.Function, error) {
+	if obj.FnSlug == "" {
+		return nil, fmt.Errorf("missing fn slug for deferred-from linkage")
+	}
+	fn, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", obj.FnSlug)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving deferred-from function: %w", err)
+	}
+	return models.MakeFunction(fn)
+}
+
+func (r *runDeferredFromResolver) Run(ctx context.Context, obj *models.RunDeferredFrom) (*models.FunctionRunV2, error) {
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: obj.RunID})
+	if err != nil {
+		return nil, nil
+	}
+	return models.MakeFunctionRunV2(run)
 }
 
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {

@@ -1675,10 +1675,10 @@ func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
 }
 
 // TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom locks in the alignment
-// between the runs-list runType filter (read off the child's executor.run
-// run.type attribute) and the run-detail classification (GetRunDeferredFrom,
-// which reads defer.parent_run_ids off the same span). Both paths must agree on
-// each run's type so the list and the detail never disagree.
+// between the runs-list runType filter (now backed by trace_runs.run_type) and
+// the run-detail classification (GetRunDeferredFrom, which reads
+// defer.parent_run_ids off the child's executor.run span). Both paths must
+// agree on each run's type so the list and the detail never disagree.
 func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -1691,41 +1691,52 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	functionID := uuid.New()
 	baseTime := time.Now().UTC().Truncate(time.Second)
 
-	// insertRootRun emits an executor.run span and optionally tags it with
-	// run.type + defer.parent_run_ids. Passing zero values for runType/parents
-	// seeds a span with no run-type attribute (the backward-compat path).
+	// insertRootRun writes a trace_runs row (with run_type) and a matching
+	// executor.run span. The span carries defer.parent_run_ids when the run is
+	// a defer child so the run-detail path can still resolve linkage.
 	insertRootRun := func(offset time.Duration, runType enums.RunType, parentRunIDs []string) string {
-		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		attrs := map[string]any{}
-		if runType != enums.RunTypeUnknown {
-			attrs[meta.Attrs.RunType.Key()] = runType.String()
-		}
-		if len(parentRunIDs) > 0 {
-			attrs[meta.Attrs.DeferParentRunIDs.Key()] = parentRunIDs
-		}
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		startedAt := baseTime.Add(offset)
+
+		err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     "trace-" + runID.String(),
+			RunID:       runID.String(),
+			QueuedAt:    startedAt,
+			StartedAt:   startedAt,
+			EndedAt:     startedAt,
+			Status:      enums.RunStatusCompleted,
+			RunType:     runType,
+		})
+		require.NoError(t, err)
+
 		var attrBytes []byte
-		if len(attrs) > 0 {
+		if len(parentRunIDs) > 0 {
 			var err error
-			attrBytes, err = json.Marshal(attrs)
+			attrBytes, err = json.Marshal(map[string]any{
+				meta.Attrs.DeferParentRunIDs.Key(): parentRunIDs,
+			})
 			require.NoError(t, err)
 		}
 		insertTestSpan(t, cm, testSpanFields{
-			RunID:         runID,
-			DynamicSpanID: "dyn-root-" + runID,
+			RunID:         runID.String(),
+			DynamicSpanID: "dyn-root-" + runID.String(),
 			Name:          meta.SpanNameRun,
 			Status:        enums.RunStatusCompleted.String(),
-			StartTime:     baseTime.Add(offset),
+			StartTime:     startedAt,
 			AccountID:     accountID.String(),
 			AppID:         appID.String(),
 			FunctionID:    functionID.String(),
 			EnvID:         workspaceID.String(),
 			Attributes:    attrBytes,
 		})
-		return runID
+		return runID.String()
 	}
 
-	// PRIMARY (no run-type attribute): backward-compat for runs written before
-	// the attribute existed.
+	// PRIMARY (Unknown → Primary back-compat path inside InsertTraceRun).
 	legacyPrimaryRunID := insertRootRun(0, enums.RunTypeUnknown, nil)
 
 	// PRIMARY tagged explicitly.
@@ -1734,12 +1745,11 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	// The parent that scheduled the defer.
 	parentRunID := insertRootRun(2*time.Second, enums.RunTypePrimary, nil)
 
-	// DEFER: child run with run.type=defer and defer.parent_run_ids pointing at
-	// the parent. There is NO defer.child_run_id span on the parent — the new
-	// path reads the breadcrumb off the child's own executor.run span.
+	// DEFER: child run with run_type=defer and defer.parent_run_ids stamped
+	// on the child's executor.run span.
 	deferRunID := insertRootRun(3*time.Second, enums.RunTypeDefer, []string{parentRunID})
 
-	listRunIDs := func(runTypes []enums.RunType) []string {
+	listRunIDs := func(preview bool, runTypes []enums.RunType) []string {
 		runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
 			Filter: cqrs.GetTraceRunFilter{
 				AccountID:   accountID,
@@ -1753,7 +1763,7 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 			Order: []cqrs.GetTraceRunOrder{
 				{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderAsc},
 			},
-			Preview: true,
+			Preview: preview,
 		})
 		require.NoError(t, err)
 		ids := make([]string, 0, len(runs))
@@ -1763,20 +1773,21 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 		return ids
 	}
 
-	deferList := listRunIDs([]enums.RunType{enums.RunTypeDefer})
-	assert.Contains(t, deferList, deferRunID,
-		"a run with run.type=defer must appear in the DEFER list")
-	assert.NotContains(t, deferList, taggedPrimaryRunID, "tagged primary run must not be DEFER")
-	assert.NotContains(t, deferList, parentRunID, "the scheduling parent is itself PRIMARY")
-	assert.NotContains(t, deferList, legacyPrimaryRunID,
-		"a run with no run.type attribute must not be DEFER")
+	for _, preview := range []bool{false, true} {
+		t.Run(fmt.Sprintf("preview=%v", preview), func(t *testing.T) {
+			deferList := listRunIDs(preview, []enums.RunType{enums.RunTypeDefer})
+			assert.Contains(t, deferList, deferRunID, "run_type=defer must appear in the DEFER list")
+			assert.NotContains(t, deferList, taggedPrimaryRunID, "tagged primary must not be DEFER")
+			assert.NotContains(t, deferList, parentRunID, "the scheduling parent is itself PRIMARY")
+			assert.NotContains(t, deferList, legacyPrimaryRunID, "Unknown defaults to PRIMARY, not DEFER")
 
-	primaryList := listRunIDs([]enums.RunType{enums.RunTypePrimary})
-	assert.Contains(t, primaryList, taggedPrimaryRunID, "tagged primary run is PRIMARY")
-	assert.Contains(t, primaryList, parentRunID, "the scheduling parent is PRIMARY")
-	assert.Contains(t, primaryList, legacyPrimaryRunID,
-		"a run with no run.type attribute must still appear in the PRIMARY list (backward-compat)")
-	assert.NotContains(t, primaryList, deferRunID, "defer run must not appear in PRIMARY list")
+			primaryList := listRunIDs(preview, []enums.RunType{enums.RunTypePrimary})
+			assert.Contains(t, primaryList, taggedPrimaryRunID, "tagged primary is PRIMARY")
+			assert.Contains(t, primaryList, parentRunID, "the scheduling parent is PRIMARY")
+			assert.Contains(t, primaryList, legacyPrimaryRunID, "Unknown defaults to PRIMARY on insert")
+			assert.NotContains(t, primaryList, deferRunID, "defer run must not appear in PRIMARY list")
+		})
+	}
 
 	// Cross-check against the run-detail path. The deferred run hydrates its
 	// parent breadcrumb purely from defer.parent_run_ids on its own
@@ -1790,7 +1801,7 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	require.NoError(t, err)
 	rdfs := df[ulid.MustParse(deferRunID)]
 	require.Len(t, rdfs, 1, "detail must surface the deferred parent for the defer run")
-	assert.Equal(t, parentRunID, rdfs[0].ParentRunID.String(),
+	assert.Equal(t, parentRunID, rdfs[0].RunID.String(),
 		"detail must record the parent recorded on defer.parent_run_ids")
 	assert.Empty(t, df[ulid.MustParse(taggedPrimaryRunID)],
 		"detail must not classify the tagged primary run as DEFER")

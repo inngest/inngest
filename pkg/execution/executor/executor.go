@@ -1314,10 +1314,14 @@ func (e *executor) schedule(
 	// whether this run is a deferred child and which parent run(s) scheduled it.
 	// It's reused below to stamp the root span and to record the defer linkage.
 	deferMetadata := deferredScheduleMetadata(req.Events, l)
-	runType := enums.RunTypePrimary
 	var parentRunIDs []string
+	// A single parent fn slug despite many parent run IDs: once batching of
+	// deferred runs is wired up, the parent fn slug becomes the implicit batch
+	// key, so a single child will never have multiple parent functions in a
+	// batch.
+	var parentFnSlug string
 	if len(deferMetadata) > 0 {
-		runType = enums.RunTypeDefer
+		parentFnSlug = deferMetadata[0].ParentFnSlug
 		parentRunIDs = make([]string, 0, len(deferMetadata))
 		for _, m := range deferMetadata {
 			parentRunIDs = append(parentRunIDs, m.ParentRunID)
@@ -1335,12 +1339,12 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
 			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
-			meta.Attr(meta.Attrs.RunType, &runType),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
 	if len(parentRunIDs) > 0 {
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentRunIDs, &parentRunIDs)
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentFnSlug, &parentFnSlug)
 	}
 	if req.RunMode == enums.RunModeSync {
 		// XXX: If this is a sync run, always add the start time to the span. We do this

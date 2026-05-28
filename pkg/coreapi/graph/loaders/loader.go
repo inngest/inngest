@@ -79,8 +79,12 @@ func LoadMany[T interface{}](
 ) ([]T, error) {
 	thunkMany := loader.LoadMany(ctx, keys)
 	results, errs := thunkMany()
-	if len(errs) > 0 {
-		return []T{}, errs[1]
+	// graph-gophers/dataloader returns one slot per key, with nil for
+	// successful keys. errs is nil only when all keys succeeded.
+	for _, e := range errs {
+		if e != nil {
+			return []T{}, e
+		}
 	}
 
 	output := make([]T, len(keys))
@@ -128,7 +132,6 @@ type Loaders struct {
 	DebugSessionLoader    *dataloader.Loader
 	RunDefersLoader       *dataloader.Loader
 	RunDeferredFromLoader *dataloader.Loader
-	RunInvokedFromLoader  *dataloader.Loader
 }
 
 func NewLoaders(params LoaderParams) *Loaders {
@@ -145,7 +148,6 @@ func NewLoaders(params LoaderParams) *Loaders {
 	loaders.DebugSessionLoader = dataloader.NewBatchedLoader(tr.GetDebugSessionTrace)
 	loaders.RunDefersLoader = dataloader.NewBatchedLoader(dr.GetRunDefers)
 	loaders.RunDeferredFromLoader = dataloader.NewBatchedLoader(dr.GetRunDeferredFrom)
-	loaders.RunInvokedFromLoader = dataloader.NewBatchedLoader(dr.GetRunInvokedFrom)
 
 	return loaders
 }

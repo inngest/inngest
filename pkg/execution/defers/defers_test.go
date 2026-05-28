@@ -52,25 +52,23 @@ func (c *capturingTracer) CreateSpan(_ context.Context, name string, opts *traci
 type fakeRunService struct {
 	statev2.RunService
 
-	saveDeferErr          error
-	savedDefer            *statev2.Defer
-	savedDeferCalls       int
-	savedRejectedFnSlug   string
-	savedRejectedHashedID string
-	savedRejectedCalls    int
+	saveDeferErr error
+	saved        []statev2.Defer
 }
 
 func (f *fakeRunService) SaveDefer(_ context.Context, _ statev2.ID, d statev2.Defer) error {
-	f.savedDeferCalls++
-	f.savedDefer = &d
+	f.saved = append(f.saved, d)
 	return f.saveDeferErr
 }
 
-func (f *fakeRunService) SaveRejectedDefer(_ context.Context, _ statev2.ID, fnSlug string, hashedID string) error {
-	f.savedRejectedCalls++
-	f.savedRejectedFnSlug = fnSlug
-	f.savedRejectedHashedID = hashedID
-	return nil
+func (f *fakeRunService) countByStatus(s enums.DeferStatus) int {
+	n := 0
+	for _, d := range f.saved {
+		if d.ScheduleStatus == s {
+			n++
+		}
+	}
+	return n
 }
 
 func runID() statev2.ID {
@@ -109,11 +107,10 @@ func TestSaveFromOp_Accepted(t *testing.T) {
 		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
-		require.Equal(t, 1, fake.savedDeferCalls)
-		require.Equal(t, 0, fake.savedRejectedCalls)
-		require.Equal(t, "user-defer-id", fake.savedDefer.UserlandID)
-		require.Equal(t, "hash-1", fake.savedDefer.HashedID)
-		require.Equal(t, enums.DeferStatusAfterRun, fake.savedDefer.ScheduleStatus)
+		require.Len(t, fake.saved, 1)
+		require.Equal(t, "user-defer-id", fake.saved[0].UserlandID)
+		require.Equal(t, "hash-1", fake.saved[0].HashedID)
+		require.Equal(t, enums.DeferStatusAfterRun, fake.saved[0].ScheduleStatus)
 	})
 
 	t.Run("Userland nil → empty UserlandID, still accepted", func(t *testing.T) {
@@ -126,13 +123,13 @@ func TestSaveFromOp_Accepted(t *testing.T) {
 		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
-		require.Equal(t, 1, fake.savedDeferCalls)
-		require.Empty(t, fake.savedDefer.UserlandID)
+		require.Len(t, fake.saved, 1)
+		require.Empty(t, fake.saved[0].UserlandID)
 	})
 }
 
 func TestSaveFromOp_Rejected(t *testing.T) {
-	t.Run("per_defer_size writes sentinel", func(t *testing.T) {
+	t.Run("per_defer_size persists Rejected", func(t *testing.T) {
 		fake := &fakeRunService{}
 		op := deferAddOp(t, "hash-too-big", "user-defer-id", state.DeferAddOpts{
 			FnSlug: "child-fn",
@@ -142,13 +139,13 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
-		require.Equal(t, 0, fake.savedDeferCalls)
-		require.Equal(t, 1, fake.savedRejectedCalls)
-		require.Equal(t, "child-fn", fake.savedRejectedFnSlug)
-		require.Equal(t, "hash-too-big", fake.savedRejectedHashedID)
+		require.Len(t, fake.saved, 1)
+		require.Equal(t, enums.DeferStatusRejected, fake.saved[0].ScheduleStatus)
+		require.Equal(t, "child-fn", fake.saved[0].FnSlug)
+		require.Equal(t, "hash-too-big", fake.saved[0].HashedID)
 	})
 
-	t.Run("invalid_opts with FnSlug present writes sentinel", func(t *testing.T) {
+	t.Run("invalid_opts with FnSlug present persists Rejected", func(t *testing.T) {
 		fake := &fakeRunService{}
 		op := deferAddOp(t, "hash-noinput", "user-defer-id", state.DeferAddOpts{
 			FnSlug: "child-fn",
@@ -157,13 +154,13 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
-		require.Equal(t, 0, fake.savedDeferCalls)
-		require.Equal(t, 1, fake.savedRejectedCalls)
-		require.Equal(t, "child-fn", fake.savedRejectedFnSlug)
-		require.Equal(t, "hash-noinput", fake.savedRejectedHashedID)
+		require.Len(t, fake.saved, 1)
+		require.Equal(t, enums.DeferStatusRejected, fake.saved[0].ScheduleStatus)
+		require.Equal(t, "child-fn", fake.saved[0].FnSlug)
+		require.Equal(t, "hash-noinput", fake.saved[0].HashedID)
 	})
 
-	t.Run("invalid_opts without FnSlug absorbs without sentinel", func(t *testing.T) {
+	t.Run("invalid_opts without FnSlug absorbs without persisting", func(t *testing.T) {
 		fake := &fakeRunService{}
 		op := deferAddOp(t, "hash-empty", "user-defer-id", state.DeferAddOpts{
 			Input: json.RawMessage(`{"x":1}`),
@@ -172,8 +169,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
-		require.Equal(t, 0, fake.savedDeferCalls)
-		require.Equal(t, 0, fake.savedRejectedCalls)
+		require.Empty(t, fake.saved)
 	})
 
 	t.Run("SaveDefer sentinel error soft-rejects", func(t *testing.T) {
@@ -186,8 +182,8 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 		err := SaveFromOp(context.Background(), fake, logger.VoidLogger(), runID(), op, tracing.NewNoopTracerProvider(), statev2.Metadata{}, time.Time{})
 
 		require.NoError(t, err)
-		require.Equal(t, 1, fake.savedDeferCalls)
-		require.Equal(t, 0, fake.savedRejectedCalls)
+		require.Equal(t, 1, fake.countByStatus(enums.DeferStatusAfterRun))
+		require.Equal(t, 0, fake.countByStatus(enums.DeferStatusRejected))
 	})
 
 	t.Run("infra error surfaces", func(t *testing.T) {

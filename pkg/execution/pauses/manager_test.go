@@ -406,9 +406,6 @@ func (m *mockRunService) LoadState(ctx context.Context, id statev2.ID) (statev2.
 func (m *mockRunService) SaveDefer(ctx context.Context, id statev2.ID, d statev2.Defer) error {
 	return nil
 }
-func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id statev2.ID, fnSlug string, hashedID string) error {
-	return nil
-}
 func (m *mockRunService) LoadDefers(ctx context.Context, id statev2.ID) (map[string]statev2.Defer, error) {
 	return nil, nil
 }

@@ -7,14 +7,35 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 )
 
+// DeferEventID returns the deterministic ID for an inngest/deferred.schedule
+// event. The ID is derived from (parent run ID, hashedID) so a duplicate
+// publish path produces the same event.ID and the runner dedupes on it.
+func DeferEventID(parent ulid.ULID, hashedID string) (ulid.ULID, error) {
+	return util.DeterministicULID(
+		ulid.Time(parent.Time()),
+
+		// "defer-event:" prefix namespaces the seed to prevent collisions with
+		// other `(parent, hashedID)` derived seeds.
+		fmt.Appendf(nil, "defer-event:%s:%s", parent, hashedID),
+	)
+}
+
 type DeferredScheduleMetadata struct {
-	FnSlug            string `json:"fn_slug"`
-	ParentFnSlug      string `json:"parent_fn_slug"`
-	ParentRunID       string `json:"parent_run_id"`
-	ParentFunctionID  string `json:"parent_function_id"`
-	HashedDeferID     string `json:"hashed_defer_id"`
+	FnSlug string `json:"fn_slug"`
+
+	// Defer span in the parent run. This is used to update the span when
+	// scheduling the deferred run.
+	ParentDeferSpan *meta.SpanReference `json:"parent_defer_span,omitempty"`
+
+	ParentFnSlug     string `json:"parent_fn_slug"`
+	ParentRunID      string `json:"parent_run_id"`
+	ParentFunctionID string `json:"parent_function_id"`
+	HashedDeferID    string `json:"hashed_defer_id"`
 }
 
 func (m *DeferredScheduleMetadata) Validate() error {

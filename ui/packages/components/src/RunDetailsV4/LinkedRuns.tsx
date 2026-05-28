@@ -1,57 +1,30 @@
 import type { ReactNode } from 'react';
 
 import { Link } from '../Link';
-import type {
-  RunDeferSummary,
-  RunDeferredFromSummary,
-  RunInvokedFromSummary,
-} from '../SharedContext/useGetRunLinkage';
+import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { IDCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import type { InvokedRun } from './runDetailsUtils';
 
 type Props = {
-  runID: string;
   defers?: RunDeferSummary[];
+  siblingDefers?: RunDeferSummary[];
   deferredFrom?: RunDeferredFromSummary[];
-  invokedFrom?: RunInvokedFromSummary | null;
   invoked: InvokedRun[];
 };
 
-export const LinkedRuns = ({ runID, defers, deferredFrom, invokedFrom, invoked }: Props) => {
+export const LinkedRuns = ({ defers, siblingDefers, deferredFrom, invoked }: Props) => {
   const parents = deferredFrom ?? [];
-  // Parallel defers are the sibling defers across every parent this run
-  // descends from, excluding the current run. De-duplicate by defer ID so a
-  // defer shared across parents (and React keys) doesn't repeat. We require
-  // d.run to be set so this run never lists itself as its own sibling when
-  // its parent-side child-run-id span hasn't (yet) been written — the prior
-  // `d.run?.id !== runID` resolved `undefined !== runID` to true and let the
-  // self-row through.
-  const parallelDefers = dedupeById(
-    parents
-      .flatMap((p) => p.parentRun?.defers ?? [])
-      .filter((d) => d.run != null && d.run.id !== runID)
-  );
 
   return (
     <div className="h-full overflow-y-auto">
       {parents.length > 0 && <ParentRunsSection parents={parents} />}
-      <DefersSection title="Parallel defers" defers={parallelDefers} />
-      {invokedFrom && <InvokedFromSection invokedFrom={invokedFrom} />}
+      <DefersSection title="Parallel defers" defers={siblingDefers ?? []} />
       <InvokedSection invoked={invoked} />
       <DefersSection title="Deferred runs" defers={defers ?? []} />
     </div>
   );
-};
-
-const dedupeById = <T extends { id: string }>(items: T[]): T[] => {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  });
 };
 
 const sectionBorder = 'border-muted mb-2 border-b pb-2';
@@ -97,84 +70,33 @@ const SectionTable = ({
 
 const MutedDash = () => <span className="text-muted">-</span>;
 
-// Common subset of `parentRun` on both RunDeferredFromSummary and
-// RunInvokedFromSummary, so the Parent* cells can serve both sections.
-type ParentRef = {
-  status: string;
-  function: { name: string; slug: string };
-} | null;
-
-const ParentStatusCell = ({ parent }: { parent: ParentRef }) => (
-  <td className={tdClass}>{parent ? <StatusCell status={parent.status} /> : <MutedDash />}</td>
-);
-
-const ParentRunIDCell = ({ runID }: { runID: string }) => {
+const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) => {
   const { pathCreator } = usePathCreator();
   return (
-    <td className={tdClass}>
-      <Link href={pathCreator.runPopout({ runID })}>
-        <IDCell>{runID}</IDCell>
-      </Link>
-    </td>
+    <SectionTable
+      title={parents.length > 1 ? 'Parent runs' : 'Parent run'}
+      columns={[{ header: 'Status', width: 'w-36' }, { header: 'Run ID' }, { header: 'Function' }]}
+    >
+      {parents.map((p) => (
+        <tr key={p.runID}>
+          <td className={tdClass}>
+            {p.run ? <StatusCell status={p.run.status} /> : <MutedDash />}
+          </td>
+          <td className={tdClass}>
+            <Link href={pathCreator.runPopout({ runID: p.runID })}>
+              <IDCell>{p.runID}</IDCell>
+            </Link>
+          </td>
+          <td className={tdClass}>
+            <Link href={pathCreator.function({ functionSlug: p.function.slug })}>
+              <PillCell type="FUNCTION">{p.function.name}</PillCell>
+            </Link>
+          </td>
+        </tr>
+      ))}
+    </SectionTable>
   );
 };
-
-const ParentFunctionCell = ({ parent }: { parent: ParentRef }) => {
-  const { pathCreator } = usePathCreator();
-  return (
-    <td className={tdClass}>
-      {parent ? (
-        <Link href={pathCreator.function({ functionSlug: parent.function.slug })}>
-          <PillCell type="FUNCTION">{parent.function.name}</PillCell>
-        </Link>
-      ) : (
-        <MutedDash />
-      )}
-    </td>
-  );
-};
-
-const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) => (
-  <SectionTable
-    title={parents.length > 1 ? 'Parent runs' : 'Parent run'}
-    columns={[{ header: 'Status', width: 'w-36' }, { header: 'Run ID' }, { header: 'Function' }]}
-  >
-    {parents.map((p) => (
-      <tr key={p.parentRunID}>
-        <ParentStatusCell parent={p.parentRun} />
-        <ParentRunIDCell runID={p.parentRunID} />
-        <ParentFunctionCell parent={p.parentRun} />
-      </tr>
-    ))}
-  </SectionTable>
-);
-
-const InvokedFromSection = ({ invokedFrom }: { invokedFrom: RunInvokedFromSummary }) => (
-  <SectionTable
-    title="Invoked by"
-    columns={[
-      { header: 'Status', width: 'w-36' },
-      { header: 'Step name' },
-      { header: 'Run ID' },
-      { header: 'Function' },
-    ]}
-  >
-    <tr>
-      <ParentStatusCell parent={invokedFrom.parentRun} />
-      <td className={tdClass}>
-        {invokedFrom.stepName ? (
-          <OptionalTooltip tooltip={invokedFrom.stepName}>
-            <IDCell>{invokedFrom.stepName}</IDCell>
-          </OptionalTooltip>
-        ) : (
-          <MutedDash />
-        )}
-      </td>
-      <ParentRunIDCell runID={invokedFrom.parentRunID} />
-      <ParentFunctionCell parent={invokedFrom.parentRun} />
-    </tr>
-  </SectionTable>
-);
 
 const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSummary[] }) => {
   const { pathCreator } = usePathCreator();
@@ -192,10 +114,10 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
       ]}
     >
       {defers.map((d) => {
-        const fnSlug = d.run?.function.slug ?? d.fnSlug;
-        const fnName = d.run?.function.name ?? d.fnSlug;
+        const fnSlug = d.function?.slug ?? d.fnSlug;
+        const fnName = d.function?.name ?? d.fnSlug;
         return (
-          <tr key={d.id}>
+          <tr key={d.hashedDeferID}>
             <td className={tdClass}>
               <StatusCell status={d.run?.status ?? d.status} />
             </td>

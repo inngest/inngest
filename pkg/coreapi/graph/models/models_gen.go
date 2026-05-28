@@ -308,8 +308,8 @@ type FunctionRunV2 struct {
 	Trace          *RunTraceSpan      `json:"trace,omitempty"`
 	HasAi          bool               `json:"hasAI"`
 	Defers         []*RunDefer        `json:"defers"`
+	SiblingDefers  []*RunDefer        `json:"siblingDefers"`
 	DeferredFrom   []*RunDeferredFrom `json:"deferredFrom"`
-	InvokedFrom    *RunInvokedFrom    `json:"invokedFrom,omitempty"`
 	RunType        RunType            `json:"runType"`
 }
 
@@ -365,25 +365,6 @@ type RerunFromStepInput struct {
 type RetryConfiguration struct {
 	Value     int   `json:"value"`
 	IsDefault *bool `json:"isDefault,omitempty"`
-}
-
-type RunDefer struct {
-	ID              string         `json:"id"`
-	UserlandDeferID string         `json:"userlandDeferID"`
-	FnSlug          string         `json:"fnSlug"`
-	Status          RunDeferStatus `json:"status"`
-	Run             *FunctionRunV2 `json:"run,omitempty"`
-}
-
-type RunDeferredFrom struct {
-	ParentRunID ulid.ULID      `json:"parentRunID"`
-	ParentRun   *FunctionRunV2 `json:"parentRun,omitempty"`
-}
-
-type RunInvokedFrom struct {
-	ParentRunID ulid.ULID      `json:"parentRunID"`
-	ParentRun   *FunctionRunV2 `json:"parentRun,omitempty"`
-	StepName    *string        `json:"stepName,omitempty"`
 }
 
 type RunStep struct {
@@ -989,15 +970,17 @@ type RunDeferStatus string
 
 const (
 	RunDeferStatusScheduled RunDeferStatus = "SCHEDULED"
+	RunDeferStatusRejected  RunDeferStatus = "REJECTED"
 )
 
 var AllRunDeferStatus = []RunDeferStatus{
 	RunDeferStatusScheduled,
+	RunDeferStatusRejected,
 }
 
 func (e RunDeferStatus) IsValid() bool {
 	switch e {
-	case RunDeferStatusScheduled:
+	case RunDeferStatusScheduled, RunDeferStatusRejected:
 		return true
 	}
 	return false

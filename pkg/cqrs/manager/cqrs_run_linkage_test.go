@@ -135,19 +135,19 @@ func TestGetRunDefers_ReadsExecutorDeferSpans(t *testing.T) {
 	assert.Equal(t, "user-aaa", first.UserlandDeferID)
 	assert.Equal(t, "app-fn-aaa", first.FnSlug)
 	assert.Equal(t, enums.DeferStatusAfterRun, first.Status)
-	require.NotNil(t, first.Run, "AfterRun defer with a present child trace run must be stitched in")
-	assert.Equal(t, linkedChildRunID.String(), first.Run.RunID)
+	require.NotNil(t, first.RunID, "AfterRun defer with a scheduled child must carry the child run ID")
+	assert.Equal(t, linkedChildRunID, *first.RunID)
 
 	// hash-bbb has no child trace row.
 	second := parentDefers[1]
 	assert.Equal(t, "hash-bbb", second.HashedDeferID)
 	assert.Equal(t, enums.DeferStatusAfterRun, second.Status)
-	assert.Nil(t, second.Run, "unlinked defer must surface with Run == nil")
+	assert.Nil(t, second.RunID, "unlinked defer must surface with RunID == nil")
 }
 
 // A defer span carrying a status the GraphQL converter can't surface (e.g.
-// Scheduled or Rejected) must be skipped, not error out the whole query. A
-// single odd span must never blank out every defer on the run.
+// Scheduled) must be skipped, not error out the whole query. A single odd span
+// must never blank out every defer on the run.
 func TestGetRunDefers_SkipsUnsurfaceableStatus(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -191,30 +191,11 @@ func TestGetRunDefers_SkipsUnsurfaceableStatus(t *testing.T) {
 	assert.Equal(t, "hash-good", parentDefers[0].HashedDeferID)
 }
 
-// Mirrors the executor.step fragment of an invoke; the invoked run ID lives on the EXTEND fragment.
-func invokeStepSpanAttrs(t *testing.T, stepName string) []byte {
-	t.Helper()
-	byt, err := json.Marshal(map[string]any{
-		meta.Attrs.StepName.Key(): stepName,
-	})
-	require.NoError(t, err)
-	return byt
-}
-
-// Mirrors the EXTEND fragment carrying the invoked run ID; shares dynamic_span_id with the executor.step fragment.
-func invokeExtendSpanAttrs(t *testing.T, invokedRunID ulid.ULID) []byte {
-	t.Helper()
-	byt, err := json.Marshal(map[string]any{
-		meta.Attrs.StepInvokeRunID.Key(): invokedRunID.String(),
-	})
-	require.NoError(t, err)
-	return byt
-}
-
-// Invoke linkage spans two fragments sharing a dynamic_span_id: executor.step carries the
-// step name, EXTEND carries the invoked run ID. GetRunInvokedFrom must merge both — losing
-// either one blanks the child's "invoked from" panel.
-func TestGetRunInvokedFrom_ReadsParentInvokeStepSpan(t *testing.T) {
+// Rejected is terminal — a defer that fails validation persists a Rejected
+// sentinel and emits an executor.defer span carrying that status. GetRunDefers
+// must surface it (with RunID == nil) so the UI can show that the defer never
+// scheduled.
+func TestGetRunDefers_SurfacesRejected(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
 
@@ -226,48 +207,26 @@ func TestGetRunInvokedFrom_ReadsParentInvokeStepSpan(t *testing.T) {
 	fnID := uuid.New()
 
 	parentRunID := ulid.MustNew(ulid.Now(), nil)
-	childRunID := ulid.MustNew(ulid.Now(), nil)
-
-	insertChildTraceRun(t, cm, parentRunID, accountID, workspaceID, appID, fnID)
-	insertChildTraceRun(t, cm, childRunID, accountID, workspaceID, appID, fnID)
-
-	// Both fragments must be present for mapSpanFromRow's read-time merge.
-	dynamicSpanID := "dyn-invoke-step"
-	traceID := "trace-invoke-step"
 	insertTestSpan(t, cm, testSpanFields{
 		RunID:         parentRunID.String(),
-		TraceID:       traceID,
-		DynamicSpanID: dynamicSpanID,
-		Name:          meta.SpanNameStep,
+		DynamicSpanID: "dyn-defer-rejected",
+		Name:          meta.SpanNameDefer,
 		AccountID:     accountID.String(),
 		AppID:         appID.String(),
 		FunctionID:    fnID.String(),
 		EnvID:         workspaceID.String(),
-		Attributes:    invokeStepSpanAttrs(t, "invoke-target-step"),
-	})
-	insertTestSpan(t, cm, testSpanFields{
-		RunID:         parentRunID.String(),
-		TraceID:       traceID,
-		DynamicSpanID: dynamicSpanID,
-		Name:          meta.SpanNameDynamicExtension,
-		AccountID:     accountID.String(),
-		AppID:         appID.String(),
-		FunctionID:    fnID.String(),
-		EnvID:         workspaceID.String(),
-		Attributes:    invokeExtendSpanAttrs(t, childRunID),
+		Attributes:    deferSpanAttrs(t, "hash-rejected", "user-rejected", "fn-rejected", enums.DeferStatusRejected),
 	})
 
-	got, err := cm.GetRunInvokedFrom(ctx, []ulid.ULID{childRunID})
+	got, err := cm.GetRunDefers(ctx, []ulid.ULID{parentRunID})
 	require.NoError(t, err)
 
-	rif, ok := got[childRunID]
-	require.True(t, ok, "expected entry for child run %s", childRunID)
-	require.NotNil(t, rif)
-	assert.Equal(t, parentRunID, rif.ParentRunID)
-	require.NotNil(t, rif.StepName)
-	assert.Equal(t, "invoke-target-step", *rif.StepName)
-	require.NotNil(t, rif.ParentRun, "ParentRun must be stitched in when the parent's TraceRun exists")
-	assert.Equal(t, parentRunID.String(), rif.ParentRun.RunID)
+	parentDefers := got[parentRunID]
+	require.Len(t, parentDefers, 1)
+	d := parentDefers[0]
+	assert.Equal(t, "hash-rejected", d.HashedDeferID)
+	assert.Equal(t, enums.DeferStatusRejected, d.Status)
+	assert.Nil(t, d.RunID, "Rejected defer never scheduled a child run")
 }
 
 // The parent's child-run-id executor.defer span is the authoritative parent
@@ -283,7 +242,6 @@ func childRunDeferParentsAttrs(t *testing.T, parentRunIDs ...ulid.ULID) []byte {
 		parents[i] = id.String()
 	}
 	byt, err := json.Marshal(map[string]any{
-		meta.Attrs.RunType.Key():           enums.RunTypeDefer.String(),
 		meta.Attrs.DeferParentRunIDs.Key(): parents,
 	})
 	require.NoError(t, err)
@@ -327,9 +285,7 @@ func TestGetRunDeferredFrom_ReadsChildRunIDDeferSpan(t *testing.T) {
 	rdfs, ok := got[childRunID]
 	require.True(t, ok, "expected entry for child run %s", childRunID)
 	require.Len(t, rdfs, 1)
-	assert.Equal(t, parentRunID, rdfs[0].ParentRunID)
-	require.NotNil(t, rdfs[0].ParentRun, "ParentRun must be stitched in when the parent's TraceRun exists")
-	assert.Equal(t, parentRunID.String(), rdfs[0].ParentRun.RunID)
+	assert.Equal(t, parentRunID, rdfs[0].RunID)
 }
 
 // A batched child run can descend from defers on several parents (N events ->
@@ -376,7 +332,7 @@ func TestGetRunDeferredFrom_MultipleParents(t *testing.T) {
 	rdfs := got[childRunID]
 	require.Len(t, rdfs, 2, "a batched child must surface every parent it descends from")
 
-	gotParents := []ulid.ULID{rdfs[0].ParentRunID, rdfs[1].ParentRunID}
+	gotParents := []ulid.ULID{rdfs[0].RunID, rdfs[1].RunID}
 	wantParents := []ulid.ULID{parentA, parentB}
 	sort.Slice(wantParents, func(i, j int) bool { return wantParents[i].Compare(wantParents[j]) < 0 })
 	assert.Equal(t, wantParents, gotParents, "parents must be returned sorted for stable output")

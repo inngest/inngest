@@ -196,6 +196,7 @@ type TraceRun struct {
 	BatchID      ulid.ULID
 	CronSchedule sql.NullString
 	HasAi        bool
+	RunType      int32
 }
 
 type WorkerConnection struct {

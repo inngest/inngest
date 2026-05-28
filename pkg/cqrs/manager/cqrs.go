@@ -108,7 +108,16 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	return mapRootSpansFromRows(ctx, spans)
 }
 
-func (w wrapper) GetSpansByRunIDsAndName(ctx context.Context, runIDs []ulid.ULID, name string) (map[ulid.ULID][]*cqrs.OtelSpan, error) {
+// GetSpansByRunIDsAndName returns spans by name with their current attribute
+// values, merging in any updates applied later via UpdateSpan. The self-join
+// on dynamic_span_id picks up follow-up rows (e.g. status flips, post-emit
+// attribute stamps) that don't carry the span name and would otherwise be
+// filtered out.
+func (w wrapper) GetSpansByRunIDsAndName(
+	ctx context.Context,
+	runIDs []ulid.ULID,
+	name string,
+) (map[ulid.ULID][]*cqrs.OtelSpan, error) {
 	if len(runIDs) == 0 {
 		return nil, nil
 	}
@@ -528,7 +537,11 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			return nil, err
 		}
 
-		if newSpan.Name == meta.SpanNameMetadata {
+		// Skip spans that are read separately and shouldn't appear in the run's
+		// trace tree. Metadata is attached to other spans. Defers are surfaced
+		// in their own view.
+		switch newSpan.Name {
+		case meta.SpanNameMetadata, meta.SpanNameDefer:
 			continue
 		}
 
@@ -1741,6 +1754,10 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		return fmt.Errorf("error parsing runID as ULID: %w", err)
 	}
 
+	// Let Unknown ride to the column — the upsert is unconditional, and
+	// coercing here loses a later DEFER classification when the executor.run
+	// batch lands before the trigger batch. ToRunType maps Unknown → Primary
+	// for the GraphQL surface.
 	params := dbpkg.InsertTraceRunParams{
 		AccountID:   run.AccountID,
 		WorkspaceID: run.WorkspaceID,
@@ -1757,6 +1774,7 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		Output:      run.Output,
 		IsDebounce:  run.IsDebounce,
 		HasAi:       run.HasAI,
+		RunType:     int64(run.RunType),
 	}
 
 	if run.BatchID != nil {
@@ -1867,27 +1885,13 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 }
 
 func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
-	// convert db.TraceRun{} to cqrs.TraceRun{}
 	sqlcTraceRuns, err := w.q.GetTraceRunsByTriggerId(ctx, triggerID.String())
 	if err != nil {
 		return nil, err
 	}
 	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
-	runIDs := make([]ulid.ULID, len(sqlcTraceRuns))
 	for i, run := range sqlcTraceRuns {
 		cqrsTraceRuns[i] = traceRunToCQRS(run)
-		runIDs[i] = run.RunID
-	}
-	if runTypes, err := w.getRunTypesByRunIDs(ctx, runIDs); err != nil {
-		logger.StdlibLogger(ctx).Warn("error backfilling run types", "trigger_id", triggerID.String(), "error", err)
-	} else {
-		for _, tr := range cqrsTraceRuns {
-			if id, perr := ulid.Parse(tr.RunID); perr == nil {
-				if rt, ok := runTypes[id]; ok {
-					tr.RunType = rt
-				}
-			}
-		}
 	}
 	return cqrsTraceRuns, nil
 }
@@ -1897,14 +1901,7 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 	if err != nil {
 		return nil, err
 	}
-
-	tr := traceRunToCQRS(run)
-	if runTypes, err := w.getRunTypesByRunIDs(ctx, []ulid.ULID{run.RunID}); err != nil {
-		logger.StdlibLogger(ctx).Warn("error backfilling run type", "run_id", run.RunID.String(), "error", err)
-	} else if rt, ok := runTypes[run.RunID]; ok {
-		tr.RunType = rt
-	}
-	return tr, nil
+	return traceRunToCQRS(run), nil
 }
 
 func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
@@ -1918,58 +1915,9 @@ func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (
 	}
 
 	out := make(map[ulid.ULID]*cqrs.TraceRun, len(rows))
-	hydrated := make([]ulid.ULID, 0, len(rows))
 	for _, row := range rows {
 		out[row.RunID] = traceRunToCQRS(row)
-		hydrated = append(hydrated, row.RunID)
 	}
-	if runTypes, err := w.getRunTypesByRunIDs(ctx, hydrated); err != nil {
-		logger.StdlibLogger(ctx).Warn("error backfilling run types", "error", err)
-	} else {
-		for id, rt := range runTypes {
-			if tr, ok := out[id]; ok {
-				tr.RunType = rt
-			}
-		}
-	}
-	return out, nil
-}
-
-// getRunTypesByRunIDs reads the run.type span attribute off each run's
-// executor.run root span. trace_runs has no run_type column, so callers
-// that hydrate from there backfill the classification from spans.
-//
-// The map is best-effort: individual mapping failures are logged at debug
-// level and the entry is omitted; only a fatal query error is returned.
-func (w wrapper) getRunTypesByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]enums.RunType, error) {
-	if len(runIDs) == 0 {
-		return map[ulid.ULID]enums.RunType{}, nil
-	}
-
-	spansByRun, err := w.GetSpansByRunIDsAndName(ctx, runIDs, meta.SpanNameRun)
-	if err != nil {
-		return nil, fmt.Errorf("error loading executor.run spans for run-type backfill: %w", err)
-	}
-
-	l := logger.StdlibLogger(ctx)
-	out := make(map[ulid.ULID]enums.RunType, len(spansByRun))
-	for runID, spans := range spansByRun {
-		for _, span := range spans {
-			if span == nil || span.Attributes == nil || span.Attributes.RunType == nil {
-				continue
-			}
-			out[runID] = *span.Attributes.RunType
-			break
-		}
-		if _, ok := out[runID]; !ok {
-			// No spans had a run.type attribute; leave the runID out of the
-			// map so callers' `if rt, ok := runTypes[id]; ok` skip the write
-			// and preserve whatever the caller pre-populated. Writing
-			// RunTypeUnknown here would have clobbered any preset.
-			l.Debug("no run.type attribute found for run", "run_id", runID.String())
-		}
-	}
-
 	return out, nil
 }
 
@@ -2007,6 +1955,7 @@ func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 		TriggerIDs:   run.EventIDs(),
 		Output:       run.Output,
 		Status:       enums.RunCodeToStatus(run.Status),
+		RunType:      enums.RunType(run.RunType),
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
@@ -2180,19 +2129,36 @@ type runsQueryBuilder struct {
 	cursorLayout *cqrs.TracePageCursor
 }
 
-// runTypeJSONExpr returns the dialect-specific JSON-extract expression for the
-// run.type span attribute, used by GetSpanRuns to both project the row's run
-// type and filter the inner executor.run subquery.
-func runTypeJSONExpr(dialect string) string {
-	key := meta.Attrs.RunType.Key()
-	switch dialect {
-	case "postgres":
-		return `attributes->>'` + key + `'`
-	case "sqlite3":
-		return `json_extract(attributes, '$."` + key + `"')`
-	default:
-		panic(fmt.Sprintf("runTypeJSONExpr: unsupported dialect %q", dialect))
+// runTypeFilterExpr is only safe against the trace_runs table. Subquerying
+// into trace_runs from the spans path silently matches nothing in sqlite —
+// sqlc overrides trace_runs.run_id to ulid.ULID, whose Value() returns
+// MarshalBinary, so the column is stored as a 16-byte BLOB. spans.run_id is
+// bound as TEXT, and BLOB-vs-TEXT IN never matches. The spans path applies an
+// equivalent filter in Go after the trace_runs stitch.
+//
+// Unknown rows surface in the Primary list — see matchesRunType.
+func runTypeFilterExpr(runTypes []enums.RunType) sq.Expression {
+	wantPrimary := slices.Contains(runTypes, enums.RunTypePrimary)
+	wantDefer := slices.Contains(runTypes, enums.RunTypeDefer)
+	if wantPrimary == wantDefer {
+		return nil
 	}
+	if wantDefer {
+		return sq.I("trace_runs.run_type").Eq(int64(enums.RunTypeDefer))
+	}
+	return sq.I("trace_runs.run_type").In(
+		int64(enums.RunTypePrimary), int64(enums.RunTypeUnknown),
+	)
+}
+
+// matchesRunType is the Go-side counterpart to runTypeFilterExpr. Unknown rows
+// are surfaced as Primary so an out-of-order OTel batch (executor.run before
+// trigger) doesn't hide a still-uncategorized run from the Primary list.
+func matchesRunType(runTypes []enums.RunType, rt enums.RunType) bool {
+	if slices.Contains(runTypes, rt) {
+		return true
+	}
+	return rt == enums.RunTypeUnknown && slices.Contains(runTypes, enums.RunTypePrimary)
 }
 
 func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
@@ -2373,6 +2339,10 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	reqcursor := builder.cursor
 	resCursorLayout := builder.cursorLayout
 
+	if rtf := runTypeFilterExpr(opt.Filter.RunType); rtf != nil {
+		filter = append(filter, rtf)
+	}
+
 	// read from database
 	// TODO:
 	// change this to a continuous loop with limits instead of just attempting to grab everything.
@@ -2396,6 +2366,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"is_debounce",
 			"cron_schedule",
 			"has_ai",
+			"run_type",
 		).
 		Where(filter...).
 		Order(order...).
@@ -2429,6 +2400,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.IsDebounce,
 			&data.CronSchedule,
 			&data.HasAi,
+			&data.RunType,
 		)
 		if err != nil {
 			return nil, err
@@ -2508,6 +2480,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			Triggers:     [][]byte{},
 			Output:       data.Output,
 			Status:       enums.RunCodeToStatus(data.Status),
+			RunType:      enums.RunType(data.RunType),
 			IsBatch:      isBatch,
 			BatchID:      batchID,
 			IsDebounce:   data.IsDebounce,
@@ -2520,49 +2493,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		if opt.Items > 0 && count >= opt.Items {
 			break
 		}
-	}
-
-	// Backfill run type from spans — trace_runs has no run_type column, so
-	// without this every hydrated TraceRun would default to Unknown and be
-	// folded to PRIMARY downstream, misclassifying defers.
-	if len(res) > 0 {
-		runIDs := make([]ulid.ULID, 0, len(res))
-		for _, tr := range res {
-			if id, err := ulid.Parse(tr.RunID); err == nil {
-				runIDs = append(runIDs, id)
-			}
-		}
-		if runTypes, err := w.getRunTypesByRunIDs(ctx, runIDs); err != nil {
-			l.Warn("error backfilling run types", "error", err)
-		} else {
-			for _, tr := range res {
-				if id, perr := ulid.Parse(tr.RunID); perr == nil {
-					if rt, ok := runTypes[id]; ok {
-						tr.RunType = rt
-					}
-				}
-			}
-		}
-	}
-
-	// Apply RunType filter post-fetch. trace_runs has no run_type column, so
-	// the SQL above can't narrow on it; without this, a caller asking for
-	// PRIMARY would still see DEFER rows leaked through (and the totalCount
-	// from GetTraceRunsCount would overshoot the visible list). Mirror
-	// GetSpanRuns: only narrow when exactly one of PRIMARY/DEFER is
-	// requested, and treat anything not classified as DEFER as PRIMARY
-	// (matching GetSpanRuns' NULL-is-PRIMARY backward-compat behavior).
-	wantPrimary := slices.Contains(opt.Filter.RunType, enums.RunTypePrimary)
-	wantDefer := slices.Contains(opt.Filter.RunType, enums.RunTypeDefer)
-	if wantPrimary != wantDefer {
-		filtered := res[:0]
-		for _, tr := range res {
-			isDefer := tr.RunType == enums.RunTypeDefer
-			if (wantDefer && isDefer) || (wantPrimary && !isDefer) {
-				filtered = append(filtered, tr)
-			}
-		}
-		res = filtered
 	}
 
 	return res, nil
@@ -3128,10 +3058,6 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
 			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
 		h.EventIDsExpr(), // DB-specific due to storage differences
-		// The run.type attribute lives on the executor.run fragment of the
-		// dynamic_span_id group; every other fragment returns NULL, so MAX
-		// surfaces the single non-NULL value.
-		sq.L("MAX(" + runTypeJSONExpr(w.dialect()) + ")").As("run_type"),
 	}
 
 	groupByCols := []interface{}{
@@ -3176,6 +3102,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	allFilters := append(builder.filter, celFilters...)
+	// run_type can't be pushed into SQL on this path — see runTypeFilterExpr's
+	// note. The Go-side filter runs after the trace_runs stitch below.
 	// The inner subquery is bounded by Until (an executor.run always precedes
 	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
 	// also apply the From floor so the inner scan stops growing O(total
@@ -3189,20 +3117,6 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
 		innerPreds = append(innerPreds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
-	}
-	// Filter by run type by reading the executor.run span's own run.type
-	// attribute. Only narrow when exactly one of PRIMARY/DEFER is requested —
-	// neither/both means no narrowing. PRIMARY also matches NULL for
-	// backward-compat with runs written before the attr existed.
-	wantPrimary := slices.Contains(opt.Filter.RunType, enums.RunTypePrimary)
-	wantDefer := slices.Contains(opt.Filter.RunType, enums.RunTypeDefer)
-	if wantPrimary != wantDefer {
-		expr := runTypeJSONExpr(w.dialect())
-		if wantDefer {
-			innerPreds = append(innerPreds, sq.L(expr+" = ?", enums.RunTypeDefer.String()))
-		} else {
-			innerPreds = append(innerPreds, sq.L("("+expr+" IS NULL OR "+expr+" = ?)", enums.RunTypePrimary.String()))
-		}
 	}
 	q = q.Select(selectCols...).
 		Where(sq.L("spans.dynamic_span_id").In(
@@ -3221,8 +3135,6 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		return nil, err
 	}
 
-	l.Debug("GetSpanRuns query", "sql", sqlQuery, "args", args)
-
 	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		l.Debug("GetSpanRuns query error", "error", err)
@@ -3230,7 +3142,26 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 	defer rows.Close()
 
-	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
+	res, err := w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
+	if err != nil {
+		return nil, err
+	}
+
+	// run_type filter — see runTypeFilterExpr's note on why this can't be SQL.
+	// A narrowed page may under-fill (and may report HasNextPage=false even
+	// when more matches exist later in the window). Matches the existing
+	// evtIDs post-SQL filter pattern in GetTraceRuns.
+	if rt := opt.Filter.RunType; len(rt) > 0 {
+		filtered := res[:0]
+		for _, r := range res {
+			if matchesRunType(rt, r.RunType) {
+				filtered = append(filtered, r)
+			}
+		}
+		res = filtered
+	}
+
+	return res, nil
 }
 
 // convertSpanRunRows converts database rows to TraceRun structs
@@ -3255,7 +3186,6 @@ func (w wrapper) convertSpanRunRows(
 		EndTime       *string
 		Status        *string
 		EventIDs      *string
-		RunType       *string
 	}
 
 	res := []*cqrs.TraceRun{}
@@ -3275,7 +3205,6 @@ func (w wrapper) convertSpanRunRows(
 			&row.EndTime,
 			&row.Status,
 			&row.EventIDs,
-			&row.RunType,
 		)
 		if err != nil {
 			return nil, err
@@ -3324,17 +3253,6 @@ func (w wrapper) convertSpanRunRows(
 			}
 		}
 
-		// Parse run type — default to PRIMARY for backward-compat with runs
-		// written before the run.type attribute existed.
-		runType := enums.RunTypePrimary
-		if row.RunType != nil && *row.RunType != "" {
-			if rt, err := enums.RunTypeString(*row.RunType); err != nil {
-				l.Debug("invalid run_type", "run_type", *row.RunType, "error", err)
-			} else if rt != enums.RunTypeUnknown {
-				runType = rt
-			}
-		}
-
 		// Parse event IDs using adapter due to differences in column type and serialization
 		triggerIDs := h.ParseEventIDs(row.EventIDs)
 
@@ -3379,7 +3297,6 @@ func (w wrapper) convertSpanRunRows(
 			Status:      status,
 			Cursor:      cursor,
 			TriggerIDs:  triggerIDs,
-			RunType:     runType,
 		}
 
 		if endTime != nil {
@@ -3392,6 +3309,33 @@ func (w wrapper) convertSpanRunRows(
 		// We have filled a page's worth of requests, so break
 		if itemLimit > 0 && count >= itemLimit {
 			break
+		}
+	}
+
+	// Stitch run_type from trace_runs table. Necessary because run_type isn't
+	// in spans. We may want to add run_type to spans in the future, but for now
+	// it's OK to stitch it in code. Don't replace with a SQL JOIN:
+	// trace_runs.run_id is stored as binary and spans.run_id as text, so the
+	// comparison silently matches nothing.
+	if len(res) > 0 {
+		ids := make([]ulid.ULID, 0, len(res))
+		for _, r := range res {
+			if id, err := ulid.Parse(r.RunID); err == nil {
+				ids = append(ids, id)
+			}
+		}
+		if traceRuns, err := w.GetTraceRunsByRunIDs(ctx, ids); err == nil {
+			for _, r := range res {
+				id, err := ulid.Parse(r.RunID)
+				if err != nil {
+					continue
+				}
+				if tr, ok := traceRuns[id]; ok {
+					r.RunType = tr.RunType
+				}
+			}
+		} else {
+			l.Warn("could not stitch run_type into preview run list", "error", err)
 		}
 	}
 

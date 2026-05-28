@@ -27,8 +27,8 @@ export function useGetRunLinkage() {
         loading: false,
         data: {
           defers: run.defers,
+          siblingDefers: run.siblingDefers,
           deferredFrom: run.deferredFrom,
-          invokedFrom: run.invokedFrom,
         },
       };
     },

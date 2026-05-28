@@ -2,17 +2,17 @@ import { gql } from 'graphql-request';
 
 export const RUN_DEFER_SUMMARY_FRAGMENT = gql`
   fragment RunDeferSummaryFields on RunDefer {
-    id
+    hashedDeferID
     userlandDeferID
     fnSlug
     status
+    function {
+      name
+      slug
+    }
     run {
       id
       status
-      function {
-        name
-        slug
-      }
     }
   }
 `;
@@ -315,11 +315,10 @@ export const GET_RUNS = gql`
           hasAI
           runType
           deferredFrom {
-            parentRun {
-              function {
-                name
-                slug
-              }
+            runID
+            function {
+              name
+              slug
             }
           }
         }
@@ -464,31 +463,19 @@ export const GET_RUN_LINKAGE = gql`
       defers {
         ...RunDeferSummaryFields
       }
-      deferredFrom {
-        parentRunID
-        parentRun {
-          id
-          status
-          function {
-            name
-            slug
-          }
-          defers {
-            ...RunDeferSummaryFields
-          }
-        }
+      siblingDefers {
+        ...RunDeferSummaryFields
       }
-      invokedFrom {
-        parentRunID
-        parentRun {
+      deferredFrom {
+        runID
+        function {
+          name
+          slug
+        }
+        run {
           id
           status
-          function {
-            name
-            slug
-          }
         }
-        stepName
       }
     }
   }

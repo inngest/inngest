@@ -32,6 +32,7 @@ function isKnownStatus(status: string): status is KnownStatus {
 }
 
 const backgroundClasses: Record<KnownStatus, string> = {
+  REJECTED: 'bg-status-failed',
   CANCELLED: 'bg-status-cancelled',
   COMPLETED: 'bg-status-completed',
   FAILED: 'bg-status-failed',
@@ -56,6 +57,7 @@ export function getStatusBackgroundClass(status: string): string {
 }
 
 const borderClasses: Record<KnownStatus, string> = {
+  REJECTED: 'border-status-cancelled',
   CANCELLED: 'border-status-cancelled',
   COMPLETED: 'border-status-completed',
   FAILED: 'border-status-failed',
@@ -80,6 +82,7 @@ export function getStatusBorderClass(status: string): string {
 }
 
 const textClasses: Record<KnownStatus, string> = {
+  REJECTED: 'text-status-cancelledText',
   CANCELLED: 'text-status-cancelledText',
   COMPLETED: 'text-status-completedText',
   FAILED: 'text-status-failedText',

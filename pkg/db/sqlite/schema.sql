@@ -131,7 +131,7 @@ CREATE TABLE trace_runs (
 	is_debounce BOOLEAN NOT NULL,
 	batch_id BLOB,
 	cron_schedule TEXT
-, has_ai BOOLEAN NOT NULL DEFAULT FALSE);
+, has_ai BOOLEAN NOT NULL DEFAULT FALSE, run_type INT NOT NULL DEFAULT 1);
 CREATE TABLE queue_snapshot_chunks (
     snapshot_id CHAR(26) NOT NULL,
     chunk_id INT NOT NULL,

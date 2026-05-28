@@ -15,11 +15,7 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
-import type {
-  RunDeferSummary,
-  RunDeferredFromSummary,
-  RunInvokedFromSummary,
-} from '../SharedContext/useGetRunLinkage';
+import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -43,8 +39,8 @@ type TopInfoProps = {
   trace?: Trace;
   isDurableEndpoint?: boolean;
   defers?: RunDeferSummary[];
+  siblingDefers?: RunDeferSummary[];
   deferredFrom?: RunDeferredFromSummary[];
-  invokedFrom?: RunInvokedFromSummary | null;
 };
 
 export type Trigger = {
@@ -104,8 +100,8 @@ export const TopInfo = ({
   trace,
   isDurableEndpoint,
   defers,
+  siblingDefers,
   deferredFrom,
-  invokedFrom,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
@@ -148,18 +144,20 @@ export const TopInfo = ({
   const invokedRuns = useMemo(() => collectInvokedRuns(trace), [trace]);
   const hasLinkedRuns =
     (deferredFrom?.length ?? 0) > 0 ||
-    Boolean(invokedFrom) ||
+    (siblingDefers?.length ?? 0) > 0 ||
     (defers?.length ?? 0) > 0 ||
     invokedRuns.length > 0;
 
-  const userlandDeferID = (deferredFrom ?? [])
-    .flatMap((p) => p.parentRun?.defers ?? [])
-    .find((d) => d.run?.id === runID)?.userlandDeferID;
+  // The header label for a deferred child should be the userland defer ID of
+  // the parent-side defer that scheduled this run. The server returns this run
+  // and its peers as `siblingDefers` (defers that share THIS run's parent),
+  // and the entry whose `run.id` matches our `runID` is the defer that
+  // produced us.
+  const userlandDeferID = (siblingDefers ?? []).find((d) => d.run?.id === runID)?.userlandDeferID;
   // Fall back through the linkage/trigger names and finally to the run/function
   // name so the header title is never blank (e.g. a deferred run with
   // incomplete linkage and no invoke or trigger name).
-  const headerLabel =
-    userlandDeferID ?? invokedFrom?.stepName ?? trigger?.eventName ?? trace?.name ?? 'Run';
+  const headerLabel = userlandDeferID ?? trigger?.eventName ?? trace?.name ?? 'Run';
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -372,10 +370,9 @@ export const TopInfo = ({
                     id: 'linked',
                     node: (
                       <LinkedRuns
-                        runID={runID}
                         defers={defers}
+                        siblingDefers={siblingDefers}
                         deferredFrom={deferredFrom}
-                        invokedFrom={invokedFrom}
                         invoked={invokedRuns}
                       />
                     ),

@@ -457,7 +457,7 @@ func (sq *sqliteQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []s
 	for i, r := range rows {
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
+			StartTime: toTime(r.SpanStartTime), EndTime: toTime(r.SpanEndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: toBytes(r.SpanFragments),
 		}
 	}
@@ -597,6 +597,7 @@ func (sq *sqliteQuerier) InsertTraceRun(ctx context.Context, arg db.InsertTraceR
 		Status: arg.Status, SourceID: arg.SourceID, TriggerIds: arg.TriggerIds,
 		Output: arg.Output, BatchID: arg.BatchID, IsDebounce: arg.IsDebounce,
 		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi,
+		RunType: arg.RunType,
 	})
 }
 

@@ -24,11 +24,10 @@ export type Run = {
   hasAI?: boolean;
   runType: RunType;
   deferredFrom?: Array<{
-    parentRun: {
-      function: {
-        name: string;
-        slug: string;
-      };
-    } | null;
+    runID: string;
+    function: {
+      name: string;
+      slug: string;
+    };
   }>;
 };

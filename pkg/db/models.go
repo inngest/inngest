@@ -203,6 +203,7 @@ type TraceRun struct {
 	BatchID      ulid.ULID
 	CronSchedule sql.NullString
 	HasAi        bool
+	RunType      int64
 }
 
 // WorkerConnection represents a connected worker instance.

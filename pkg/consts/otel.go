@@ -44,6 +44,7 @@ const (
 	OtelSysFunctionOutput     = "sys.function.output"
 	OtelSysFunctionLink       = "sys.function.link"
 	OtelSysFunctionHasAI      = "sys.function.hasAI"
+	OtelSysFunctionRunType    = "sys.function.runType"
 
 	OtelSysStepID              = "sys.step.id"
 	OtelSysStepDisplayName     = "sys.step.display.name"

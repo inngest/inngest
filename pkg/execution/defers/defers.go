@@ -30,8 +30,16 @@ func SaveFromOp(
 	now time.Time,
 ) error {
 	var (
-		rejected     bool
+		// Why the defer was rejected.
 		rejectReason string
+
+		// Whether the rejected defer was persisted in the StateStore. Some
+		// rejections don't persist (e.g. per_run_count when there are too many
+		// defers), so this isn't redundant with rejectReason.
+		//
+		// Gates defer span creation to prevent abuse, where someone inserts an
+		// unbounded number of defer spans.
+		rejectionPersisted bool
 	)
 
 	var userlandID string
@@ -41,25 +49,34 @@ func SaveFromOp(
 
 	opts, parseErr := op.DeferAddOpts()
 	if parseErr != nil {
-		rejected = true
-		if errors.Is(parseErr, state.ErrDeferInputTooLarge) {
+		switch {
+		case errors.Is(parseErr, state.ErrDeferInputTooLarge):
 			rejectReason = "per_defer_size"
-		} else {
+		case errors.Is(parseErr, state.ErrDeferInputInvalid):
+			rejectReason = "invalid_input"
+		default:
 			rejectReason = "invalid_opts"
 		}
-		// Best-effort sentinel so SDK retransmits dedupe.
+		// Persist a Rejected record so SDK retransmits dedupe.
 		if opts != nil && opts.FnSlug != "" {
-			if rerr := rs.SaveRejectedDefer(ctx, id, opts.FnSlug, op.ID); rerr != nil {
-				log.Warn("failed to save rejected defer sentinel; SDK retransmits will not dedupe",
+			if err := rs.SaveDefer(ctx, id, statev2.Defer{
+				FnSlug:         opts.FnSlug,
+				HashedID:       op.ID,
+				UserlandID:     userlandID,
+				ScheduleStatus: enums.DeferStatusRejected,
+			}); err != nil {
+				log.Warn("failed to persist rejected defer; SDK retransmits will not dedupe",
 					"step_id", sanitizeLogValue(op.ID),
 					"run_id", id.RunID,
-					"error", rerr,
+					"error", err,
 				)
+			} else {
+				rejectionPersisted = true
 			}
 		}
 	}
 
-	if !rejected {
+	if rejectReason == "" {
 		d := statev2.Defer{
 			FnSlug:         opts.FnSlug,
 			HashedID:       op.ID,
@@ -70,29 +87,41 @@ func SaveFromOp(
 		saveErr := rs.SaveDefer(ctx, id, d)
 		switch {
 		case errors.Is(saveErr, statev2.ErrDeferLimitExceeded):
-			// Count cap binds the sentinel write too. SDK retransmits absorbed.
-			rejected = true
+			// Count cap rejects without persisting anything. SDK retransmits absorbed.
 			rejectReason = "per_run_count"
 		case errors.Is(saveErr, statev2.ErrDeferInputAggregateExceeded):
-			// saveDefer.lua already wrote the Rejected sentinel.
-			rejected = true
+			// saveDefer.lua already persisted the Rejected record.
 			rejectReason = "aggregate_size"
+			rejectionPersisted = true
 		case saveErr != nil:
 			return fmt.Errorf("error saving defer: %w", saveErr)
 		}
 
-		if !rejected {
+		if rejectReason == "" {
 			emitDeferSpan(ctx, tp, md, now, d)
 		}
 	}
 
-	if rejected {
+	if rejectReason != "" {
 		log.Warn("defer soft-rejected; run will continue without this deferred run",
 			"step_id", sanitizeLogValue(op.ID),
 			"reason", rejectReason,
 			"run_id", id.RunID,
 		)
 		metrics.IncrDefersRejectedCounter(ctx, rejectReason, metrics.CounterOpt{PkgName: pkgName})
+	}
+
+	if rejectionPersisted {
+		fnSlug := ""
+		if opts != nil {
+			fnSlug = opts.FnSlug
+		}
+		emitDeferSpan(ctx, tp, md, now, statev2.Defer{
+			FnSlug:         fnSlug,
+			HashedID:       op.ID,
+			UserlandID:     userlandID,
+			ScheduleStatus: enums.DeferStatusRejected,
+		})
 	}
 
 	return nil

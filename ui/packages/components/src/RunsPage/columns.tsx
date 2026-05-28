@@ -99,7 +99,7 @@ const columns = [
       // A batched run can have several parents; show the first for the
       // list breadcrumb. Each name truncates independently so a long parent
       // name can't crowd out the child the user actually clicked into.
-      const parentName = data.deferredFrom?.[0]?.parentRun?.function?.name;
+      const parentName = data.deferredFrom?.[0]?.function?.name;
 
       // Compose the name cell inline rather than early-returning the AI
       // branch — an AI-using deferred run still needs the breadcrumb and
@@ -132,7 +132,7 @@ const columns = [
   columnHelper.accessor('app', {
     cell: (info) => {
       return (
-        <div className="text-nowrap flex items-center">
+        <div className="flex items-center text-nowrap">
           <TextCell>{info.getValue().externalID}</TextCell>
         </div>
       );

@@ -155,7 +155,17 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 
 	t.Run("rejects empty Input", func(t *testing.T) {
 		opts := DeferAddOpts{FnSlug: "fn"}
-		require.Error(t, opts.Validate())
+		require.ErrorIs(t, opts.Validate(), ErrDeferInputInvalid)
+	})
+
+	t.Run("rejects non-object Input", func(t *testing.T) {
+		// Arrays, scalars, and bare strings all fail. The SDK contract is
+		// that defer Input is a JSON object so step receivers can index by
+		// key.
+		for _, in := range []string{`"x"`, `[1,2]`, `null`, `42`, `true`} {
+			opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(in)}
+			require.ErrorIs(t, opts.Validate(), ErrDeferInputInvalid, "Input=%q", in)
+		}
 	})
 
 	t.Run("accepts valid opts", func(t *testing.T) {
@@ -164,9 +174,11 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 	})
 
 	t.Run("rejects Input larger than MaxDeferInputSize", func(t *testing.T) {
-		// Build an Input one byte over the limit. Padding is filler — the
-		// validator only cares about byte length.
-		oversized := bytes.Repeat([]byte("x"), consts.MaxDeferInputSize+1)
+		// Build a valid JSON object whose total byte length is one over the
+		// limit. The IsJSONObject gate runs before the size check, so the
+		// payload must start with `{` — bare padding would be rejected as
+		// invalid input instead of as oversized.
+		oversized := buildOversizedJSONObject(consts.MaxDeferInputSize + 1)
 		opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(oversized)}
 		err := opts.Validate()
 		require.ErrorIs(t, err, ErrDeferInputTooLarge,
@@ -175,8 +187,22 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 
 	t.Run("accepts Input at exactly MaxDeferInputSize", func(t *testing.T) {
 		// Boundary: equal-to-limit must pass; only strictly greater fails.
-		atLimit := bytes.Repeat([]byte("x"), consts.MaxDeferInputSize)
+		atLimit := buildOversizedJSONObject(consts.MaxDeferInputSize)
 		opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(atLimit)}
 		require.NoError(t, opts.Validate())
 	})
+}
+
+// buildOversizedJSONObject returns a JSON object whose serialized form is
+// exactly `total` bytes. Padding is filler inside a string value so the
+// payload remains a valid JSON object (IsJSONObject passes) while still
+// stressing the size check.
+func buildOversizedJSONObject(total int) []byte {
+	const wrapper = `{"k":""}`
+	pad := max(total-len(wrapper), 0)
+	out := make([]byte, 0, total)
+	out = append(out, []byte(`{"k":"`)...)
+	out = append(out, bytes.Repeat([]byte("x"), pad)...)
+	out = append(out, []byte(`"}`)...)
+	return out
 }

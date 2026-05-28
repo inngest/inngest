@@ -1,4 +1,5 @@
 export const statusTitles: Record<string, string> = {
+  REJECTED: 'Rejected',
   CANCELED: 'Canceled',
   CANCELLED: 'Canceled',
   COMPLETED: 'Completed',

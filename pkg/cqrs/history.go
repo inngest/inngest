@@ -56,10 +56,5 @@ type HistoryReader interface {
 	// run, keyed by child run ID. A batched child can descend from multiple
 	// parents, so each child maps to a list of parents. Runs with no linkage
 	// are omitted.
-	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]*RunDeferredFrom, error)
-
-	// GetRunInvokedFrom returns the parent linkage for each child run that
-	// was triggered by a parent's `step.invoke`, keyed by child run ID. Runs
-	// with no invoke linkage are omitted.
-	GetRunInvokedFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*RunInvokedFrom, error)
+	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDeferredFrom, error)
 }

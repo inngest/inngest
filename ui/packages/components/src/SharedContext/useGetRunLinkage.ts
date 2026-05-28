@@ -8,42 +8,31 @@ export type GetRunLinkagePayload = {
 };
 
 export type RunDeferSummary = {
-  id: string;
+  hashedDeferID: string;
   userlandDeferID: string;
   fnSlug: string;
   status: string;
+  function: { name: string; slug: string } | null;
   run: {
     id: string;
     status: string;
-    function: { name: string; slug: string };
   } | null;
 };
 
 export type RunDeferredFromSummary = {
-  parentRunID: string;
-  parentRun: {
+  runID: string;
+  function: { name: string; slug: string };
+  run: {
     id: string;
     status: string;
-    function: { name: string; slug: string };
-    defers: RunDeferSummary[];
   } | null;
-};
-
-export type RunInvokedFromSummary = {
-  parentRunID: string;
-  parentRun: {
-    id: string;
-    status: string;
-    function: { name: string; slug: string };
-  } | null;
-  stepName: string | null;
 };
 
 export type GetRunLinkageData = {
   defers: RunDeferSummary[];
+  siblingDefers: RunDeferSummary[];
   // A batched child can descend from several parents, so this is a list.
   deferredFrom: RunDeferredFromSummary[];
-  invokedFrom: RunInvokedFromSummary | null;
 };
 
 export type GetRunLinkageResult = {

@@ -126,7 +126,7 @@ export function Pill({
 
 export type PillContentProps = {
   children: React.ReactNode;
-  type?: 'EVENT' | 'CRON' | 'FUNCTION' | 'APP' | 'PRIMARY' | 'DEFER';
+  type?: 'EVENT' | 'CRON' | 'FUNCTION' | 'APP';
 };
 
 export function PillContent({ children, type }: PillContentProps) {
@@ -136,7 +136,6 @@ export function PillContent({ children, type }: PillContentProps) {
       {type === 'CRON' && <RiTimeLine className="text-subtle h-3 w-3" />}
       {type === 'FUNCTION' && <FunctionsIcon className="text-subtle h-3 w-3" />}
       {type === 'APP' && <AppsIcon className="text-subtle h-3 w-3" />}
-      {type === 'PRIMARY' && <FunctionsIcon className="text-subtle h-3 w-3" />}
       <p className="flex-1 truncate">{children}</p>
     </div>
   );

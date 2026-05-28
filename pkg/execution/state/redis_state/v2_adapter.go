@@ -259,10 +259,6 @@ func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
 	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
 }
 
-func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
-	return v.mgr.SaveRejectedDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, fnSlug, hashedID)
-}
-
 // Metadata returns metadata for a given run
 func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, error) {
 	md, err := v.mgr.metadata(ctx, id.Tenant.AccountID, id.RunID)

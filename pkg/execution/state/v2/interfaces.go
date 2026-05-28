@@ -46,11 +46,8 @@ type RunService interface {
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
 
+	// SaveDefer atomically writes a Defer, including rejected defers.
 	SaveDefer(ctx context.Context, id ID, d Defer) error
-	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
-	// No-op if any defer already exists for hashedID. Returns
-	// ErrDeferLimitExceeded if no room.
-	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for

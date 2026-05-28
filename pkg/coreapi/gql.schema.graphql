@@ -500,8 +500,8 @@ type FunctionRunV2 {
   trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
   defers: [RunDefer!]!
+  siblingDefers: [RunDefer!]!
   deferredFrom: [RunDeferredFrom!]!
-  invokedFrom: RunInvokedFrom
   runType: RunType!
 }
 
@@ -517,15 +517,26 @@ type FunctionRunV2Edge {
 }
 
 type RunDefer {
-  id: String!
+  hashedDeferID: String!
   userlandDeferID: String!
   fnSlug: String!
+
+  # Status of the defer itself (not the run).
   status: RunDeferStatus!
+
+  # Only null if the fnSlug does not match a function. Will exist before run
+  # schedules.
+  function: Function
+
+  runID: ULID
+
+  # Eventually consistent some time after runID exists.
   run: FunctionRunV2
 }
 
 enum RunDeferStatus {
   SCHEDULED
+  REJECTED
 }
 
 enum RunType {
@@ -534,14 +545,9 @@ enum RunType {
 }
 
 type RunDeferredFrom {
-  parentRunID: ULID!
-  parentRun: FunctionRunV2
-}
-
-type RunInvokedFrom {
-  parentRunID: ULID!
-  parentRun: FunctionRunV2
-  stepName: String
+  runID: ULID!
+  function: Function!
+  run: FunctionRunV2
 }
 
 enum RunTraceSpanStatus {

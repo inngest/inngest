@@ -3,7 +3,6 @@ import {
   PillContent,
   type PillAppearance,
   type PillContentProps,
-  type PillKind,
 } from '@inngest/components/Pill';
 import { StatusDot, type StatusDotProps } from '@inngest/components/Status/StatusDot';
 import { getStatusTextClass } from '@inngest/components/Status/statusClasses';
@@ -29,7 +28,7 @@ export function AICell({ children }: React.PropsWithChildren) {
     <div
       className={cn(
         cellStyles,
-        'text-primary-xIntense border-primary-xIntense max-w-56 flex w-fit items-center gap-2 rounded border px-1.5'
+        'text-primary-xIntense border-primary-xIntense flex w-fit max-w-56 items-center gap-2 rounded border px-1.5'
       )}
     >
       <RiSparkling2Fill className="h-3.5 w-3.5 shrink-0" />
@@ -42,15 +41,11 @@ export function PillCell({
   children,
   type,
   appearance = 'outlined',
-  kind,
-  className,
 }: PillContentProps & {
   appearance?: PillAppearance;
-  kind?: PillKind;
-  className?: string;
 }) {
   return (
-    <Pill appearance={appearance} kind={kind} className={className}>
+    <Pill appearance={appearance}>
       <PillContent type={type}>{children}</PillContent>
     </Pill>
   );

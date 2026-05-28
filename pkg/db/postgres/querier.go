@@ -537,7 +537,7 @@ func (pq *pgQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []strin
 	for i, r := range rows {
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
+			StartTime: toTime(r.SpanStartTime), EndTime: toTime(r.SpanEndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: r.SpanFragments,
 		}
 	}
@@ -683,6 +683,7 @@ func (pq *pgQuerier) InsertTraceRun(ctx context.Context, arg db.InsertTraceRunPa
 		Status: int32(arg.Status), SourceID: arg.SourceID, TriggerIds: arg.TriggerIds,
 		Output: arg.Output, BatchID: arg.BatchID[:], IsDebounce: arg.IsDebounce,
 		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi,
+		RunType: int32(arg.RunType),
 	})
 }
 
