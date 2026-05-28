@@ -16,6 +16,11 @@ type FunctionProvider interface {
 	GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error)
 }
 
+type FunctionBatchProvider interface {
+	// GetFunctions loads all requested functions in one call instead of one call per run.
+	GetFunctions(ctx context.Context, identifiers []string) (map[string]inngest.DeployedFunction, error)
+}
+
 type FunctionScheduler interface {
 	// Schedule initializes a new function run, ensuring that the function will be
 	// executed via our async execution engine as quickly as possible.

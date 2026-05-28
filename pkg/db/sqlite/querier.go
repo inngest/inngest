@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/inngest/inngest/pkg/db"
+	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -170,6 +170,14 @@ func (sq *sqliteQuerier) GetFunctionByID(ctx context.Context, id uuid.UUID) (*db
 		return nil, err
 	}
 	return functionFromSQLite(r), nil
+}
+
+func (sq *sqliteQuerier) GetFunctionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*db.Function, error) {
+	rows, err := sq.q.GetFunctionsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromSQLite), nil
 }
 
 func (sq *sqliteQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*db.Function, error) {

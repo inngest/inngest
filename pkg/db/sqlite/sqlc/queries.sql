@@ -103,6 +103,14 @@ JOIN apps ON apps.id = functions.app_id
 WHERE functions.archived_at IS NULL
 AND apps.archived_at IS NULL;
 
+-- name: GetFunctionsByIDs :many
+SELECT functions.*
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.id IN (sqlc.slice('ids'))
+AND functions.archived_at IS NULL
+AND apps.archived_at IS NULL;
+
 -- name: GetAppFunctions :many
 SELECT * FROM functions WHERE app_id = ? AND archived_at IS NULL;
 

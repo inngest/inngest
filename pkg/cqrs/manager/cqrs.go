@@ -1064,7 +1064,7 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 }
 
 // UpsertAppByName upserts on the partial unique index apps_name_active_key
-// (name) WHERE archived_at IS NULL AND name <> ''. The id provided in arg is
+// (name) WHERE archived_at IS NULL AND name <> ”. The id provided in arg is
 // only used for fresh inserts; on conflict, the existing row's id is kept,
 // so SDK re-syncs adopt legacy URL-derived ids in place.
 func (w wrapper) UpsertAppByName(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
@@ -1156,6 +1156,15 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 	}
 
 	return domainToCQRS(fn, domainFunction), nil
+}
+
+func (w wrapper) GetFunctionsByInternalUUIDs(ctx context.Context, fnIDs []uuid.UUID) ([]*cqrs.Function, error) {
+	fns, err := w.q.GetFunctionsByIDs(ctx, fnIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainToCQRSList(fns, domainFunction), nil
 }
 
 func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {

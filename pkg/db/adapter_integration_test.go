@@ -201,6 +201,11 @@ func TestInsertFunctionRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, fns, 1)
 
+	fnsByID, err := q.GetFunctionsByIDs(ctx, []uuid.UUID{fnID})
+	require.NoError(t, err)
+	require.Len(t, fnsByID, 1)
+	assert.Equal(t, fnID, fnsByID[0].ID)
+
 	allFns, err := q.GetFunctions(ctx)
 	require.NoError(t, err)
 	assert.Len(t, allFns, 1)

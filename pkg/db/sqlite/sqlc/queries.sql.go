@@ -1029,6 +1029,56 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getFunctionsByIDs = `-- name: GetFunctionsByIDs :many
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.archived_at
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.id IN (/*SLICE:ids*/?)
+AND functions.archived_at IS NULL
+AND apps.archived_at IS NULL
+`
+
+func (q *Queries) GetFunctionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*Function, error) {
+	query := getFunctionsByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Function
+	for rows.Next() {
+		var i Function
+		if err := rows.Scan(
+			&i.ID,
+			&i.AppID,
+			&i.Name,
+			&i.Slug,
+			&i.Config,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getHistoryItem = `-- name: GetHistoryItem :one
 SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result, step_type FROM history WHERE id = ?
 `

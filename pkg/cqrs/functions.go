@@ -48,6 +48,8 @@ type FunctionReader interface {
 	GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID string, functionID string) (*Function, error)
 	// GetFunctionByInternalUUID returns a function given the internal ID.
 	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*Function, error)
+	// GetFunctionsByInternalUUIDs returns active functions given internal IDs.
+	GetFunctionsByInternalUUIDs(ctx context.Context, fnIDs []uuid.UUID) ([]*Function, error)
 	// GetActiveFunctionByAppAndSlug returns an active (non-archived) function
 	// given its parent app's user-facing name and the function's slug.
 	//

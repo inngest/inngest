@@ -102,6 +102,14 @@ JOIN apps ON apps.id = functions.app_id
 WHERE functions.archived_at IS NULL
 AND apps.archived_at IS NULL;
 
+-- name: GetFunctionsByIDs :many
+SELECT functions.*
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.id = ANY(@ids::uuid[])
+AND functions.archived_at IS NULL
+AND apps.archived_at IS NULL;
+
 -- name: GetAppFunctions :many
 SELECT * FROM functions WHERE app_id = $1 AND archived_at IS NULL;
 

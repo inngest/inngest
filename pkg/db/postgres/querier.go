@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db"
+	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/oklog/ulid/v2"
 )
@@ -169,6 +169,14 @@ func (pq *pgQuerier) GetFunctionByID(ctx context.Context, id uuid.UUID) (*db.Fun
 		return nil, err
 	}
 	return functionFromPG(r), nil
+}
+
+func (pq *pgQuerier) GetFunctionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*db.Function, error) {
+	rows, err := pq.q.GetFunctionsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromPG), nil
 }
 
 func (pq *pgQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*db.Function, error) {

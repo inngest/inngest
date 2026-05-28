@@ -1046,6 +1046,21 @@ func TestCQRSGetFunctions(t *testing.T) {
 			assert.True(t, foundFnIDs[expectedID], "Expected function ID %s to be found", expectedID)
 		}
 	})
+
+	t.Run("get functions by internal uuids", func(t *testing.T) {
+		functions, err := cm.GetFunctionsByInternalUUIDs(ctx, fnIDs[:2])
+		require.NoError(t, err)
+		require.Len(t, functions, 2)
+
+		foundFnIDs := make(map[uuid.UUID]bool)
+		for _, fn := range functions {
+			foundFnIDs[fn.ID] = true
+		}
+
+		assert.True(t, foundFnIDs[fnIDs[0]])
+		assert.True(t, foundFnIDs[fnIDs[1]])
+		assert.False(t, foundFnIDs[fnIDs[2]])
+	})
 }
 
 func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {

@@ -47,6 +47,34 @@ func TestNewFunctionProvider(t *testing.T) {
 	require.Equal(t, "test-fn", fn.Function.Slug)
 }
 
+func TestFunctionProviderGetFunctionsUsesBulkIDRead(t *testing.T) {
+	ctx := context.Background()
+	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	store := &fakeFunctionStore{
+		fns: []*cqrs.Function{
+			{
+				ID:     fnID,
+				AppID:  appID,
+				Slug:   "app-test-fn",
+				Config: []byte(`{"name":"Test function","slug":"test-fn"}`),
+			},
+		},
+		app: &cqrs.App{
+			ID:   appID,
+			Name: "app",
+		},
+	}
+
+	provider := NewFunctionProvider(store)
+	fns, err := provider.(apiv2.FunctionBatchProvider).GetFunctions(ctx, []string{fnID.String()})
+
+	require.NoError(t, err)
+	require.Equal(t, 0, store.listCalls)
+	require.Equal(t, []uuid.UUID{fnID}, store.bulkIDs)
+	require.Equal(t, fnID, fns[fnID.String()].ID)
+}
+
 func TestNewFunctionProviderErrors(t *testing.T) {
 	t.Run("reader error", func(t *testing.T) {
 		provider := NewFunctionProvider(&fakeFunctionStore{err: errors.New("read failed")})
@@ -118,13 +146,36 @@ func TestFunctionTraceReader(t *testing.T) {
 }
 
 type fakeFunctionStore struct {
-	fns []*cqrs.Function
-	app *cqrs.App
-	err error
+	fns       []*cqrs.Function
+	app       *cqrs.App
+	err       error
+	listCalls int
+	bulkIDs   []uuid.UUID
 }
 
 func (f *fakeFunctionStore) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
+	f.listCalls++
 	return f.fns, f.err
+}
+
+func (f *fakeFunctionStore) GetFunctionsByInternalUUIDs(ctx context.Context, fnIDs []uuid.UUID) ([]*cqrs.Function, error) {
+	f.bulkIDs = append([]uuid.UUID(nil), fnIDs...)
+	if f.err != nil {
+		return nil, f.err
+	}
+
+	seen := make(map[uuid.UUID]struct{}, len(fnIDs))
+	for _, id := range fnIDs {
+		seen[id] = struct{}{}
+	}
+
+	result := make([]*cqrs.Function, 0, len(fnIDs))
+	for _, fn := range f.fns {
+		if _, ok := seen[fn.ID]; ok {
+			result = append(result, fn)
+		}
+	}
+	return result, nil
 }
 
 func (f *fakeFunctionStore) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {

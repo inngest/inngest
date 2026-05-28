@@ -34,6 +34,7 @@ type Querier interface {
 	GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
+	GetFunctionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 	GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
