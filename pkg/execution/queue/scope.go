@@ -6,6 +6,14 @@ import (
 	"github.com/google/uuid"
 )
 
+// Scope identifies the tenant/function namespace for queue-owned state.
+type Scope struct {
+	IsSystem   bool
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	FunctionID uuid.UUID
+}
+
 func (s Scope) Validate() error {
 	if s.IsSystem {
 		return nil
@@ -20,4 +28,30 @@ func (s Scope) Validate() error {
 		return fmt.Errorf("missing function ID")
 	}
 	return nil
+}
+
+func ScopeFromQueueItem(i QueueItem) Scope {
+	scope := Scope{
+		AccountID:  i.Data.Identifier.AccountID,
+		EnvID:      i.Data.Identifier.WorkspaceID,
+		FunctionID: i.FunctionID,
+	}
+	if i.QueueName != nil {
+		scope.IsSystem = true
+	}
+	return scope
+}
+
+func ScopeFromQueuePartition(partition *QueuePartition) Scope {
+	scope := Scope{AccountID: partition.AccountID}
+	if partition.EnvID != nil {
+		scope.EnvID = *partition.EnvID
+	}
+	if partition.FunctionID != nil {
+		scope.FunctionID = *partition.FunctionID
+	}
+	if partition.QueueName != nil {
+		scope.IsSystem = true
+	}
+	return scope
 }

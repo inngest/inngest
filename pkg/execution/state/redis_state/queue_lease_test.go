@@ -44,16 +44,18 @@ func TestQueueLease(t *testing.T) {
 	start := clock.Now().Truncate(time.Second)
 
 	t.Run("It leases an item", func(t *testing.T) {
-		fnID, accountID := uuid.New(), uuid.New()
+		fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		scope := osqueue.Scope{AccountID: accountID, EnvID: envID, FunctionID: fnID}
 
 		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
-					RunID:      runID,
-					WorkflowID: fnID,
-					AccountID:  accountID,
+					RunID:       runID,
+					WorkflowID:  fnID,
+					AccountID:   accountID,
+					WorkspaceID: envID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -65,6 +67,7 @@ func TestQueueLease(t *testing.T) {
 		p := osqueue.QueuePartition{
 			ID:         fnID.String(),
 			FunctionID: &fnID,
+			EnvID:      &envID,
 			AccountID:  accountID,
 		} // Default workflow ID etc
 
@@ -90,7 +93,7 @@ func TestQueueLease(t *testing.T) {
 		})
 
 		t.Run("It should add the item to the function's in-progress concurrency queue", func(t *testing.T) {
-			count, err := shard.RunningCount(ctx, fnID)
+			count, err := shard.RunningCount(ctx, scope)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count, r.Dump())
 		})
@@ -126,7 +129,7 @@ func TestQueueLease(t *testing.T) {
 
 			// Now expired
 			t.Run("After expiry, no items should be in progress", func(t *testing.T) {
-				count, err := shard.RunningCount(ctx, *p.FunctionID)
+				count, err := shard.RunningCount(ctx, scope)
 				require.NoError(t, err)
 				require.EqualValues(t, 0, count)
 			})
@@ -141,7 +144,7 @@ func TestQueueLease(t *testing.T) {
 			require.WithinDuration(t, now.Add(5*time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 			t.Run("Leasing an expired key has one in-progress", func(t *testing.T) {
-				count, err := shard.RunningCount(ctx, *p.FunctionID)
+				count, err := shard.RunningCount(ctx, scope)
 				require.NoError(t, err)
 				require.EqualValues(t, 1, count)
 			})

@@ -42,14 +42,19 @@ func TestQueueRequeue(t *testing.T) {
 		now := time.Now()
 
 		fnID := uuid.New()
+		acctID := uuid.New()
+		envID := uuid.New()
+		scope := osqueue.Scope{AccountID: acctID, EnvID: envID, FunctionID: fnID}
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
-					RunID:      runID,
-					WorkflowID: fnID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					RunID:       runID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, now, osqueue.EnqueueOpts{})
@@ -62,7 +67,7 @@ func TestQueueRequeue(t *testing.T) {
 		pi := osqueue.QueuePartition{FunctionID: &item.FunctionID}
 		requirePartitionScoreEquals(t, r, pi.FunctionID, now.Truncate(time.Second))
 
-		requirePartitionInProgress(t, shard, item.FunctionID, 1)
+		requirePartitionInProgress(t, shard, scope, 1)
 
 		next := now.Add(time.Hour)
 		err = shard.Requeue(ctx, item, next)
@@ -78,7 +83,7 @@ func TestQueueRequeue(t *testing.T) {
 		})
 
 		t.Run("It should decrease the in-progress count", func(t *testing.T) {
-			requirePartitionInProgress(t, shard, item.FunctionID, 0)
+			requirePartitionInProgress(t, shard, scope, 0)
 		})
 
 		t.Run("It should update the partition's earliest time, if earliest", func(t *testing.T) {

@@ -3,6 +3,11 @@
 
 package types
 
+// From score.go
+const (
+	KindInngestScore = "inngest.score"
+)
+
 // From warning.go
 const (
 	KindInngestWarnings = "inngest.warnings"

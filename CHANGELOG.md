@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.0] - 2026-05-22
+
+### 🚀 Features
+
+- Insights: Add stubs for new insights API endpoints (#4189)
+- Add update notifier to select commands (#4185)
+- Phase 1 scoring (#4170)
+
+### 🐛 Bug Fixes
+
+- *(syncs)* Fix function orphaning on app resync after <v1.15 upgrade (#4143)
+- *(pauses)* Retry enqueueing edge after consuming pause (#4228)
+- *(batching)* Enforce batch size limits in the in-memory batching path. (#3871)
+- Add feature flag for enforcing state size limits (#4251)
+- Bulk canel bug (#4255)
+
+### 💼 Other
+
+- *(deps)* Update pgx and goose (#4248)
+- *(deps)* Remove vulnerable docker module (#4249)
+
+### ⚡ Performance
+
+- *(batch)* Split batch partition into workspace-scoped partitions (#4236)
+
+### 🧪 Testing
+
+- *(connect)* Forward regression test (#4214)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add a concurrency safe marshal to state configs (#4256)
+
+### 🛡️ Security
+
+- *(npm)* Address vulnerable npm dependencies (#4250)
+
 ## [v1.21.0] - 2026-05-19
 
 ### 🚀 Features
@@ -11,6 +48,10 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - *(ci)* Disable provenance on publish (#4226)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.21.0 (#4227)
 
 ## [v1.20.0] - 2026-05-19
 

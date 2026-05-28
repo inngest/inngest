@@ -475,36 +475,36 @@ Purpose: make one gateway websocket handler's lifecycle observable.
 
 *** Implementation checklist
 
-- [ ] Add internal =gatewayConnPhase= values:
-  - [ ] =New=
-  - [ ] =Handshaking=
-  - [ ] =Ready=
-  - [ ] =Draining=
-  - [ ] =Disconnecting=
-  - [ ] =Closed=
-- [ ] Add concurrency-safe phase storage and transition logging.
-- [ ] Route existing state changes through phase helpers while preserving
+- [X] Add internal =gatewayConnPhase= values:
+  - [X] =New=
+  - [X] =Handshaking=
+  - [X] =Ready=
+  - [X] =Draining=
+  - [X] =Disconnecting=
+  - [X] =Closed=
+- [X] Add concurrency-safe phase storage and transition logging.
+- [X] Route existing state changes through phase helpers while preserving
   current behavior.
-- [ ] Keep =draining= temporarily if needed, but derive it from phase where
+- [X] Keep =draining= temporarily if needed, but derive it from phase where
   possible.
-- [ ] Add phase to useful connection logs.
+- [X] Add phase to useful connection logs.
 
 *** Test checklist
 
-- [ ] handshake moves =New -> Handshaking -> Ready=;
-- [ ] worker pause moves =Ready -> Draining=;
-- [ ] gateway drain moves =Ready -> Draining=;
-- [ ] read-loop exit moves to =Disconnecting= and then =Closed=;
-- [ ] repeated close/cleanup is idempotent.
+- [X] handshake moves =New -> Handshaking -> Ready=;
+- [X] worker pause moves =Ready -> Draining=;
+- [X] gateway drain moves =Ready -> Draining=;
+- [X] read-loop exit moves to =Disconnecting= and then =Closed=;
+- [X] repeated close/cleanup is idempotent.
 
 *** Validation checklist
 
-- [ ] =go test ./pkg/connect -count=1=
+- [X] =go test ./pkg/connect -count=1=
 
 *** Exit criteria
 
-- [ ] Every established gateway connection has an observable phase.
-- [ ] No intentional behavior change is introduced in this phase.
+- [X] Every established gateway connection has an observable phase.
+- [X] No intentional behavior change is introduced in this phase.
 
 ** Phase 2: Centralize write and forward eligibility
 
@@ -512,31 +512,31 @@ Purpose: make routing and websocket writes consult connection phase.
 
 *** Implementation checklist
 
-- [ ] Add =canForward= and =canWrite= helpers.
-- [ ] Require =Ready= before accepting a new =Forward= into =messageChan=.
-- [ ] Require =Ready= before writing =GATEWAY_EXECUTOR_REQUEST=.
-- [ ] Allow =WORKER_REPLY_ACK= only for a message already read by the run loop,
+- [X] Add =canForward= and =canWrite= helpers.
+- [X] Require =Ready= before accepting a new =Forward= into =messageChan=.
+- [X] Require =Ready= before writing =GATEWAY_EXECUTOR_REQUEST=.
+- [X] Allow =WORKER_REPLY_ACK= only for a message already read by the run loop,
   and keep write failure non-fatal after persistence.
-- [ ] Allow heartbeat responses only when not draining/disconnecting.
-- [ ] Replace direct =draining.Load()= checks where a phase check is clearer.
-- [ ] Release =pendingAcks= explicitly when transitioning out of =Ready=.
+- [X] Allow heartbeat responses only when not draining/disconnecting.
+- [X] Replace direct =draining.Load()= checks where a phase check is clearer.
+- [X] Release =pendingAcks= explicitly when transitioning out of =Ready=.
 
 *** Test checklist
 
-- [ ] no new =Forward= succeeds outside =Ready=;
-- [ ] =GATEWAY_EXECUTOR_REQUEST= is not written outside =Ready=;
-- [ ] =pendingAcks= waiters are released when connection starts disconnecting;
-- [ ] heartbeat cannot revive a draining connection;
-- [ ] reply handling after persistence stays non-fatal.
+- [X] no new =Forward= succeeds outside =Ready=;
+- [X] =GATEWAY_EXECUTOR_REQUEST= is not written outside =Ready=;
+- [X] =pendingAcks= waiters are released when connection starts disconnecting;
+- [X] heartbeat cannot revive a draining connection;
+- [X] reply handling after persistence stays non-fatal.
 
 *** Validation checklist
 
-- [ ] =go test ./pkg/connect -count=1=
+- [X] =go test ./pkg/connect -count=1=
 
 *** Exit criteria
 
-- [ ] New router work cannot be sent to a draining or disconnecting websocket.
-- [ ] Pending ACK cleanup is lifecycle-driven, not only timeout-driven.
+- [X] New router work cannot be sent to a draining or disconnecting websocket.
+- [X] Pending ACK cleanup is lifecycle-driven, not only timeout-driven.
 
 ** Phase 3: Decide and encode =WORKER_REQUEST_ACK= semantics
 

@@ -100,7 +100,11 @@ func TestPartitionByID(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			res, err := q.PartitionByID(ctx, shard, fnID.String())
+			res, err := q.PartitionByID(ctx, shard, osqueue.Scope{
+				AccountID:  acctId,
+				EnvID:      wsID,
+				FunctionID: fnID,
+			}, fnID.String())
 			require.NoError(t, err)
 
 			// fmt.Printf("RESULT: %#v\n", res)

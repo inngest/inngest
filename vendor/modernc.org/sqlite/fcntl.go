@@ -5,7 +5,6 @@
 package sqlite // import "modernc.org/sqlite"
 
 import (
-	"runtime"
 	"unsafe"
 
 	"modernc.org/libc"
@@ -21,15 +20,12 @@ type FileControl interface {
 var _ FileControl = (*conn)(nil)
 
 func (c *conn) FileControlPersistWAL(dbName string, mode int) (int, error) {
-	i32 := int32(mode)
-	pi32 := &i32
+	pi32 := c.tls.Alloc(4)
+	defer c.tls.Free(4)
 
-	var p runtime.Pinner
-	p.Pin(pi32)
-	defer p.Unpin()
-
-	err := c.fileControl(dbName, sqlite3.SQLITE_FCNTL_PERSIST_WAL, (uintptr)(unsafe.Pointer(pi32)))
-	return int(i32), err
+	*(*int32)(unsafe.Pointer(pi32)) = int32(mode)
+	err := c.fileControl(dbName, sqlite3.SQLITE_FCNTL_PERSIST_WAL, pi32)
+	return int(*(*int32)(unsafe.Pointer(pi32))), err
 }
 
 func (c *conn) fileControl(dbName string, op int, pArg uintptr) error {

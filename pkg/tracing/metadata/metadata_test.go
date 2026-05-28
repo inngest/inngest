@@ -3,6 +3,9 @@ package metadata
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValuesSize(t *testing.T) {
@@ -76,5 +79,108 @@ func TestValuesSizeNilMap(t *testing.T) {
 	var v Values
 	if got := v.Size(); got != 0 {
 		t.Errorf("nil Values.Size() = %d, want 0", got)
+	}
+}
+
+func TestUpdateValidateAllowedNamedScoreValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		update  Update
+		wantErr error
+	}{
+		{
+			name: "finite numeric value is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.accuracy",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"value": json.RawMessage(`0.95`)},
+			}},
+		},
+		{
+			name: "arbitrary name in kind is accepted",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.click-through rate (variant A)",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"value": json.RawMessage(`0.23`)},
+			}},
+		},
+		{
+			name: "missing value key is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.accuracy",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"score": json.RawMessage(`1`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "extra keys alongside value are rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.accuracy",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"value": json.RawMessage(`1`), "extra": json.RawMessage(`2`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "empty values map is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.accuracy",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "null value is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.accuracy",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"value": json.RawMessage(`null`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "string value is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.accuracy",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"value": json.RawMessage(`"high"`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "object value is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "inngest.score.accuracy",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"value": json.RawMessage(`{"nested":1}`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "non-score metadata keeps generic shape",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   "userland.score",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"score": json.RawMessage(`{"value":1}`)},
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.update.ValidateAllowed()
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+		})
 	}
 }

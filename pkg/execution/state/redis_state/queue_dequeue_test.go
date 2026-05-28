@@ -232,15 +232,20 @@ func TestQueueDequeue(t *testing.T) {
 
 		start := time.Now()
 
+		acctID := uuid.New()
+		envID := uuid.New()
 		fnID := uuid.New()
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		scope := osqueue.Scope{AccountID: acctID, EnvID: envID, FunctionID: fnID}
 
 		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 			FunctionID: fnID,
 			Data: osqueue.Item{
 				Identifier: state.Identifier{
-					RunID:      runID,
-					WorkflowID: fnID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					RunID:       runID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -252,7 +257,7 @@ func TestQueueDequeue(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("The lease exists in the partition queue", func(t *testing.T) {
-			count, err := shard.RunningCount(ctx, *p.FunctionID)
+			count, err := shard.RunningCount(ctx, scope)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count, r.Dump())
 		})
@@ -278,7 +283,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the concurrency partition's queue", func(t *testing.T) {
-			count, err := shard.RunningCount(ctx, *p.FunctionID)
+			count, err := shard.RunningCount(ctx, scope)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, count)
 		})

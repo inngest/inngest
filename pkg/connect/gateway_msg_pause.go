@@ -15,7 +15,7 @@ func (c *connectionHandler) handleWorkerPause() *connecterrors.SocketError {
 		c.log.Warn("worker pause signal received during draining sequence")
 	}
 
-	c.draining.Store(true)
+	c.beginDrain("worker pause message", "svc_draining", c.svc.isDraining.Load())
 
 	err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING, "worker pause message", "svc_draining", c.svc.isDraining.Load())
 	if err != nil {

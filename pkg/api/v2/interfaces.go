@@ -32,8 +32,12 @@ type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
 }
 
+type GetFunctionRunOpts struct {
+	IncludeOutput bool
+}
+
 type FunctionRunReader interface {
-	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*cqrs.FunctionRun, error)
+	GetFunctionRun(ctx context.Context, runID ulid.ULID, opts GetFunctionRunOpts) (*cqrs.FunctionRun, error)
 }
 
 type FunctionTraceReader interface {
