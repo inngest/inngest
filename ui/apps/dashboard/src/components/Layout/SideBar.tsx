@@ -43,7 +43,7 @@ export default function SideBar({
     <nav
       className={`bg-canvasBase border-subtle group flex h-full flex-col justify-start ${
         collapsed ? 'w-[64px]' : 'w-[224px]'
-      } shrink-0 overflow-visible border-r`}
+      } shrink-0 overflow-visible border-r-hairline`}
       ref={navRef}
     >
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />

@@ -25,7 +25,7 @@ export default function Layout({
     <div className="bg-canvasSubtle flex h-screen w-full flex-col overflow-hidden">
       <TopBar activeEnv={activeEnv} profile={profile} />
 
-      <div className="border-subtle bg-canvasBase mx-3 flex flex-1 flex-row overflow-hidden rounded border">
+      <div className="border-subtle bg-canvasBase shadow-xs mx-3 flex flex-1 flex-row overflow-hidden rounded border-hairline">
         <SideBar activeEnv={activeEnv} collapsed={collapsed} />
 
         <div
