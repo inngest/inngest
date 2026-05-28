@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	openapiv2 "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/api"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
@@ -47,6 +48,8 @@ type endpoint struct {
 	name       string
 	method     string
 	path       string
+	summary    string
+	help       string
 	body       string
 	input      protoreflect.MessageDescriptor
 	pathParams []string
@@ -72,10 +75,12 @@ func endpointCommands() []*cli.Command {
 
 	for _, ep := range endpoints {
 		cmds = append(cmds, &cli.Command{
-			Name:      ep.name,
-			Usage:     fmt.Sprintf("%s %s", ep.method, ep.path),
-			UsageText: fmt.Sprintf("inngest alpha api [target/auth flags] %s [endpoint flags]", ep.name),
-			Flags:     endpointFlags(ep),
+			Name:        ep.name,
+			Usage:       endpointUsage(ep),
+			UsageText:   endpointUsageText(ep),
+			Description: endpointDescription(ep),
+			Flags:       endpointFlags(ep),
+			Arguments:   endpointArguments(ep),
 			Action: func(ctx context.Context, cmd *cli.Command) error {
 				return callEndpoint(ctx, cmd, ep)
 			},
@@ -140,6 +145,29 @@ func commonFlags() []cli.Flag {
 	}
 }
 
+func endpointUsageText(ep endpoint) string {
+	var positional strings.Builder
+	for _, name := range ep.pathParams {
+		fmt.Fprintf(&positional, " [<%s>]", kebab(name))
+	}
+	return fmt.Sprintf("inngest alpha api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
+}
+
+func endpointArguments(ep endpoint) []cli.Argument {
+	if len(ep.pathParams) == 0 {
+		return nil
+	}
+	args := make([]cli.Argument, 0, len(ep.pathParams))
+	for _, name := range ep.pathParams {
+		flagName := kebab(name)
+		args = append(args, &cli.StringArg{
+			Name:      flagName,
+			UsageText: fmt.Sprintf("[<%s>]", flagName),
+		})
+	}
+	return args
+}
+
 func endpointFlags(ep endpoint) []cli.Flag {
 	var flags []cli.Flag
 	if ep.body != "" {
@@ -176,7 +204,7 @@ func endpointFlags(ep endpoint) []cli.Flag {
 }
 
 func flagForField(category, name string, field protoreflect.FieldDescriptor) cli.Flag {
-	usage := string(field.JSONName())
+	usage := fieldUsage(field)
 	if field.IsList() {
 		return &cli.StringSliceFlag{
 			Category: category,
@@ -191,6 +219,22 @@ func flagForField(category, name string, field protoreflect.FieldDescriptor) cli
 	default:
 		return &cli.StringFlag{Category: category, Name: name, Usage: usage}
 	}
+}
+
+func fieldUsage(field protoreflect.FieldDescriptor) string {
+	usage := string(field.JSONName())
+	opts := field.Options()
+	if proto.HasExtension(opts, openapiv2.E_Openapiv2Field) {
+		if schema, ok := proto.GetExtension(opts, openapiv2.E_Openapiv2Field).(*openapiv2.JSONSchema); ok && schema.GetDescription() != "" {
+			usage = schema.GetDescription()
+		}
+	}
+
+	if isRequiredField(field) {
+		usage += " (required)"
+	}
+
+	return usage
 }
 
 func discoverEndpoints() []endpoint {
@@ -221,10 +265,13 @@ func discoverEndpoints() []endpoint {
 			continue
 		}
 
+		summary, help := methodHelp(method)
 		endpoints = append(endpoints, endpoint{
 			name:       endpointCommandName(methodName),
 			method:     httpMethod,
 			path:       path,
+			summary:    summary,
+			help:       help,
 			body:       httpRule.Body,
 			input:      method.Input(),
 			pathParams: pathParams(path),
@@ -232,6 +279,48 @@ func discoverEndpoints() []endpoint {
 	}
 
 	return endpoints
+}
+
+func endpointUsage(ep endpoint) string {
+	if ep.summary != "" {
+		return ep.summary
+	}
+	return fmt.Sprintf("%s %s", ep.method, ep.path)
+}
+
+func endpointDescription(ep endpoint) string {
+	lines := []string{}
+	if ep.help != "" {
+		lines = append(lines, ep.help, "")
+	}
+
+	lines = append(lines,
+		fmt.Sprintf("Endpoint: %s %s", ep.method, ep.path),
+		"",
+		"Target, auth, and output flags are inherited from `inngest alpha api`:",
+		"  --prod                  Target Inngest Cloud Production",
+		"  --api-host, --api-port  Target a custom API server",
+		"  --api-key               API key, or INNGEST_API_KEY",
+		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
+		"  --env                   Environment name, or INNGEST_ENV",
+		"  --raw                   Print the response body without formatting",
+	)
+
+	return strings.Join(lines, "\n")
+}
+
+func methodHelp(method protoreflect.MethodDescriptor) (string, string) {
+	opts := method.Options()
+	if !proto.HasExtension(opts, openapiv2.E_Openapiv2Operation) {
+		return "", ""
+	}
+
+	op, ok := proto.GetExtension(opts, openapiv2.E_Openapiv2Operation).(*openapiv2.Operation)
+	if !ok {
+		return "", ""
+	}
+
+	return op.GetSummary(), op.GetDescription()
 }
 
 func endpointCommandName(methodName string) string {
@@ -270,6 +359,10 @@ func methodAndPath(rule *annotations.HttpRule) (string, string) {
 }
 
 func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
+	if extras := cmd.Args().Slice(); len(extras) > 0 {
+		return fmt.Errorf("unexpected positional argument(s): %s", strings.Join(extras, " "))
+	}
+
 	req, err := buildRequest(ctx, cmd, ep)
 	if err != nil {
 		return err
@@ -479,18 +572,30 @@ func resolvePath(cmd *cli.Command, ep endpoint) (string, error) {
 
 		name := parts[1]
 		flagName := kebab(name)
-		if !cmd.IsSet(flagName) || cmd.String(flagName) == "" {
-			firstErr = fmt.Errorf("missing required --%s", flagName)
+		value, ok := pathParamValue(cmd, ep, name)
+		if !ok {
+			firstErr = fmt.Errorf("missing required --%s or positional argument <%s>", flagName, flagName)
 			return match
 		}
 
-		return url.PathEscape(cmd.String(flagName))
+		return url.PathEscape(value)
 	})
 
 	if firstErr != nil {
 		return "", firstErr
 	}
 	return path, nil
+}
+
+func pathParamValue(cmd *cli.Command, _ endpoint, name string) (string, bool) {
+	flagName := kebab(name)
+	if cmd.IsSet(flagName) && cmd.String(flagName) != "" {
+		return cmd.String(flagName), true
+	}
+	if value := cmd.StringArg(flagName); value != "" {
+		return value, true
+	}
+	return "", false
 }
 
 func queryParams(cmd *cli.Command, ep endpoint) (url.Values, error) {

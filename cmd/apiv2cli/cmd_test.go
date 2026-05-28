@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"testing"
 
@@ -43,6 +44,68 @@ func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {
 	require.Equal(t, "get-webhooks", endpointCommandName("ListWebhooks"))
 	require.Equal(t, "get-function-run", endpointCommandName("GetFunctionRun"))
 	require.Equal(t, "create-env", endpointCommandName("CreateEnv"))
+}
+
+func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
+	var invoke *cli.Command
+	for _, cmd := range endpointCommands() {
+		if cmd.Name == "invoke-function" {
+			invoke = cmd
+			break
+		}
+	}
+
+	require.NotNil(t, invoke)
+	require.Equal(t, "Invoke function", invoke.Usage)
+	require.Contains(t, invoke.Description, "Endpoint: POST /apps/{app_id}/functions/{function_id}/invoke")
+	require.Contains(t, invoke.Description, "--prod")
+	require.Contains(t, invoke.Description, "INNGEST_API_KEY")
+	require.Contains(t, invoke.Description, "INNGEST_ENV")
+}
+
+func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
+	var invoke endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "invoke-function" {
+			invoke = ep
+			break
+		}
+	}
+	require.NotEmpty(t, invoke.name)
+
+	flags := endpointFlags(invoke)
+	byName := map[string]cli.Flag{}
+	for _, flag := range flags {
+		byName[flag.Names()[0]] = flag
+	}
+
+	require.Contains(t, byName["data"].String(), "JSON object containing the input data for the function")
+	require.Contains(t, byName["function-id"].String(), "The ID of the function to invoke")
+	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
+}
+
+func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {
+	var invoke endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "invoke-function" {
+			invoke = ep
+			break
+		}
+	}
+	require.NotEmpty(t, invoke.name)
+
+	valid := map[string]bool{}
+	for _, flag := range commonFlags() {
+		for _, name := range flag.Names() {
+			valid["--"+name] = true
+		}
+	}
+
+	desc := endpointDescription(invoke)
+	for _, match := range regexp.MustCompile(`--[a-z][a-z0-9-]*`).FindAllString(desc, -1) {
+		require.True(t, valid[match],
+			"endpointDescription references %s, which is not defined in commonFlags(); keep the inherited-flag block in sync", match)
+	}
 }
 
 func TestCommandCallsGeneratedEndpoint(t *testing.T) {
@@ -116,6 +179,125 @@ func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "includeOutput=true", gotQuery)
+}
+
+func TestCommandAcceptsPositionalPathParams(t *testing.T) {
+	var gotPath string
+	var gotQuery string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"get-function-trace",
+		"01J00000000000000000000000",
+		"--include-output",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "/api/v2/runs/01J00000000000000000000000/trace", gotPath)
+	require.Equal(t, "includeOutput=true", gotQuery)
+}
+
+func TestCommandAcceptsMultiplePositionalPathParams(t *testing.T) {
+	var gotPath string
+	var gotBody map[string]any
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"runId":"01J00000000000000000000000"}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"invoke-function",
+		"my app",
+		"hello/world",
+		"--data", `{"message":"hi"}`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/invoke", gotPath)
+	require.Equal(t, map[string]any{
+		"data": map[string]any{"message": "hi"},
+	}, gotBody)
+}
+
+func TestCommandFlagOverridesPositionalPathParam(t *testing.T) {
+	var gotPath string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"get-function-trace",
+		"positional-id",
+		"--run-id", "flag-id",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "/api/v2/runs/flag-id/trace", gotPath)
+}
+
+func TestCommandMissingPathParamReportsBothInputs(t *testing.T) {
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "http://localhost:1",
+		"get-function-trace",
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "missing required --run-id or positional argument <run-id>")
+}
+
+func TestCommandRejectsExtraPositionalArgs(t *testing.T) {
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "http://localhost:1",
+		"get-function-trace",
+		"01J00000000000000000000000",
+		"extra-junk",
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unexpected positional argument(s): extra-junk")
 }
 
 func TestCommandUsesAPIPortForAPIHost(t *testing.T) {
