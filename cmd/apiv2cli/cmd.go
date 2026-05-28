@@ -74,8 +74,9 @@ func endpointCommands() []*cli.Command {
 		cmds = append(cmds, &cli.Command{
 			Name:      ep.name,
 			Usage:     fmt.Sprintf("%s %s", ep.method, ep.path),
-			UsageText: fmt.Sprintf("inngest alpha api [target/auth flags] %s [endpoint flags]", ep.name),
+			UsageText: endpointUsageText(ep),
 			Flags:     endpointFlags(ep),
+			Arguments: endpointArguments(ep),
 			Action: func(ctx context.Context, cmd *cli.Command) error {
 				return callEndpoint(ctx, cmd, ep)
 			},
@@ -138,6 +139,29 @@ func commonFlags() []cli.Flag {
 			Usage:    "Print the response body without JSON formatting",
 		},
 	}
+}
+
+func endpointUsageText(ep endpoint) string {
+	var positional strings.Builder
+	for _, name := range ep.pathParams {
+		fmt.Fprintf(&positional, " [<%s>]", kebab(name))
+	}
+	return fmt.Sprintf("inngest alpha api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
+}
+
+func endpointArguments(ep endpoint) []cli.Argument {
+	if len(ep.pathParams) == 0 {
+		return nil
+	}
+	args := make([]cli.Argument, 0, len(ep.pathParams))
+	for _, name := range ep.pathParams {
+		flagName := kebab(name)
+		args = append(args, &cli.StringArg{
+			Name:      flagName,
+			UsageText: fmt.Sprintf("[<%s>]", flagName),
+		})
+	}
+	return args
 }
 
 func endpointFlags(ep endpoint) []cli.Flag {
@@ -270,6 +294,10 @@ func methodAndPath(rule *annotations.HttpRule) (string, string) {
 }
 
 func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
+	if extras := cmd.Args().Slice(); len(extras) > 0 {
+		return fmt.Errorf("unexpected positional argument(s): %s", strings.Join(extras, " "))
+	}
+
 	req, err := buildRequest(ctx, cmd, ep)
 	if err != nil {
 		return err
@@ -494,22 +522,15 @@ func resolvePath(cmd *cli.Command, ep endpoint) (string, error) {
 	return path, nil
 }
 
-func pathParamValue(cmd *cli.Command, ep endpoint, name string) (string, bool) {
+func pathParamValue(cmd *cli.Command, _ endpoint, name string) (string, bool) {
 	flagName := kebab(name)
 	if cmd.IsSet(flagName) && cmd.String(flagName) != "" {
 		return cmd.String(flagName), true
 	}
-
-	index := slices.Index(ep.pathParams, name)
-	if index < 0 || cmd.Args().Len() <= index {
-		return "", false
+	if value := cmd.StringArg(flagName); value != "" {
+		return value, true
 	}
-
-	value := cmd.Args().Get(index)
-	if value == "" {
-		return "", false
-	}
-	return value, true
+	return "", false
 }
 
 func queryParams(cmd *cli.Command, ep endpoint) (url.Values, error) {

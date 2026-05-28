@@ -179,6 +179,64 @@ func TestCommandAcceptsMultiplePositionalPathParams(t *testing.T) {
 	}, gotBody)
 }
 
+func TestCommandFlagOverridesPositionalPathParam(t *testing.T) {
+	var gotPath string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"get-function-trace",
+		"positional-id",
+		"--run-id", "flag-id",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "/api/v2/runs/flag-id/trace", gotPath)
+}
+
+func TestCommandMissingPathParamReportsBothInputs(t *testing.T) {
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "http://localhost:1",
+		"get-function-trace",
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "missing required --run-id or positional argument <run-id>")
+}
+
+func TestCommandRejectsExtraPositionalArgs(t *testing.T) {
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "http://localhost:1",
+		"get-function-trace",
+		"01J00000000000000000000000",
+		"extra-junk",
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unexpected positional argument(s): extra-junk")
+}
+
 func TestCommandUsesAPIPortForAPIHost(t *testing.T) {
 	var gotPath string
 
