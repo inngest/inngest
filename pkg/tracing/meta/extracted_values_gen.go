@@ -34,11 +34,13 @@ type ExtractedValues struct {
 	RunID *ulid.ULID
 	ReplayOriginalRunID *ulid.ULID
 	RunScheduleType *enums.ScheduleType
+	RunType *enums.RunType
 	SkipReason *enums.SkipReason
 	SkipExistingRunID *string
 	IsDurableEndpointRun *bool
 	DurableEndpointModeChangedAt *time.Time
 	DeferChildRunID *ulid.ULID
+	DeferParentRunIDs *[]string
 	DeferFnSlug *string
 	DeferHashedID *string
 	DeferStatus *enums.DeferStatus

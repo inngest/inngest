@@ -291,6 +291,20 @@ func StringSliceAttr(key string) attr[*[]string] {
 			if slice, ok := v.([]string); ok {
 				return &slice, true
 			}
+			// JSON-decoded fragment attributes arrive as []any. Coerce when
+			// every element is a string so persisted spans round-trip
+			// correctly through mapSpanFromRow.
+			if raw, ok := v.([]any); ok {
+				slice := make([]string, 0, len(raw))
+				for _, item := range raw {
+					s, ok := item.(string)
+					if !ok {
+						return nil, false
+					}
+					slice = append(slice, s)
+				}
+				return &slice, true
+			}
 
 			return nil, false
 		},

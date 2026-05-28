@@ -5,14 +5,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 )
 
 type DeferredScheduleMetadata struct {
-	FnSlug       string `json:"fn_slug"`
-	ParentFnSlug string `json:"parent_fn_slug"`
-	ParentRunID  string `json:"parent_run_id"`
-	HashedDeferID string `json:"hashed_defer_id"`
+	FnSlug            string `json:"fn_slug"`
+	ParentFnSlug      string `json:"parent_fn_slug"`
+	ParentRunID       string `json:"parent_run_id"`
+	ParentFunctionID  string `json:"parent_function_id"`
+	HashedDeferID     string `json:"hashed_defer_id"`
 }
 
 func (m *DeferredScheduleMetadata) Validate() error {
@@ -25,6 +27,17 @@ func (m *DeferredScheduleMetadata) Validate() error {
 	}
 	if m.ParentRunID == "" {
 		errs = append(errs, errors.New("parent_run_id is required"))
+	}
+	if m.ParentFunctionID == "" {
+		errs = append(errs, errors.New("parent_function_id is required"))
+	} else if parsed, err := uuid.Parse(m.ParentFunctionID); err != nil {
+		errs = append(errs, fmt.Errorf("parent_function_id is invalid: %w", err))
+	} else if parsed == uuid.Nil {
+		// uuid.Parse accepts the zero string; reject it explicitly so a
+		// zero-value FunctionID can't slip through and stamp uuid.Nil onto
+		// the persisted span (where it would disappear from per-function
+		// indexes).
+		errs = append(errs, errors.New("parent_function_id must not be the zero uuid"))
 	}
 	if m.HashedDeferID == "" {
 		errs = append(errs, errors.New("hashed_defer_id is required"))

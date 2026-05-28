@@ -59,7 +59,12 @@ func loadByRunID[V any](
 	}
 
 	for _, p := range parsedKeys {
-		results[p.index] = &dataloader.Result{Data: byRunID[p.runID]}
+		v, ok := byRunID[p.runID]
+		if !ok {
+			results[p.index] = &dataloader.Result{Data: nil}
+			continue
+		}
+		results[p.index] = &dataloader.Result{Data: v}
 	}
 	return results
 }

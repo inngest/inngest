@@ -1309,6 +1309,21 @@ func (e *executor) schedule(
 	if req.ScheduleType != enums.ScheduleTypeUnknown {
 		scheduleTypePtr = &req.ScheduleType
 	}
+
+	// Parse deferred-schedule metadata once; it's the single source of truth for
+	// whether this run is a deferred child and which parent run(s) scheduled it.
+	// It's reused below to stamp the root span and to record the defer linkage.
+	deferMetadata := deferredScheduleMetadata(req.Events, l)
+	runType := enums.RunTypePrimary
+	var parentRunIDs []string
+	if len(deferMetadata) > 0 {
+		runType = enums.RunTypeDefer
+		parentRunIDs = make([]string, 0, len(deferMetadata))
+		for _, m := range deferMetadata {
+			parentRunIDs = append(parentRunIDs, m.ParentRunID)
+		}
+	}
+
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1320,8 +1335,12 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
 			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
+			meta.Attr(meta.Attrs.RunType, &runType),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
+	}
+	if len(parentRunIDs) > 0 {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentRunIDs, &parentRunIDs)
 	}
 	if req.RunMode == enums.RunModeSync {
 		// XXX: If this is a sync run, always add the start time to the span. We do this
@@ -1467,14 +1486,15 @@ func (e *executor) schedule(
 	// onto the invoking function's invoke span so the in-progress trace shows it.
 	e.updateInvokeSpanWithInvokedRunID(ctx, l, req.Events, metadata.ID.RunID)
 
-	// If this run was scheduled by a parent's `defer`, record the child run ID
-	// onto the parent's defer linkage so both runs can find each other.
-	e.recordDeferChildRun(ctx, l, req.Events, metadata)
-
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
 	if req.RunMode == enums.RunModeSync {
+		// Record the parent-side defer linkage only on the success path. The
+		// emit uses non-droppable CreateSpan, so firing before this gate would
+		// orphan a Scheduled defer pointing at a child whose droppable
+		// executor.run span never gets sent.
+		e.recordDeferChildRun(ctx, l, deferMetadata, metadata)
 		sendSpans()
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
@@ -1489,9 +1509,14 @@ func (e *executor) schedule(
 	case nil:
 		// no-op
 	case queue.ErrQueueItemExists:
-		// If the item already exists in the queue, we can safely ignore this
-		// entire schedule request; it's basically a retry and we should not
-		// persist this for the user.
+		// The original Schedule call already succeeded the Enqueue; if it
+		// crashed before reaching recordDeferChildRun below, the parent's
+		// defer.child_run_id span never landed and the linkage is permanently
+		// lost. Re-emit it here on retry — the span dedupes downstream by
+		// (parent run, hashed defer ID), so a duplicate write is harmless.
+		// Run/discovery spans intentionally do NOT flush: we still want to
+		// drop this retry's copy of those so we don't persist it for the user.
+		e.recordDeferChildRun(ctx, l, deferMetadata, metadata)
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
 	case queue.ErrQueueItemSingletonExists:
@@ -1505,6 +1530,12 @@ func (e *executor) schedule(
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
+	// Record the parent-side defer linkage only on the success path. The emit
+	// uses non-droppable CreateSpan, so firing before the Enqueue success gate
+	// would orphan a Scheduled defer pointing at a child whose droppable
+	// executor.run span never gets sent (ErrQueueItemExists /
+	// ErrQueueItemSingletonExists return before sendSpans).
+	e.recordDeferChildRun(ctx, l, deferMetadata, metadata)
 	sendSpans()
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
@@ -1568,6 +1599,43 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 	}
 }
 
+// deferredScheduleMetadata parses the deferred-schedule metadata for a run's
+// triggering events. It returns nil when the run was not scheduled by a
+// parent's `defer` (i.e. the triggering event isn't a deferred.schedule event).
+// Otherwise it parses every event's metadata, skipping (with a debug log) any
+// that fail to decode or whose parent run/function identifiers are malformed,
+// and returns the parsed slice. This is the single source of truth for "is
+// this run deferred, and from which parents?" — only fully-valid metadata
+// flows downstream, so the run span attrs and recordDeferChildRun can trust
+// every entry.
+func deferredScheduleMetadata(events []event.TrackedEvent, l logger.Logger) []*event.DeferredScheduleMetadata {
+	// At most one deferred.schedule event today; a batch is handled defensively.
+	if len(events) == 0 || events[0].GetEvent().Name != consts.FnDeferScheduleName {
+		return nil
+	}
+	parsed := make([]*event.DeferredScheduleMetadata, 0, len(events))
+	for _, trackedEvent := range events {
+		evt := trackedEvent.GetEvent()
+		m, err := evt.DeferredScheduleMetadata()
+		if err != nil {
+			l.Debug("deferred schedule event missing metadata; skipping defer linkage", "event_id", evt.ID, "error", err)
+			continue
+		}
+		if _, err := ulid.Parse(m.ParentRunID); err != nil {
+			l.Debug("deferred schedule event has unparseable parent run id; skipping defer linkage", "event_id", evt.ID, "parent_run_id", m.ParentRunID, "error", err)
+			continue
+		}
+		// ParentFunctionID is intentionally NOT required here. During a rolling
+		// deploy an old binary may emit deferred.schedule events without the
+		// parent_function_id field; dropping the metadata entirely would also
+		// drop the child-side breadcrumb (runType + defer.parent_run_ids on
+		// the child's executor.run span). recordDeferChildRun parses it
+		// defensively and skips just the parent-side write when invalid.
+		parsed = append(parsed, m)
+	}
+	return parsed
+}
+
 // recordDeferChildRun records this run's ID onto its parent's defer linkage when
 // the run was scheduled by a parent's `defer`. It emits a dedicated
 // executor.defer span on the parent run carrying defer.child_run_id;
@@ -1578,27 +1646,28 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 // TODO: we should probably use the event data to pass the information we're using to create the
 // target span, so that we're able to keep the logic of what we're sending there. implementation detaily here
 // TODO: since the pattern is similar to the invoke method, make the name more similar.
-func (e *executor) recordDeferChildRun(ctx context.Context, l logger.Logger, events []event.TrackedEvent, childMD sv2.Metadata) {
-	// At most one deferred.schedule event today; a batch is handled defensively.
-	if len(events) == 0 || events[0].GetEvent().Name != consts.FnDeferScheduleName {
-		return
-	}
-	for _, trackedEvent := range events {
-		evt := trackedEvent.GetEvent()
-		m, err := evt.DeferredScheduleMetadata()
-		if err != nil {
-			l.Debug("deferred schedule event missing metadata; skipping defer linkage", "event_id", evt.ID, "error", err)
-			continue
-		}
+func (e *executor) recordDeferChildRun(ctx context.Context, l logger.Logger, parsed []*event.DeferredScheduleMetadata, childMD sv2.Metadata) {
+	for _, m := range parsed {
+		// Both identifiers were validated by deferredScheduleMetadata; the
+		// re-parse here is defensive — if validation invariants are ever
+		// violated we log and skip rather than stamp zero values onto the span.
 		parentRunID, err := ulid.Parse(m.ParentRunID)
 		if err != nil {
-			l.Debug("deferred schedule event has unparseable parent run id; skipping defer linkage", "event_id", evt.ID, "parent_run_id", m.ParentRunID, "error", err)
+			l.Debug("deferred schedule metadata parent run id failed defensive re-parse; skipping defer linkage", "parent_run_id", m.ParentRunID, "error", err)
+			continue
+		}
+		parentFunctionID, err := uuid.Parse(m.ParentFunctionID)
+		if err != nil {
+			l.Debug("deferred schedule metadata parent function id failed defensive re-parse; skipping defer linkage", "parent_function_id", m.ParentFunctionID, "error", err)
 			continue
 		}
 		// The span is attributed to the PARENT run so GetRunDefers(parent) finds
 		// it. A deferred child shares its parent's tenant (defers schedule within
-		// the same env/account), so reuse the child's tenant for storage.
-		parentMD := sv2.Metadata{ID: sv2.ID{RunID: parentRunID, Tenant: childMD.ID.Tenant}}
+		// the same env/account), so reuse the child's tenant for storage. Setting
+		// the real parent FunctionID ensures the OTEL processor's tenant-attr
+		// writer stamps a usable function_id on the linkage span (per-function
+		// span queries would otherwise miss it).
+		parentMD := sv2.Metadata{ID: sv2.ID{RunID: parentRunID, FunctionID: parentFunctionID, Tenant: childMD.ID.Tenant}}
 		sv2.InitConfig(&parentMD.Config)
 		defers.EmitChildRunIDSpan(ctx, e.tracerProvider, parentMD, e.now(), m.HashedDeferID, childMD.ID.RunID)
 	}

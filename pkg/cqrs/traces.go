@@ -372,6 +372,7 @@ type TraceRun struct {
 	HasAI        bool            `json:"has_ai"`
 	BatchID      *ulid.ULID      `json:"batch_id,omitempty"`
 	CronSchedule *string         `json:"cron_schedule,omitempty"`
+	RunType      enums.RunType   `json:"run_type"`
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
 }

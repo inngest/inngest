@@ -334,6 +334,22 @@ func TestGetRunInvokedFrom_ReadsParentInvokeStepSpan(t *testing.T) {
 // link for deferred runs: it lives on the PARENT and records defer.child_run_id.
 // GetRunDeferredFrom queries those spans by child run ID. If this fails, a
 // deferred child can't render its parent breadcrumb.
+// childRunDeferParentsAttrs mirrors the executor.run-span attributes a deferred
+// child carries: defer.parent_run_ids names every parent that scheduled it.
+func childRunDeferParentsAttrs(t *testing.T, parentRunIDs ...ulid.ULID) []byte {
+	t.Helper()
+	parents := make([]string, len(parentRunIDs))
+	for i, id := range parentRunIDs {
+		parents[i] = id.String()
+	}
+	byt, err := json.Marshal(map[string]any{
+		meta.Attrs.RunType.Key():           enums.RunTypeDefer.String(),
+		meta.Attrs.DeferParentRunIDs.Key(): parents,
+	})
+	require.NoError(t, err)
+	return byt
+}
+
 func TestGetRunDeferredFrom_ReadsChildRunIDDeferSpan(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -352,16 +368,17 @@ func TestGetRunDeferredFrom_ReadsChildRunIDDeferSpan(t *testing.T) {
 	insertChildTraceRun(t, cm, parentRunID, accountID, workspaceID, appID, fnID)
 	insertChildTraceRun(t, cm, childRunID, accountID, workspaceID, appID, fnID)
 
-	// The linkage span lives on the PARENT run, not the child.
+	// The breadcrumb lives on the CHILD's own executor.run span via
+	// defer.parent_run_ids — no parent-side span is needed.
 	insertTestSpan(t, cm, testSpanFields{
-		RunID:         parentRunID.String(),
-		DynamicSpanID: "dyn-defer-child",
-		Name:          meta.SpanNameDefer,
+		RunID:         childRunID.String(),
+		DynamicSpanID: "dyn-child-run",
+		Name:          meta.SpanNameRun,
 		AccountID:     accountID.String(),
 		AppID:         appID.String(),
 		FunctionID:    fnID.String(),
 		EnvID:         workspaceID.String(),
-		Attributes:    childRunIDDeferSpanAttrs(t, "hash-aaa", childRunID),
+		Attributes:    childRunDeferParentsAttrs(t, parentRunID),
 	})
 
 	got, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{childRunID})
@@ -400,18 +417,18 @@ func TestGetRunDeferredFrom_MultipleParents(t *testing.T) {
 	insertChildTraceRun(t, cm, parentA, accountID, workspaceID, appID, fnID)
 	insertChildTraceRun(t, cm, parentB, accountID, workspaceID, appID, fnID)
 
-	for i, parent := range []ulid.ULID{parentA, parentB} {
-		insertTestSpan(t, cm, testSpanFields{
-			RunID:         parent.String(),
-			DynamicSpanID: fmt.Sprintf("dyn-defer-child-%d", i),
-			Name:          meta.SpanNameDefer,
-			AccountID:     accountID.String(),
-			AppID:         appID.String(),
-			FunctionID:    fnID.String(),
-			EnvID:         workspaceID.String(),
-			Attributes:    childRunIDDeferSpanAttrs(t, fmt.Sprintf("hash-%d", i), childRunID),
-		})
-	}
+	// The child's executor.run span lists every scheduling parent in one
+	// defer.parent_run_ids attribute.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         childRunID.String(),
+		DynamicSpanID: "dyn-child-run",
+		Name:          meta.SpanNameRun,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    fnID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    childRunDeferParentsAttrs(t, parentA, parentB),
+	})
 
 	got, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{childRunID})
 	require.NoError(t, err)

@@ -179,45 +179,48 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 		return map[ulid.ULID][]*cqrs.RunDeferredFrom{}, nil
 	}
 
-	strIDs := make([]string, len(runIDs))
-	for i, id := range runIDs {
-		strIDs[i] = id.String()
-	}
-
-	// The parent->child linkage lives on the PARENT's child-run-id
-	// executor.defer span (defer.child_run_id), so the reverse link queries
-	// those spans by child run ID.
-	rows, err := w.queryDeferredFromSpans(ctx, strIDs)
+	// Parents are now recorded on the CHILD's own executor.run span via the
+	// defer.parent_run_ids attribute, so an indexed lookup by run_id finds the
+	// breadcrumb in one shot rather than scanning every parent's defer spans.
+	spansByChild, err := w.GetSpansByRunIDsAndName(ctx, runIDs, meta.SpanNameRun)
 	if err != nil {
-		return nil, fmt.Errorf("error loading deferred-from spans: %w", err)
+		return nil, fmt.Errorf("error loading executor.run spans: %w", err)
 	}
 
 	out := make(map[ulid.ULID][]*cqrs.RunDeferredFrom)
-	// Collapse duplicate (child, parent) pairs in case a parent ends up with
-	// more than one child-run-id span pointing at the same child.
+	// Collapse duplicate (child, parent) pairs in case the attribute lists the
+	// same parent more than once (e.g. batched runs).
 	seen := make(map[ulid.ULID]map[ulid.ULID]struct{})
 	parentRunIDSet := make(map[ulid.ULID]struct{})
-	for _, row := range rows {
-		span, err := mapSpanFromRow(ctx, row, nil)
-		if err != nil {
-			return nil, err
-		}
-		if span.Attributes.DeferChildRunID == nil {
-			continue
-		}
-		childRunID := *span.Attributes.DeferChildRunID
-		parentRunID := span.RunID
+	for childRunID, spans := range spansByChild {
+		for _, span := range spans {
+			if span.Attributes.DeferParentRunIDs == nil {
+				continue
+			}
+			for _, parentStr := range *span.Attributes.DeferParentRunIDs {
+				parentRunID, err := ulid.Parse(parentStr)
+				if err != nil {
+					logger.StdlibLogger(ctx).Warn(
+						"skipping unparseable defer parent run ID",
+						"child_run_id", childRunID.String(),
+						"parent_run_id", parentStr,
+						"error", err,
+					)
+					continue
+				}
 
-		if seen[childRunID] == nil {
-			seen[childRunID] = make(map[ulid.ULID]struct{})
-		}
-		if _, dup := seen[childRunID][parentRunID]; dup {
-			continue
-		}
-		seen[childRunID][parentRunID] = struct{}{}
+				if seen[childRunID] == nil {
+					seen[childRunID] = make(map[ulid.ULID]struct{})
+				}
+				if _, dup := seen[childRunID][parentRunID]; dup {
+					continue
+				}
+				seen[childRunID][parentRunID] = struct{}{}
 
-		out[childRunID] = append(out[childRunID], &cqrs.RunDeferredFrom{ParentRunID: parentRunID})
-		parentRunIDSet[parentRunID] = struct{}{}
+				out[childRunID] = append(out[childRunID], &cqrs.RunDeferredFrom{ParentRunID: parentRunID})
+				parentRunIDSet[parentRunID] = struct{}{}
+			}
+		}
 	}
 
 	if len(parentRunIDSet) > 0 {
@@ -326,13 +329,6 @@ var _ normalizedSpan = (*linkageSpanRow)(nil)
 // UpdateSpan), so it matches step.invoke.run.id on name = 'EXTEND'.
 func (w wrapper) queryInvokedFromSpans(ctx context.Context, childRunIDs []string) ([]*linkageSpanRow, error) {
 	return w.queryLinkageSpansByAttr(ctx, meta.SpanNameDynamicExtension, meta.Attrs.StepInvokeRunID.Key(), childRunIDs)
-}
-
-// queryDeferredFromSpans finds, for each child run ID, the parent's defer
-// linkage: the child run ID lives on a child-run-id executor.defer span
-// (defer.child_run_id), so it matches that attribute on name = 'executor.defer'.
-func (w wrapper) queryDeferredFromSpans(ctx context.Context, childRunIDs []string) ([]*linkageSpanRow, error) {
-	return w.queryLinkageSpansByAttr(ctx, meta.SpanNameDefer, meta.Attrs.DeferChildRunID.Key(), childRunIDs)
 }
 
 // queryLinkageSpansByAttr returns the spans whose dynamic_span_id matches a span

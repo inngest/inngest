@@ -33,6 +33,7 @@ var Attrs = struct {
 	RunID               attr[*ulid.ULID]
 	ReplayOriginalRunID attr[*ulid.ULID]
 	RunScheduleType     attr[*enums.ScheduleType]
+	RunType             attr[*enums.RunType]
 	SkipReason          attr[*enums.SkipReason]
 	SkipExistingRunID   attr[*string]
 
@@ -41,11 +42,12 @@ var Attrs = struct {
 	DurableEndpointModeChangedAt attr[*time.Time]
 
 	// Defer attributes
-	DeferChildRunID attr[*ulid.ULID]
-	DeferFnSlug     attr[*string]
-	DeferHashedID   attr[*string]
-	DeferStatus     attr[*enums.DeferStatus]
-	DeferUserID     attr[*string]
+	DeferChildRunID   attr[*ulid.ULID]
+	DeferParentRunIDs attr[*[]string]
+	DeferFnSlug       attr[*string]
+	DeferHashedID     attr[*string]
+	DeferStatus       attr[*enums.DeferStatus]
+	DeferUserID       attr[*string]
 
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
@@ -175,6 +177,7 @@ var Attrs = struct {
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
 	DeferChildRunID:                    ULIDAttr("defer.child_run_id"),
+	DeferParentRunIDs:                  StringSliceAttr("defer.parent_run_ids"),
 	DeferFnSlug:                        StringAttr("defer.fn_slug"),
 	DeferHashedID:                      StringAttr("defer.hashed_id"),
 	DeferStatus:                        TextAttr[enums.DeferStatus]("defer.status"),
@@ -205,6 +208,7 @@ var Attrs = struct {
 	RunID:                              ULIDAttr("run.id"),
 	ReplayOriginalRunID:                ULIDAttr("run.replay_original_run_id"),
 	RunScheduleType:                    TextAttr[enums.ScheduleType]("run.schedule_type"),
+	RunType:                            TextAttr[enums.RunType]("run.type"),
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
 	StartedAt:                          TimeAttr("started_at"),

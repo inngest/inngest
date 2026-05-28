@@ -249,10 +249,11 @@ func (e *executor) buildDeferEvents(
 		}
 
 		evtMeta := event.DeferredScheduleMetadata{
-			FnSlug:        d.FnSlug,
-			ParentFnSlug:  fnSlug,
-			ParentRunID:   opts.Metadata.ID.RunID.String(),
-			HashedDeferID: d.HashedID,
+			FnSlug:           d.FnSlug,
+			ParentFnSlug:     fnSlug,
+			ParentRunID:      opts.Metadata.ID.RunID.String(),
+			ParentFunctionID: opts.Metadata.ID.FunctionID.String(),
+			HashedDeferID:    d.HashedID,
 		}
 		if err := evtMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(
