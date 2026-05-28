@@ -25,13 +25,13 @@ export default function Layout({
     <div className="bg-canvasSubtle flex h-screen w-full flex-col overflow-hidden">
       <TopBar activeEnv={activeEnv} profile={profile} />
 
-      <div
-        id="layout-scroll-container"
-        className="border-subtle bg-canvasBase mx-3 flex flex-1 flex-row overflow-hidden rounded border"
-      >
+      <div className="border-subtle bg-canvasBase mx-3 flex flex-1 flex-row overflow-hidden rounded border">
         <SideBar activeEnv={activeEnv} collapsed={collapsed} />
 
-        <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto overflow-x-scroll">
+        <div
+          id="layout-scroll-container"
+          className="no-scrollbar flex flex-1 flex-col overflow-auto"
+        >
           <IncidentBanner />
 
           <ActiveBanners />

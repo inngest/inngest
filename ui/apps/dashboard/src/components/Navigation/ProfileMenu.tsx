@@ -25,10 +25,10 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
   return (
     <Listbox>
-      <Listbox.Button className="w-full cursor-pointer ring-0">
-        {children}
-      </Listbox.Button>
       <div className="relative">
+        <Listbox.Button className="cursor-pointer ring-0">
+          {children}
+        </Listbox.Button>
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute right-0 top-full z-50 mt-2 w-[220px] rounded border ring-0 focus:outline-none">
           <Listbox.Option
             disabled
