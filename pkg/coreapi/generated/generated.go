@@ -4243,6 +4243,7 @@ type RunDefer {
 enum RunDeferStatus {
   SCHEDULED
   ABORTED
+  REJECTED
 }
 
 enum RunType {

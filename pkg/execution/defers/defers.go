@@ -57,10 +57,13 @@ func SaveFromOp(
 	if err != nil {
 		if errors.Is(err, state.ErrDeferInputTooLarge) {
 			rejectReason = "per_defer_size"
+		} else if errors.Is(err, state.ErrDeferInputInvalid) {
+			rejectReason = "invalid_input"
 		} else {
 			rejectReason = "invalid_opts"
 		}
-		if opts != nil && opts.FnSlug != "" {
+		if opts != nil {
+			fmt.Println("saving defer")
 			if err := rs.SaveDefer(ctx, md.ID, statev2.Defer{
 				FnSlug:         opts.FnSlug,
 				HashedID:       op.ID,

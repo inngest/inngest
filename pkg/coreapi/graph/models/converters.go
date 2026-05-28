@@ -182,6 +182,8 @@ func ToRunDeferStatus(s enums.DeferStatus) (RunDeferStatus, error) {
 		return RunDeferStatusScheduled, nil
 	case enums.DeferStatusAborted:
 		return RunDeferStatusAborted, nil
+	case enums.DeferStatusRejected:
+		return RunDeferStatusRejected, nil
 	default:
 		return "", fmt.Errorf("unsurfaceable defer status: %s", s)
 	}
