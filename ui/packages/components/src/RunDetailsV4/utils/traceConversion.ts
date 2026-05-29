@@ -124,13 +124,14 @@ function getTimingFromMetadata(
  */
 function getInngestBreakdown(
   trace: Trace,
-  runStartedAtMs: number | null
+  discoveryStartAtMs: number | null
 ): InngestBreakdownData | null {
   if (!trace.queuedAt) return null;
 
-  // Discovery: time from when the run started executing to when this step was queued
+  // Discovery: time from the previous completed sibling to when this step was queued.
   const stepQueuedAt = new Date(trace.queuedAt).getTime();
-  const discoveryMs = runStartedAtMs !== null ? Math.max(0, stepQueuedAt - runStartedAtMs) : 0;
+  const discoveryMs =
+    discoveryStartAtMs !== null ? Math.max(0, stepQueuedAt - discoveryStartAtMs) : 0;
 
   // Concurrency delay + system latency from metadata
   let queueDelayMs = 0;
@@ -148,6 +149,40 @@ function getInngestBreakdown(
   if (totalMs <= 0) return null;
 
   return { discoveryMs, queueDelayMs, systemLatencyMs, totalMs };
+}
+
+function tracesToBarData(
+  traces: Trace[] | undefined,
+  orgName?: string,
+  rootStatus?: string,
+  initialDiscoveryStartAtMs?: number | null,
+  functionSlug?: string
+): TimelineBarData[] | undefined {
+  if (!traces) return undefined;
+
+  let latestCompletedSiblingEndMs = initialDiscoveryStartAtMs ?? null;
+  const bars: TimelineBarData[] = [];
+  for (const trace of traces) {
+    const bar = traceToBarData(
+      trace,
+      orgName,
+      rootStatus,
+      latestCompletedSiblingEndMs,
+      functionSlug
+    );
+
+    if (bar.endTime) {
+      const endMs = bar.endTime.getTime();
+      latestCompletedSiblingEndMs =
+        latestCompletedSiblingEndMs === null
+          ? endMs
+          : Math.max(latestCompletedSiblingEndMs, endMs);
+    }
+
+    bars.push(bar);
+  }
+
+  return bars;
 }
 
 /**
@@ -180,7 +215,7 @@ function traceToBarData(
   trace: Trace,
   orgName?: string,
   rootStatus?: string,
-  runStartedAtMs?: number | null,
+  discoveryStartAtMs?: number | null,
   functionSlug?: string
 ): TimelineBarData {
   const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
@@ -205,8 +240,14 @@ function traceToBarData(
 
   // Per-step Inngest overhead breakdown (discovery + metadata timing)
   const inngestBreakdown = isStepRun
-    ? getInngestBreakdown(trace, runStartedAtMs ?? null) ?? undefined
+    ? getInngestBreakdown(trace, discoveryStartAtMs ?? null) ?? undefined
     : undefined;
+
+  const traceStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
+  const traceQueuedAtMs = trace.queuedAt ? new Date(trace.queuedAt).getTime() : null;
+  const childDiscoveryStartAtMs = trace.isRoot
+    ? (traceStartedAtMs ?? discoveryStartAtMs)
+    : (traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs);
 
   // Check if this step has experiment metadata
   const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
@@ -229,8 +270,12 @@ function traceToBarData(
     startTime: new Date(trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
-    children: trace.childrenSpans?.map((child) =>
-      traceToBarData(child, orgName, rootStatus, runStartedAtMs, functionSlug)
+    children: tracesToBarData(
+      trace.childrenSpans,
+      orgName,
+      rootStatus,
+      childDiscoveryStartAtMs,
+      functionSlug
     ),
     timingBreakdown,
     httpTimingBreakdown,
