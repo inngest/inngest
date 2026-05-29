@@ -37,7 +37,6 @@ func (m *mockQueueProcessor) Clock() clockwork.Clock                            
 func (m *mockQueueProcessor) Semaphore() util.TrackingSemaphore                   { return m.sem }
 func (m *mockQueueProcessor) Options() *QueueOptions                              { return m.opts }
 func (m *mockQueueProcessor) Workers() chan ProcessItem                           { return m.workers }
-func (m *mockQueueProcessor) SequentialLease() *ulid.ULID                         { return m.seqLease }
 func (m *mockQueueProcessor) ShadowPartitionWorkers() chan ShadowPartitionChanMsg { return m.shadowCh }
 func (m *mockQueueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
 }

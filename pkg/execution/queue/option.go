@@ -266,6 +266,13 @@ func WithRunMode(m QueueRunMode) QueueOpt {
 	}
 }
 
+func WithQueueRoles(roles ...QueueRole) QueueOpt {
+	return func(q *QueueOptions) {
+		q.rolesConfigured = true
+		q.roles = append([]QueueRole(nil), roles...)
+	}
+}
+
 // WithClock allows replacing the queue's default (real) clock by a mock, for testing.
 func WithClock(c clockwork.Clock) QueueOpt {
 	return func(q *QueueOptions) {
@@ -409,6 +416,9 @@ type QueueOptions struct {
 
 	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode
+
+	roles           []QueueRole
+	rolesConfigured bool
 
 	continuationLimit uint
 
@@ -773,5 +783,24 @@ func NewQueueOptions(
 	for _, qopt := range options {
 		qopt(o)
 	}
+
+	if !o.rolesConfigured {
+		o.roles = defaultQueueRoles(o)
+	}
 	return o
+}
+
+func defaultQueueRoles(o *QueueOptions) []QueueRole {
+	roles := []QueueRole{}
+	if o.runMode.Sequential {
+		roles = append(roles, NewSequentialRole())
+	}
+	if o.runMode.Scavenger {
+		roles = append(roles, NewScavengerRole())
+	}
+	roles = append(roles, NewInstrumentationRole(WithRoleRunInterval(o.instrumentInterval)))
+	if o.latencyPartition != nil {
+		roles = append(roles, NewLatencyTrackerRole(WithRoleRunInterval(o.latencyPartition.Interval)))
+	}
+	return roles
 }

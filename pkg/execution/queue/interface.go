@@ -130,7 +130,6 @@ type QueueProcessor interface {
 	Semaphore() util.TrackingSemaphore
 	Options() *QueueOptions
 	Workers() chan ProcessItem
-	SequentialLease() *ulid.ULID
 
 	ShadowPartitionWorkers() chan ShadowPartitionChanMsg
 	AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint)
