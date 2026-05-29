@@ -186,7 +186,7 @@ func createDeferSpan(
 		Seed:      tracing.DeferSpanSeed(md.ID.RunID, d.HashedID),
 		Attributes: meta.NewAttrSet(
 			meta.Attr(meta.Attrs.DeferHashedID, &d.HashedID),
-			meta.Attr(meta.Attrs.DeferUserID, &userlandID),
+			meta.Attr(meta.Attrs.DeferUserlandID, &userlandID),
 			meta.Attr(meta.Attrs.DeferFnSlug, &d.FnSlug),
 			meta.Attr(meta.Attrs.DeferStatus, &d.ScheduleStatus),
 		),

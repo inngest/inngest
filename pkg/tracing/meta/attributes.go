@@ -47,7 +47,7 @@ var Attrs = struct {
 	DeferParentFnSlug attr[*string]
 	DeferParentRunIDs attr[*[]string]
 	DeferStatus       attr[*enums.DeferStatus]
-	DeferUserID       attr[*string]
+	DeferUserlandID   attr[*string]
 
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
@@ -182,7 +182,7 @@ var Attrs = struct {
 	DeferParentFnSlug:                  StringAttr("defer.parent_fn_slug"),
 	DeferParentRunIDs:                  StringSliceAttr("defer.parent_run_ids"),
 	DeferStatus:                        TextAttr[enums.DeferStatus]("defer.status"),
-	DeferUserID:                        StringAttr("defer.user_id"),
+	DeferUserlandID:                    StringAttr("defer.userland_id"),
 	DropSpan:                           BoolAttr("executor.drop"),
 	DynamicTraceID:                     StringAttr("dynamic.trace.id"),
 	DynamicSpanID:                      StringAttr("dynamic.span.id"),
