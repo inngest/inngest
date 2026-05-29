@@ -518,7 +518,7 @@ type FunctionRunV2Edge {
 
 type RunDefer {
   hashedDeferID: String!
-  deferID: String!
+  userlandDeferID: String!
   fnSlug: String!
 
   # Status of the defer itself (not the run).

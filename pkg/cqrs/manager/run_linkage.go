@@ -49,7 +49,7 @@ func (w wrapper) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid
 				RunID: s.Attributes.DeferChildRunID,
 			}
 			if s.Attributes.DeferUserID != nil {
-				rd.UserDeferID = *s.Attributes.DeferUserID
+				rd.UserlandDeferID = *s.Attributes.DeferUserID
 			}
 			if s.Attributes.DeferFnSlug != nil {
 				rd.FnSlug = *s.Attributes.DeferFnSlug

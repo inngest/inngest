@@ -1,17 +1,14 @@
 import { useMemo } from 'react';
-import { type PillKind } from '@inngest/components/Pill';
+import { Pill } from '@inngest/components/Pill';
 import { IDCell, PillCell, TextCell, TimeCell } from '@inngest/components/Table';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';
 import type { Run, ViewScope } from './types';
-
-const runTypePill = {
-  primary: { kind: 'primary' as PillKind, label: 'Primary', type: 'PRIMARY' as const },
-  deferred: { kind: 'info' as PillKind, label: 'Deferred', type: 'DEFER' as const },
-};
 
 const columnHelper = createColumnHelper<Run>();
 
@@ -22,7 +19,6 @@ const columnsIDs = [
   'function',
   'id',
   'queuedAt',
-  'isDeferred',
   'startedAt',
   'status',
   'trigger',
@@ -55,10 +51,16 @@ const columns = [
   columnHelper.accessor('id', {
     cell: (info) => {
       const id = info.getValue();
+      const { isDeferred } = info.row.original;
 
       return (
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <IDCell>{id}</IDCell>
+          {isDeferred && (
+            <Pill appearance="outlined" kind="default">
+              Defer
+            </Pill>
+          )}
         </div>
       );
     },
@@ -101,25 +103,31 @@ const columns = [
     cell: (info) => {
       const data = info.row.original;
       const fnName = info.getValue().name;
+      const { isDeferred } = data;
 
-      if (data.hasAI) {
-        return <AICell>{fnName}</AICell>;
-      }
+      const parentFunction = data.deferredFrom?.[0]?.function;
+      const parentLabel =
+        parentFunction?.name || parentFunction?.slug || 'Parent function unavailable';
 
-      const parentName = data.deferredFrom?.[0]?.function.name;
-      if (parentName) {
-        return (
-          <div className="text-nowrap flex items-center gap-1">
-            <span className="text-muted text-sm font-medium">{parentName}</span>
-            <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
-            <TextCell>{fnName}</TextCell>
-          </div>
-        );
-      }
+      const nameCell = data.hasAI ? (
+        <AICell>{fnName}</AICell>
+      ) : (
+        <TextCell className="min-w-0">{fnName}</TextCell>
+      );
 
       return (
-        <div className="text-nowrap flex items-center">
-          <TextCell>{fnName}</TextCell>
+        <div className="flex max-w-md items-center gap-1">
+          {isDeferred && (
+            <>
+              <OptionalTooltip tooltip={parentLabel}>
+                <span className="inline-flex">
+                  <FunctionsIcon className="text-muted h-4 w-4 shrink-0" />
+                </span>
+              </OptionalTooltip>
+              <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
+            </>
+          )}
+          {nameCell}
         </div>
       );
     },
@@ -127,26 +135,10 @@ const columns = [
     enableSorting: false,
     id: ensureColumnID('function'),
   }),
-  columnHelper.accessor('isDeferred', {
-    cell: (info) => {
-      const pill = info.getValue() ? runTypePill.deferred : runTypePill.primary;
-
-      return (
-        <div className="flex items-center">
-          <PillCell type={pill.type} kind={pill.kind} className="bg-transparent">
-            {pill.label}
-          </PillCell>
-        </div>
-      );
-    },
-    header: 'Type',
-    enableSorting: false,
-    id: ensureColumnID('isDeferred'),
-  }),
   columnHelper.accessor('app', {
     cell: (info) => {
       return (
-        <div className="text-nowrap flex items-center">
+        <div className="flex items-center text-nowrap">
           <TextCell>{info.getValue().externalID}</TextCell>
         </div>
       );
@@ -215,18 +207,15 @@ const columns = [
  * single function's runs then we shouldn't show the app or function columns
  * since every row will have the same values
  */
-export function useScopedColumns(scope: ViewScope, showRunType: boolean) {
+export function useScopedColumns(scope: ViewScope) {
   return useMemo(() => {
     return columns.filter((column) => {
       if ('accessorKey' in column) {
-        if (!showRunType && column.accessorKey === 'isDeferred') {
-          return false;
-        }
         if (scope === 'fn') {
           return column.accessorKey !== 'app' && column.accessorKey !== 'function';
         }
       }
       return true;
     });
-  }, [scope, showRunType]);
+  }, [scope]);
 }

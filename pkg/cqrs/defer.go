@@ -10,11 +10,11 @@ import (
 // or when the defer was aborted before scheduling. The child function slug is
 // always populated; consumers resolve the child function lazily via the slug.
 type RunDefer struct {
-	// Hashed `UserDeferID`
+	// Hashed `RunDeferResolver`
 	HashedDeferID string
 
 	// Defer ID passed to `defer()` call in the Inngest function
-	UserDeferID string
+	UserlandDeferID string
 
 	// Deferred function slug
 	FnSlug string

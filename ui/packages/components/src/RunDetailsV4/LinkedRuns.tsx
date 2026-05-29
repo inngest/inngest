@@ -1,26 +1,27 @@
 import type { ReactNode } from 'react';
 
 import { Link } from '../Link';
-import type {
-  RunDeferSummary,
-  RunDeferredFromSummary,
-} from '../SharedContext/useGetRunLinkage';
+import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { IDCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
+import type { InvokedRun } from './runDetailsUtils';
 
 type Props = {
   defers?: RunDeferSummary[];
   siblingDefers?: RunDeferSummary[];
   deferredFrom?: RunDeferredFromSummary[];
+  invoked: InvokedRun[];
 };
 
-export const LinkedRuns = ({ defers, siblingDefers, deferredFrom = [] }: Props) => {
-  // TODO: Handle multiple deferredFrom instead of only using the first
+export const LinkedRuns = ({ defers, siblingDefers, deferredFrom, invoked }: Props) => {
+  const parents = deferredFrom ?? [];
+
   return (
     <div className="h-full overflow-y-auto">
-      {deferredFrom[0] && <ParentRunsSection deferredFrom={deferredFrom[0]} />}
+      {parents.length > 0 && <ParentRunsSection parents={parents} />}
       <DefersSection title="Parallel defers" defers={siblingDefers ?? []} />
+      <InvokedSection invoked={invoked} />
       <DefersSection title="Deferred runs" defers={defers ?? []} />
     </div>
   );
@@ -69,47 +70,39 @@ const SectionTable = ({
 
 const MutedDash = () => <span className="text-muted">-</span>;
 
-const ParentStatusCell = ({ status }: { status: string | undefined }) => (
-  <td className={tdClass}>{status ? <StatusCell status={status} /> : <MutedDash />}</td>
-);
-
-const ParentRunIDCell = ({ runID }: { runID: string | undefined }) => {
+const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) => {
   const { pathCreator } = usePathCreator();
   return (
-    <td className={tdClass}>
-      <Link href={pathCreator.runPopout({ runID: runID ?? "-" })}>
-        <IDCell>{runID}</IDCell>
-      </Link>
-    </td>
+    <SectionTable
+      title={parents.length > 1 ? 'Parent runs' : 'Parent run'}
+      columns={[{ header: 'Status', width: 'w-36' }, { header: 'Run ID' }, { header: 'Function' }]}
+    >
+      {parents.map((p) => (
+        <tr key={p.runID}>
+          <td className={tdClass}>
+            {p.run ? <StatusCell status={p.run.status} /> : <MutedDash />}
+          </td>
+          <td className={tdClass}>
+            <Link href={pathCreator.runPopout({ runID: p.runID })}>
+              <IDCell>{p.runID}</IDCell>
+            </Link>
+          </td>
+          <td className={tdClass}>
+            {p.function ? (
+              <Link href={pathCreator.function({ functionSlug: p.function.slug })}>
+                <PillCell type="FUNCTION">{p.function.name || p.function.slug}</PillCell>
+              </Link>
+            ) : (
+              <OptionalTooltip tooltip="Parent function unavailable">
+                <MutedDash />
+              </OptionalTooltip>
+            )}
+          </td>
+        </tr>
+      ))}
+    </SectionTable>
   );
 };
-
-const ParentFunctionCell = ({ name, slug }: { name: string; slug: string }) => {
-  const { pathCreator } = usePathCreator();
-  return (
-    <td className={tdClass}>
-      <Link href={pathCreator.function({ functionSlug: slug })}>
-        <PillCell type="FUNCTION">{name}</PillCell>
-      </Link>
-    </td>
-  );
-};
-
-const ParentRunsSection = ({ deferredFrom }: { deferredFrom: RunDeferredFromSummary }) => (
-  <SectionTable
-    title="Parent runs"
-    columns={[{ header: 'Status', width: 'w-36' }, { header: 'Run ID' }, { header: 'Function' }]}
-  >
-    <tr>
-      <ParentStatusCell status={deferredFrom.run?.status} />
-      <ParentRunIDCell runID={deferredFrom.run?.id} />
-      <ParentFunctionCell
-        name={deferredFrom.function.name}
-        slug={deferredFrom.function.slug}
-      />
-    </tr>
-  </SectionTable>
-);
 
 const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSummary[] }) => {
   const { pathCreator } = usePathCreator();
@@ -126,33 +119,78 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
         { header: 'Function' },
       ]}
     >
-      {defers.map((d) => (
-        <tr key={d.hashedDeferID}>
-          <td className={tdClass}>
-            <StatusCell status={d.run?.status ?? d.status} />
-          </td>
-          <td className={tdClass}>
-            <OptionalTooltip tooltip={d.deferID}>
-              <IDCell>{d.deferID}</IDCell>
-            </OptionalTooltip>
-          </td>
-          <td className={tdClass}>
-            {d.run ? (
-              <Link href={pathCreator.runPopout({ runID: d.run.id })}>
-                <IDCell>{d.run.id}</IDCell>
+      {defers.map((d) => {
+        const fnSlug = d.function?.slug || d.fnSlug;
+        const fnName = d.function?.name || d.fnSlug;
+        return (
+          <tr key={d.hashedDeferID}>
+            <td className={tdClass}>
+              <StatusCell status={d.run?.status ?? d.status} />
+            </td>
+            <td className={tdClass}>
+              <OptionalTooltip tooltip={d.userlandDeferID}>
+                <IDCell>{d.userlandDeferID}</IDCell>
+              </OptionalTooltip>
+            </td>
+            <td className={tdClass}>
+              {d.run ? (
+                <Link href={pathCreator.runPopout({ runID: d.run.id })}>
+                  <IDCell>{d.run.id}</IDCell>
+                </Link>
+              ) : (
+                <MutedDash />
+              )}
+            </td>
+            <td className={tdClass}>
+              <Link href={pathCreator.function({ functionSlug: fnSlug })}>
+                <PillCell type="FUNCTION">{fnName}</PillCell>
               </Link>
+            </td>
+          </tr>
+        );
+      })}
+    </SectionTable>
+  );
+};
+
+const InvokedSection = ({ invoked }: { invoked: InvokedRun[] }) => {
+  const { pathCreator } = usePathCreator();
+
+  if (invoked.length === 0) return null;
+
+  return (
+    <SectionTable
+      title="Invoked runs"
+      columns={[
+        { header: 'Status', width: 'w-32' },
+        { header: 'Step name' },
+        { header: 'Run ID' },
+        { header: 'Function' },
+      ]}
+    >
+      {invoked.map((i) => (
+        <tr key={i.spanID}>
+          <td className={tdClass}>
+            <StatusCell status={i.status} />
+          </td>
+          <td className={tdClass}>
+            {i.invokerName ? (
+              <OptionalTooltip tooltip={i.invokerName}>
+                <IDCell>{i.invokerName}</IDCell>
+              </OptionalTooltip>
             ) : (
               <MutedDash />
             )}
           </td>
           <td className={tdClass}>
-            {d.function ? (
-              <Link href={pathCreator.function({ functionSlug: d.function.slug })}>
-                <PillCell type="FUNCTION">{d.function.name}</PillCell>
-              </Link>
-            ) : (
-              <MutedDash />
-            )}
+            <Link href={pathCreator.runPopout({ runID: i.runID })}>
+              <IDCell>{i.runID}</IDCell>
+            </Link>
+          </td>
+          <td className={tdClass}>
+            <Link href={pathCreator.function({ functionSlug: i.functionID })}>
+              <PillCell type="FUNCTION">{i.functionID}</PillCell>
+            </Link>
           </td>
         </tr>
       ))}

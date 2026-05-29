@@ -296,7 +296,7 @@ export const RunDetailsV4 = ({
               standalone={standalone}
               result={resultData}
               isDurableEndpoint={runData?.isDurableEndpoint}
-              isDeferred={Boolean(linkageData?.deferredFrom)}
+              isDeferred={(linkageData?.deferredFrom?.length ?? 0) > 0}
             />
             {showError && (
               <ErrorCard
@@ -368,7 +368,7 @@ export const RunDetailsV4 = ({
               trace={runData?.trace as unknown as Trace | undefined}
               isDurableEndpoint={runData?.isDurableEndpoint}
               defers={linkageData?.defers}
-              siblingDefers={linkageData?.siblingDefers}
+              siblingDefers={linkageData?.siblingDefers ?? []}
               deferredFrom={linkageData?.deferredFrom}
             />
           )}

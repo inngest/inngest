@@ -46,11 +46,11 @@ func (r *functionRunV2Resolver) Defers(ctx context.Context, fn *models.FunctionR
 			return nil, fmt.Errorf("error converting defer status: %w", err)
 		}
 		out = append(out, &models.RunDefer{
-			HashedDeferID: d.HashedDeferID,
-			DeferID:       d.UserDeferID,
-			FnSlug:        d.FnSlug,
-			Status:        status,
-			RunID:         d.RunID,
+			HashedDeferID:   d.HashedDeferID,
+			UserlandDeferID: d.UserlandDeferID,
+			FnSlug:          d.FnSlug,
+			Status:          status,
+			RunID:           d.RunID,
 		})
 	}
 	return out, nil
@@ -91,11 +91,11 @@ func (r *functionRunV2Resolver) SiblingDefers(ctx context.Context, fn *models.Fu
 				return nil, fmt.Errorf("error converting defer status: %w", err)
 			}
 			out = append(out, &models.RunDefer{
-				HashedDeferID: d.HashedDeferID,
-				DeferID:       d.UserDeferID,
-				FnSlug:        d.FnSlug,
-				Status:        status,
-				RunID:         d.RunID,
+				HashedDeferID:   d.HashedDeferID,
+				UserlandDeferID: d.UserlandDeferID,
+				FnSlug:          d.FnSlug,
+				Status:          status,
+				RunID:           d.RunID,
 			})
 		}
 	}

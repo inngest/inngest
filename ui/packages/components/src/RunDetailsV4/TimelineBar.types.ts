@@ -333,7 +333,7 @@ export interface TimingBreakdownData {
  * Per-step-attempt breakdown combining metadata and timestamp-derived phases.
  */
 export interface InngestBreakdownData {
-  /** Discovery time: SDK executing user code until it discovers this step (previous step end → step.queuedAt) */
+  /** Discovery time: SDK executing user code until it discovers this step (run.startedAt → step.queuedAt) */
   discoveryMs: number;
 
   /** Sojourn delay from concurrency limits, throttle, or other constraints (from metadata) */

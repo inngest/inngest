@@ -9,9 +9,10 @@ export type GetRunLinkagePayload = {
 
 export type RunDeferSummary = {
   hashedDeferID: string;
-  deferID: string;
-  function: { name: string; slug: string } | null;
+  userlandDeferID: string;
+  fnSlug: string;
   status: string;
+  function: { name: string; slug: string } | null;
   run: {
     id: string;
     status: string;
@@ -19,7 +20,8 @@ export type RunDeferSummary = {
 };
 
 export type RunDeferredFromSummary = {
-  function: { name: string; slug: string };
+  runID: string;
+  function: { name: string; slug: string } | null;
   run: {
     id: string;
     status: string;
@@ -29,6 +31,7 @@ export type RunDeferredFromSummary = {
 export type GetRunLinkageData = {
   defers: RunDeferSummary[];
   siblingDefers: RunDeferSummary[];
+  // A batched child can descend from several parents, so this is a list.
   deferredFrom: RunDeferredFromSummary[];
 };
 

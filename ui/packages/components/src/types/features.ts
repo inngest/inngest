@@ -16,5 +16,5 @@ export type Features = {
    * Whether the data source surfaces deferred-run linkage (`isDeferred`,
    * `deferredFrom`).
    */
-  deferredRuns?: boolean;
+  isDeferred?: boolean;
 };

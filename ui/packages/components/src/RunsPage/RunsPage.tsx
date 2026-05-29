@@ -26,6 +26,7 @@ import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
+  useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
   useValidatedArraySearchParam,
@@ -41,7 +42,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'deferredRuns'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -87,7 +88,7 @@ export function RunsPage({
   searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const columns = useScopedColumns(scope, features.deferredRuns ?? false);
+  const columns = useScopedColumns(scope);
   const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
@@ -131,9 +132,8 @@ export function RunsPage({
     isFunctionTimeField
   );
 
-  const [filterIsDeferredRaw] = useSearchParam('filterIsDeferred');
-  const filterIsDeferred =
-    filterIsDeferredRaw === 'true' ? true : filterIsDeferredRaw === 'false' ? false : undefined;
+  const [excludeDeferred = false, setExcludeDeferred, removeExcludeDeferred] =
+    useBooleanSearchParam('excludeDeferred');
 
   const [search, setSearch, removeSearch] = useSearchParam('search');
 
@@ -199,12 +199,16 @@ export function RunsPage({
     [scrollToTop, setTimeField]
   );
 
-  const onIsDeferredFilterChange = useCallback(
-    (value: boolean | undefined) => {
+  const onExcludeDeferredChange = useCallback(
+    (value: boolean) => {
       scrollToTop();
-      batchUpdate({ filterIsDeferred: value === undefined ? null : value ? 'true' : 'false' });
+      if (value) {
+        setExcludeDeferred(true);
+      } else {
+        removeExcludeDeferred();
+      }
     },
-    [batchUpdate, scrollToTop]
+    [removeExcludeDeferred, scrollToTop, setExcludeDeferred]
   );
 
   const onDaysChange = useCallback(
@@ -264,7 +268,7 @@ export function RunsPage({
         </div>
       );
     },
-    [getTrigger, pollInterval, features.tracesPreview, features.runDetailsV4]
+    [getTrigger, pollInterval, features.runDetailsV4]
   );
 
   const options = useMemo(() => {
@@ -371,10 +375,10 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-            {features.deferredRuns && (
+            {features.isDeferred && (
               <RunsTypeFilter
-                isDeferred={filterIsDeferred}
-                onChange={onIsDeferredFilterChange}
+                excludeDeferred={excludeDeferred}
+                onExcludeDeferredChange={onExcludeDeferredChange}
               />
             )}
           </div>

@@ -3,12 +3,13 @@ import { gql } from 'graphql-request';
 export const RUN_DEFER_SUMMARY_FRAGMENT = gql`
   fragment RunDeferSummaryFields on RunDefer {
     hashedDeferID
-    deferID
+    userlandDeferID
+    fnSlug
+    status
     function {
       name
       slug
     }
-    status
     run {
       id
       status
@@ -314,6 +315,7 @@ export const GET_RUNS = gql`
           hasAI
           isDeferred
           deferredFrom {
+            runID
             function {
               name
               slug
@@ -465,11 +467,11 @@ export const GET_RUN_LINKAGE = gql`
         ...RunDeferSummaryFields
       }
       deferredFrom {
+        runID
         function {
           name
           slug
         }
-        runID
         run {
           id
           status

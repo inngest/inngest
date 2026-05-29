@@ -8,6 +8,7 @@ import {
   IDElement,
   LinkElement,
   OptimisticElementWrapper,
+  SkeletonElement,
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
@@ -83,9 +84,13 @@ export const RunInfo = ({
                 expanded ? 'rotate-90' : ''
               }`}
             />
-            <span className="text-basis text-sm font-normal">
-              {isDeferred ? 'Companion function' : 'Normal function'}
-            </span>
+            {isLazyDone(run) ? (
+              <span className="text-basis text-sm font-normal">
+                {isDeferred ? 'Companion function' : 'Normal function'}
+              </span>
+            ) : (
+              <SkeletonElement />
+            )}
           </div>
 
           {isLazyDone(run) && (

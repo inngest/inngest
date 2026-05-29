@@ -382,13 +382,13 @@ type ComplexityRoot struct {
 	}
 
 	RunDefer struct {
-		DeferID       func(childComplexity int) int
-		FnSlug        func(childComplexity int) int
-		Function      func(childComplexity int) int
-		HashedDeferID func(childComplexity int) int
-		Run           func(childComplexity int) int
-		RunID         func(childComplexity int) int
-		Status        func(childComplexity int) int
+		FnSlug          func(childComplexity int) int
+		Function        func(childComplexity int) int
+		HashedDeferID   func(childComplexity int) int
+		Run             func(childComplexity int) int
+		RunID           func(childComplexity int) int
+		Status          func(childComplexity int) int
+		UserlandDeferID func(childComplexity int) int
 	}
 
 	RunDeferredFrom struct {
@@ -2409,13 +2409,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RetryConfiguration.Value(childComplexity), true
 
-	case "RunDefer.deferID":
-		if e.complexity.RunDefer.DeferID == nil {
-			break
-		}
-
-		return e.complexity.RunDefer.DeferID(childComplexity), true
-
 	case "RunDefer.fnSlug":
 		if e.complexity.RunDefer.FnSlug == nil {
 			break
@@ -2457,6 +2450,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunDefer.Status(childComplexity), true
+
+	case "RunDefer.userlandDeferID":
+		if e.complexity.RunDefer.UserlandDeferID == nil {
+			break
+		}
+
+		return e.complexity.RunDefer.UserlandDeferID(childComplexity), true
 
 	case "RunDeferredFrom.function":
 		if e.complexity.RunDeferredFrom.Function == nil {
@@ -4224,7 +4224,7 @@ type FunctionRunV2Edge {
 
 type RunDefer {
   hashedDeferID: String!
-  deferID: String!
+  userlandDeferID: String!
   fnSlug: String!
 
   # Status of the defer itself (not the run).
@@ -12800,8 +12800,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_defers(ctx context.Contex
 			switch field.Name {
 			case "hashedDeferID":
 				return ec.fieldContext_RunDefer_hashedDeferID(ctx, field)
-			case "deferID":
-				return ec.fieldContext_RunDefer_deferID(ctx, field)
+			case "userlandDeferID":
+				return ec.fieldContext_RunDefer_userlandDeferID(ctx, field)
 			case "fnSlug":
 				return ec.fieldContext_RunDefer_fnSlug(ctx, field)
 			case "status":
@@ -12860,8 +12860,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_siblingDefers(ctx context
 			switch field.Name {
 			case "hashedDeferID":
 				return ec.fieldContext_RunDefer_hashedDeferID(ctx, field)
-			case "deferID":
-				return ec.fieldContext_RunDefer_deferID(ctx, field)
+			case "userlandDeferID":
+				return ec.fieldContext_RunDefer_userlandDeferID(ctx, field)
 			case "fnSlug":
 				return ec.fieldContext_RunDefer_fnSlug(ctx, field)
 			case "status":
@@ -16359,8 +16359,8 @@ func (ec *executionContext) fieldContext_RunDefer_hashedDeferID(ctx context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _RunDefer_deferID(ctx context.Context, field graphql.CollectedField, obj *models.RunDefer) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RunDefer_deferID(ctx, field)
+func (ec *executionContext) _RunDefer_userlandDeferID(ctx context.Context, field graphql.CollectedField, obj *models.RunDefer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDefer_userlandDeferID(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -16373,7 +16373,7 @@ func (ec *executionContext) _RunDefer_deferID(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.DeferID, nil
+		return obj.UserlandDeferID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16390,7 +16390,7 @@ func (ec *executionContext) _RunDefer_deferID(ctx context.Context, field graphql
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_RunDefer_deferID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_RunDefer_userlandDeferID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RunDefer",
 		Field:      field,
@@ -28527,9 +28527,9 @@ func (ec *executionContext) _RunDefer(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		case "deferID":
+		case "userlandDeferID":
 
-			out.Values[i] = ec._RunDefer_deferID(ctx, field, obj)
+			out.Values[i] = ec._RunDefer_userlandDeferID(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
