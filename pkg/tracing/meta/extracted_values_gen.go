@@ -39,11 +39,12 @@ type ExtractedValues struct {
 	IsDurableEndpointRun *bool
 	DurableEndpointModeChangedAt *time.Time
 	DeferChildRunID *ulid.ULID
-	DeferParents *[]DeferParent
 	DeferFnSlug *string
 	DeferHashedID *string
+	DeferParentFnSlug *string
+	DeferParentRunIDs *[]string
 	DeferStatus *enums.DeferStatus
-	DeferUserlandID *string
+	DeferUserID *string
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
 	DynamicTraceID *string

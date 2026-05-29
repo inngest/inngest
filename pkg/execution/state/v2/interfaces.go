@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -46,8 +47,15 @@ type RunService interface {
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
 
-	// SaveDefer atomically writes a Defer, including rejected defers.
 	SaveDefer(ctx context.Context, id ID, d Defer) error
+	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when
+	// no defer exists for hashedID. The Aborted transition also releases
+	// the Input from the aggregate budget; the meta entry stays.
+	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
+	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
+	// No-op if any defer already exists for hashedID. Returns
+	// ErrDeferLimitExceeded if no room.
+	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
 }
 
 // MetadataSizeIncrementer is an optional extension to RunService for

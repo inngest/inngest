@@ -45,19 +45,15 @@ type Defer struct {
 	// Hashed defer ID
 	HashedID string
 
-	// UserlandID is the SDK-caller-supplied defer id (the first argument to
-	// `defer("foo", ...)`). HashedID is `sha1(UserlandID)`. It is not
-	// persisted; it rides from the opcode onto the executor.defer span at
-	// schedule time so the UI can show the id the user typed instead of the
-	// hash (see defers.SaveFromOp -> emitDeferSpan).
-	UserlandID string
-
 	// Status for scheduling the deferred run:
 	// - Already scheduled?
 	// - Schedule after the parent run ends?
+	// - Never schedule (i.e. aborted)?
 	//
-	// The Lua-level SaveDefer silently no-ops any subsequent write for the
-	// same hashedID, so a Rejected sentinel is sticky for the run.
+	// Aborted is terminal within a run: once a defer transitions to
+	// DeferStatusAborted, it stays there. The Lua-level SaveDefer silently
+	// no-ops any subsequent write for the same hashedID. There is no "unabort"
+	// path: same hashedID + abort is final.
 	ScheduleStatus enums.DeferStatus
 
 	// Data passed to the defer

@@ -4242,12 +4242,13 @@ type RunDefer {
 
 enum RunDeferStatus {
   SCHEDULED
+  ABORTED
   REJECTED
 }
 
 type RunDeferredFrom {
   runID: ULID!
-  function: Function
+  function: Function!
   run: FunctionRunV2
 }
 
@@ -16750,11 +16751,14 @@ func (ec *executionContext) _RunDeferredFrom_function(ctx context.Context, field
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
 	res := resTmp.(*models.Function)
 	fc.Result = res
-	return ec.marshalOFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx, field.Selections, res)
+	return ec.marshalNFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_RunDeferredFrom_function(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -28620,6 +28624,9 @@ func (ec *executionContext) _RunDeferredFrom(ctx context.Context, sel ast.Select
 					}
 				}()
 				res = ec._RunDeferredFrom_function(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
 				return res
 			}
 

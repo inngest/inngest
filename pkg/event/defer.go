@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
@@ -28,20 +27,12 @@ func DeferEventID(parent ulid.ULID, hashedID string) (ulid.ULID, error) {
 type DeferredScheduleMetadata struct {
 	FnSlug string `json:"fn_slug"`
 
-	// ParentRunSpan is the OTel ref of the parent's executor.run span, used as
-	// the Parent of the child-run-id linkage span emitted at child-schedule
-	// time. Stamped on the event so the executor doesn't re-derive it.
-	ParentRunSpan *meta.SpanReference `json:"parent_run_span,omitempty"`
+	// Defer span in the parent run. This is used to update the span when
+	// scheduling the deferred run.
+	ParentDeferSpan *meta.SpanReference `json:"parent_defer_span,omitempty"`
 
-	ParentFnSlug string `json:"parent_fn_slug"`
-	// ParentFnName is the display name of the parent function. Stamped onto
-	// deferred.schedule events so the run-list resolver can synthesize the
-	// linkage's models.Function without a per-row DB lookup. Empty is
-	// tolerated (the UI falls back to ParentFnSlug).
-	ParentFnName     string `json:"parent_fn_name,omitempty"`
-	ParentRunID      string `json:"parent_run_id"`
-	ParentFunctionID string `json:"parent_function_id"`
-	HashedDeferID    string `json:"hashed_defer_id"`
+	ParentFnSlug string    `json:"parent_fn_slug"`
+	ParentRunID  ulid.ULID `json:"parent_run_id"`
 }
 
 func (m *DeferredScheduleMetadata) Validate() error {
@@ -52,22 +43,11 @@ func (m *DeferredScheduleMetadata) Validate() error {
 	if m.ParentFnSlug == "" {
 		errs = append(errs, errors.New("parent_fn_slug is required"))
 	}
-	if m.ParentRunID == "" {
+	if m.ParentRunID == (ulid.ULID{}) {
 		errs = append(errs, errors.New("parent_run_id is required"))
 	}
-	if m.ParentFunctionID == "" {
-		errs = append(errs, errors.New("parent_function_id is required"))
-	} else if parsed, err := uuid.Parse(m.ParentFunctionID); err != nil {
-		errs = append(errs, fmt.Errorf("parent_function_id is invalid: %w", err))
-	} else if parsed == uuid.Nil {
-		// uuid.Parse accepts the zero string; reject it explicitly so a
-		// zero-value FunctionID can't slip through and stamp uuid.Nil onto
-		// the persisted span (where it would disappear from per-function
-		// indexes).
-		errs = append(errs, errors.New("parent_function_id must not be the zero uuid"))
-	}
-	if m.HashedDeferID == "" {
-		errs = append(errs, errors.New("hashed_defer_id is required"))
+	if m.ParentDeferSpan == nil {
+		errs = append(errs, errors.New("parent_defer_span is required"))
 	}
 	return errors.Join(errs...)
 }

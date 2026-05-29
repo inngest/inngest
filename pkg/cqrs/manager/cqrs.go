@@ -1105,7 +1105,7 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 }
 
 // UpsertAppByName upserts on the partial unique index apps_name_active_key
-// (name) WHERE archived_at IS NULL AND name <> ''. The id provided in arg is
+// (name) WHERE archived_at IS NULL AND name <> "". The id provided in arg is
 // only used for fresh inserts; on conflict, the existing row's id is kept,
 // so SDK re-syncs adopt legacy URL-derived ids in place.
 func (w wrapper) UpsertAppByName(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
@@ -1197,23 +1197,6 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 	}
 
 	return domainToCQRS(fn, domainFunction), nil
-}
-
-func (w wrapper) GetFunctionsBySlugs(ctx context.Context, slugs []string) (map[string]*cqrs.Function, error) {
-	if len(slugs) == 0 {
-		return map[string]*cqrs.Function{}, nil
-	}
-
-	rows, err := w.q.GetFunctionsBySlugs(ctx, slugs)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make(map[string]*cqrs.Function, len(rows))
-	for _, row := range rows {
-		out[row.Slug] = domainToCQRS(row, domainFunction)
-	}
-	return out, nil
 }
 
 func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {
@@ -1929,6 +1912,7 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 }
 
 func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
+	// convert db.TraceRun{} to cqrs.TraceRun{}
 	sqlcTraceRuns, err := w.q.GetTraceRunsByTriggerId(ctx, triggerID.String())
 	if err != nil {
 		return nil, err
@@ -1945,24 +1929,8 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 	if err != nil {
 		return nil, err
 	}
+
 	return traceRunToCQRS(run), nil
-}
-
-func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
-	if len(runIDs) == 0 {
-		return map[ulid.ULID]*cqrs.TraceRun{}, nil
-	}
-
-	rows, err := w.q.GetTraceRunsByRunIDs(ctx, runIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make(map[ulid.ULID]*cqrs.TraceRun, len(rows))
-	for _, row := range rows {
-		out[row.RunID] = traceRunToCQRS(row)
-	}
-	return out, nil
 }
 
 func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
@@ -2349,10 +2317,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	order := builder.order
 	reqcursor := builder.cursor
 	resCursorLayout := builder.cursorLayout
-
-	// IsDeferred is only meaningful against the spans table, so the
-	// non-preview trace_runs path no longer applies a defer filter. Callers
-	// that need it must use the preview (spans) path.
 
 	// read from database
 	// TODO:
@@ -3162,6 +3126,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		return nil, err
 	}
 
+	l.Debug("GetSpanRuns query", "sql", sqlQuery, "args", args)
+
 	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		l.Debug("GetSpanRuns query error", "error", err)
@@ -3169,12 +3135,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 	defer rows.Close()
 
-	res, err := w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
-	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
+	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
 }
 
 // convertSpanRunRows converts database rows to TraceRun structs

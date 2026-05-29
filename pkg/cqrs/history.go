@@ -47,14 +47,11 @@ type HistoryReader interface {
 	// ordered from oldest to newest.
 	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error)
 
-	// GetRunDefers returns defers attached to each parent run, keyed by
-	// parent run ID. Each entry's Run is the child TraceRun if one has been
-	// scheduled, otherwise nil. Parents with no defers are omitted.
+	// GetRunDefers returns the child deferred runs. Empty if this run didn't
+	// defer any runs.
 	GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDefer, error)
 
-	// GetRunDeferredFrom returns the parent linkage for each deferred child
-	// run, keyed by child run ID. A batched child can descend from multiple
-	// parents, so each child maps to a list of parents. Runs with no linkage
-	// are omitted.
+	// GetRunDeferredFrom returns the parent runs that triggered this deferred
+	// run. Empty if this run isn't a defer.
 	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDeferredFrom, error)
 }

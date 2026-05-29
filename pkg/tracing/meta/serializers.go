@@ -7,7 +7,6 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"reflect"
 	"strconv"
 	"time"
@@ -289,22 +288,20 @@ func StringSliceAttr(key string) attr[*[]string] {
 			return attribute.StringSlice(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*[]string, bool) {
-			if slice, ok := v.([]string); ok {
-				return &slice, true
-			}
-			// JSON-decoded fragment attributes arrive as []any. Coerce when
-			// every element is a string so persisted spans round-trip
-			// correctly through mapSpanFromRow.
-			if raw, ok := v.([]any); ok {
-				slice := make([]string, 0, len(raw))
-				for _, item := range raw {
-					s, ok := item.(string)
+			switch v := v.(type) {
+			case []string:
+				// This may be unreachable. At runtime, `v` is of type `[]any`.
+				return &v, true
+			case []any:
+				strings := make([]string, len(v))
+				for i, item := range v {
+					itemStr, ok := item.(string)
 					if !ok {
 						return nil, false
 					}
-					slice = append(slice, s)
+					strings[i] = itemStr
 				}
-				return &slice, true
+				return &strings, true
 			}
 
 			return nil, false
@@ -572,27 +569,14 @@ func JsonAttr[T any](key string) attr[*T] {
 			return attribute.String(withPrefix(key), string(byt))
 		},
 		deserialize: func(v any) (*T, bool) {
-			// Both branches log on drop: silently failing here can wipe out
-			// an entire linkage with no diagnostic — the type-assertion miss
-			// (round-trip through ClickHouse / map[string]any deliveries) is
-			// the more common case in practice.
-			str, ok := v.(string)
-			if !ok {
-				slog.Warn("JSON span attribute is not a string",
-					"key", withPrefix(key),
-					"type", fmt.Sprintf("%T", v),
-				)
-				return nil, false
+			if str, ok := v.(string); ok {
+				var req T
+				if err := json.Unmarshal([]byte(str), &req); err == nil {
+					return &req, true
+				}
 			}
-			var req T
-			if err := json.Unmarshal([]byte(str), &req); err != nil {
-				slog.Warn("failed to deserialize JSON span attribute",
-					"key", withPrefix(key),
-					"error", err,
-				)
-				return nil, false
-			}
-			return &req, true
+
+			return nil, false
 		},
 	}
 }

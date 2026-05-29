@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -119,7 +118,7 @@ type RunHistoryInvokeFunctionResult struct {
 	Timeout bool       `json:"timeout"`
 }
 
-func NewRunHistoryResultFromHistoryResult(hr *history.Result) *RunHistoryResult {
+func NewRunHistoryResultFromHistoryResult(hr *cqrs.Result) *RunHistoryResult {
 	if hr == nil {
 		return nil
 	}

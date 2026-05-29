@@ -6,28 +6,34 @@ import (
 )
 
 // RunDefer is a single defer attached to a parent function run. RunID is nil
-// when the deferred child has not been scheduled yet (parent still running).
-// The child function slug is always populated; consumers resolve the child
-// function lazily via the slug.
+// when the deferred child has not been scheduled yet (parent still running)
+// or when the defer was aborted before scheduling. The child function slug is
+// always populated; consumers resolve the child function lazily via the slug.
 type RunDefer struct {
-	HashedDeferID   string            // SHA1-hashed UserlandDeferID
-	UserlandDeferID string            // ID provided by the userland SDK caller, ie `defer("foo", ...)` => "foo"
-	FnSlug          string            // Slug of the deferred function, "foo-defer"
-	Status          enums.DeferStatus // Status of the defer itself, not its associated run
-	RunID           *ulid.ULID        // Scheduled child run ID, nil when the child hasn't been scheduled.
+	// Hashed `RunDeferResolver`
+	HashedDeferID string
+
+	// Defer ID passed to `defer()` call in the Inngest function
+	UserlandDeferID string
+
+	// Deferred function slug
+	FnSlug string
+
+	// Status of the defer (not the child run)
+	Status enums.DeferStatus
+
+	// Scheduled child run ID, nil when the child hasn't been scheduled.
+	RunID *ulid.ULID
 }
 
 // RunDeferredFrom describes a parent run that scheduled a function run via
 // `defer`. A child can have multiple parents when batching collapses several
 // deferred.schedule events into one Schedule call.
 //
-// FnName and FnSlug ride along on the child's executor.run span so the
-// run-list GraphQL resolver can return the parent's Function shape without
-// issuing one DB lookup per row. FnSlug is always populated; FnName may be
-// empty when scheduling didn't carry a name, in which case the UI falls back
-// to FnSlug.
+// The struct exposes only the parent's identifiers. Consumers that need the
+// parent run or function fetch them lazily (via GraphQL resolvers, etc.) so
+// the read path doesn't pay for joins the caller may not use.
 type RunDeferredFrom struct {
 	RunID  ulid.ULID
 	FnSlug string
-	FnName string
 }

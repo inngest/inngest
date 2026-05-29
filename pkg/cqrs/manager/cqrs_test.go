@@ -16,7 +16,6 @@ import (
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -1674,139 +1673,6 @@ func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
 	assert.Equal(t, completedRunID, runs[0].RunID)
 }
 
-// TestCQRSGetSpanRunsIsDeferredFilterMatchesDeferredFrom locks in the alignment
-// between the preview (spans-backed) runs-list IsDeferred filter and the
-// run-detail classification (GetRunDeferredFrom, which reads defer.parents off
-// the child's executor.run span). Both paths must agree on each run's defer
-// classification so the list and the detail never disagree.
-func TestCQRSGetSpanRunsIsDeferredFilterMatchesDeferredFrom(t *testing.T) {
-	ctx := context.Background()
-	appID := uuid.New()
-
-	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
-	defer cleanup()
-
-	accountID := uuid.New()
-	workspaceID := uuid.New()
-	functionID := uuid.New()
-	baseTime := time.Now().UTC().Truncate(time.Second)
-
-	// insertRootRun writes a trace_runs row and a matching executor.run span.
-	// The span carries defer.parents when the run is a defer child so the
-	// run-detail path can still resolve linkage; the span's is_deferred column
-	// is stamped from those parents.
-	insertRootRun := func(offset time.Duration, isDeferred bool, parentRunIDs []string) string {
-		runID := ulid.MustNew(ulid.Now(), rand.Reader)
-		startedAt := baseTime.Add(offset)
-
-		err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
-			AccountID:   accountID,
-			WorkspaceID: workspaceID,
-			AppID:       appID,
-			FunctionID:  functionID,
-			TraceID:     "trace-" + runID.String(),
-			RunID:       runID.String(),
-			QueuedAt:    startedAt,
-			StartedAt:   startedAt,
-			EndedAt:     startedAt,
-			Status:      enums.RunStatusCompleted,
-			IsDeferred:  isDeferred,
-		})
-		require.NoError(t, err)
-
-		var attrBytes []byte
-		if len(parentRunIDs) > 0 {
-			parents := make([]meta.DeferParent, len(parentRunIDs))
-			for i, id := range parentRunIDs {
-				parents[i] = meta.DeferParent{RunID: id, FnSlug: "app-parent-fn"}
-			}
-			parentsJSON, err := json.Marshal(parents)
-			require.NoError(t, err)
-			attrBytes, err = json.Marshal(map[string]any{
-				meta.Attrs.DeferParents.Key(): string(parentsJSON),
-			})
-			require.NoError(t, err)
-		}
-		insertTestSpan(t, cm, testSpanFields{
-			RunID:         runID.String(),
-			DynamicSpanID: "dyn-root-" + runID.String(),
-			Name:          meta.SpanNameRun,
-			Status:        enums.RunStatusCompleted.String(),
-			StartTime:     startedAt,
-			AccountID:     accountID.String(),
-			AppID:         appID.String(),
-			FunctionID:    functionID.String(),
-			EnvID:         workspaceID.String(),
-			Attributes:    attrBytes,
-			IsDeferred:    sql.NullBool{Bool: isDeferred, Valid: isDeferred},
-		})
-		return runID.String()
-	}
-
-	// Primary: no deferred flag.
-	primaryRunID := insertRootRun(0, false, nil)
-
-	// The parent that scheduled the defer.
-	parentRunID := insertRootRun(time.Second, false, nil)
-
-	// Defer child: span carries defer.parents and is_deferred=true.
-	deferRunID := insertRootRun(2*time.Second, true, []string{parentRunID})
-
-	listRunIDs := func(isDeferred *bool) []string {
-		runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
-			Filter: cqrs.GetTraceRunFilter{
-				AccountID:   accountID,
-				WorkspaceID: workspaceID,
-				FunctionID:  []uuid.UUID{functionID},
-				TimeField:   enums.TraceRunTimeStartedAt,
-				From:        baseTime.Add(-time.Hour),
-				Until:       baseTime.Add(time.Hour),
-				IsDeferred:  isDeferred,
-			},
-			Order: []cqrs.GetTraceRunOrder{
-				{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderAsc},
-			},
-			Preview: true,
-		})
-		require.NoError(t, err)
-		ids := make([]string, 0, len(runs))
-		for _, r := range runs {
-			ids = append(ids, r.RunID)
-		}
-		return ids
-	}
-
-	deferredTrue := true
-	deferList := listRunIDs(&deferredTrue)
-	assert.Contains(t, deferList, deferRunID, "is_deferred=true must surface the defer child")
-	assert.NotContains(t, deferList, primaryRunID, "primary must not be in the deferred list")
-	assert.NotContains(t, deferList, parentRunID, "the scheduling parent is itself primary")
-
-	deferredFalse := false
-	primaryList := listRunIDs(&deferredFalse)
-	assert.Contains(t, primaryList, primaryRunID, "primary is in the non-deferred list")
-	assert.Contains(t, primaryList, parentRunID, "the scheduling parent is non-deferred")
-	assert.NotContains(t, primaryList, deferRunID, "defer run must not appear in the non-deferred list")
-
-	// Cross-check against the run-detail path. The deferred run hydrates its
-	// parent breadcrumb purely from defer.parents on its own executor.run
-	// span — no parent-side defer.child_run_id span exists.
-	df, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{
-		ulid.MustParse(deferRunID),
-		ulid.MustParse(primaryRunID),
-		ulid.MustParse(parentRunID),
-	})
-	require.NoError(t, err)
-	rdfs := df[ulid.MustParse(deferRunID)]
-	require.Len(t, rdfs, 1, "detail must surface the deferred parent for the defer run")
-	assert.Equal(t, parentRunID, rdfs[0].RunID.String(),
-		"detail must record the parent recorded on defer.parents")
-	assert.Empty(t, df[ulid.MustParse(primaryRunID)],
-		"detail must not classify the primary run as deferred")
-	assert.Empty(t, df[ulid.MustParse(parentRunID)],
-		"detail must not classify the scheduling parent as deferred")
-}
-
 //
 // Span Tests
 //
@@ -1988,22 +1854,20 @@ func TestSpanOutputReadBack(t *testing.T) {
 //
 
 type testSpanFields struct {
-	RunID          string       // required
-	DynamicSpanID  string       // required for GROUP BY tests
-	ParentSpanID   string       // for child spans (references parent's DynamicSpanID)
-	DebugRunID     string       // for debug run tests
-	DebugSessionID string       // for debug session tests
-	Name           string       // default: "test-span"
-	Status         string       // default: "" (NULL)
-	StartTime      time.Time    // default: time.Now()
-	AccountID      string       // default: "acct"
-	AppID          string       // default: "app"
-	FunctionID     string       // default: "fn"
-	EnvID          string       // default: "env"
-	TraceID        string       // default: new ULID (set explicitly when two fragments must share a trace_id and dynamic_span_id, e.g. an EXTEND pair)
-	Attributes     []byte       // JSON attributes (optional)
-	Output         []byte       // JSON output (optional)
-	IsDeferred     sql.NullBool // TRUE iff this span was emitted for a deferred run
+	RunID          string    // required
+	DynamicSpanID  string    // required for GROUP BY tests
+	ParentSpanID   string    // for child spans (references parent's DynamicSpanID)
+	DebugRunID     string    // for debug run tests
+	DebugSessionID string    // for debug session tests
+	Name           string    // default: "test-span"
+	Status         string    // default: "" (NULL)
+	StartTime      time.Time // default: time.Now()
+	AccountID      string    // default: "acct"
+	AppID          string    // default: "app"
+	FunctionID     string    // default: "fn"
+	EnvID          string    // default: "env"
+	Attributes     []byte    // JSON attributes (optional)
+	Output         []byte    // JSON output (optional)
 }
 
 // There aren't any functions exposed on cqrs.Manager that write to the new spans table
@@ -2012,10 +1876,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 	t.Helper()
 
 	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	traceID := spanFields.TraceID
-	if traceID == "" {
-		traceID = ulid.MustNew(ulid.Now(), rand.Reader).String()
-	}
+	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 
 	// Apply defaults
 	if spanFields.Name == "" {
@@ -2057,7 +1918,6 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		DebugSessionID: sql.NullString{String: spanFields.DebugSessionID, Valid: spanFields.DebugSessionID != ""},
 		Attributes:     spanFields.Attributes,
 		Output:         spanFields.Output,
-		IsDeferred:     spanFields.IsDeferred,
 	})
 	require.NoError(t, err)
 }

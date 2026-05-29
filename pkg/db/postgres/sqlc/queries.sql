@@ -114,11 +114,6 @@ SELECT * FROM functions WHERE id = $1;
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = $1 AND archived_at IS NULL;
 
--- name: GetFunctionsBySlugs :many
-SELECT * FROM functions
-WHERE slug = ANY(sqlc.slice('slugs')::TEXT[])
-  AND archived_at IS NULL;
-
 -- name: GetFunctionByAppNameAndSlug :one
 -- Look up a function by the app's user-facing name, not its internal UUID.
 -- The dev server derives app UUIDs from different inputs at different sites
@@ -302,9 +297,6 @@ ON CONFLICT (run_id) DO UPDATE SET
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = sqlc.arg('run_id')::CHAR(26);
-
--- name: GetTraceRunsByRunIDs :many
-SELECT * FROM trace_runs WHERE run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::CHAR(26)[]));
 
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND run_id = sqlc.arg('run_id')::CHAR(26) ORDER BY timestamp_unix_ms DESC, duration DESC;

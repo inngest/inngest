@@ -1,8 +1,8 @@
 --[[
 Atomically insert a Defer record, including rejected defers.
 
-Insert-only: any existing entry for the hashedID (AfterRun, Rejected) is a
-no-op, so SDK retransmits are idempotent regardless of payload.
+Insert-only: any existing entry for the hashedID (AfterRun, Aborted, Rejected)
+is a no-op, so SDK retransmits are idempotent regardless of payload.
 
 New defers past the per-run count cap are rejected. Writes that would exceed the
 aggregate-input cap are converted into a Rejected sentinel (status=Rejected, no
@@ -25,7 +25,7 @@ Output:
 ]]
 
 -- Must match enums.DeferStatusRejected in pkg/enums/defer_status.go.
-local DEFER_STATUS_REJECTED = 3
+local DEFER_STATUS_REJECTED = 4
 
 local metaKey       = KEYS[1]
 local inputKey      = KEYS[2]

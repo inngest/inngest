@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
-	"github.com/inngest/inngest/pkg/execution/defers"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -127,7 +126,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	// blocking Finalize. The downstream cleanup (Delete, finalizeRemoveJobs,
 	// finalizeEvents for function.X) must still run regardless.
 	loadDefersStart := e.now()
-	loadedDefers, deferErr := util.WithRetry(ctx, "state.LoadDefers",
+	defers, deferErr := util.WithRetry(ctx, "state.LoadDefers",
 		func(ctx context.Context) (map[string]sv2.Defer, error) {
 			return e.smv2.LoadDefers(ctx, opts.Metadata.ID)
 		},
@@ -143,7 +142,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 			"run_id", opts.Metadata.ID.RunID,
 		)
 	}
-	metrics.HistogramDefersPerRun(ctx, int64(len(loadedDefers)), metrics.HistogramOpt{
+	metrics.HistogramDefersPerRun(ctx, int64(len(defers)), metrics.HistogramOpt{
 		PkgName: pkgName,
 	})
 
@@ -151,7 +150,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	// using the in-memory function loader, not state). The actual publish
 	// happens in finalizeEvents so all finalize-time events go through a
 	// single finishHandler call.
-	deferEvents, err := e.buildDeferEvents(ctx, opts, loadedDefers)
+	deferEvents, err := e.buildDeferEvents(ctx, opts, defers)
 	if err != nil {
 		l.Error(
 			"error building deferred schedule events; continuing without defer events",
@@ -195,9 +194,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 func (e *executor) buildDeferEvents(
 	ctx context.Context,
 	opts execution.FinalizeOpts,
-	loadedDefers map[string]sv2.Defer,
+	defers map[string]sv2.Defer,
 ) ([]event.Event, error) {
-	if len(loadedDefers) == 0 {
+	if len(defers) == 0 {
 		return nil, nil
 	}
 
@@ -208,16 +207,11 @@ func (e *executor) buildDeferEvents(
 	if fnSlug == "" {
 		return nil, fmt.Errorf("function slug missing from run metadata for deferred events")
 	}
-	fnName := opts.Optional.FnName
-	if fnName == "" {
-		fnName = opts.Metadata.Config.FunctionName()
-	}
 
 	now := e.now()
-	parentRunSpan := tracing.RunSpanRefFromMetadata(&opts.Metadata)
 	var events []event.Event
 
-	for _, d := range loadedDefers {
+	for _, d := range defers {
 		if err := d.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(
 				"invalid defer",
@@ -234,7 +228,17 @@ func (e *executor) buildDeferEvents(
 			continue
 		}
 
-		eventID := defers.EventID(opts.Metadata.ID.RunID, d.HashedID)
+		eventID, err := event.DeferEventID(opts.Metadata.ID.RunID, d.HashedID)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"failed to create defer event ID",
+				"error", err,
+				"hashed_id", d.HashedID,
+				"run_id", opts.Metadata.ID.RunID,
+			)
+			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
+			continue
+		}
 
 		data := map[string]any{}
 		if len(d.Input) > 0 {
@@ -254,16 +258,13 @@ func (e *executor) buildDeferEvents(
 			}
 		}
 
-		evtMeta := event.DeferredScheduleMetadata{
-			FnSlug:           d.FnSlug,
-			ParentFnSlug:     fnSlug,
-			ParentFnName:     fnName,
-			ParentRunID:      opts.Metadata.ID.RunID.String(),
-			ParentFunctionID: opts.Metadata.ID.FunctionID.String(),
-			HashedDeferID:    d.HashedID,
-			ParentRunSpan:    parentRunSpan,
+		deferredMeta := event.DeferredScheduleMetadata{
+			FnSlug:          d.FnSlug,
+			ParentDeferSpan: tracing.DeferSpanRef(opts.Metadata.ID.RunID, d.HashedID),
+			ParentFnSlug:    fnSlug,
+			ParentRunID:     opts.Metadata.ID.RunID,
 		}
-		if err := evtMeta.Validate(); err != nil {
+		if err := deferredMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(
 				"invalid deferred event metadata",
 				"error", err,
@@ -272,7 +273,7 @@ func (e *executor) buildDeferEvents(
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
 		}
-		data[consts.InngestEventDataPrefix] = evtMeta
+		data[consts.InngestEventDataPrefix] = deferredMeta
 
 		events = append(events, event.Event{
 			ID:        eventID.String(),
@@ -356,12 +357,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		evts     = opts.Optional.InputEvents
 	)
 
-	// Find the function slug. Try the in-memory Config fallback (populated at
-	// schedule time, used by callers that don't thread FnSlug through
-	// FinalizeOpts) before falling back to a DB load.
-	if fnSlug == "" {
-		fnSlug = opts.Metadata.Config.FunctionSlug()
-	}
+	// Find the function slug.
 	if fnSlug == "" {
 		fn, err := e.fl.LoadFunction(ctx, opts.Metadata.ID.Tenant.EnvID, opts.Metadata.ID.FunctionID)
 		if err != nil {

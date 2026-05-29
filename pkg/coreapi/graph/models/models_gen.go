@@ -970,17 +970,19 @@ type RunDeferStatus string
 
 const (
 	RunDeferStatusScheduled RunDeferStatus = "SCHEDULED"
+	RunDeferStatusAborted   RunDeferStatus = "ABORTED"
 	RunDeferStatusRejected  RunDeferStatus = "REJECTED"
 )
 
 var AllRunDeferStatus = []RunDeferStatus{
 	RunDeferStatusScheduled,
+	RunDeferStatusAborted,
 	RunDeferStatusRejected,
 }
 
 func (e RunDeferStatus) IsValid() bool {
 	switch e {
-	case RunDeferStatusScheduled, RunDeferStatusRejected:
+	case RunDeferStatusScheduled, RunDeferStatusAborted, RunDeferStatusRejected:
 		return true
 	}
 	return false

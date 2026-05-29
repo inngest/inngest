@@ -977,9 +977,8 @@ func IncrDefersFinalizedCounter(ctx context.Context, status string, opts Counter
 	})
 }
 
-// IncrDefersRejectedCounter records a soft-rejected defer. Reason is one of
-// "per_defer_size", "aggregate_size", "per_run_count", "invalid_input",
-// "invalid_opts".
+// IncrDefersRejectedCounter records a soft-rejected defer. Reason is one
+// of "per_defer_size", "aggregate_size", "per_run_count", "invalid_opts".
 func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}

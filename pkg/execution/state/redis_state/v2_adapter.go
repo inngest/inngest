@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -257,6 +258,14 @@ func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 
 func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
 	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
+}
+
+func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
+	return v.mgr.SetDeferStatus(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hashedID, status)
+}
+
+func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
+	return v.mgr.SaveRejectedDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, fnSlug, hashedID)
 }
 
 // Metadata returns metadata for a given run

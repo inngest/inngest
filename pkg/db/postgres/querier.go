@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db"
+	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/oklog/ulid/v2"
 )
@@ -177,14 +177,6 @@ func (pq *pgQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*db.Fu
 		return nil, err
 	}
 	return functionFromPG(r), nil
-}
-
-func (pq *pgQuerier) GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*db.Function, error) {
-	rows, err := pq.q.GetFunctionsBySlugs(ctx, slugs)
-	if err != nil {
-		return nil, err
-	}
-	return convertSlice(rows, functionFromPG), nil
 }
 
 func (pq *pgQuerier) GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*db.Function, error) {
@@ -723,21 +715,6 @@ func (pq *pgQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.Trac
 		return nil, err
 	}
 	return traceRunFromPG(r), nil
-}
-
-func (pq *pgQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
-	if len(runIDs) == 0 {
-		return nil, nil
-	}
-	strIDs := make([]string, len(runIDs))
-	for i, id := range runIDs {
-		strIDs[i] = id.String()
-	}
-	rows, err := pq.q.GetTraceRunsByRunIDs(ctx, strIDs)
-	if err != nil {
-		return nil, err
-	}
-	return convertSlice(rows, traceRunFromPG), nil
 }
 
 func (pq *pgQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {

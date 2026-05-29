@@ -536,12 +536,13 @@ type RunDefer {
 
 enum RunDeferStatus {
   SCHEDULED
+  ABORTED
   REJECTED
 }
 
 type RunDeferredFrom {
   runID: ULID!
-  function: Function
+  function: Function!
   run: FunctionRunV2
 }
 

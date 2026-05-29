@@ -168,10 +168,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				}
 			}
 
-			// DeferParents is only stamped on the executor.run span of a
-			// deferred child, so its presence is the source of truth for
-			// is_deferred on the corresponding row.
-			if string(attr.Key) == meta.Attrs.DeferParents.Key() {
+			if string(attr.Key) == meta.Attrs.DeferParentRunIDs.Key() {
 				isDeferred = true
 			}
 
@@ -228,9 +225,9 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		outputByt := anyToBytes(output)
 		inputByt := anyToBytes(input)
 
-		var isDeferredNB sql.NullBool
+		var IsDeferred sql.NullBool
 		if isDeferred {
-			isDeferredNB = sql.NullBool{Bool: true, Valid: true}
+			IsDeferred = sql.NullBool{Bool: true, Valid: true}
 		}
 
 		err = e.q.InsertSpan(ctx, dbpkg.InsertSpanParams{
@@ -266,7 +263,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				Valid:  status != "",
 			},
 			EventIds:   eventIdsByt,
-			IsDeferred: isDeferredNB,
+			IsDeferred: IsDeferred,
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("failed to insert span into database",
@@ -282,6 +279,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			)
 			continue
 		}
+
 	}
 	return nil
 }

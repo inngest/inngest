@@ -212,10 +212,6 @@ func (f *fakeTraceReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) 
 	return f.root, nil
 }
 
-func (f *fakeTraceReader) GetSpansByRunIDsAndName(ctx context.Context, runIDs []ulid.ULID, name string) (map[ulid.ULID][]*cqrs.OtelSpan, error) {
-	return nil, nil
-}
-
 func (f *fakeTraceReader) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
 	return nil, nil
 }

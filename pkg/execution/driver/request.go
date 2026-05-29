@@ -52,7 +52,16 @@ type SDKRequest struct {
 
 // SDKDeferEntry tells the SDK that a deferred run is already registered for the
 // given hashed ID, so it should not re-report `OpcodeDeferAdd` for it.
-type SDKDeferEntry struct{}
+type SDKDeferEntry struct {
+	// Abortable indicates the SDK may emit `OpcodeDeferAbort` for this
+	// entry. It signifies that the deferred run hasn't queued yet, so it can be
+	// aborted.
+	//
+	// Note that this is different than run cancellation on an already-queued
+	// run. Aborting a deferred run simply will mean no run will ever exist
+	// (e.g. no run ID).
+	Abortable bool `json:"abortable"`
+}
 
 type SDKRequestContext struct {
 	// FunctionID is used within entrypoints to SDK-based functions in

@@ -132,9 +132,7 @@ func MakeFunctionRunV2(run *cqrs.TraceRun) (*FunctionRunV2, error) {
 		sourceID = &run.SourceID
 	}
 	switch status {
-	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusSkipped:
-		// Skipped is terminal per enums.RunStatusEnded; omitting it here
-		// silently dropped a real EndedAt for Skipped runs.
+	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled:
 		if run.EndedAt.UnixMilli() > 0 {
 			endedAt = &run.EndedAt
 		}
@@ -164,6 +162,8 @@ func ToRunDeferStatus(s enums.DeferStatus) (RunDeferStatus, error) {
 	switch s {
 	case enums.DeferStatusAfterRun:
 		return RunDeferStatusScheduled, nil
+	case enums.DeferStatusAborted:
+		return RunDeferStatusAborted, nil
 	case enums.DeferStatusRejected:
 		return RunDeferStatusRejected, nil
 	default:

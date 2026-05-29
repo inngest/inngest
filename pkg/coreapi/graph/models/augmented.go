@@ -67,6 +67,14 @@ func RunTraceEnded(s RunTraceSpanStatus) bool {
 	return s == RunTraceSpanStatusCompleted || s == RunTraceSpanStatusCancelled || s == RunTraceSpanStatusFailed || s == RunTraceSpanStatusSkipped
 }
 
+// RunDeferredFrom carries a parent run's ID and function slug. Function and
+// Run are resolved lazily so list views that only need the parent's function
+// metadata don't pay for a full TraceRun fetch per linkage entry.
+type RunDeferredFrom struct {
+	RunID  ulid.ULID `json:"runID"`
+	FnSlug string    `json:"-"`
+}
+
 // RunDefer is a single defer attached to a parent run. Function and Run are
 // resolved lazily — FnSlug (always set) drives the function lookup, RunID
 // drives the run lookup when the child has been scheduled.
@@ -78,17 +86,4 @@ type RunDefer struct {
 	// RunID is nil when the defer hasn't been linked to a scheduled child
 	// yet (parent still running, aborted, or rejected).
 	RunID *ulid.ULID `json:"runID,omitempty"`
-}
-
-// RunDeferredFrom carries a parent run's ID, function slug, and display name.
-// Function and Run are resolved lazily so list views that only need the
-// parent's function metadata don't pay for a full TraceRun fetch per linkage
-// entry. FnName/FnSlug are stamped on the child's executor.run span at
-// schedule time, letting the Function resolver synthesize the parent's
-// Function shape without a DB lookup. FnSlug is always populated; FnName may
-// be empty (the UI falls back to FnSlug).
-type RunDeferredFrom struct {
-	RunID  ulid.ULID `json:"runID"`
-	FnSlug string    `json:"-"`
-	FnName string    `json:"-"`
 }

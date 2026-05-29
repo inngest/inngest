@@ -74,12 +74,6 @@ type traceReader struct {
 	reader  cqrs.TraceReader
 }
 
-// GetTraceRunsByIDs batches per-row TraceRun lookups (e.g. defer
-// linkage's child/parent runs) into a single GetTraceRunsByRunIDs call.
-func (tr *traceReader) GetTraceRunsByIDs(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
-	return loadByRunID(ctx, keys, tr.reader.GetTraceRunsByRunIDs)
-}
-
 // just run id
 func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
 	results := make([]*dataloader.Result, len(keys))
@@ -182,15 +176,6 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 }
 
 func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
-	// executor.defer spans are storage backing run-to-run linkage (read
-	// separately via GetRunDefers), not execution steps. Keep them out of the
-	// trace tree entirely. Returning nil makes the caller's children loop
-	// (`if child == nil { continue }`) skip them; the spans stay persisted and
-	// queryable for linkage.
-	if span.Name == meta.SpanNameDefer {
-		return nil, nil
-	}
-
 	status := models.RunTraceSpanStatusRunning
 
 	// Make sure we parse dynamic statuses from updates

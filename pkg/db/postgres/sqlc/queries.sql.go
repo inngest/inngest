@@ -1009,43 +1009,6 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
-const getFunctionsBySlugs = `-- name: GetFunctionsBySlugs :many
-SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions
-WHERE slug = ANY($1::TEXT[])
-  AND archived_at IS NULL
-`
-
-func (q *Queries) GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*Function, error) {
-	rows, err := q.db.QueryContext(ctx, getFunctionsBySlugs, pq.Array(slugs))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Function
-	for rows.Next() {
-		var i Function
-		if err := rows.Scan(
-			&i.ID,
-			&i.AppID,
-			&i.Name,
-			&i.Slug,
-			&i.Config,
-			&i.CreatedAt,
-			&i.ArchivedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getHistoryItem = `-- name: GetHistoryItem :one
 SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result, step_type FROM history WHERE id = $1
 `
@@ -1746,51 +1709,6 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 		&i.HasAi,
 	)
 	return &i, err
-}
-
-const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id IN (SELECT UNNEST($1::CHAR(26)[]))
-`
-
-func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []string) ([]*TraceRun, error) {
-	rows, err := q.db.QueryContext(ctx, getTraceRunsByRunIDs, pq.Array(runIds))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*TraceRun
-	for rows.Next() {
-		var i TraceRun
-		if err := rows.Scan(
-			&i.RunID,
-			&i.AccountID,
-			&i.WorkspaceID,
-			&i.AppID,
-			&i.FunctionID,
-			&i.TraceID,
-			&i.QueuedAt,
-			&i.StartedAt,
-			&i.EndedAt,
-			&i.Status,
-			&i.SourceID,
-			&i.TriggerIds,
-			&i.Output,
-			&i.IsDebounce,
-			&i.BatchID,
-			&i.CronSchedule,
-			&i.HasAi,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many

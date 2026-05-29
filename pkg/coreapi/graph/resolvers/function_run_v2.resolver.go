@@ -2,9 +2,10 @@ package resolvers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/99designs/gqlgen/graphql"
+	"github.com/google/uuid"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -102,40 +103,27 @@ func (r *functionRunV2Resolver) SiblingDefers(ctx context.Context, fn *models.Fu
 }
 
 func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.FunctionRunV2) ([]*models.RunDeferredFrom, error) {
-	dfs, err := loader.LoadOneWithString[[]cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
+	df, err := loader.LoadOneWithString[[]cqrs.RunDeferredFrom](ctx, loader.FromCtx(ctx).RunDeferredFromLoader, fn.ID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving deferred-from linkage: %w", err)
 	}
-	if dfs == nil {
+	if df == nil {
 		return nil, nil
 	}
 
-	out := make([]*models.RunDeferredFrom, 0, len(*dfs))
-	for _, df := range *dfs {
+	out := make([]*models.RunDeferredFrom, 0, len(*df))
+	for _, parent := range *df {
 		out = append(out, &models.RunDeferredFrom{
-			RunID:  df.RunID,
-			FnSlug: df.FnSlug,
-			FnName: df.FnName,
+			RunID:  parent.RunID,
+			FnSlug: parent.FnSlug,
 		})
 	}
 	return out, nil
 }
 
-// RunDefer field resolvers — Function/Run are loaded lazily so list views
-// that only render hashed id + status skip the joins.
-
-func (r *runDeferResolver) Function(ctx context.Context, obj *models.RunDefer) (*models.Function, error) {
-	if obj.FnSlug == "" {
-		return nil, nil
-	}
-	fn, err := loader.LoadOneWithString[cqrs.Function](
-		ctx, loader.FromCtx(ctx).FunctionBySlugLoader, obj.FnSlug,
-	)
+func (r *runDeferResolver) Function(ctx context.Context, d *models.RunDefer) (*models.Function, error) {
+	fn, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", d.FnSlug)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving function for defer linkage: %w", err)
-	}
-	// nil fn = slug doesn't resolve (function was deleted or renamed).
-	if fn == nil {
 		return nil, nil
 	}
 	return models.MakeFunction(fn)
@@ -145,59 +133,35 @@ func (r *runDeferResolver) Run(ctx context.Context, d *models.RunDefer) (*models
 	if d.RunID == nil {
 		return nil, nil
 	}
-	run, err := loader.LoadOneWithString[cqrs.TraceRun](
-		ctx, loader.FromCtx(ctx).TraceRunByIDLoader, d.RunID.String(),
-	)
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: *d.RunID})
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving defer child run: %w", err)
-	}
-	if run == nil {
-		return nil, nil
+		logger.StdlibLogger(ctx).Error(
+			"failed to get run",
+			"error", err,
+			"run_id", *d.RunID,
+		)
+		return nil, errors.New("failed to get run")
 	}
 	return models.MakeFunctionRunV2(run)
 }
 
-func (r *runDeferredFromResolver) Function(ctx context.Context, obj *models.RunDeferredFrom) (*models.Function, error) {
-	if obj.FnSlug == "" {
-		return nil, nil
+func (r *runDeferredFromResolver) Function(ctx context.Context, df *models.RunDeferredFrom) (*models.Function, error) {
+	fun, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", df.FnSlug)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving deferred-from parent function: %w", err)
 	}
-	synth := &models.Function{Name: obj.FnName, Slug: obj.FnSlug}
-	// Name+slug ride along on the defer.parents span attr, so list views
-	// can answer from the linkage with no DB lookup. Anything beyond
-	// name/slug requires the real record (synth fields like AppID are zero).
-	for _, f := range graphql.CollectAllFields(ctx) {
-		if f != "name" && f != "slug" && f != "__typename" {
-			fn, err := loader.LoadOneWithString[cqrs.Function](
-				ctx, loader.FromCtx(ctx).FunctionBySlugLoader, obj.FnSlug,
-			)
-			if err == nil && fn != nil {
-				return models.MakeFunction(fn)
-			}
-			// Not-found or loader error: synth keeps the row renderable.
-			// The loader logs batch failures once per request.
-			return synth, nil
-		}
-	}
-	return synth, nil
+	return models.MakeFunction(fun)
 }
 
-func (r *runDeferredFromResolver) Run(ctx context.Context, obj *models.RunDeferredFrom) (*models.FunctionRunV2, error) {
-	run, err := loader.LoadOneWithString[cqrs.TraceRun](
-		ctx, loader.FromCtx(ctx).TraceRunByIDLoader, obj.RunID.String(),
-	)
+func (r *runDeferredFromResolver) Run(ctx context.Context, df *models.RunDeferredFrom) (*models.FunctionRunV2, error) {
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: df.RunID})
 	if err != nil {
-		// Returning nil keeps the rest of the row renderable (linkage doesn't
-		// collapse), but a batched loader error can affect many rows in the
-		// same request — log so the degradation is visible.
 		logger.StdlibLogger(ctx).Error(
-			"failed to load deferred-from parent run; rendering linkage without run details",
-			"run_id", obj.RunID.String(),
+			"failed to get run",
 			"error", err,
+			"run_id", df.RunID,
 		)
-		return nil, nil
-	}
-	if run == nil {
-		return nil, nil
+		return nil, errors.New("failed to get run")
 	}
 	return models.MakeFunctionRunV2(run)
 }

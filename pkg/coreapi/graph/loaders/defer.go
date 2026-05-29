@@ -55,17 +55,7 @@ func loadByRunID[V any](
 	}
 
 	for _, p := range parsedKeys {
-		// A missing key is mapped to Data: nil. Each caller decides what that
-		// means for their domain — for run-defer/deferred-from loaders it's
-		// the valid "this run has no defers/parents" state; for the trace-run
-		// loader it's "child run not yet persisted" (the linkage is recorded
-		// before the run shows up in trace storage).
-		v, ok := byRunID[p.runID]
-		if !ok {
-			results[p.index] = &dataloader.Result{Data: nil}
-			continue
-		}
-		results[p.index] = &dataloader.Result{Data: v}
+		results[p.index] = &dataloader.Result{Data: byRunID[p.runID]}
 	}
 	return results
 }

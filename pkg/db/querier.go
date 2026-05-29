@@ -35,7 +35,6 @@ type Querier interface {
 	GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
-	GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*Function, error)
 	GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
 	UpsertFunction(ctx context.Context, arg UpsertFunctionParams) (*Function, error)
@@ -90,7 +89,6 @@ type Querier interface {
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
 	InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
-	GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
