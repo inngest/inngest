@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
@@ -16,6 +17,15 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/redis/rueidis"
 )
+
+const releaseFinalizationClaimLua = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+	return redis.call("DEL", KEYS[1])
+end
+return 0
+`
+
+var releaseFinalizationClaimScript = NewClusterLuaScript(releaseFinalizationClaimLua)
 
 func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
 	o := &mgrV2Opts{}
@@ -206,13 +216,13 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 // executor depends only on the state/v2 finalization-claim contract.
 func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (state.FinalizationClaim, error) {
 	r, key := v.finalizationClaimHandle(ctx, md)
-	val := md.ID.RunID.String()
+	claimToken := uuid.NewString()
 
 	res, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().
 			Set().
 			Key(key).
-			Value(val).
+			Value(claimToken).
 			Nx().
 			Ex(consts.FunctionIdempotencyPeriod).
 			Build()
@@ -229,9 +239,7 @@ func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (state.Fin
 	}
 
 	return state.NewFinalizationClaim(true, func(ctx context.Context) error {
-		if err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Del().Key(key).Build()
-		}).Error(); err != nil {
+		if err := releaseFinalizationClaimScript.Exec(ctx, r, []string{key}, []string{claimToken}).Error(); err != nil {
 			return fmt.Errorf("error releasing finalization claim: %w", err)
 		}
 		return nil
