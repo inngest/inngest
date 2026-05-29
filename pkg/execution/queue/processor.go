@@ -423,16 +423,6 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	return eg.Wait()
 }
 
-// SetFunctionMigrate implements Queue.
-func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard string, scope Scope, migrateLockUntil *time.Time) error {
-	shard, err := q.shards.ByName(sourceShard)
-	if err != nil {
-		return fmt.Errorf("could not find shard %q", sourceShard)
-	}
-
-	return shard.SetFunctionMigrate(ctx, scope, migrateLockUntil)
-}
-
 // UnpauseFunction implements Queue.
 func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, scope Scope) error {
 	shard, err := q.shards.ByName(shardName)

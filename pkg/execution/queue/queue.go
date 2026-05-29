@@ -83,9 +83,6 @@ type Consumer interface {
 type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
 
 type Migrator interface {
-	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
-	// another queue shard
-	SetFunctionMigrate(ctx context.Context, sourceShard string, scope Scope, migrateLockUntil *time.Time) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
 	Migrate(ctx context.Context, shard string, scope Scope, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)

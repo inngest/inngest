@@ -13,30 +13,8 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
 )
-
-func (q *queue) IsMigrationLocked(ctx context.Context, scope osqueue.Scope) (*time.Time, error) {
-	client := q.RedisClient.Client()
-	kg := q.RedisClient.KeyGenerator()
-	cmd := client.B().Get().Key(kg.QueueMigrationLock(scope.FunctionID)).Build()
-	exists, err := client.Do(ctx, cmd).ToString()
-	if err != nil {
-		if rueidis.IsRedisNil(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("could not check for migration lock: %w", err)
-	}
-
-	parsed, err := ulid.Parse(exists)
-	if err != nil {
-		return nil, fmt.Errorf("invalid lock format: %w", err)
-	}
-
-	lockUntil := parsed.Timestamp()
-	return &lockUntil, nil
-}
 
 // peekShadowPartitions returns pending shadow partitions within the global shadow partition pointer _or_ account shadow partition pointer ZSET.
 func (q *queue) PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*osqueue.QueueShadowPartition, error) {

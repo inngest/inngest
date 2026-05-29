@@ -93,16 +93,6 @@ func (q *queue) PartitionByID(ctx context.Context, scope osqueue.Scope, partitio
 	if qp.FunctionID != nil && qp.EnvID != nil {
 		paused := q.PartitionPausedGetter(ctx, *qp.FunctionID)
 		result.Paused = paused.Paused
-
-		locked, err := q.IsMigrationLocked(ctx, osqueue.Scope{
-			AccountID:  qp.AccountID,
-			EnvID:      *qp.EnvID,
-			FunctionID: *qp.FunctionID,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not get locked state: %w", err)
-		}
-		result.Migrate = locked != nil
 	}
 
 	return &result, nil

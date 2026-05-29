@@ -5,7 +5,6 @@ type PartitionInspectionResult struct {
 	QueueShadowPartition *QueueShadowPartition
 
 	Paused            bool `json:"paused"`
-	Migrate           bool `json:"migrate"`
 	AccountInProgress int  `json:"acct_in_progress"`
 	Ready             int  `json:"ready"`
 	InProgress        int  `json:"in_progress"`

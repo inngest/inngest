@@ -335,7 +335,6 @@ type ShardOperations interface {
 
 	RemoveQueueItem(ctx context.Context, scope Scope, partitionID string, itemID string) error
 
-	SetFunctionMigrate(ctx context.Context, scope Scope, migrateLockUntil *time.Time) error
 	ResetAttemptsByJobID(ctx context.Context, scope Scope, jobID string) error
 
 	PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error)
@@ -345,8 +344,6 @@ type ShardOperations interface {
 	ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error
 
 	LoadQueueItem(ctx context.Context, itemID string) (*QueueItem, error)
-
-	IsMigrationLocked(ctx context.Context, scope Scope) (*time.Time, error)
 
 	ItemExists(ctx context.Context, scope Scope, jobID string) (bool, error)
 	ItemsByRunID(ctx context.Context, scope Scope, runID ulid.ULID) ([]*QueueItem, error)

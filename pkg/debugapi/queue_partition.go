@@ -102,9 +102,8 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 	}
 
 	return &pb.PartitionStatusResponse{
-		Id:      req.GetId(),
-		Paused:  pt.Paused,
-		Migrate: pt.Migrate,
+		Id:     req.GetId(),
+		Paused: pt.Paused,
 
 		AccountInProgress: int64(pt.AccountInProgress),
 		Ready:             int64(pt.Ready),

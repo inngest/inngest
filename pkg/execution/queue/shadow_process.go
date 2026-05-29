@@ -34,29 +34,6 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 
 	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
 	if shadowPart.FunctionID != nil && shadowPart.AccountID != nil && shadowPart.EnvID != nil {
-		lockedUntil, err := shard.IsMigrationLocked(ctx, Scope{
-			AccountID:  *shadowPart.AccountID,
-			EnvID:      *shadowPart.EnvID,
-			FunctionID: *shadowPart.FunctionID,
-		})
-		if err != nil {
-			return fmt.Errorf("could not check for migration lock: %w", err)
-		}
-
-		if lockedUntil != nil {
-			q.removeShadowContinue(ctx, shadowPart, false)
-			_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
-				err := shard.ShadowPartitionRequeue(ctx, shadowPart, lockedUntil)
-				return nil, err
-			}, map[string]any{"reason": "migrating"})
-			switch err {
-			case nil, ErrShadowPartitionNotFound:
-				return nil
-			default:
-				return fmt.Errorf("could not requeue migrating shadow partition: %w", err)
-			}
-		}
-
 		// Check paused status with a timeout
 		dbCtx, dbCtxCancel := context.WithTimeout(ctx, DatabaseReadTimeout)
 		info := q.PartitionPausedGetter(dbCtx, *shadowPart.FunctionID)

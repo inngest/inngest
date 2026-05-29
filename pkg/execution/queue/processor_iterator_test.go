@@ -148,10 +148,6 @@ func (m *mockShardForIterator) ItemsByBacklog(ctx context.Context, backlogID str
 	return nil, nil
 }
 
-func (m *mockShardForIterator) SetFunctionMigrate(ctx context.Context, scope Scope, migrateLockUntil *time.Time) error {
-	return nil
-}
-
 func (m *mockShardForIterator) ResetAttemptsByJobID(ctx context.Context, scope Scope, jobID string) error {
 	return nil
 }
@@ -317,10 +313,6 @@ func (m *mockShardForIterator) BacklogByID(ctx context.Context, backlogID string
 }
 
 func (m *mockShardForIterator) PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
-	return nil, nil
-}
-
-func (m *mockShardForIterator) IsMigrationLocked(ctx context.Context, scope Scope) (*time.Time, error) {
 	return nil, nil
 }
 

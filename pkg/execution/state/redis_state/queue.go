@@ -2,7 +2,6 @@ package redis_state
 
 import (
 	"context"
-	crand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -325,34 +324,6 @@ func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, keyIndex, keyPa
 	default:
 		return fmt.Errorf("unknown response dropping pointer if empty: %d", status)
 	}
-}
-
-func (q *queue) SetFunctionMigrate(ctx context.Context, scope osqueue.Scope, migrateLockUntil *time.Time) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
-	client := q.RedisClient.Client()
-	kg := q.RedisClient.KeyGenerator()
-
-	key := kg.QueueMigrationLock(scope.FunctionID)
-	if migrateLockUntil == nil {
-		cmd := client.B().Del().Key(key).Build()
-		err := client.Do(ctx, cmd).Error()
-		if err != nil {
-			return fmt.Errorf("could not set migration lock: %w", err)
-		}
-	} else {
-		lockID, err := ulid.New(ulid.Timestamp(*migrateLockUntil), crand.Reader)
-		if err != nil {
-			return fmt.Errorf("could not generate lockID: %w", err)
-		}
-
-		cmd := client.B().Set().Key(key).Value(lockID.String()).Exat(*migrateLockUntil).Build()
-		err = client.Do(ctx, cmd).Error()
-		if err != nil {
-			return fmt.Errorf("could not remove migration lock: %w", err)
-		}
-	}
-
-	return nil
 }
 
 // removeQueueItem attempts to remove a specific item in the target queue shard

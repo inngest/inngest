@@ -81,7 +81,6 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 	if pts != nil {
 		if err := w.WriteOrdered(OrderedData(
 			"Paused", pts.Paused,
-			"Migrate", pts.Migrate,
 		)); err != nil {
 			return err
 		}
