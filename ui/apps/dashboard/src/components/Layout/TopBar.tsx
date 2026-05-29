@@ -12,16 +12,21 @@ import SearchTrigger from './SearchTrigger';
 export default function TopBar({
   activeEnv,
   profile,
+  showOnboardingWidget,
 }: {
   activeEnv?: Environment;
   profile?: ProfileDisplayType;
+  showOnboardingWidget: () => void;
 }) {
   return (
     <header className="bg-canvasSubtle relative z-[60] flex h-12 shrink-0 items-center justify-between gap-3 px-3">
       <div className="flex items-center gap-2">
         {profile && (
           <>
-            <OrgMenu profile={profile}>
+            <OrgMenu
+              profile={profile}
+              showOnboardingWidget={showOnboardingWidget}
+            >
               <OrgButton profile={profile} />
             </OrgMenu>
             <span className="text-disabled" aria-hidden>

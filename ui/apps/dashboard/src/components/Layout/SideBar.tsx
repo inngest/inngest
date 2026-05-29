@@ -3,22 +3,23 @@ import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
 import Navigation from '../Navigation/Navigation';
-import OnboardingGuideTrigger from '../Navigation/OnboardingGuideTrigger';
-import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
 import OnboardingWidget from '../Navigation/OnboardingWidget';
 
 export default function SideBar({
   collapsed: serverCollapsed,
   activeEnv,
+  isWidgetOpen,
+  closeWidget,
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
+  isWidgetOpen: boolean;
+  closeWidget: () => void;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
 
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
-  const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
 
   const autoCollapse = () =>
     typeof window !== 'undefined' &&
@@ -52,8 +53,8 @@ export default function SideBar({
 
   return (
     <nav
-      className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start ${
-        collapsed ? 'w-[64px]' : 'w-[224px]'
+      className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start py-3 ${
+        collapsed ? 'w-[64px]' : 'w-[200px]'
       } shrink-0 overflow-visible border-r-hairline`}
       ref={navRef}
     >
@@ -62,7 +63,7 @@ export default function SideBar({
         type="button"
         onClick={toggleCollapsed}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className="bg-canvasBase border-subtle shadow-xs absolute right-0 top-6 z-10 hidden h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-hairline group-hover:flex"
+        className="bg-canvasBase border-subtle shadow-xs absolute right-0 top-6 z-[70] hidden h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-hairline group-hover:flex"
       >
         {collapsed ? (
           <RiContractRightLine className="text-muted h-3.5 w-3.5" />
@@ -74,15 +75,10 @@ export default function SideBar({
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
-        <div className="mx-4">
+        <div className="pl-3 pr-2">
           <SeatOverageWidget collapsed={collapsed} />
-          {isWidgetOpen ? (
+          {isWidgetOpen && (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
-          ) : (
-            <OnboardingGuideTrigger
-              collapsed={collapsed}
-              showWidget={showWidget}
-            />
           )}
         </div>
       </div>

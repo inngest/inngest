@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import {
   RiArrowLeftRightLine,
   RiBillLine,
+  RiBookReadLine,
   RiEqualizerLine,
   RiGroupLine,
   RiKey2Line,
@@ -12,17 +13,25 @@ import {
 import type { FileRouteTypes } from '@/routeTree.gen';
 import type { ProfileDisplayType } from '@/queries/server/profile';
 import { pathCreator } from '@/utils/urls';
+import useOnboardingStep from '../Onboarding/useOnboardingStep';
 
 type Props = React.PropsWithChildren<{
   profile: ProfileDisplayType;
+  showOnboardingWidget: () => void;
 }>;
 
 const itemClassName =
   'text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]';
 
-export const OrgMenu = ({ children, profile }: Props) => {
+export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
   const navigate = useNavigate();
+  const { nextStep, lastCompletedStep } = useOnboardingStep();
   const orgName = profile.orgName ?? '';
+
+  const onboardingTo = pathCreator.onboardingSteps({
+    step: nextStep ? nextStep.name : lastCompletedStep?.name,
+    ref: 'app-org-menu-onboarding',
+  });
 
   return (
     <Listbox>
@@ -92,6 +101,18 @@ export const OrgMenu = ({ children, profile }: Props) => {
           >
             <RiKey2Line className="text-muted mr-2 h-4 w-4" />
             <div>API keys</div>
+          </Listbox.Option>
+
+          <Listbox.Option
+            className={itemClassName}
+            value="onboardingGuide"
+            onClick={() => {
+              showOnboardingWidget();
+              navigate({ to: onboardingTo });
+            }}
+          >
+            <RiBookReadLine className="text-muted mr-2 h-4 w-4" />
+            <div>Onboarding guide</div>
           </Listbox.Option>
 
           <hr className="border-subtle mt-2" />

@@ -7,6 +7,7 @@ import SideBar from './SideBar';
 import TopBar from './TopBar';
 import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
 import IncidentBanner from '../Incident/IncidentBanner';
+import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 
 type LayoutProps = {
   collapsed: boolean | undefined;
@@ -21,12 +22,25 @@ export default function Layout({
   profile,
   children,
 }: LayoutProps) {
+  // Hoist the onboarding-widget state so the trigger can live in the org
+  // menu (top bar) while the widget itself renders in the sidebar.
+  const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
+
   return (
     <div className="bg-canvasSubtle flex h-screen w-full flex-col overflow-hidden">
-      <TopBar activeEnv={activeEnv} profile={profile} />
+      <TopBar
+        activeEnv={activeEnv}
+        profile={profile}
+        showOnboardingWidget={showWidget}
+      />
 
       <div className="border-subtle bg-canvasBase shadow-xs mx-3 flex flex-1 flex-row overflow-hidden rounded border-hairline">
-        <SideBar activeEnv={activeEnv} collapsed={collapsed} />
+        <SideBar
+          activeEnv={activeEnv}
+          collapsed={collapsed}
+          isWidgetOpen={isWidgetOpen}
+          closeWidget={closeWidget}
+        />
 
         <div
           id="layout-scroll-container"
