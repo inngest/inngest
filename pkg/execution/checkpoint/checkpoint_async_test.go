@@ -195,46 +195,6 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		require.True(hasMetadata, "Expected a metadata span")
 	})
 
-	t.Run("defer add", func(t *testing.T) {
-		// Async path handles OpcodeDeferAdd the same way the sync path
-		// does: persist a Defer record. SDK-side memoization is carried
-		// by the SDKRequest `Defers` map, not the steps map, so no
-		// SaveStep is expected.
-		//
-		// Note: there's intentionally no async equivalent of the sync
-		// path's "bundled with RunComplete" test. Async checkpoints
-		// can't bundle RunComplete — checkpointAsyncSteps's switch
-		// returns "cannot checkpoint opcode" for OpcodeRunComplete.
-		ctx := context.Background()
-		require := require.New(t)
-
-		op := state.GeneratorOpcode{
-			ID: "step-defer",
-			Op: enums.OpcodeDeferAdd,
-			Opts: map[string]any{
-				"fn_slug": "onDefer-score",
-				"input":   map[string]any{"user_id": "u_123"},
-			},
-		}
-
-		mocks, testData := setupAsyncCheckpointTest(t, op)
-
-		mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
-			return d.FnSlug == "onDefer-score" &&
-				d.HashedID == "step-defer" &&
-				d.ScheduleStatus == enums.DeferStatusAfterRun &&
-				string(d.Input) == `{"user_id":"u_123"}`
-		})).Return(nil)
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
-
-		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
-		require.NoError(err)
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-	})
-
 	t.Run("step output too large", func(t *testing.T) {
 		// A single step whose output exceeds MaxStepOutputSize causes
 		// CheckpointAsyncSteps to return ErrStepOutputTooLarge without
@@ -326,6 +286,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 
 // setupAsyncCheckpointTest creates new mocks, asserting that
 func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testMocks, *testData) {
+	t.Helper()
 	ctx := context.Background()
 
 	// Create mock dependencies
@@ -370,15 +331,6 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 	// Setup mock expectations
 	mocks.state.On("LoadMetadata", ctx, asyncCheckpoint.ID()).Return(testMetadata, nil)
 
-	// Permissive expectation for the executor.defer span emitted from
-	// defers.SaveFromOp on the accepted branch. Defer-add tests don't
-	// otherwise wire CreateSpan and shouldn't have to; non-defer tests
-	// never trigger this path so .Maybe() is a no-op for them.
-	mocks.tracer.
-		On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.Anything).
-		Return((*meta.SpanReference)(nil), nil).
-		Maybe()
-
 	// Create checkpointer
 	checkpointer := New(Opts{
 		State:           mocks.state,
@@ -419,29 +371,6 @@ func (m *mockRunService) SaveStep(ctx context.Context, id state.ID, stepID strin
 func (m *mockRunService) UpdateMetadata(ctx context.Context, id state.ID, config state.MutableConfig) error {
 	args := m.Called(ctx, id, config)
 	return args.Error(0)
-}
-
-func (m *mockRunService) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
-	args := m.Called(ctx, id, d)
-	return args.Error(0)
-}
-
-func (m *mockRunService) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer, error) {
-	args := m.Called(ctx, id)
-	var defers map[string]state.Defer
-	if v := args.Get(0); v != nil {
-		defers = v.(map[string]state.Defer)
-	}
-	return defers, args.Error(1)
-}
-
-func (m *mockRunService) LoadDefersMeta(ctx context.Context, id state.ID) (map[string]state.DeferMeta, error) {
-	args := m.Called(ctx, id)
-	var defers map[string]state.DeferMeta
-	if v := args.Get(0); v != nil {
-		defers = v.(map[string]state.DeferMeta)
-	}
-	return defers, args.Error(1)
 }
 
 // mockTracerProvider mocks the tracing.TracerProvider interface

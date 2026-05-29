@@ -215,158 +215,6 @@ func TestCheckpointSyncSteps(t *testing.T) {
 		mocks.executor.AssertExpectations(t)
 	})
 
-	t.Run("defer add", func(t *testing.T) {
-		// A sync checkpoint containing an OpcodeDeferAdd persists a Defer
-		// record with DeferStatusAfterRun, matching the executor's
-		// non-checkpoint handleGeneratorDeferAdd path.
-		ctx := context.Background()
-		require := require.New(t)
-
-		op := state.GeneratorOpcode{
-			ID: "step-defer",
-			Op: enums.OpcodeDeferAdd,
-			Opts: map[string]any{
-				"fn_slug": "onDefer-score",
-				"input":   map[string]any{"user_id": "u_123"},
-			},
-		}
-
-		mocks, testData := setupSyncCheckpointTest(t, op)
-
-		mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
-			return d.FnSlug == "onDefer-score" &&
-				d.HashedID == "step-defer" &&
-				d.ScheduleStatus == enums.DeferStatusAfterRun &&
-				string(d.Input) == `{"user_id":"u_123"}`
-		})).Return(nil)
-
-		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
-		require.NoError(err)
-
-		// No discovery step should be enqueued (the SDK is driving the run).
-		mocks.queue.AssertNotCalled(t, "Enqueue")
-		// DeferAdd is a sync opcode — no async mode transition should fire.
-		mocks.tracer.AssertNotCalled(t, "UpdateSpan")
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-		mocks.executor.AssertExpectations(t)
-	})
-
-	t.Run("defer add bundled with RunComplete", func(t *testing.T) {
-		// [DeferAdd, RunComplete] in a single batch persists the Defer (so
-		// Finalize's LoadDefers can read it before state deletion) and
-		// invokes Finalize. ForceStepPlan must NOT trigger because the
-		// batch has only one non-lazy op.
-		ctx := context.Background()
-		require := require.New(t)
-
-		ops := []state.GeneratorOpcode{
-			{
-				ID: "step-defer",
-				Op: enums.OpcodeDeferAdd,
-				Opts: map[string]any{
-					"fn_slug": "onDefer-score",
-					"input":   map[string]any{},
-				},
-			},
-			{
-				ID:   "run-complete",
-				Op:   enums.OpcodeRunComplete,
-				Data: json.RawMessage(`{"data": {"status_code": 200}}`),
-			},
-		}
-
-		mocks, testData := setupSyncCheckpointTest(t, ops...)
-
-		// SaveDefer must run before Finalize (which deletes state) so the
-		// Defer record is readable by Finalize's LoadDefers call.
-		mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
-			return d.HashedID == "step-defer" && d.FnSlug == "onDefer-score"
-		})).Return(nil)
-
-		// Finalize must be called for this run with the RunComplete response type.
-		mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
-			return opts.Metadata.ID == testData.metadata.ID &&
-				opts.Response.Type == execution.FinalizeResponseAPI
-		})).Return(nil)
-
-		// Registered so the async goroutine in checkpoint.go (`go MetricsProvider.OnFnFinished`)
-		// doesn't panic on an unmocked call. Not asserted: the goroutine races against
-		// the test's return.
-		mocks.metrics.On("OnFnFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.RunStatusCompleted)
-
-		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
-		require.NoError(err)
-
-		mocks.state.AssertNotCalled(t, "UpdateMetadata", mock.Anything, mock.Anything, mock.Anything)
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-		mocks.executor.AssertExpectations(t)
-	})
-
-	t.Run("defer add reordered before RunComplete still saves", func(t *testing.T) {
-		// Ordering invariant: DeferAdd must drain before RunComplete even
-		// when the SDK delivers them in the opposite order. Without the
-		// priority reorder, RunComplete's Finalize would delete state
-		// before SaveDefer ran, silently dropping the deferred run.
-		ctx := context.Background()
-		r := require.New(t)
-
-		ops := []state.GeneratorOpcode{
-			{
-				ID:   "run-complete",
-				Op:   enums.OpcodeRunComplete,
-				Data: json.RawMessage(`{"data": {"status_code": 200}}`),
-			},
-			{
-				ID: "step-defer",
-				Op: enums.OpcodeDeferAdd,
-				Opts: map[string]any{
-					"fn_slug": "onDefer-score",
-					"input":   map[string]any{},
-				},
-			},
-		}
-
-		mocks, testData := setupSyncCheckpointTest(t, ops...)
-
-		var saveDeferAt, finalizeAt int
-		var calls int
-
-		mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
-			return d.HashedID == "step-defer" && d.FnSlug == "onDefer-score"
-		})).Run(func(args mock.Arguments) {
-			calls++
-			saveDeferAt = calls
-		}).Return(nil)
-
-		mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
-			return opts.Metadata.ID == testData.metadata.ID &&
-				opts.Response.Type == execution.FinalizeResponseAPI
-		})).Run(func(args mock.Arguments) {
-			calls++
-			finalizeAt = calls
-		}).Return(nil)
-
-		mocks.metrics.On("OnFnFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.RunStatusCompleted)
-
-		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
-		r.NoError(err)
-
-		r.NotZero(saveDeferAt, "SaveDefer must be called")
-		r.NotZero(finalizeAt, "Finalize must be called")
-		r.Less(saveDeferAt, finalizeAt, "SaveDefer must run before Finalize so LoadDefers can read the record")
-
-		mocks.state.AssertExpectations(t)
-		mocks.tracer.AssertExpectations(t)
-		mocks.queue.AssertExpectations(t)
-		mocks.executor.AssertExpectations(t)
-	})
-
 	t.Run("step output too large", func(t *testing.T) {
 		// A single step whose output exceeds MaxStepOutputSize causes
 		// CheckpointSyncSteps to return ErrStepOutputTooLarge without
@@ -991,15 +839,6 @@ func setupSyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testS
 	// LoadMetadata should NOT be called since syncCheckpoint.Metadata is already set
 	mocks.state.AssertNotCalled(t, "LoadMetadata")
 
-	// Permissive expectation for the executor.defer span emitted from
-	// defers.SaveFromOp on the accepted branch. Defer-add tests don't
-	// otherwise wire CreateSpan and shouldn't have to; non-defer tests
-	// never trigger this path so .Maybe() is a no-op for them.
-	mocks.tracer.
-		On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.Anything).
-		Return((*meta.SpanReference)(nil), nil).
-		Maybe()
-
 	// Create checkpointer
 	checkpointer := New(Opts{
 		State:           mocks.state,
@@ -1087,7 +926,7 @@ func (m *mockFnReader) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.
 // mockConfigFunction mocks the config function interface
 type mockConfigFunction struct{}
 
-func (m *mockConfigFunction) InngestFunction() (interface{}, error) {
+func (m *mockConfigFunction) InngestFunction() (any, error) {
 	return &mockInngestFunction{}, nil
 }
 
