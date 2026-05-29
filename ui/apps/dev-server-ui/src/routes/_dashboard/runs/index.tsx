@@ -171,6 +171,7 @@ function RunsComponent() {
         status: filteredStatus,
         timeField,
         celQuery: search,
+        preview,
         isDeferred: excludeDeferred ? false : null,
       });
       setTotalCount(data.runs.totalCount);
@@ -181,6 +182,7 @@ function RunsComponent() {
     filteredStatus,
     timeField,
     search,
+    preview,
     excludeDeferred,
   ]);
 
