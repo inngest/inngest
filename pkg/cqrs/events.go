@@ -11,7 +11,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const MaxEvents = 51
+const MaxEvents = 100
 
 func ConvertFromEvent(internalID ulid.ULID, e event.Event) Event {
 	return Event{
