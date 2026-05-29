@@ -1933,23 +1933,6 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 	return traceRunToCQRS(run), nil
 }
 
-func (w wrapper) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID]*cqrs.TraceRun, error) {
-	if len(runIDs) == 0 {
-		return map[ulid.ULID]*cqrs.TraceRun{}, nil
-	}
-
-	rows, err := w.q.GetTraceRunsByRunIDs(ctx, runIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make(map[ulid.ULID]*cqrs.TraceRun, len(rows))
-	for _, row := range rows {
-		out[row.RunID] = traceRunToCQRS(row)
-	}
-	return out, nil
-}
-
 func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 	start := time.UnixMilli(run.StartedAt)
 	end := time.UnixMilli(run.EndedAt)

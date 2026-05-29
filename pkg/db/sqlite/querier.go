@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/inngest/inngest/pkg/db"
+	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -628,17 +628,6 @@ func (sq *sqliteQuerier) GetTraceRun(ctx context.Context, runID ulid.ULID) (*db.
 		return nil, err
 	}
 	return traceRunFromSQLite(r), nil
-}
-
-func (sq *sqliteQuerier) GetTraceRunsByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*db.TraceRun, error) {
-	if len(runIDs) == 0 {
-		return nil, nil
-	}
-	rows, err := sq.q.GetTraceRunsByRunIDs(ctx, runIDs)
-	if err != nil {
-		return nil, err
-	}
-	return convertSlice(rows, traceRunFromSQLite), nil
 }
 
 func (sq *sqliteQuerier) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*db.TraceRun, error) {

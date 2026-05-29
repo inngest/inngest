@@ -2,12 +2,14 @@ package resolvers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -131,13 +133,14 @@ func (r *runDeferResolver) Run(ctx context.Context, d *models.RunDefer) (*models
 	if d.RunID == nil {
 		return nil, nil
 	}
-	runs, err := r.Data.GetTraceRunsByRunIDs(ctx, []ulid.ULID{*d.RunID})
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: *d.RunID})
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving defer child run: %w", err)
-	}
-	run, ok := runs[*d.RunID]
-	if !ok || run == nil {
-		return nil, nil
+		logger.StdlibLogger(ctx).Error(
+			"failed to get run",
+			"error", err,
+			"run_id", *d.RunID,
+		)
+		return nil, errors.New("failed to get run")
 	}
 	return models.MakeFunctionRunV2(run)
 }
@@ -151,13 +154,14 @@ func (r *runDeferredFromResolver) Function(ctx context.Context, df *models.RunDe
 }
 
 func (r *runDeferredFromResolver) Run(ctx context.Context, df *models.RunDeferredFrom) (*models.FunctionRunV2, error) {
-	runs, err := r.Data.GetTraceRunsByRunIDs(ctx, []ulid.ULID{df.RunID})
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: df.RunID})
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving deferred-from parent run: %w", err)
-	}
-	run, ok := runs[df.RunID]
-	if !ok || run == nil {
-		return nil, nil
+		logger.StdlibLogger(ctx).Error(
+			"failed to get run",
+			"error", err,
+			"run_id", df.RunID,
+		)
+		return nil, errors.New("failed to get run")
 	}
 	return models.MakeFunctionRunV2(run)
 }
