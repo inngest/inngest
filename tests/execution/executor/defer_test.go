@@ -819,7 +819,7 @@ func TestDeferAdd(t *testing.T) {
 						ID: acceptedID,
 						Opts: map[string]any{
 							"fn_slug": "onDefer-score",
-							"input":   string(bigInput),
+							"input":   map[string]any{"msg": string(bigInput)},
 						},
 					},
 					{
@@ -827,7 +827,7 @@ func TestDeferAdd(t *testing.T) {
 						ID: rejectedID,
 						Opts: map[string]any{
 							"fn_slug": "onDefer-score",
-							"input":   string(overflowInput),
+							"input":   map[string]any{"msg": string(overflowInput)},
 						},
 					},
 				},

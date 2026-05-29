@@ -63,7 +63,6 @@ func SaveFromOp(
 			rejectReason = "invalid_opts"
 		}
 		if opts != nil {
-			fmt.Println("saving defer")
 			if err := rs.SaveDefer(ctx, md.ID, statev2.Defer{
 				FnSlug:         opts.FnSlug,
 				HashedID:       op.ID,

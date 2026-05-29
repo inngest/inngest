@@ -195,7 +195,7 @@ func TestSaveDefer(t *testing.T) {
 			FnSlug:         "onDefer-score",
 			HashedID:       "hash-accepted",
 			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          json.RawMessage(`"` + string(bigInput) + `"`),
+			Input:          json.RawMessage(`{"msg": "` + string(bigInput) + `"}`),
 		}))
 
 		// Reject since it'd exceed the aggregate cap
@@ -207,7 +207,7 @@ func TestSaveDefer(t *testing.T) {
 			FnSlug:         "onDefer-score",
 			HashedID:       "hash-rejected",
 			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          json.RawMessage(`"` + string(overflowInput) + `"`),
+			Input:          json.RawMessage(`{"msg": "` + string(overflowInput) + `"}`),
 		})
 		r.ErrorIs(err, statev2.ErrDeferInputAggregateExceeded)
 
@@ -236,7 +236,7 @@ func TestSaveDefer(t *testing.T) {
 			FnSlug:         "onDefer-score",
 			HashedID:       "hash-rejected",
 			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          json.RawMessage(`"` + string(overflow) + `"`),
+			Input:          json.RawMessage(`{"msg": "` + string(overflow) + `"}`),
 		}
 		r.ErrorIs(v2svc.SaveDefer(ctx, id, op), statev2.ErrDeferInputAggregateExceeded)
 
@@ -264,7 +264,7 @@ func TestSaveDefer(t *testing.T) {
 			FnSlug:         "onDefer-score",
 			HashedID:       "hash-first",
 			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          json.RawMessage(`"` + string(big) + `"`),
+			Input:          json.RawMessage(`{"msg": "` + string(big) + `"}`),
 		}
 		r.NoError(v2svc.SaveDefer(ctx, id, first))
 		r.NoError(v2svc.SaveDefer(ctx, id, first))
@@ -282,7 +282,7 @@ func TestSaveDefer(t *testing.T) {
 			FnSlug:         "onDefer-score",
 			HashedID:       "hash-second",
 			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          json.RawMessage(`"` + string(small) + `"`),
+			Input:          json.RawMessage(`{"msg": "` + string(small) + `"}`),
 		}
 		r.NoError(v2svc.SaveDefer(ctx, id, second))
 
