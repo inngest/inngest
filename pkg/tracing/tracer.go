@@ -158,8 +158,6 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	st := opts.StartTime
 	if st.IsZero() {
 		st = time.Now()
-	} else if !(isPairedTrailing) {
-		meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
 	}
 
 	if opts.Parent != nil {
