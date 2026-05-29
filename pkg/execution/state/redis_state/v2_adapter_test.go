@@ -514,7 +514,7 @@ func TestV2AdapterClaimFinalization(t *testing.T) {
 	require.NoError(t, err)
 
 	v2svc := MustRunServiceV2(mgr)
-	claimer, ok := v2svc.(statev2.FinalizationClaimer)
+	claimer, ok := v2svc.(statev2.FinalizationClaimAdapter)
 	require.True(t, ok)
 
 	functionID := uuid.New()
@@ -555,19 +555,26 @@ func TestV2AdapterClaimFinalization(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	claimed, err := claimer.ClaimFinalization(ctx, md)
+	claim, err := claimer.ClaimFinalization(ctx, md)
 	require.NoError(t, err)
-	require.True(t, claimed)
+	require.True(t, claim.Claimed())
+	firstClaim := claim
 
-	claimed, err = claimer.ClaimFinalization(ctx, md)
+	claim, err = claimer.ClaimFinalization(ctx, md)
 	require.NoError(t, err)
-	require.False(t, claimed)
+	require.False(t, claim.Claimed())
 
-	require.NoError(t, claimer.ReleaseFinalization(ctx, md))
+	require.NoError(t, claim.Release(ctx), "duplicate claim release is a no-op")
 
-	claimed, err = claimer.ClaimFinalization(ctx, md)
+	claim, err = claimer.ClaimFinalization(ctx, md)
 	require.NoError(t, err)
-	require.True(t, claimed)
+	require.False(t, claim.Claimed())
+
+	require.NoError(t, firstClaim.Release(ctx))
+
+	claim, err = claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.True(t, claim.Claimed())
 }
 
 func TestV2AdapterWithDisabledRetries(t *testing.T) {

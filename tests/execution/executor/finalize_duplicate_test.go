@@ -318,7 +318,7 @@ func TestFinalizeDeleteFailureDoesNotLoseFinishEffects(t *testing.T) {
 	)
 	require.NoError(t, err)
 	baseState := redis_state.MustRunServiceV2(sm)
-	claimant, ok := baseState.(statev2.FinalizationClaimer)
+	claimant, ok := baseState.(statev2.FinalizationClaimAdapter)
 	require.True(t, ok)
 
 	stateSvc := &deleteFailsOnceRunService{
@@ -433,7 +433,7 @@ func TestFinalizeDeleteFailureDoesNotLoseFinishEffects(t *testing.T) {
 
 type deleteFailsOnceRunService struct {
 	statev2.RunService
-	claimant statev2.FinalizationClaimer
+	claimant statev2.FinalizationClaimAdapter
 
 	mu          sync.Mutex
 	deleteCalls int
@@ -451,10 +451,6 @@ func (d *deleteFailsOnceRunService) Delete(ctx context.Context, id statev2.ID) e
 	return d.RunService.Delete(ctx, id)
 }
 
-func (d *deleteFailsOnceRunService) ClaimFinalization(ctx context.Context, md statev2.Metadata) (bool, error) {
+func (d *deleteFailsOnceRunService) ClaimFinalization(ctx context.Context, md statev2.Metadata) (statev2.FinalizationClaim, error) {
 	return d.claimant.ClaimFinalization(ctx, md)
-}
-
-func (d *deleteFailsOnceRunService) ReleaseFinalization(ctx context.Context, md statev2.Metadata) error {
-	return d.claimant.ReleaseFinalization(ctx, md)
 }

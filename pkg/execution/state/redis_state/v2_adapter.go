@@ -201,9 +201,10 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 	})
 }
 
-// ClaimFinalization atomically claims finish-effect emission for a run and
-// returns true only for the first caller allowed to emit finish effects.
-func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (bool, error) {
+// ClaimFinalization claims finish-effect emission for a run using Redis SET NX.
+// The Redis key layout is intentionally kept inside this adapter so the
+// executor depends only on the state/v2 finalization-claim contract.
+func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (state.FinalizationClaim, error) {
 	r, key := v.finalizationClaimHandle(ctx, md)
 	val := md.ID.RunID.String()
 
@@ -217,26 +218,24 @@ func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (bool, err
 			Build()
 	}).ToString()
 	if err == rueidis.Nil {
-		return false, nil
+		return state.NewFinalizationClaim(false, nil), nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("error claiming finalization: %w", err)
+		return state.NewFinalizationClaim(false, nil), fmt.Errorf("error claiming finalization: %w", err)
 	}
 
-	return res == "OK", nil
-}
-
-// ReleaseFinalization clears a previously-acquired finalization claim after a
-// failed publish so a retry can attempt finish effects again.
-func (v v2) ReleaseFinalization(ctx context.Context, md state.Metadata) error {
-	r, key := v.finalizationClaimHandle(ctx, md)
-	if err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Del().Key(key).Build()
-	}).Error(); err != nil {
-		return fmt.Errorf("error releasing finalization claim: %w", err)
+	if res != "OK" {
+		return state.NewFinalizationClaim(false, nil), nil
 	}
 
-	return nil
+	return state.NewFinalizationClaim(true, func(ctx context.Context) error {
+		if err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Del().Key(key).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("error releasing finalization claim: %w", err)
+		}
+		return nil
+	}), nil
 }
 
 func (v v2) finalizationClaimHandle(ctx context.Context, md state.Metadata) (RetriableClient, string) {
