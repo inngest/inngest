@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
+import { Pill } from '@inngest/components/Pill';
 import { IDCell, PillCell, TextCell, TimeCell } from '@inngest/components/Table';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
@@ -48,10 +51,16 @@ const columns = [
   columnHelper.accessor('id', {
     cell: (info) => {
       const id = info.getValue();
+      const isDeferred = info.row.original.runType === 'DEFER';
 
       return (
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <IDCell>{id}</IDCell>
+          {isDeferred && (
+            <Pill appearance="outlined" kind="default">
+              Defer
+            </Pill>
+          )}
         </div>
       );
     },
@@ -96,14 +105,9 @@ const columns = [
       const fnName = info.getValue().name;
       const isDeferred = data.runType === 'DEFER';
 
-      // A batched run can have several parents; show the first for the
-      // list breadcrumb. Each name truncates independently so a long parent
-      // name can't crowd out the child the user actually clicked into.
-      const parentName = data.deferredFrom?.[0]?.function?.name;
+      const parentFunction = data.deferredFrom?.[0]?.function;
+      const parentLabel = parentFunction?.name ?? parentFunction?.slug;
 
-      // Compose the name cell inline rather than early-returning the AI
-      // branch — an AI-using deferred run still needs the breadcrumb and
-      // "(Deferred)" suffix to be visible.
       const nameCell = data.hasAI ? (
         <AICell>{fnName}</AICell>
       ) : (
@@ -112,16 +116,17 @@ const columns = [
 
       return (
         <div className="flex max-w-md items-center gap-1">
-          {parentName && (
+          {isDeferred && (
             <>
-              <span className="text-muted min-w-0 truncate text-sm font-medium">{parentName}</span>
+              <OptionalTooltip tooltip={parentLabel}>
+                <span className="inline-flex">
+                  <FunctionsIcon className="text-muted h-4 w-4 shrink-0" />
+                </span>
+              </OptionalTooltip>
               <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
             </>
           )}
           {nameCell}
-          {isDeferred && (
-            <span className="text-light shrink-0 text-xs font-normal">(Deferred)</span>
-          )}
         </div>
       );
     },
