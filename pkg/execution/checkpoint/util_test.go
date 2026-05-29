@@ -23,7 +23,7 @@ func TestIsPairedTrailingStepRun(t *testing.T) {
 			name: "non-StepRun opcode is never paired-trailing",
 			op: state.GeneratorOpcode{
 				Op:   enums.OpcodeStepPlanned,
-				Opts: map[string]any{"_paired_trailing": true},
+				Opts: map[string]any{PairedTrailingKey: true},
 			},
 			want: false,
 		},
@@ -52,7 +52,7 @@ func TestIsPairedTrailingStepRun(t *testing.T) {
 			name: "StepRun with flag set to false",
 			op: state.GeneratorOpcode{
 				Op:   enums.OpcodeStepRun,
-				Opts: map[string]any{"_paired_trailing": false},
+				Opts: map[string]any{PairedTrailingKey: false},
 			},
 			want: false,
 		},
@@ -60,7 +60,7 @@ func TestIsPairedTrailingStepRun(t *testing.T) {
 			name: "StepRun with flag as a string is the wrong type",
 			op: state.GeneratorOpcode{
 				Op:   enums.OpcodeStepRun,
-				Opts: map[string]any{"_paired_trailing": "true"},
+				Opts: map[string]any{PairedTrailingKey: "true"},
 			},
 			want: false,
 		},
@@ -68,7 +68,7 @@ func TestIsPairedTrailingStepRun(t *testing.T) {
 			name: "StepRun with flag set to true",
 			op: state.GeneratorOpcode{
 				Op:   enums.OpcodeStepRun,
-				Opts: map[string]any{"_paired_trailing": true},
+				Opts: map[string]any{PairedTrailingKey: true},
 			},
 			want: true,
 		},
@@ -136,7 +136,7 @@ func TestStepRunAttrs(t *testing.T) {
 
 	t.Run("paired-trailing StepRun omits QueuedAt and StartedAt", func(t *testing.T) {
 		op := baseOp()
-		op.Opts = map[string]any{"_paired_trailing": true}
+		op.Opts = map[string]any{PairedTrailingKey: true}
 		attrs := stepRunAttrs(meta.NewAttrSet(), op, runID)
 
 		val, ok := meta.GetBoolFlag(attrs, meta.Attrs.IsPairedTrailing)

@@ -16,6 +16,8 @@ func stepDynamicSeed(op state.GeneratorOpcode, attempt int) []byte {
 	return fmt.Appendf(nil, "%s:%d", op.ID, attempt)
 }
 
+const PairedTrailingKey = "_paired_trailing"
+
 // isPairedTrailingStepRun reports whether this StepRun is the trailing arm
 // of a paired StepPlanned + StepRun emitted by an SDK in checkpointing mode
 // for an in-progress step.
@@ -27,7 +29,7 @@ func isPairedTrailingStepRun(op state.GeneratorOpcode) bool {
 	if !ok {
 		return false
 	}
-	v, ok := opts["_paired_trailing"].(bool)
+	v, ok := opts[PairedTrailingKey].(bool)
 	return ok && v
 }
 
