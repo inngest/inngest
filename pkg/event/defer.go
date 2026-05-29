@@ -28,9 +28,9 @@ func DeferEventID(parent ulid.ULID, hashedID string) (ulid.ULID, error) {
 type DeferredScheduleMetadata struct {
 	FnSlug string `json:"fn_slug"`
 
-	// ParentRunSpan is the parent run's span reference. Used as Parent when
-	// emitting the executor.defer child-run-id linkage span at child-schedule
-	// time — stamped here so the executor doesn't re-derive it from string IDs.
+	// ParentRunSpan is the OTel ref of the parent's executor.run span, used as
+	// the Parent of the child-run-id linkage span emitted at child-schedule
+	// time. Stamped on the event so the executor doesn't re-derive it.
 	ParentRunSpan *meta.SpanReference `json:"parent_run_span,omitempty"`
 
 	ParentFnSlug string `json:"parent_fn_slug"`

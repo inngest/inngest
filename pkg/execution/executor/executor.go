@@ -1668,12 +1668,9 @@ func (e *executor) updateDeferSpanWithDeferredRunID(ctx context.Context, l logge
 			l.Debug("deferred schedule metadata parent function id failed defensive re-parse; skipping defer linkage", "parent_function_id", m.ParentFunctionID, "error", err)
 			continue
 		}
-		// The span is attributed to the PARENT run so GetRunDefers(parent) finds
-		// it. A deferred child shares its parent's tenant (defers schedule within
-		// the same env/account), so reuse the child's tenant for storage. Setting
-		// the real parent FunctionID ensures the OTEL processor's tenant-attr
-		// writer stamps a usable function_id on the linkage span (per-function
-		// span queries would otherwise miss it).
+		// parentMD only feeds the OTEL processor's tenant-attr writer so the
+		// linkage span lands under the parent's run/function for indexed
+		// lookup; the span's OTel parent is m.ParentRunSpan, not derived here.
 		parentMD := sv2.Metadata{ID: sv2.ID{RunID: parentRunID, FunctionID: parentFunctionID, Tenant: childMD.ID.Tenant}}
 		sv2.InitConfig(&parentMD.Config)
 		defers.EmitChildRunIDSpan(ctx, e.tracerProvider, m.ParentRunSpan, parentMD, e.now(), m.HashedDeferID, childMD.ID.RunID)
