@@ -154,6 +154,7 @@ type Span struct {
 	Status         sql.NullString
 	Input          pqtype.NullRawMessage
 	EventIds       pqtype.NullRawMessage
+	RunType        int32
 }
 
 type Trace struct {

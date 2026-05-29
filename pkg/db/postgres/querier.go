@@ -524,6 +524,7 @@ func (pq *pgQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams) er
 		DebugRunID:    arg.DebugRunID, DebugSessionID: arg.DebugSessionID,
 		Status:   arg.Status,
 		EventIds: bytesToNullRaw(arg.EventIds),
+		RunType:  arg.RunType,
 	})
 }
 

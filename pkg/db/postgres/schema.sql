@@ -213,7 +213,8 @@ CREATE TABLE public.spans (
     debug_session_id text,
     status text,
     input jsonb,
-    event_ids jsonb
+    event_ids jsonb,
+    run_type integer DEFAULT 1 NOT NULL
 );
 
 --

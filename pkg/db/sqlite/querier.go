@@ -448,6 +448,7 @@ func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
 		EventIds:       bytesToNullString(arg.EventIds),
+		RunType:        int64(arg.RunType),
 	})
 }
 

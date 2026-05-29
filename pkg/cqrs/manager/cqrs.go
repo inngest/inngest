@@ -2165,9 +2165,8 @@ type runsQueryBuilder struct {
 	cursorLayout *cqrs.TracePageCursor
 }
 
-// outerRunIDCol is the run_id column of the caller's FROM. When the caller is
-// already querying trace_runs we filter the column directly; otherwise we
-// subquery into trace_runs so the spans-path callers don't have to JOIN.
+// runTypeFilterExpr creates a run_type column filter. outerRunIDCol is the
+// run_id column of the caller's query.
 func runTypeFilterExpr(dialect string, outerRunIDCol string, runTypes []enums.RunType) sq.Expression {
 	wantPrimary := slices.Contains(runTypes, enums.RunTypePrimary)
 	wantDefer := slices.Contains(runTypes, enums.RunTypeDefer)
@@ -2185,9 +2184,9 @@ func runTypeFilterExpr(dialect string, outerRunIDCol string, runTypes []enums.Ru
 	}
 
 	sub := sq.Dialect(dialect).
-		From("trace_runs").
+		From("spans").
 		Select(sq.C("run_id")).
-		Where(sq.C("run_type").Eq(target))
+		Where(sq.C("name").Eq(meta.SpanNameRun), sq.C("run_type").Eq(target))
 	return sq.I(outerRunIDCol).In(sub)
 }
 
@@ -3087,6 +3086,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		sq.L(`(SELECT s2.status FROM spans s2
 			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
 			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
+		sq.L("MAX(spans.run_type)").As("run_type"),
 		h.EventIDsExpr(), // DB-specific due to storage differences
 	}
 
@@ -3186,6 +3186,7 @@ func (w wrapper) convertSpanRunRows(
 	h driverhelp.DialectHelpers,
 	itemLimit uint,
 ) ([]*cqrs.TraceRun, error) {
+	fmt.Println("convertSpanRunRows")
 	l := logger.StdlibLogger(ctx)
 
 	type runRow struct {
@@ -3199,6 +3200,7 @@ func (w wrapper) convertSpanRunRows(
 		StartTime     string
 		EndTime       *string
 		Status        *string
+		RunType       *int64
 		EventIDs      *string
 	}
 
@@ -3218,6 +3220,7 @@ func (w wrapper) convertSpanRunRows(
 			&row.StartTime,
 			&row.EndTime,
 			&row.Status,
+			&row.RunType,
 			&row.EventIDs,
 		)
 		if err != nil {
@@ -3298,6 +3301,11 @@ func (w wrapper) convertSpanRunRows(
 			}
 		}
 
+		runType := enums.RunTypePrimary
+		if row.RunType != nil {
+			runType = enums.RunType(*row.RunType)
+		}
+
 		traceRun := &cqrs.TraceRun{
 			AccountID:   accountUUID,
 			WorkspaceID: workspaceUUID,
@@ -3309,6 +3317,7 @@ func (w wrapper) convertSpanRunRows(
 			StartedAt:   startTime,
 			Duration:    duration,
 			Status:      status,
+			RunType:     runType,
 			Cursor:      cursor,
 			TriggerIDs:  triggerIDs,
 		}
@@ -3323,33 +3332,6 @@ func (w wrapper) convertSpanRunRows(
 		// We have filled a page's worth of requests, so break
 		if itemLimit > 0 && count >= itemLimit {
 			break
-		}
-	}
-
-	// Stitch run_type from trace_runs table. Necessary because run_type isn't
-	// in spans. We may want to add run_type to spans in the future, but for now
-	// it's OK to stitch it in code. Don't replace with a SQL JOIN:
-	// trace_runs.run_id is stored as binary and spans.run_id as text, so the
-	// comparison silently matches nothing.
-	if len(res) > 0 {
-		ids := make([]ulid.ULID, 0, len(res))
-		for _, r := range res {
-			if id, err := ulid.Parse(r.RunID); err == nil {
-				ids = append(ids, id)
-			}
-		}
-		if traceRuns, err := w.GetTraceRunsByRunIDs(ctx, ids); err == nil {
-			for _, r := range res {
-				id, err := ulid.Parse(r.RunID)
-				if err != nil {
-					continue
-				}
-				if tr, ok := traceRuns[id]; ok {
-					r.RunType = tr.RunType
-				}
-			}
-		} else {
-			l.Warn("could not stitch run_type into preview run list", "error", err)
 		}
 	}
 

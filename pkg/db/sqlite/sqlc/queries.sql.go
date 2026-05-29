@@ -2247,7 +2247,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  run_type
 ) VALUES (
   ?1,
   ?2,
@@ -2268,7 +2269,8 @@ INSERT INTO spans (
   ?17,
   ?18,
   ?19,
-  CAST(?20 AS TEXT)
+  CAST(?20 AS TEXT),
+  ?21
 )
 `
 
@@ -2293,6 +2295,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       sql.NullString
+	RunType        int64
 }
 
 // New
@@ -2318,6 +2321,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.DebugSessionID,
 		arg.Status,
 		arg.EventIds,
+		arg.RunType,
 	)
 	return err
 }

@@ -402,7 +402,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  run_type
 ) VALUES (
   sqlc.arg(span_id),
   sqlc.arg(trace_id),
@@ -423,7 +424,8 @@ INSERT INTO spans (
   sqlc.narg(debug_run_id),
   sqlc.narg(debug_session_id),
   sqlc.narg(status),
-  CAST(sqlc.narg(event_ids) AS TEXT)
+  CAST(sqlc.narg(event_ids) AS TEXT),
+  sqlc.arg(run_type)
 );
 
 -- name: GetSpansByRunID :many
