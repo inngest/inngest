@@ -23,6 +23,9 @@ type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 // AccountPriorityFinder returns the priority for a given account.
 type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 
+// AccountExists reports whether an account can still process queue partitions.
+type AccountExists func(ctx context.Context, accountID uuid.UUID) (bool, error)
+
 type PartitionPausedInfo struct {
 	Stale  bool
 	Paused bool
@@ -60,6 +63,14 @@ func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) Queu
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
 	return func(q *QueueOptions) {
 		q.AccountPriorityFinder = apf
+	}
+}
+
+func WithAccountExists(f AccountExists) QueueOpt {
+	return func(q *QueueOptions) {
+		if f != nil {
+			q.AccountExists = f
+		}
 	}
 }
 
@@ -326,6 +337,7 @@ type QueueRunMode struct {
 type QueueOptions struct {
 	PartitionPriorityFinder PartitionPriorityFinder
 	AccountPriorityFinder   AccountPriorityFinder
+	AccountExists           AccountExists
 	PartitionPausedGetter   PartitionPausedGetter
 
 	lifecycles QueueLifecycleListeners
@@ -686,6 +698,9 @@ func NewQueueOptions(
 		},
 		AccountPriorityFinder: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
+		},
+		AccountExists: func(_ context.Context, _ uuid.UUID) (bool, error) {
+			return true, nil
 		},
 		PartitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
 			return PartitionPausedInfo{}

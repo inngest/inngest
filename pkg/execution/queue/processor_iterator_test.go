@@ -56,7 +56,11 @@ func (m *mockQueueProcessor) ClearShadowContinuations() {
 
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
-	name string
+	name                    string
+	partitionLeaseCount     int32
+	partitionRequeueCount   int32
+	partitionRequeueAt      time.Time
+	partitionRequeueForceAt bool
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -125,10 +129,15 @@ func (m *mockShardForIterator) PartitionPeek(ctx context.Context, sequential boo
 }
 
 func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error) {
-	return nil, nil
+	atomic.AddInt32(&m.partitionLeaseCount, 1)
+	id := ulid.Make()
+	return &id, nil
 }
 
 func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
+	atomic.AddInt32(&m.partitionRequeueCount, 1)
+	m.partitionRequeueAt = at
+	m.partitionRequeueForceAt = forceAt
 	return nil
 }
 
