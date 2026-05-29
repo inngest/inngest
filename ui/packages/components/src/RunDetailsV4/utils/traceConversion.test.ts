@@ -378,6 +378,34 @@ describe('traceConversion', () => {
       expect(childBar?.inngestBreakdown?.totalMs).toBe(3000);
     });
 
+    it('calculates discovery from the previous completed sibling instead of run start', () => {
+      const trace = createTrace({
+        isRoot: true,
+        startedAt: '2024-01-01T00:00:00Z',
+        childrenSpans: [
+          createTrace({
+            spanID: 'slow-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00Z',
+            startedAt: '2024-01-01T00:00:00Z',
+            endedAt: '2024-01-01T00:00:08Z',
+          }),
+          createTrace({
+            spanID: 'quick-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:08.100Z',
+            startedAt: '2024-01-01T00:00:08.100Z',
+            endedAt: '2024-01-01T00:00:08.350Z',
+          }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      const quickStep = result.bars[0]?.children?.[1];
+      expect(quickStep?.inngestBreakdown?.discoveryMs).toBe(100);
+      expect(quickStep?.inngestBreakdown?.totalMs).toBe(100);
+    });
+
     it('returns no inngestBreakdown without metadata timing', () => {
       const trace = createTrace({
         isRoot: true,
