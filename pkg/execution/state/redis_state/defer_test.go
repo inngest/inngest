@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -254,43 +255,44 @@ func TestSaveDefer(t *testing.T) {
 		r := require.New(t)
 		v2svc, id := newDeferTestRunService(t)
 
-		// 3MB once, then retransmit twice. Each retransmit is a no-op
-		// (insert-only) so the budget stays at the original 3MB+quotes.
-		big := make([]byte, 3*1024*1024)
-		for i := range big {
-			big[i] = 'a'
-		}
+		// First, we'll save a large-input defer multiple times. The duplicate saves
+		// must not error, since we're deduping.
 		first := statev2.Defer{
 			FnSlug:         "onDefer-score",
 			HashedID:       "hash-first",
 			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          json.RawMessage(`{"msg": "` + string(big) + `"}`),
+
+			// Use an input size that would exceed MaxDeferInputAggregateSize if
+			// saved twice.
+			Input: json.RawMessage(`{"msg": "` + strings.Repeat("a", consts.MaxDeferInputAggregateSize-64) + `"}`),
 		}
 		r.NoError(v2svc.SaveDefer(ctx, id, first))
 		r.NoError(v2svc.SaveDefer(ctx, id, first))
 		r.NoError(v2svc.SaveDefer(ctx, id, first))
 
-		// Second defer fills the remaining budget. First Input on the wire
-		// is `"<3MB>"` = 3MB+2 bytes; remaining is 1MB-2 bytes total, minus
-		// 2 quote bytes for the second JSON wrapper = 1MB-4 inner. Would
-		// fail if any retransmit had bumped the counter.
-		small := make([]byte, 1024*1024-4)
-		for i := range small {
-			small[i] = 'b'
-		}
+		// Second, we'll save a small-input defer. This proves that the previous
+		// duplicate saves did not consume the total defer input budget.
 		second := statev2.Defer{
 			FnSlug:         "onDefer-score",
 			HashedID:       "hash-second",
 			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          json.RawMessage(`{"msg": "` + string(small) + `"}`),
+			Input:          json.RawMessage(`{"msg": "a"}`),
 		}
 		r.NoError(v2svc.SaveDefer(ctx, id, second))
 
+		// Third, we'll save a large-input defer that exceeds the total defer
+		// input budget.
+		third := first
+		third.HashedID = "hash-third"
+		r.Error(v2svc.SaveDefer(ctx, id, third))
+
+		// All 3 defers appear. The third defer's status reflects its rejection.
 		defers, err := v2svc.LoadDefers(ctx, id)
 		r.NoError(err)
-		r.Len(defers, 2)
+		r.Len(defers, 3)
 		r.Equal(enums.DeferStatusAfterRun, defers["hash-first"].ScheduleStatus)
 		r.Equal(enums.DeferStatusAfterRun, defers["hash-second"].ScheduleStatus)
+		r.Equal(enums.DeferStatusRejected, defers["hash-third"].ScheduleStatus)
 	})
 
 	t.Run("does not affect run state_size", func(t *testing.T) {
