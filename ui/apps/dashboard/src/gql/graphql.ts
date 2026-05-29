@@ -1127,8 +1127,6 @@ export type FunctionRunV2 = {
   appID: Scalars['UUID']['output'];
   batchCreatedAt: Maybe<Scalars['Time']['output']>;
   cronSchedule: Maybe<Scalars['String']['output']>;
-  deferredFrom: Array<RunDeferredFrom>;
-  defers: Array<RunDefer>;
   endedAt: Maybe<Scalars['Time']['output']>;
   eventName: Maybe<Scalars['String']['output']>;
   function: Workflow;
@@ -1136,10 +1134,8 @@ export type FunctionRunV2 = {
   hasAI: Scalars['Boolean']['output'];
   id: Scalars['ULID']['output'];
   isBatch: Scalars['Boolean']['output'];
-  isDeferred: Scalars['Boolean']['output'];
   output: Maybe<Scalars['Bytes']['output']>;
   queuedAt: Scalars['Time']['output'];
-  siblingDefers: Array<RunDefer>;
   sourceID: Maybe<Scalars['String']['output']>;
   startedAt: Maybe<Scalars['Time']['output']>;
   status: FunctionRunStatus;
@@ -2035,30 +2031,6 @@ export type RetryConfiguration = {
   value: Scalars['Int']['output'];
 };
 
-export type RunDefer = {
-  __typename?: 'RunDefer';
-  deferID: Scalars['String']['output'];
-  fnSlug: Scalars['String']['output'];
-  function: Maybe<Workflow>;
-  hashedDeferID: Scalars['String']['output'];
-  run: Maybe<FunctionRunV2>;
-  runID: Maybe<Scalars['ULID']['output']>;
-  status: RunDeferStatus;
-};
-
-export enum RunDeferStatus {
-  Aborted = 'ABORTED',
-  Rejected = 'REJECTED',
-  Scheduled = 'SCHEDULED'
-}
-
-export type RunDeferredFrom = {
-  __typename?: 'RunDeferredFrom';
-  function: Workflow;
-  run: Maybe<FunctionRunV2>;
-  runID: Scalars['ULID']['output'];
-};
-
 export type RunTraceSpan = {
   __typename?: 'RunTraceSpan';
   account: Account;
@@ -2664,6 +2636,7 @@ export type Workspace = {
   signingKeys: Array<SigningKey>;
   slug: Scalars['String']['output'];
   test: Scalars['Boolean']['output'];
+  traceOutput: Scalars['Bytes']['output'];
   type: EnvironmentType;
   unattachedSyncs: Array<Deploy>;
   vercelApps: Array<VercelApp>;
@@ -2793,6 +2766,11 @@ export type WorkspaceScopedFunctionStatusArgs = {
 
 export type WorkspaceScopedMetricsArgs = {
   filter: ScopedMetricsFilter;
+};
+
+
+export type WorkspaceTraceOutputArgs = {
+  outputID: Scalars['String']['input'];
 };
 
 

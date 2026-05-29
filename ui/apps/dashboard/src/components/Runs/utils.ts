@@ -116,8 +116,6 @@ export function parseRunsData(
       return {
         ...edge.node,
         durationMS,
-        // Cloud GraphQL schema doesn't surface runType yet; default to PRIMARY.
-        runType: 'PRIMARY' as const,
       };
     }) ?? []
   );
