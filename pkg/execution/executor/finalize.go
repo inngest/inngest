@@ -214,6 +214,7 @@ func (e *executor) buildDeferEvents(
 	}
 
 	now := e.now()
+	parentRunSpan := tracing.RunSpanRefFromMetadata(&opts.Metadata)
 	var events []event.Event
 
 	for _, d := range loadedDefers {
@@ -260,6 +261,7 @@ func (e *executor) buildDeferEvents(
 			ParentRunID:      opts.Metadata.ID.RunID.String(),
 			ParentFunctionID: opts.Metadata.ID.FunctionID.String(),
 			HashedDeferID:    d.HashedID,
+			ParentRunSpan:    parentRunSpan,
 		}
 		if err := evtMeta.Validate(); err != nil {
 			logger.StdlibLogger(ctx).Error(

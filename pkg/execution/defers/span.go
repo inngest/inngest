@@ -42,13 +42,14 @@ func emitDeferSpan(ctx context.Context, tp tracing.TracerProvider, md statev2.Me
 
 // EmitChildRunIDSpan writes the executor.defer span linking a parent defer
 // to its scheduled child run. The child run ID isn't known when the schedule
-// span is emitted, so it's recorded here at child-schedule time. parentMD
+// span is emitted, so it's recorded here at child-schedule time. parent is
+// the parent run's span reference (carried on the triggering event); parentMD
 // must describe the parent run so GetRunDefers(parent) finds it.
-func EmitChildRunIDSpan(ctx context.Context, tp tracing.TracerProvider, parentMD statev2.Metadata, now time.Time, hashedID string, childRunID ulid.ULID) {
+func EmitChildRunIDSpan(ctx context.Context, tp tracing.TracerProvider, parent *meta.SpanReference, parentMD statev2.Metadata, now time.Time, hashedID string, childRunID ulid.ULID) {
 	_, err := tp.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
 		Debug:     &tracing.SpanDebugData{Location: "executor.Schedule.deferChildRunID"},
 		Metadata:  &parentMD,
-		Parent:    tracing.RunSpanRefFromMetadata(&parentMD),
+		Parent:    parent,
 		StartTime: now,
 		EndTime:   now,
 		Seed:      SpanSeed(parentMD.ID.RunID, hashedID, SpanChildRunID),

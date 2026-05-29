@@ -1500,7 +1500,7 @@ func (e *executor) schedule(
 		// emit uses non-droppable CreateSpan, so firing before this gate would
 		// orphan a Scheduled defer pointing at a child whose droppable
 		// executor.run span never gets sent.
-		e.recordDeferChildRun(ctx, l, deferMetadata, metadata)
+		e.updateDeferSpanWithDeferredRunID(ctx, l, deferMetadata, metadata)
 		sendSpans()
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
@@ -1516,13 +1516,13 @@ func (e *executor) schedule(
 		// no-op
 	case queue.ErrQueueItemExists:
 		// The original Schedule call already succeeded the Enqueue; if it
-		// crashed before reaching recordDeferChildRun below, the parent's
+		// crashed before reaching updateDeferSpanWithDeferredRunID below, the parent's
 		// defer.child_run_id span never landed and the linkage is permanently
 		// lost. Re-emit it here on retry — the span dedupes downstream by
 		// (parent run, hashed defer ID), so a duplicate write is harmless.
 		// Run/discovery spans intentionally do NOT flush: we still want to
 		// drop this retry's copy of those so we don't persist it for the user.
-		e.recordDeferChildRun(ctx, l, deferMetadata, metadata)
+		e.updateDeferSpanWithDeferredRunID(ctx, l, deferMetadata, metadata)
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
 	case queue.ErrQueueItemSingletonExists:
@@ -1541,7 +1541,7 @@ func (e *executor) schedule(
 	// would orphan a Scheduled defer pointing at a child whose droppable
 	// executor.run span never gets sent (ErrQueueItemExists /
 	// ErrQueueItemSingletonExists return before sendSpans).
-	e.recordDeferChildRun(ctx, l, deferMetadata, metadata)
+	e.updateDeferSpanWithDeferredRunID(ctx, l, deferMetadata, metadata)
 	sendSpans()
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
@@ -1612,7 +1612,7 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 // that fail to decode or whose parent run/function identifiers are malformed,
 // and returns the parsed slice. This is the single source of truth for "is
 // this run deferred, and from which parents?" — only fully-valid metadata
-// flows downstream, so the run span attrs and recordDeferChildRun can trust
+// flows downstream, so the run span attrs and updateDeferSpanWithDeferredRunID can trust
 // every entry.
 func deferredScheduleMetadata(events []event.TrackedEvent, l logger.Logger) []*event.DeferredScheduleMetadata {
 	// At most one deferred.schedule event today; a batch is handled defensively.
@@ -1643,24 +1643,17 @@ func deferredScheduleMetadata(events []event.TrackedEvent, l logger.Logger) []*e
 		// deploy an old binary may emit deferred.schedule events without the
 		// parent_function_id field; dropping the metadata entirely would also
 		// drop the child-side breadcrumb (runType + defer.parents on the
-		// child's executor.run span). recordDeferChildRun parses it
+		// child's executor.run span). updateDeferSpanWithDeferredRunID parses it
 		// defensively and skips just the parent-side write when invalid.
 		parsed = append(parsed, m)
 	}
 	return parsed
 }
 
-// recordDeferChildRun records this run's ID onto its parent's defer linkage when
-// the run was scheduled by a parent's `defer`. It emits a dedicated
-// executor.defer span on the parent run carrying defer.child_run_id;
-// GetRunDefers / GetRunDeferredFrom reconstruct both directions of the linkage
-// from it. Recording linkage in the executor mirrors
-// updateInvokeSpanWithInvokedRunID and, like it, gates on the triggering event
-// name here rather than baking defer logic into run-ID generation.
-// TODO: we should probably use the event data to pass the information we're using to create the
-// target span, so that we're able to keep the logic of what we're sending there. implementation detaily here
-// TODO: since the pattern is similar to the invoke method, make the name more similar.
-func (e *executor) recordDeferChildRun(ctx context.Context, l logger.Logger, parsed []*event.DeferredScheduleMetadata, childMD sv2.Metadata) {
+// updateDeferSpanWithDeferredRunID emits a sibling executor.defer span carrying
+// the child's run ID (not a real UpdateSpan — GetRunDefers is name-indexed and
+// can't see EXTEND fragments).
+func (e *executor) updateDeferSpanWithDeferredRunID(ctx context.Context, l logger.Logger, parsed []*event.DeferredScheduleMetadata, childMD sv2.Metadata) {
 	for _, m := range parsed {
 		// Both identifiers were validated by deferredScheduleMetadata; the
 		// re-parse here is defensive — if validation invariants are ever
@@ -1683,7 +1676,7 @@ func (e *executor) recordDeferChildRun(ctx context.Context, l logger.Logger, par
 		// span queries would otherwise miss it).
 		parentMD := sv2.Metadata{ID: sv2.ID{RunID: parentRunID, FunctionID: parentFunctionID, Tenant: childMD.ID.Tenant}}
 		sv2.InitConfig(&parentMD.Config)
-		defers.EmitChildRunIDSpan(ctx, e.tracerProvider, parentMD, e.now(), m.HashedDeferID, childMD.ID.RunID)
+		defers.EmitChildRunIDSpan(ctx, e.tracerProvider, m.ParentRunSpan, parentMD, e.now(), m.HashedDeferID, childMD.ID.RunID)
 	}
 }
 
