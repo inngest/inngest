@@ -31,7 +31,6 @@ type Props = {
   runID: string;
   result?: TraceResult;
   isDurableEndpoint?: boolean;
-  isDeferred?: boolean;
 };
 
 type Run = {
@@ -64,7 +63,6 @@ export const RunInfo = ({
   standalone,
   result,
   isDurableEndpoint,
-  isDeferred,
 }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
@@ -85,9 +83,7 @@ export const RunInfo = ({
               }`}
             />
             {isLazyDone(run) ? (
-              <span className="text-basis text-sm font-normal">
-                {isDeferred ? 'Companion function' : 'Normal function'}
-              </span>
+              <span className="text-basis text-sm font-normal">{run.fn.name}</span>
             ) : (
               <SkeletonElement />
             )}
