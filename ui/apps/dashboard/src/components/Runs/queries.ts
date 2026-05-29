@@ -47,6 +47,7 @@ export const GetRunsDocument = graphql(`
             startedAt
             status
             hasAI
+            isDeferred
           }
         }
         pageInfo {

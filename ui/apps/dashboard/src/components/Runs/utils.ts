@@ -116,8 +116,6 @@ export function parseRunsData(
       return {
         ...edge.node,
         durationMS,
-        // Cloud GraphQL schema doesn't surface isDeferred yet; default to false.
-        isDeferred: false,
       };
     }) ?? []
   );
