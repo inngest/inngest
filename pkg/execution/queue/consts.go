@@ -33,10 +33,11 @@ const (
 	// NOTE: This must be greater than PartitionLookahead
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
-	PartitionConcurrencyLimitRequeueExtension  = 5 * time.Second
+	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
 	PartitionSemaphoreLimitRequeueExtension   = 1 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
 	PartitionPausedRequeueExtension           = 5 * time.Minute
+	PartitionDeletedAccountRequeueExtension   = 7 * 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
