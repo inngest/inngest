@@ -546,7 +546,7 @@ enum RunType {
 
 type RunDeferredFrom {
   runID: ULID!
-  function: Function!
+  function: Function
   run: FunctionRunV2
 }
 

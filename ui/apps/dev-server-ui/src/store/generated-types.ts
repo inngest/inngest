@@ -711,7 +711,7 @@ export enum RunDeferStatus {
 
 export type RunDeferredFrom = {
   __typename?: 'RunDeferredFrom';
-  function: Function;
+  function: Maybe<Function>;
   run: Maybe<FunctionRunV2>;
   runID: Scalars['ULID'];
 };
@@ -1362,7 +1362,11 @@ export type GetRunsQuery = {
         deferredFrom: Array<{
           __typename?: 'RunDeferredFrom';
           runID: any;
-          function: { __typename?: 'Function'; name: string; slug: string };
+          function: {
+            __typename?: 'Function';
+            name: string;
+            slug: string;
+          } | null;
         }>;
       };
     }>;
@@ -1850,7 +1854,7 @@ export type GetRunLinkageQuery = {
     deferredFrom: Array<{
       __typename?: 'RunDeferredFrom';
       runID: any;
-      function: { __typename?: 'Function'; name: string; slug: string };
+      function: { __typename?: 'Function'; name: string; slug: string } | null;
       run: {
         __typename?: 'FunctionRunV2';
         id: any;

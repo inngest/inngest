@@ -7,6 +7,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"strconv"
 	"time"
@@ -571,14 +572,27 @@ func JsonAttr[T any](key string) attr[*T] {
 			return attribute.String(withPrefix(key), string(byt))
 		},
 		deserialize: func(v any) (*T, bool) {
-			if str, ok := v.(string); ok {
-				var req T
-				if err := json.Unmarshal([]byte(str), &req); err == nil {
-					return &req, true
-				}
+			// Both branches log on drop: silently failing here can wipe out
+			// an entire linkage with no diagnostic — the type-assertion miss
+			// (round-trip through ClickHouse / map[string]any deliveries) is
+			// the more common case in practice.
+			str, ok := v.(string)
+			if !ok {
+				slog.Warn("JSON span attribute is not a string",
+					"key", withPrefix(key),
+					"type", fmt.Sprintf("%T", v),
+				)
+				return nil, false
 			}
-
-			return nil, false
+			var req T
+			if err := json.Unmarshal([]byte(str), &req); err != nil {
+				slog.Warn("failed to deserialize JSON span attribute",
+					"key", withPrefix(key),
+					"error", err,
+				)
+				return nil, false
+			}
+			return &req, true
 		},
 	}
 }

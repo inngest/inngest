@@ -112,6 +112,22 @@ describe('LinkedRuns', () => {
     ]);
   });
 
+  it('renders the parent row without a function link when function is null', () => {
+    const deferredFrom: RunDeferredFromSummary[] = [
+      {
+        runID: '01PARENT01',
+        function: null,
+        run: null,
+      },
+    ];
+    render(<LinkedRuns invoked={[]} deferredFrom={deferredFrom} />);
+    // Run ID link is the only link; no /functions/* href is generated when
+    // the parent's function couldn't be resolved.
+    const links = screen.getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/runs/01PARENT01']);
+    expect(screen.queryByText('Parent Fn')).toBeNull();
+  });
+
   it('parallel defers are passed in directly and exclude the current run', () => {
     const sibling = makeDefer({
       hashedDeferID: 'hash-sibling',

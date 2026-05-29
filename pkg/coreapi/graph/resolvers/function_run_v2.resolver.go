@@ -2,12 +2,16 @@ package resolvers
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -114,6 +118,7 @@ func (r *functionRunV2Resolver) DeferredFrom(ctx context.Context, fn *models.Fun
 		out = append(out, &models.RunDeferredFrom{
 			RunID:  df.RunID,
 			FnSlug: df.FnSlug,
+			FnName: df.FnName,
 		})
 	}
 	return out, nil
@@ -140,12 +145,13 @@ func (r *runDeferResolver) Run(ctx context.Context, d *models.RunDefer) (*models
 	if d.RunID == nil {
 		return nil, nil
 	}
-	runs, err := r.Data.GetTraceRunsByRunIDs(ctx, []ulid.ULID{*d.RunID})
+	run, err := loader.LoadOneWithString[cqrs.TraceRun](
+		ctx, loader.FromCtx(ctx).TraceRunByIDLoader, d.RunID.String(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving defer child run: %w", err)
 	}
-	run, ok := runs[*d.RunID]
-	if !ok || run == nil {
+	if run == nil {
 		return nil, nil
 	}
 	return models.MakeFunctionRunV2(run)
@@ -153,18 +159,51 @@ func (r *runDeferResolver) Run(ctx context.Context, d *models.RunDefer) (*models
 
 func (r *runDeferredFromResolver) Function(ctx context.Context, obj *models.RunDeferredFrom) (*models.Function, error) {
 	if obj.FnSlug == "" {
-		return nil, fmt.Errorf("missing fn slug for deferred-from linkage")
+		return nil, nil
 	}
-	fn, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", obj.FnSlug)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving deferred-from function: %w", err)
+	synth := &models.Function{Name: obj.FnName, Slug: obj.FnSlug}
+	// List views only render the parent's display name, and name+slug both
+	// ride along on the defer.parents span attr — answering from the linkage
+	// avoids a per-row DB lookup. Anything beyond name/slug requires the
+	// real record since synthesized fields like AppID are zero.
+	for _, f := range graphql.CollectAllFields(ctx) {
+		if f != "name" && f != "slug" && f != "__typename" {
+			fn, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", obj.FnSlug)
+			if err == nil {
+				return models.MakeFunction(fn)
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				// Transient DB error: fall back to synth so the run row
+				// still renders, but log so the degradation is visible.
+				logger.StdlibLogger(ctx).Error(
+					"failed to load parent function for deferred-from linkage; falling back to synthesized record",
+					"fn_slug", obj.FnSlug,
+					"error", err,
+				)
+			}
+			// Not-found (rename/delete) or transient error: synth.
+			return synth, nil
+		}
 	}
-	return models.MakeFunction(fn)
+	return synth, nil
 }
 
 func (r *runDeferredFromResolver) Run(ctx context.Context, obj *models.RunDeferredFrom) (*models.FunctionRunV2, error) {
-	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: obj.RunID})
+	run, err := loader.LoadOneWithString[cqrs.TraceRun](
+		ctx, loader.FromCtx(ctx).TraceRunByIDLoader, obj.RunID.String(),
+	)
 	if err != nil {
+		// Returning nil keeps the rest of the row renderable (linkage doesn't
+		// collapse), but a batched loader error can affect many rows in the
+		// same request — log so the degradation is visible.
+		logger.StdlibLogger(ctx).Error(
+			"failed to load deferred-from parent run; rendering linkage without run details",
+			"run_id", obj.RunID.String(),
+			"error", err,
+		)
+		return nil, nil
+	}
+	if run == nil {
 		return nil, nil
 	}
 	return models.MakeFunctionRunV2(run)

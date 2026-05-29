@@ -106,7 +106,8 @@ const columns = [
       const isDeferred = data.runType === 'DEFER';
 
       const parentFunction = data.deferredFrom?.[0]?.function;
-      const parentLabel = parentFunction?.name ?? parentFunction?.slug;
+      const parentLabel =
+        parentFunction?.name || parentFunction?.slug || 'Parent function unavailable';
 
       const nameCell = data.hasAI ? (
         <AICell>{fnName}</AICell>

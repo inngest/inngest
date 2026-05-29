@@ -41,13 +41,17 @@ var Attrs = struct {
 	DurableEndpointModeChangedAt attr[*time.Time]
 
 	// Defer attributes
-	DeferChildRunID   attr[*ulid.ULID]
-	DeferParentRunIDs attr[*[]string]
-	DeferFnSlug       attr[*string]
-	DeferParentFnSlug attr[*string]
-	DeferHashedID     attr[*string]
-	DeferStatus       attr[*enums.DeferStatus]
-	DeferUserlandID   attr[*string]
+	DeferChildRunID attr[*ulid.ULID]
+	// DeferParents records every parent run that scheduled this run via a
+	// `defer`, alongside the parent function's slug and display name. Stamped
+	// on the deferred child's own executor.run span at schedule time so
+	// run-list queries can resolve the parent linkage (and synthesize the
+	// parent's Function metadata) without a per-row DB lookup.
+	DeferParents    attr[*[]DeferParent]
+	DeferFnSlug     attr[*string]
+	DeferHashedID   attr[*string]
+	DeferStatus     attr[*enums.DeferStatus]
+	DeferUserlandID attr[*string]
 
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
@@ -177,9 +181,8 @@ var Attrs = struct {
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
 	DeferChildRunID:                    ULIDAttr("defer.child_run_id"),
-	DeferParentRunIDs:                  StringSliceAttr("defer.parent_run_ids"),
+	DeferParents:                       JsonAttr[[]DeferParent]("defer.parents"),
 	DeferFnSlug:                        StringAttr("defer.fn_slug"),
-	DeferParentFnSlug:                  StringAttr("defer.parent_fn_slug"),
 	DeferHashedID:                      StringAttr("defer.hashed_id"),
 	DeferStatus:                        TextAttr[enums.DeferStatus]("defer.status"),
 	DeferUserlandID:                    StringAttr("defer.userland_id"),
@@ -259,6 +262,14 @@ var Attrs = struct {
 	MetadataKind:  StringishAttr[metadata.Kind]("metadata.kind"),
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
+}
+
+// DeferParent describes a single parent run that scheduled a deferred child
+// via `defer`. A batched child may carry several. See Attrs.DeferParents.
+type DeferParent struct {
+	RunID  string `json:"run_id"`
+	FnSlug string `json:"fn_slug"`
+	FnName string `json:"fn_name,omitempty"`
 }
 
 type ResponseOps []ResponseOp

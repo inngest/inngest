@@ -1677,7 +1677,7 @@ func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
 // TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom locks in the alignment
 // between the runs-list runType filter (now backed by trace_runs.run_type) and
 // the run-detail classification (GetRunDeferredFrom, which reads
-// defer.parent_run_ids off the child's executor.run span). Both paths must
+// defer.parents off the child's executor.run span). Both paths must
 // agree on each run's type so the list and the detail never disagree.
 func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	ctx := context.Background()
@@ -1692,7 +1692,7 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	baseTime := time.Now().UTC().Truncate(time.Second)
 
 	// insertRootRun writes a trace_runs row (with run_type) and a matching
-	// executor.run span. The span carries defer.parent_run_ids when the run is
+	// executor.run span. The span carries defer.parents when the run is
 	// a defer child so the run-detail path can still resolve linkage.
 	insertRootRun := func(offset time.Duration, runType enums.RunType, parentRunIDs []string) string {
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -1715,9 +1715,14 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 
 		var attrBytes []byte
 		if len(parentRunIDs) > 0 {
-			var err error
+			parents := make([]meta.DeferParent, len(parentRunIDs))
+			for i, id := range parentRunIDs {
+				parents[i] = meta.DeferParent{RunID: id, FnSlug: "app-parent-fn"}
+			}
+			parentsJSON, err := json.Marshal(parents)
+			require.NoError(t, err)
 			attrBytes, err = json.Marshal(map[string]any{
-				meta.Attrs.DeferParentRunIDs.Key(): parentRunIDs,
+				meta.Attrs.DeferParents.Key(): string(parentsJSON),
 			})
 			require.NoError(t, err)
 		}
@@ -1745,7 +1750,7 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	// The parent that scheduled the defer.
 	parentRunID := insertRootRun(2*time.Second, enums.RunTypePrimary, nil)
 
-	// DEFER: child run with run_type=defer and defer.parent_run_ids stamped
+	// DEFER: child run with run_type=defer and defer.parents stamped
 	// on the child's executor.run span.
 	deferRunID := insertRootRun(3*time.Second, enums.RunTypeDefer, []string{parentRunID})
 
@@ -1790,8 +1795,8 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	}
 
 	// Cross-check against the run-detail path. The deferred run hydrates its
-	// parent breadcrumb purely from defer.parent_run_ids on its own
-	// executor.run span — no parent-side defer.child_run_id span exists.
+	// parent breadcrumb purely from defer.parents on its own executor.run
+	// span — no parent-side defer.child_run_id span exists.
 	df, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{
 		ulid.MustParse(deferRunID),
 		ulid.MustParse(taggedPrimaryRunID),
@@ -1802,7 +1807,7 @@ func TestCQRSGetTraceRunsRunTypeFilterMatchesDeferredFrom(t *testing.T) {
 	rdfs := df[ulid.MustParse(deferRunID)]
 	require.Len(t, rdfs, 1, "detail must surface the deferred parent for the defer run")
 	assert.Equal(t, parentRunID, rdfs[0].RunID.String(),
-		"detail must record the parent recorded on defer.parent_run_ids")
+		"detail must record the parent recorded on defer.parents")
 	assert.Empty(t, df[ulid.MustParse(taggedPrimaryRunID)],
 		"detail must not classify the tagged primary run as DEFER")
 	assert.Empty(t, df[ulid.MustParse(parentRunID)],

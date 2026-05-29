@@ -32,7 +32,12 @@ type DeferredScheduleMetadata struct {
 	// scheduling the deferred run.
 	ParentDeferSpan *meta.SpanReference `json:"parent_defer_span,omitempty"`
 
-	ParentFnSlug     string `json:"parent_fn_slug"`
+	ParentFnSlug string `json:"parent_fn_slug"`
+	// ParentFnName is the display name of the parent function. Stamped onto
+	// deferred.schedule events so the run-list resolver can synthesize the
+	// linkage's models.Function without a per-row DB lookup. Empty is
+	// tolerated (the UI falls back to ParentFnSlug).
+	ParentFnName     string `json:"parent_fn_name,omitempty"`
 	ParentRunID      string `json:"parent_run_id"`
 	ParentFunctionID string `json:"parent_function_id"`
 	HashedDeferID    string `json:"hashed_defer_id"`

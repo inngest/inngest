@@ -495,6 +495,11 @@ type FinalizeOptional struct {
 	//
 	// If not present, this will be loaded via the function loader.
 	FnSlug string
+	// FnName is the display name of the function, used to stamp the parent
+	// linkage on deferred.schedule events so the run-list resolver can return
+	// it without a per-row function lookup. Falls back to
+	// Metadata.Config.FunctionName() when empty.
+	FnName string
 	// InputEvents are the events that triggered the function run.
 	InputEvents []json.RawMessage
 	// TODO: Document

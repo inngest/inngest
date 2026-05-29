@@ -1071,6 +1071,7 @@ func (e *executor) schedule(
 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
+	config.SetFunctionName(req.Function.Name)
 	config.SetDebounceFlag(req.PreventDebounce)
 	config.SetEventIDMapping(req.Events)
 
@@ -1314,17 +1315,19 @@ func (e *executor) schedule(
 	// whether this run is a deferred child and which parent run(s) scheduled it.
 	// It's reused below to stamp the root span and to record the defer linkage.
 	deferMetadata := deferredScheduleMetadata(req.Events, l)
-	var parentRunIDs []string
-	// A single parent fn slug despite many parent run IDs: once batching of
-	// deferred runs is wired up, the parent fn slug becomes the implicit batch
-	// key, so a single child will never have multiple parent functions in a
-	// batch.
-	var parentFnSlug string
+	var deferParents []meta.DeferParent
 	if len(deferMetadata) > 0 {
-		parentFnSlug = deferMetadata[0].ParentFnSlug
-		parentRunIDs = make([]string, 0, len(deferMetadata))
+		// Today every parent in a batch shares one parent fn slug — once
+		// batching collapses N events into 1 run, the parent fn slug becomes
+		// the implicit batch key. Stamping per-entry still keeps the shape
+		// correct if that ever changes.
+		deferParents = make([]meta.DeferParent, 0, len(deferMetadata))
 		for _, m := range deferMetadata {
-			parentRunIDs = append(parentRunIDs, m.ParentRunID)
+			deferParents = append(deferParents, meta.DeferParent{
+				RunID:  m.ParentRunID,
+				FnSlug: m.ParentFnSlug,
+				FnName: m.ParentFnName,
+			})
 		}
 	}
 
@@ -1342,9 +1345,8 @@ func (e *executor) schedule(
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
-	if len(parentRunIDs) > 0 {
-		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentRunIDs, &parentRunIDs)
-		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParentFnSlug, &parentFnSlug)
+	if len(deferParents) > 0 {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.DeferParents, &deferParents)
 	}
 	if req.RunMode == enums.RunModeSync {
 		// XXX: If this is a sync run, always add the start time to the span. We do this
@@ -1629,11 +1631,19 @@ func deferredScheduleMetadata(events []event.TrackedEvent, l logger.Logger) []*e
 			l.Debug("deferred schedule event has unparseable parent run id; skipping defer linkage", "event_id", evt.ID, "parent_run_id", m.ParentRunID, "error", err)
 			continue
 		}
+		if m.ParentFnSlug == "" {
+			// Without a parent slug the run-list resolver has no key to look
+			// up the parent function and would have to render the linkage
+			// row with no useful label. Drop the entry rather than carry a
+			// dead breadcrumb forward.
+			l.Debug("deferred schedule event missing parent fn slug; skipping defer linkage", "event_id", evt.ID)
+			continue
+		}
 		// ParentFunctionID is intentionally NOT required here. During a rolling
 		// deploy an old binary may emit deferred.schedule events without the
 		// parent_function_id field; dropping the metadata entirely would also
-		// drop the child-side breadcrumb (runType + defer.parent_run_ids on
-		// the child's executor.run span). recordDeferChildRun parses it
+		// drop the child-side breadcrumb (runType + defer.parents on the
+		// child's executor.run span). recordDeferChildRun parses it
 		// defensively and skips just the parent-side write when invalid.
 		parsed = append(parsed, m)
 	}
@@ -2156,6 +2166,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					},
 					Optional: execution.FinalizeOptional{
 						FnSlug:        i.f.GetSlug(),
+						FnName:        i.f.Name,
 						InputEvents:   i.events,
 						OutputSpanRef: i.execSpan,
 						Reason:        "fail-early",
@@ -2215,6 +2226,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			},
 			Optional: execution.FinalizeOptional{
 				FnSlug:        i.f.GetSlug(),
+				FnName:        i.f.Name,
 				InputEvents:   i.events,
 				OutputSpanRef: i.execSpan,
 				Reason:        "resp-err",
@@ -2245,6 +2257,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			},
 			Optional: execution.FinalizeOptional{
 				FnSlug:        i.f.GetSlug(),
+				FnName:        i.f.Name,
 				InputEvents:   i.events,
 				OutputSpanRef: i.execSpan,
 				Reason:        "opcode-none",
@@ -3036,6 +3049,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		},
 		Optional: execution.FinalizeOptional{
 			FnSlug:      f.Function.GetSlug(),
+			FnName:      f.Function.Name,
 			InputEvents: evts,
 			Cancel:      true,
 			Reason:      "cancel",

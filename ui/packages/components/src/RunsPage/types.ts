@@ -28,6 +28,6 @@ export type Run = {
     function: {
       name: string;
       slug: string;
-    };
+    } | null;
   }>;
 };

@@ -208,6 +208,10 @@ func (e *executor) buildDeferEvents(
 	if fnSlug == "" {
 		return nil, fmt.Errorf("function slug missing from run metadata for deferred events")
 	}
+	fnName := opts.Optional.FnName
+	if fnName == "" {
+		fnName = opts.Metadata.Config.FunctionName()
+	}
 
 	now := e.now()
 	var events []event.Event
@@ -252,6 +256,7 @@ func (e *executor) buildDeferEvents(
 		evtMeta := event.DeferredScheduleMetadata{
 			FnSlug:           d.FnSlug,
 			ParentFnSlug:     fnSlug,
+			ParentFnName:     fnName,
 			ParentRunID:      opts.Metadata.ID.RunID.String(),
 			ParentFunctionID: opts.Metadata.ID.FunctionID.String(),
 			HashedDeferID:    d.HashedID,
@@ -346,7 +351,12 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		evts     = opts.Optional.InputEvents
 	)
 
-	// Find the function slug.
+	// Find the function slug. Try the in-memory Config fallback (populated at
+	// schedule time, used by callers that don't thread FnSlug through
+	// FinalizeOpts) before falling back to a DB load.
+	if fnSlug == "" {
+		fnSlug = opts.Metadata.Config.FunctionSlug()
+	}
 	if fnSlug == "" {
 		fn, err := e.fl.LoadFunction(ctx, opts.Metadata.ID.Tenant.EnvID, opts.Metadata.ID.FunctionID)
 		if err != nil {

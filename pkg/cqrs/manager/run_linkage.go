@@ -138,9 +138,11 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 		return map[ulid.ULID][]cqrs.RunDeferredFrom{}, nil
 	}
 
-	// Parents are now recorded on the CHILD's own executor.run span via the
-	// defer.parent_run_ids attribute, so an indexed lookup by run_id finds the
+	// Parents are recorded on the CHILD's own executor.run span via the
+	// defer.parents attribute, so an indexed lookup by run_id finds the
 	// breadcrumb in one shot rather than scanning every parent's defer spans.
+	// Each entry carries the parent run ID, fn slug, and fn name so the
+	// run-list resolver can synthesize the parent's Function shape.
 	spansByChild, err := w.GetSpansByRunIDsAndName(ctx, runIDs, meta.SpanNameRun)
 	if err != nil {
 		return nil, fmt.Errorf("error loading executor.run spans: %w", err)
@@ -152,22 +154,16 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 	seen := make(map[ulid.ULID]map[ulid.ULID]struct{})
 	for childRunID, spans := range spansByChild {
 		for _, span := range spans {
-			if span.Attributes.DeferParentRunIDs == nil {
+			if span.Attributes.DeferParents == nil {
 				continue
 			}
-			// All parents in a batch share a single fn slug (the implicit
-			// batch key). The Function resolver looks it up lazily.
-			var fnSlug string
-			if span.Attributes.DeferParentFnSlug != nil {
-				fnSlug = *span.Attributes.DeferParentFnSlug
-			}
-			for _, parentStr := range *span.Attributes.DeferParentRunIDs {
-				parentRunID, err := ulid.Parse(parentStr)
+			for _, p := range *span.Attributes.DeferParents {
+				parentRunID, err := ulid.Parse(p.RunID)
 				if err != nil {
 					logger.StdlibLogger(ctx).Warn(
 						"skipping unparseable defer parent run ID",
 						"child_run_id", childRunID.String(),
-						"parent_run_id", parentStr,
+						"parent_run_id", p.RunID,
 						"error", err,
 					)
 					continue
@@ -183,7 +179,8 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 
 				out[childRunID] = append(out[childRunID], cqrs.RunDeferredFrom{
 					RunID:  parentRunID,
-					FnSlug: fnSlug,
+					FnSlug: p.FnSlug,
+					FnName: p.FnName,
 				})
 			}
 		}

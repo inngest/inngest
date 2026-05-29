@@ -288,6 +288,7 @@ func TestDeferFinalize(t *testing.T) {
 			},
 			Optional: execution.FinalizeOptional{
 				FnSlug: infra.fn.Slug,
+				FnName: infra.fn.Name,
 			},
 		})
 		r.NoError(err)
@@ -364,7 +365,7 @@ func TestDeferFinalize(t *testing.T) {
 				Type:        execution.FinalizeResponseRunComplete,
 				RunComplete: state.GeneratorOpcode{Op: enums.OpcodeRunComplete},
 			},
-			Optional: execution.FinalizeOptional{FnSlug: infra.fn.Slug},
+			Optional: execution.FinalizeOptional{FnSlug: infra.fn.Slug, FnName: infra.fn.Name},
 		})
 		r.NoError(err, "Finalize must complete despite LoadDefers failure")
 
@@ -413,7 +414,7 @@ func TestDeferFinalize(t *testing.T) {
 				Type:        execution.FinalizeResponseRunComplete,
 				RunComplete: state.GeneratorOpcode{Op: enums.OpcodeRunComplete},
 			},
-			Optional: execution.FinalizeOptional{FnSlug: infra.fn.Slug},
+			Optional: execution.FinalizeOptional{FnSlug: infra.fn.Slug, FnName: infra.fn.Name},
 		}))
 
 		var deferredFnSlugs []string

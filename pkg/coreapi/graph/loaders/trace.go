@@ -74,6 +74,12 @@ type traceReader struct {
 	reader  cqrs.TraceReader
 }
 
+// GetTraceRunsByIDs batches per-row TraceRun lookups (e.g. defer
+// linkage's child/parent runs) into a single GetTraceRunsByRunIDs call.
+func (tr *traceReader) GetTraceRunsByIDs(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
+	return loadByRunID(ctx, keys, tr.reader.GetTraceRunsByRunIDs)
+}
+
 // just run id
 func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
 	results := make([]*dataloader.Result, len(keys))

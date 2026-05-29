@@ -102,6 +102,7 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 			},
 			Optional: execution.FinalizeOptional{
 				FnSlug:      r.f.GetSlug(),
+				FnName:      r.f.Name,
 				InputEvents: r.evts,
 				Reason:      "validation-step-limit-reached",
 			},

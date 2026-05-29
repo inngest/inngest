@@ -88,9 +88,15 @@ const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) =
             </Link>
           </td>
           <td className={tdClass}>
-            <Link href={pathCreator.function({ functionSlug: p.function.slug })}>
-              <PillCell type="FUNCTION">{p.function.name}</PillCell>
-            </Link>
+            {p.function ? (
+              <Link href={pathCreator.function({ functionSlug: p.function.slug })}>
+                <PillCell type="FUNCTION">{p.function.name || p.function.slug}</PillCell>
+              </Link>
+            ) : (
+              <OptionalTooltip tooltip="Parent function unavailable">
+                <MutedDash />
+              </OptionalTooltip>
+            )}
           </td>
         </tr>
       ))}
@@ -114,8 +120,8 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
       ]}
     >
       {defers.map((d) => {
-        const fnSlug = d.function?.slug ?? d.fnSlug;
-        const fnName = d.function?.name ?? d.fnSlug;
+        const fnSlug = d.function?.slug || d.fnSlug;
+        const fnName = d.function?.name || d.fnSlug;
         return (
           <tr key={d.hashedDeferID}>
             <td className={tdClass}>

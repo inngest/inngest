@@ -21,10 +21,13 @@ type RunDefer struct {
 // `defer`. A child can have multiple parents when batching collapses several
 // deferred.schedule events into one Schedule call.
 //
-// The struct exposes only the parent's identifiers. Consumers that need the
-// parent run or function fetch them lazily (via GraphQL resolvers, etc.) so
-// the read path doesn't pay for joins the caller may not use.
+// FnName and FnSlug ride along on the child's executor.run span so the
+// run-list GraphQL resolver can return the parent's Function shape without
+// issuing one DB lookup per row. FnSlug is always populated; FnName may be
+// empty when scheduling didn't carry a name, in which case the UI falls back
+// to FnSlug.
 type RunDeferredFrom struct {
 	RunID  ulid.ULID
 	FnSlug string
+	FnName string
 }

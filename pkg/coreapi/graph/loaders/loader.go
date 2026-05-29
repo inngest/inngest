@@ -132,6 +132,7 @@ type Loaders struct {
 	DebugSessionLoader    *dataloader.Loader
 	RunDefersLoader       *dataloader.Loader
 	RunDeferredFromLoader *dataloader.Loader
+	TraceRunByIDLoader    *dataloader.Loader
 }
 
 func NewLoaders(params LoaderParams) *Loaders {
@@ -148,6 +149,7 @@ func NewLoaders(params LoaderParams) *Loaders {
 	loaders.DebugSessionLoader = dataloader.NewBatchedLoader(tr.GetDebugSessionTrace)
 	loaders.RunDefersLoader = dataloader.NewBatchedLoader(dr.GetRunDefers)
 	loaders.RunDeferredFromLoader = dataloader.NewBatchedLoader(dr.GetRunDeferredFrom)
+	loaders.TraceRunByIDLoader = dataloader.NewBatchedLoader(tr.GetTraceRunsByIDs)
 
 	return loaders
 }

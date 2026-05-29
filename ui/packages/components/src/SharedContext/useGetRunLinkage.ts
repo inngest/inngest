@@ -21,7 +21,7 @@ export type RunDeferSummary = {
 
 export type RunDeferredFromSummary = {
   runID: string;
-  function: { name: string; slug: string };
+  function: { name: string; slug: string } | null;
   run: {
     id: string;
     status: string;

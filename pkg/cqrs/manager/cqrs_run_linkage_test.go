@@ -229,20 +229,15 @@ func TestGetRunDefers_SurfacesRejected(t *testing.T) {
 	assert.Nil(t, d.RunID, "Rejected defer never scheduled a child run")
 }
 
-// The parent's child-run-id executor.defer span is the authoritative parent
-// link for deferred runs: it lives on the PARENT and records defer.child_run_id.
-// GetRunDeferredFrom queries those spans by child run ID. If this fails, a
-// deferred child can't render its parent breadcrumb.
 // childRunDeferParentsAttrs mirrors the executor.run-span attributes a deferred
-// child carries: defer.parent_run_ids names every parent that scheduled it.
-func childRunDeferParentsAttrs(t *testing.T, parentRunIDs ...ulid.ULID) []byte {
+// child carries: defer.parents names every parent that scheduled it, alongside
+// the parent function's slug and display name.
+func childRunDeferParentsAttrs(t *testing.T, parents ...meta.DeferParent) []byte {
 	t.Helper()
-	parents := make([]string, len(parentRunIDs))
-	for i, id := range parentRunIDs {
-		parents[i] = id.String()
-	}
+	parentsJSON, err := json.Marshal(parents)
+	require.NoError(t, err)
 	byt, err := json.Marshal(map[string]any{
-		meta.Attrs.DeferParentRunIDs.Key(): parents,
+		meta.Attrs.DeferParents.Key(): string(parentsJSON),
 	})
 	require.NoError(t, err)
 	return byt
@@ -267,7 +262,7 @@ func TestGetRunDeferredFrom_ReadsChildRunIDDeferSpan(t *testing.T) {
 	insertChildTraceRun(t, cm, childRunID, accountID, workspaceID, appID, fnID)
 
 	// The breadcrumb lives on the CHILD's own executor.run span via
-	// defer.parent_run_ids — no parent-side span is needed.
+	// defer.parents — no parent-side span is needed.
 	insertTestSpan(t, cm, testSpanFields{
 		RunID:         childRunID.String(),
 		DynamicSpanID: "dyn-child-run",
@@ -276,7 +271,11 @@ func TestGetRunDeferredFrom_ReadsChildRunIDDeferSpan(t *testing.T) {
 		AppID:         appID.String(),
 		FunctionID:    fnID.String(),
 		EnvID:         workspaceID.String(),
-		Attributes:    childRunDeferParentsAttrs(t, parentRunID),
+		Attributes: childRunDeferParentsAttrs(t, meta.DeferParent{
+			RunID:  parentRunID.String(),
+			FnSlug: "app-parent-fn",
+			FnName: "Parent Fn",
+		}),
 	})
 
 	got, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{childRunID})
@@ -286,6 +285,8 @@ func TestGetRunDeferredFrom_ReadsChildRunIDDeferSpan(t *testing.T) {
 	require.True(t, ok, "expected entry for child run %s", childRunID)
 	require.Len(t, rdfs, 1)
 	assert.Equal(t, parentRunID, rdfs[0].RunID)
+	assert.Equal(t, "app-parent-fn", rdfs[0].FnSlug)
+	assert.Equal(t, "Parent Fn", rdfs[0].FnName)
 }
 
 // A batched child run can descend from defers on several parents (N events ->
@@ -314,7 +315,7 @@ func TestGetRunDeferredFrom_MultipleParents(t *testing.T) {
 	insertChildTraceRun(t, cm, parentB, accountID, workspaceID, appID, fnID)
 
 	// The child's executor.run span lists every scheduling parent in one
-	// defer.parent_run_ids attribute.
+	// defer.parents attribute.
 	insertTestSpan(t, cm, testSpanFields{
 		RunID:         childRunID.String(),
 		DynamicSpanID: "dyn-child-run",
@@ -323,7 +324,10 @@ func TestGetRunDeferredFrom_MultipleParents(t *testing.T) {
 		AppID:         appID.String(),
 		FunctionID:    fnID.String(),
 		EnvID:         workspaceID.String(),
-		Attributes:    childRunDeferParentsAttrs(t, parentA, parentB),
+		Attributes: childRunDeferParentsAttrs(t,
+			meta.DeferParent{RunID: parentA.String(), FnSlug: "app-parent-fn", FnName: "Parent Fn"},
+			meta.DeferParent{RunID: parentB.String(), FnSlug: "app-parent-fn", FnName: "Parent Fn"},
+		),
 	})
 
 	got, err := cm.GetRunDeferredFrom(ctx, []ulid.ULID{childRunID})
