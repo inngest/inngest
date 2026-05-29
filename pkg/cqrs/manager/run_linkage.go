@@ -108,6 +108,7 @@ func (w wrapper) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (ma
 						"error", err,
 						"value", runIDStr,
 					)
+					continue
 				}
 				parents = append(parents, cqrs.RunDeferredFrom{
 					RunID:  runID,
