@@ -474,6 +474,31 @@ func IntAttr(key string) attr[*int] {
 	}
 }
 
+func RunTypeAttr(key string) attr[*enums.RunType] {
+	return attr[*enums.RunType]{
+		key: withPrefix(key),
+		serialize: func(v *enums.RunType) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			return attribute.Int(withPrefix(key), int(*v))
+		},
+		deserialize: func(v any) (*enums.RunType, bool) {
+			if raw, ok := v.(int); ok {
+				status := enums.RunType(raw)
+				if !status.IsARunType() {
+					return nil, false
+				}
+
+				return &status, true
+			}
+
+			return nil, false
+		},
+	}
+}
+
 func StepStatusAttr(key string) attr[*enums.StepStatus] {
 	return attr[*enums.StepStatus]{
 		key: withPrefix(key),
