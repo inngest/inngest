@@ -11,9 +11,7 @@ import {
   FunctionRunTimeField,
   isFunctionRunStatus,
   isFunctionTimeField,
-  isRunType,
   type FunctionRunStatus,
-  type RunType,
 } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
@@ -43,7 +41,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'runType'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'deferredRuns'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -89,7 +87,7 @@ export function RunsPage({
   searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const columns = useScopedColumns(scope, features.runType ?? false);
+  const columns = useScopedColumns(scope, features.deferredRuns ?? false);
   const [showSearch, setShowSearch] = useState(false);
 
   const displayAllColumns = useMemo(() => {
@@ -133,7 +131,9 @@ export function RunsPage({
     isFunctionTimeField
   );
 
-  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
+  const [filterIsDeferredRaw] = useSearchParam('filterIsDeferred');
+  const filterIsDeferred =
+    filterIsDeferredRaw === 'true' ? true : filterIsDeferredRaw === 'false' ? false : undefined;
 
   const [search, setSearch, removeSearch] = useSearchParam('search');
 
@@ -199,10 +199,10 @@ export function RunsPage({
     [scrollToTop, setTimeField]
   );
 
-  const onRunTypeFilterChange = useCallback(
-    (value: RunType | undefined) => {
+  const onIsDeferredFilterChange = useCallback(
+    (value: boolean | undefined) => {
       scrollToTop();
-      batchUpdate({ filterRunType: value ?? null });
+      batchUpdate({ filterIsDeferred: value === undefined ? null : value ? 'true' : 'false' });
     },
     [batchUpdate, scrollToTop]
   );
@@ -371,10 +371,10 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-            {features.runType && (
+            {features.deferredRuns && (
               <RunsTypeFilter
-                selectedRunType={filterRunType}
-                onRunTypeChange={onRunTypeFilterChange}
+                isDeferred={filterIsDeferred}
+                onChange={onIsDeferredFilterChange}
               />
             )}
           </div>

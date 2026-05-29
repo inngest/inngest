@@ -5888,12 +5888,9 @@ func updateDeferSpans(
 		parentRunIDs = append(parentRunIDs, m.ParentRunID.String())
 	}
 
-	runType := enums.RunTypePrimary
-
-	isDefer := len(parentRunIDs) > 0
-	if isDefer {
-		runType = enums.RunTypeDefer
-		// Add defer-related attributes to the child run's span.
+	if len(parentRunIDs) > 0 {
+		// Defer-related attributes stay on the child run's span; tracer_sqlc
+		// reads DeferParentRunIDs presence to populate spans.is_deferred.
 		meta.AddAttr(
 			spanOpts.Attributes,
 			meta.Attrs.DeferParentRunIDs,
@@ -5905,6 +5902,4 @@ func updateDeferSpans(
 			&parentFnSlug,
 		)
 	}
-
-	meta.AddAttr(spanOpts.Attributes, meta.Attrs.RunType, &runType)
 }

@@ -23,7 +23,6 @@ import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import {
   isFunctionRunStatus,
-  isRunType,
   FunctionRunTimeField,
   isFunctionTimeField,
 } from '@inngest/components/types/functionRun';
@@ -71,7 +70,9 @@ function RunsComponent() {
     'timeField',
     isFunctionTimeField,
   );
-  const [filterRunType] = useValidatedSearchParam('filterRunType', isRunType);
+  const [filterIsDeferredRaw] = useSearchParam('filterIsDeferred');
+  const filterIsDeferred =
+    filterIsDeferredRaw === 'true' ? true : filterIsDeferredRaw === 'false' ? false : undefined;
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
@@ -100,7 +101,7 @@ function RunsComponent() {
         timeField,
         celQuery: search,
         preview,
-        runType: filterRunType ?? null,
+        isDeferred: filterIsDeferred ?? null,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -128,7 +129,7 @@ function RunsComponent() {
       timeField,
       search,
       preview,
-      filterRunType,
+      filterIsDeferred,
     ],
   );
 
@@ -144,7 +145,7 @@ function RunsComponent() {
           timeField,
           search,
           preview,
-          filterRunType,
+          filterIsDeferred,
         },
       ],
       queryFn,
@@ -171,7 +172,7 @@ function RunsComponent() {
         status: filteredStatus,
         timeField,
         celQuery: search,
-        runType: filterRunType ?? null,
+        isDeferred: filterIsDeferred ?? null,
       });
       setTotalCount(data.runs.totalCount);
     })();
@@ -181,7 +182,7 @@ function RunsComponent() {
     filteredStatus,
     timeField,
     search,
-    filterRunType,
+    filterIsDeferred,
   ]);
 
   useEffect(() => {
@@ -245,7 +246,7 @@ function RunsComponent() {
           'id',
           'trigger',
           'function',
-          'runType',
+          'isDeferred',
           'queuedAt',
           'endedAt',
         ]}
@@ -253,7 +254,7 @@ function RunsComponent() {
           history: Number.MAX_SAFE_INTEGER,
           tracesPreview: tracesPreviewEnabled,
           runDetailsV4: v4Enabled,
-          runType: true,
+          deferredRuns: true,
         }}
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}

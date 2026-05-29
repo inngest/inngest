@@ -448,7 +448,7 @@ func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
 		EventIds:       bytesToNullString(arg.EventIds),
-		RunType:        int64(arg.RunType),
+		IsDeferred:     arg.IsDeferred,
 	})
 }
 
@@ -618,7 +618,7 @@ func (sq *sqliteQuerier) InsertTraceRun(ctx context.Context, arg db.InsertTraceR
 		QueuedAt: arg.QueuedAt, StartedAt: arg.StartedAt, EndedAt: arg.EndedAt,
 		Status: arg.Status, SourceID: arg.SourceID, TriggerIds: arg.TriggerIds,
 		Output: arg.Output, BatchID: arg.BatchID, IsDebounce: arg.IsDebounce,
-		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi, RunType: arg.RunType,
+		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi,
 	})
 }
 

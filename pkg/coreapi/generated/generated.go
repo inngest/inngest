@@ -288,9 +288,9 @@ type ComplexityRoot struct {
 		HasAi          func(childComplexity int) int
 		ID             func(childComplexity int) int
 		IsBatch        func(childComplexity int) int
+		IsDeferred     func(childComplexity int) int
 		Output         func(childComplexity int) int
 		QueuedAt       func(childComplexity int) int
-		RunType        func(childComplexity int) int
 		SiblingDefers  func(childComplexity int) int
 		SourceID       func(childComplexity int) int
 		StartedAt      func(childComplexity int) int
@@ -1826,6 +1826,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FunctionRunV2.IsBatch(childComplexity), true
 
+	case "FunctionRunV2.isDeferred":
+		if e.complexity.FunctionRunV2.IsDeferred == nil {
+			break
+		}
+
+		return e.complexity.FunctionRunV2.IsDeferred(childComplexity), true
+
 	case "FunctionRunV2.output":
 		if e.complexity.FunctionRunV2.Output == nil {
 			break
@@ -1839,13 +1846,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRunV2.QueuedAt(childComplexity), true
-
-	case "FunctionRunV2.runType":
-		if e.complexity.FunctionRunV2.RunType == nil {
-			break
-		}
-
-		return e.complexity.FunctionRunV2.RunType(childComplexity), true
 
 	case "FunctionRunV2.siblingDefers":
 		if e.complexity.FunctionRunV2.SiblingDefers == nil {
@@ -4159,7 +4159,7 @@ input RunsFilterV2 {
   functionIDs: [UUID!]
   appIDs: [UUID!]
 
-  runType: RunType
+  isDeferred: Boolean
 
   query: String # CEL query string
 }
@@ -4208,7 +4208,7 @@ type FunctionRunV2 {
   defers: [RunDefer!]!
   siblingDefers: [RunDefer!]!
   deferredFrom: [RunDeferredFrom!]!
-  runType: RunType!
+  isDeferred: Boolean!
 }
 
 type RunsV2Connection {
@@ -4244,11 +4244,6 @@ enum RunDeferStatus {
   SCHEDULED
   ABORTED
   REJECTED
-}
-
-enum RunType {
-  PRIMARY
-  DEFER
 }
 
 type RunDeferredFrom {
@@ -9202,8 +9197,8 @@ func (ec *executionContext) fieldContext_EventV2_runs(ctx context.Context, field
 				return ec.fieldContext_FunctionRunV2_siblingDefers(ctx, field)
 			case "deferredFrom":
 				return ec.fieldContext_FunctionRunV2_deferredFrom(ctx, field)
-			case "runType":
-				return ec.fieldContext_FunctionRunV2_runType(ctx, field)
+			case "isDeferred":
+				return ec.fieldContext_FunctionRunV2_isDeferred(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -12936,8 +12931,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_deferredFrom(ctx context.
 	return fc, nil
 }
 
-func (ec *executionContext) _FunctionRunV2_runType(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_FunctionRunV2_runType(ctx, field)
+func (ec *executionContext) _FunctionRunV2_isDeferred(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRunV2) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRunV2_isDeferred(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -12950,7 +12945,7 @@ func (ec *executionContext) _FunctionRunV2_runType(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.RunType, nil
+		return obj.IsDeferred, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12962,19 +12957,19 @@ func (ec *executionContext) _FunctionRunV2_runType(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(models.RunType)
+	res := resTmp.(bool)
 	fc.Result = res
-	return ec.marshalNRunType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunType(ctx, field.Selections, res)
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_FunctionRunV2_runType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_FunctionRunV2_isDeferred(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "FunctionRunV2",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type RunType does not have child fields")
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -13063,8 +13058,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2Edge_node(ctx context.Cont
 				return ec.fieldContext_FunctionRunV2_siblingDefers(ctx, field)
 			case "deferredFrom":
 				return ec.fieldContext_FunctionRunV2_deferredFrom(ctx, field)
-			case "runType":
-				return ec.fieldContext_FunctionRunV2_runType(ctx, field)
+			case "isDeferred":
+				return ec.fieldContext_FunctionRunV2_isDeferred(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -15427,8 +15422,8 @@ func (ec *executionContext) fieldContext_Query_run(ctx context.Context, field gr
 				return ec.fieldContext_FunctionRunV2_siblingDefers(ctx, field)
 			case "deferredFrom":
 				return ec.fieldContext_FunctionRunV2_deferredFrom(ctx, field)
-			case "runType":
-				return ec.fieldContext_FunctionRunV2_runType(ctx, field)
+			case "isDeferred":
+				return ec.fieldContext_FunctionRunV2_isDeferred(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -16682,8 +16677,8 @@ func (ec *executionContext) fieldContext_RunDefer_run(ctx context.Context, field
 				return ec.fieldContext_FunctionRunV2_siblingDefers(ctx, field)
 			case "deferredFrom":
 				return ec.fieldContext_FunctionRunV2_deferredFrom(ctx, field)
-			case "runType":
-				return ec.fieldContext_FunctionRunV2_runType(ctx, field)
+			case "isDeferred":
+				return ec.fieldContext_FunctionRunV2_isDeferred(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -16883,8 +16878,8 @@ func (ec *executionContext) fieldContext_RunDeferredFrom_run(ctx context.Context
 				return ec.fieldContext_FunctionRunV2_siblingDefers(ctx, field)
 			case "deferredFrom":
 				return ec.fieldContext_FunctionRunV2_deferredFrom(ctx, field)
-			case "runType":
-				return ec.fieldContext_FunctionRunV2_runType(ctx, field)
+			case "isDeferred":
+				return ec.fieldContext_FunctionRunV2_isDeferred(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
 		},
@@ -25523,7 +25518,7 @@ func (ec *executionContext) unmarshalInputRunsFilterV2(ctx context.Context, obj 
 		asMap["timeField"] = "QUEUED_AT"
 	}
 
-	fieldsInOrder := [...]string{"from", "until", "timeField", "status", "functionIDs", "appIDs", "runType", "query"}
+	fieldsInOrder := [...]string{"from", "until", "timeField", "status", "functionIDs", "appIDs", "isDeferred", "query"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -25578,11 +25573,11 @@ func (ec *executionContext) unmarshalInputRunsFilterV2(ctx context.Context, obj 
 			if err != nil {
 				return it, err
 			}
-		case "runType":
+		case "isDeferred":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("runType"))
-			it.RunType, err = ec.unmarshalORunType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunType(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isDeferred"))
+			it.IsDeferred, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -27643,9 +27638,9 @@ func (ec *executionContext) _FunctionRunV2(ctx context.Context, sel ast.Selectio
 				return innerFunc(ctx)
 
 			})
-		case "runType":
+		case "isDeferred":
 
-			out.Values[i] = ec._FunctionRunV2_runType(ctx, field, obj)
+			out.Values[i] = ec._FunctionRunV2_isDeferred(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
@@ -31513,16 +31508,6 @@ func (ec *executionContext) marshalNRunTraceTrigger2ᚖgithubᚗcomᚋinngestᚋ
 	return ec._RunTraceTrigger(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNRunType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunType(ctx context.Context, v interface{}) (models.RunType, error) {
-	var res models.RunType
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNRunType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunType(ctx context.Context, sel ast.SelectionSet, v models.RunType) graphql.Marshaler {
-	return v
-}
-
 func (ec *executionContext) unmarshalNRunsFilterV22githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunsFilterV2(ctx context.Context, v interface{}) (models.RunsFilterV2, error) {
 	res, err := ec.unmarshalInputRunsFilterV2(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -32928,22 +32913,6 @@ func (ec *executionContext) marshalORunTraceSpanResponseInfo2ᚖgithubᚗcomᚋi
 		return graphql.Null
 	}
 	return ec._RunTraceSpanResponseInfo(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalORunType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunType(ctx context.Context, v interface{}) (*models.RunType, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var res = new(models.RunType)
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalORunType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunType(ctx context.Context, sel ast.SelectionSet, v *models.RunType) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return v
 }
 
 func (ec *executionContext) unmarshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunsV2OrderByField(ctx context.Context, v interface{}) (*models.RunsV2OrderByField, error) {

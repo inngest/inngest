@@ -367,7 +367,7 @@ type TraceRun struct {
 	Triggers     [][]byte        `json:"triggers"`
 	Output       []byte          `json:"output,omitempty"`
 	Status       enums.RunStatus `json:"status"`
-	RunType      enums.RunType   `json:"run_type"`
+	IsDeferred   bool            `json:"is_deferred"`
 	IsBatch      bool            `json:"is_batch"`
 	IsDebounce   bool            `json:"is_debounce"`
 	HasAI        bool            `json:"has_ai"`
@@ -496,7 +496,7 @@ type GetTraceRunFilter struct {
 	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
-	RunType     []enums.RunType
+	IsDeferred  *bool
 }
 
 type GetTraceRunOrder struct {

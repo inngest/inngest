@@ -1786,12 +1786,6 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		return fmt.Errorf("error parsing runID as ULID: %w", err)
 	}
 
-	runType := run.RunType
-	if runType == enums.RunTypeUnknown {
-		// Back compat
-		runType = enums.RunTypePrimary
-	}
-
 	params := dbpkg.InsertTraceRunParams{
 		AccountID:   run.AccountID,
 		WorkspaceID: run.WorkspaceID,
@@ -1808,7 +1802,6 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		Output:      run.Output,
 		IsDebounce:  run.IsDebounce,
 		HasAi:       run.HasAI,
-		RunType:     int64(runType),
 	}
 
 	if run.BatchID != nil {
@@ -1991,7 +1984,6 @@ func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 		TriggerIDs:   run.EventIDs(),
 		Output:       run.Output,
 		Status:       enums.RunCodeToStatus(run.Status),
-		RunType:      enums.RunType(run.RunType),
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
@@ -2163,31 +2155,6 @@ type runsQueryBuilder struct {
 	order        []sqexp.OrderedExpression
 	cursor       *cqrs.TracePageCursor
 	cursorLayout *cqrs.TracePageCursor
-}
-
-// runTypeFilterExpr creates a run_type column filter. outerRunIDCol is the
-// run_id column of the caller's query.
-func runTypeFilterExpr(dialect string, outerRunIDCol string, runTypes []enums.RunType) sq.Expression {
-	wantPrimary := slices.Contains(runTypes, enums.RunTypePrimary)
-	wantDefer := slices.Contains(runTypes, enums.RunTypeDefer)
-	if wantPrimary == wantDefer {
-		return nil
-	}
-
-	target := int64(enums.RunTypePrimary)
-	if wantDefer {
-		target = int64(enums.RunTypeDefer)
-	}
-
-	if outerRunIDCol == "trace_runs.run_id" {
-		return sq.I("trace_runs.run_type").Eq(target)
-	}
-
-	sub := sq.Dialect(dialect).
-		From("spans").
-		Select(sq.C("run_id")).
-		Where(sq.C("name").Eq(meta.SpanNameRun), sq.C("run_type").Eq(target))
-	return sq.I(outerRunIDCol).In(sub)
 }
 
 func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
@@ -2368,10 +2335,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	reqcursor := builder.cursor
 	resCursorLayout := builder.cursorLayout
 
-	if rtf := runTypeFilterExpr(w.dialect(), "trace_runs.run_id", opt.Filter.RunType); rtf != nil {
-		filter = append(filter, rtf)
-	}
-
 	// read from database
 	// TODO:
 	// change this to a continuous loop with limits instead of just attempting to grab everything.
@@ -2395,7 +2358,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"is_debounce",
 			"cron_schedule",
 			"has_ai",
-			"run_type",
 		).
 		Where(filter...).
 		Order(order...).
@@ -2429,7 +2391,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.IsDebounce,
 			&data.CronSchedule,
 			&data.HasAi,
-			&data.RunType,
 		)
 		if err != nil {
 			return nil, err
@@ -2509,7 +2470,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			Triggers:     [][]byte{},
 			Output:       data.Output,
 			Status:       enums.RunCodeToStatus(data.Status),
-			RunType:      enums.RunType(data.RunType),
 			IsBatch:      isBatch,
 			BatchID:      batchID,
 			IsDebounce:   data.IsDebounce,
@@ -3086,7 +3046,11 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		sq.L(`(SELECT s2.status FROM spans s2
 			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
 			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
-		sq.L("MAX(spans.run_type)").As("run_type"),
+		// Only executor.run rows carry is_deferred (EXTEND rows leave it NULL),
+		// so a subselect anchored on that row gives an unambiguous boolean.
+		sq.L(`(SELECT s3.is_deferred FROM spans s3
+			WHERE s3.run_id = spans.run_id AND s3.name = ?
+			ORDER BY s3.start_time ASC LIMIT 1)`, meta.SpanNameRun).As("is_deferred"),
 		h.EventIDsExpr(), // DB-specific due to storage differences
 	}
 
@@ -3132,8 +3096,21 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	allFilters := append(builder.filter, celFilters...)
-	if rtf := runTypeFilterExpr(w.dialect(), "spans.run_id", opt.Filter.RunType); rtf != nil {
-		allFilters = append(allFilters, rtf)
+	if opt.Filter.IsDeferred != nil {
+		// is_deferred uses TRUE/NULL encoding, so a non-deferred filter must
+		// check IS NULL. Anchor on the executor.run row because EXTEND rows
+		// don't carry is_deferred.
+		var deferPred sq.Expression
+		if *opt.Filter.IsDeferred {
+			deferPred = sq.C("is_deferred").IsTrue()
+		} else {
+			deferPred = sq.C("is_deferred").IsNull()
+		}
+		sub := sq.Dialect(h.GoquDialect()).
+			From("spans").
+			Select(sq.C("run_id")).
+			Where(sq.C("name").Eq(meta.SpanNameRun), deferPred)
+		allFilters = append(allFilters, sq.I("spans.run_id").In(sub))
 	}
 	// The inner subquery is bounded by Until (an executor.run always precedes
 	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
@@ -3186,7 +3163,6 @@ func (w wrapper) convertSpanRunRows(
 	h driverhelp.DialectHelpers,
 	itemLimit uint,
 ) ([]*cqrs.TraceRun, error) {
-	fmt.Println("convertSpanRunRows")
 	l := logger.StdlibLogger(ctx)
 
 	type runRow struct {
@@ -3200,7 +3176,7 @@ func (w wrapper) convertSpanRunRows(
 		StartTime     string
 		EndTime       *string
 		Status        *string
-		RunType       *int64
+		IsDeferred    sql.NullBool
 		EventIDs      *string
 	}
 
@@ -3220,7 +3196,7 @@ func (w wrapper) convertSpanRunRows(
 			&row.StartTime,
 			&row.EndTime,
 			&row.Status,
-			&row.RunType,
+			&row.IsDeferred,
 			&row.EventIDs,
 		)
 		if err != nil {
@@ -3301,11 +3277,6 @@ func (w wrapper) convertSpanRunRows(
 			}
 		}
 
-		runType := enums.RunTypePrimary
-		if row.RunType != nil {
-			runType = enums.RunType(*row.RunType)
-		}
-
 		traceRun := &cqrs.TraceRun{
 			AccountID:   accountUUID,
 			WorkspaceID: workspaceUUID,
@@ -3317,7 +3288,7 @@ func (w wrapper) convertSpanRunRows(
 			StartedAt:   startTime,
 			Duration:    duration,
 			Status:      status,
-			RunType:     runType,
+			IsDeferred:  row.IsDeferred.Valid && row.IsDeferred.Bool,
 			Cursor:      cursor,
 			TriggerIDs:  triggerIDs,
 		}

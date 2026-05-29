@@ -6,12 +6,11 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';
-import { type RunType } from '../types/functionRun';
 import type { Run, ViewScope } from './types';
 
-const runTypePill: Record<RunType, { kind: PillKind; label: string }> = {
-  PRIMARY: { kind: 'primary', label: 'Primary' },
-  DEFER: { kind: 'info', label: 'Deferred' },
+const runTypePill = {
+  primary: { kind: 'primary' as PillKind, label: 'Primary', type: 'PRIMARY' as const },
+  deferred: { kind: 'info' as PillKind, label: 'Deferred', type: 'DEFER' as const },
 };
 
 const columnHelper = createColumnHelper<Run>();
@@ -23,7 +22,7 @@ const columnsIDs = [
   'function',
   'id',
   'queuedAt',
-  'runType',
+  'isDeferred',
   'startedAt',
   'status',
   'trigger',
@@ -128,14 +127,13 @@ const columns = [
     enableSorting: false,
     id: ensureColumnID('function'),
   }),
-  columnHelper.accessor('runType', {
+  columnHelper.accessor('isDeferred', {
     cell: (info) => {
-      const runType = info.getValue();
-      const pill = runTypePill[runType];
+      const pill = info.getValue() ? runTypePill.deferred : runTypePill.primary;
 
       return (
         <div className="flex items-center">
-          <PillCell type={runType} kind={pill.kind} className="bg-transparent">
+          <PillCell type={pill.type} kind={pill.kind} className="bg-transparent">
             {pill.label}
           </PillCell>
         </div>
@@ -143,7 +141,7 @@ const columns = [
     },
     header: 'Type',
     enableSorting: false,
-    id: ensureColumnID('runType'),
+    id: ensureColumnID('isDeferred'),
   }),
   columnHelper.accessor('app', {
     cell: (info) => {
@@ -221,7 +219,7 @@ export function useScopedColumns(scope: ViewScope, showRunType: boolean) {
   return useMemo(() => {
     return columns.filter((column) => {
       if ('accessorKey' in column) {
-        if (!showRunType && column.accessorKey === 'runType') {
+        if (!showRunType && column.accessorKey === 'isDeferred') {
           return false;
         }
         if (scope === 'fn') {

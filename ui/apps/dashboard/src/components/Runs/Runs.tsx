@@ -172,7 +172,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         history: features.data?.history ?? 7,
         tracesPreview: tracePreviewEnabled,
         runDetailsV4: v4Enabled,
-        runType: false,
+        deferredRuns: false,
       }}
       hasMore={hasNextPage}
       isLoadingInitial={isLoadingInitial}

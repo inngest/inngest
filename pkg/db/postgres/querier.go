@@ -522,9 +522,9 @@ func (pq *pgQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams) er
 		Output:        bytesToNullRaw(arg.Output),
 		Input:         bytesToNullRaw(arg.Input),
 		DebugRunID:    arg.DebugRunID, DebugSessionID: arg.DebugSessionID,
-		Status:   arg.Status,
-		EventIds: bytesToNullRaw(arg.EventIds),
-		RunType:  arg.RunType,
+		Status:     arg.Status,
+		EventIds:   bytesToNullRaw(arg.EventIds),
+		IsDeferred: arg.IsDeferred,
 	})
 }
 
@@ -704,7 +704,7 @@ func (pq *pgQuerier) InsertTraceRun(ctx context.Context, arg db.InsertTraceRunPa
 		QueuedAt: arg.QueuedAt, StartedAt: arg.StartedAt, EndedAt: arg.EndedAt,
 		Status: int32(arg.Status), SourceID: arg.SourceID, TriggerIds: arg.TriggerIds,
 		Output: arg.Output, BatchID: arg.BatchID[:], IsDebounce: arg.IsDebounce,
-		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi, RunType: int32(arg.RunType),
+		CronSchedule: arg.CronSchedule, HasAi: arg.HasAi,
 	})
 }
 

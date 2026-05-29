@@ -453,7 +453,7 @@ input RunsFilterV2 {
   functionIDs: [UUID!]
   appIDs: [UUID!]
 
-  runType: RunType
+  isDeferred: Boolean
 
   query: String # CEL query string
 }
@@ -502,7 +502,7 @@ type FunctionRunV2 {
   defers: [RunDefer!]!
   siblingDefers: [RunDefer!]!
   deferredFrom: [RunDeferredFrom!]!
-  runType: RunType!
+  isDeferred: Boolean!
 }
 
 type RunsV2Connection {
@@ -538,11 +538,6 @@ enum RunDeferStatus {
   SCHEDULED
   ABORTED
   REJECTED
-}
-
-enum RunType {
-  PRIMARY
-  DEFER
 }
 
 type RunDeferredFrom {

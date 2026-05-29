@@ -174,7 +174,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       []byte
-	RunType        int32
+	IsDeferred     sql.NullBool
 }
 
 // InsertTraceParams are the parameters for inserting a trace.
@@ -219,7 +219,6 @@ type InsertTraceRunParams struct {
 	IsDebounce   bool
 	CronSchedule sql.NullString
 	HasAi        bool
-	RunType      int64
 }
 
 // InsertWorkerConnectionParams are the parameters for inserting/upserting a worker connection.

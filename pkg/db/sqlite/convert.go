@@ -95,7 +95,7 @@ func traceRunFromSQLite(s *sqlc.TraceRun) *db.TraceRun {
 		QueuedAt: s.QueuedAt, StartedAt: s.StartedAt, EndedAt: s.EndedAt,
 		Status: s.Status, SourceID: s.SourceID, TriggerIds: s.TriggerIds,
 		Output: s.Output, IsDebounce: s.IsDebounce, BatchID: s.BatchID,
-		CronSchedule: s.CronSchedule, HasAi: s.HasAi, RunType: s.RunType,
+		CronSchedule: s.CronSchedule, HasAi: s.HasAi,
 	}
 }
 

@@ -412,9 +412,9 @@ export type FunctionRunV2 = {
   hasAI: Scalars['Boolean'];
   id: Scalars['ULID'];
   isBatch: Scalars['Boolean'];
+  isDeferred: Scalars['Boolean'];
   output: Maybe<Scalars['Bytes']>;
   queuedAt: Scalars['Time'];
-  runType: RunType;
   siblingDefers: Array<RunDefer>;
   sourceID: Maybe<Scalars['String']>;
   startedAt: Maybe<Scalars['Time']>;
@@ -728,6 +728,7 @@ export type RunDefer = {
 
 export enum RunDeferStatus {
   Aborted = 'ABORTED',
+  Rejected = 'REJECTED',
   Scheduled = 'SCHEDULED'
 }
 
@@ -890,17 +891,12 @@ export type RunTraceTrigger = {
   timestamp: Scalars['Time'];
 };
 
-export enum RunType {
-  Defer = 'DEFER',
-  Primary = 'PRIMARY'
-}
-
 export type RunsFilterV2 = {
   appIDs?: InputMaybe<Array<Scalars['UUID']>>;
   from: Scalars['Time'];
   functionIDs?: InputMaybe<Array<Scalars['UUID']>>;
+  isDeferred?: InputMaybe<Scalars['Boolean']>;
   query?: InputMaybe<Scalars['String']>;
-  runType?: InputMaybe<RunType>;
   status?: InputMaybe<Array<FunctionRunStatus>>;
   timeField?: InputMaybe<RunsV2OrderByField>;
   until?: InputMaybe<Scalars['Time']>;
@@ -1171,18 +1167,18 @@ export type GetRunsQueryVariables = Exact<{
   functionRunCursor?: InputMaybe<Scalars['String']>;
   celQuery?: InputMaybe<Scalars['String']>;
   preview?: InputMaybe<Scalars['Boolean']>;
-  runType?: InputMaybe<RunType>;
+  isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
-export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, hasAI: boolean, runType: RunType, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string }, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', function: { __typename?: 'Function', name: string, slug: string } }> } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
+export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, hasAI: boolean, isDeferred: boolean, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string }, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', function: { __typename?: 'Function', name: string, slug: string } }> } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
 
 export type CountRunsQueryVariables = Exact<{
   startTime: Scalars['Time'];
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   preview?: InputMaybe<Scalars['Boolean']>;
-  runType?: InputMaybe<RunType>;
+  isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
