@@ -19,8 +19,19 @@ import (
 // recordingTracerProvider captures UpdateSpan calls so tests can inspect them.
 type recordingTracerProvider struct {
 	tracing.TracerProvider
+	createCalls []*createSpanCall
 	updateCalls []*tracing.UpdateSpanOptions
 	updateErr   error
+}
+
+type createSpanCall struct {
+	name string
+	opts *tracing.CreateSpanOptions
+}
+
+func (r *recordingTracerProvider) CreateDroppableSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*tracing.DroppableSpan, error) {
+	r.createCalls = append(r.createCalls, &createSpanCall{name: name, opts: opts})
+	return r.TracerProvider.CreateDroppableSpan(ctx, name, opts)
 }
 
 func (r *recordingTracerProvider) UpdateSpan(_ context.Context, opts *tracing.UpdateSpanOptions) error {
