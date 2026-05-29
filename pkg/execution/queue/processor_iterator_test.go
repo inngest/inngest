@@ -24,7 +24,6 @@ type mockQueueProcessor struct {
 	sem                  util.TrackingSemaphore
 	opts                 *QueueOptions
 	workers              chan ProcessItem
-	seqLease             *ulid.ULID
 	shadowCh             chan ShadowPartitionChanMsg
 	shadowMu             sync.Mutex
 	shadowMap            map[string]ShadowContinuation

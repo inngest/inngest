@@ -294,7 +294,7 @@ func (q *queueProcessor) setRoleLease(ctx context.Context, roleName string, leas
 
 	if !previousActive && nextActive {
 		switch roleName {
-		case QueueRoleSequential, QueueRoleScavenger:
+		case QueueRoleSequential:
 			metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		case QueueRoleInstrumentation:
 			logger.StdlibLogger(ctx).Debug("claimed instrumentation lease")

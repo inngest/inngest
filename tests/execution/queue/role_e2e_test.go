@@ -100,7 +100,7 @@ func TestQueueRoleStopsRunningAfterLeaseLoss(t *testing.T) {
 	}, time.Second, 5*time.Millisecond)
 
 	otherLease := ulid.MustNew(ulid.Timestamp(time.Now().Add(time.Second)), rand.Reader)
-	r.Set(configLeaseKey(role.Name()), otherLease.String())
+	require.NoError(t, r.Set(configLeaseKey(role.Name()), otherLease.String()))
 
 	require.Eventually(t, func() bool {
 		return activeRoleStatus(q, role.Name()) == nil
