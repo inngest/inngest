@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -448,4 +449,14 @@ func spanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
 	sc := trace.SpanContextFromContext(ctx)
 
 	return sc
+}
+
+func isPairedTrailing(attrs []attribute.KeyValue) bool {
+	for _, attr := range attrs {
+		if string(attr.Key) == meta.Attrs.IsPairedTrailing.Key() &&
+			attr.Value.Type() == attribute.BOOL && attr.Value.AsBool() {
+			return true
+		}
+	}
+	return false
 }
