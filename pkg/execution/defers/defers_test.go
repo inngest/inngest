@@ -59,7 +59,7 @@ func deferAddOp(t *testing.T, hashedID string, opts state.DeferAddOpts) state.Ge
 
 func TestSaveFromOp_Rejected(t *testing.T) {
 	validInput := json.RawMessage(`{"x":1}`)
-	oversizedInput := json.RawMessage(`"` + strings.Repeat("a", consts.MaxDeferInputSize+1) + `"`)
+	oversizedInput := json.RawMessage(`{"msg": "` + strings.Repeat("a", consts.MaxDeferInputSize+1) + `"}`)
 
 	cases := []struct {
 		name           string
@@ -82,12 +82,9 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			wantStatus:    enums.DeferStatusRejected,
 		},
 		{
-			// No FnSlug means we can't even identify the child function; the SDK
-			// keeps retransmitting on every step, so writing a sentinel would
-			// spam the trace. Stay silent.
-			name:          "invalid opts without FnSlug is silently dropped",
+			name:          "invalid opts without FnSlug",
 			opts:          state.DeferAddOpts{Input: validInput},
-			wantSaveCalls: 0,
+			wantSaveCalls: 1,
 		},
 		{
 			// ErrDeferLimitExceeded is the soft-reject signal from the
