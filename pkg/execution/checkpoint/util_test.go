@@ -3,9 +3,13 @@ package checkpoint
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util/interval"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,4 +96,63 @@ func TestIsPairedTrailingStepRun_WireShape(t *testing.T) {
 
 	require.Equal(t, enums.OpcodeStepRun, op.Op)
 	require.True(t, isPairedTrailingStepRun(op))
+}
+
+func TestStepRunAttrs(t *testing.T) {
+	runID := ulid.Make()
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	timing := interval.Interval{A: start.UnixNano(), B: int64(5 * time.Second)}
+	name := "my-step"
+
+	baseOp := func() state.GeneratorOpcode {
+		return state.GeneratorOpcode{
+			Op:          enums.OpcodeStepRun,
+			ID:          "step-id",
+			DisplayName: &name,
+			Timing:      timing,
+		}
+	}
+
+	t.Run("plain StepRun sets QueuedAt and StartedAt and is not paired-trailing", func(t *testing.T) {
+		op := baseOp()
+		attrs := stepRunAttrs(meta.NewAttrSet(), op, runID)
+
+		_, isPaired := meta.GetBoolFlag(attrs, meta.Attrs.IsPairedTrailing)
+		require.False(t, isPaired, "plain StepRun must not be flagged paired-trailing")
+
+		qa, ok := attrs.Get(meta.Attrs.QueuedAt.Key()).(*time.Time)
+		require.True(t, ok, "QueuedAt must be set for a plain StepRun")
+		require.Equal(t, op.Timing.Start().UnixNano(), qa.UnixNano())
+
+		sa, ok := attrs.Get(meta.Attrs.StartedAt.Key()).(*time.Time)
+		require.True(t, ok, "StartedAt must be set for a plain StepRun")
+		require.Equal(t, op.Timing.Start().UnixNano(), sa.UnixNano())
+
+		// The common attributes are merged regardless of the paired-trailing branch.
+		sn, ok := attrs.Get(meta.Attrs.StepName.Key()).(*string)
+		require.True(t, ok)
+		require.Equal(t, name, *sn)
+	})
+
+	t.Run("paired-trailing StepRun omits QueuedAt and StartedAt", func(t *testing.T) {
+		op := baseOp()
+		op.Opts = map[string]any{"_paired_trailing": true}
+		attrs := stepRunAttrs(meta.NewAttrSet(), op, runID)
+
+		val, ok := meta.GetBoolFlag(attrs, meta.Attrs.IsPairedTrailing)
+		require.True(t, ok)
+		require.True(t, val)
+
+		// Omitting these is the whole point: the trailing arm must not clobber
+		// the timing the leading StepPlanned already wrote to the shared span.
+		require.Nil(t, attrs.Get(meta.Attrs.QueuedAt.Key()),
+			"QueuedAt must be omitted so the leading arm's value survives")
+		require.Nil(t, attrs.Get(meta.Attrs.StartedAt.Key()),
+			"StartedAt must be omitted so the leading arm's value survives")
+
+		// The common attributes are still merged.
+		sn, ok := attrs.Get(meta.Attrs.StepName.Key()).(*string)
+		require.True(t, ok)
+		require.Equal(t, name, *sn)
+	})
 }
