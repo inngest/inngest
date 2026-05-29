@@ -68,6 +68,9 @@ type Opts struct {
 	BackoffFunc backoff.BackoffFunc
 	// AllowStepMetadata controls whether step metadata is allowed for a given account.
 	AllowStepMetadata executor.AllowStepMetadata
+	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
+	// The default is to always enforce the limits.
+	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 }
 
 func New(o Opts) Checkpointer {
@@ -76,6 +79,9 @@ func New(o Opts) Checkpointer {
 	}
 	if o.BackoffFunc == nil {
 		o.BackoffFunc = backoff.GetLinearBackoffFunc(5 * time.Second)
+	}
+	if o.EnforceStepSizeLimits == nil {
+		o.EnforceStepSizeLimits = func(ctx context.Context, accountID uuid.UUID) bool { return true }
 	}
 
 	return checkpointer{o}
@@ -174,8 +180,10 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		}
 	}
 
+	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
+
 	if !complete {
-		if input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
+		if enforceStepSizeLimits && input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
 			return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
 		}
 	}
@@ -194,7 +202,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			if len(output) > consts.MaxStepOutputSize {
+			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
 				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 
@@ -227,7 +235,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncStep"},
-					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, runCtx.AttemptCount())),
+					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -265,7 +273,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncErr"},
-					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, runCtx.AttemptCount())),
+					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -459,7 +467,9 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
-	if md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
+	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
+
+	if enforceStepSizeLimits && md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
 		return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
 	}
 
@@ -476,7 +486,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			if len(output) > consts.MaxStepOutputSize {
+			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
 				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 
@@ -500,7 +510,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.AsyncStep"},
-					Seed:       []byte(fmt.Sprintf("%s:%d", op.ID, 0)),
+					Seed:       stepDynamicSeed(op, 0),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -513,6 +523,33 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
+
+		case enums.OpcodeStepPlanned:
+			// When the SDK announces a step is about to run, we open a Running
+			// executor.step span to show progress to the user.
+			_, err := c.TracerProvider.CreateSpan(
+				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+					Identifier: md.ID,
+					Attempt:    0,
+				}),
+				meta.SpanNameStep,
+				&tracing.CreateSpanOptions{
+					Debug: &tracing.SpanDebugData{Location: "checkpoint.AsyncStepPlanned"},
+
+					// Set the same dynamic span ID as the eventual completion arm.
+					// We use DynamicSpanIDOverride instead of Seed to avoid setting the same
+					// span ID.
+					DynamicSpanIDOverride: tracing.DeterministicSpanConfig(stepDynamicSeed(op, 0)).SpanID.String(),
+					Parent:                tracing.RunSpanRefFromMetadata(&md),
+					StartTime:             op.Timing.Start(),
+					Attributes:            stepPlannedAttrs(attrs, op, input.RunID),
+				},
+			)
+			if err != nil {
+				// Processing the leading-edge is best effort both in the executor and SDK.
+				// We'll eventually get the completion arm even if this fails.
+				l.Warn("error saving leading-edge span for StepPlanned", "error", err, "step_id", op.ID)
+			}
 
 		case enums.OpcodeDeferAdd:
 			if err := defers.SaveFromOp(ctx, c.State, l, md.ID, op, c.TracerProvider, md, time.Now()); err != nil {
@@ -548,7 +585,11 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return nil
 	}
 
-	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), ref.JobID()); err != nil {
+	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), queue.Scope{
+		AccountID:  md.ID.Tenant.AccountID,
+		EnvID:      md.ID.Tenant.EnvID,
+		FunctionID: md.ID.FunctionID,
+	}, ref.JobID()); err != nil {
 		l.Error("error resetting queue item attempts", "error", err)
 		return err
 	}
@@ -668,7 +709,7 @@ func (c checkpointer) processMetadata(
 	}
 
 	for _, spanMd := range metadataEntries {
-		if err := spanMd.Validate(); err != nil {
+		if err := spanMd.ValidateAllowed(); err != nil {
 			l.Warn("invalid metadata in checkpoint step",
 				"error", err,
 				"run_id", md.ID.RunID,

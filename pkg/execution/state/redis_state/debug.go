@@ -11,7 +11,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 )
 
-func (q *queue) PartitionByID(ctx context.Context, partitionID string) (*osqueue.PartitionInspectionResult, error) {
+func (q *queue) PartitionByID(ctx context.Context, scope osqueue.Scope, partitionID string) (*osqueue.PartitionInspectionResult, error) {
 	var (
 		result osqueue.PartitionInspectionResult
 		qp     osqueue.QueuePartition
@@ -90,11 +90,15 @@ func (q *queue) PartitionByID(ctx context.Context, partitionID string) (*osqueue
 	}
 
 	// Fetch paused + migrating state
-	if qp.FunctionID != nil {
+	if qp.FunctionID != nil && qp.EnvID != nil {
 		paused := q.PartitionPausedGetter(ctx, *qp.FunctionID)
 		result.Paused = paused.Paused
 
-		locked, err := q.IsMigrationLocked(ctx, *qp.FunctionID)
+		locked, err := q.IsMigrationLocked(ctx, osqueue.Scope{
+			AccountID:  qp.AccountID,
+			EnvID:      *qp.EnvID,
+			FunctionID: *qp.FunctionID,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("could not get locked state: %w", err)
 		}

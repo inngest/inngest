@@ -159,6 +159,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		i.Data.JobID = &i.ID
 	}
 
+	// Start GenerationID at 1 so the very first dispatch carries a non-zero
+	// value to the SDK. The validator treats 0 as "no value sent"
+	if i.GenerationID == 0 {
+		i.GenerationID = 1
+	}
+
 	partitionTime := at
 	if at.Before(now) {
 		// We don't want to enqueue partitions (pointers to fns) before now.
@@ -321,12 +327,12 @@ func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, keyIndex, keyPa
 	}
 }
 
-func (q *queue) SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error {
+func (q *queue) SetFunctionMigrate(ctx context.Context, scope osqueue.Scope, migrateLockUntil *time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.KeyGenerator()
 
-	key := kg.QueueMigrationLock(fnID)
+	key := kg.QueueMigrationLock(scope.FunctionID)
 	if migrateLockUntil == nil {
 		cmd := client.B().Del().Key(key).Build()
 		err := client.Do(ctx, cmd).Error()
@@ -351,7 +357,7 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateL
 
 // removeQueueItem attempts to remove a specific item in the target queue shard
 // and also remove it from the queue item hash as well
-func (q *queue) RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error {
+func (q *queue) RemoveQueueItem(ctx context.Context, scope osqueue.Scope, partitionID string, itemID string) error {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "removeQueueItem"), redis_telemetry.ScopeQueue)
@@ -455,6 +461,7 @@ func (q *queue) Peek(ctx context.Context, partition *osqueue.QueuePartition, unt
 			Until:        until,
 			PartitionKey: partitionKey,
 			PartitionID:  partition.ID,
+			Scope:        osqueue.ScopeFromQueuePartition(partition),
 		},
 	)
 	return result.Items, err
@@ -484,6 +491,7 @@ func (q *queue) PeekRandom(ctx context.Context, partition *osqueue.QueuePartitio
 			Until:        until,
 			PartitionKey: partitionKey,
 			PartitionID:  partition.ID,
+			Scope:        osqueue.ScopeFromQueuePartition(partition),
 			Random:       true,
 		},
 	)
@@ -493,6 +501,7 @@ func (q *queue) PeekRandom(ctx context.Context, partition *osqueue.QueuePartitio
 type peekOpts struct {
 	PartitionID  string
 	PartitionKey string
+	Scope        osqueue.Scope
 	Random       bool
 	From         *time.Time
 	Until        time.Time
@@ -623,7 +632,7 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) (peekResult, error) {
 		for _, missingItemId := range missingQueueItems {
 			id := missingItemId
 			eg.Go(func() error {
-				return q.RemoveQueueItem(ctx, opts.PartitionID, id)
+				return q.RemoveQueueItem(ctx, opts.Scope, opts.PartitionID, id)
 			})
 		}
 
@@ -681,7 +690,7 @@ func (q *queue) peek(ctx context.Context, opts peekOpts) (peekResult, error) {
 	}, nil
 }
 
-func (q *queue) ResetAttemptsByJobID(ctx context.Context, jobID string) error {
+func (q *queue) ResetAttemptsByJobID(ctx context.Context, scope osqueue.Scope, jobID string) error {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ResetAttemptsByJobID"), redis_telemetry.ScopeQueue)
@@ -1140,7 +1149,7 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 	return partitions, nil
 }
 
-func (q *queue) PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error) {
+func (q *queue) PartitionSize(ctx context.Context, scope osqueue.Scope, partitionID string, until time.Time) (int64, error) {
 	return q.partitionSize(ctx, q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, partitionID, ""), until)
 }
 

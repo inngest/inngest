@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/constraintapi"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -50,8 +52,29 @@ func (q *queueProcessor) ProcessItem(
 	p := i.P
 	continuationCtr := i.PCtr
 
-	var err error
 	leaseID := qi.LeaseID
+	leaseMu := sync.RWMutex{}
+
+	currentLeaseID := func() *ulid.ULID {
+		leaseMu.RLock()
+		defer leaseMu.RUnlock()
+		if leaseID == nil {
+			return nil
+		}
+		current := *leaseID
+		return &current
+	}
+
+	setLeaseID := func(next *ulid.ULID) {
+		leaseMu.Lock()
+		defer leaseMu.Unlock()
+		leaseID = next
+	}
+
+	itemWithCurrentLease := func(item QueueItem) QueueItem {
+		item.LeaseID = currentLeaseID()
+		return item
+	}
 
 	// Allow the main runner to block until this work is done
 	q.wg.Add(1)
@@ -71,6 +94,7 @@ func (q *queueProcessor) ProcessItem(
 	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
 	jobCtx = WithShardID(jobCtx, shard.Name())
 	jobCtx = WithJobID(jobCtx, qi.ID)
+	jobCtx = WithGenerationID(jobCtx, qi.GenerationID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
@@ -79,7 +103,10 @@ func (q *queueProcessor) ProcessItem(
 	// Continually extend lease in the background while we're working on this job
 	extendLeaseTick := q.Clock().NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
+	leaseRenewalDone := make(chan struct{})
 	go func() {
+		defer close(leaseRenewalDone)
+
 		for {
 			select {
 			case <-jobCtx.Done():
@@ -90,7 +117,8 @@ func (q *queueProcessor) ProcessItem(
 					return
 				}
 
-				if leaseID == nil {
+				current := currentLeaseID()
+				if current == nil {
 					l.Error("cannot extend lease since lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
@@ -98,10 +126,10 @@ func (q *queueProcessor) ProcessItem(
 				}
 
 				// Once a job has started, use a BG context to always renew.
-				leaseID, err = shard.ExtendLease(
+				nextLeaseID, err := shard.ExtendLease(
 					context.Background(),
 					qi,
-					*leaseID,
+					*current,
 					QueueLeaseDuration,
 				)
 				if err != nil {
@@ -115,9 +143,16 @@ func (q *queueProcessor) ProcessItem(
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
 					return
 				}
+				setLeaseID(nextLeaseID)
 			}
 		}
 	}()
+	stopItemLeaseRenewal := func() {
+		jobDone()
+		// Ensure cleanup observes any lease renewal that won the race with job
+		// completion before passing a lease token to Requeue or Dequeue.
+		<-leaseRenewalDone
+	}
 
 	// If a capacity lease is set on the item, continue extending it and cancel execution if lease expires
 	capacityLeaseID := newCapacityLease(i.CapacityLease)
@@ -406,7 +441,7 @@ func (q *queueProcessor) ProcessItem(
 	case err := <-errCh:
 		// Job errored or extending lease errored.  Signal that the job is done to
 		// stop everything.
-		jobDone()
+		stopItemLeaseRenewal()
 
 		if ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
 			at := q.backoffFunc(qi.Data.Attempt)
@@ -422,13 +457,14 @@ func (q *queueProcessor) ProcessItem(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := shard.Requeue(context.WithoutCancel(ctx), qi, at); err != nil {
+			requeueItem := itemWithCurrentLease(qi)
+			if err := shard.Requeue(context.WithoutCancel(ctx), requeueItem, at); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
 				}
 
-				l.Error("error requeuing job", "error", err, "item", qi)
+				l.Error("error requeuing job", "error", err, "item", requeueItem)
 				return err
 			}
 			if _, ok := err.(QuitError); ok {
@@ -440,7 +476,7 @@ func (q *queueProcessor) ProcessItem(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := shard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -454,7 +490,8 @@ func (q *queueProcessor) ProcessItem(
 			return err
 		}
 	case <-jobCtx.Done():
-		if err := shard.Dequeue(context.WithoutCancel(ctx), qi); err != nil {
+		stopItemLeaseRenewal()
+		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil

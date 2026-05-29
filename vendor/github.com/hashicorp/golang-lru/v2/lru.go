@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package lru
 
 import (
@@ -228,6 +231,14 @@ func (c *Cache[K, V]) Keys() []K {
 	keys := c.lru.Keys()
 	c.lock.RUnlock()
 	return keys
+}
+
+// Values returns a slice of the values in the cache, from oldest to newest.
+func (c *Cache[K, V]) Values() []V {
+	c.lock.RLock()
+	values := c.lru.Values()
+	c.lock.RUnlock()
+	return values
 }
 
 // Len returns the number of items in the cache.

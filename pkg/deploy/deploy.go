@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -179,7 +178,7 @@ func handlePingError(err error) error {
 func GetDeployError(resp *http.Response) error {
 	if resp.StatusCode == http.StatusBadRequest {
 		// 400s usually contain SDK error messages that we want to pass through
-		byt, _ := ioutil.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+		byt, _ := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		type result struct {
 			Message string `json:"message"`
 		}

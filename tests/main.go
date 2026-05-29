@@ -241,6 +241,7 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 
 	rr := &sdk.RegisterRequest{
 		URL:       "http://127.0.0.1:3000/api/inngest",
+		AppName:   "test-suite",
 		Functions: fns,
 	}
 

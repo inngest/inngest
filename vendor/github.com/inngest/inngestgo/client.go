@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngestgo/internal/logger"
-	"github.com/inngest/inngestgo/internal/middleware"
+	"github.com/inngest/inngestgo/middleware"
 	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/inngest/inngestgo/pkg/env"
 )

@@ -27,8 +27,8 @@ type mockFunctionRunReader struct {
 	mock.Mock
 }
 
-func (m *mockFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*cqrs.FunctionRun, error) {
-	args := m.Called(ctx, runID)
+func (m *mockFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID, opts GetFunctionRunOpts) (*cqrs.FunctionRun, error) {
+	args := m.Called(ctx, runID, opts)
 	run, _ := args.Get(0).(*cqrs.FunctionRun)
 	return run, args.Error(1)
 }

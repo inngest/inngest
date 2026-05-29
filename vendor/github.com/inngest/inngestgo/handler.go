@@ -25,10 +25,10 @@ import (
 	"github.com/inngest/inngestgo/internal/event"
 	"github.com/inngest/inngestgo/internal/fn"
 	"github.com/inngest/inngestgo/internal/logger"
-	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
 	"github.com/inngest/inngestgo/internal/util"
+	"github.com/inngest/inngestgo/middleware"
 	"github.com/inngest/inngestgo/pkg/env"
 	"github.com/inngest/inngestgo/pkg/httputil"
 	"github.com/inngest/inngestgo/step"
@@ -789,6 +789,8 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		h.Logger.Error("error decoding function request", "error", err)
 		return fmt.Errorf("%w: %s", errBadRequest, err)
 	}
+	request.CallCtx.RequestID = r.Header.Get(HeaderKeyRequestID)
+	request.CallCtx.JobID = r.Header.Get(HeaderKeyJobID)
 
 	if request.UseAPI {
 		// TODO: implement this
@@ -813,7 +815,14 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("%w: %s", errFunctionMissing, fnID)
 	}
 
-	l := h.Logger.With("fn", fnID, "call_ctx", request.CallCtx)
+	logAttrs := []any{"fn", fnID, "call_ctx", request.CallCtx}
+	if request.CallCtx.RequestID != "" {
+		logAttrs = append(logAttrs, "request_id", request.CallCtx.RequestID)
+	}
+	if request.CallCtx.JobID != "" {
+		logAttrs = append(logAttrs, "job_id", request.CallCtx.JobID)
+	}
+	l := h.Logger.With(logAttrs...)
 	l.Debug("calling function")
 
 	var stepID *string
@@ -1273,6 +1282,8 @@ func invoke(
 		RunID:      input.CallCtx.RunID,
 		StepID:     input.CallCtx.StepID,
 		Attempt:    input.CallCtx.Attempt,
+		RequestID:  input.CallCtx.RequestID,
+		JobID:      input.CallCtx.JobID,
 	}
 	inputVal.FieldByName("InputCtx").Set(reflect.ValueOf(callCtx))
 
@@ -1321,7 +1332,7 @@ func invoke(
 			for i, rawjson := range input.Events {
 				var evt event.Event
 				if err := json.Unmarshal(rawjson, &evt); err != nil {
-					mgr.SetErr(fmt.Errorf("error unmarshalling event for function: %w", err))
+					mgr.SetErr(sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err)))
 					panic(sdkrequest.ControlHijack{})
 				}
 				evts[i] = &evt
@@ -1423,7 +1434,7 @@ func updateInput(
 			newEvent := reflect.New(eventType).Interface()
 
 			if err := json.Unmarshal(byt, newEvent); err != nil {
-				return fmt.Errorf("error unmarshalling event for function: %w", err)
+				return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent).Elem())
 		}
@@ -1443,7 +1454,7 @@ func updateInput(
 				// The same type as the event.
 				newEvent := reflect.New(eventType).Interface()
 				if err := json.Unmarshal(byt, newEvent); err != nil {
-					return fmt.Errorf("error unmarshalling event for function: %w", err)
+					return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 				}
 
 				newEvents = reflect.Append(newEvents, reflect.ValueOf(newEvent).Elem())
@@ -1460,7 +1471,7 @@ func updateInput(
 
 			newEvent := map[string]any{}
 			if err := json.Unmarshal(byt, &newEvent); err != nil {
-				return fmt.Errorf("error unmarshalling event for function: %w", err)
+				return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 			}
 			fnInput.FieldByName("Event").Set(reflect.ValueOf(newEvent))
 		}
@@ -1476,7 +1487,7 @@ func updateInput(
 
 				var newEvent map[string]any
 				if err := json.Unmarshal(byt, &newEvent); err != nil {
-					return fmt.Errorf("error unmarshalling event for function: %w", err)
+					return sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling event for function: %w", err))
 				}
 
 				newEvents[i] = newEvent

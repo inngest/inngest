@@ -655,3 +655,29 @@ func HistogramDefersPerRun(ctx context.Context, count int64, opts HistogramOpt) 
 		Boundaries:  []float64{1, 2, 5, 10, 15, 20},
 	})
 }
+
+func HistogramMetadataGetParentSpanDuration(
+	ctx context.Context,
+	dur time.Duration,
+	attempts int,
+	opts HistogramOpt,
+) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	// Always be true, but we'll add this check to protect cardinality just in
+	// case
+	if attempts < 10 {
+		opts.Tags["attempts"] = attempts
+	}
+
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_get_parent_span_duration",
+		Description: "Distribution of latency when getting parent span in metadata endpoint",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 120_000},
+	})
+}

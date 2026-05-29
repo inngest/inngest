@@ -72,7 +72,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		// Expect queue reset to be called with the job ID and shard info.
 		// Without this, a failed queue item that becomes successful will
 		// have an attempt count > 0 on the next retry.
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err)
@@ -91,7 +91,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			require.EqualValues("Completed", capture.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
 		}
 
-		mocks.queue.AssertCalled(t, "ResetAttemptsByJobID", ctx, "shard-1", "job-123")
+		mocks.queue.AssertCalled(t, "ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123")
 
 		mocks.state.AssertExpectations(t)
 		mocks.tracer.AssertExpectations(t)
@@ -176,7 +176,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
 			Return(&meta.SpanReference{}, nil)
 
-		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 		require.NoError(err)
@@ -193,6 +193,87 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		}
 		require.True(hasStep, "Expected a step span")
 		require.True(hasMetadata, "Expected a metadata span")
+	})
+
+	t.Run("StepPlanned then StepRun share the same span seed", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		now := time.Now()
+		planned := state.GeneratorOpcode{
+			ID:     "step-1",
+			Op:     enums.OpcodeStepPlanned,
+			Name:   "work",
+			Timing: interval.New(now, time.Time{}),
+		}
+		run := state.GeneratorOpcode{
+			ID:     "step-1",
+			Op:     enums.OpcodeStepRun,
+			Data:   json.RawMessage(`{"result":"ok"}`),
+			Name:   "work",
+			Timing: interval.New(now, now.Add(time.Second)),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, planned, run)
+
+		expectedData := map[string]any{"data": json.RawMessage(run.Data)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-1", expectedOutputBytes).Return(false, nil)
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil).
+			Twice()
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		require.Len(mocks.tracer.createdSpans, 2)
+		leadingEdgeSpan := mocks.tracer.createdSpans[0]
+		completionArmSpan := mocks.tracer.createdSpans[1]
+
+		completionSeed := completionArmSpan.options.Seed
+		require.NotEmpty(completionSeed, "completion arm should still use Seed")
+		expectedDynID := tracing.DeterministicSpanConfig(completionSeed).SpanID.String()
+
+		require.Empty(leadingEdgeSpan.options.Seed, "leading edge should still not use Seed")
+		require.Equal(expectedDynID, leadingEdgeSpan.options.DynamicSpanIDOverride,
+			"leading-edge DynamicSpanIDOverride must equal DeterministicSpanConfig(completion.Seed).SpanID")
+
+		require.EqualValues("Running",
+			leadingEdgeSpan.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
+		require.Nil(leadingEdgeSpan.attributes.Get(meta.Attrs.EndedAt.Key()))
+
+		require.EqualValues("Completed",
+			completionArmSpan.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
+		require.NotNil(completionArmSpan.attributes.Get(meta.Attrs.EndedAt.Key()))
+	})
+
+	t.Run("StepPlanned span creation failure does not fail the request", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:     "step-flaky",
+			Op:     enums.OpcodeStepPlanned,
+			Name:   "work",
+			Timing: interval.New(time.Now(), time.Time{}),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, fmt.Errorf("simulated tracer outage")).
+			Once()
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err, "best-effort: tracer failure must not surface to caller")
+
+		mocks.state.AssertNotCalled(t, "SaveStep")
+		mocks.tracer.AssertExpectations(t)
+		mocks.queue.AssertExpectations(t)
 	})
 
 	t.Run("step output too large", func(t *testing.T) {
@@ -305,6 +386,11 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 	appID := uuid.New()
 
 	// Create test metadata
+	scope := queue.Scope{
+		AccountID:  accountID,
+		EnvID:      envID,
+		FunctionID: fnID,
+	}
 	testMetadata := state.Metadata{
 		ID: state.ID{
 			RunID:      runID,
@@ -341,6 +427,7 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 
 	return mocks, &testData{
 		metadata:        testMetadata,
+		scope:           scope,
 		stepOpcodes:     ops,
 		asyncCheckpoint: asyncCheckpoint,
 		checkpointer:    checkpointer,
@@ -432,8 +519,8 @@ type mockQueue struct {
 	mock.Mock
 }
 
-func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID, jobID string) error {
-	args := m.Called(ctx, shardID, jobID)
+func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID string, scope queue.Scope, jobID string) error {
+	args := m.Called(ctx, shardID, scope, jobID)
 	return args.Error(0)
 }
 
@@ -470,6 +557,7 @@ type testMocks struct {
 
 type testData struct {
 	metadata        state.Metadata
+	scope           queue.Scope
 	stepOpcodes     []state.GeneratorOpcode
 	asyncCheckpoint AsyncCheckpoint
 	checkpointer    Checkpointer

@@ -117,7 +117,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 		partition = *item.QueueName
 	}
 
-	err := shard.RemoveQueueItem(ctx, partition, item.ID)
+	err := shard.RemoveQueueItem(ctx, queue.ScopeFromQueueItem(*item), partition, item.ID)
 	if err != nil {
 		return fmt.Errorf("could not remove queue item: %w", err)
 	}

@@ -761,7 +761,11 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 		return enums.SkipReasonNone, nil
 	}
 
-	scheduledSteps, err := e.queue.StatusCount(ctx, req.Function.ID, "start")
+	scheduledSteps, err := e.queue.StatusCount(ctx, queue.Scope{
+		AccountID:  req.AccountID,
+		EnvID:      req.WorkspaceID,
+		FunctionID: req.Function.ID,
+	}, "start")
 	if err != nil {
 		return enums.SkipReasonNone, fmt.Errorf("could not get scheduled step count: %w", err)
 	}
@@ -2048,13 +2052,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			l := l.With("step_metadata", true)
 			for _, opcode := range resp.Generator {
 				for _, md := range opcode.Metadata {
-					if err := md.Validate(); err != nil {
-						l.Warn("invalid metadata in driver response", "error", err)
-						continue
-					}
-
-					if err := md.Kind().ValidateAllowed(); err != nil {
-						l.Warn("disallowed metadata kind in driver response", "error", err, "kind", md.Kind())
+					// SDK metadata is untrusted; validate before creating spans.
+					if err := md.ValidateAllowed(); err != nil {
+						l.Warn("invalid metadata in driver response", "error", err, "kind", md.Kind())
 						continue
 					}
 
@@ -3001,6 +3001,31 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
+		if r.ForceLifecycleHook {
+			l.Warn(
+				"cancel: metadata not found while force lifecycle hook was requested",
+				"error", err,
+				"cancellation_id", r.CancellationID,
+			)
+
+			md := sv2.Metadata{ID: id, Config: *sv2.InitConfig(&sv2.Config{})}
+			if err := e.Finalize(ctx, execution.FinalizeOpts{
+				Metadata: md,
+				Response: execution.FinalizeResponse{
+					Type:           execution.FinalizeResponseDriver,
+					DriverResponse: state.DriverResponse{},
+				},
+				Optional: execution.FinalizeOptional{
+					Cancel: true,
+					Reason: "cancel",
+				},
+			}); err != nil {
+				l.Error("error running synthetic finish handler", "error", err)
+			}
+			for _, e := range e.lifecycles {
+				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
+			}
+		}
 		return nil
 	}
 	if err != nil {
@@ -3016,7 +3041,17 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if errors.Is(err, state.ErrEventNotFound) {
 		// If the event has gone, another thread cancelled the function.
-		l.Warn("cancel: events not found but metadata exists, skipping finalize")
+		l.Warn(
+			"cancel: events not found but metadata exists",
+			"force_lifecycle_hook", r.ForceLifecycleHook,
+			"cancellation_id", r.CancellationID,
+		)
+		if r.ForceLifecycleHook {
+			for _, e := range e.lifecycles {
+				// Emit cancellation lifecycles so history and traces can mark this run cancelled even though event payloads are gone.
+				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
+			}
+		}
 		return nil
 	}
 	if err != nil {
@@ -3258,12 +3293,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			"consumed", consumeResult,
 		)
 
-		if !consumeResult.DidConsume {
-			// We don't need to do anything here.  This could be a dupe;  consuming a pause
-			// is transactional / atomic, so ignore this.
-			return nil
-		}
-
 		status := enums.StepStatusCompleted
 		if r.IsTimeout {
 			status = enums.StepStatusTimedOut
@@ -3326,15 +3355,18 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			if err != nil {
-				if err == queue.ErrQueueItemExists {
-					nextStepSpan.Drop()
-				} else {
-					_ = nextStepSpan.Send()
-					return fmt.Errorf("error enqueueing after pause: %w", err)
-				}
+			// if we did not consume the pause, it implies another handler raced to consume
+			// the pause first. Drop the span and exit and let the other handler write spans.
+			if !consumeResult.DidConsume {
+				nextStepSpan.Drop()
+				return nil
 			}
 
+			if err != nil && err != queue.ErrQueueItemExists {
+				nextStepSpan.Drop()
+				return fmt.Errorf("error enqueueing after pause: %w", err)
+			}
+			// on successful enqueue, send the span
 			_ = nextStepSpan.Send()
 		}
 
@@ -3812,12 +3844,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	// The step output was already persisted, typically by an earlier
-	// attempt that timed out or errored after succeeding. Clear the error so the
-	// discovery step still enqueues; otherwise the run stalls.
-	// XXX: hasPendingSteps can be stale on duplicate; worst case is
-	// redundant SDK invocations per in-flight parallel siblng.
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// A prior attempt can persist output then fail before enqueueing discovery.
+		// Keep going so pending steps still enqueue; duplicate work is bounded.
 		e.log.Warn("step output already persisted; keeping existing output", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
 		err = nil
 	}

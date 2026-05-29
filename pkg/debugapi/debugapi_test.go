@@ -3,6 +3,7 @@ package debugapi
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
@@ -101,6 +103,77 @@ func setupDebouncer(t *testing.T, rc rueidis.Client) debounce.Debouncer {
 	deb, err := debounce.NewDebouncer(shardRegistry, shard.Name(), q)
 	require.NoError(t, err)
 	return deb
+}
+
+func TestGetQueueItemByRunIDResolvesShardFromScope(t *testing.T) {
+	defaultRC, _ := setupTestRedis(t)
+	accountRC, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	defaultShard := redis_state.NewQueueShard(
+		consts.DefaultQueueShardName,
+		redis_state.NewUnshardedClient(defaultRC, redis_state.StateDefaultKey, redis_state.QueueDefaultKey).Queue(),
+	)
+	accountShard := redis_state.NewQueueShard(
+		"account-shard",
+		redis_state.NewUnshardedClient(accountRC, redis_state.StateDefaultKey, redis_state.QueueDefaultKey).Queue(),
+	)
+
+	accountID := uuid.New()
+	envID := uuid.New()
+	functionID := uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	shardRegistry, err := queue.NewShardRegistry(
+		map[string]queue.QueueShard{
+			defaultShard.Name(): defaultShard,
+			accountShard.Name(): accountShard,
+		},
+		queue.WithPrimary(defaultShard),
+		queue.WithShardSelector(func(ctx context.Context, id uuid.UUID, queueName *string) (queue.QueueShard, error) {
+			if id == accountID {
+				return accountShard, nil
+			}
+			return defaultShard, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	q, err := queue.New(ctx, "debug-queue-item-test", shardRegistry)
+	require.NoError(t, err)
+
+	jobID := "run-item"
+	err = q.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
+		WorkspaceID: envID,
+		Kind:        queue.KindEdge,
+		Identifier: state.Identifier{
+			AccountID:   accountID,
+			WorkspaceID: envID,
+			WorkflowID:  functionID,
+			RunID:       runID,
+		},
+	}, time.Now(), queue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	d := &debugAPI{
+		queue:  q,
+		shards: shardRegistry,
+	}
+
+	resp, err := d.GetQueueItem(ctx, &pb.QueueItemRequest{
+		RunId:      runID.String(),
+		AccountId:  accountID.String(),
+		EnvId:      envID.String(),
+		FunctionId: functionID.String(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, accountShard.Name(), resp.GetQueueShard())
+
+	var item queue.QueueItem
+	require.NoError(t, json.Unmarshal(resp.GetData(), &item))
+	require.Equal(t, runID, item.Data.Identifier.RunID)
+	require.Equal(t, functionID, item.FunctionID)
 }
 
 // TestGetBatchInfoHandler tests the debug API handler for batch info.

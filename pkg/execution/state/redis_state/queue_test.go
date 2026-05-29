@@ -988,6 +988,7 @@ func TestQueuePeek(t *testing.T) {
 			ia.EnqueuedAt = items[0].EnqueuedAt
 			require.EqualValues(t, int64(1), items[0].ScavengeCount, "ScavengeCount should be 1 after first scavenge/requeue")
 			ia.ScavengeCount = 1
+			ia.GenerationID = items[0].GenerationID
 			require.EqualValues(t, []*osqueue.QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 
@@ -1213,7 +1214,11 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		// After unpausing A, it should be included in the peek:
 		paused[idA] = false
-		require.NoError(t, q.UnpauseFunction(ctx, shard.Name(), accountId, uuid.Nil, idA))
+		require.NoError(t, q.UnpauseFunction(ctx, shard.Name(), osqueue.Scope{
+			AccountID:  accountId,
+			EnvID:      uuid.New(),
+			FunctionID: idA,
+		}))
 
 		require.NoError(t, err)
 		items, err = shard.PartitionPeek(ctx, true, now.Add(time.Hour), osqueue.PartitionPeekMax)
@@ -1612,7 +1617,11 @@ func TestQueueFunctionPause(t *testing.T) {
 
 	paused = false
 
-	err = q.UnpauseFunction(ctx, shard.Name(), uuid.Nil, uuid.Nil, idA)
+	err = q.UnpauseFunction(ctx, shard.Name(), osqueue.Scope{
+		AccountID:  uuid.New(),
+		EnvID:      uuid.New(),
+		FunctionID: idA,
+	})
 	require.NoError(t, err)
 
 	peeked, err = shard.PartitionPeek(ctx, true, now.Add(5*time.Minute), 100)
@@ -1641,14 +1650,16 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		ctx := context.Background()
 
 		acctID := uuid.New()
+		envID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 		fnID := uuid.New()
-		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
+		scope := osqueue.Scope{AccountID: acctID, EnvID: envID, FunctionID: fnID}
+		id := state.Identifier{AccountID: acctID, WorkspaceID: envID, WorkflowID: fnID}
 		_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		lockUntil := now.Add(10 * time.Minute)
-		err = q.SetFunctionMigrate(ctx, "default", fnID, &lockUntil)
+		err = q.SetFunctionMigrate(ctx, "default", scope, &lockUntil)
 		require.NoError(t, err)
 
 		require.True(t, r.Exists(kg.QueueMigrationLock(fnID)))
@@ -1657,7 +1668,7 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		require.Equal(t, lockUntil, ulid.MustParse(lockValue).Timestamp())
 
 		// disable migration flag
-		err = q.SetFunctionMigrate(ctx, "default", fnID, nil)
+		err = q.SetFunctionMigrate(ctx, "default", scope, nil)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.QueueMigrationLock(fnID)))
@@ -1677,9 +1688,11 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		ctx := context.Background()
 
 		acctID := uuid.New()
+		envID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 		fnID := uuid.New()
-		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
+		scope := osqueue.Scope{AccountID: acctID, EnvID: envID, FunctionID: fnID}
+		id := state.Identifier{AccountID: acctID, WorkspaceID: envID, WorkflowID: fnID}
 		_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
@@ -1696,24 +1709,24 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		sp := getShadowPartition()
 		require.Equal(t, fnID.String(), sp.PartitionID)
 
-		lockedUntil, err := shard.IsMigrationLocked(ctx, fnID)
+		lockedUntil, err := shard.IsMigrationLocked(ctx, scope)
 		require.NoError(t, err)
 		require.Nil(t, lockedUntil)
 
 		lockUntil := now.Add(10 * time.Minute)
-		err = q.SetFunctionMigrate(ctx, "default", fnID, &lockUntil)
+		err = q.SetFunctionMigrate(ctx, "default", scope, &lockUntil)
 		require.NoError(t, err)
 
-		lockedUntil, err = shard.IsMigrationLocked(ctx, fnID)
+		lockedUntil, err = shard.IsMigrationLocked(ctx, scope)
 		require.NoError(t, err)
 		require.NotNil(t, lockedUntil)
 		require.Equal(t, lockUntil, *lockedUntil)
 
 		// disable migration flag
-		err = q.SetFunctionMigrate(ctx, "default", fnID, nil)
+		err = q.SetFunctionMigrate(ctx, "default", scope, nil)
 		require.NoError(t, err)
 
-		lockedUntil, err = shard.IsMigrationLocked(ctx, fnID)
+		lockedUntil, err = shard.IsMigrationLocked(ctx, scope)
 		require.NoError(t, err)
 		require.Nil(t, lockedUntil)
 	})
@@ -1740,23 +1753,25 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 
 		ctx := context.Background()
 		acctID := uuid.New()
+		envID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 		fnID := uuid.New()
-		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
+		scope := osqueue.Scope{AccountID: acctID, EnvID: envID, FunctionID: fnID}
+		id := state.Identifier{AccountID: acctID, WorkspaceID: envID, WorkflowID: fnID}
 		_, err = yoloShard.EnqueueItem(ctx, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		lockUntil := now.Add(10 * time.Minute)
-		err = q.SetFunctionMigrate(ctx, "yolo", fnID, &lockUntil)
+		err = q.SetFunctionMigrate(ctx, "yolo", scope, &lockUntil)
 		require.NoError(t, err)
 
 		// should not find it in the default shard
-		lockedUntil, err := defaultShard.IsMigrationLocked(ctx, fnID)
+		lockedUntil, err := defaultShard.IsMigrationLocked(ctx, scope)
 		require.NoError(t, err)
 		require.Nil(t, lockedUntil)
 
 		// should find metadata in the other shard
-		lockedUntil, err = yoloShard.IsMigrationLocked(ctx, fnID)
+		lockedUntil, err = yoloShard.IsMigrationLocked(ctx, scope)
 		require.NoError(t, err)
 		require.Equal(t, lockUntil, *lockedUntil)
 	})
@@ -2161,12 +2176,21 @@ func TestMigrate(t *testing.T) {
 			)
 			require.NoError(t, err)
 
+			acctID := uuid.New()
+			envID := uuid.New()
+			fnID := uuid.New()
+			scope := osqueue.Scope{
+				AccountID:  acctID,
+				EnvID:      envID,
+				FunctionID: fnID,
+			}
+
 			expectItemCountForPartition := func(ctx context.Context, shard RedisQueueShard, partitionID uuid.UUID, expected int) {
 				var count int
 
 				from := time.Time{}
 				until := clock.Now().Add(24 * time.Hour * 365)
-				items, err := shard.ItemsByPartition(ctx, partitionID.String(), from, until)
+				items, err := shard.ItemsByPartition(ctx, scope, partitionID.String(), from, until)
 				require.NoError(t, err)
 
 				for range items {
@@ -2175,12 +2199,9 @@ func TestMigrate(t *testing.T) {
 				require.Equal(t, expected, count)
 			}
 
-			acctID := uuid.New()
-			fnID := uuid.New()
-
 			// Enqueue to shard 1
 			for range 5 {
-				id := state.Identifier{AccountID: acctID, WorkflowID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
+				id := state.Identifier{AccountID: acctID, WorkspaceID: envID, WorkflowID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
 				err := q1.Enqueue(ctx, osqueue.Item{Identifier: id}, clock.Now(), osqueue.EnqueueOpts{})
 				require.NoError(t, err)
 			}
@@ -2190,14 +2211,14 @@ func TestMigrate(t *testing.T) {
 
 			// Don't really need it since there are no executors to process the enqueued items
 			lockUntil := clock.Now().Add(10 * time.Minute)
-			err = q1.SetFunctionMigrate(ctx, shard1.Name(), fnID, &lockUntil)
+			err = q1.SetFunctionMigrate(ctx, shard1.Name(), scope, &lockUntil)
 			require.NoError(t, err)
 
 			// Verify that there are expected number of items in it
 			expectItemCountForPartition(ctx, shard1, fnID, 5)
 
 			// Attempt to migrate from shard1 to shard2
-			processed, err := q1.Migrate(ctx, shard1.Name(), fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
+			processed, err := q1.Migrate(ctx, shard1.Name(), scope, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
 				return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 			})
 			require.NoError(t, err)
@@ -2216,7 +2237,7 @@ func TestMigrate(t *testing.T) {
 			require.Equal(t, time.Duration(0), remainingTTL, remainingTTL.String())
 
 			// Now, move everything back to queue 1
-			returned, err := q2.Migrate(ctx, shard2.Name(), fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
+			returned, err := q2.Migrate(ctx, shard2.Name(), scope, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
 				return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
 			})
 			require.NoError(t, err, "r1", r1.Dump())
@@ -2249,9 +2270,9 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) osqueue.Queue
 	return i
 }
 
-func requirePartitionInProgress(t *testing.T, q RedisQueueShard, workflowID uuid.UUID, count int) {
+func requirePartitionInProgress(t *testing.T, q RedisQueueShard, scope osqueue.Scope, count int) {
 	t.Helper()
-	actual, err := q.RunningCount(context.Background(), workflowID)
+	actual, err := q.RunningCount(context.Background(), scope)
 	require.NoError(t, err)
 	require.EqualValues(t, count, actual)
 }
@@ -3314,6 +3335,8 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 	ctx := context.Background()
 	fnID := uuid.New()
 	acctID := uuid.New()
+	envID := uuid.New()
+	scope := osqueue.Scope{AccountID: acctID, EnvID: envID, FunctionID: fnID}
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("removes start status index", func(t *testing.T) {
@@ -3324,22 +3347,24 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Verify the status index was created by enqueue.
-		count, err := shard.StatusCount(ctx, fnID, "start")
+		count, err := shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count, "status:start index should have 1 member after enqueue")
 
 		// RemoveQueueItem should clean up the status index.
-		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "start")
+		count, err = shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 0, count, "status:start index should be empty after remove")
 	})
@@ -3352,20 +3377,22 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindEdge,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "in-progress")
+		count, err := shard.StatusCount(ctx, scope, "in-progress")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count, "status:in-progress index should have 1 member after enqueue")
 
-		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "in-progress")
+		count, err = shard.StatusCount(ctx, scope, "in-progress")
 		require.NoError(t, err)
 		require.EqualValues(t, 0, count, "status:in-progress index should be empty after remove")
 	})
@@ -3378,20 +3405,22 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindSleep,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "sleep")
+		count, err := shard.StatusCount(ctx, scope, "sleep")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count, "status:sleep index should have 1 member after enqueue")
 
-		err = shard.RemoveQueueItem(ctx, fnID.String(), item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), item.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "sleep")
+		count, err = shard.StatusCount(ctx, scope, "sleep")
 		require.NoError(t, err)
 		require.EqualValues(t, 0, count, "status:sleep index should be empty after remove")
 	})
@@ -3404,7 +3433,9 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -3415,21 +3446,23 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start.Add(time.Second), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "start")
+		count, err := shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 2, count)
 
 		// Remove only itemA.
-		err = shard.RemoveQueueItem(ctx, fnID.String(), itemA.ID)
+		err = shard.RemoveQueueItem(ctx, scope, fnID.String(), itemA.ID)
 		require.NoError(t, err)
 
-		count, err = shard.StatusCount(ctx, fnID, "start")
+		count, err = shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	})
@@ -3443,23 +3476,25 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 			Data: osqueue.Item{
 				Kind: osqueue.KindStart,
 				Identifier: state.Identifier{
-					AccountID: acctID,
+					AccountID:   acctID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		count, err := shard.StatusCount(ctx, fnID, "start")
+		count, err := shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 
 		// Calling with a non-UUID partition should not error, but also won't
 		// clean up status indexes (no function ID to derive keys from).
-		err = shard.RemoveQueueItem(ctx, "not-a-uuid", item.ID)
+		err = shard.RemoveQueueItem(ctx, scope, "not-a-uuid", item.ID)
 		require.NoError(t, err)
 
 		// Status index should still contain the item since we used the wrong partition.
-		count, err = shard.StatusCount(ctx, fnID, "start")
+		count, err = shard.StatusCount(ctx, scope, "start")
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	})

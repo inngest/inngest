@@ -599,6 +599,472 @@ func TestFunctionUniqueActiveAppSlug(t *testing.T) {
 	})
 }
 
+// TestAppUniqueActiveName verifies that an active app (archived_at IS NULL)
+// is unique per non-empty name. This is the schema-level guarantee that
+// register()'s UpsertAppByName relies on for adoption: with the partial
+// unique index in place, a re-sync from a customer upgrading across the
+// v1.15 seed flip (URL -> AppName) cannot insert a parallel row.
+//
+// Empty names are deliberately excluded so the placeholder paths (-u
+// startup, autodiscovery, UI add-by-URL) can keep multiple unreachable
+// rows for distinct URLs.
+func TestAppUniqueActiveName(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	first := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          first,
+		Name:        "uniq-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "checksum-uniq-app",
+		Url:         "https://example.com/inngest",
+	})
+	require.NoError(t, err)
+
+	t.Run("duplicate active name rejected", func(t *testing.T) {
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "uniq-app",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "checksum-uniq-app-2",
+			Url:         "https://example.com/inngest-2",
+		})
+		require.Error(t, err, "second active app with same name must fail")
+		assert.Contains(t, strings.ToLower(err.Error()), "unique")
+	})
+
+	t.Run("multiple empty names allowed", func(t *testing.T) {
+		// Distinct unreachable placeholders keyed by different URLs must
+		// coexist; the partial index excludes name=''.
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "",
+			SdkLanguage: "",
+			SdkVersion:  "",
+			Status:      "",
+			Checksum:    "",
+			Url:         "https://example.com/placeholder-a",
+		})
+		require.NoError(t, err)
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "",
+			SdkLanguage: "",
+			SdkVersion:  "",
+			Status:      "",
+			Checksum:    "",
+			Url:         "https://example.com/placeholder-b",
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("archived row reserves the name against UpsertApp with a fresh id", func(t *testing.T) {
+		// Archive the previously-created row. The new index covers archived
+		// rows too (predicate is just `name <> ''`), so a fresh INSERT with
+		// the same name but a different id must fail. UpsertAppByName is the
+		// supported way to re-take an archived name; that path is covered in
+		// TestUpsertAppByNameRevivesArchivedRow below.
+		require.NoError(t, q.DeleteApp(ctx, first))
+
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          uuid.New(),
+			Name:        "uniq-app",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "checksum-uniq-app-replacement",
+			Url:         "https://example.com/inngest-replacement",
+		})
+		require.Error(t, err, "UpsertApp with a fresh id must collide with the archived row's name")
+		assert.Contains(t, strings.ToLower(err.Error()), "unique")
+	})
+}
+
+// TestAppsNameUniqueKeyMigrationDedup exercises the dedup step of the
+// apps_name_unique_key migration: drop the index that the migration created
+// on boot, seed same-name rows that would violate the relaxed predicate,
+// re-run the dedup SQL + recreate the index, and check which row survived
+// with its name intact.
+//
+// Tiebreaker order under test:
+//   1. Active wins over archived.
+//   2. Same status: more active functions wins.
+//   3. Same function count: newer created_at wins.
+//   4. Same created_at: higher id wins.
+//
+// Losers get their name suffixed with their id (so the unique index no
+// longer collides) and archived_at is forced non-null.
+func TestAppsNameUniqueKeyMigrationDedup(t *testing.T) {
+	runDedup := func(t *testing.T, conn *sql.DB, dialect db.Dialect) {
+		t.Helper()
+		var ddl string
+		switch dialect {
+		case db.DialectPostgres:
+			ddl = `
+WITH fn_counts AS (
+    SELECT app_id, COUNT(*) AS n
+    FROM functions
+    WHERE archived_at IS NULL
+    GROUP BY app_id
+),
+ranked AS (
+    SELECT a.id,
+           ROW_NUMBER() OVER (
+               PARTITION BY a.name
+               ORDER BY (a.archived_at IS NULL) DESC,
+                        COALESCE(fc.n, 0) DESC,
+                        a.created_at DESC,
+                        a.id DESC
+           ) AS rn
+    FROM apps a
+    LEFT JOIN fn_counts fc ON fc.app_id = a.id
+    WHERE a.name <> ''
+)
+UPDATE apps
+SET archived_at = COALESCE(archived_at, NOW()),
+    name       = name || ' (id:' || id::text || ')'
+WHERE id IN (SELECT id FROM ranked WHERE rn > 1);`
+		case db.DialectSQLite:
+			ddl = `
+WITH fn_counts AS (
+    SELECT app_id, COUNT(*) AS n
+    FROM functions
+    WHERE archived_at IS NULL
+    GROUP BY app_id
+),
+ranked AS (
+    SELECT a.id,
+           ROW_NUMBER() OVER (
+               PARTITION BY a.name
+               ORDER BY (a.archived_at IS NULL) DESC,
+                        COALESCE(fc.n, 0) DESC,
+                        a.created_at DESC,
+                        a.id DESC
+           ) AS rn
+    FROM apps a
+    LEFT JOIN fn_counts fc ON fc.app_id = a.id
+    WHERE a.name <> ''
+)
+UPDATE apps
+SET archived_at = COALESCE(archived_at, datetime('now')),
+    name       = name || ' (id:' || id || ')'
+WHERE id IN (SELECT id FROM ranked WHERE rn > 1);`
+		}
+		_, err := conn.Exec(ddl)
+		require.NoError(t, err)
+	}
+
+	// dropAndRecreateIndex drops apps_name_unique_key (created on boot by the
+	// 000006/000004 migration), lets the caller seed pre-dedup state, then the
+	// caller calls runDedup + recreates the index via this helper to mirror
+	// the migration's order.
+	dropIndex := func(t *testing.T, conn *sql.DB) {
+		t.Helper()
+		_, err := conn.Exec(`DROP INDEX apps_name_unique_key`)
+		require.NoError(t, err)
+	}
+	createIndex := func(t *testing.T, conn *sql.DB) {
+		t.Helper()
+		_, err := conn.Exec(`CREATE UNIQUE INDEX apps_name_unique_key ON apps (name) WHERE name <> ''`)
+		require.NoError(t, err)
+	}
+
+	seedApp := func(t *testing.T, adapter db.Adapter, ctx context.Context, name string, createdAt time.Time, archived bool) uuid.UUID {
+		t.Helper()
+		id := uuid.New()
+		_, err := adapter.Q().UpsertApp(ctx, db.UpsertAppParams{
+			ID:          id,
+			Name:        name,
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    fmt.Sprintf("checksum-%s", id),
+			Url:         fmt.Sprintf("https://example.com/%s", id),
+		})
+		require.NoError(t, err)
+		// Override created_at + archived_at so the dedup ordering is
+		// deterministic across all backends; UpsertApp doesn't expose those.
+		stmt := `UPDATE apps SET created_at = $1, archived_at = $2 WHERE id = $3`
+		if adapter.Dialect() == db.DialectSQLite {
+			stmt = `UPDATE apps SET created_at = ?, archived_at = ? WHERE id = ?`
+		}
+		var archivedAt interface{}
+		if archived {
+			archivedAt = createdAt
+		}
+		_, err = adapter.Conn().Exec(stmt, createdAt, archivedAt, id)
+		require.NoError(t, err)
+		return id
+	}
+
+	seedFn := func(t *testing.T, adapter db.Adapter, ctx context.Context, appID uuid.UUID, slug string) {
+		t.Helper()
+		_, err := adapter.Q().UpsertFunction(ctx, db.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     appID,
+			Name:      slug,
+			Slug:      slug,
+			Config:    `{}`,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err)
+	}
+
+	t.Run("active wins over archived regardless of function count", func(t *testing.T) {
+		adapter, cleanup := newTestAdapter(t)
+		defer cleanup()
+		ctx := context.Background()
+		conn := adapter.Conn()
+		dropIndex(t, conn)
+
+		// Archived row has more functions, but the active row should still
+		// survive with its name intact.
+		olderActive := seedApp(t, adapter, ctx, "shared", time.Now().Add(-2*time.Hour).UTC(), false)
+		newerArchived := seedApp(t, adapter, ctx, "shared", time.Now().Add(-1*time.Hour).UTC(), true)
+		seedFn(t, adapter, ctx, newerArchived, "slug-a")
+		seedFn(t, adapter, ctx, newerArchived, "slug-b")
+
+		runDedup(t, conn, adapter.Dialect())
+		createIndex(t, conn)
+
+		winner, err := adapter.Q().GetAppByID(ctx, olderActive)
+		require.NoError(t, err)
+		require.Equal(t, "shared", winner.Name, "active row must keep its name")
+		require.False(t, winner.ArchivedAt.Valid)
+
+		loser, err := adapter.Q().GetAppByID(ctx, newerArchived)
+		require.NoError(t, err)
+		require.True(t, strings.HasPrefix(loser.Name, "shared (id:"), "archived loser must be renamed with its id, got %q", loser.Name)
+		require.True(t, loser.ArchivedAt.Valid, "archived loser stays archived")
+	})
+
+	t.Run("among actives, more active functions wins", func(t *testing.T) {
+		adapter, cleanup := newTestAdapter(t)
+		defer cleanup()
+		ctx := context.Background()
+		conn := adapter.Conn()
+		dropIndex(t, conn)
+
+		// Newer row is empty; older row has functions — older should win.
+		olderWithFns := seedApp(t, adapter, ctx, "shared", time.Now().Add(-2*time.Hour).UTC(), false)
+		newerEmpty := seedApp(t, adapter, ctx, "shared", time.Now().Add(-1*time.Hour).UTC(), false)
+		seedFn(t, adapter, ctx, olderWithFns, "slug-a")
+		seedFn(t, adapter, ctx, olderWithFns, "slug-b")
+		seedFn(t, adapter, ctx, olderWithFns, "slug-c")
+
+		runDedup(t, conn, adapter.Dialect())
+		createIndex(t, conn)
+
+		winner, err := adapter.Q().GetAppByID(ctx, olderWithFns)
+		require.NoError(t, err)
+		require.Equal(t, "shared", winner.Name)
+		require.False(t, winner.ArchivedAt.Valid)
+
+		loser, err := adapter.Q().GetAppByID(ctx, newerEmpty)
+		require.NoError(t, err)
+		require.True(t, strings.HasPrefix(loser.Name, "shared (id:"), "newer-empty loser must be renamed, got %q", loser.Name)
+		require.True(t, loser.ArchivedAt.Valid, "newer-empty loser must be force-archived")
+	})
+
+	t.Run("among actives with same function count, newer created_at wins", func(t *testing.T) {
+		adapter, cleanup := newTestAdapter(t)
+		defer cleanup()
+		ctx := context.Background()
+		conn := adapter.Conn()
+		dropIndex(t, conn)
+
+		older := seedApp(t, adapter, ctx, "shared", time.Now().Add(-2*time.Hour).UTC(), false)
+		newer := seedApp(t, adapter, ctx, "shared", time.Now().Add(-1*time.Hour).UTC(), false)
+		// Same function count (zero).
+
+		runDedup(t, conn, adapter.Dialect())
+		createIndex(t, conn)
+
+		winner, err := adapter.Q().GetAppByID(ctx, newer)
+		require.NoError(t, err)
+		require.Equal(t, "shared", winner.Name)
+		require.False(t, winner.ArchivedAt.Valid)
+
+		loser, err := adapter.Q().GetAppByID(ctx, older)
+		require.NoError(t, err)
+		require.True(t, strings.HasPrefix(loser.Name, "shared (id:"), "older loser must be renamed, got %q", loser.Name)
+		require.True(t, loser.ArchivedAt.Valid)
+	})
+
+	t.Run("non-conflicting rows are untouched", func(t *testing.T) {
+		adapter, cleanup := newTestAdapter(t)
+		defer cleanup()
+		ctx := context.Background()
+		conn := adapter.Conn()
+		dropIndex(t, conn)
+
+		// Two distinct names, plus a placeholder (name=""), plus a single
+		// archived row with no peer.
+		alpha := seedApp(t, adapter, ctx, "alpha", time.Now().Add(-1*time.Hour).UTC(), false)
+		beta := seedApp(t, adapter, ctx, "beta", time.Now().Add(-1*time.Hour).UTC(), false)
+		placeholder := seedApp(t, adapter, ctx, "", time.Now().Add(-1*time.Hour).UTC(), false)
+		lonelyArchived := seedApp(t, adapter, ctx, "gamma", time.Now().Add(-1*time.Hour).UTC(), true)
+
+		runDedup(t, conn, adapter.Dialect())
+		createIndex(t, conn)
+
+		for _, id := range []uuid.UUID{alpha, beta, placeholder, lonelyArchived} {
+			got, err := adapter.Q().GetAppByID(ctx, id)
+			require.NoError(t, err)
+			require.NotContains(t, got.Name, "(id:", "non-conflicting row %s must keep its name", id)
+		}
+	})
+}
+
+// TestUpsertAppByNameAdoptsLegacyURLKeyedRow exercises the partial-index
+// upsert path that fixes the v1.13 -> v1.19 orphaning bug. A pre-existing
+// row keyed by sha1(URL) (the pre-v1.15 deterministic id) must be adopted
+// in place when register() upserts by name with a fresh sha1(AppName) id;
+// the existing row's id stays, only the mutable fields are refreshed.
+func TestUpsertAppByNameAdoptsLegacyURLKeyedRow(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	// Pre-populate the legacy row (id derived from URL).
+	legacyID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          legacyID,
+		Name:        "adopt-me",
+		SdkLanguage: "go",
+		SdkVersion:  "0.0.1",
+		Status:      "ok",
+		Checksum:    "old-checksum",
+		Url:         "https://example.com/legacy",
+	})
+	require.NoError(t, err)
+
+	// Re-sync via UpsertAppByName with a fresh "candidate" id.
+	candidateID := uuid.New()
+	got, err := q.UpsertAppByName(ctx, db.UpsertAppParams{
+		ID:          candidateID,
+		Name:        "adopt-me",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "ok",
+		Checksum:    "new-checksum",
+		Url:         "https://example.com/legacy",
+	})
+	require.NoError(t, err)
+
+	// The returning id is the legacy one — the candidate is ignored on
+	// conflict. Mutable fields are refreshed.
+	require.Equal(t, legacyID, got.ID, "existing row's id must be preserved on name conflict")
+	require.Equal(t, "1.0.0", got.SdkVersion)
+	require.Equal(t, "new-checksum", got.Checksum)
+}
+
+// TestUpsertAppByNameRevivesArchivedRow covers the archive-then-resync flow:
+// a previously-archived app with this name must be revived in place when
+// register() upserts by name, preserving the original id (so any external
+// references — history, function_runs, etc. — keep resolving). The relaxed
+// partial-index predicate (WHERE name <> '', no archived_at clause) is what
+// makes the arbiter find archived rows so ON CONFLICT DO UPDATE archived_at
+// = NULL can re-activate them.
+func TestUpsertAppByNameRevivesArchivedRow(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	originalID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          originalID,
+		Name:        "revive-me",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "pre-archive-checksum",
+		Url:         "https://example.com/revive",
+	})
+	require.NoError(t, err)
+	require.NoError(t, q.DeleteApp(ctx, originalID))
+
+	// Confirm it really is archived: GetAppByName filters archived rows.
+	missing, err := q.GetAppByName(ctx, "revive-me")
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.Nil(t, missing)
+
+	candidateID := uuid.New()
+	revived, err := q.UpsertAppByName(ctx, db.UpsertAppParams{
+		ID:          candidateID,
+		Name:        "revive-me",
+		SdkLanguage: "go",
+		SdkVersion:  "2.0.0",
+		Status:      "active",
+		Checksum:    "post-revive-checksum",
+		Url:         "https://example.com/revive",
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, originalID, revived.ID, "revive must reuse the archived row's id")
+	require.False(t, revived.ArchivedAt.Valid, "archived_at must be cleared on revive")
+	require.Equal(t, "2.0.0", revived.SdkVersion)
+	require.Equal(t, "post-revive-checksum", revived.Checksum)
+
+	// And the active-row lookup now finds it again.
+	active, err := q.GetAppByName(ctx, "revive-me")
+	require.NoError(t, err)
+	require.Equal(t, originalID, active.ID)
+}
+
+// TestUpsertAppPreservesNameOnEmptyClobber covers the upstream defect that
+// turns the v1.13 row into a name="" placeholder before re-sync arrives:
+// service.go:315 (the -u startup loop) and the autodiscovery / UI add-by-URL
+// paths upsert with name="" to set/clear the unreachable error. The query
+// now skips the name assignment when excluded.name is empty so a real app's
+// name is never erased by re-pinging the same id.
+func TestUpsertAppPreservesNameOnEmptyClobber(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	id := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          id,
+		Name:        "real-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Status:      "active",
+		Checksum:    "real-checksum",
+		Url:         "https://example.com/real",
+	})
+	require.NoError(t, err)
+
+	// Mimic the placeholder upsert: empty name, error set.
+	_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:    id,
+		Name:  "",
+		Url:   "https://example.com/real",
+		Error: sql.NullString{Valid: true, String: "unreachable"},
+	})
+	require.NoError(t, err)
+
+	got, err := q.GetAppByID(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, "real-app", got.Name, "placeholder upsert must not blank a real name")
+	require.True(t, got.Error.Valid, "error should be set by the placeholder upsert")
+	require.Equal(t, "unreachable", got.Error.String)
+}
+
 // TestInsertFunctionIdempotentOnSameID covers the resync path: the sync loop
 // uses GetFunctionByInternalUUID to decide between UpsertFunction and
 // UpdateFunctionConfig, but UpsertFunction must still tolerate being called

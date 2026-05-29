@@ -56,7 +56,11 @@ func (m *mockQueueProcessor) ClearShadowContinuations() {
 
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
-	name string
+	name                    string
+	partitionLeaseCount     int32
+	partitionRequeueCount   int32
+	partitionRequeueAt      time.Time
+	partitionRequeueForceAt bool
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -125,10 +129,15 @@ func (m *mockShardForIterator) PartitionPeek(ctx context.Context, sequential boo
 }
 
 func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error) {
-	return nil, nil
+	atomic.AddInt32(&m.partitionLeaseCount, 1)
+	id := ulid.Make()
+	return &id, nil
 }
 
 func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
+	atomic.AddInt32(&m.partitionRequeueCount, 1)
+	m.partitionRequeueAt = at
+	m.partitionRequeueForceAt = forceAt
 	return nil
 }
 
@@ -140,7 +149,7 @@ func (m *mockShardForIterator) Instrument(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockShardForIterator) ItemsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
+func (m *mockShardForIterator) ItemsByPartition(ctx context.Context, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
 	return nil, nil
 }
 
@@ -148,11 +157,11 @@ func (m *mockShardForIterator) ItemsByBacklog(ctx context.Context, backlogID str
 	return nil, nil
 }
 
-func (m *mockShardForIterator) SetFunctionMigrate(ctx context.Context, fnID uuid.UUID, migrateLockUntil *time.Time) error {
+func (m *mockShardForIterator) SetFunctionMigrate(ctx context.Context, scope Scope, migrateLockUntil *time.Time) error {
 	return nil
 }
 
-func (m *mockShardForIterator) ResetAttemptsByJobID(ctx context.Context, jobID string) error {
+func (m *mockShardForIterator) ResetAttemptsByJobID(ctx context.Context, scope Scope, jobID string) error {
 	return nil
 }
 
@@ -164,7 +173,7 @@ func (m *mockShardForIterator) SetPeekEWMA(ctx context.Context, fnID *uuid.UUID,
 	return nil
 }
 
-func (m *mockShardForIterator) PartitionSize(ctx context.Context, partitionID string, until time.Time) (int64, error) {
+func (m *mockShardForIterator) PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error) {
 	return 0, nil
 }
 
@@ -236,7 +245,7 @@ func (m *mockShardForIterator) BacklogRefillConstraintCheck(ctx context.Context,
 	return nil, nil
 }
 
-func (m *mockShardForIterator) RemoveQueueItem(ctx context.Context, partitionID string, itemID string) error {
+func (m *mockShardForIterator) RemoveQueueItem(ctx context.Context, scope Scope, partitionID string, itemID string) error {
 	return nil
 }
 
@@ -320,7 +329,7 @@ func (m *mockShardForIterator) PeekShadowPartitions(ctx context.Context, account
 	return nil, nil
 }
 
-func (m *mockShardForIterator) IsMigrationLocked(ctx context.Context, fnID uuid.UUID) (*time.Time, error) {
+func (m *mockShardForIterator) IsMigrationLocked(ctx context.Context, scope Scope) (*time.Time, error) {
 	return nil, nil
 }
 
@@ -332,39 +341,39 @@ func (m *mockShardForIterator) DequeueByJobID(ctx context.Context, jobID string)
 	return nil
 }
 
-func (m *mockShardForIterator) ItemExists(ctx context.Context, jobID string) (bool, error) {
+func (m *mockShardForIterator) ItemExists(ctx context.Context, scope Scope, jobID string) (bool, error) {
 	return false, nil
 }
 
-func (m *mockShardForIterator) ItemsByRunID(ctx context.Context, runID ulid.ULID) ([]*QueueItem, error) {
+func (m *mockShardForIterator) ItemsByRunID(ctx context.Context, scope Scope, runID ulid.ULID) ([]*QueueItem, error) {
 	return nil, nil
 }
 
-func (m *mockShardForIterator) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+func (m *mockShardForIterator) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
 	return 0, nil
 }
 
-func (m *mockShardForIterator) PartitionByID(ctx context.Context, partitionID string) (*PartitionInspectionResult, error) {
+func (m *mockShardForIterator) PartitionByID(ctx context.Context, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
 	return nil, nil
 }
 
-func (m *mockShardForIterator) UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error {
+func (m *mockShardForIterator) UnpauseFunction(ctx context.Context, scope Scope) error {
 	return nil
 }
 
-func (m *mockShardForIterator) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
+func (m *mockShardForIterator) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
 	return 0, nil
 }
 
-func (m *mockShardForIterator) RunningCount(ctx context.Context, functionID uuid.UUID) (int64, error) {
+func (m *mockShardForIterator) RunningCount(ctx context.Context, scope Scope) (int64, error) {
 	return 0, nil
 }
 
-func (m *mockShardForIterator) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
+func (m *mockShardForIterator) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
 	return 0, nil
 }
 
-func (m *mockShardForIterator) RunJobs(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error) {
+func (m *mockShardForIterator) RunJobs(ctx context.Context, scope Scope, runID ulid.ULID, limit, offset int64) ([]JobResponse, error) {
 	return nil, nil
 }
 

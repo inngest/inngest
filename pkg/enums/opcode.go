@@ -34,6 +34,7 @@ const (
 var opcodeSyncMap = map[Opcode]struct{}{
 	OpcodeStep:            {},
 	OpcodeStepRun:         {},
+	OpcodeStepPlanned:     {},
 	OpcodeRunComplete:     {},
 	OpcodeSyncRunComplete: {},
 	OpcodeStepFailed:      {},

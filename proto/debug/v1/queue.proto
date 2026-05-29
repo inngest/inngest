@@ -59,9 +59,15 @@ message QueueItemRequest {
   string item_id = 1;
   string run_id = 2;
   string queue_shard = 3;
+  string account_id = 4;
+  string env_id = 5;
+  string function_id = 6;
 }
 
-message QueueItemResponse { bytes data = 1; }
+message QueueItemResponse {
+  bytes data = 1;
+  string queue_shard = 2;
+}
 
 //
 // Shadow Partition / Backlog (Key Queues)

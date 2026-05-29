@@ -7,14 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
 )
 
-func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error) {
+func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, scope Scope, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error) {
 	l := logger.StdlibLogger(ctx)
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
 
@@ -26,7 +25,7 @@ func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, fn
 	from := time.Time{}
 	// setting it to 5 years ahead should be enough to cover all queue items in the partition
 	until := q.Clock().Now().Add(24 * time.Hour * 365 * 5)
-	items, err := shard.ItemsByPartition(ctx, fnID.String(), from, until,
+	items, err := shard.ItemsByPartition(ctx, scope, scope.FunctionID.String(), from, until,
 		WithQueueItemIterBatchSize(limit),
 	)
 	if err != nil {

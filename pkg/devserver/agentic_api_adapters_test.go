@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
@@ -88,7 +89,7 @@ func TestFunctionRunReader(t *testing.T) {
 	run := &cqrs.FunctionRun{RunID: runID}
 	reader := &fakeFunctionRunReader{run: run}
 
-	result, err := NewFunctionRunReader(reader).GetFunctionRun(context.Background(), runID)
+	result, err := NewFunctionRunReader(reader).GetFunctionRun(context.Background(), runID, apiv2.GetFunctionRunOpts{})
 
 	require.NoError(t, err)
 	require.Equal(t, run, result)

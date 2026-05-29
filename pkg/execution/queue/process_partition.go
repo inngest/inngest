@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -81,6 +82,30 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	}
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
+	}
+
+	if !p.IsSystem() {
+		accountExists, err := q.accountExists(ctx, p.AccountID)
+		if err != nil {
+			metrics.IncrQueueDeletedAccountPartitionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": shard.Name(),
+					"action":      deletedAccountPartitionActionCheckError,
+				},
+			})
+			l.Warn("error checking account existence for partition", "error", err, "account_id", p.AccountID.String(), "partition_id", p.ID)
+		} else if !accountExists {
+			metrics.IncrQueueDeletedAccountPartitionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": shard.Name(),
+					"action":      deletedAccountPartitionActionFound,
+				},
+			})
+			span.SetAttributes(attribute.String("status", "deleted_account"))
+			return q.requeueDeletedAccountPartition(ctx, shard, p)
+		}
 	}
 
 	begin := q.Clock().Now()
@@ -224,6 +249,12 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
 	_, isSystemFn := q.queueKindMapping[p.Queue()]
+	// Function-scoped batch partitions ("schedule-batch:<fnID>") still get
+	// parallel within-partition processing even though the suffixed name is
+	// not in queueKindMapping.
+	if strings.HasPrefix(p.Queue(), KindScheduleBatch) {
+		isSystemFn = true
+	}
 	_, parallelFn := q.disableFifoForFunctions[p.Queue()]
 	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
 

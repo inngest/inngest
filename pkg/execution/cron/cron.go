@@ -34,7 +34,7 @@ type CronSyncer interface {
 
 type CronHealthChecker interface {
 	// HealthCheck checks if a "cron" queue item exists in the system queue for the next expected schedule time
-	HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error)
+	HealthCheck(ctx context.Context, accountID, envID, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error)
 
 	// Enqueues the next periodic global cron-health-check system job
 	EnqueueNextHealthCheck(ctx context.Context) error

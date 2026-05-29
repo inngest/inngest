@@ -16,4 +16,6 @@ type InputCtx struct {
 	RunID      string `json:"run_id"`
 	StepID     string `json:"step_id"`
 	Attempt    int    `json:"attempt"`
+	RequestID  string `json:"request_id"`
+	JobID      string `json:"job_id"`
 }

@@ -320,7 +320,7 @@ export const RunDetailsV4 = ({
                 ) : traceReady ? (
                   <TimelineV4Wrapper
                     runID={runID}
-                    trace={runData.trace}
+                    trace={runData.trace as unknown as Trace}
                     orgName={orgName}
                     functionSlug={runData.fn.slug}
                   />
@@ -365,7 +365,7 @@ export const RunDetailsV4 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
-              trace={runData?.trace}
+              trace={runData?.trace as unknown as Trace | undefined}
               isDurableEndpoint={runData?.isDurableEndpoint}
               defers={linkageData?.defers}
               siblingDefers={linkageData?.siblingDefers ?? []}

@@ -1,8 +1,39 @@
 -- name: UpsertApp :one
+-- Placeholder-friendly upsert: keyed by id. The placeholder paths (-u
+-- startup, autodiscovery, UI add-by-URL) intentionally upsert with name=''
+-- to set/clear errors on a URL-derived id; they must not erase a real app's
+-- name when re-pinging the same id, so the name update is conditional.
+-- For the SDK /fn/register flow, use UpsertAppByName instead - it adopts an
+-- existing active row keyed by name regardless of how its id was minted.
 INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
-    name = excluded.name,
+    name = CASE WHEN excluded.name = '' THEN apps.name ELSE excluded.name END,
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    archived_at = NULL,
+    "method" = excluded.method,
+    app_version = excluded.app_version,
+    url = excluded.url
+RETURNING *;
+
+-- name: UpsertAppByName :one
+-- For SDK /fn/register: the partial unique index apps_name_unique_key on
+-- (name) WHERE name <> '' is the conflict target. The predicate omits
+-- archived_at so a conflicting archived row is found by the arbiter; the
+-- DO UPDATE clears archived_at, so an SDK re-sync under the same name
+-- revives a previously-archived app in place. The existing row's id is
+-- preserved on conflict, so v1.13.x legacy rows keyed by sha1(URL) are
+-- adopted by name when an SDK re-syncs under v1.15+ (which derives ids
+-- from name) - no Go-side lookup required.
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (name) WHERE name <> '' DO UPDATE SET
     sdk_language = excluded.sdk_language,
     sdk_version = excluded.sdk_version,
     framework = excluded.framework,

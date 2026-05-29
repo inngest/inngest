@@ -42,7 +42,7 @@ func TestHandleWorkerReadyIgnoresDrainingConnection(t *testing.T) {
 	handshake(t, res)
 
 	ch := newTestConnectionHandler(t, res)
-	ch.draining.Store(true)
+	ch.beginDrain("test drain")
 
 	serr := ch.handleWorkerReady()
 	require.Nil(t, serr)

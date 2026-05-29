@@ -2,6 +2,121 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.23.0] - 2026-05-28
+
+### 🚀 Features
+
+- *(queue)* Allow EnqueueItem on other shard types (#4263)
+- Accept positional path params in agentic cli (#4246)
+
+### 🐛 Bug Fixes
+
+- *(executor)* Initialize synthetic cancel metadata config (#4261)
+- *(queue)* Handle renewed item lease during processing (#4267)
+- Get outputs working again with v2 runs (#4273)
+
+### 🚜 Refactor
+
+- *(connect)* Gate gateway routing by connection phase (#4241)
+- *(queue)* Add Scope to more queue methods (#4271)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update go sdk (#4264)
+- Improve agentic api cli help  (#4245)
+
+### ◀️ Revert
+
+- "chore: add a concurrency safe marshal to state configs" (#4257)
+
+## [v1.22.0] - 2026-05-22
+
+### 🚀 Features
+
+- Insights: Add stubs for new insights API endpoints (#4189)
+- Add update notifier to select commands (#4185)
+- Phase 1 scoring (#4170)
+
+### 🐛 Bug Fixes
+
+- *(syncs)* Fix function orphaning on app resync after <v1.15 upgrade (#4143)
+- *(pauses)* Retry enqueueing edge after consuming pause (#4228)
+- *(batching)* Enforce batch size limits in the in-memory batching path. (#3871)
+- Add feature flag for enforcing state size limits (#4251)
+- Bulk canel bug (#4255)
+
+### 💼 Other
+
+- *(deps)* Update pgx and goose (#4248)
+- *(deps)* Remove vulnerable docker module (#4249)
+
+### ⚡ Performance
+
+- *(batch)* Split batch partition into workspace-scoped partitions (#4236)
+
+### 🧪 Testing
+
+- *(connect)* Forward regression test (#4214)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add a concurrency safe marshal to state configs (#4256)
+- *(release)* V1.22.0 (#4230)
+
+### 🛡️ Security
+
+- *(npm)* Address vulnerable npm dependencies (#4250)
+
+## [v1.21.0] - 2026-05-19
+
+### 🚀 Features
+
+- EXE-1547 - Accept StepPlanned upon beginning to run a step (#4201)
+
+### 🐛 Bug Fixes
+
+- *(ci)* Disable provenance on publish (#4226)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.21.0 (#4227)
+
+## [v1.20.0] - 2026-05-19
+
+### 🚀 Features
+
+- Track GenerationID on QueueItem (#4219)
+- Agentic api cli (#4197)
+
+### 🐛 Bug Fixes
+
+- Adding A Check For Minimum Number of Apps Per Connection (#4193)
+- *(connect)* Keep worker messages alive on transient gateway errors (#4211)
+- *(pauses)* Dedup evaluables fix upstream (#4213)
+- Enforce step state limit & total state size for checkpointing (#4212)
+- Use listener directly in Serve() (#4222)
+
+### 🚜 Refactor
+
+- *(queue)* Remove duplicate global partition peek method (#4204)
+- *(db)* Move CQRS bootstrap into dialect packages (#4203)
+- *(cqrs)* Move composite manager package (#4209)
+- *(connect)* Split gateway message handlers (#4210)
+
+### 📚 Documentation
+
+- Add markdown and llms.txt generation to API docs site (#4218)
+
+### ⚡ Performance
+
+- *(connect)* Split heartbeats into a high priority goroutine (#4224)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add graceful failure handling for linear-release step (#4192)
+- Add submodules to checkout (#4221)
+- *(release)* V1.20.0 (#4205)
+
 ## [v1.19.4] - 2026-05-15
 
 ### 🐛 Bug Fixes
@@ -24,6 +139,7 @@ All notable changes to this project will be documented in this file.
 - *(release)* Restore tag-triggered publishing (#4191)
 - Update protobuf to add deltas/changed bool (#4195)
 - Add missing metric on state store delete (#4200)
+- *(release)* V1.19.4 (#4196)
 
 ## [v1.19.3] - 2026-05-14
 

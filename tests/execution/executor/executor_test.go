@@ -131,8 +131,9 @@ func TestScheduleRaceCondition(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
@@ -297,8 +298,9 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	work := make(chan *hookData)
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
@@ -469,8 +471,9 @@ func TestFinalize(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Initialize the devserver
 	adapter := dbsqlite.New(db)
@@ -597,8 +600,11 @@ func TestFinalize(t *testing.T) {
 	jobs1, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run1.ID.Tenant.EnvID,
-		run1.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run1.ID.Tenant.AccountID,
+			EnvID:      run1.ID.Tenant.EnvID,
+			FunctionID: run1.ID.FunctionID,
+		},
 		run1.ID.RunID,
 		1000,
 		0,
@@ -632,8 +638,11 @@ func TestFinalize(t *testing.T) {
 	jobs2, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run2.ID.Tenant.EnvID,
-		run2.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run2.ID.Tenant.AccountID,
+			EnvID:      run2.ID.Tenant.EnvID,
+			FunctionID: run2.ID.FunctionID,
+		},
 		run2.ID.RunID,
 		1000,
 		0,
@@ -720,8 +729,9 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up database and function loader
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := cqrsmanager.New(adapter)
@@ -924,8 +934,9 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := cqrsmanager.New(adapter)
@@ -1055,8 +1066,11 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
@@ -1108,8 +1122,9 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	dbcqrs := cqrsmanager.New(dbsqlite.New(db))
 	loader := dbcqrs.(state.FunctionLoader)
@@ -1236,8 +1251,11 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
@@ -1285,8 +1303,9 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 func TestExecutorScheduleRateLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := cqrsmanager.New(adapter)
@@ -1422,8 +1441,11 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
@@ -1486,8 +1508,9 @@ func (fll *fakeLimitLifecycle) OnFunctionBacklogSizeLimitReached(context.Context
 func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := cqrsmanager.New(adapter)
@@ -1622,8 +1645,11 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 	jobsAfterSchedule, err := rq.RunJobs(
 		ctx,
 		queueShard.Name(),
-		run.ID.Tenant.EnvID,
-		run.ID.FunctionID,
+		queue.Scope{
+			AccountID:  run.ID.Tenant.AccountID,
+			EnvID:      run.ID.Tenant.EnvID,
+			FunctionID: run.ID.FunctionID,
+		},
 		run.ID.RunID,
 		1000,
 		0,
@@ -1675,8 +1701,9 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := cqrsmanager.New(adapter)
@@ -1792,8 +1819,9 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
-	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false})
+	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	adapter := dbsqlite.New(db)
 	dbcqrs := cqrsmanager.New(adapter)

@@ -132,24 +132,21 @@ func NewHTTPServer(f http.Handler) *HTTPServer {
 		log.Fatal(err)
 	}
 	port := l.Addr().(*net.TCPAddr).Port
-	l.Close()
 
 	s := &http.Server{
-		Addr:           fmt.Sprintf("0.0.0.0:%d", port),
 		Handler:        f,
 		ReadTimeout:    60 * time.Second,
 		WriteTimeout:   60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {
-		err := s.ListenAndServe()
-		// Check if server is closed error
+		err := s.Serve(l)
 		if err != nil && err != http.ErrServerClosed {
 			panic(err)
 		}
 	}()
 
-	// Give it ime to start.
+	// Give it time to start.
 	<-time.After(20 * time.Millisecond)
 
 	return &HTTPServer{Server: s, Port: int32(port)}

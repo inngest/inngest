@@ -303,8 +303,11 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 	// Find all items for the current function run.
 	jobs, err := shard.RunJobs(
 		ctx,
-		opts.Metadata.ID.Tenant.EnvID,
-		opts.Metadata.ID.FunctionID,
+		queue.Scope{
+			AccountID:  opts.Metadata.ID.Tenant.AccountID,
+			EnvID:      opts.Metadata.ID.Tenant.EnvID,
+			FunctionID: opts.Metadata.ID.FunctionID,
+		},
 		opts.Metadata.ID.RunID,
 		1000,
 		0,

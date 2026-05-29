@@ -5,19 +5,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-func (q *queue) UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UUID) error {
+func (q *queue) UnpauseFunction(ctx context.Context, scope osqueue.Scope) error {
 	l := logger.StdlibLogger(ctx)
 
 	part := &osqueue.QueuePartition{
-		ID:         fnID.String(),
-		FunctionID: &fnID,
-		AccountID:  acctID,
-		EnvID:      &envID,
+		ID:         scope.FunctionID.String(),
+		FunctionID: &scope.FunctionID,
+		AccountID:  scope.AccountID,
+		EnvID:      &scope.EnvID,
 	}
 
 	err := q.PartitionRequeue(ctx, part, q.Clock.Now(), false)
@@ -27,11 +26,11 @@ func (q *queue) UnpauseFunction(ctx context.Context, acctID, envID, fnID uuid.UU
 	}
 
 	// Also unpause shadow partition if key queues enabled
-	if q.AllowKeyQueues(ctx, acctID, envID, fnID) {
+	if q.AllowKeyQueues(ctx, scope.AccountID, scope.EnvID, scope.FunctionID) {
 		shadowPart := &osqueue.QueueShadowPartition{
-			PartitionID: fnID.String(),
-			FunctionID:  &fnID,
-			AccountID:   &acctID,
+			PartitionID: scope.FunctionID.String(),
+			FunctionID:  &scope.FunctionID,
+			AccountID:   &scope.AccountID,
 		}
 		// requeue to earliest item
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
