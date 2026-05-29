@@ -133,6 +133,7 @@ type Loaders struct {
 	RunDefersLoader       *dataloader.Loader
 	RunDeferredFromLoader *dataloader.Loader
 	TraceRunByIDLoader    *dataloader.Loader
+	FunctionBySlugLoader  *dataloader.Loader
 }
 
 func NewLoaders(params LoaderParams) *Loaders {
@@ -140,6 +141,7 @@ func NewLoaders(params LoaderParams) *Loaders {
 	tr := &traceReader{loaders: loaders, reader: params.DB}
 	er := &eventReader{loaders: loaders, reader: params.DB}
 	dr := &deferReader{reader: params.DB}
+	fr := &functionReader{reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.LegacyRunTraceLoader = dataloader.NewBatchedLoader(tr.GetLegacyRunTrace)
@@ -150,6 +152,7 @@ func NewLoaders(params LoaderParams) *Loaders {
 	loaders.RunDefersLoader = dataloader.NewBatchedLoader(dr.GetRunDefers)
 	loaders.RunDeferredFromLoader = dataloader.NewBatchedLoader(dr.GetRunDeferredFrom)
 	loaders.TraceRunByIDLoader = dataloader.NewBatchedLoader(tr.GetTraceRunsByIDs)
+	loaders.FunctionBySlugLoader = dataloader.NewBatchedLoader(fr.GetFunctionsBySlugs)
 
 	return loaders
 }

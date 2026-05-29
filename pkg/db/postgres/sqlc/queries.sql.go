@@ -1009,6 +1009,43 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getFunctionsBySlugs = `-- name: GetFunctionsBySlugs :many
+SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions
+WHERE slug = ANY($1::TEXT[])
+  AND archived_at IS NULL
+`
+
+func (q *Queries) GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*Function, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionsBySlugs, pq.Array(slugs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Function
+	for rows.Next() {
+		var i Function
+		if err := rows.Scan(
+			&i.ID,
+			&i.AppID,
+			&i.Name,
+			&i.Slug,
+			&i.Config,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getHistoryItem = `-- name: GetHistoryItem :one
 SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result, step_type FROM history WHERE id = $1
 `

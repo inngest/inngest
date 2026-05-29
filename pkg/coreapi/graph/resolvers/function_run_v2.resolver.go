@@ -2,12 +2,9 @@ package resolvers
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
-	"github.com/google/uuid"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -131,11 +128,14 @@ func (r *runDeferResolver) Function(ctx context.Context, obj *models.RunDefer) (
 	if obj.FnSlug == "" {
 		return nil, nil
 	}
-	fn, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", obj.FnSlug)
+	fn, err := loader.LoadOneWithString[cqrs.Function](
+		ctx, loader.FromCtx(ctx).FunctionBySlugLoader, obj.FnSlug,
+	)
 	if err != nil {
-		// Fn slugs that don't resolve are valid: a defer is recorded even
-		// when its target function was deleted or renamed. Surface nil so
-		// the GraphQL field returns null per schema.
+		return nil, fmt.Errorf("error retrieving function for defer linkage: %w", err)
+	}
+	// nil fn = slug doesn't resolve (function was deleted or renamed).
+	if fn == nil {
 		return nil, nil
 	}
 	return models.MakeFunction(fn)
@@ -162,26 +162,19 @@ func (r *runDeferredFromResolver) Function(ctx context.Context, obj *models.RunD
 		return nil, nil
 	}
 	synth := &models.Function{Name: obj.FnName, Slug: obj.FnSlug}
-	// List views only render the parent's display name, and name+slug both
-	// ride along on the defer.parents span attr — answering from the linkage
-	// avoids a per-row DB lookup. Anything beyond name/slug requires the
-	// real record since synthesized fields like AppID are zero.
+	// Name+slug ride along on the defer.parents span attr, so list views
+	// can answer from the linkage with no DB lookup. Anything beyond
+	// name/slug requires the real record (synth fields like AppID are zero).
 	for _, f := range graphql.CollectAllFields(ctx) {
 		if f != "name" && f != "slug" && f != "__typename" {
-			fn, err := r.Data.GetFunctionByExternalID(ctx, uuid.Nil, "", obj.FnSlug)
-			if err == nil {
+			fn, err := loader.LoadOneWithString[cqrs.Function](
+				ctx, loader.FromCtx(ctx).FunctionBySlugLoader, obj.FnSlug,
+			)
+			if err == nil && fn != nil {
 				return models.MakeFunction(fn)
 			}
-			if !errors.Is(err, sql.ErrNoRows) {
-				// Transient DB error: fall back to synth so the run row
-				// still renders, but log so the degradation is visible.
-				logger.StdlibLogger(ctx).Error(
-					"failed to load parent function for deferred-from linkage; falling back to synthesized record",
-					"fn_slug", obj.FnSlug,
-					"error", err,
-				)
-			}
-			// Not-found (rename/delete) or transient error: synth.
+			// Not-found or loader error: synth keeps the row renderable.
+			// The loader logs batch failures once per request.
 			return synth, nil
 		}
 	}

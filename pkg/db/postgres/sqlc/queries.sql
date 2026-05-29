@@ -83,6 +83,11 @@ SELECT * FROM functions WHERE id = $1;
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = $1 AND archived_at IS NULL;
 
+-- name: GetFunctionsBySlugs :many
+SELECT * FROM functions
+WHERE slug = ANY(sqlc.slice('slugs')::TEXT[])
+  AND archived_at IS NULL;
+
 -- name: GetFunctionByAppNameAndSlug :one
 -- Look up a function by the app's user-facing name, not its internal UUID.
 -- The dev server derives app UUIDs from different inputs at different sites

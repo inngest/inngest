@@ -159,6 +159,14 @@ func (sq *sqliteQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*d
 	return functionFromSQLite(r), nil
 }
 
+func (sq *sqliteQuerier) GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*db.Function, error) {
+	rows, err := sq.q.GetFunctionsBySlugs(ctx, slugs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromSQLite), nil
+}
+
 func (sq *sqliteQuerier) GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*db.Function, error) {
 	r, err := sq.q.GetFunctionByAppNameAndSlug(ctx, sqlc.GetFunctionByAppNameAndSlugParams{
 		Name: appName,

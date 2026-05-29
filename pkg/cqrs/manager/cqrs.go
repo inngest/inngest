@@ -1167,6 +1167,23 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 	return domainToCQRS(fn, domainFunction), nil
 }
 
+func (w wrapper) GetFunctionsBySlugs(ctx context.Context, slugs []string) (map[string]*cqrs.Function, error) {
+	if len(slugs) == 0 {
+		return map[string]*cqrs.Function{}, nil
+	}
+
+	rows, err := w.q.GetFunctionsBySlugs(ctx, slugs)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[string]*cqrs.Function, len(rows))
+	for _, row := range rows {
+		out[row.Slug] = domainToCQRS(row, domainFunction)
+	}
+	return out, nil
+}
+
 func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {
 	fn, err := w.q.GetFunctionByAppNameAndSlug(ctx, appName, slug)
 	if err != nil {
