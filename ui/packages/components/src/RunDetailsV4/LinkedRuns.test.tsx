@@ -52,31 +52,16 @@ function makeDefer(overrides: Partial<RunDeferSummary> = {}): RunDeferSummary {
 }
 
 describe('LinkedRuns', () => {
-  it('renders Deferred + Invoked sections for a primary run (no deferredFrom)', () => {
-    render(
-      <LinkedRuns
-        invoked={[
-          {
-            spanID: 'span-1',
-            invokerName: 'invoker-step',
-            runID: 'run-invoked',
-            functionID: 'invoked-fn',
-            status: 'COMPLETED',
-          },
-        ]}
-        defers={[makeDefer()]}
-      />
-    );
+  it('renders Deferred section for a primary run (no deferredFrom)', () => {
+    render(<LinkedRuns defers={[makeDefer()]} />);
     expect(screen.getByText('Deferred runs')).toBeTruthy();
-    expect(screen.getByText('Invoked runs')).toBeTruthy();
     expect(screen.queryByText('Parent run')).toBeNull();
     expect(screen.queryByText('Parallel defers')).toBeNull();
   });
 
-  it('skips empty Deferred and Invoked sections for a primary run', () => {
-    render(<LinkedRuns invoked={[]} />);
+  it('skips empty Deferred section for a primary run', () => {
+    render(<LinkedRuns />);
     expect(screen.queryByText('Deferred runs')).toBeNull();
-    expect(screen.queryByText('Invoked runs')).toBeNull();
   });
 
   it('renders Parent section and skips empty Parallel defers for a deferred run', () => {
@@ -87,7 +72,7 @@ describe('LinkedRuns', () => {
         run: null,
       },
     ];
-    render(<LinkedRuns invoked={[]} deferredFrom={deferredFrom} />);
+    render(<LinkedRuns deferredFrom={deferredFrom} />);
     expect(screen.getByText('Parent run')).toBeTruthy();
     expect(screen.queryByText('Parallel defers')).toBeNull();
     expect(screen.queryByText('Deferred runs')).toBeNull();
@@ -102,7 +87,7 @@ describe('LinkedRuns', () => {
         run: null,
       },
     ];
-    render(<LinkedRuns invoked={[]} deferredFrom={deferredFrom} />);
+    render(<LinkedRuns deferredFrom={deferredFrom} />);
     expect(screen.getByText('Parent Fn')).toBeTruthy();
     // Two links: run-ID link and function link.
     const links = screen.getAllByRole('link');
@@ -120,7 +105,7 @@ describe('LinkedRuns', () => {
         run: null,
       },
     ];
-    render(<LinkedRuns invoked={[]} deferredFrom={deferredFrom} />);
+    render(<LinkedRuns deferredFrom={deferredFrom} />);
     // Run ID link is the only link; no /functions/* href is generated when
     // the parent's function couldn't be resolved.
     const links = screen.getAllByRole('link');
@@ -139,7 +124,7 @@ describe('LinkedRuns', () => {
       },
     });
     // The server returns `siblingDefers` already filtered to exclude this run.
-    render(<LinkedRuns invoked={[]} siblingDefers={[sibling]} />);
+    render(<LinkedRuns siblingDefers={[sibling]} />);
     expect(screen.getByText('Parallel defers')).toBeTruthy();
     expect(screen.getByText('user-sibling')).toBeTruthy();
   });
@@ -169,9 +154,7 @@ describe('LinkedRuns', () => {
         run: { id: '01PARENTB0', status: 'COMPLETED' },
       },
     ];
-    render(
-      <LinkedRuns invoked={[]} deferredFrom={deferredFrom} siblingDefers={[siblingA, siblingB]} />
-    );
+    render(<LinkedRuns deferredFrom={deferredFrom} siblingDefers={[siblingA, siblingB]} />);
 
     expect(screen.getByText('Parent runs')).toBeTruthy();
     expect(screen.getByText('01PARENTA0')).toBeTruthy();
@@ -186,7 +169,6 @@ describe('LinkedRuns', () => {
   it('renders the userlandDeferID, not the hashed id', () => {
     render(
       <LinkedRuns
-        invoked={[]}
         defers={[makeDefer({ hashedDeferID: 'sha1-hashed-id', userlandDeferID: 'order-7' })]}
       />
     );
@@ -195,14 +177,12 @@ describe('LinkedRuns', () => {
   });
 
   it('falls back to fnSlug for the function pill when function is null', () => {
-    render(
-      <LinkedRuns invoked={[]} defers={[makeDefer({ function: null, fnSlug: 'fallback-fn' })]} />
-    );
+    render(<LinkedRuns defers={[makeDefer({ function: null, fnSlug: 'fallback-fn' })]} />);
     expect(screen.getByText('fallback-fn')).toBeTruthy();
   });
 
   it("shows '-' in the run-ID column when the run is null", () => {
-    render(<LinkedRuns invoked={[]} defers={[makeDefer({ run: null })]} />);
+    render(<LinkedRuns defers={[makeDefer({ run: null })]} />);
     // We only render a '-' for the missing run cell. Status and other cells are
     // present too but `-` should appear at least once.
     const dashes = screen.getAllByText('-');
@@ -212,7 +192,6 @@ describe('LinkedRuns', () => {
   it('prefers the run status over the defer-row status when a run is linked', () => {
     render(
       <LinkedRuns
-        invoked={[]}
         defers={[
           makeDefer({
             status: 'SCHEDULED',

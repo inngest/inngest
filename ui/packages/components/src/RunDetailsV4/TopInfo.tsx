@@ -28,7 +28,6 @@ import { IO } from './IO';
 import { LinkedRuns } from './LinkedRuns';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
-import { collectInvokedRuns } from './runDetailsUtils';
 import { isScoreMetadata, type Trace } from './types';
 
 type TopInfoProps = {
@@ -145,23 +144,15 @@ export const TopInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
-  const invokedRuns = useMemo(() => collectInvokedRuns(trace), [trace]);
   const hasLinkedRuns =
     (deferredFrom?.length ?? 0) > 0 ||
     (siblingDefers?.length ?? 0) > 0 ||
-    (defers?.length ?? 0) > 0 ||
-    invokedRuns.length > 0;
+    (defers?.length ?? 0) > 0;
 
-  // The header label for a deferred child should be the userland defer ID of
-  // the parent-side defer that scheduled this run. The server returns this run
-  // and its peers as `siblingDefers` (defers that share THIS run's parent),
-  // and the entry whose `run.id` matches our `runID` is the defer that
-  // produced us.
-  const userlandDeferID = (siblingDefers ?? []).find((d) => d.run?.id === runID)?.userlandDeferID;
   // Fall back through the linkage/trigger names and finally to the run/function
   // name so the header title is never blank (e.g. a deferred run with
   // incomplete linkage and no invoke or trigger name).
-  const headerLabel = userlandDeferID ?? trigger?.eventName ?? trace?.name ?? 'Run';
+  const headerLabel = trigger?.eventName ?? trace?.name ?? 'Run';
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -388,7 +379,6 @@ export const TopInfo = ({
                         defers={defers}
                         siblingDefers={siblingDefers}
                         deferredFrom={deferredFrom}
-                        invoked={invokedRuns}
                       />
                     ),
                   },

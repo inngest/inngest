@@ -14,12 +14,11 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 
-import type { useScopedColumns } from './columns';
-import type { Run } from './types';
+import { useScopedColumns } from './columns';
+import type { Run, ViewScope } from './types';
 
 type RunsTableProps = {
   data: Run[] | undefined;
-  columns: ReturnType<typeof useScopedColumns>;
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
@@ -28,11 +27,11 @@ type RunsTableProps = {
   renderSubComponent: (props: Run) => React.ReactElement;
   getRowCanExpand: (row: Row<Run>) => boolean;
   visibleColumns?: VisibilityState;
+  scope: ViewScope;
 };
 
 export default function RunsTable({
   data = [],
-  columns,
   isLoading,
   error,
   onRefresh,
@@ -41,7 +40,10 @@ export default function RunsTable({
   getRowCanExpand,
   renderSubComponent,
   visibleColumns: columnVisibility,
+  scope,
 }: RunsTableProps) {
+  const columns = useScopedColumns(scope);
+
   // Manually track expanded rows because getIsExpanded seems to be index-based,
   // which means polling can shift the expanded row. We may be able to switch
   // back to getIsExpanded when we replace polling with websockets

@@ -268,7 +268,7 @@ export function RunsPage({
         </div>
       );
     },
-    [getTrigger, pollInterval, features.runDetailsV4]
+    [getTrigger, pollInterval, features.tracesPreview, features.runDetailsV4]
   );
 
   const options = useMemo(() => {
@@ -423,13 +423,13 @@ export function RunsPage({
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
-          columns={columns}
           isLoading={isLoadingInitial}
           error={error}
           onRefresh={onRefresh}
           renderSubComponent={renderSubComponent}
           getRowCanExpand={() => true}
           visibleColumns={columnVisibility}
+          scope={scope}
         />
         {infiniteScrollTrigger?.(containerRef.current)}
         {!hasMore && data.length > 1 && (

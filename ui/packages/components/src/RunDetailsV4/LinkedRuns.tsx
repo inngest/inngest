@@ -5,23 +5,20 @@ import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/u
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { IDCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
-import type { InvokedRun } from './runDetailsUtils';
 
 type Props = {
   defers?: RunDeferSummary[];
   siblingDefers?: RunDeferSummary[];
   deferredFrom?: RunDeferredFromSummary[];
-  invoked: InvokedRun[];
 };
 
-export const LinkedRuns = ({ defers, siblingDefers, deferredFrom, invoked }: Props) => {
+export const LinkedRuns = ({ defers, siblingDefers, deferredFrom }: Props) => {
   const parents = deferredFrom ?? [];
 
   return (
     <div className="h-full overflow-y-auto">
       {parents.length > 0 && <ParentRunsSection parents={parents} />}
       <DefersSection title="Parallel defers" defers={siblingDefers ?? []} />
-      <InvokedSection invoked={invoked} />
       <DefersSection title="Deferred runs" defers={defers ?? []} />
     </div>
   );
@@ -149,51 +146,6 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
           </tr>
         );
       })}
-    </SectionTable>
-  );
-};
-
-const InvokedSection = ({ invoked }: { invoked: InvokedRun[] }) => {
-  const { pathCreator } = usePathCreator();
-
-  if (invoked.length === 0) return null;
-
-  return (
-    <SectionTable
-      title="Invoked runs"
-      columns={[
-        { header: 'Status', width: 'w-32' },
-        { header: 'Step name' },
-        { header: 'Run ID' },
-        { header: 'Function' },
-      ]}
-    >
-      {invoked.map((i) => (
-        <tr key={i.spanID}>
-          <td className={tdClass}>
-            <StatusCell status={i.status} />
-          </td>
-          <td className={tdClass}>
-            {i.invokerName ? (
-              <OptionalTooltip tooltip={i.invokerName}>
-                <IDCell>{i.invokerName}</IDCell>
-              </OptionalTooltip>
-            ) : (
-              <MutedDash />
-            )}
-          </td>
-          <td className={tdClass}>
-            <Link href={pathCreator.runPopout({ runID: i.runID })}>
-              <IDCell>{i.runID}</IDCell>
-            </Link>
-          </td>
-          <td className={tdClass}>
-            <Link href={pathCreator.function({ functionSlug: i.functionID })}>
-              <PillCell type="FUNCTION">{i.functionID}</PillCell>
-            </Link>
-          </td>
-        </tr>
-      ))}
     </SectionTable>
   );
 };
