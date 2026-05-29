@@ -1,4 +1,4 @@
-import { type FunctionRunStatus, type RunType } from '@inngest/components/types/functionRun';
+import { type FunctionRunStatus } from '@inngest/components/types/functionRun';
 
 // Whether the view is at the environment or function level
 export type ViewScope = 'env' | 'fn';
@@ -22,7 +22,7 @@ export type Run = {
   endedAt: string | null;
   startedAt: string | null;
   hasAI?: boolean;
-  runType: RunType;
+  isDeferred: boolean;
   deferredFrom?: Array<{
     runID: string;
     function: {

@@ -32,10 +32,6 @@ export function isDeferStatus(s: string): s is DeferStatus {
   return deferStatuses.includes(s as DeferStatus);
 }
 
-export const runTypes = ['PRIMARY', 'DEFER'] as const;
-export type RunType = (typeof runTypes)[number];
-export const isRunType = (v: unknown): v is RunType => runTypes.includes(v as RunType);
-
 export type FunctionRun = {
   batchCreatedAt: Date | null;
   batchID: string | null;

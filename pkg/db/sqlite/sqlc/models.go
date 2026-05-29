@@ -154,6 +154,7 @@ type Span struct {
 	Status         sql.NullString
 	Input          json.RawMessage
 	EventIds       json.RawMessage
+	IsDeferred     sql.NullBool
 }
 
 type Trace struct {
@@ -196,7 +197,6 @@ type TraceRun struct {
 	BatchID      ulid.ULID
 	CronSchedule sql.NullString
 	HasAi        bool
-	RunType      int64
 }
 
 type WorkerConnection struct {

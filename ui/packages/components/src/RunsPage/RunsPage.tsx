@@ -42,7 +42,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'runType'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -375,7 +375,7 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-            {features.runType && (
+            {features.isDeferred && (
               <RunsTypeFilter
                 excludeDeferred={excludeDeferred}
                 onExcludeDeferredChange={onExcludeDeferredChange}

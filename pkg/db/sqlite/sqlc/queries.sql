@@ -261,9 +261,9 @@ VALUES
 INSERT INTO trace_runs (
     run_id, account_id, workspace_id, app_id, function_id, trace_id,
     queued_at, started_at, ended_at, status, source_id, trigger_ids,
-    output, batch_id, is_debounce, cron_schedule, has_ai, run_type
+    output, batch_id, is_debounce, cron_schedule, has_ai
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(run_id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -284,8 +284,7 @@ DO UPDATE SET
     has_ai = CASE
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
-             END,
-    run_type = excluded.run_type;
+             END;
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
@@ -407,7 +406,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  is_deferred
 ) VALUES (
   sqlc.arg(span_id),
   sqlc.arg(trace_id),
@@ -428,7 +428,8 @@ INSERT INTO spans (
   sqlc.narg(debug_run_id),
   sqlc.narg(debug_session_id),
   sqlc.narg(status),
-  CAST(sqlc.narg(event_ids) AS TEXT)
+  CAST(sqlc.narg(event_ids) AS TEXT),
+  sqlc.narg(is_deferred)
 );
 
 -- name: GetSpansByRunID :many

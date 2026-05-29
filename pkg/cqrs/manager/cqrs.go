@@ -1803,10 +1803,6 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		return fmt.Errorf("error parsing runID as ULID: %w", err)
 	}
 
-	// Let Unknown ride to the column — the upsert is unconditional, and
-	// coercing here loses a later DEFER classification when the executor.run
-	// batch lands before the trigger batch. ToRunType maps Unknown → Primary
-	// for the GraphQL surface.
 	params := dbpkg.InsertTraceRunParams{
 		AccountID:   run.AccountID,
 		WorkspaceID: run.WorkspaceID,
@@ -1823,7 +1819,6 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 		Output:      run.Output,
 		IsDebounce:  run.IsDebounce,
 		HasAi:       run.HasAI,
-		RunType:     int64(run.RunType),
 	}
 
 	if run.BatchID != nil {
@@ -2004,7 +1999,6 @@ func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 		TriggerIDs:   run.EventIDs(),
 		Output:       run.Output,
 		Status:       enums.RunCodeToStatus(run.Status),
-		RunType:      enums.RunType(run.RunType),
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
@@ -2176,38 +2170,6 @@ type runsQueryBuilder struct {
 	order        []sqexp.OrderedExpression
 	cursor       *cqrs.TracePageCursor
 	cursorLayout *cqrs.TracePageCursor
-}
-
-// runTypeFilterExpr is only safe against the trace_runs table. Subquerying
-// into trace_runs from the spans path silently matches nothing in sqlite —
-// sqlc overrides trace_runs.run_id to ulid.ULID, whose Value() returns
-// MarshalBinary, so the column is stored as a 16-byte BLOB. spans.run_id is
-// bound as TEXT, and BLOB-vs-TEXT IN never matches. The spans path applies an
-// equivalent filter in Go after the trace_runs stitch.
-//
-// Unknown rows surface in the Primary list — see matchesRunType.
-func runTypeFilterExpr(runTypes []enums.RunType) sq.Expression {
-	wantPrimary := slices.Contains(runTypes, enums.RunTypePrimary)
-	wantDefer := slices.Contains(runTypes, enums.RunTypeDefer)
-	if wantPrimary == wantDefer {
-		return nil
-	}
-	if wantDefer {
-		return sq.I("trace_runs.run_type").Eq(int64(enums.RunTypeDefer))
-	}
-	return sq.I("trace_runs.run_type").In(
-		int64(enums.RunTypePrimary), int64(enums.RunTypeUnknown),
-	)
-}
-
-// matchesRunType is the Go-side counterpart to runTypeFilterExpr. Unknown rows
-// are surfaced as Primary so an out-of-order OTel batch (executor.run before
-// trigger) doesn't hide a still-uncategorized run from the Primary list.
-func matchesRunType(runTypes []enums.RunType, rt enums.RunType) bool {
-	if slices.Contains(runTypes, rt) {
-		return true
-	}
-	return rt == enums.RunTypeUnknown && slices.Contains(runTypes, enums.RunTypePrimary)
 }
 
 func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
@@ -2388,9 +2350,9 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	reqcursor := builder.cursor
 	resCursorLayout := builder.cursorLayout
 
-	if rtf := runTypeFilterExpr(opt.Filter.RunType); rtf != nil {
-		filter = append(filter, rtf)
-	}
+	// IsDeferred is only meaningful against the spans table, so the
+	// non-preview trace_runs path no longer applies a defer filter. Callers
+	// that need it must use the preview (spans) path.
 
 	// read from database
 	// TODO:
@@ -2415,7 +2377,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"is_debounce",
 			"cron_schedule",
 			"has_ai",
-			"run_type",
 		).
 		Where(filter...).
 		Order(order...).
@@ -2449,7 +2410,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			&data.IsDebounce,
 			&data.CronSchedule,
 			&data.HasAi,
-			&data.RunType,
 		)
 		if err != nil {
 			return nil, err
@@ -2529,7 +2489,6 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			Triggers:     [][]byte{},
 			Output:       data.Output,
 			Status:       enums.RunCodeToStatus(data.Status),
-			RunType:      enums.RunType(data.RunType),
 			IsBatch:      isBatch,
 			BatchID:      batchID,
 			IsDebounce:   data.IsDebounce,
@@ -3106,6 +3065,11 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		sq.L(`(SELECT s2.status FROM spans s2
 			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
 			ORDER BY s2.end_time DESC LIMIT 1)`).As("status"),
+		// Only executor.run rows carry is_deferred (EXTEND rows leave it NULL),
+		// so a subselect anchored on that row gives an unambiguous boolean.
+		sq.L(`(SELECT s3.is_deferred FROM spans s3
+			WHERE s3.run_id = spans.run_id AND s3.name = ?
+			ORDER BY s3.start_time ASC LIMIT 1)`, meta.SpanNameRun).As("is_deferred"),
 		h.EventIDsExpr(), // DB-specific due to storage differences
 	}
 
@@ -3151,8 +3115,22 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	allFilters := append(builder.filter, celFilters...)
-	// run_type can't be pushed into SQL on this path — see runTypeFilterExpr's
-	// note. The Go-side filter runs after the trace_runs stitch below.
+	if opt.Filter.IsDeferred != nil {
+		// is_deferred uses TRUE/NULL encoding, so a non-deferred filter must
+		// check IS NULL. Anchor on the executor.run row because EXTEND rows
+		// don't carry is_deferred.
+		var deferPred sq.Expression
+		if *opt.Filter.IsDeferred {
+			deferPred = sq.C("is_deferred").IsTrue()
+		} else {
+			deferPred = sq.C("is_deferred").IsNull()
+		}
+		sub := sq.Dialect(h.GoquDialect()).
+			From("spans").
+			Select(sq.C("run_id")).
+			Where(sq.C("name").Eq(meta.SpanNameRun), deferPred)
+		allFilters = append(allFilters, sq.I("spans.run_id").In(sub))
+	}
 	// The inner subquery is bounded by Until (an executor.run always precedes
 	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
 	// also apply the From floor so the inner scan stops growing O(total
@@ -3196,20 +3174,6 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		return nil, err
 	}
 
-	// run_type filter — see runTypeFilterExpr's note on why this can't be SQL.
-	// A narrowed page may under-fill (and may report HasNextPage=false even
-	// when more matches exist later in the window). Matches the existing
-	// evtIDs post-SQL filter pattern in GetTraceRuns.
-	if rt := opt.Filter.RunType; len(rt) > 0 {
-		filtered := res[:0]
-		for _, r := range res {
-			if matchesRunType(rt, r.RunType) {
-				filtered = append(filtered, r)
-			}
-		}
-		res = filtered
-	}
-
 	return res, nil
 }
 
@@ -3234,6 +3198,7 @@ func (w wrapper) convertSpanRunRows(
 		StartTime     string
 		EndTime       *string
 		Status        *string
+		IsDeferred    sql.NullBool
 		EventIDs      *string
 	}
 
@@ -3253,6 +3218,7 @@ func (w wrapper) convertSpanRunRows(
 			&row.StartTime,
 			&row.EndTime,
 			&row.Status,
+			&row.IsDeferred,
 			&row.EventIDs,
 		)
 		if err != nil {
@@ -3344,6 +3310,7 @@ func (w wrapper) convertSpanRunRows(
 			StartedAt:   startTime,
 			Duration:    duration,
 			Status:      status,
+			IsDeferred:  row.IsDeferred.Valid && row.IsDeferred.Bool,
 			Cursor:      cursor,
 			TriggerIDs:  triggerIDs,
 		}
@@ -3358,33 +3325,6 @@ func (w wrapper) convertSpanRunRows(
 		// We have filled a page's worth of requests, so break
 		if itemLimit > 0 && count >= itemLimit {
 			break
-		}
-	}
-
-	// Stitch run_type from trace_runs table. Necessary because run_type isn't
-	// in spans. We may want to add run_type to spans in the future, but for now
-	// it's OK to stitch it in code. Don't replace with a SQL JOIN:
-	// trace_runs.run_id is stored as binary and spans.run_id as text, so the
-	// comparison silently matches nothing.
-	if len(res) > 0 {
-		ids := make([]ulid.ULID, 0, len(res))
-		for _, r := range res {
-			if id, err := ulid.Parse(r.RunID); err == nil {
-				ids = append(ids, id)
-			}
-		}
-		if traceRuns, err := w.GetTraceRunsByRunIDs(ctx, ids); err == nil {
-			for _, r := range res {
-				id, err := ulid.Parse(r.RunID)
-				if err != nil {
-					continue
-				}
-				if tr, ok := traceRuns[id]; ok {
-					r.RunType = tr.RunType
-				}
-			}
-		} else {
-			l.Warn("could not stitch run_type into preview run list", "error", err)
 		}
 	}
 

@@ -372,7 +372,7 @@ type TraceRun struct {
 	HasAI        bool            `json:"has_ai"`
 	BatchID      *ulid.ULID      `json:"batch_id,omitempty"`
 	CronSchedule *string         `json:"cron_schedule,omitempty"`
-	RunType      enums.RunType   `json:"run_type"`
+	IsDeferred   bool            `json:"is_deferred"`
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
 }
@@ -500,7 +500,7 @@ type GetTraceRunFilter struct {
 	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
-	RunType     []enums.RunType
+	IsDeferred  *bool
 }
 
 type GetTraceRunOrder struct {

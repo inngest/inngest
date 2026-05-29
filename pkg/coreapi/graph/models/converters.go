@@ -101,10 +101,6 @@ func MakeFunctionRunV2(run *cqrs.TraceRun) (*FunctionRunV2, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing status: %w", err)
 	}
-	runType, err := ToRunType(run.RunType)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing run type: %w", err)
-	}
 
 	var (
 		startedAt *time.Time
@@ -160,22 +156,8 @@ func MakeFunctionRunV2(run *cqrs.TraceRun) (*FunctionRunV2, error) {
 		CronSchedule:   run.CronSchedule,
 		Output:         output,
 		HasAi:          run.HasAI,
-		RunType:        runType,
+		IsDeferred:     run.IsDeferred,
 	}, nil
-}
-
-func ToRunType(t enums.RunType) (RunType, error) {
-	switch t {
-	case enums.RunTypeDefer:
-		return RunTypeDefer, nil
-	case enums.RunTypePrimary:
-		return RunTypePrimary, nil
-	case enums.RunTypeUnknown:
-		// Back compat
-		return RunTypePrimary, nil
-	default:
-		return "", fmt.Errorf("unknown run type: %s", t)
-	}
 }
 
 func ToRunDeferStatus(s enums.DeferStatus) (RunDeferStatus, error) {

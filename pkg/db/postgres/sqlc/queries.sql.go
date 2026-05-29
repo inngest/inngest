@@ -1720,7 +1720,7 @@ func (q *Queries) GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStep
 }
 
 const getTraceRun = `-- name: GetTraceRun :one
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE run_id = $1::CHAR(26)
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id = $1::CHAR(26)
 `
 
 func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, error) {
@@ -1744,13 +1744,12 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 		&i.BatchID,
 		&i.CronSchedule,
 		&i.HasAi,
-		&i.RunType,
 	)
 	return &i, err
 }
 
 const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE run_id IN (SELECT UNNEST($1::CHAR(26)[]))
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id IN (SELECT UNNEST($1::CHAR(26)[]))
 `
 
 func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []string) ([]*TraceRun, error) {
@@ -1780,7 +1779,6 @@ func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []string) ([]
 			&i.BatchID,
 			&i.CronSchedule,
 			&i.HasAi,
-			&i.RunType,
 		); err != nil {
 			return nil, err
 		}
@@ -1796,7 +1794,7 @@ func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []string) ([]
 }
 
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE POSITION($1 IN convert_from(trigger_ids, 'UTF8')) > 0
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE POSITION($1 IN convert_from(trigger_ids, 'UTF8')) > 0
 `
 
 func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID interface{}) ([]*TraceRun, error) {
@@ -1826,7 +1824,6 @@ func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID interface
 			&i.BatchID,
 			&i.CronSchedule,
 			&i.HasAi,
-			&i.RunType,
 		); err != nil {
 			return nil, err
 		}
@@ -2233,8 +2230,9 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+  event_ids,
+  is_deferred
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 `
 
 type InsertSpanParams struct {
@@ -2258,6 +2256,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       pqtype.NullRawMessage
+	IsDeferred     sql.NullBool
 }
 
 // New
@@ -2283,6 +2282,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.DebugSessionID,
 		arg.Status,
 		arg.EventIds,
+		arg.IsDeferred,
 	)
 	return err
 }
@@ -2346,9 +2346,9 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT INTO trace_runs
-    (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule, has_ai, run_type)
+    (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule, has_ai)
 VALUES
-    ($1, $2, $3, $4, $5, $6::CHAR(26), $7, $8, $9, $10, $11, $12, $13, $14::BYTEA, $15, $16, $17, $18)
+    ($1, $2, $3, $4, $5, $6::CHAR(26), $7, $8, $9, $10, $11, $12, $13, $14::BYTEA, $15, $16, $17)
 ON CONFLICT (run_id) DO UPDATE SET
     account_id = excluded.account_id,
     workspace_id = excluded.workspace_id,
@@ -2368,8 +2368,7 @@ ON CONFLICT (run_id) DO UPDATE SET
     has_ai = CASE
                 WHEN trace_runs.has_ai = TRUE THEN TRUE
                 ELSE excluded.has_ai
-             END,
-    run_type = excluded.run_type
+             END
 `
 
 type InsertTraceRunParams struct {
@@ -2390,7 +2389,6 @@ type InsertTraceRunParams struct {
 	IsDebounce   bool
 	CronSchedule sql.NullString
 	HasAi        bool
-	RunType      int32
 }
 
 func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error {
@@ -2412,7 +2410,6 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.IsDebounce,
 		arg.CronSchedule,
 		arg.HasAi,
-		arg.RunType,
 	)
 	return err
 }

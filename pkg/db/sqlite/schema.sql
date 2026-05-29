@@ -131,7 +131,7 @@ CREATE TABLE trace_runs (
 	is_debounce BOOLEAN NOT NULL,
 	batch_id BLOB,
 	cron_schedule TEXT
-, has_ai BOOLEAN NOT NULL DEFAULT FALSE, run_type INT NOT NULL DEFAULT 1);
+, has_ai BOOLEAN NOT NULL DEFAULT FALSE);
 CREATE TABLE queue_snapshot_chunks (
     snapshot_id CHAR(26) NOT NULL,
     chunk_id INT NOT NULL,
@@ -156,7 +156,7 @@ CREATE TABLE spans (
   function_id TEXT NOT NULL,
   run_id TEXT NOT NULL,
   env_id TEXT NOT NULL,
-  output JSON, debug_run_id CHAR(36), debug_session_id CHAR(36), status TEXT, input JSON, event_ids JSON,
+  output JSON, debug_run_id CHAR(36), debug_session_id CHAR(36), status TEXT, input JSON, event_ids JSON, is_deferred BOOLEAN,
 
   PRIMARY KEY (trace_id, span_id)
 );

@@ -1646,9 +1646,10 @@ func deferredScheduleMetadata(events []event.TrackedEvent, l logger.Logger) []*e
 		// ParentFunctionID is intentionally NOT required here. During a rolling
 		// deploy an old binary may emit deferred.schedule events without the
 		// parent_function_id field; dropping the metadata entirely would also
-		// drop the child-side breadcrumb (runType + defer.parents on the
-		// child's executor.run span). updateDeferSpanWithDeferredRunID parses it
-		// defensively and skips just the parent-side write when invalid.
+		// drop the child-side breadcrumb (defer.parents on the child's
+		// executor.run span, which feeds spans.is_deferred).
+		// updateDeferSpanWithDeferredRunID parses it defensively and skips
+		// just the parent-side write when invalid.
 		parsed = append(parsed, m)
 	}
 	return parsed

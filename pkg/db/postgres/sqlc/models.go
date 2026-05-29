@@ -154,6 +154,7 @@ type Span struct {
 	Status         sql.NullString
 	Input          pqtype.NullRawMessage
 	EventIds       pqtype.NullRawMessage
+	IsDeferred     sql.NullBool
 }
 
 type Trace struct {
@@ -196,7 +197,6 @@ type TraceRun struct {
 	BatchID      ulid.ULID
 	CronSchedule sql.NullString
 	HasAi        bool
-	RunType      int32
 }
 
 type WorkerConnection struct {

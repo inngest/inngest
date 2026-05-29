@@ -1770,7 +1770,7 @@ func (q *Queries) GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStep
 }
 
 const getTraceRun = `-- name: GetTraceRun :one
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE run_id = ?1
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id = ?1
 `
 
 func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error) {
@@ -1794,13 +1794,12 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, 
 		&i.BatchID,
 		&i.CronSchedule,
 		&i.HasAi,
-		&i.RunType,
 	)
 	return &i, err
 }
 
 const getTraceRunsByRunIDs = `-- name: GetTraceRunsByRunIDs :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE run_id IN (/*SLICE:run_ids*/?)
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id IN (/*SLICE:run_ids*/?)
 `
 
 func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*TraceRun, error) {
@@ -1840,7 +1839,6 @@ func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []ulid.ULID) 
 			&i.BatchID,
 			&i.CronSchedule,
 			&i.HasAi,
-			&i.RunType,
 		); err != nil {
 			return nil, err
 		}
@@ -1856,7 +1854,7 @@ func (q *Queries) GetTraceRunsByRunIDs(ctx context.Context, runIds []ulid.ULID) 
 }
 
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
-SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai, run_type FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), ?1) > 0
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), ?1) > 0
 `
 
 func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error) {
@@ -1886,7 +1884,6 @@ func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) (
 			&i.BatchID,
 			&i.CronSchedule,
 			&i.HasAi,
-			&i.RunType,
 		); err != nil {
 			return nil, err
 		}
@@ -2294,7 +2291,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  is_deferred
 ) VALUES (
   ?1,
   ?2,
@@ -2315,7 +2313,8 @@ INSERT INTO spans (
   ?17,
   ?18,
   ?19,
-  CAST(?20 AS TEXT)
+  CAST(?20 AS TEXT),
+  ?21
 )
 `
 
@@ -2340,6 +2339,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       sql.NullString
+	IsDeferred     sql.NullBool
 }
 
 // New
@@ -2365,6 +2365,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.DebugSessionID,
 		arg.Status,
 		arg.EventIds,
+		arg.IsDeferred,
 	)
 	return err
 }
@@ -2429,9 +2430,9 @@ const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT INTO trace_runs (
     run_id, account_id, workspace_id, app_id, function_id, trace_id,
     queued_at, started_at, ended_at, status, source_id, trigger_ids,
-    output, batch_id, is_debounce, cron_schedule, has_ai, run_type
+    output, batch_id, is_debounce, cron_schedule, has_ai
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(run_id)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -2452,8 +2453,7 @@ DO UPDATE SET
     has_ai = CASE
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
-             END,
-    run_type = excluded.run_type
+             END
 `
 
 type InsertTraceRunParams struct {
@@ -2474,7 +2474,6 @@ type InsertTraceRunParams struct {
 	IsDebounce   bool
 	CronSchedule sql.NullString
 	HasAi        bool
-	RunType      int64
 }
 
 func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error {
@@ -2496,7 +2495,6 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 		arg.IsDebounce,
 		arg.CronSchedule,
 		arg.HasAi,
-		arg.RunType,
 	)
 	return err
 }

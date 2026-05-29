@@ -67,22 +67,21 @@ func TestMakeFunctionRunV2(t *testing.T) {
 		assert.Nil(t, got.StartedAt)
 	})
 
-	t.Run("RunTypeDefer surfaces as DEFER", func(t *testing.T) {
+	t.Run("IsDeferred=true surfaces on the GraphQL model", func(t *testing.T) {
 		run := &cqrs.TraceRun{
-			RunID:   ulid.Make().String(),
-			Status:  enums.RunStatusRunning,
-			RunType: enums.RunTypeDefer,
+			RunID:      ulid.Make().String(),
+			Status:     enums.RunStatusRunning,
+			IsDeferred: true,
 		}
 		got, err := MakeFunctionRunV2(run)
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		assert.Equal(t, RunTypeDefer, got.RunType)
+		assert.True(t, got.IsDeferred)
 	})
 
-	t.Run("unknown RunType defaults to PRIMARY (never empty)", func(t *testing.T) {
-		// Zero-value enums.RunType is RunTypeUnknown; the GraphQL field is
-		// non-null so the empty string would be invalid. PRIMARY is the
-		// safe default.
+	t.Run("IsDeferred defaults to false", func(t *testing.T) {
+		// The GraphQL field is non-null Boolean; the zero value (false)
+		// is the safe default for unclassified runs.
 		run := &cqrs.TraceRun{
 			RunID:  ulid.Make().String(),
 			Status: enums.RunStatusRunning,
@@ -90,7 +89,7 @@ func TestMakeFunctionRunV2(t *testing.T) {
 		got, err := MakeFunctionRunV2(run)
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		assert.Equal(t, RunTypePrimary, got.RunType)
+		assert.False(t, got.IsDeferred)
 	})
 
 	t.Run("Skipped status preserves a real EndedAt", func(t *testing.T) {

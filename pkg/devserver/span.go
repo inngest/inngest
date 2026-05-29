@@ -131,16 +131,6 @@ func (sh *spanIngestionHandler) Add(ctx context.Context, span *cqrs.Span) {
 			run.CronSchedule = &cron
 		}
 
-		// Capture run type from the OnFunctionScheduled trigger span so the
-		// trace_runs row gets the right run_type column on insert. Gate on
-		// IsARunType — an out-of-range int would later make ToRunType error
-		// and silently drop the row from list results.
-		if rt, err := strconv.Atoi(spanAttr(span.SpanAttributes, consts.OtelSysFunctionRunType)); err == nil {
-			if t := enums.RunType(rt); t.IsARunType() {
-				run.RunType = t
-			}
-		}
-
 		// assign it back
 		sh.runs[span.RunID.String()] = run
 	}

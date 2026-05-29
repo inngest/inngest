@@ -5,8 +5,8 @@ type RunsTypeFilterProps = {
   onExcludeDeferredChange: (value: boolean) => void;
 };
 
-// A simple on/off toggle: off shows all runs (no run-type filter), on excludes
-// deferred runs by filtering to PRIMARY runs on the backend.
+// A simple on/off toggle: off shows all runs (no filter), on excludes deferred
+// runs by filtering to `isDeferred: false` on the backend.
 export default function RunsTypeFilter({
   excludeDeferred,
   onExcludeDeferredChange,

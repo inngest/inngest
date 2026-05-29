@@ -276,9 +276,9 @@ VALUES
 
 -- name: InsertTraceRun :exec
 INSERT INTO trace_runs
-    (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule, has_ai, run_type)
+    (account_id, workspace_id, app_id, function_id, trace_id, run_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, batch_id, is_debounce, cron_schedule, has_ai)
 VALUES
-    (sqlc.arg('account_id'), sqlc.arg('workspace_id'), sqlc.arg('app_id'), sqlc.arg('function_id'), sqlc.arg('trace_id'), sqlc.arg('run_id')::CHAR(26), sqlc.arg('queued_at'), sqlc.arg('started_at'), sqlc.arg('ended_at'), sqlc.arg('status'), sqlc.arg('source_id'), sqlc.arg('trigger_ids'), sqlc.arg('output'), sqlc.arg('batch_id')::BYTEA, sqlc.arg('is_debounce'), sqlc.arg('cron_schedule'), sqlc.arg('has_ai'), sqlc.arg('run_type'))
+    (sqlc.arg('account_id'), sqlc.arg('workspace_id'), sqlc.arg('app_id'), sqlc.arg('function_id'), sqlc.arg('trace_id'), sqlc.arg('run_id')::CHAR(26), sqlc.arg('queued_at'), sqlc.arg('started_at'), sqlc.arg('ended_at'), sqlc.arg('status'), sqlc.arg('source_id'), sqlc.arg('trigger_ids'), sqlc.arg('output'), sqlc.arg('batch_id')::BYTEA, sqlc.arg('is_debounce'), sqlc.arg('cron_schedule'), sqlc.arg('has_ai'))
 ON CONFLICT (run_id) DO UPDATE SET
     account_id = excluded.account_id,
     workspace_id = excluded.workspace_id,
@@ -298,8 +298,7 @@ ON CONFLICT (run_id) DO UPDATE SET
     has_ai = CASE
                 WHEN trace_runs.has_ai = TRUE THEN TRUE
                 ELSE excluded.has_ai
-             END,
-    run_type = excluded.run_type;
+             END;
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = sqlc.arg('run_id')::CHAR(26);
@@ -447,8 +446,9 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20);
+  event_ids,
+  is_deferred
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21);
 
 -- name: GetSpansByRunID :many
 SELECT

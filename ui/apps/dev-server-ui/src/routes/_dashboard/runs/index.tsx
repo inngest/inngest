@@ -8,7 +8,6 @@ import {
   GetRunsDocument,
   CountRunsQuery,
   CountRunsDocument,
-  RunType,
 } from '@/store/generated';
 import { Header } from '@inngest/components/Header/Header';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -101,7 +100,7 @@ function RunsComponent() {
         timeField,
         celQuery: search,
         preview,
-        runType: excludeDeferred ? RunType.Primary : null,
+        isDeferred: excludeDeferred ? false : null,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -172,7 +171,7 @@ function RunsComponent() {
         status: filteredStatus,
         timeField,
         celQuery: search,
-        runType: excludeDeferred ? RunType.Primary : null,
+        isDeferred: excludeDeferred ? false : null,
       });
       setTotalCount(data.runs.totalCount);
     })();
@@ -253,7 +252,7 @@ function RunsComponent() {
           history: Number.MAX_SAFE_INTEGER,
           tracesPreview: tracesPreviewEnabled,
           runDetailsV4: v4Enabled,
-          runType: true,
+          isDeferred: true,
         }}
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}

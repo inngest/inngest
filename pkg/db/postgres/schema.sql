@@ -213,7 +213,8 @@ CREATE TABLE public.spans (
     debug_session_id text,
     status text,
     input jsonb,
-    event_ids jsonb
+    event_ids jsonb,
+    is_deferred boolean
 );
 
 --
@@ -237,8 +238,7 @@ CREATE TABLE public.trace_runs (
     is_debounce boolean NOT NULL,
     batch_id bytea,
     cron_schedule text,
-    has_ai boolean DEFAULT false NOT NULL,
-    run_type integer DEFAULT 1 NOT NULL
+    has_ai boolean DEFAULT false NOT NULL
 );
 
 --

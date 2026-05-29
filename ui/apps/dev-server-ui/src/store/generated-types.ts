@@ -417,9 +417,9 @@ export type FunctionRunV2 = {
   hasAI: Scalars['Boolean'];
   id: Scalars['ULID'];
   isBatch: Scalars['Boolean'];
+  isDeferred: Scalars['Boolean'];
   output: Maybe<Scalars['Bytes']>;
   queuedAt: Scalars['Time'];
-  runType: RunType;
   siblingDefers: Array<RunDefer>;
   sourceID: Maybe<Scalars['String']>;
   startedAt: Maybe<Scalars['Time']>;
@@ -868,17 +868,12 @@ export type RunTraceTrigger = {
   timestamp: Scalars['Time'];
 };
 
-export enum RunType {
-  Defer = 'DEFER',
-  Primary = 'PRIMARY',
-}
-
 export type RunsFilterV2 = {
   appIDs?: InputMaybe<Array<Scalars['UUID']>>;
   from: Scalars['Time'];
   functionIDs?: InputMaybe<Array<Scalars['UUID']>>;
+  isDeferred?: InputMaybe<Scalars['Boolean']>;
   query?: InputMaybe<Scalars['String']>;
-  runType?: InputMaybe<RunType>;
   status?: InputMaybe<Array<FunctionRunStatus>>;
   timeField?: InputMaybe<RunsV2OrderByField>;
   until?: InputMaybe<Scalars['Time']>;
@@ -1336,7 +1331,7 @@ export type GetRunsQueryVariables = Exact<{
   functionRunCursor?: InputMaybe<Scalars['String']>;
   celQuery?: InputMaybe<Scalars['String']>;
   preview?: InputMaybe<Scalars['Boolean']>;
-  runType?: InputMaybe<RunType>;
+  isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
 
 export type GetRunsQuery = {
@@ -1356,7 +1351,7 @@ export type GetRunsQuery = {
         startedAt: any | null;
         status: FunctionRunStatus;
         hasAI: boolean;
-        runType: RunType;
+        isDeferred: boolean;
         app: { __typename?: 'App'; externalID: string; name: string };
         function: { __typename?: 'Function'; name: string; slug: string };
         deferredFrom: Array<{
@@ -1385,7 +1380,7 @@ export type CountRunsQueryVariables = Exact<{
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   preview?: InputMaybe<Scalars['Boolean']>;
-  runType?: InputMaybe<RunType>;
+  isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
 
 export type CountRunsQuery = {

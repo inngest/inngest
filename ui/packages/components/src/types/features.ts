@@ -13,8 +13,8 @@ export type Features = {
   runDetailsV4?: boolean;
 
   /**
-   * Whether the data source surfaces deferred-run linkage (`runType`,
+   * Whether the data source surfaces deferred-run linkage (`isDeferred`,
    * `deferredFrom`).
    */
-  runType?: boolean;
+  isDeferred?: boolean;
 };

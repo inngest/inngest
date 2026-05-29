@@ -51,7 +51,7 @@ const columns = [
   columnHelper.accessor('id', {
     cell: (info) => {
       const id = info.getValue();
-      const isDeferred = info.row.original.runType === 'DEFER';
+      const { isDeferred } = info.row.original;
 
       return (
         <div className="flex items-center gap-2">
@@ -103,7 +103,7 @@ const columns = [
     cell: (info) => {
       const data = info.row.original;
       const fnName = info.getValue().name;
-      const isDeferred = data.runType === 'DEFER';
+      const { isDeferred } = data;
 
       const parentFunction = data.deferredFrom?.[0]?.function;
       const parentLabel =

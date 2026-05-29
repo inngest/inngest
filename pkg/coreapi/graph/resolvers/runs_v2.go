@@ -399,16 +399,6 @@ func toRunsQueryOpt(
 		items = num
 	}
 
-	var runTypes []enums.RunType
-	if filter.RunType != nil {
-		switch *filter.RunType {
-		case models.RunTypePrimary:
-			runTypes = []enums.RunType{enums.RunTypePrimary}
-		case models.RunTypeDefer:
-			runTypes = []enums.RunType{enums.RunTypeDefer}
-		}
-	}
-
 	return cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			AppID:      filter.AppIDs,
@@ -418,7 +408,7 @@ func toRunsQueryOpt(
 			Until:      until,
 			Status:     statuses,
 			CEL:        cel,
-			RunType:    runTypes,
+			IsDeferred: filter.IsDeferred,
 		},
 		Order:   orderBy,
 		Cursor:  cursor,
