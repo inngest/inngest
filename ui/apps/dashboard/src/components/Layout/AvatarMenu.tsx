@@ -13,9 +13,9 @@ export default function AvatarMenu({
   return (
     <ProfileMenu isMarketplace={profile.isMarketplace}>
       <div className="bg-canvasMuted text-subtle flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs uppercase">
-        {profile.orgProfilePic ? (
+        {profile.userProfilePic ? (
           <Image
-            src={profile.orgProfilePic}
+            src={profile.userProfilePic}
             className="h-8 w-8 rounded-full object-cover"
             width={32}
             height={32}

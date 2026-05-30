@@ -185,28 +185,24 @@ export default function EnvironmentSelectMenu({
   return (
     <Listbox value={selected} onChange={onSelect}>
       {({ open }) => (
-        <div className="bg-canvasBase relative flex">
+        <div className="relative flex">
           <OptionalTooltip tooltip={collapsed && tooltip(selectedEnv)}>
+            {/* Trigger styled inline to match the breadcrumb look in the
+                top bar: flat, transparent, hover:bg-canvasMuted, text-basis.
+                If the env switcher ever gets mounted somewhere else we'll
+                want to introduce a variant prop here. */}
             <Listbox.Button
-              className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle px-2 ${
-                collapsed ? `w-8` : !activeEnv ? 'w-[196px]' : 'w-[158px]'
-              } h-8 overflow-hidden rounded border text-sm ${
-                open && 'border-primary-intense'
-              }`}
+              className={`text-basis hover:bg-canvasMuted flex items-center gap-1.5 rounded px-2 py-1 text-sm ${
+                collapsed ? 'w-8 justify-center' : ''
+              } ${open ? 'bg-canvasMuted' : ''}`}
             >
-              <div
-                className={`flex flex-row items-center  ${
-                  collapsed ? 'justify-center' : 'justify-between'
-                }`}
-              >
-                <SelectedDisplay selected={selectedEnv} collapsed={collapsed} />
-                {!collapsed && (
-                  <RiExpandUpDownLine
-                    className="text-muted h-4 w-4"
-                    aria-hidden="true"
-                  />
-                )}
-              </div>
+              <SelectedDisplay selected={selectedEnv} collapsed={collapsed} />
+              {!collapsed && (
+                <RiExpandUpDownLine
+                  className="text-muted h-4 w-4 shrink-0"
+                  aria-hidden="true"
+                />
+              )}
             </Listbox.Button>
           </OptionalTooltip>
 

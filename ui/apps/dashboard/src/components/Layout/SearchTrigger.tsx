@@ -29,7 +29,7 @@ export default function SearchTrigger({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="bg-canvasBase border-subtle text-muted hover:bg-canvasBase/90 flex h-8 w-96 shrink-0 items-center gap-2 whitespace-nowrap rounded border px-2.5 text-sm"
+        className="bg-canvasMuted border-subtle text-muted hover:bg-canvasMuted/80 flex h-8 w-96 shrink-0 items-center gap-2 whitespace-nowrap rounded border px-2.5 text-sm"
       >
         <RiSearchLine className="h-4 w-4 shrink-0" />
         <span className="flex-1 text-left">Search by name or IDs</span>

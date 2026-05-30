@@ -19,8 +19,8 @@ export default function TopBar({
   showOnboardingWidget: () => void;
 }) {
   return (
-    <header className="bg-canvasSubtle relative z-[60] flex h-12 shrink-0 items-center justify-between gap-3 px-3">
-      <div className="flex items-center gap-2">
+    <header className="bg-canvasSubtle relative z-[60] flex h-[42px] shrink-0 items-center justify-between gap-3 px-3">
+      <div className="flex items-center gap-1">
         {profile && (
           <>
             <OrgMenu
@@ -30,7 +30,7 @@ export default function TopBar({
               <OrgButton profile={profile} />
             </OrgMenu>
             <span className="text-disabled" aria-hidden>
-              |
+              /
             </span>
           </>
         )}
