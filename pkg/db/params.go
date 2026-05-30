@@ -117,6 +117,13 @@ type GetFunctionRunsTimeboundParams struct {
 	Limit  int64
 }
 
+type GetRunsParams struct {
+	EventID       ulid.ULID
+	Limit         int64
+	Offset        int64
+	IncludeOutput bool
+}
+
 // InsertHistoryParams are the parameters for inserting a history record.
 type InsertHistoryParams struct {
 	ID                   ulid.ULID

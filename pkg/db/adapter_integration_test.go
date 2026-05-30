@@ -206,6 +206,106 @@ func TestInsertFunctionRoundTrip(t *testing.T) {
 	assert.Len(t, allFns, 1)
 }
 
+func TestGetRuns(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID: appID, Name: "event-runs-app", SdkLanguage: "go", SdkVersion: "1.0.0",
+		Metadata: "{}", Status: "active", Checksum: "c", Url: "http://x", Method: "POST",
+	})
+	require.NoError(t, err)
+
+	fnID := uuid.New()
+	_, err = q.UpsertFunction(ctx, db.UpsertFunctionParams{
+		ID:        fnID,
+		AppID:     appID,
+		Name:      "Event Runs Function",
+		Slug:      "event-runs-app-event-runs-function",
+		Config:    `{"name":"Event Runs Function","slug":"event-runs-function"}`,
+		CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	eventID := ulid.Make()
+	firstBatchEventID := ulid.Make()
+	thirdBatchEventID := ulid.Make()
+	batchID := ulid.Make()
+	runID := ulid.Make()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	require.NoError(t, q.InsertFunctionRun(ctx, db.InsertFunctionRunParams{
+		RunID:           runID,
+		RunStartedAt:    startedAt,
+		FunctionID:      fnID,
+		FunctionVersion: 1,
+		TriggerType:     "event",
+		EventID:         eventID,
+		BatchID:         batchID,
+		WorkspaceID:     uuid.New(),
+	}))
+	require.NoError(t, q.InsertFunctionFinish(ctx, db.InsertFunctionFinishParams{
+		RunID:              runID,
+		Status:             sql.NullString{String: "completed", Valid: true},
+		Output:             sql.NullString{String: ``, Valid: true},
+		CompletedStepCount: sql.NullInt64{Int64: 1, Valid: true},
+		CreatedAt:          sql.NullTime{Time: startedAt.Add(time.Second), Valid: true},
+	}))
+	require.NoError(t, q.InsertTraceRun(ctx, db.InsertTraceRunParams{
+		RunID:       runID,
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		AppID:       appID,
+		FunctionID:  fnID,
+		TraceID:     []byte("trace-id"),
+		QueuedAt:    startedAt.UnixMilli(),
+		StartedAt:   startedAt.UnixMilli(),
+		EndedAt:     startedAt.Add(time.Second).UnixMilli(),
+		Status:      300,
+		SourceID:    "test",
+		TriggerIds:  []byte(eventID.String()),
+		Output:      []byte(`{"data":{"ok":true}}`),
+	}))
+	require.NoError(t, q.InsertEventBatch(ctx, db.InsertEventBatchParams{
+		ID:          batchID,
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		AppID:       appID,
+		WorkflowID:  fnID,
+		RunID:       runID,
+		StartedAt:   startedAt,
+		ExecutedAt:  startedAt.Add(time.Second),
+		EventIds:    []byte(firstBatchEventID.String() + "," + eventID.String() + "," + thirdBatchEventID.String()),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID:       eventID,
+		Limit:         10,
+		IncludeOutput: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, "event-runs-app", rows[0].AppName)
+	assert.Equal(t, "event-runs-app-event-runs-function", rows[0].FunctionSlug)
+	assert.Equal(t, `{"name":"Event Runs Function","slug":"event-runs-function"}`, rows[0].FunctionConfig)
+	assert.Equal(t, "completed", rows[0].FunctionFinish.Status.String)
+	assert.JSONEq(t, `{"data":{"ok":true}}`, string(rows[0].Output))
+
+	for _, batchEventID := range []ulid.ULID{firstBatchEventID, eventID, thirdBatchEventID} {
+		rows, err := q.GetRuns(ctx, db.GetRunsParams{
+			EventID: batchEventID,
+			Limit:   10,
+		})
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Event insert and read
 // ---------------------------------------------------------------------------

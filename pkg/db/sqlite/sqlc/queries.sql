@@ -173,6 +173,26 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_ru
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
 
+-- name: GetRuns :many
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes),
+	COALESCE(functions.slug, '') AS function_slug,
+	COALESCE(functions.name, '') AS function_name,
+	COALESCE(functions.config, '{}') AS function_config,
+	COALESCE(functions.app_id, '00000000-0000-0000-0000-000000000000') AS function_app_id,
+	COALESCE(apps.name, '') AS app_name,
+	COALESCE(trace_runs.output, x'') AS run_output
+FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL
+LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
+LEFT JOIN trace_runs ON trace_runs.run_id = function_runs.run_id
+LEFT JOIN event_batches ON event_batches.run_id = function_runs.run_id
+	AND INSTR(CAST(event_batches.event_ids AS TEXT), @event_id_text) > 0
+WHERE function_runs.event_id = @event_id
+	OR event_batches.run_id IS NOT NULL
+ORDER BY function_runs.run_id
+LIMIT @limit_rows OFFSET @offset_rows;
+
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
 

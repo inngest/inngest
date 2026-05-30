@@ -55,6 +55,7 @@ type Querier interface {
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error)
+	GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)
 	GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error)
 	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*GetSpansByDebugRunIDRow, error)

@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/inngest/inngest/pkg/db"
+	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -329,6 +329,38 @@ func (sq *sqliteQuerier) GetFunctionRunsFromEvents(ctx context.Context, eventIds
 	out := make([]*db.FunctionRunRow, len(rows))
 	for i, r := range rows {
 		out[i] = functionRunRowFromSQLite(&r.FunctionRun, &r.FunctionFinish)
+	}
+	return out, nil
+}
+
+func (sq *sqliteQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
+	rows, err := sq.q.GetRuns(ctx, sqlc.GetRunsParams{
+		EventIDText: arg.EventID.String(),
+		EventID:     arg.EventID,
+		OffsetRows:  arg.Offset,
+		LimitRows:   arg.Limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*db.RunListItemRow, len(rows))
+	for i, r := range rows {
+		var output []byte
+		if arg.IncludeOutput {
+			output = toBytes(r.RunOutput)
+		}
+
+		out[i] = &db.RunListItemRow{
+			FunctionRun:    *functionRunFromSQLite(&r.FunctionRun),
+			FunctionFinish: *functionFinishFromSQLite(&r.FunctionFinish),
+			Output:         output,
+			FunctionSlug:   r.FunctionSlug,
+			FunctionName:   r.FunctionName,
+			FunctionConfig: r.FunctionConfig,
+			FunctionAppID:  r.FunctionAppID,
+			AppName:        r.AppName,
+		}
 	}
 	return out, nil
 }

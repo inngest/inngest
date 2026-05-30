@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db"
+	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
 	"github.com/oklog/ulid/v2"
 )
@@ -392,6 +392,69 @@ func (pq *pgQuerier) GetFunctionRunsFromEvents(ctx context.Context, eventIds []u
 				CompletedStepCount: sql.NullInt64{Int64: int64(r.FinishCompletedStepCount), Valid: true},
 				CreatedAt:          sql.NullTime{Time: r.FinishCreatedAt, Valid: !r.FinishCreatedAt.IsZero()},
 			},
+		}
+	}
+	return out, nil
+}
+
+func (pq *pgQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
+	batchRunIDs, err := pq.q.GetEventBatchesByEventID(ctx, arg.EventID.String())
+	if err != nil {
+		return nil, err
+	}
+	runIDs := make([][]byte, 0, len(batchRunIDs))
+	for _, batch := range batchRunIDs {
+		runIDs = append(runIDs, batch.RunID[:])
+	}
+
+	rows, err := pq.q.GetRuns(ctx, sqlc.GetRunsParams{
+		EventID:    arg.EventID[:],
+		RunIds:     runIDs,
+		OffsetRows: int32(arg.Offset),
+		LimitRows:  int32(arg.Limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	outputs := map[ulid.ULID][]byte{}
+	if arg.IncludeOutput && len(rows) > 0 {
+		runIDs := make([]string, len(rows))
+		for i, r := range rows {
+			runIDs[i] = r.FunctionRun.RunID.String()
+		}
+
+		outputRows, err := pq.q.GetTraceRunOutputs(ctx, runIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range outputRows {
+			outputs[r.RunID] = r.Output
+		}
+	}
+
+	out := make([]*db.RunListItemRow, len(rows))
+	for i, r := range rows {
+		output := r.RunOutput
+		if traceOutput, ok := outputs[r.FunctionRun.RunID]; ok {
+			output = traceOutput
+		}
+
+		out[i] = &db.RunListItemRow{
+			FunctionRun: *functionRunFromPG(&r.FunctionRun),
+			FunctionFinish: db.FunctionFinish{
+				RunID:              r.FunctionRun.RunID,
+				Status:             sql.NullString{String: r.FinishStatus, Valid: r.FinishStatus != ""},
+				Output:             sql.NullString{String: r.FinishOutput, Valid: r.FinishOutput != ""},
+				CompletedStepCount: sql.NullInt64{Int64: int64(r.FinishCompletedStepCount), Valid: true},
+				CreatedAt:          sql.NullTime{Time: r.FinishCreatedAt, Valid: !r.FinishCreatedAt.IsZero()},
+			},
+			Output:         output,
+			FunctionSlug:   r.FunctionSlug,
+			FunctionName:   r.FunctionName,
+			FunctionConfig: r.FunctionConfig,
+			FunctionAppID:  r.FunctionAppID,
+			AppName:        r.AppName,
 		}
 	}
 	return out, nil

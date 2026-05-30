@@ -1232,6 +1232,97 @@ func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDPa
 	return &i, err
 }
 
+const getRuns = `-- name: GetRuns :many
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+    COALESCE(function_finishes.status, '') AS finish_status,
+    COALESCE(function_finishes.output, '') AS finish_output,
+    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
+    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at,
+    COALESCE(functions.slug, '') AS function_slug,
+    COALESCE(functions.name, '') AS function_name,
+    COALESCE(functions.config, '{}') AS function_config,
+    COALESCE(functions.app_id, '00000000-0000-0000-0000-000000000000') AS function_app_id,
+    COALESCE(apps.name, '') AS app_name,
+    ''::bytea AS run_output
+FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL
+LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
+WHERE function_runs.event_id = $1::BYTEA
+    OR function_runs.run_id IN (SELECT UNNEST($2::BYTEA[]))
+ORDER BY function_runs.run_id
+LIMIT $4 OFFSET $3
+`
+
+type GetRunsParams struct {
+	EventID    []byte
+	RunIds     [][]byte
+	OffsetRows int32
+	LimitRows  int32
+}
+
+type GetRunsRow struct {
+	FunctionRun              FunctionRun
+	FinishStatus             string
+	FinishOutput             string
+	FinishCompletedStepCount int32
+	FinishCreatedAt          time.Time
+	FunctionSlug             string
+	FunctionName             string
+	FunctionConfig           string
+	FunctionAppID            uuid.UUID
+	AppName                  string
+	RunOutput                []byte
+}
+
+func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRuns,
+		arg.EventID,
+		pq.Array(arg.RunIds),
+		arg.OffsetRows,
+		arg.LimitRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunsRow
+	for rows.Next() {
+		var i GetRunsRow
+		if err := rows.Scan(
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FinishStatus,
+			&i.FinishOutput,
+			&i.FinishCompletedStepCount,
+			&i.FinishCreatedAt,
+			&i.FunctionSlug,
+			&i.FunctionName,
+			&i.FunctionConfig,
+			&i.FunctionAppID,
+			&i.AppName,
+			&i.RunOutput,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSpanBySpanID = `-- name: GetSpanBySpanID :one
 SELECT
   run_id,
@@ -1635,6 +1726,40 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 		&i.HasAi,
 	)
 	return &i, err
+}
+
+const getTraceRunOutputs = `-- name: GetTraceRunOutputs :many
+SELECT run_id, COALESCE(output, ''::bytea) AS output
+FROM trace_runs
+WHERE run_id = ANY($1::CHAR(26)[])
+`
+
+type GetTraceRunOutputsRow struct {
+	RunID  ulid.ULID
+	Output []byte
+}
+
+func (q *Queries) GetTraceRunOutputs(ctx context.Context, dollar_1 []string) ([]*GetTraceRunOutputsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceRunOutputs, pq.Array(dollar_1))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetTraceRunOutputsRow
+	for rows.Next() {
+		var i GetTraceRunOutputsRow
+		if err := rows.Scan(&i.RunID, &i.Output); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many

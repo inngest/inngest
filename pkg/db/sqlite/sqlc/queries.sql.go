@@ -1251,6 +1251,95 @@ func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDPa
 	return &i, err
 }
 
+const getRuns = `-- name: GetRuns :many
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id, function_finishes.run_id, function_finishes.status, function_finishes.output, function_finishes.completed_step_count, function_finishes.created_at,
+	COALESCE(functions.slug, '') AS function_slug,
+	COALESCE(functions.name, '') AS function_name,
+	COALESCE(functions.config, '{}') AS function_config,
+	COALESCE(functions.app_id, '00000000-0000-0000-0000-000000000000') AS function_app_id,
+	COALESCE(apps.name, '') AS app_name,
+	COALESCE(trace_runs.output, x'') AS run_output
+FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL
+LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
+LEFT JOIN trace_runs ON trace_runs.run_id = function_runs.run_id
+LEFT JOIN event_batches ON event_batches.run_id = function_runs.run_id
+	AND INSTR(CAST(event_batches.event_ids AS TEXT), ?1) > 0
+WHERE function_runs.event_id = ?2
+	OR event_batches.run_id IS NOT NULL
+ORDER BY function_runs.run_id
+LIMIT ?4 OFFSET ?3
+`
+
+type GetRunsParams struct {
+	EventIDText string
+	EventID     ulid.ULID
+	OffsetRows  int64
+	LimitRows   int64
+}
+
+type GetRunsRow struct {
+	FunctionRun    FunctionRun
+	FunctionFinish FunctionFinish
+	FunctionSlug   string
+	FunctionName   string
+	FunctionConfig string
+	FunctionAppID  uuid.UUID
+	AppName        string
+	RunOutput      []byte
+}
+
+func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRuns,
+		arg.EventIDText,
+		arg.EventID,
+		arg.OffsetRows,
+		arg.LimitRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunsRow
+	for rows.Next() {
+		var i GetRunsRow
+		if err := rows.Scan(
+			&i.FunctionRun.RunID,
+			&i.FunctionRun.RunStartedAt,
+			&i.FunctionRun.FunctionID,
+			&i.FunctionRun.FunctionVersion,
+			&i.FunctionRun.TriggerType,
+			&i.FunctionRun.EventID,
+			&i.FunctionRun.BatchID,
+			&i.FunctionRun.OriginalRunID,
+			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
+			&i.FunctionFinish.RunID,
+			&i.FunctionFinish.Status,
+			&i.FunctionFinish.Output,
+			&i.FunctionFinish.CompletedStepCount,
+			&i.FunctionFinish.CreatedAt,
+			&i.FunctionSlug,
+			&i.FunctionName,
+			&i.FunctionConfig,
+			&i.FunctionAppID,
+			&i.AppName,
+			&i.RunOutput,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSpanBySpanID = `-- name: GetSpanBySpanID :one
 SELECT
   run_id,
