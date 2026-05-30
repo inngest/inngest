@@ -10,6 +10,7 @@ export default function NavSection({
   activeEnv,
   collapsed,
   footer,
+  first = false,
 }: {
   group: NavGroupConfig;
   activeEnv: EnvType;
@@ -17,6 +18,10 @@ export default function NavSection({
   // Optional extra row rendered after the section's items (e.g. the Keys
   // popover trigger inside Manage). Counts toward "is this section empty?".
   footer?: ReactNode;
+  // When true, the section is the first one in the list; we skip the
+  // leading divider in collapsed mode so the top of the sidebar isn't
+  // bracketed by a floating line.
+  first?: boolean;
 }) {
   if (group.items.length === 0 && !footer) {
     return null;
@@ -25,7 +30,7 @@ export default function NavSection({
   return (
     <div className="flex w-full flex-col">
       {collapsed ? (
-        <hr className="border-subtle mx-auto mb-1 w-6" />
+        !first && <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
         <div className="text-muted leading-4.5 mb-1 text-xs font-medium">
           {group.heading}
@@ -38,7 +43,7 @@ export default function NavSection({
           collapsed={collapsed}
           text={item.label}
           beta={item.beta}
-          icon={<item.Icon className="h-[18px] w-[18px]" />}
+          icon={<item.Icon className="h-[14px] w-[14px]" />}
         />
       ))}
       {footer}

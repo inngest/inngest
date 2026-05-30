@@ -53,7 +53,7 @@ export default function SideBar({
 
   return (
     <nav
-      className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start py-3 ${
+      className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start py-3 transition-[width] duration-200 ease-out ${
         collapsed ? 'w-[64px]' : 'w-[200px]'
       } shrink-0 overflow-visible border-r-hairline`}
       ref={navRef}

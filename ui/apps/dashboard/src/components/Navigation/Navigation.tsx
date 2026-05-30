@@ -38,7 +38,12 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
         collapsed ? 'gap-2' : 'gap-4'
       }`}
     >
-      <NavSection group={observe} activeEnv={activeEnv} collapsed={collapsed} />
+      <NavSection
+        group={observe}
+        activeEnv={activeEnv}
+        collapsed={collapsed}
+        first
+      />
       <NavSection
         group={workflow}
         activeEnv={activeEnv}

@@ -32,7 +32,10 @@ export default function KeysNavItem({
           <button
             type="button"
             className={cn(
-              'my-0.5 flex h-6 w-full flex-row items-center gap-3 self-stretch rounded px-1 text-left',
+              'my-0.5 flex items-center rounded text-left',
+              collapsed
+                ? 'mx-auto h-8 w-8 justify-center'
+                : 'h-6 w-full flex-row gap-3 self-stretch px-1',
               active
                 ? 'bg-canvasMuted text-basis'
                 : 'hover:bg-canvasSubtle text-muted',
@@ -44,7 +47,7 @@ export default function KeysNavItem({
                 active ? 'text-basis' : 'text-light',
               )}
             >
-              <RiKey2Line className="h-[18px] w-[18px]" />
+              <RiKey2Line className="h-[14px] w-[14px]" />
             </span>
             {!collapsed && <span className="text-sm leading-tight">Keys</span>}
           </button>
