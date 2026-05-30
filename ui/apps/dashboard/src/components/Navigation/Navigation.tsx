@@ -33,7 +33,11 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
   }
 
   return (
-    <div className="text-basis flex h-full flex-col pl-3 pr-2">
+    <div
+      className={`text-basis flex h-full flex-col pl-3 pr-2 ${
+        collapsed ? 'gap-2' : 'gap-4'
+      }`}
+    >
       <NavSection group={observe} activeEnv={activeEnv} collapsed={collapsed} />
       <NavSection
         group={workflow}

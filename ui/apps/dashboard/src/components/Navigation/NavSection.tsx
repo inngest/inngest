@@ -23,7 +23,7 @@ export default function NavSection({
   }
 
   return (
-    <div className={`flex w-full flex-col ${collapsed ? 'mt-2' : 'mt-4'}`}>
+    <div className="flex w-full flex-col">
       {collapsed ? (
         <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
