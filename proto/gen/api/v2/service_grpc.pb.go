@@ -32,6 +32,7 @@ const (
 	V2_ListWebhooks_FullMethodName             = "/api.v2.V2/ListWebhooks"
 	V2_PatchEnv_FullMethodName                 = "/api.v2.V2/PatchEnv"
 	V2_GetFunctionRun_FullMethodName           = "/api.v2.V2/GetFunctionRun"
+	V2_GetEventRuns_FullMethodName             = "/api.v2.V2/GetEventRuns"
 	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName         = "/api.v2.V2/GetFunctionTrace"
 	V2_InvokeFunction_FullMethodName           = "/api.v2.V2/InvokeFunction"
@@ -61,6 +62,7 @@ type V2Client interface {
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
 	PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error)
 	GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error)
+	GetEventRuns(ctx context.Context, in *GetEventRunsRequest, opts ...grpc.CallOption) (*GetEventRunsResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
@@ -208,6 +210,16 @@ func (c *v2Client) GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest
 	return out, nil
 }
 
+func (c *v2Client) GetEventRuns(ctx context.Context, in *GetEventRunsRequest, opts ...grpc.CallOption) (*GetEventRunsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetEventRunsResponse)
+	err := c.cc.Invoke(ctx, V2_GetEventRuns_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SyncAppResponse)
@@ -298,6 +310,7 @@ type V2Server interface {
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
 	PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error)
 	GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error)
+	GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
@@ -353,6 +366,9 @@ func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*Patch
 }
 func (UnimplementedV2Server) GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctionRun not implemented")
+}
+func (UnimplementedV2Server) GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEventRuns not implemented")
 }
 func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncApp not implemented")
@@ -630,6 +646,24 @@ func _V2_GetFunctionRun_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_GetEventRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEventRunsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetEventRuns(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetEventRuns_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetEventRuns(ctx, req.(*GetEventRunsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_SyncApp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SyncAppRequest)
 	if err := dec(in); err != nil {
@@ -814,6 +848,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFunctionRun",
 			Handler:    _V2_GetFunctionRun_Handler,
+		},
+		{
+			MethodName: "GetEventRuns",
+			Handler:    _V2_GetEventRuns_Handler,
 		},
 		{
 			MethodName: "SyncApp",

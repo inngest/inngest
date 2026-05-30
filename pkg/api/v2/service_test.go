@@ -440,6 +440,159 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 }
 
+func TestService_GetEventRuns(t *testing.T) {
+	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	nextRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cz")
+	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+	endedAt := startedAt.Add(2 * time.Second)
+
+	run := &RunListItem{
+		RunID:        runID,
+		RunStartedAt: startedAt,
+		EventID:      eventID,
+		Status:       enums.RunStatusCompleted,
+		EndedAt:      &endedAt,
+		Output:       json.RawMessage(`{"ok":true}`),
+		FunctionID:   "test-fn",
+		FunctionName: "Test function",
+		AppID:        "my-app",
+	}
+	nextRun := &RunListItem{
+		RunID:        nextRunID,
+		RunStartedAt: startedAt.Add(time.Minute),
+		EventID:      eventID,
+		Status:       enums.RunStatusRunning,
+		FunctionID:   "next-fn",
+		FunctionName: "Next function",
+		AppID:        "my-app",
+	}
+
+	t.Run("returns mapped event runs", func(t *testing.T) {
+		reader := &mockRunsReader{}
+		reader.On("GetRuns", mock.Anything, GetRunsOpts{
+			EventID:       eventID,
+			Offset:        0,
+			Limit:         defaultEventRunsLimit,
+			IncludeOutput: true,
+		}).Return(&GetRunsResult{Runs: []*RunListItem{run}}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{RunList: reader})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId:       eventID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.Equal(t, runID.String(), resp.Data[0].Id)
+		require.Equal(t, "test-fn", resp.Data[0].Function.Id)
+		require.Equal(t, "Test function", resp.Data[0].Function.Name)
+		require.Equal(t, "my-app", resp.Data[0].App.Id)
+		require.Equal(t, []string{eventID.String()}, resp.Data[0].Trigger.EventIds)
+		require.NotNil(t, resp.Data[0].Output)
+		require.True(t, resp.Data[0].Output.Fields["ok"].GetBoolValue())
+		require.NotNil(t, resp.Page)
+		require.False(t, resp.Page.HasMore)
+		require.Equal(t, int32(defaultEventRunsLimit), resp.Page.Limit)
+	})
+
+	t.Run("passes pagination to reader", func(t *testing.T) {
+		reader := &mockRunsReader{}
+		reader.On("GetRuns", mock.Anything, GetRunsOpts{
+			EventID: eventID,
+			Offset:  0,
+			Limit:   1,
+		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
+		reader.On("GetRuns", mock.Anything, GetRunsOpts{
+			EventID: eventID,
+			Offset:  1,
+			Limit:   1,
+		}).Return(&GetRunsResult{Runs: []*RunListItem{nextRun}}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{RunList: reader})
+		limit := int32(1)
+
+		first, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Limit:   &limit,
+		})
+		require.NoError(t, err)
+		require.Len(t, first.Data, 1)
+		require.Equal(t, runID.String(), first.Data[0].Id)
+		require.True(t, first.Page.HasMore)
+		require.NotNil(t, first.Page.Cursor)
+
+		second, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Cursor:  first.Page.Cursor,
+			Limit:   &limit,
+		})
+		require.NoError(t, err)
+		require.Len(t, second.Data, 1)
+		require.Equal(t, nextRunID.String(), second.Data[0].Id)
+		require.False(t, second.Page.HasMore)
+		require.Nil(t, second.Page.Cursor)
+	})
+
+	t.Run("requires event id", func(t *testing.T) {
+		service := NewService(ServiceOptions{})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event ID is required")
+	})
+
+	t.Run("validates event id format", func(t *testing.T) {
+		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: "not-a-ulid",
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event ID must be a valid ULID")
+	})
+
+	t.Run("returns internal error when reader fails", func(t *testing.T) {
+		reader := &mockRunsReader{}
+		reader.On("GetRuns", mock.Anything, GetRunsOpts{
+			EventID: eventID,
+			Offset:  0,
+			Limit:   defaultEventRunsLimit,
+		}).Return(nil, errors.New("reader failed")).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{RunList: reader})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Unable to fetch event runs")
+	})
+
+	t.Run("validates pagination", func(t *testing.T) {
+		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		invalidLimit := int32(maxEventRunsLimit + 1)
+
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Limit:   &invalidLimit,
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Limit cannot exceed 40")
+	})
+}
+
 func TestToTraceSpanStatus(t *testing.T) {
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, toTraceSpanStatus(models.RunTraceSpanStatusCompleted))
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_FAILED, toTraceSpanStatus(models.RunTraceSpanStatusFailed))
