@@ -441,6 +441,24 @@ CREATE INDEX idx_spans_account_status_time ON public.spans USING btree (account_
 CREATE INDEX idx_spans_active_start_time ON public.spans USING btree (start_time) WHERE ((debug_run_id IS NULL) AND ((status IS NULL) OR (status <> 'Skipped'::text)));
 
 --
+-- Name: idx_spans_dynamic_debug_starttime; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_dynamic_debug_starttime ON public.spans USING btree (dynamic_span_id, start_time) WHERE (debug_run_id IS NULL);
+
+--
+-- Name: idx_spans_executor_run_start; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_executor_run_start ON public.spans USING btree (start_time DESC, run_id) WHERE ((name = 'executor.run'::text) AND (debug_run_id IS NULL) AND ((status IS NULL) OR (status <> 'Skipped'::text)));
+
+--
+-- Name: idx_spans_name_dynamic_span_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_name_dynamic_span_id ON public.spans USING btree (name, dynamic_span_id);
+
+--
 -- Name: idx_spans_name_start_time_dynamic_span_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -459,6 +477,18 @@ CREATE INDEX idx_spans_run_id ON public.spans USING btree (run_id);
 CREATE INDEX idx_spans_run_id_dynamic_start_time ON public.spans USING btree (run_id, dynamic_span_id, start_time);
 
 --
+-- Name: idx_spans_run_dynamic_endtime_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_run_dynamic_endtime_status ON public.spans USING btree (run_id, dynamic_span_id, end_time DESC NULLS LAST) INCLUDE (status);
+
+--
+-- Name: idx_spans_run_inner_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_run_inner_lookup ON public.spans USING btree (account_id, env_id, start_time DESC, dynamic_span_id) INCLUDE (app_id, function_id, run_id) WHERE ((name = 'executor.run'::text) AND (debug_run_id IS NULL) AND ((status IS NULL) OR (status <> 'Skipped'::text)));
+
+--
 -- Name: idx_spans_run_status; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -469,6 +499,24 @@ CREATE INDEX idx_spans_run_status ON public.spans USING btree (run_id, status);
 --
 
 CREATE INDEX idx_spans_status ON public.spans USING btree (status);
+
+--
+-- Name: idx_trace_runs_acct_ws_ended; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_trace_runs_acct_ws_ended ON public.trace_runs USING btree (account_id, workspace_id, ended_at DESC, run_id);
+
+--
+-- Name: idx_trace_runs_acct_ws_queued; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_trace_runs_acct_ws_queued ON public.trace_runs USING btree (account_id, workspace_id, queued_at DESC, run_id);
+
+--
+-- Name: idx_trace_runs_acct_ws_started; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_trace_runs_acct_ws_started ON public.trace_runs USING btree (account_id, workspace_id, started_at DESC, run_id);
 
 --
 -- Name: idx_traces_trace_id; Type: INDEX; Schema: public; Owner: -

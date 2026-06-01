@@ -1673,6 +1673,193 @@ func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
 	assert.Equal(t, completedRunID, runs[0].RunID)
 }
 
+func TestCQRSGetTraceRunsPreviewScopesRootLookupAndCount(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	otherAccountID := uuid.New()
+	otherWorkspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	completedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         completedRunID,
+		DynamicSpanID: "dyn-completed",
+		Name:          "executor.run",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	failedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         failedRunID,
+		DynamicSpanID: "dyn-failed",
+		Name:          "executor.run",
+		Status:        enums.RunStatusFailed.String(),
+		StartTime:     baseTime.Add(time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	// This fragment shares a dynamic span ID with another tenant's root span,
+	// but it has no root in the requested tenant and must not become a run.
+	leakedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         leakedRunID,
+		DynamicSpanID: "dyn-shared",
+		Name:          "EXTEND",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime.Add(2 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		DynamicSpanID: "dyn-shared",
+		Name:          "executor.run",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime.Add(2 * time.Second),
+		AccountID:     otherAccountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         otherWorkspaceID.String(),
+	})
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		DynamicSpanID: "dyn-skipped",
+		Name:          "executor.run",
+		Status:        enums.RunStatusSkipped.String(),
+		StartTime:     baseTime.Add(3 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Items:   1,
+		Preview: true,
+	}
+
+	firstPage, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+
+	countOpt := opt
+	countOpt.Cursor = firstPage[0].Cursor
+	count, err := cm.GetTraceRunsCount(ctx, countOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count, "count should ignore cursor and exclude cross-tenant root matches")
+
+	countOpt.Filter.Status = []enums.RunStatus{enums.RunStatusCompleted}
+	statusCount, err := cm.GetTraceRunsCount(ctx, countOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, statusCount)
+
+	listOpt := opt
+	listOpt.Items = 0
+	runs, err := cm.GetTraceRuns(ctx, listOpt)
+	require.NoError(t, err)
+	require.Len(t, runs, 2)
+
+	runIDs := []string{runs[0].RunID, runs[1].RunID}
+	assert.Contains(t, runIDs, completedRunID)
+	assert.Contains(t, runIDs, failedRunID)
+	assert.NotContains(t, runIDs, leakedRunID)
+}
+
+func TestCQRSGetTraceRunsNonPreviewScopesTenant(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	otherAccountID := uuid.New()
+	otherWorkspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	targetRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-target",
+		RunID:       targetRunID,
+		QueuedAt:    baseTime,
+		StartedAt:   baseTime,
+		EndedAt:     baseTime.Add(time.Second),
+		Status:      enums.RunStatusCompleted,
+	})
+	require.NoError(t, err)
+
+	err = cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+		AccountID:   otherAccountID,
+		WorkspaceID: otherWorkspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-other",
+		RunID:       ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		QueuedAt:    baseTime,
+		StartedAt:   baseTime,
+		EndedAt:     baseTime.Add(time.Second),
+		Status:      enums.RunStatusCompleted,
+	})
+	require.NoError(t, err)
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+	}
+
+	runs, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, targetRunID, runs[0].RunID)
+
+	count, err := cm.GetTraceRunsCount(ctx, opt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}
+
 //
 // Span Tests
 //

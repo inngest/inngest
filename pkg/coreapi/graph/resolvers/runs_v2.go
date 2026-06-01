@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -507,13 +508,15 @@ func toRunsQueryOpt(
 
 	return cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
-			AppID:      filter.AppIDs,
-			FunctionID: filter.FunctionIDs,
-			TimeField:  tsfield,
-			From:       filter.From,
-			Until:      until,
-			Status:     statuses,
-			CEL:        cel,
+			AccountID:   consts.DevServerAccountID,
+			WorkspaceID: consts.DevServerEnvID,
+			AppID:       filter.AppIDs,
+			FunctionID:  filter.FunctionIDs,
+			TimeField:   tsfield,
+			From:        filter.From,
+			Until:       until,
+			Status:      statuses,
+			CEL:         cel,
 		},
 		Order:   orderBy,
 		Cursor:  cursor,

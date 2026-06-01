@@ -2142,6 +2142,12 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 
 	// filters
 	filter := []sq.Expression{}
+	if opt.Filter.AccountID != uuid.Nil {
+		filter = append(filter, sq.C("account_id").Eq(opt.Filter.AccountID))
+	}
+	if opt.Filter.WorkspaceID != uuid.Nil {
+		filter = append(filter, sq.C("workspace_id").Eq(opt.Filter.WorkspaceID))
+	}
 	if len(opt.Filter.AppID) > 0 {
 		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
 	}
@@ -2268,15 +2274,11 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	// explicitly set it to zero so it would not attempt to paginate
 	opt.Items = 0
-	var (
-		res []*cqrs.TraceRun
-		err error
-	)
 	if opt.Preview {
-		res, err = w.GetSpanRuns(ctx, opt)
-	} else {
-		res, err = w.GetTraceRuns(ctx, opt)
+		return w.getSpanRunsCount(ctx, opt)
 	}
+
+	res, err := w.GetTraceRuns(ctx, opt)
 	if err != nil {
 		return 0, err
 	}
@@ -2991,24 +2993,9 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 
 	builder := newSpanRunsQueryBuilder(ctx, opt)
 
-	// Parse CEL expressions using adapter's converter
-	var celFilters []sq.Expression
-	var useJoin bool
-	if opt.Filter.CEL != "" {
-		expHandler, err := run.NewExpressionHandler(ctx,
-			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
-			run.WithExpressionSQLConverter(h.CELConverter()),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if expHandler.HasFilters() {
-			celFilters, err = expHandler.ToSQLFilters(ctx)
-			if err != nil {
-				return nil, err
-			}
-			useJoin = needsEventJoin(opt.Filter.CEL)
-		}
+	celFilters, useJoin, err := spanRunCELFilters(ctx, opt, h)
+	if err != nil {
+		return nil, err
 	}
 
 	selectCols := []interface{}{
@@ -3071,23 +3058,9 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	allFilters := append(builder.filter, celFilters...)
-	// The inner subquery is bounded by Until (an executor.run always precedes
-	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
-	// also apply the From floor so the inner scan stops growing O(total
-	// executor.run history) as the system ages — at the cost of excluding runs
-	// whose root started before From but had EXTEND activity inside the
-	// window. For end_time-based windows we skip the floor: a run that ended
-	// in-window can legitimately have started arbitrarily earlier.
-	innerPreds := []sq.Expression{
-		sq.C("name").Eq(meta.SpanNameRun),
-		sq.C("start_time").Lt(opt.Filter.Until.UTC()),
-	}
-	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
-		innerPreds = append(innerPreds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
-	}
 	q = q.Select(selectCols...).
 		Where(sq.L("spans.dynamic_span_id").In(
-			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(innerPreds...),
+			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(spanRunRootPredicates(opt)...),
 		)).
 		Where(allFilters...).
 		GroupBy(groupByCols...).
@@ -3112,6 +3085,131 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	defer rows.Close()
 
 	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
+}
+
+func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	l := logger.StdlibLogger(ctx)
+	h := w.helpers()
+
+	// Total counts should ignore pagination state.
+	opt.Cursor = ""
+	opt.Items = 0
+
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+	celFilters, useJoin, err := spanRunCELFilters(ctx, opt, h)
+	if err != nil {
+		return 0, err
+	}
+
+	q := sq.Dialect(h.GoquDialect()).From("spans")
+	if useJoin {
+		q = h.BuildEventJoin(q)
+	}
+
+	grouped := q.Select(sq.L("1")).
+		Where(sq.L("spans.dynamic_span_id").In(
+			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(spanRunRootPredicates(opt)...),
+		)).
+		Where(append(builder.filter, celFilters...)...).
+		GroupBy(spanRunGroupByCols()...)
+
+	sqlQuery, args, err := sq.Dialect(h.GoquDialect()).
+		From(grouped.As("span_runs")).
+		Select(sq.COUNT("*").As("count")).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	l.Debug("GetSpanRunsCount query", "sql", sqlQuery, "args", args)
+
+	var count int
+	if err := w.adapter.Conn().QueryRowContext(ctx, sqlQuery, args...).Scan(&count); err != nil {
+		l.Debug("GetSpanRunsCount query error", "error", err)
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func spanRunCELFilters(
+	ctx context.Context,
+	opt cqrs.GetTraceRunOpt,
+	h driverhelp.DialectHelpers,
+) ([]sq.Expression, bool, error) {
+	var celFilters []sq.Expression
+	var useJoin bool
+
+	if opt.Filter.CEL == "" {
+		return celFilters, useJoin, nil
+	}
+
+	expHandler, err := run.NewExpressionHandler(ctx,
+		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+		run.WithExpressionSQLConverter(h.CELConverter()),
+	)
+	if err != nil {
+		return nil, false, err
+	}
+	if !expHandler.HasFilters() {
+		return celFilters, useJoin, nil
+	}
+
+	celFilters, err = expHandler.ToSQLFilters(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	useJoin = needsEventJoin(opt.Filter.CEL)
+
+	return celFilters, useJoin, nil
+}
+
+func spanRunRootPredicates(opt cqrs.GetTraceRunOpt) []sq.Expression {
+	// The root subquery is bounded by Until (an executor.run always precedes
+	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
+	// also apply the From floor so the inner scan stops growing O(total
+	// executor.run history) as the system ages — at the cost of excluding runs
+	// whose root started before From but had EXTEND activity inside the
+	// window. For end_time-based windows we skip the floor: a run that ended
+	// in-window can legitimately have started arbitrarily earlier.
+	preds := []sq.Expression{
+		sq.C("name").Eq(meta.SpanNameRun),
+		sq.C("debug_run_id").IsNull(),
+		sq.Or(
+			sq.C("status").IsNull(),
+			sq.C("status").Neq(enums.RunStatusSkipped.String()),
+		),
+		sq.C("start_time").Lt(opt.Filter.Until.UTC()),
+	}
+	if opt.Filter.AccountID != uuid.Nil {
+		preds = append(preds, sq.C("account_id").Eq(opt.Filter.AccountID))
+	}
+	if opt.Filter.WorkspaceID != uuid.Nil {
+		preds = append(preds, sq.C("env_id").Eq(opt.Filter.WorkspaceID))
+	}
+	if len(opt.Filter.AppID) > 0 {
+		preds = append(preds, sq.C("app_id").In(opt.Filter.AppID))
+	}
+	if len(opt.Filter.FunctionID) > 0 {
+		preds = append(preds, sq.C("function_id").In(opt.Filter.FunctionID))
+	}
+	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
+		preds = append(preds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
+	}
+
+	return preds
+}
+
+func spanRunGroupByCols() []interface{} {
+	return []interface{}{
+		"spans.run_id",
+		"spans.dynamic_span_id",
+		"spans.account_id",
+		"spans.env_id",
+		"spans.app_id",
+		"spans.function_id",
+		"spans.trace_id",
+	}
 }
 
 // convertSpanRunRows converts database rows to TraceRun structs
