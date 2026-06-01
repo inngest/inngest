@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,14 +52,48 @@ type ExtendedTraceCapDecision struct {
 	CapBytes  int64
 }
 
-// ExtendedTraceCapChecker is consulted near the top of the
-// /v1/traces/userland handler to decide whether a request should write spans
-// or only be parsed for rejected-usage accounting.
-type ExtendedTraceCapChecker func(ctx context.Context, accountID uuid.UUID) ExtendedTraceCapDecision
+// ExtendedTraceCapChecker is consulted after a valid /v1/traces/userland
+// payload is read and parsed, but before spans are written. requestBytes is the
+// summed wire size of the request's spans (the ingress quantity the cap meters,
+// matching what ExtendedTraceAcceptedRecorder bills) that should be reserved
+// against the account cap.
+type ExtendedTraceCapChecker func(ctx context.Context, accountID uuid.UUID, requestBytes int64) ExtendedTraceCapDecision
 
 // ExtendedTraceRejectedRecorder records metrics for an over-cap payload after
 // the handler has successfully parsed it but before returning 429.
 type ExtendedTraceRejectedRecorder func(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest, rawBody []byte, decision ExtendedTraceCapDecision) error
+
+// ExtendedTraceAcceptedRecorder records ingested userland-trace usage after a
+// payload is accepted (under cap) and sent. Cloud uses this as the single
+// source of truth for the accepted byte/span metrics, computed from the same
+// per-span ingress sizes the cap reserves. Nil hook is a no-op (self-host).
+type ExtendedTraceAcceptedRecorder func(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) error
+
+// userlandSpanBytes sums the OTLP wire size of every span in the request. This
+// is the ingress quantity the extended-trace cap reserves and that the
+// accepted-usage recorder bills, so reservation and billing reconcile.
+func userlandSpanBytes(req *collecttrace.ExportTraceServiceRequest) int64 {
+	if req == nil {
+		return 0
+	}
+	var total int64
+	for _, rs := range req.ResourceSpans {
+		for _, ss := range rs.ScopeSpans {
+			for _, span := range ss.Spans {
+				total += int64(proto.Size(span))
+			}
+		}
+	}
+	return total
+}
+
+// maxUserlandTraceBodySize bounds the /v1/traces/userland request body. The
+// cap gate runs only after the body is read and parsed (it needs the parsed
+// spans to meter ingress bytes), so without this an over-cap or abusive account
+// would force unbounded read+parse on every request before the 429 — the
+// amplification the old pre-read cap gate prevented. Generous enough for a full
+// OTLP userland span batch; well below anything that would pressure the API.
+const maxUserlandTraceBodySize = 8 * 1024 * 1024 // 8MB
 
 func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Auth the app
@@ -79,14 +114,17 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var capDecision ExtendedTraceCapDecision
-	if a.opts.ExtendedTraceCapCheck != nil {
-		capDecision = a.opts.ExtendedTraceCapCheck(ctx, auth.AccountID())
-	}
-
-	// Check that the trace ID is valid and accessible to the app.
+	// Bound the body before reading: the cap gate runs after parsing, so this
+	// is what stops an over-cap/abusive account from forcing unbounded
+	// read+parse on every request before the 429.
+	r.Body = http.MaxBytesReader(w, r.Body, maxUserlandTraceBodySize)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			respondError(w, r, http.StatusRequestEntityTooLarge, "Request body too large")
+			return
+		}
 		respondError(w, r, http.StatusBadRequest, "Error reading body")
 		return
 	}
@@ -101,6 +139,11 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, "Invalid payload")
 		return
+	}
+
+	var capDecision ExtendedTraceCapDecision
+	if a.opts.ExtendedTraceCapCheck != nil {
+		capDecision = a.opts.ExtendedTraceCapCheck(ctx, auth.AccountID(), userlandSpanBytes(req))
 	}
 
 	if capDecision.OverCap {
@@ -118,6 +161,12 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rejectedSpans := a.convertOTLPAndSend(r.Context(), auth, req)
+
+	if a.opts.ExtendedTraceAcceptedRecorder != nil {
+		if err := a.opts.ExtendedTraceAcceptedRecorder(ctx, auth, req); err != nil {
+			logger.StdlibLogger(ctx).Warn("failed to record accepted extended-trace payload", "err", err, "account_id", auth.AccountID())
+		}
+	}
 
 	resp := &collecttrace.ExportTraceServiceResponse{}
 	if rejectedSpans > 0 {
