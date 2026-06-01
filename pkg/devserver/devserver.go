@@ -195,7 +195,20 @@ func start(ctx context.Context, opts StartOpts) error {
 		Helpers() driverhelp.DialectHelpers
 	}
 	if opts.PostgresURI != "" {
-		db, err := dbpostgres.Open(ctx, dbpostgres.Options{URI: opts.PostgresURI})
+		pgOpts := dbpostgres.Options{URI: opts.PostgresURI}
+		if opts.PostgresMaxOpenConns > 0 {
+			pgOpts.MaxOpenConns = opts.PostgresMaxOpenConns
+		}
+		if opts.PostgresMaxIdleConns > 0 {
+			pgOpts.MaxIdleConns = opts.PostgresMaxIdleConns
+		}
+		if opts.PostgresConnMaxLifetime > 0 {
+			pgOpts.ConnMaxLifetime = time.Duration(opts.PostgresConnMaxLifetime) * time.Second
+		}
+		if opts.PostgresConnMaxIdleTime > 0 {
+			pgOpts.ConnMaxIdleTime = time.Duration(opts.PostgresConnMaxIdleTime) * time.Second
+		}
+		db, err := dbpostgres.Open(ctx, pgOpts)
 		if err != nil {
 			return err
 		}

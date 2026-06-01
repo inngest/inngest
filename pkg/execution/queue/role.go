@@ -157,6 +157,13 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 		if err != nil {
 			q.setRoleLease(ctx, name, nil, shard)
 			if initial {
+				// On transient DB errors during startup, retry instead of
+				// immediately killing the queue.
+				if IsTransientDBError(err) {
+					logger.StdlibLogger(ctx).Warn("transient database error claiming role lease, will retry",
+						"role", name, "error", err)
+					return true
+				}
 				q.quit <- err
 				return false
 			}

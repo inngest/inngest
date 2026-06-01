@@ -3,6 +3,10 @@ package queue
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"strings"
+	"syscall"
 )
 
 var ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
@@ -108,4 +112,54 @@ func ShardLeaseRenewalRetryableError(err error) bool {
 		return false
 	}
 	return true
+}
+
+// IsTransientDBError returns true if the error is a transient database connection
+// error that may resolve on retry (e.g. connection reset, refused, EOF).
+// This is used to allow the queue scanner and role lease claims to recover from
+// brief database unavailability instead of permanently shutting down.
+func IsTransientDBError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Network-level errors
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EPIPE) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+
+	// String-based detection for wrapped errors that lose type info
+	msg := err.Error()
+	transientPatterns := []string{
+		"connection refused",
+		"connection reset",
+		"broken pipe",
+		"no such host",
+		"i/o timeout",
+		"connection timed out",
+		"server closed the connection unexpectedly",
+		"unexpected EOF",
+		"driver: bad connection",
+		"sql: database is closed",
+	}
+	for _, pattern := range transientPatterns {
+		if strings.Contains(strings.ToLower(msg), pattern) {
+			return true
+		}
+	}
+
+	return false
 }
