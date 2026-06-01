@@ -268,7 +268,6 @@ func WithRunMode(m QueueRunMode) QueueOpt {
 
 func WithQueueRoles(roles ...QueueRole) QueueOpt {
 	return func(q *QueueOptions) {
-		q.rolesConfigured = true
 		q.roles = append([]QueueRole(nil), roles...)
 	}
 }
@@ -417,8 +416,7 @@ type QueueOptions struct {
 	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode
 
-	roles           []QueueRole
-	rolesConfigured bool
+	roles []QueueRole
 
 	continuationLimit uint
 
@@ -784,15 +782,16 @@ func NewQueueOptions(
 		qopt(o)
 	}
 
-	if !o.rolesConfigured {
+	if len(o.roles) == 0 {
 		o.roles = defaultQueueRoles(o)
 	}
+	o.roles = filterQueueRoles(o, o.roles)
 	return o
 }
 
 func defaultQueueRoles(o *QueueOptions) []QueueRole {
 	roles := []QueueRole{}
-	if o.runMode.Sequential {
+	if includeSequentialRole(o) {
 		roles = append(roles, NewSequentialRole())
 	}
 	if o.runMode.Scavenger {
@@ -803,4 +802,19 @@ func defaultQueueRoles(o *QueueOptions) []QueueRole {
 		roles = append(roles, NewLatencyTrackerRole(*o.latencyPartition, WithRoleRunInterval(o.latencyPartition.Interval)))
 	}
 	return roles
+}
+
+func filterQueueRoles(o *QueueOptions, roles []QueueRole) []QueueRole {
+	filtered := make([]QueueRole, 0, len(roles))
+	for _, role := range roles {
+		if role == nil {
+			filtered = append(filtered, role)
+			continue
+		}
+		if role.Name() == QueueRoleSequential && !includeSequentialRole(o) {
+			continue
+		}
+		filtered = append(filtered, role)
+	}
+	return filtered
 }

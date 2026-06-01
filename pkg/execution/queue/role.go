@@ -118,9 +118,6 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 	if role == nil {
 		return
 	}
-	if role.Name() == QueueRoleSequential && len(q.AllowQueues) > 0 {
-		return
-	}
 
 	name := role.Name()
 	if name == "" {
@@ -135,6 +132,10 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 	}
 
 	shard := q.Shard()
+
+	// claim attempts to acquire or renew the role lease.  The current lease ID
+	// is passed back to the shard so the same worker can renew leases it already
+	// owns, while another active owner's lease is treated as expected contention.
 	claim := func(initial bool) bool {
 		leaseID, err := shard.RoleLease(ctx, name, leaseDuration, q.roleLease(name))
 		if err == ErrRoleAlreadyLeased {
@@ -154,16 +155,24 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 		return true
 	}
 
+	// The first claim decides whether this role goroutine can start.  A startup
+	// lease error means queue startup should fail instead of leaving a broken
+	// background loop running.
 	if !claim(true) {
 		return
 	}
 
+	// leaseTick renews the ownership lease before it expires.  This is separate
+	// from role execution so a role can keep ownership even if RunInterval is
+	// longer than the lease duration.
 	leaseTick := q.Clock().NewTicker(leaseDuration / 3)
 	defer leaseTick.Stop()
 
 	var runTick clockwork.Ticker
 	var runC <-chan time.Time
 	if role.RunInterval() > 0 {
+		// runTick controls how often the role's actual work runs.  If the
+		// interval is zero, runC stays nil and this select case is disabled.
 		runTick = q.Clock().NewTicker(role.RunInterval())
 		defer runTick.Stop()
 		runC = runTick.Chan()
@@ -177,6 +186,8 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 		case <-leaseTick.Chan():
 			claim(false)
 		case <-runC:
+			// The worker may have lost the lease on a renewal tick; only run
+			// role work while this process still owns an active lease.
 			if q.isRoleActive(name) {
 				if err := role.Run(ctx, shard); err != nil {
 					logger.StdlibLogger(ctx).Error("error running queue role", "role", name, "error", err)
@@ -203,6 +214,10 @@ func (q *queueProcessor) setRoleLease(ctx context.Context, roleName string, leas
 	defer q.roleLeaseLock.Unlock()
 
 	previous := q.roleLeaseIDs[roleName]
+
+	// Treat active state as a transition, not merely nil/non-nil.  A stored ULID
+	// can be expired, and renewing an already-active lease should not emit
+	// claim metrics again.
 	previousActive := previous != nil && ulid.Time(previous.Time()).After(q.Clock().Now())
 	nextActive := leaseID != nil && ulid.Time(leaseID.Time()).After(q.Clock().Now())
 
@@ -215,10 +230,15 @@ func (q *queueProcessor) setRoleLease(ctx context.Context, roleName string, leas
 			metrics.IncrInstrumentationLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		}
 	}
+
+	// Instrumentation has explicit claim/loss logs because it is expected to be
+	// a singleton per shard and is useful when debugging missing queue metrics.
 	if previousActive && !nextActive && roleName == QueueRoleInstrumentation {
 		logger.StdlibLogger(ctx).Debug("lost instrumentation lease")
 	}
 
+	// Store the latest lease value, including nil when contention or errors mean
+	// this worker does not currently own the role.
 	q.roleLeaseIDs[roleName] = leaseID
 }
 
@@ -228,10 +248,6 @@ func (q *queueProcessor) isRoleActive(roleName string) bool {
 		return false
 	}
 	return ulid.Time(l.Time()).After(q.Clock().Now())
-}
-
-func (q *queueProcessor) isSequential() bool {
-	return q.isRoleActive(QueueRoleSequential)
 }
 
 func (q *queueProcessor) scanningExcludedByRole() string {

@@ -34,6 +34,30 @@ func TestWithQueueRoles(t *testing.T) {
 		require.Contains(t, names, QueueRoleInstrumentation)
 		require.Contains(t, names, QueueRoleLatencyTracker)
 	})
+
+	t.Run("omits default sequential role for allowlisted workers", func(t *testing.T) {
+		opts := NewQueueOptions(WithAllowQueueNames("critical"))
+
+		names := map[string]struct{}{}
+		for _, role := range opts.roles {
+			names[role.Name()] = struct{}{}
+		}
+
+		require.NotContains(t, names, QueueRoleSequential)
+		require.Contains(t, names, QueueRoleScavenger)
+		require.Contains(t, names, QueueRoleInstrumentation)
+	})
+
+	t.Run("filters explicit sequential role for allowlisted workers", func(t *testing.T) {
+		custom := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
+		opts := NewQueueOptions(
+			WithQueueRoles(NewSequentialRole(), custom),
+			WithAllowQueueNames("critical"),
+		)
+
+		require.Len(t, opts.roles, 1)
+		require.Equal(t, "custom", opts.roles[0].Name())
+	})
 }
 
 func TestActiveRoles(t *testing.T) {
