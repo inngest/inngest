@@ -1242,8 +1242,7 @@ SELECT function_runs.run_id, function_runs.run_started_at, function_runs.functio
     COALESCE(functions.name, '') AS function_name,
     COALESCE(functions.config, '{}') AS function_config,
     COALESCE(functions.app_id, '00000000-0000-0000-0000-000000000000') AS function_app_id,
-    COALESCE(apps.name, '') AS app_name,
-    ''::bytea AS run_output
+    COALESCE(apps.name, '') AS app_name
 FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL
@@ -1272,7 +1271,6 @@ type GetRunsRow struct {
 	FunctionConfig           string
 	FunctionAppID            uuid.UUID
 	AppName                  string
-	RunOutput                []byte
 }
 
 func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error) {
@@ -1308,7 +1306,6 @@ func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow
 			&i.FunctionConfig,
 			&i.FunctionAppID,
 			&i.AppName,
-			&i.RunOutput,
 		); err != nil {
 			return nil, err
 		}
