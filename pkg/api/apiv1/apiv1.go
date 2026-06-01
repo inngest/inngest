@@ -67,8 +67,8 @@ type Opts struct {
 	ExtendedTraceRejectedRecorder ExtendedTraceRejectedRecorder
 	// ExtendedTraceAcceptedRecorder is called after an under-cap payload is
 	// accepted and sent. Cloud uses this as the single source of truth for the
-	// ingested byte/span metrics, computed from the same per-span ingress sizes
-	// the cap reserves. Nil hook is a no-op (self-host).
+	// ingested byte/span metrics, computed only from spans that were
+	// successfully committed. Nil hook is a no-op (self-host).
 	ExtendedTraceAcceptedRecorder ExtendedTraceAcceptedRecorder
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
