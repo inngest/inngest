@@ -62,28 +62,38 @@ func TestQueueRunSequential(t *testing.T) {
 
 	<-time.After(110 * time.Millisecond)
 	// Q1 gets lease, as it started first.
-	require.NotNil(t, q1.SequentialLease())
+	require.NotNil(t, activeRoleLease(q1, osqueue.QueueRoleSequential))
 	// Lease is in the future.
-	require.True(t, ulid.Time(q1.SequentialLease().Time()).After(time.Now()))
+	require.True(t, ulid.Time(activeRoleLease(q1, osqueue.QueueRoleSequential).Time()).After(time.Now()))
 	// Q2 has no lease.
-	require.Nil(t, q2.SequentialLease())
+	require.Nil(t, activeRoleLease(q2, osqueue.QueueRoleSequential))
 
-	<-time.After(osqueue.ConfigLeaseDuration)
+	<-time.After(osqueue.RoleLeaseDuration)
 
 	// Q1 retains lease.
-	require.NotNil(t, q1.SequentialLease())
-	require.Nil(t, q2.SequentialLease())
+	require.NotNil(t, activeRoleLease(q1, osqueue.QueueRoleSequential))
+	require.Nil(t, activeRoleLease(q2, osqueue.QueueRoleSequential))
 
 	// Cancel q1, temrinating the queue with the sequential lease.
 	q1cancel()
 
-	<-time.After(osqueue.ConfigLeaseDuration * 2)
+	<-time.After(osqueue.RoleLeaseDuration * 2)
 
 	// Q2 obtains lease.
-	require.NotNil(t, q2.SequentialLease())
+	require.NotNil(t, activeRoleLease(q2, osqueue.QueueRoleSequential))
 	// And that the previous lease has expired.
-	lease := q1.SequentialLease()
+	lease := activeRoleLease(q1, osqueue.QueueRoleSequential)
 	require.True(t, lease == nil || ulid.Time(lease.Time()).Before(time.Now()))
+}
+
+func activeRoleLease(q queueImpl, roleName string) *ulid.ULID {
+	for _, role := range q.ActiveRoles() {
+		if role.Name == roleName {
+			leaseID := role.LeaseID
+			return &leaseID
+		}
+	}
+	return nil
 }
 
 func max(i int) *int {

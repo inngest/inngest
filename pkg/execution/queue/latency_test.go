@@ -200,34 +200,13 @@ func TestRunLatencyTracker(t *testing.T) {
 
 func TestEnqueueLatencyJob(t *testing.T) {
 	t.Run("enqueues item with correct fields", func(t *testing.T) {
-		fakeClock := clockwork.NewFakeClock()
-
 		var enqueuedItem Item
 		var enqueuedAt time.Time
 		var enqueuedOpts EnqueueOpts
 		var enqueueCalled atomic.Int32
+		at := time.UnixMilli(123456789)
+		interval := time.Second
 
-		shard := &mockShardForIterator{name: "test"}
-		shardRegistry, err := NewSingleShardRegistry(shard)
-		require.NoError(t, err)
-		qp := &queueProcessor{
-			QueueOptions: NewQueueOptions(
-				WithLatencyPartition(LatencyPartitionOptions{
-					Partitions: 1,
-					Interval:   time.Second,
-					Callback:   func(ctx context.Context, info RunInfo) {},
-				}),
-				WithClock(fakeClock),
-			),
-			shards: shardRegistry,
-		}
-
-		// Monkey-patch by wrapping: we can't easily mock Enqueue on queueProcessor
-		// since it calls shard.EnqueueItem, which our mock already stubs.
-		// Instead, verify the mock shard receives the call.
-
-		// The mockShardForIterator.EnqueueItem is a stub that returns (i, nil).
-		// We need a custom shard to capture calls.
 		captureShard := &capturingShardForLatency{
 			mockShardForIterator: mockShardForIterator{name: "test"},
 			onEnqueue: func(item QueueItem, at time.Time, opts EnqueueOpts) {
@@ -238,10 +217,7 @@ func TestEnqueueLatencyJob(t *testing.T) {
 			},
 		}
 
-		qp.shards, err = NewSingleShardRegistry(captureShard)
-		require.NoError(t, err)
-
-		err = qp.enqueueLatencyJob(context.Background(), 1)
+		err := enqueueLatencyJob(context.Background(), captureShard, 3, interval, at)
 		require.NoError(t, err)
 		require.Equal(t, int32(1), enqueueCalled.Load())
 
@@ -249,11 +225,10 @@ func TestEnqueueLatencyJob(t *testing.T) {
 		require.NotNil(t, enqueuedItem.QueueName)
 		require.Equal(t, "ltc", *enqueuedItem.QueueName)
 		require.NotNil(t, enqueuedItem.JobID)
-		require.Contains(t, *enqueuedItem.JobID, "ltrack-1-")
-		// Enqueue truncates times to millisecond precision internally.
-		require.Equal(t, fakeClock.Now().UnixMilli(), enqueuedAt.UnixMilli())
+		require.Equal(t, "ltrack-3-123456789", *enqueuedItem.JobID)
+		require.Equal(t, at, enqueuedAt)
 		require.NotNil(t, enqueuedOpts.IdempotencyPeriod)
-		require.Equal(t, time.Second, *enqueuedOpts.IdempotencyPeriod)
+		require.Equal(t, interval, *enqueuedOpts.IdempotencyPeriod)
 		require.Equal(t, "test", enqueuedOpts.ForceQueueShardName)
 	})
 }
