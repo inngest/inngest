@@ -53,12 +53,18 @@ type Opts struct {
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
 	MetricsMiddleware api.MetricsMiddleware
 
-	// ExtendedTraceCapCheck is consulted at the top of the /v1/traces/userland
-	// handler. Implementations should return a non-nil error to reject the
-	// request (typically because the account is over its extended-trace
-	// bytes-per-period cap); nil to accept. Nil hook means "always accept" —
-	// the right default for self-host, which has no billing relationship.
+	// ExtendedTraceCapCheck is consulted near the top of the
+	// /v1/traces/userland handler. Implementations return a decision, not an
+	// immediate rejection: over-cap payloads are still parsed so callers can
+	// account for rejected bytes/spans before the handler returns 429. Nil hook
+	// means "always accept" — the right default for self-host, which has no
+	// billing relationship.
 	ExtendedTraceCapCheck ExtendedTraceCapChecker
+	// ExtendedTraceRejectedRecorder is called after an over-cap payload is
+	// successfully parsed, before the handler returns 429. Cloud uses this to
+	// record customer_execution_metrics and Redis overage counters without
+	// writing rejected spans to ClickHouse/Kafka. Nil hook is a no-op.
+	ExtendedTraceRejectedRecorder ExtendedTraceRejectedRecorder
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator

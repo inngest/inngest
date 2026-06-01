@@ -42,11 +42,23 @@ type TraceParent struct {
 
 type TraceRoot struct{}
 
-// ExtendedTraceCapChecker is consulted at the top of the /v1/traces/userland
-// handler to enforce a per-account ingest cap. Implementations should return
-// a non-nil error (typically ErrExtendedTraceCapExceeded) to reject the
-// request and nil to accept it. Wire this through apiv1.Opts.
-type ExtendedTraceCapChecker func(ctx context.Context, accountID uuid.UUID) error
+// ExtendedTraceCapDecision describes whether a payload should be accepted or
+// parsed only for accounting before returning a 429.
+type ExtendedTraceCapDecision struct {
+	OverCap   bool
+	Response  string
+	UsedBytes int64
+	CapBytes  int64
+}
+
+// ExtendedTraceCapChecker is consulted near the top of the
+// /v1/traces/userland handler to decide whether a request should write spans
+// or only be parsed for rejected-usage accounting.
+type ExtendedTraceCapChecker func(ctx context.Context, accountID uuid.UUID) ExtendedTraceCapDecision
+
+// ExtendedTraceRejectedRecorder records metrics for an over-cap payload after
+// the handler has successfully parsed it but before returning 429.
+type ExtendedTraceRejectedRecorder func(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest, rawBody []byte, decision ExtendedTraceCapDecision) error
 
 func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Auth the app
@@ -67,14 +79,9 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hard-cap gate: reject before we read the body so over-cap accounts pay
-	// neither bandwidth nor CPU. Nil checker = self-host default = always
-	// accept.
+	var capDecision ExtendedTraceCapDecision
 	if a.opts.ExtendedTraceCapCheck != nil {
-		if err := a.opts.ExtendedTraceCapCheck(ctx, auth.AccountID()); err != nil {
-			respondError(w, r, http.StatusTooManyRequests, err.Error())
-			return
-		}
+		capDecision = a.opts.ExtendedTraceCapCheck(ctx, auth.AccountID())
 	}
 
 	// Check that the trace ID is valid and accessible to the app.
@@ -93,6 +100,20 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if capDecision.OverCap {
+		if a.opts.ExtendedTraceRejectedRecorder != nil {
+			if err := a.opts.ExtendedTraceRejectedRecorder(ctx, auth, req, body, capDecision); err != nil {
+				logger.StdlibLogger(ctx).Warn("failed to record rejected extended-trace payload", "err", err, "account_id", auth.AccountID())
+			}
+		}
+		msg := capDecision.Response
+		if msg == "" {
+			msg = "extended trace bytes cap exceeded for current billing period"
+		}
+		respondError(w, r, http.StatusTooManyRequests, msg)
 		return
 	}
 
