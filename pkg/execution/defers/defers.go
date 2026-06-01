@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -14,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 const pkgName = "defers"
@@ -69,7 +69,7 @@ func SaveFromOp(
 				ScheduleStatus: enums.DeferStatusRejected,
 			}); err != nil {
 				log.Warn("failed to persist rejected defer; SDK retransmits will not dedupe",
-					"step_id", sanitizeLogValue(op.ID),
+					"step_id", util.SanitizeLogField(op.ID),
 					"run_id", md.ID.RunID,
 					"error", err,
 				)
@@ -101,7 +101,7 @@ func SaveFromOp(
 
 	if rejectReason != "" {
 		log.Warn("defer soft-rejected; run will continue without this deferred run",
-			"step_id", sanitizeLogValue(op.ID),
+			"step_id", util.SanitizeLogField(op.ID),
 			"reason", rejectReason,
 			"run_id", md.ID.RunID,
 		)
@@ -223,15 +223,9 @@ func updateDeferSpanStatus(
 		log.Error(
 			"error updating executor.defer span status",
 			"error", err,
-			"hashed_id", hashedID,
+			"hashed_id", util.SanitizeLogField(hashedID),
 			"run_id", md.ID.RunID,
 			"status", status.String(),
 		)
 	}
-}
-
-func sanitizeLogValue(v string) string {
-	v = strings.ReplaceAll(v, "\n", "")
-	v = strings.ReplaceAll(v, "\r", "")
-	return v
 }
