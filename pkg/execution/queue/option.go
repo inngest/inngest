@@ -268,7 +268,7 @@ func WithRunMode(m QueueRunMode) QueueOpt {
 
 func WithQueueRoles(roles ...QueueRole) QueueOpt {
 	return func(q *QueueOptions) {
-		q.roles = append([]QueueRole(nil), roles...)
+		q.roles = roles
 	}
 }
 
