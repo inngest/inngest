@@ -8,7 +8,6 @@ import { toMaybeDate } from '@inngest/components/utils/date';
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
   RunsOrderByField as FunctionRunTimeFieldEnum,
-  type FunctionRunV2,
 } from '@/gql/graphql';
 
 /**
@@ -73,28 +72,8 @@ export function toTimeField(
   }
 }
 
-type PickedFunctionRunV2 = Pick<
-  FunctionRunV2,
-  | 'id'
-  | 'queuedAt'
-  | 'startedAt'
-  | 'status'
-  | 'endedAt'
-  | 'eventName'
-  | 'isBatch'
-  | 'cronSchedule'
->;
 type PickedFunctionRunV2EdgeWithNode = {
-  node: PickedFunctionRunV2 & {
-    app: {
-      externalID: string;
-      name: string;
-    };
-    function: {
-      name: string;
-      slug: string;
-    };
-  };
+  node: Omit<Run, 'durationMS'>;
 };
 
 /**
@@ -116,9 +95,6 @@ export function parseRunsData(
       return {
         ...edge.node,
         durationMS,
-        // Cloud GetRuns query doesn't select isDeferred yet; default to false
-        // until the defer linkage UI is enabled for cloud.
-        isDeferred: false,
       };
     }) ?? []
   );
