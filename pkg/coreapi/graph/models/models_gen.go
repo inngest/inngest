@@ -288,25 +288,29 @@ type FunctionRunQuery struct {
 }
 
 type FunctionRunV2 struct {
-	ID             ulid.ULID         `json:"id"`
-	AppID          uuid.UUID         `json:"appID"`
-	App            *cqrs.App         `json:"app"`
-	FunctionID     uuid.UUID         `json:"functionID"`
-	Function       *Function         `json:"function"`
-	TraceID        string            `json:"traceID"`
-	QueuedAt       time.Time         `json:"queuedAt"`
-	StartedAt      *time.Time        `json:"startedAt,omitempty"`
-	EndedAt        *time.Time        `json:"endedAt,omitempty"`
-	Status         FunctionRunStatus `json:"status"`
-	SourceID       *string           `json:"sourceID,omitempty"`
-	TriggerIDs     []ulid.ULID       `json:"triggerIDs"`
-	EventName      *string           `json:"eventName,omitempty"`
-	IsBatch        bool              `json:"isBatch"`
-	BatchCreatedAt *time.Time        `json:"batchCreatedAt,omitempty"`
-	CronSchedule   *string           `json:"cronSchedule,omitempty"`
-	Output         *string           `json:"output,omitempty"`
-	Trace          *RunTraceSpan     `json:"trace,omitempty"`
-	HasAi          bool              `json:"hasAI"`
+	ID             ulid.ULID          `json:"id"`
+	AppID          uuid.UUID          `json:"appID"`
+	App            *cqrs.App          `json:"app"`
+	FunctionID     uuid.UUID          `json:"functionID"`
+	Function       *Function          `json:"function"`
+	TraceID        string             `json:"traceID"`
+	QueuedAt       time.Time          `json:"queuedAt"`
+	StartedAt      *time.Time         `json:"startedAt,omitempty"`
+	EndedAt        *time.Time         `json:"endedAt,omitempty"`
+	Status         FunctionRunStatus  `json:"status"`
+	SourceID       *string            `json:"sourceID,omitempty"`
+	TriggerIDs     []ulid.ULID        `json:"triggerIDs"`
+	EventName      *string            `json:"eventName,omitempty"`
+	IsBatch        bool               `json:"isBatch"`
+	BatchCreatedAt *time.Time         `json:"batchCreatedAt,omitempty"`
+	CronSchedule   *string            `json:"cronSchedule,omitempty"`
+	Output         *string            `json:"output,omitempty"`
+	Trace          *RunTraceSpan      `json:"trace,omitempty"`
+	HasAi          bool               `json:"hasAI"`
+	Defers         []*RunDefer        `json:"defers"`
+	SiblingDefers  []*RunDefer        `json:"siblingDefers"`
+	DeferredFrom   []*RunDeferredFrom `json:"deferredFrom"`
+	IsDeferred     bool               `json:"isDeferred"`
 }
 
 type FunctionRunV2Edge struct {
@@ -403,6 +407,7 @@ type RunsFilterV2 struct {
 	Status      []FunctionRunStatus `json:"status,omitempty"`
 	FunctionIDs []uuid.UUID         `json:"functionIDs,omitempty"`
 	AppIDs      []uuid.UUID         `json:"appIDs,omitempty"`
+	IsDeferred  *bool               `json:"isDeferred,omitempty"`
 	Query       *string             `json:"query,omitempty"`
 }
 
@@ -958,6 +963,49 @@ func (e *FunctionTriggerTypes) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunDeferStatus string
+
+const (
+	RunDeferStatusScheduled RunDeferStatus = "SCHEDULED"
+	RunDeferStatusAborted   RunDeferStatus = "ABORTED"
+	RunDeferStatusRejected  RunDeferStatus = "REJECTED"
+)
+
+var AllRunDeferStatus = []RunDeferStatus{
+	RunDeferStatusScheduled,
+	RunDeferStatusAborted,
+	RunDeferStatusRejected,
+}
+
+func (e RunDeferStatus) IsValid() bool {
+	switch e {
+	case RunDeferStatusScheduled, RunDeferStatusAborted, RunDeferStatusRejected:
+		return true
+	}
+	return false
+}
+
+func (e RunDeferStatus) String() string {
+	return string(e)
+}
+
+func (e *RunDeferStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunDeferStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunDeferStatus", str)
+	}
+	return nil
+}
+
+func (e RunDeferStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

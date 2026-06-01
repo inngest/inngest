@@ -64,6 +64,10 @@ A defer must never fail its parent run. Each rejection logs a warning, increment
 
 ## Todo
 
+### E2E test for `run_type = Defer` assignment
+
+Write a real Dev Server + Go SDK test that schedules a deferred run and asserts the child's `run_type` is `Defer`. Blocked on deferred-function support in the Go SDK.
+
 ### Suppress SDK retransmits after `MaxDefersPerRun` is hit
 
 **Problem.** Once a run reaches the count cap, `saveDefer.lua` can't write a Rejected sentinel for any new hashedID because the meta hash is full. The SDK keeps re-emitting `OpcodeDeferAdd` for that hashedID until the run finalizes. Wasted SDK to server traffic; not a failure.

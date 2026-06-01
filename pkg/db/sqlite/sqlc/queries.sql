@@ -398,7 +398,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  is_deferred
 ) VALUES (
   sqlc.arg(span_id),
   sqlc.arg(trace_id),
@@ -419,7 +420,8 @@ INSERT INTO spans (
   sqlc.narg(debug_run_id),
   sqlc.narg(debug_session_id),
   sqlc.narg(status),
-  CAST(sqlc.narg(event_ids) AS TEXT)
+  CAST(sqlc.narg(event_ids) AS TEXT),
+  sqlc.narg(is_deferred)
 );
 
 -- name: GetSpansByRunID :many
@@ -651,3 +653,31 @@ WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
+
+
+-- name: GetSpansByRunIDsAndName :many
+-- Returns spans by name with their current attribute values, merging in any
+-- updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+-- up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+-- carry the span name and would otherwise be filtered out.
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_group_array(json_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = ?
+  AND m.run_id IN (sqlc.slice('run_ids'))
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time;

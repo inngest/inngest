@@ -56,6 +56,7 @@ type deferTestInfra struct {
 	pauseMgr      pauses.Manager
 	loader        state.FunctionLoader
 	dbcqrs        cqrs.Manager
+	adapter       *dbsqlite.Adapter
 	queueShard    redis_state.RedisQueueShard
 	shardRegistry queue.ShardRegistryController
 	rq            queue.Queue
@@ -140,6 +141,7 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 		pauseMgr:      pauseMgr,
 		loader:        loader,
 		dbcqrs:        dbcqrs,
+		adapter:       adapter,
 		queueShard:    queueShard,
 		shardRegistry: shardRegistry,
 		rq:            rq,
@@ -166,7 +168,7 @@ func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, drive
 		executor.WithLogger(logger.StdlibLogger(i.ctx)),
 		executor.WithFunctionLoader(i.loader),
 		executor.WithShardRegistry(i.shardRegistry),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(i.adapter.Q())),
 	}
 	if driver != nil {
 		opts = append(opts, executor.WithDriverV1(driver))
@@ -186,7 +188,7 @@ func (i *deferTestInfra) newCheckpointer(t *testing.T, exec execution.Executor) 
 		State:          i.smv2,
 		FnReader:       i.dbcqrs,
 		Executor:       exec,
-		TracerProvider: tracing.NewOtelTracerProvider(nil, time.Millisecond),
+		TracerProvider: tracing.NewSqlcTracerProvider(i.adapter.Q()),
 		Queue:          i.rq,
 	})
 }
@@ -345,7 +347,7 @@ func TestDeferFinalize(t *testing.T) {
 			executor.WithLogger(logger.StdlibLogger(ctx)),
 			executor.WithFunctionLoader(infra.loader),
 			executor.WithShardRegistry(infra.shardRegistry),
-			executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+			executor.WithTracerProvider(tracing.NewSqlcTracerProvider(infra.adapter.Q())),
 		)
 		r.NoError(err)
 
@@ -400,7 +402,11 @@ func TestDeferFinalize(t *testing.T) {
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          json.RawMessage(`{"x":1}`),
 		}))
-		r.NoError(infra.smv2.SaveRejectedDefer(ctx, run.ID, "onDefer-score", "hash-rejected"))
+		r.NoError(infra.smv2.SaveDefer(ctx, run.ID, statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-rejected",
+			ScheduleStatus: enums.DeferStatusRejected,
+		}))
 
 		r.NoError(exec.Finalize(ctx, execution.FinalizeOpts{
 			Metadata: *run,
@@ -813,7 +819,7 @@ func TestDeferAdd(t *testing.T) {
 						ID: acceptedID,
 						Opts: map[string]any{
 							"fn_slug": "onDefer-score",
-							"input":   string(bigInput),
+							"input":   map[string]any{"msg": string(bigInput)},
 						},
 					},
 					{
@@ -821,7 +827,7 @@ func TestDeferAdd(t *testing.T) {
 						ID: rejectedID,
 						Opts: map[string]any{
 							"fn_slug": "onDefer-score",
-							"input":   string(overflowInput),
+							"input":   map[string]any{"msg": string(overflowInput)},
 						},
 					},
 				},
@@ -1034,5 +1040,315 @@ func TestDeferAbort(t *testing.T) {
 		defers, err := infra.smv2.LoadDefers(infra.ctx, run.ID)
 		r.NoError(err)
 		r.Equal(enums.DeferStatusAborted, defers[deferStepID].ScheduleStatus)
+	})
+}
+
+// runParentDefer schedules a parent run, drives Execute with the given
+// DeferAdd hashedIDs piggybacked on RunComplete, and returns the parent run
+// ID and the deferred.schedule events emitted by Finalize. Each hashedID gets
+// its own DeferAdd op targeting the same child fn_slug.
+func (i *deferTestInfra) runParentDefer(t *testing.T, hashedIDs ...string) (ulid.ULID, []event.Event) {
+	t.Helper()
+	r := require.New(t)
+	r.NotEmpty(hashedIDs)
+
+	// Build ops (DeferAdd and RunComplete)
+	ops := make([]*state.GeneratorOpcode, 0, len(hashedIDs)+1)
+	for _, hashedID := range hashedIDs {
+		ops = append(ops, &state.GeneratorOpcode{
+			Op:   enums.OpcodeDeferAdd,
+			ID:   hashedID,
+			Opts: map[string]any{"fn_slug": i.fn.Slug, "input": map[string]any{}},
+		})
+	}
+	ops = append(ops, &state.GeneratorOpcode{
+		Op:   enums.OpcodeRunComplete,
+		ID:   "run-complete",
+		Data: json.RawMessage(`{"data": {}}`),
+	})
+
+	// Mock response to have the ops
+	driver := &mockDriverV1{
+		t:        t,
+		response: &state.DriverResponse{StatusCode: 206, Generator: ops},
+	}
+	exec := i.newExecutor(t, driver)
+
+	// Capture finalization events
+	var finalizationEvents []event.Event
+	exec.SetFinalizer(func(_ context.Context, _ statev2.ID, events []event.Event) error {
+		finalizationEvents = append(finalizationEvents, events...)
+		return nil
+	})
+
+	parentRun := i.scheduleRun(t, exec)
+	firstOp := hashedIDs[0]
+	_, err := exec.Execute(i.ctx, state.Identifier{
+		WorkflowID: i.fnID, RunID: parentRun.ID.RunID, AccountID: i.aID,
+	}, queue.Item{
+		Identifier:  state.Identifier{WorkflowID: i.fnID, RunID: parentRun.ID.RunID, AccountID: i.aID},
+		Kind:        queue.KindStart,
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: firstOp}},
+		WorkspaceID: i.wsID,
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: firstOp})
+	r.NoError(err)
+
+	// Filter defer events out of finalization events
+	var deferEvents []event.Event
+	for _, e := range finalizationEvents {
+		if e.Name == consts.FnDeferScheduleName {
+			deferEvents = append(deferEvents, e)
+		}
+	}
+	r.Len(deferEvents, len(hashedIDs))
+	return parentRun.ID.RunID, deferEvents
+}
+
+// findDeferEvent picks the deferred.schedule event whose ParentDeferSpan
+// matches (parentRunID, hashedID). buildDeferEvents emits in
+// non-deterministic order, so we can't rely on slice position.
+func findDeferEvent(t *testing.T, events []event.Event, parentRunID ulid.ULID, hashedID string) event.Event {
+	t.Helper()
+	wantSpanID := tracing.DeferSpanRef(parentRunID, hashedID).DynamicSpanID
+	for _, e := range events {
+		md, err := e.DeferredScheduleMetadata()
+		if err != nil || md.ParentDeferSpan == nil {
+			continue
+		}
+		if md.ParentDeferSpan.DynamicSpanID == wantSpanID {
+			return e
+		}
+	}
+	t.Fatalf("no deferred.schedule event found for parent=%s hashedID=%s", parentRunID, hashedID)
+	return event.Event{}
+}
+
+// scheduleChildRun schedules a child run with the given deferred.schedule
+// events as its triggering batch.
+func (i *deferTestInfra) scheduleChildRun(t *testing.T, deferSchedules ...event.Event) ulid.ULID {
+	t.Helper()
+	require.NotEmpty(t, deferSchedules)
+
+	exec := i.newExecutor(t, nil)
+	now := time.Now()
+	events := make([]event.TrackedEvent, len(deferSchedules))
+	for k, s := range deferSchedules {
+		events[k] = event.NewBaseTrackedEventWithID(s, ulid.MustNew(ulid.Timestamp(now), rand.Reader))
+	}
+	_, childRun, err := exec.Schedule(i.ctx, execution.ScheduleRequest{
+		Function:    i.fn,
+		At:          &now,
+		AccountID:   i.aID,
+		WorkspaceID: i.wsID,
+		AppID:       i.appID,
+		Events:      events,
+	})
+	require.NoError(t, err)
+	return childRun.ID.RunID
+}
+
+// deferRecord collapses a cqrs.RunDefer to the fields under test so subtests
+// can compare expected vs. actual with a single Equal call. Empty ChildRunID
+// covers the "child not yet scheduled" case by mismatch.
+type deferRecord struct {
+	HashedDeferID string
+	FnSlug        string
+	Status        enums.DeferStatus
+	ChildRunID    string
+}
+
+func toDeferRecords(got map[ulid.ULID][]cqrs.RunDefer) map[ulid.ULID][]deferRecord {
+	out := map[ulid.ULID][]deferRecord{}
+	for k, defers := range got {
+		for _, d := range defers {
+			rec := deferRecord{HashedDeferID: d.HashedDeferID, FnSlug: d.FnSlug, Status: d.Status}
+			if d.RunID != nil {
+				rec.ChildRunID = d.RunID.String()
+			}
+			out[k] = append(out[k], rec)
+		}
+	}
+	return out
+}
+
+func toParentRunIDs(got map[ulid.ULID][]cqrs.RunDeferredFrom) map[ulid.ULID][]ulid.ULID {
+	out := map[ulid.ULID][]ulid.ULID{}
+	for k, parents := range got {
+		for _, p := range parents {
+			out[k] = append(out[k], p.RunID)
+		}
+	}
+	return out
+}
+
+// Assert that parents and children are properly linked via real exec.Schedule
+// and exec.Execute calls.
+func TestDeferLinkage(t *testing.T) {
+	t.Run("1 parent to 1 child", func(t *testing.T) {
+		r := require.New(t)
+		infra := newDeferTestInfra(t)
+
+		parentRunID, evts := infra.runParentDefer(t, "hash-1")
+		childRunID := infra.scheduleChildRun(t,
+			findDeferEvent(t, evts, parentRunID, "hash-1"),
+		)
+
+		// Parent linked to the child
+		defers, err := infra.dbcqrs.GetRunDefers(infra.ctx,
+			[]ulid.ULID{parentRunID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]deferRecord{
+			parentRunID: {{
+				ChildRunID:    childRunID.String(),
+				FnSlug:        infra.fn.Slug,
+				HashedDeferID: "hash-1",
+				Status:        enums.DeferStatusAfterRun,
+			}},
+		}, toDeferRecords(defers))
+
+		// Child linked to the parent
+		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
+			[]ulid.ULID{childRunID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]ulid.ULID{
+			childRunID: {parentRunID},
+		}, toParentRunIDs(parents))
+		r.Equal(infra.fn.Slug, parents[childRunID][0].FnSlug)
+	})
+
+	// 1 parent run calls defer() twice, triggering 2 child runs.
+	t.Run("1 parent to 2 children", func(t *testing.T) {
+		r := require.New(t)
+		infra := newDeferTestInfra(t)
+
+		parentRunID, evts := infra.runParentDefer(t, "hash-a", "hash-b")
+		child1ID := infra.scheduleChildRun(t,
+			findDeferEvent(t, evts, parentRunID, "hash-a"),
+		)
+		child2ID := infra.scheduleChildRun(t,
+			findDeferEvent(t, evts, parentRunID, "hash-b"),
+		)
+
+		// Parent linked to the children
+		defers, err := infra.dbcqrs.GetRunDefers(infra.ctx,
+			[]ulid.ULID{parentRunID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]deferRecord{
+			parentRunID: {
+				{
+					ChildRunID:    child1ID.String(),
+					FnSlug:        infra.fn.Slug,
+					HashedDeferID: "hash-a",
+					Status:        enums.DeferStatusAfterRun,
+				},
+				{
+					ChildRunID:    child2ID.String(),
+					FnSlug:        infra.fn.Slug,
+					HashedDeferID: "hash-b",
+					Status:        enums.DeferStatusAfterRun,
+				},
+			},
+		}, toDeferRecords(defers))
+
+		// Children linked to the parent. Each has its own link to the parent
+		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
+			[]ulid.ULID{child1ID, child2ID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]ulid.ULID{
+			child1ID: {parentRunID},
+			child2ID: {parentRunID},
+		}, toParentRunIDs(parents))
+	})
+
+	// 2 parent runs call defer() and both events batch into 1 child run.
+	t.Run("2 parents to 1 child", func(t *testing.T) {
+		r := require.New(t)
+		infra := newDeferTestInfra(t)
+
+		parent1ID, evts1 := infra.runParentDefer(t, "hash-a")
+		parent2ID, evts2 := infra.runParentDefer(t, "hash-b")
+
+		childID := infra.scheduleChildRun(t,
+			findDeferEvent(t, evts1, parent1ID, "hash-a"),
+			findDeferEvent(t, evts2, parent2ID, "hash-b"),
+		)
+
+		// Parents linked to the child. Each has its own link to the child
+		defers, err := infra.dbcqrs.GetRunDefers(infra.ctx,
+			[]ulid.ULID{parent1ID, parent2ID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]deferRecord{
+			parent1ID: {{
+				ChildRunID:    childID.String(),
+				FnSlug:        infra.fn.Slug,
+				HashedDeferID: "hash-a",
+				Status:        enums.DeferStatusAfterRun,
+			}},
+			parent2ID: {{
+				ChildRunID:    childID.String(),
+				FnSlug:        infra.fn.Slug,
+				HashedDeferID: "hash-b",
+				Status:        enums.DeferStatusAfterRun,
+			}},
+		}, toDeferRecords(defers))
+
+		// Child linked to the parents
+		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
+			[]ulid.ULID{childID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]ulid.ULID{
+			childID: {parent1ID, parent2ID},
+		}, toParentRunIDs(parents))
+	})
+
+	// 1 parent run calls defer() twice and both events batch into 1 child run.
+	t.Run("1 parent batches 2 defers to 1 child", func(t *testing.T) {
+		r := require.New(t)
+		infra := newDeferTestInfra(t)
+
+		parentRunID, evts := infra.runParentDefer(t, "hash-a", "hash-b")
+		childID := infra.scheduleChildRun(t,
+			findDeferEvent(t, evts, parentRunID, "hash-a"),
+			findDeferEvent(t, evts, parentRunID, "hash-b"),
+		)
+
+		// Parent linked to the child. The 1 parent has 2 links to the child,
+		// since there were 2 defers
+		defers, err := infra.dbcqrs.GetRunDefers(infra.ctx,
+			[]ulid.ULID{parentRunID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]deferRecord{
+			parentRunID: {
+				{
+					ChildRunID:    childID.String(),
+					FnSlug:        infra.fn.Slug,
+					HashedDeferID: "hash-a",
+					Status:        enums.DeferStatusAfterRun,
+				},
+				{
+					ChildRunID:    childID.String(),
+					FnSlug:        infra.fn.Slug,
+					HashedDeferID: "hash-b",
+					Status:        enums.DeferStatusAfterRun,
+				},
+			},
+		}, toDeferRecords(defers))
+
+		// Child linked to the parent twice (once per defer event). We may want
+		// to dedupe this, but right now there are dupes in the slice
+		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
+			[]ulid.ULID{childID},
+		)
+		r.NoError(err)
+		r.Equal(map[ulid.ULID][]ulid.ULID{
+			childID: {parentRunID, parentRunID},
+		}, toParentRunIDs(parents))
 	})
 }

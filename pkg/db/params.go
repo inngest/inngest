@@ -174,6 +174,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       []byte
+	IsDeferred     sql.NullBool
 }
 
 // InsertTraceParams are the parameters for inserting a trace.
