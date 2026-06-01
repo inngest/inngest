@@ -288,8 +288,20 @@ func StringSliceAttr(key string) attr[*[]string] {
 			return attribute.StringSlice(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*[]string, bool) {
-			if slice, ok := v.([]string); ok {
-				return &slice, true
+			switch v := v.(type) {
+			case []string:
+				// This may be unreachable. At runtime, `v` is of type `[]any`.
+				return &v, true
+			case []any:
+				strings := make([]string, len(v))
+				for i, item := range v {
+					itemStr, ok := item.(string)
+					if !ok {
+						return nil, false
+					}
+					strings[i] = itemStr
+				}
+				return &strings, true
 			}
 
 			return nil, false

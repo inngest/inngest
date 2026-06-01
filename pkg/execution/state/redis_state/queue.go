@@ -1816,7 +1816,7 @@ func isKeyConcurrencyPointerItem(partition string) bool {
 	return strings.HasPrefix(partition, "{")
 }
 
-// ConfigLease allows a worker to lease config keys for sequential or scavenger processing.
+// RoleLease allows a worker to lease queue roles.
 // Leasing this key works similar to leasing partitions or queue items:
 //
 //   - If the key isn't leased, a new lease is accepted.
@@ -1827,12 +1827,12 @@ func isKeyConcurrencyPointerItem(partition string) bool {
 // This returns the new lease ID on success.
 //
 // If the sequential key is leased, this allows a worker to peek partitions sequentially.
-func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
-	if duration > osqueue.ConfigLeaseMax {
-		return nil, osqueue.ErrConfigLeaseExceedsLimits
+func (q *queue) RoleLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+	if duration > osqueue.RoleLeaseMax {
+		return nil, osqueue.ErrRoleLeaseExceedsLimits
 	}
 
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ConfigLease"), redis_telemetry.ScopeQueue)
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RoleLease"), redis_telemetry.ScopeQueue)
 
 	now := q.Clock.Now()
 	newLeaseID, err := ulid.New(ulid.Timestamp(now.Add(duration)), rnd)
@@ -1858,20 +1858,20 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 		redis_telemetry.WithScriptName(ctx, "configLease"),
 		q.RedisClient.unshardedRc,
 		[]string{
-			q.RedisClient.kg.ConfigLeaseKey(key),
+			q.RedisClient.kg.RoleLeaseKey(key),
 		},
 		args,
 	).AsInt64()
 	if err != nil {
-		return nil, fmt.Errorf("error claiming config lease: %w", err)
+		return nil, fmt.Errorf("error claiming role lease: %w", err)
 	}
 	switch status {
 	case 0:
 		return &newLeaseID, nil
 	case 1:
-		return nil, osqueue.ErrConfigAlreadyLeased
+		return nil, osqueue.ErrRoleAlreadyLeased
 	default:
-		return nil, fmt.Errorf("unknown response claiming config lease: %d", status)
+		return nil, fmt.Errorf("unknown response claiming role lease: %d", status)
 	}
 }
 

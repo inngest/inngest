@@ -58,6 +58,61 @@ type RunService interface {
 	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
 }
 
+// FinalizationClaim is a storage-neutral handle for a run's finish-effect
+// emission claim.  State backends own the underlying storage details: Redis can
+// use SET NX, Cassandra can use a conditional insert/update, and callers do not
+// depend on either implementation.
+type FinalizationClaim struct {
+	claimed bool
+	release func(context.Context) error
+}
+
+// NewFinalizationClaim constructs a finalization claim handle for a state
+// backend implementation.
+func NewFinalizationClaim(claimed bool, release func(context.Context) error) FinalizationClaim {
+	return FinalizationClaim{claimed: claimed, release: release}
+}
+
+// Claimed returns true only for the caller allowed to emit finish effects for
+// this run.  Duplicate finalizers should still clean up state, but must skip
+// externally-visible finish effects.
+func (c FinalizationClaim) Claimed() bool {
+	return c.claimed
+}
+
+// Release clears a previously-acquired finalization claim after a publish
+// failure so a later retry can emit finish effects.  Release is best effort and
+// is intentionally scoped to the backend-created handle instead of requiring
+// callers to know how the claim is addressed in storage.
+func (c FinalizationClaim) Release(ctx context.Context) error {
+	if c.release == nil {
+		return nil
+	}
+	return c.release(ctx)
+}
+
+// FinalizationClaimAdapter is an optional state-store adapter for claiming a
+// run's finish effects.  Implementations must provide first-writer-wins
+// semantics without assuming multi-key transactions; the claim should be safe
+// for non-transactional backends such as Cassandra.
+type FinalizationClaimAdapter interface {
+	// ClaimFinalization returns a backend-owned claim handle.  The handle's
+	// Claimed value decides whether finalize-time effects may be emitted.
+	ClaimFinalization(ctx context.Context, md Metadata) (FinalizationClaim, error)
+}
+
+// TryClaimFinalization asks the state backend to claim finish-effect emission.
+// Backends without a claim adapter preserve previous behavior and allow emit.
+func TryClaimFinalization(ctx context.Context, svc RunService, md Metadata) (FinalizationClaim, bool, error) {
+	claimant, ok := svc.(FinalizationClaimAdapter)
+	if !ok {
+		return NewFinalizationClaim(true, nil), false, nil
+	}
+
+	claim, err := claimant.ClaimFinalization(ctx, md)
+	return claim, true, err
+}
+
 // MetadataSizeIncrementer is an optional extension to RunService for
 // implementations that support atomic metadata size tracking. Callers should
 // use TryIncrementMetadataSize to safely attempt the operation.

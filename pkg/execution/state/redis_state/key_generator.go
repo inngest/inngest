@@ -196,8 +196,8 @@ type QueueKeyGenerator interface {
 	// Queue metadata keys
 	//
 
-	// Sequential returns the key which allows a worker to claim a config lease for specific roles
-	ConfigLeaseKey(scope string) string
+	// RoleLeaseKey returns the key which allows a worker to claim a lease for a specific role.
+	RoleLeaseKey(scope string) string
 	// ShardLeaseKey returns the key which allows a worker to claim one of n available leases per shard to begin processing
 	// partitions in that shard
 	ShardLeaseKey(scope string) string
@@ -316,7 +316,7 @@ func (u queueKeyGenerator) Instrumentation() string {
 	return fmt.Sprintf("{%s}:queue:instrument", u.queueDefaultKey)
 }
 
-func (u queueKeyGenerator) ConfigLeaseKey(scope string) string {
+func (u queueKeyGenerator) RoleLeaseKey(scope string) string {
 	return fmt.Sprintf("{%s}:queue:%s", u.queueDefaultKey, scope)
 }
 

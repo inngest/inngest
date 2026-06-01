@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/inngest/inngest/pkg/db"
+	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -448,6 +448,7 @@ func (sq *sqliteQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams
 		DebugSessionID: arg.DebugSessionID,
 		Status:         arg.Status,
 		EventIds:       bytesToNullString(arg.EventIds),
+		IsDeferred:     arg.IsDeferred,
 	})
 }
 
@@ -459,6 +460,28 @@ func (sq *sqliteQuerier) GetSpansByRunID(ctx context.Context, runID string) ([]*
 	out := make([]*db.SpanRow, len(rows))
 	for i, r := range rows {
 		out[i] = spanRowFromSQLiteRunID(r)
+	}
+	return out, nil
+}
+
+func (sq *sqliteQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []string, name string) ([]*db.SpanRow, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := sq.q.GetSpansByRunIDsAndName(ctx, sqlc.GetSpansByRunIDsAndNameParams{
+		RunIds: runIDs,
+		Name:   name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.SpanRow, len(rows))
+	for i, r := range rows {
+		out[i] = &db.SpanRow{
+			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
+			StartTime: toTime(r.SpanStartTime), EndTime: toTime(r.SpanEndTime), ParentSpanID: r.ParentSpanID,
+			SpanFragments: toBytes(r.SpanFragments),
+		}
 	}
 	return out, nil
 }
