@@ -86,6 +86,8 @@ func New(
 		}
 	}
 
+	qp.configureQueueRoles()
+
 	return qp, nil
 }
 

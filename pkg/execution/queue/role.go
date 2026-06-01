@@ -36,6 +36,9 @@ type QueueRole interface {
 
 	// Run performs the role's periodic work against the leased shard.
 	Run(ctx context.Context, shard QueueShard) error
+
+	// OnLeaseTick performs processor-local work before each lease renewal.
+	OnLeaseTick(ctx context.Context, shard QueueShard)
 }
 
 type QueueRoleStatus struct {
@@ -70,6 +73,7 @@ type queueRole struct {
 	runInterval      time.Duration
 	excludesScanning bool
 	run              func(context.Context, QueueShard) error
+	onLeaseTick      func(context.Context, QueueShard)
 }
 
 func (r queueRole) Name() string {
@@ -95,11 +99,18 @@ func (r queueRole) Run(ctx context.Context, shard QueueShard) error {
 	return r.run(ctx, shard)
 }
 
+func (r queueRole) OnLeaseTick(ctx context.Context, shard QueueShard) {
+	if r.onLeaseTick != nil {
+		r.onLeaseTick(ctx, shard)
+	}
+}
+
 func newQueueRole(
 	name string,
 	leaseDuration time.Duration,
 	runInterval time.Duration,
 	run func(context.Context, QueueShard) error,
+	onLeaseTick func(context.Context, QueueShard),
 	opts ...QueueRoleOpt,
 ) queueRole {
 	role := queueRole{
@@ -107,6 +118,7 @@ func newQueueRole(
 		leaseDuration: leaseDuration,
 		runInterval:   runInterval,
 		run:           run,
+		onLeaseTick:   onLeaseTick,
 	}
 	for _, opt := range opts {
 		opt(&role)
@@ -184,6 +196,7 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 			q.setRoleLease(context.Background(), name, nil, shard)
 			return
 		case <-leaseTick.Chan():
+			role.OnLeaseTick(ctx, shard)
 			claim(false)
 		case <-runC:
 			// The worker may have lost the lease on a renewal tick; only run

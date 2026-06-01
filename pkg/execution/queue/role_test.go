@@ -13,14 +13,14 @@ import (
 func TestWithQueueRoles(t *testing.T) {
 	t.Run("uses explicit roles", func(t *testing.T) {
 		role := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
-		opts := NewQueueOptions(WithQueueRoles(role))
+		opts := configuredRoleOptions(WithQueueRoles(role))
 
 		require.Len(t, opts.roles, 1)
 		require.Equal(t, "custom", opts.roles[0].Name())
 	})
 
 	t.Run("defaults from run mode and latency config", func(t *testing.T) {
-		opts := NewQueueOptions(WithLatencyPartition(LatencyPartitionOptions{
+		opts := configuredRoleOptions(WithLatencyPartition(LatencyPartitionOptions{
 			Interval: time.Second,
 		}))
 
@@ -36,7 +36,7 @@ func TestWithQueueRoles(t *testing.T) {
 	})
 
 	t.Run("omits default sequential role for allowlisted workers", func(t *testing.T) {
-		opts := NewQueueOptions(WithAllowQueueNames("critical"))
+		opts := configuredRoleOptions(WithAllowQueueNames("critical"))
 
 		names := map[string]struct{}{}
 		for _, role := range opts.roles {
@@ -50,7 +50,7 @@ func TestWithQueueRoles(t *testing.T) {
 
 	t.Run("filters explicit sequential role for allowlisted workers", func(t *testing.T) {
 		custom := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
-		opts := NewQueueOptions(
+		opts := configuredRoleOptions(
 			WithQueueRoles(NewSequentialRole(), custom),
 			WithAllowQueueNames("critical"),
 		)
@@ -61,11 +61,18 @@ func TestWithQueueRoles(t *testing.T) {
 
 	t.Run("filters nil roles", func(t *testing.T) {
 		custom := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
-		opts := NewQueueOptions(WithQueueRoles(nil, custom))
+		opts := configuredRoleOptions(WithQueueRoles(nil, custom))
 
 		require.Len(t, opts.roles, 1)
 		require.Equal(t, "custom", opts.roles[0].Name())
 	})
+}
+
+func configuredRoleOptions(options ...QueueOpt) *QueueOptions {
+	opts := NewQueueOptions(options...)
+	qp := &queueProcessor{QueueOptions: opts}
+	qp.configureQueueRoles()
+	return opts
 }
 
 func TestActiveRoles(t *testing.T) {

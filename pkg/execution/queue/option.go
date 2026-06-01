@@ -782,24 +782,27 @@ func NewQueueOptions(
 		qopt(o)
 	}
 
-	if len(o.roles) == 0 {
-		o.roles = defaultQueueRoles(o)
-	}
-	o.roles = filterQueueRoles(o, o.roles)
 	return o
 }
 
-func defaultQueueRoles(o *QueueOptions) []QueueRole {
+func (q *queueProcessor) configureQueueRoles() {
+	if len(q.roles) == 0 {
+		q.roles = q.defaultQueueRoles()
+	}
+	q.roles = filterQueueRoles(q.QueueOptions, q.roles)
+}
+
+func (q *queueProcessor) defaultQueueRoles() []QueueRole {
 	roles := []QueueRole{}
-	if includeSequentialRole(o) {
+	if includeSequentialRole(q.QueueOptions) {
 		roles = append(roles, NewSequentialRole())
 	}
-	if o.runMode.Scavenger {
+	if q.runMode.Scavenger {
 		roles = append(roles, NewScavengerRole())
 	}
-	roles = append(roles, NewInstrumentationRole(WithRoleRunInterval(o.instrumentInterval)))
-	if o.latencyPartition != nil {
-		roles = append(roles, NewLatencyTrackerRole(*o.latencyPartition, WithRoleRunInterval(o.latencyPartition.Interval)))
+	roles = append(roles, NewInstrumentationRole(q, WithRoleRunInterval(q.instrumentInterval)))
+	if q.latencyPartition != nil {
+		roles = append(roles, NewLatencyTrackerRole(*q.latencyPartition, WithRoleRunInterval(q.latencyPartition.Interval)))
 	}
 	return roles
 }

@@ -18,7 +18,7 @@ func NewScavengerRole(opts ...QueueRoleOpt) QueueRole {
 			logger.StdlibLogger(ctx).Info("scavenged lost jobs", "len", count)
 		}
 		return nil
-	}, opts...)
+	}, nil, opts...)
 }
 
 func RandomScavengeOffset(seed int64, count int64, limit int) int64 {

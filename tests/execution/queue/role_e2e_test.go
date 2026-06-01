@@ -178,6 +178,9 @@ func (r *testQueueRole) Run(ctx context.Context, shard osqueue.QueueShard) error
 	return nil
 }
 
+func (r *testQueueRole) OnLeaseTick(ctx context.Context, shard osqueue.QueueShard) {
+}
+
 func newRoleQueue(t *testing.T, role osqueue.QueueRole, runMode osqueue.QueueRunMode) (*miniredis.Miniredis, rueidis.Client, osqueue.Queue, osqueue.QueueShard) {
 	t.Helper()
 

@@ -1,7 +1,7 @@
 package queue
 
 func NewSequentialRole(opts ...QueueRoleOpt) QueueRole {
-	return newQueueRole(QueueRoleSequential, RoleLeaseDuration, RoleLeaseDuration/3, nil, opts...)
+	return newQueueRole(QueueRoleSequential, RoleLeaseDuration, RoleLeaseDuration/3, nil, nil, opts...)
 }
 
 func includeSequentialRole(o *QueueOptions) bool {

@@ -21,7 +21,7 @@ func NewLatencyTrackerRole(latency LatencyPartitionOptions, opts ...QueueRoleOpt
 			}
 		}
 		return nil
-	}, opts...)
+	}, nil, opts...)
 }
 
 // runLatencyTracker is a background goroutine that periodically enqueues
