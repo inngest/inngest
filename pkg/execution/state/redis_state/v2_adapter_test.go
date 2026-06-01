@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 )
@@ -479,6 +480,195 @@ func TestV2Adapter(t *testing.T) {
 			assert.NoError(t, err2) // Should not error for idempotent responses
 		})
 	})
+}
+
+func TestV2AdapterClaimFinalization(t *testing.T) {
+	ctx := context.Background()
+
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	defer mr.Close()
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{mr.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+	pauseStore := NewPauseStore(unshardedClient)
+
+	mgr, err := New(
+		ctx,
+		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
+	)
+	require.NoError(t, err)
+
+	v2svc := MustRunServiceV2(mgr)
+	claimer, ok := v2svc.(statev2.FinalizationClaimAdapter)
+	require.True(t, ok)
+
+	functionID := uuid.New()
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	rawEvent, err := json.Marshal(map[string]any{
+		"name": "test.event",
+		"id":   eventID.String(),
+		"data": map[string]any{"ok": true},
+	})
+	require.NoError(t, err)
+
+	md := statev2.Metadata{
+		ID: statev2.ID{
+			RunID:      runID,
+			FunctionID: functionID,
+			Tenant: statev2.Tenant{
+				AccountID: accountID,
+				EnvID:     workspaceID,
+				AppID:     appID,
+			},
+		},
+		Config: *statev2.InitConfig(&statev2.Config{
+			EventIDs:        []ulid.ULID{eventID},
+			Idempotency:     fmt.Sprintf("claim-finalize-%s", runID.String()),
+			FunctionVersion: 1,
+			RequestVersion:  1,
+		}),
+	}
+
+	_, err = v2svc.Create(ctx, statev2.CreateState{
+		Metadata: md,
+		Events:   []json.RawMessage{rawEvent},
+	})
+	require.NoError(t, err)
+
+	claim, err := claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.True(t, claim.Claimed())
+	firstClaim := claim
+
+	claim, err = claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.False(t, claim.Claimed())
+
+	require.NoError(t, claim.Release(ctx), "duplicate claim release is a no-op")
+
+	claim, err = claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.False(t, claim.Claimed())
+
+	require.NoError(t, firstClaim.Release(ctx))
+
+	claim, err = claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.True(t, claim.Claimed())
+}
+
+func TestV2AdapterFinalizationReleaseDoesNotDeleteNewerClaim(t *testing.T) {
+	ctx := context.Background()
+
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	defer mr.Close()
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{mr.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+	pauseStore := NewPauseStore(unshardedClient)
+
+	mgr, err := New(
+		ctx,
+		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
+	)
+	require.NoError(t, err)
+
+	v2svc := MustRunServiceV2(mgr)
+	claimer, ok := v2svc.(statev2.FinalizationClaimAdapter)
+	require.True(t, ok)
+
+	functionID := uuid.New()
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	rawEvent, err := json.Marshal(map[string]any{
+		"name": "test.event",
+		"id":   eventID.String(),
+		"data": map[string]any{"ok": true},
+	})
+	require.NoError(t, err)
+
+	md := statev2.Metadata{
+		ID: statev2.ID{
+			RunID:      runID,
+			FunctionID: functionID,
+			Tenant: statev2.Tenant{
+				AccountID: accountID,
+				EnvID:     workspaceID,
+				AppID:     appID,
+			},
+		},
+		Config: *statev2.InitConfig(&statev2.Config{
+			EventIDs:        []ulid.ULID{eventID},
+			Idempotency:     fmt.Sprintf("claim-finalize-newer-%s", runID.String()),
+			FunctionVersion: 1,
+			RequestVersion:  1,
+		}),
+	}
+
+	_, err = v2svc.Create(ctx, statev2.CreateState{
+		Metadata: md,
+		Events:   []json.RawMessage{rawEvent},
+	})
+	require.NoError(t, err)
+
+	firstClaim, err := claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.True(t, firstClaim.Claimed())
+
+	// Simulate the first claim expiring while the first finalizer is still
+	// running, then a retry acquiring a newer claim for the same run.
+	mr.FastForward(consts.FunctionIdempotencyPeriod + time.Second)
+
+	secondClaim, err := claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.True(t, secondClaim.Claimed())
+
+	require.NoError(t, firstClaim.Release(ctx))
+
+	thirdClaim, err := claimer.ClaimFinalization(ctx, md)
+	require.NoError(t, err)
+	require.False(t, thirdClaim.Claimed(), "old release must not delete a newer claim")
 }
 
 func TestV2AdapterWithDisabledRetries(t *testing.T) {

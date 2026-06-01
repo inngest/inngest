@@ -159,6 +159,8 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
+	finalizationClaim := e.claimFinalization(ctx, opts.Metadata)
+
 	// Delete the function state in every case.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
@@ -181,7 +183,46 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	// finalizeEvents creates function finished events, and also attempts to fast-resume
 	// any parent function that invoked this run. Defer events are published as
 	// part of the same finishHandler call.
-	return e.finalizeEvents(ctx, opts, deferEvents)
+	if !finalizationClaim.Claimed() {
+		return nil
+	}
+	if err := e.finalizeEvents(ctx, opts, deferEvents); err != nil {
+		if releaseErr := finalizationClaim.Release(ctx); releaseErr != nil {
+			logger.StdlibLogger(ctx).Warn(
+				"error releasing finalization claim after failed publish",
+				"error", releaseErr,
+				"run_id", opts.Metadata.ID.RunID,
+			)
+			return errors.Join(err, releaseErr)
+		}
+		return err
+	}
+	return nil
+}
+
+func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) sv2.FinalizationClaim {
+	if e.finishHandler == nil {
+		return sv2.NewFinalizationClaim(false, nil)
+	}
+
+	claim, _, err := sv2.TryClaimFinalization(ctx, e.smv2, md)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn(
+			"error claiming finalization; continuing without dedupe",
+			"error", err,
+			"run_id", md.ID.RunID,
+		)
+		return sv2.NewFinalizationClaim(true, nil)
+	}
+
+	if !claim.Claimed() {
+		logger.StdlibLogger(ctx).Debug(
+			"skipping duplicate finalize effects",
+			"run_id", md.ID.RunID,
+		)
+	}
+
+	return claim
 }
 
 // buildDeferEvents constructs the inngest/deferred.schedule events for every

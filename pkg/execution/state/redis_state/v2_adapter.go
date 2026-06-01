@@ -7,13 +7,25 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/redis/rueidis"
 )
+
+const releaseFinalizationClaimLua = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+	return redis.call("DEL", KEYS[1])
+end
+return 0
+`
+
+var releaseFinalizationClaimScript = NewClusterLuaScript(releaseFinalizationClaimLua)
 
 func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
 	o := &mgrV2Opts{}
@@ -197,6 +209,58 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 		AccountID:   id.Tenant.AccountID,
 		WorkspaceID: id.Tenant.EnvID,
 	})
+}
+
+// ClaimFinalization claims finish-effect emission for a run using Redis SET NX.
+// The Redis key layout is intentionally kept inside this adapter so the
+// executor depends only on the state/v2 finalization-claim contract.
+func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (state.FinalizationClaim, error) {
+	r, key := v.finalizationClaimHandle(ctx, md)
+	claimToken := uuid.NewString()
+
+	res, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().
+			Set().
+			Key(key).
+			Value(claimToken).
+			Nx().
+			Ex(consts.FunctionIdempotencyPeriod).
+			Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return state.NewFinalizationClaim(false, nil), nil
+	}
+	if err != nil {
+		return state.NewFinalizationClaim(false, nil), fmt.Errorf("error claiming finalization: %w", err)
+	}
+
+	if res != "OK" {
+		return state.NewFinalizationClaim(false, nil), nil
+	}
+
+	return state.NewFinalizationClaim(true, func(ctx context.Context) error {
+		if err := releaseFinalizationClaimScript.Exec(ctx, r, []string{key}, []string{claimToken}).Error(); err != nil {
+			return fmt.Errorf("error releasing finalization claim: %w", err)
+		}
+		return nil
+	}), nil
+}
+
+func (v v2) finalizationClaimHandle(ctx context.Context, md state.Metadata) (RetriableClient, string) {
+	fnRunState := v.mgr.s.FunctionRunState()
+	v1id := statev1.Identifier{
+		RunID:       md.ID.RunID,
+		WorkflowID:  md.ID.FunctionID,
+		AccountID:   md.ID.Tenant.AccountID,
+		WorkspaceID: md.ID.Tenant.EnvID,
+		AppID:       md.ID.Tenant.AppID,
+		Key:         md.Config.Idempotency,
+	}
+
+	r, isSharded := fnRunState.Client(ctx, v1id.AccountID, v1id.RunID)
+	baseKey := fnRunState.kg.Idempotency(ctx, isSharded, v1id)
+
+	return r, fmt.Sprintf("%s:finalize", baseKey)
 }
 
 func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {
