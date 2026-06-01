@@ -8,7 +8,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 )
@@ -23,11 +22,20 @@ const (
 // QueueRole is a leased background responsibility for a queue processor.
 // Each role leases its Name() per shard before Run is called at RunInterval().
 type QueueRole interface {
+	// Name returns the shard-scoped lease key for this role.
 	Name() string
+
+	// LeaseDuration returns how long the role lease is held before renewal.
 	LeaseDuration() time.Duration
+
+	// RunInterval returns how often Run should be called while this worker holds the role lease.
 	RunInterval() time.Duration
+
+	// ExcludesScanning reports whether holding this role should pause normal queue scanning.
 	ExcludesScanning() bool
-	Run(ctx context.Context, q QueueRoleProcessor, shard QueueShard) error
+
+	// Run performs the role's periodic work against the leased shard.
+	Run(ctx context.Context, shard QueueShard) error
 }
 
 type QueueRoleStatus struct {
@@ -37,34 +45,21 @@ type QueueRoleStatus struct {
 	ExcludesScanning bool
 }
 
-type QueueRoleProcessor interface {
-	Producer
-
-	Shard() QueueShard
-	Clock() clockwork.Clock
-	Options() *QueueOptions
-}
-
-type QueueRoleOpt func(*queueRoleConfig)
-
-type queueRoleConfig struct {
-	excludesScanning bool
-	runInterval      time.Duration
-}
+type QueueRoleOpt func(*queueRole)
 
 // WithRoleExcludesScanning makes a role suppress normal queue scanning while
 // this worker actively holds that role's lease.
 func WithRoleExcludesScanning(exclude bool) QueueRoleOpt {
-	return func(c *queueRoleConfig) {
-		c.excludesScanning = exclude
+	return func(r *queueRole) {
+		r.excludesScanning = exclude
 	}
 }
 
 // WithRoleRunInterval overrides the role callback interval.
 func WithRoleRunInterval(interval time.Duration) QueueRoleOpt {
-	return func(c *queueRoleConfig) {
+	return func(r *queueRole) {
 		if interval > 0 {
-			c.runInterval = interval
+			r.runInterval = interval
 		}
 	}
 }
@@ -74,7 +69,7 @@ type queueRole struct {
 	leaseDuration    time.Duration
 	runInterval      time.Duration
 	excludesScanning bool
-	run              func(context.Context, QueueRoleProcessor, QueueShard) error
+	run              func(context.Context, QueueShard) error
 }
 
 func (r queueRole) Name() string {
@@ -93,111 +88,30 @@ func (r queueRole) ExcludesScanning() bool {
 	return r.excludesScanning
 }
 
-func (r queueRole) Run(ctx context.Context, q QueueRoleProcessor, shard QueueShard) error {
+func (r queueRole) Run(ctx context.Context, shard QueueShard) error {
 	if r.run == nil {
 		return nil
 	}
-	return r.run(ctx, q, shard)
+	return r.run(ctx, shard)
 }
 
-func NewSequentialRole(opts ...QueueRoleOpt) QueueRole {
-	cfg := newQueueRoleConfig(opts...)
-	return queueRole{
-		name:             QueueRoleSequential,
-		leaseDuration:    RoleLeaseDuration,
-		runInterval:      roleInterval(cfg, RoleLeaseDuration/3),
-		excludesScanning: cfg.excludesScanning,
+func newQueueRole(
+	name string,
+	leaseDuration time.Duration,
+	runInterval time.Duration,
+	run func(context.Context, QueueShard) error,
+	opts ...QueueRoleOpt,
+) queueRole {
+	role := queueRole{
+		name:          name,
+		leaseDuration: leaseDuration,
+		runInterval:   runInterval,
+		run:           run,
 	}
-}
-
-func NewScavengerRole(opts ...QueueRoleOpt) QueueRole {
-	cfg := newQueueRoleConfig(opts...)
-	return queueRole{
-		name:             QueueRoleScavenger,
-		leaseDuration:    RoleLeaseDuration,
-		runInterval:      roleInterval(cfg, 30*time.Second),
-		excludesScanning: cfg.excludesScanning,
-		run: func(ctx context.Context, _ QueueRoleProcessor, shard QueueShard) error {
-			count, err := shard.Scavenge(ctx, ScavengePeekSize)
-			if err != nil {
-				return err
-			}
-			if count > 0 {
-				logger.StdlibLogger(ctx).Info("scavenged lost jobs", "len", count)
-			}
-			return nil
-		},
-	}
-}
-
-func NewInstrumentationRole(opts ...QueueRoleOpt) QueueRole {
-	cfg := newQueueRoleConfig(opts...)
-	return queueRole{
-		name:             QueueRoleInstrumentation,
-		leaseDuration:    RoleLeaseMax,
-		runInterval:      roleInterval(cfg, DefaultInstrumentInterval),
-		excludesScanning: cfg.excludesScanning,
-		run: func(ctx context.Context, q QueueRoleProcessor, shard QueueShard) error {
-			if qp, ok := q.(*queueProcessor); ok {
-				metrics.GaugeWorkerQueueCapacity(ctx, int64(qp.numWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
-				metrics.GaugePartitionProcessorCapacity(ctx, qp.partitionCapacity(), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
-				metrics.GaugePartitionProcessorInFlight(ctx, qp.partitionSem.Count(), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
-			}
-
-			shardAssignmentConfig := shard.ShardAssignmentConfig()
-			metrics.GaugeShardLeaseCapacity(ctx, int64(shardAssignmentConfig.NumExecutors), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"shard_group": shardAssignmentConfig.ShardGroup, "queue_shard": shard.Name(), "segment": q.Options().ShardLeaseKeySuffix}})
-
-			ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
-			return shard.Instrument(ctx)
-		},
-	}
-}
-
-func NewLatencyTrackerRole(opts ...QueueRoleOpt) QueueRole {
-	cfg := newQueueRoleConfig(opts...)
-	return queueRole{
-		name:             QueueRoleLatencyTracker,
-		leaseDuration:    RoleLeaseDuration,
-		runInterval:      roleInterval(cfg, 5*time.Second),
-		excludesScanning: cfg.excludesScanning,
-		run: func(ctx context.Context, q QueueRoleProcessor, shard QueueShard) error {
-			opts := q.Options().latencyPartition
-			if opts == nil {
-				return nil
-			}
-			for i := 1; i <= opts.Partitions; i++ {
-				jobID := fmt.Sprintf("ltrack-%d-%d", i, q.Clock().Now().UnixMilli())
-				idempotency := opts.Interval
-				queueName := "ltc"
-				if err := q.Enqueue(ctx, Item{
-					JobID:     &jobID,
-					Kind:      KindLatencyTrack,
-					QueueName: &queueName,
-				}, q.Clock().Now(), EnqueueOpts{
-					IdempotencyPeriod:   &idempotency,
-					ForceQueueShardName: shard.Name(),
-				}); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}
-}
-
-func newQueueRoleConfig(opts ...QueueRoleOpt) queueRoleConfig {
-	cfg := queueRoleConfig{}
 	for _, opt := range opts {
-		opt(&cfg)
+		opt(&role)
 	}
-	return cfg
-}
-
-func roleInterval(cfg queueRoleConfig, def time.Duration) time.Duration {
-	if cfg.runInterval > 0 {
-		return cfg.runInterval
-	}
-	return def
+	return role
 }
 
 func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
@@ -264,7 +178,7 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 			claim(false)
 		case <-runC:
 			if q.isRoleActive(name) {
-				if err := role.Run(ctx, q, shard); err != nil {
+				if err := role.Run(ctx, shard); err != nil {
 					logger.StdlibLogger(ctx).Error("error running queue role", "role", name, "error", err)
 				}
 			}

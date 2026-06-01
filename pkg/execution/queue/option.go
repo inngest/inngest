@@ -800,7 +800,7 @@ func defaultQueueRoles(o *QueueOptions) []QueueRole {
 	}
 	roles = append(roles, NewInstrumentationRole(WithRoleRunInterval(o.instrumentInterval)))
 	if o.latencyPartition != nil {
-		roles = append(roles, NewLatencyTrackerRole(WithRoleRunInterval(o.latencyPartition.Interval)))
+		roles = append(roles, newLatencyTrackerRole(*o.latencyPartition, WithRoleRunInterval(o.latencyPartition.Interval)))
 	}
 	return roles
 }

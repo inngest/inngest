@@ -3,7 +3,35 @@ package queue
 import (
 	"context"
 	"fmt"
+	"time"
 )
+
+const defaultLatencyTrackerInterval = 5 * time.Second
+
+func NewLatencyTrackerRole(opts ...QueueRoleOpt) QueueRole {
+	return newLatencyTrackerRole(LatencyPartitionOptions{
+		Partitions: 1,
+		Interval:   defaultLatencyTrackerInterval,
+	}, opts...)
+}
+
+func newLatencyTrackerRole(latency LatencyPartitionOptions, opts ...QueueRoleOpt) QueueRole {
+	if latency.Partitions <= 0 {
+		latency.Partitions = 1
+	}
+	if latency.Interval <= 0 {
+		latency.Interval = defaultLatencyTrackerInterval
+	}
+
+	return newQueueRole(QueueRoleLatencyTracker, RoleLeaseDuration, latency.Interval, func(ctx context.Context, shard QueueShard) error {
+		for i := 1; i <= latency.Partitions; i++ {
+			if err := enqueueLatencyJob(ctx, shard, i, latency.Interval, time.Now()); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, opts...)
+}
 
 // runLatencyTracker is a background goroutine that periodically enqueues
 // latency tracking canary jobs into the queue.
@@ -21,27 +49,36 @@ func (q *queueProcessor) runLatencyTracker(ctx context.Context) {
 			return
 		case <-tick.Chan():
 			for i := 1; i <= q.latencyPartition.Partitions; i++ {
-				_ = q.enqueueLatencyJob(ctx, i)
+				_ = enqueueLatencyJob(ctx, q.Shard(), i, q.latencyPartition.Interval, q.Clock().Now())
 			}
 		}
 	}
 }
 
 // enqueueLatencyJob enqueues a single latency tracking canary item into the
-// given partition number.
-func (q *queueProcessor) enqueueLatencyJob(ctx context.Context, partition int) error {
-	jobID := fmt.Sprintf("ltrack-%d-%d", partition, q.Clock().Now().UnixMilli())
-	idempotency := q.latencyPartition.Interval
+// queue shard.
+func enqueueLatencyJob(ctx context.Context, shard QueueShard, partition int, interval time.Duration, at time.Time) error {
+	jobID := fmt.Sprintf("ltrack-%d-%d", partition, at.UnixMilli())
 	queueName := "ltc"
-
-	return q.Enqueue(ctx, Item{
+	item := Item{
 		JobID:     &jobID,
 		Kind:      KindLatencyTrack,
 		QueueName: &queueName,
-	}, q.Clock().Now(), EnqueueOpts{
-		IdempotencyPeriod:   &idempotency,
-		ForceQueueShardName: q.Shard().Name(),
+	}
+	qi := QueueItem{
+		ID:                jobID,
+		AtMS:              at.UnixMilli(),
+		WallTimeMS:        at.UnixMilli(),
+		Data:              item,
+		QueueName:         item.QueueName,
+		IdempotencyPeriod: &interval,
+	}
+
+	_, err := shard.EnqueueItem(ctx, qi, at, EnqueueOpts{
+		IdempotencyPeriod:   &interval,
+		ForceQueueShardName: shard.Name(),
 	})
+	return err
 }
 
 // wrapRunFuncWithLatency wraps a RunFunc to intercept latency tracking items.

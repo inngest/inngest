@@ -173,7 +173,7 @@ func (r *testQueueRole) ExcludesScanning() bool {
 	return r.excludesScanning
 }
 
-func (r *testQueueRole) Run(ctx context.Context, q osqueue.QueueRoleProcessor, shard osqueue.QueueShard) error {
+func (r *testQueueRole) Run(ctx context.Context, shard osqueue.QueueShard) error {
 	r.runCount.Add(1)
 	return nil
 }

@@ -1,6 +1,25 @@
 package queue
 
-import "math/rand"
+import (
+	"context"
+	"math/rand"
+	"time"
+
+	"github.com/inngest/inngest/pkg/logger"
+)
+
+func NewScavengerRole(opts ...QueueRoleOpt) QueueRole {
+	return newQueueRole(QueueRoleScavenger, RoleLeaseDuration, 30*time.Second, func(ctx context.Context, shard QueueShard) error {
+		count, err := shard.Scavenge(ctx, ScavengePeekSize)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			logger.StdlibLogger(ctx).Info("scavenged lost jobs", "len", count)
+		}
+		return nil
+	}, opts...)
+}
 
 func RandomScavengeOffset(seed int64, count int64, limit int) int64 {
 	// only apply random offset if there are more total items to scavenge than the limit
