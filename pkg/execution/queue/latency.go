@@ -6,21 +6,12 @@ import (
 	"time"
 )
 
-const defaultLatencyTrackerInterval = 5 * time.Second
-
-func NewLatencyTrackerRole(opts ...QueueRoleOpt) QueueRole {
-	return newLatencyTrackerRole(LatencyPartitionOptions{
-		Partitions: 1,
-		Interval:   defaultLatencyTrackerInterval,
-	}, opts...)
-}
-
-func newLatencyTrackerRole(latency LatencyPartitionOptions, opts ...QueueRoleOpt) QueueRole {
+func NewLatencyTrackerRole(latency LatencyPartitionOptions, opts ...QueueRoleOpt) QueueRole {
 	if latency.Partitions <= 0 {
 		latency.Partitions = 1
 	}
 	if latency.Interval <= 0 {
-		latency.Interval = defaultLatencyTrackerInterval
+		latency.Interval = 5 * time.Second
 	}
 
 	return newQueueRole(QueueRoleLatencyTracker, RoleLeaseDuration, latency.Interval, func(ctx context.Context, shard QueueShard) error {
