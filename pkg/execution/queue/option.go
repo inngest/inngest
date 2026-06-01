@@ -808,7 +808,6 @@ func filterQueueRoles(o *QueueOptions, roles []QueueRole) []QueueRole {
 	filtered := make([]QueueRole, 0, len(roles))
 	for _, role := range roles {
 		if role == nil {
-			filtered = append(filtered, role)
 			continue
 		}
 		if role.Name() == QueueRoleSequential && !includeSequentialRole(o) {

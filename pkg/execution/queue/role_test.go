@@ -58,6 +58,14 @@ func TestWithQueueRoles(t *testing.T) {
 		require.Len(t, opts.roles, 1)
 		require.Equal(t, "custom", opts.roles[0].Name())
 	})
+
+	t.Run("filters nil roles", func(t *testing.T) {
+		custom := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
+		opts := NewQueueOptions(WithQueueRoles(nil, custom))
+
+		require.Len(t, opts.roles, 1)
+		require.Equal(t, "custom", opts.roles[0].Name())
+	})
 }
 
 func TestActiveRoles(t *testing.T) {
