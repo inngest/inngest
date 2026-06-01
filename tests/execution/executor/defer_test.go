@@ -316,6 +316,8 @@ func TestDeferFinalize(t *testing.T) {
 		r.NotNil(activeData)
 
 		inn := activeData["_inngest"].(map[string]any)
+		r.Equal(infra.appID.String(), inn["parent_app_id"])
+		r.Equal(infra.fnID.String(), inn["parent_fn_id"])
 		r.Equal(infra.fn.Slug, inn["parent_fn_slug"])
 		r.Equal(run.ID.RunID.String(), inn["parent_run_id"])
 

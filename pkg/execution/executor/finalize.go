@@ -301,7 +301,9 @@ func (e *executor) buildDeferEvents(
 
 		deferredMeta := event.DeferredScheduleMetadata{
 			FnSlug:          d.FnSlug,
+			ParentAppID:     opts.Metadata.ID.Tenant.AppID,
 			ParentDeferSpan: tracing.DeferSpanRef(opts.Metadata.ID.RunID, d.HashedID),
+			ParentFnID:      opts.Metadata.ID.FunctionID,
 			ParentFnSlug:    fnSlug,
 			ParentRunID:     opts.Metadata.ID.RunID,
 		}

@@ -5866,9 +5866,10 @@ func updateDeferSpans(
 		err = tp.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: meta.NewAttrSet(
 				meta.Attr(meta.Attrs.AccountID, &md.ID.Tenant.AccountID),
-				meta.Attr(meta.Attrs.AppID, &md.ID.Tenant.AppID),
+				meta.Attr(meta.Attrs.AppID, &m.ParentAppID),
 				meta.Attr(meta.Attrs.DeferChildRunID, &md.ID.RunID),
 				meta.Attr(meta.Attrs.EnvID, &md.ID.Tenant.EnvID),
+				meta.Attr(meta.Attrs.FunctionID, &m.ParentFnID),
 				meta.Attr(meta.Attrs.RunID, &m.ParentRunID),
 			),
 			Debug: &tracing.SpanDebugData{
