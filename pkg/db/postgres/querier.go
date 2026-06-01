@@ -424,6 +424,9 @@ func (pq *pgQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.R
 			runIDs[i] = r.FunctionRun.RunID.String()
 		}
 
+		// we store function_runs.run_id as bytea and trace_runs.run_id as CHAR(26),
+		// so we batch fetch outputs after sqlc decodes the run IDs to canonical strings.
+		// TODO: Make run IDs use matching types so this can be a normal join.
 		outputRows, err := pq.q.GetTraceRunOutputs(ctx, runIDs)
 		if err != nil {
 			return nil, err
@@ -435,7 +438,7 @@ func (pq *pgQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.R
 
 	out := make([]*db.RunListItemRow, len(rows))
 	for i, r := range rows {
-		output := r.RunOutput
+		var output []byte
 		if traceOutput, ok := outputs[r.FunctionRun.RunID]; ok {
 			output = traceOutput
 		}

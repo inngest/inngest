@@ -45,7 +45,6 @@ func TestGetRuns(t *testing.T) {
 		`{"name":"Event Runs Function","slug":"event-runs-function"}`,
 		appID.String(),
 		"event-runs-app",
-		[]byte{},
 	}}})
 
 	conn, err := sql.Open("postgres-sqlc-get-runs", "")
@@ -63,7 +62,6 @@ func TestGetRuns(t *testing.T) {
 	require.Equal(t, runID, rows[0].FunctionRun.RunID)
 	require.Equal(t, "completed", rows[0].FinishStatus)
 	require.Equal(t, "event-runs-app", rows[0].AppName)
-	require.Empty(t, rows[0].RunOutput)
 }
 
 func TestGetTraceRunOutputs(t *testing.T) {
@@ -263,7 +261,6 @@ func getRunsColumns() []string {
 		"function_config",
 		"function_app_id",
 		"app_name",
-		"run_output",
 	}
 }
 

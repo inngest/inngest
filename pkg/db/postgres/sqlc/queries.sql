@@ -203,8 +203,7 @@ SELECT sqlc.embed(function_runs),
     COALESCE(functions.name, '') AS function_name,
     COALESCE(functions.config, '{}') AS function_config,
     COALESCE(functions.app_id, '00000000-0000-0000-0000-000000000000') AS function_app_id,
-    COALESCE(apps.name, '') AS app_name,
-    ''::bytea AS run_output
+    COALESCE(apps.name, '') AS app_name
 FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL

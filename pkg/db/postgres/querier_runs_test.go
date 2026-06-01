@@ -47,7 +47,6 @@ func TestQuerierGetRuns(t *testing.T) {
 			`{"name":"Event Runs Function","slug":"event-runs-function"}`,
 			appID.String(),
 			"event-runs-app",
-			[]byte{},
 		}},
 		outputRows: [][]driver.Value{{
 			runID.String(),
@@ -99,7 +98,6 @@ func TestQuerierGetRunsSkipsOutputQuery(t *testing.T) {
 			`{"name":"Event Runs Function","slug":"event-runs-function"}`,
 			appID.String(),
 			"event-runs-app",
-			[]byte{},
 		}},
 		outputRows: [][]driver.Value{{
 			runID.String(),
@@ -161,7 +159,6 @@ func TestQuerierGetRunsIncludesBatchRunIDs(t *testing.T) {
 			`{"name":"Event Runs Function","slug":"event-runs-function"}`,
 			appID.String(),
 			"event-runs-app",
-			[]byte{},
 		}},
 	}
 	sql.Register("postgres-get-runs-batch", driver)
@@ -220,7 +217,6 @@ func TestQuerierGetRunsError(t *testing.T) {
 					`{"name":"Event Runs Function","slug":"event-runs-function"}`,
 					uuid.New().String(),
 					"event-runs-app",
-					[]byte{},
 				}},
 				outputQueryErr: errors.New("output query failed"),
 			},
@@ -340,7 +336,6 @@ func getRunsColumns() []string {
 		"function_config",
 		"function_app_id",
 		"app_name",
-		"run_output",
 	}
 }
 
