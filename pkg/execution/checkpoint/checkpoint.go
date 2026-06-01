@@ -1,6 +1,7 @@
 package checkpoint
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/defers"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -27,10 +29,12 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
+	"github.com/oklog/ulid/v2"
 )
 
 type Checkpointer interface {
@@ -48,6 +52,32 @@ type SyncCheckpointer interface {
 type AsyncCheckpointer interface {
 	// CheckpointAsyncSteps checkpoints steps for an async function.
 	CheckpointAsyncSteps(context.Context, AsyncCheckpoint) error
+}
+
+const pkgName = "checkpoint"
+
+var ErrStaleDispatch = errors.New("stale dispatch")
+
+// AllowAsyncDispatchValidation gates the async dispatch validator per account
+// so it can ramp through a staged rollout. Returns true to run the validator;
+// nil or false leaves it off.
+type AllowAsyncDispatchValidation func(ctx context.Context, acctID uuid.UUID) bool
+
+func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.UUID) bool {
+	if a == nil {
+		return false
+	}
+	return a(ctx, acctID)
+}
+
+// Skip the queue-item load for dispatches younger than this window: a Requeue
+// cannot fire before the queue lease expires, so a fresh dispatch is
+// uncontested. The upper bound is the shortest plausible serverless timeout
+// (~10s) — longer windows let a fast-Requeue race slip past unfenced.
+const dispatchValidationSkipDuration = 10 * time.Second
+
+type queueItemLoader interface {
+	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
 }
 
 type Opts struct {
@@ -71,6 +101,8 @@ type Opts struct {
 	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
 	// The default is to always enforce the limits.
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
+	// AllowAsyncDispatchValidation gates the dispatch validator per account.
+	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
 }
 
 func New(o Opts) Checkpointer {
@@ -480,6 +512,12 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
+	if c.AllowAsyncDispatchValidation.Enabled(ctx, input.AccountID) {
+		if err := c.validateAsyncDispatch(ctx, input); err != nil {
+			return err
+		}
+	}
+
 	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
 
 	if enforceStepSizeLimits && md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
@@ -634,6 +672,85 @@ func stepOutputSize(ops []state.GeneratorOpcode) int {
 		}
 	}
 	return total
+}
+
+func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) (err error) {
+	start := time.Now()
+	result := "passed"
+	defer func() {
+		if errors.Is(err, ErrStaleDispatch) {
+			result = "stale"
+		}
+		metrics.HistogramCheckpointAsyncDispatchValidationDuration(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"result": result},
+		})
+	}()
+	if input.RequestID == "" {
+		result = "no_request_id"
+		return nil
+	}
+
+	// Negative elapsed (future-dated stamp from clock skew or a buggy SDK)
+	// falls through to the full validation.
+	if input.RequestStartedAt != 0 {
+		elapsed := time.Since(time.UnixMilli(input.RequestStartedAt))
+		if elapsed >= 0 && elapsed < dispatchValidationSkipDuration {
+			result = "fresh"
+			return nil
+		}
+	}
+
+	parsed, err := ulid.Parse(input.RequestID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid request id %q: %v", ErrStaleDispatch, input.RequestID, err)
+	}
+
+	ref := queueref.Decode(input.QueueItemRef)
+	if ref.JobID() == "" || ref.ShardID() == "" {
+		result = "no_qi_ref"
+		return nil
+	}
+
+	loader, ok := c.Queue.(queueItemLoader)
+	if !ok {
+		// Fail open if the queue can't load items (e.g. mock or alt backend);
+		// the alternative is rejecting every fenced POST forever.
+		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
+			"run_id", input.RunID,
+		)
+		result = "no_loader"
+		return nil
+	}
+
+	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
+	if errors.Is(err, queue.ErrQueueItemNotFound) {
+		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
+	}
+	if err != nil {
+		// Fail open on transient load errors (e.g. Redis timeout). Rejecting
+		// here would surface as HTTP 400 and abort an otherwise-valid run.
+		logger.StdlibLogger(ctx).Warn("checkpoint: failed to load queue item for dispatch validation; skipping",
+			"error", err,
+			"run_id", input.RunID,
+		)
+		result = "load_error"
+		return nil
+	}
+	if item.GenerationID == 0 {
+		result = "no_generation"
+		return nil
+	}
+
+	// Compare only the entropy: it's the deterministic part bound to
+	// (runID, generationID). The ULID timestamp is incidental (it just
+	// gives RequestIDs chronological sort order) and isn't part of the
+	// fence.
+	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
+		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
+	}
+
+	return nil
 }
 
 func (c checkpointer) runContext(md state.Metadata, fn *inngest.Function) execution.RunContext {

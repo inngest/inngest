@@ -3,14 +3,30 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
 type sdkRequestIDCtxKey struct{}
 
 type sdkJobIDCtxKey struct{}
+
+// DispatchRequestID is the single source of truth for the request ID the
+// executor (producer) stamps on outbound SDK requests and the checkpoint
+// validator (consumer) recomputes when fencing stale dispatches.
+func DispatchRequestID(ts time.Time, runID ulid.ULID, generationID int) ulid.ULID {
+	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", runID, generationID))
+}
+
+// DispatchRequestIDEntropy returns the entropy portion of the dispatch
+// RequestID; the timestamp doesn't participate in fencing.
+func DispatchRequestIDEntropy(runID ulid.ULID, generationID int) []byte {
+	return DispatchRequestID(time.Unix(0, 0), runID, generationID).Entropy()
+}
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
 // driver calls.
