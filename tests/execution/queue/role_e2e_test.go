@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestQueueRoleRequiresConfigLease(t *testing.T) {
+func TestQueueRoleRequiresRoleLease(t *testing.T) {
 	ctx := context.Background()
 	role := &testQueueRole{
 		name:          "blocked-role",
@@ -29,7 +29,7 @@ func TestQueueRoleRequiresConfigLease(t *testing.T) {
 	_, rc, q, shard := newRoleQueue(t, role, osqueue.QueueRunMode{})
 	defer rc.Close()
 
-	leaseID, err := shard.ConfigLease(ctx, role.Name(), role.LeaseDuration())
+	leaseID, err := shard.RoleLease(ctx, role.Name(), role.LeaseDuration())
 	require.NoError(t, err)
 	require.NotNil(t, leaseID)
 
@@ -100,7 +100,7 @@ func TestQueueRoleStopsRunningAfterLeaseLoss(t *testing.T) {
 	}, time.Second, 5*time.Millisecond)
 
 	otherLease := ulid.MustNew(ulid.Timestamp(time.Now().Add(time.Second)), rand.Reader)
-	require.NoError(t, r.Set(configLeaseKey(role.Name()), otherLease.String()))
+	require.NoError(t, r.Set(roleLeaseKey(role.Name()), otherLease.String()))
 
 	require.Eventually(t, func() bool {
 		return activeRoleStatus(q, role.Name()) == nil
@@ -240,7 +240,7 @@ func activeRoleStatus(q osqueue.RoleStatusReader, roleName string) *osqueue.Queu
 	return nil
 }
 
-func configLeaseKey(roleName string) string {
+func roleLeaseKey(roleName string) string {
 	return fmt.Sprintf("{%s}:queue:%s", redis_state.QueueDefaultKey, roleName)
 }
 

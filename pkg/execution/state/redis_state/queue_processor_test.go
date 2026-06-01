@@ -68,7 +68,7 @@ func TestQueueRunSequential(t *testing.T) {
 	// Q2 has no lease.
 	require.Nil(t, activeRoleLease(q2, osqueue.QueueRoleSequential))
 
-	<-time.After(osqueue.ConfigLeaseDuration)
+	<-time.After(osqueue.RoleLeaseDuration)
 
 	// Q1 retains lease.
 	require.NotNil(t, activeRoleLease(q1, osqueue.QueueRoleSequential))
@@ -77,7 +77,7 @@ func TestQueueRunSequential(t *testing.T) {
 	// Cancel q1, temrinating the queue with the sequential lease.
 	q1cancel()
 
-	<-time.After(osqueue.ConfigLeaseDuration * 2)
+	<-time.After(osqueue.RoleLeaseDuration * 2)
 
 	// Q2 obtains lease.
 	require.NotNil(t, activeRoleLease(q2, osqueue.QueueRoleSequential))

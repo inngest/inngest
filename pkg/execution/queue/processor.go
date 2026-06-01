@@ -120,7 +120,7 @@ type queueProcessor struct {
 	// prior to leasing items.
 	sem util.TrackingSemaphore
 
-	// roleLeaseIDs stores per-role config lease IDs.
+	// roleLeaseIDs stores per-role lease IDs.
 	roleLeaseIDs map[string]*ulid.ULID
 	// roleLeaseLock ensures that there are no data races writing to
 	// or reading from roleLeaseIDs in parallel.

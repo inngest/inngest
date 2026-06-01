@@ -175,7 +175,7 @@ func (m *mockShardForIterator) PartitionSize(ctx context.Context, scope Scope, p
 	return 0, nil
 }
 
-func (m *mockShardForIterator) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+func (m *mockShardForIterator) RoleLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
 	return nil, nil
 }
 

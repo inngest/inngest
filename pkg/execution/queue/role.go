@@ -104,8 +104,8 @@ func NewSequentialRole(opts ...QueueRoleOpt) QueueRole {
 	cfg := newQueueRoleConfig(opts...)
 	return queueRole{
 		name:             QueueRoleSequential,
-		leaseDuration:    ConfigLeaseDuration,
-		runInterval:      roleInterval(cfg, ConfigLeaseDuration/3),
+		leaseDuration:    RoleLeaseDuration,
+		runInterval:      roleInterval(cfg, RoleLeaseDuration/3),
 		excludesScanning: cfg.excludesScanning,
 	}
 }
@@ -114,7 +114,7 @@ func NewScavengerRole(opts ...QueueRoleOpt) QueueRole {
 	cfg := newQueueRoleConfig(opts...)
 	return queueRole{
 		name:             QueueRoleScavenger,
-		leaseDuration:    ConfigLeaseDuration,
+		leaseDuration:    RoleLeaseDuration,
 		runInterval:      roleInterval(cfg, 30*time.Second),
 		excludesScanning: cfg.excludesScanning,
 		run: func(ctx context.Context, _ QueueRoleProcessor, shard QueueShard) error {
@@ -134,7 +134,7 @@ func NewInstrumentationRole(opts ...QueueRoleOpt) QueueRole {
 	cfg := newQueueRoleConfig(opts...)
 	return queueRole{
 		name:             QueueRoleInstrumentation,
-		leaseDuration:    ConfigLeaseMax,
+		leaseDuration:    RoleLeaseMax,
 		runInterval:      roleInterval(cfg, DefaultInstrumentInterval),
 		excludesScanning: cfg.excludesScanning,
 		run: func(ctx context.Context, q QueueRoleProcessor, shard QueueShard) error {
@@ -157,7 +157,7 @@ func NewLatencyTrackerRole(opts ...QueueRoleOpt) QueueRole {
 	cfg := newQueueRoleConfig(opts...)
 	return queueRole{
 		name:             QueueRoleLatencyTracker,
-		leaseDuration:    ConfigLeaseDuration,
+		leaseDuration:    RoleLeaseDuration,
 		runInterval:      roleInterval(cfg, 5*time.Second),
 		excludesScanning: cfg.excludesScanning,
 		run: func(ctx context.Context, q QueueRoleProcessor, shard QueueShard) error {
@@ -222,8 +222,8 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 
 	shard := q.Shard()
 	claim := func(initial bool) bool {
-		leaseID, err := shard.ConfigLease(ctx, name, leaseDuration, q.roleLease(name))
-		if err == ErrConfigAlreadyLeased {
+		leaseID, err := shard.RoleLease(ctx, name, leaseDuration, q.roleLease(name))
+		if err == ErrRoleAlreadyLeased {
 			q.setRoleLease(ctx, name, nil, shard)
 			return true
 		}

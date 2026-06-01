@@ -2049,7 +2049,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	})
 }
 
-func TestQueueLeaseSequential(t *testing.T) {
+func TestQueueRoleLeaseSequential(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
 
@@ -2067,22 +2067,22 @@ func TestQueueLeaseSequential(t *testing.T) {
 	t.Run("It claims sequential leases", func(t *testing.T) {
 		now := time.Now()
 		dur := 500 * time.Millisecond
-		leaseID, err = shard.ConfigLease(ctx, "sequential", dur)
+		leaseID, err = shard.RoleLease(ctx, "sequential", dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
 	t.Run("It doesn't allow renewing leasing without an existing lease ID", func(t *testing.T) {
-		id, err := shard.ConfigLease(ctx, "sequential", time.Second)
-		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
+		id, err := shard.RoleLease(ctx, "sequential", time.Second)
+		require.Equal(t, osqueue.ErrRoleAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
 	t.Run("It doesn't allow leasing with an invalid lease ID", func(t *testing.T) {
 		newULID := ulid.MustNew(ulid.Now(), rnd)
-		id, err := shard.ConfigLease(ctx, "sequential", time.Second, &newULID)
-		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
+		id, err := shard.RoleLease(ctx, "sequential", time.Second, &newULID)
+		require.Equal(t, osqueue.ErrRoleAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
@@ -2091,7 +2091,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = shard.ConfigLease(ctx, "sequential", dur, leaseID)
+		leaseID, err = shard.RoleLease(ctx, "sequential", dur, leaseID)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
@@ -2102,7 +2102,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = shard.ConfigLease(ctx, "sequential", dur)
+		leaseID, err = shard.RoleLease(ctx, "sequential", dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)

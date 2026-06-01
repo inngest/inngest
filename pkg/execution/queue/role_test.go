@@ -12,7 +12,7 @@ import (
 
 func TestWithQueueRoles(t *testing.T) {
 	t.Run("uses explicit roles", func(t *testing.T) {
-		role := queueRole{name: "custom", leaseDuration: ConfigLeaseDuration}
+		role := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
 		opts := NewQueueOptions(WithQueueRoles(role))
 
 		require.Len(t, opts.roles, 1)
@@ -39,7 +39,7 @@ func TestWithQueueRoles(t *testing.T) {
 func TestActiveRoles(t *testing.T) {
 	role := queueRole{
 		name:             "exclusive",
-		leaseDuration:    ConfigLeaseDuration,
+		leaseDuration:    RoleLeaseDuration,
 		excludesScanning: true,
 	}
 

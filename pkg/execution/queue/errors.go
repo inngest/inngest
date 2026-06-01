@@ -54,8 +54,8 @@ var (
 	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
-	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
-	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
+	ErrRoleAlreadyLeased             = fmt.Errorf("role already leased")
+	ErrRoleLeaseExceedsLimits        = fmt.Errorf("role lease duration exceeds the maximum of %d seconds", int(RoleLeaseMax.Seconds()))
 
 	ErrAllShardsAlreadyLeased  = fmt.Errorf("all shards in the group are fully allocated")
 	ErrShardLeaseNotFound      = fmt.Errorf("shard lease not found")
