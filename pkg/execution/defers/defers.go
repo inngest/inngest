@@ -194,7 +194,7 @@ func createDeferSpan(
 		log.Error(
 			"error emitting executor.defer span",
 			"error", err,
-			"hashed_id", d.HashedID,
+			"hashed_id", util.SanitizeLogField(d.HashedID),
 			"run_id", md.ID.RunID,
 		)
 	}
