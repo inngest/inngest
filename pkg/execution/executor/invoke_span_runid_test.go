@@ -23,15 +23,6 @@ type recordingTracerProvider struct {
 	createCalls []*createSpanCall
 	updateCalls []*tracing.UpdateSpanOptions
 	updateErr   error
-
-	createCalls []recordedCreateCall
-}
-
-// recordedCreateCall captures the name + options handed to CreateSpan so
-// tests can assert against the emit shape (seed, attributes, parent ref).
-type recordedCreateCall struct {
-	Name string
-	Opts *tracing.CreateSpanOptions
 }
 
 type createSpanCall struct {
@@ -50,7 +41,7 @@ func (r *recordingTracerProvider) UpdateSpan(_ context.Context, opts *tracing.Up
 }
 
 func (r *recordingTracerProvider) CreateSpan(_ context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
-	r.createCalls = append(r.createCalls, recordedCreateCall{Name: name, Opts: opts})
+	r.createCalls = append(r.createCalls, &createSpanCall{name: name, opts: opts})
 	return &meta.SpanReference{}, nil
 }
 
