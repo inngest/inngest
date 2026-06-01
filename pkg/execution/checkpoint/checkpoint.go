@@ -27,7 +27,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/flags"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -58,6 +57,18 @@ type AsyncCheckpointer interface {
 const pkgName = "checkpoint"
 
 var ErrStaleDispatch = errors.New("stale dispatch")
+
+// AllowAsyncDispatchValidation gates the async dispatch validator per account
+// so it can ramp through a staged rollout. Returns true to run the validator;
+// nil or false leaves it off.
+type AllowAsyncDispatchValidation func(ctx context.Context, acctID uuid.UUID) bool
+
+func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.UUID) bool {
+	if a == nil {
+		return false
+	}
+	return a(ctx, acctID)
+}
 
 // Skip the queue-item load for dispatches younger than this window: a Requeue
 // cannot fire before the queue lease expires, so a fresh dispatch is
@@ -91,7 +102,7 @@ type Opts struct {
 	// The default is to always enforce the limits.
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
-	AllowAsyncDispatchValidation flags.BoolFlag
+	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
 }
 
 func New(o Opts) Checkpointer {
