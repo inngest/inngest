@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
@@ -25,12 +26,14 @@ func DeferEventID(parent ulid.ULID, hashedID string) (ulid.ULID, error) {
 }
 
 type DeferredScheduleMetadata struct {
-	FnSlug string `json:"fn_slug"`
+	FnSlug      string    `json:"fn_slug"`
+	ParentAppID uuid.UUID `json:"parent_app_id"`
 
 	// Defer span in the parent run. This is used to update the span when
 	// scheduling the deferred run.
 	ParentDeferSpan *meta.SpanReference `json:"parent_defer_span,omitempty"`
 
+	ParentFnID   uuid.UUID `json:"parent_fn_id"`
 	ParentFnSlug string    `json:"parent_fn_slug"`
 	ParentRunID  ulid.ULID `json:"parent_run_id"`
 }
@@ -39,6 +42,12 @@ func (m *DeferredScheduleMetadata) Validate() error {
 	var errs []error
 	if m.FnSlug == "" {
 		errs = append(errs, errors.New("fn_slug is required"))
+	}
+	if m.ParentAppID == uuid.Nil {
+		errs = append(errs, errors.New("parent_app_id is required"))
+	}
+	if m.ParentFnID == uuid.Nil {
+		errs = append(errs, errors.New("parent_fn_id is required"))
 	}
 	if m.ParentFnSlug == "" {
 		errs = append(errs, errors.New("parent_fn_slug is required"))
