@@ -117,7 +117,7 @@ func compareByRank(a, b parsedAttr) int {
 }
 
 func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) (foundAny bool) {
-	var potentialAttrs map[string][]parsedAttr = map[string][]parsedAttr{}
+	potentialAttrs := map[string][]parsedAttr{}
 
 	for _, attr := range attributes {
 		if mapping, ok := keyFieldMap[attr.Key]; ok {
