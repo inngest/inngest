@@ -268,7 +268,7 @@ func WithRunMode(m QueueRunMode) QueueOpt {
 
 func WithQueueRoles(roles ...QueueRole) QueueOpt {
 	return func(q *QueueOptions) {
-		q.roles = roles
+		q.roles = append(q.roles, roles...)
 	}
 }
 
@@ -786,9 +786,7 @@ func NewQueueOptions(
 }
 
 func (q *queueProcessor) configureQueueRoles() {
-	if len(q.roles) == 0 {
-		q.roles = q.defaultQueueRoles()
-	}
+	q.roles = append(q.defaultQueueRoles(), q.roles...)
 	q.roles = filterQueueRoles(q.QueueOptions, q.roles)
 }
 
@@ -800,7 +798,7 @@ func (q *queueProcessor) defaultQueueRoles() []QueueRole {
 	if q.runMode.Scavenger {
 		roles = append(roles, NewScavengerRole())
 	}
-	roles = append(roles, NewInstrumentationRole(q, WithRoleRunInterval(q.instrumentInterval)))
+	roles = append(roles, newInstrumentationRole(q, WithRoleRunInterval(q.instrumentInterval)))
 	if q.latencyPartition != nil {
 		roles = append(roles, NewLatencyTrackerRole(*q.latencyPartition, WithRoleRunInterval(q.latencyPartition.Interval)))
 	}

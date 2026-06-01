@@ -7,7 +7,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 )
 
-func NewInstrumentationRole(q *queueProcessor, opts ...QueueRoleOpt) QueueRole {
+func newInstrumentationRole(q *queueProcessor, opts ...QueueRoleOpt) QueueRole {
 	return newQueueRole(QueueRoleInstrumentation, RoleLeaseMax, DefaultInstrumentInterval, func(ctx context.Context, shard QueueShard) error {
 		ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
 		return shard.Instrument(ctx)

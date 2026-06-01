@@ -11,12 +11,15 @@ import (
 )
 
 func TestWithQueueRoles(t *testing.T) {
-	t.Run("uses explicit roles", func(t *testing.T) {
+	t.Run("appends custom roles to defaults", func(t *testing.T) {
 		role := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
 		opts := configuredRoleOptions(WithQueueRoles(role))
 
-		require.Len(t, opts.roles, 1)
-		require.Equal(t, "custom", opts.roles[0].Name())
+		names := roleNames(opts.roles)
+		require.Contains(t, names, QueueRoleSequential)
+		require.Contains(t, names, QueueRoleScavenger)
+		require.Contains(t, names, QueueRoleInstrumentation)
+		require.Contains(t, names, "custom")
 	})
 
 	t.Run("defaults from run mode and latency config", func(t *testing.T) {
@@ -24,10 +27,7 @@ func TestWithQueueRoles(t *testing.T) {
 			Interval: time.Second,
 		}))
 
-		names := map[string]struct{}{}
-		for _, role := range opts.roles {
-			names[role.Name()] = struct{}{}
-		}
+		names := roleNames(opts.roles)
 
 		require.Contains(t, names, QueueRoleSequential)
 		require.Contains(t, names, QueueRoleScavenger)
@@ -38,34 +38,45 @@ func TestWithQueueRoles(t *testing.T) {
 	t.Run("omits default sequential role for allowlisted workers", func(t *testing.T) {
 		opts := configuredRoleOptions(WithAllowQueueNames("critical"))
 
-		names := map[string]struct{}{}
-		for _, role := range opts.roles {
-			names[role.Name()] = struct{}{}
-		}
+		names := roleNames(opts.roles)
 
 		require.NotContains(t, names, QueueRoleSequential)
 		require.Contains(t, names, QueueRoleScavenger)
 		require.Contains(t, names, QueueRoleInstrumentation)
 	})
 
-	t.Run("filters explicit sequential role for allowlisted workers", func(t *testing.T) {
+	t.Run("filters custom sequential role for allowlisted workers", func(t *testing.T) {
 		custom := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
 		opts := configuredRoleOptions(
 			WithQueueRoles(NewSequentialRole(), custom),
 			WithAllowQueueNames("critical"),
 		)
 
-		require.Len(t, opts.roles, 1)
-		require.Equal(t, "custom", opts.roles[0].Name())
+		names := roleNames(opts.roles)
+		require.NotContains(t, names, QueueRoleSequential)
+		require.Contains(t, names, QueueRoleScavenger)
+		require.Contains(t, names, QueueRoleInstrumentation)
+		require.Contains(t, names, "custom")
 	})
 
 	t.Run("filters nil roles", func(t *testing.T) {
 		custom := queueRole{name: "custom", leaseDuration: RoleLeaseDuration}
 		opts := configuredRoleOptions(WithQueueRoles(nil, custom))
 
-		require.Len(t, opts.roles, 1)
-		require.Equal(t, "custom", opts.roles[0].Name())
+		names := roleNames(opts.roles)
+		require.Contains(t, names, QueueRoleSequential)
+		require.Contains(t, names, QueueRoleScavenger)
+		require.Contains(t, names, QueueRoleInstrumentation)
+		require.Contains(t, names, "custom")
 	})
+}
+
+func roleNames(roles []QueueRole) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, role := range roles {
+		names[role.Name()] = struct{}{}
+	}
+	return names
 }
 
 func configuredRoleOptions(options ...QueueOpt) *QueueOptions {
