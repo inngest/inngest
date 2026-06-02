@@ -3183,7 +3183,7 @@ func (w wrapper) getSpanRunsCountFullAggregate(ctx context.Context, opt cqrs.Get
 	return count, nil
 }
 
-// getSpanRunsPushdown pages roots first so work is bounded to page size.
+// getSpanRunsPushdown pages executor spans first so we ignore work outside of the page size
 func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	l := logger.StdlibLogger(ctx)
 	h := w.helpers()
