@@ -472,7 +472,6 @@ func TestService_GetEventRuns(t *testing.T) {
 		reader := &mockRunsReader{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID:       eventID,
-			Offset:        0,
 			Limit:         defaultEventRunsLimit,
 			IncludeOutput: true,
 		}).Return(&GetRunsResult{Runs: []*RunListItem{run}}, nil).Once()
@@ -504,12 +503,11 @@ func TestService_GetEventRuns(t *testing.T) {
 		reader := &mockRunsReader{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
-			Offset:  0,
 			Limit:   1,
 		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
-			Offset:  1,
+			Cursor:  runID,
 			Limit:   1,
 		}).Return(&GetRunsResult{Runs: []*RunListItem{nextRun}}, nil).Once()
 		t.Cleanup(func() {
@@ -528,6 +526,7 @@ func TestService_GetEventRuns(t *testing.T) {
 		require.Equal(t, runID.String(), first.Data[0].Id)
 		require.True(t, first.Page.HasMore)
 		require.NotNil(t, first.Page.Cursor)
+		require.Equal(t, runID.String(), first.Page.GetCursor())
 
 		second, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: eventID.String(),
@@ -563,7 +562,6 @@ func TestService_GetEventRuns(t *testing.T) {
 		reader := &mockRunsReader{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
-			Offset:  0,
 			Limit:   defaultEventRunsLimit,
 		}).Return(nil, errors.New("reader failed")).Once()
 		t.Cleanup(func() {

@@ -23,7 +23,7 @@ func NewRunsReader(q db.Querier) apiv2.RunsReader {
 func (r *runsReader) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*apiv2.GetRunsResult, error) {
 	rows, err := r.q.GetRuns(ctx, db.GetRunsParams{
 		EventID:       opts.EventID,
-		Offset:        int64(opts.Offset),
+		Cursor:        opts.Cursor,
 		Limit:         int64(opts.Limit + 1),
 		IncludeOutput: opts.IncludeOutput,
 	})

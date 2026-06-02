@@ -2,11 +2,9 @@ package apiv2
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -84,14 +82,14 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Event ID must be a valid ULID")
 	}
 
-	offset, limit, err := runsPageOpts(req.GetCursor(), req.GetLimit())
+	cursor, limit, err := runsPageOpts(req.GetCursor(), req.GetLimit())
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
 
 	result, err := s.runList.GetRuns(ctx, GetRunsOpts{
 		EventID:       eventID,
-		Offset:        offset,
+		Cursor:        cursor,
 		Limit:         limit,
 		IncludeOutput: req.GetIncludeOutput(),
 	})
@@ -110,63 +108,52 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 	return &apiv2.GetEventRunsResponse{
 		Data:     data,
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
-		Page:     runsPage(offset, limit, result.HasMore),
+		Page:     runsPage(result.Runs, limit, result.HasMore),
 	}, nil
 }
 
-func runsPageOpts(cursor string, requestedLimit int32) (int, int, error) {
+func runsPageOpts(cursor string, requestedLimit int32) (ulid.ULID, int, error) {
 	limit := int(requestedLimit)
 	if limit == 0 {
 		limit = defaultEventRunsLimit
 	}
 	if limit < 1 {
-		return 0, 0, fmt.Errorf("Limit must be at least 1")
+		return ulid.Zero, 0, fmt.Errorf("Limit must be at least 1")
 	}
 	if limit > maxEventRunsLimit {
-		return 0, 0, fmt.Errorf("Limit cannot exceed %d", maxEventRunsLimit)
+		return ulid.Zero, 0, fmt.Errorf("Limit cannot exceed %d", maxEventRunsLimit)
 	}
 
-	offset := 0
+	parsedCursor := ulid.Zero
 	if cursor != "" {
-		decodedOffset, err := decodeEventRunsCursor(cursor)
+		decodedCursor, err := decodeEventRunsCursor(cursor)
 		if err != nil {
-			return 0, 0, fmt.Errorf("Cursor is invalid")
+			return ulid.Zero, 0, fmt.Errorf("Cursor is invalid")
 		}
-		offset = decodedOffset
+		parsedCursor = decodedCursor
 	}
 
-	return offset, limit, nil
+	return parsedCursor, limit, nil
 }
 
-func runsPage(offset int, limit int, hasMore bool) *apiv2.Page {
+func runsPage(runs []*RunListItem, limit int, hasMore bool) *apiv2.Page {
 	page := &apiv2.Page{
 		HasMore: hasMore,
 		Limit:   int32(limit),
 	}
-	if hasMore {
-		nextCursor := encodeEventRunsCursor(offset + limit)
+	if hasMore && len(runs) > 0 {
+		nextCursor := encodeEventRunsCursor(runs[len(runs)-1].RunID)
 		page.Cursor = &nextCursor
 	}
 	return page
 }
 
-func encodeEventRunsCursor(offset int) string {
-	return base64.StdEncoding.EncodeToString([]byte(strconv.Itoa(offset)))
+func encodeEventRunsCursor(runID ulid.ULID) string {
+	return runID.String()
 }
 
-func decodeEventRunsCursor(cursor string) (int, error) {
-	decoded, err := base64.StdEncoding.DecodeString(cursor)
-	if err != nil {
-		return 0, err
-	}
-	offset, err := strconv.Atoi(string(decoded))
-	if err != nil {
-		return 0, err
-	}
-	if offset < 0 {
-		return 0, fmt.Errorf("cursor offset must be positive")
-	}
-	return offset, nil
+func decodeEventRunsCursor(cursor string) (ulid.ULID, error) {
+	return ulid.Parse(cursor)
 }
 
 func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTraceRequest) (*apiv2.GetFunctionTraceResponse, error) {

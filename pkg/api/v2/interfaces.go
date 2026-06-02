@@ -45,7 +45,7 @@ type FunctionRunReader interface {
 
 type GetRunsOpts struct {
 	EventID       ulid.ULID
-	Offset        int
+	Cursor        ulid.ULID
 	Limit         int
 	IncludeOutput bool
 }
