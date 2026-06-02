@@ -2,7 +2,6 @@ package extractors
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -14,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/aigateway"
-	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 //tygo:generate
@@ -51,73 +49,6 @@ func (ms AIMetadata) Serialize() (metadata.Values, error) {
 	}
 
 	return rawMetadata, nil
-}
-
-type AIMetadataExtractor struct{}
-
-func NewAIMetadataExtractor() *AIMetadataExtractor {
-	return &AIMetadataExtractor{}
-}
-
-func (e *AIMetadataExtractor) ExtractSpanMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
-	if !e.isLikelyAISpan(span) {
-		return nil, nil // TODO: should this be an explicit "nah, didn't find any" return?
-	}
-
-	aiMetadata := e.extractAIMetadata(span)
-	return []metadata.Structured{aiMetadata}, nil
-}
-
-var aiAttributeKeys = map[string]bool{
-	"gen_ai.usage.input_tokens":  true,
-	"gen_ai.usage.output_tokens": true,
-	"gen_ai.request.model":       true,
-	"gen_ai.system":              true,
-	"gen_ai.operation.name":      true,
-}
-
-func (e *AIMetadataExtractor) isLikelyAISpan(span *tracev1.Span) bool {
-	for _, attr := range span.Attributes {
-		if aiAttributeKeys[attr.Key] {
-			return true
-		}
-	}
-	return false
-}
-
-func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) AIMetadata {
-	var md AIMetadata
-
-	for _, attr := range span.Attributes {
-		switch attr.Key {
-		case "gen_ai.usage.input_tokens":
-			md.InputTokens = attr.Value.GetIntValue()
-		case "gen_ai.usage.output_tokens":
-			md.OutputTokens = attr.Value.GetIntValue()
-		case "gen_ai.request.model":
-			md.Model = attr.Value.GetStringValue()
-		case "gen_ai.system":
-			md.System = attr.Value.GetStringValue()
-		case "gen_ai.operation.name":
-			md.OperationName = attr.Value.GetStringValue()
-		}
-	}
-
-	// calculate latency from span duration
-	if span.EndTimeUnixNano > span.StartTimeUnixNano {
-		latencyMs := int64((span.EndTimeUnixNano - span.StartTimeUnixNano) / 1_000_000)
-		md.LatencyMs = &latencyMs
-	}
-
-	// calculate total tokens
-	if md.InputTokens > 0 || md.OutputTokens > 0 {
-		totalTokens := md.InputTokens + md.OutputTokens
-		md.TotalTokens = &totalTokens
-	}
-
-	md.EstimatedCost = EstimateCost(md.Model, md.InputTokens, md.OutputTokens)
-
-	return md
 }
 
 func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte, serverProcessingMs int64) ([]metadata.Structured, error) {
