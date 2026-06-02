@@ -141,14 +141,8 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 			continue
 		}
 
-		var chosenAttr parsedAttr
-
-		if len(attrs) == 1 {
-			chosenAttr = attrs[0]
-		} else {
-			// Reduce our list of attrs to the highest-priority one.
-			chosenAttr = slices.MinFunc(attrs, compareByRank)
-		}
+		// Reduce our list of attrs to the highest-priority one.
+		chosenAttr := slices.MinFunc(attrs, compareByRank)
 
 		metadataFieldSetter, ok := metadataFieldSetters[field]
 		if !ok {
