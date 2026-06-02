@@ -333,6 +333,11 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	// Cleanup subscription
+	if err := a.opts.Broadcaster.CloseSubscription(ctx, sub.ID()); err != nil {
+		logger.StdlibLogger(ctx).Warn("error closing websocket subscription", "error", err, "sub_id", sub.ID())
+	}
+
 	logger.StdlibLogger(ctx).Debug("closing websocket conn", "sub_id", sub.ID())
 	_ = ws.CloseNow()
 }
