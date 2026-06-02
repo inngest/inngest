@@ -6,6 +6,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -133,6 +134,57 @@ func TestAIMetadataExtractor_NonAISpan(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, metadata, "Non-AI span should not produce metadata")
+}
+
+func TestExtractAIMetadata_TotalTokens(t *testing.T) {
+	t.Parallel()
+
+	e := NewAIMetadataExtractor()
+
+	cases := []struct {
+		name  string
+		attrs []*commonv1.KeyValue
+		want  *int64
+	}{
+		{
+			// We should be using the provider's total, even if it differs from our calcs
+			name: "provider total preserved when it differs from sum",
+			attrs: []*commonv1.KeyValue{
+				intAttr("gen_ai.usage.input_tokens", 17),
+				intAttr("gen_ai.usage.output_tokens", 44),
+				// 100 != 17 + 44
+				intAttr("gen_ai.usage.total_tokens", 100),
+			},
+			want: util.ToPtr[int64](100),
+		},
+		{
+			name: "computed from input only when total absent",
+			attrs: []*commonv1.KeyValue{
+				intAttr("gen_ai.usage.input_tokens", 10),
+			},
+			want: util.ToPtr[int64](10),
+		},
+		{
+			name: "computed from input+output when total absent",
+			attrs: []*commonv1.KeyValue{
+				intAttr("gen_ai.usage.input_tokens", 56),
+				intAttr("gen_ai.usage.output_tokens", 30),
+			},
+			want: util.ToPtr[int64](86),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			span := &tracev1.Span{Attributes: tc.attrs}
+			md, ok := e.extractAIMetadata(span)
+
+			assert.True(t, ok)
+			assert.Equal(t, tc.want, md.TotalTokens)
+		})
+	}
 }
 
 func TestExtractAIOutputMetadata_VercelAISDK(t *testing.T) {

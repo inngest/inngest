@@ -3,6 +3,7 @@ package extractors
 import (
 	"testing"
 
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/assert"
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 )
@@ -97,6 +98,7 @@ func TestExtractAIMetadataFromAttributes_RealSpans(t *testing.T) {
 			want: AIMetadata{
 				InputTokens:   17,
 				OutputTokens:  44,
+				TotalTokens:   util.ToPtr[int64](61),
 				Model:         "gpt-5.4-nano",
 				System:        "openai",
 				OperationName: "chat",
@@ -129,6 +131,7 @@ func TestExtractAIMetadataFromAttributes_RealSpans(t *testing.T) {
 			want: AIMetadata{
 				InputTokens:  17,
 				OutputTokens: 35,
+				TotalTokens:  util.ToPtr[int64](52),
 				Model:        "gpt-5.4-nano-2026-03-17",
 				System:       "openai",
 				// No gen_ai.operation.name equivalent, so OperationName stays empty.
@@ -155,6 +158,7 @@ func TestExtractAIMetadataFromAttributes_RealSpans(t *testing.T) {
 			want: AIMetadata{
 				InputTokens:   56,
 				OutputTokens:  30,
+				TotalTokens:   util.ToPtr[int64](86),
 				Model:         "gpt-4.1-nano",
 				System:        "openai",
 				OperationName: "chat",
@@ -211,6 +215,7 @@ func TestExtractAIMetadataFromAttributes_RealSpans(t *testing.T) {
 			want: AIMetadata{
 				InputTokens:   56,
 				OutputTokens:  14,
+				TotalTokens:   util.ToPtr[int64](70),
 				Model:         "gpt-4.1-nano-2025-04-14",
 				System:        "openai",
 				OperationName: "",
