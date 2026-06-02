@@ -84,6 +84,7 @@ type ExtractedValues struct {
 	StepGatewayResponseOutputSizeBytes *int
 	RequestID *string
 	JobID *string
+	GroupID *string
 	RequestURL *string
 	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int

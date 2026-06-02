@@ -22,6 +22,10 @@ type ExecutionContext struct {
 	MaxAttempts *int
 	// QueueKind is the queue kind string, eg. "sleep" - the type of job enqueued in our system.
 	QueueKind string
+
+	RequestID *string
+	GroupID   *string
+	JobID     *string
 }
 
 // WithExecutionContext stores data for spans in context.
@@ -76,11 +80,19 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	ec := getExecutionContext(parent)
 
 	if ec != nil {
-		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &ec.Identifier.RunID)
-		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &ec.Identifier.FunctionID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &ec.Identifier.Tenant.AccountID)
-		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &ec.Identifier.Tenant.EnvID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &ec.Identifier.Tenant.AppID)
+		AddMetadataTenantAttrs(rawAttrs, ec.Identifier)
+
+		if ec.RequestID != nil {
+			meta.AddAttr(rawAttrs, meta.Attrs.RequestID, ec.RequestID)
+		}
+
+		if ec.GroupID != nil {
+			meta.AddAttr(rawAttrs, meta.Attrs.GroupID, ec.GroupID)
+		}
+
+		if ec.JobID != nil {
+			meta.AddAttr(rawAttrs, meta.Attrs.JobID, ec.JobID)
+		}
 	}
 
 	// Do not set extra contextual data on extension spans
@@ -130,8 +142,6 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStep:
 		{
-			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
-
 			if ec != nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, ec.MaxAttempts)
 				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
