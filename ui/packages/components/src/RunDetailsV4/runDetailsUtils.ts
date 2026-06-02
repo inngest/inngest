@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { Trace } from './types';
+import { type Trace } from './types';
 
 export const FINAL_SPAN_DISPLAY = 'Finalization';
 export const FINAL_SPAN_NAME = 'function success';

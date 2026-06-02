@@ -44,6 +44,11 @@ type AsyncCheckpoint struct {
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
 	QueueItemRef string `json:"qi_id"`
+	// RequestID is the dispatch ULID the SDK echoes back; see validateAsyncDispatch.
+	RequestID string `json:"request_id"`
+	// RequestStartedAt is the unix-millisecond epoch when the SDK began
+	// processing the dispatched request. See validateAsyncDispatch.
+	RequestStartedAt int64 `json:"request_started_at"`
 
 	// Plus auth data added from auth.  This is never exposed via JSON
 	// for security.

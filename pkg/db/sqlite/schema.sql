@@ -156,7 +156,7 @@ CREATE TABLE spans (
   function_id TEXT NOT NULL,
   run_id TEXT NOT NULL,
   env_id TEXT NOT NULL,
-  output JSON, debug_run_id CHAR(36), debug_session_id CHAR(36), status TEXT, input JSON, event_ids JSON,
+  output JSON, debug_run_id CHAR(36), debug_session_id CHAR(36), status TEXT, input JSON, event_ids JSON, is_deferred BOOLEAN,
 
   PRIMARY KEY (trace_id, span_id)
 );

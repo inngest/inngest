@@ -1636,6 +1636,91 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpan
 	return items, nil
 }
 
+const getSpansByRunIDsAndName = `-- name: GetSpansByRunIDsAndName :many
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_group_array(json_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = ?
+  AND m.run_id IN (/*SLICE:run_ids*/?)
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time
+`
+
+type GetSpansByRunIDsAndNameParams struct {
+	Name   string
+	RunIds []string
+}
+
+type GetSpansByRunIDsAndNameRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	SpanStartTime interface{}
+	SpanEndTime   interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+// Returns spans by name with their current attribute values, merging in any
+// updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+// up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+// carry the span name and would otherwise be filtered out.
+func (q *Queries) GetSpansByRunIDsAndName(ctx context.Context, arg GetSpansByRunIDsAndNameParams) ([]*GetSpansByRunIDsAndNameRow, error) {
+	query := getSpansByRunIDsAndName
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Name)
+	if len(arg.RunIds) > 0 {
+		for _, v := range arg.RunIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(arg.RunIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByRunIDsAndNameRow
+	for rows.Next() {
+		var i GetSpansByRunIDsAndNameRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.TraceID,
+			&i.DynamicSpanID,
+			&i.SpanStartTime,
+			&i.SpanEndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStepSpanByStepID = `-- name: GetStepSpanByStepID :one
 SELECT
   run_id,
@@ -2193,7 +2278,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  is_deferred
 ) VALUES (
   ?1,
   ?2,
@@ -2214,7 +2300,8 @@ INSERT INTO spans (
   ?17,
   ?18,
   ?19,
-  CAST(?20 AS TEXT)
+  CAST(?20 AS TEXT),
+  ?21
 )
 `
 
@@ -2239,6 +2326,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       sql.NullString
+	IsDeferred     sql.NullBool
 }
 
 // New
@@ -2264,6 +2352,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.DebugSessionID,
 		arg.Status,
 		arg.EventIds,
+		arg.IsDeferred,
 	)
 	return err
 }

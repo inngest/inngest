@@ -588,8 +588,9 @@ func (pq *pgQuerier) InsertSpan(ctx context.Context, arg db.InsertSpanParams) er
 		Output:        bytesToNullRaw(arg.Output),
 		Input:         bytesToNullRaw(arg.Input),
 		DebugRunID:    arg.DebugRunID, DebugSessionID: arg.DebugSessionID,
-		Status:   arg.Status,
-		EventIds: bytesToNullRaw(arg.EventIds),
+		Status:     arg.Status,
+		EventIds:   bytesToNullRaw(arg.EventIds),
+		IsDeferred: arg.IsDeferred,
 	})
 }
 
@@ -603,6 +604,28 @@ func (pq *pgQuerier) GetSpansByRunID(ctx context.Context, runID string) ([]*db.S
 		out[i] = &db.SpanRow{
 			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
 			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
+			SpanFragments: r.SpanFragments,
+		}
+	}
+	return out, nil
+}
+
+func (pq *pgQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []string, name string) ([]*db.SpanRow, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := pq.q.GetSpansByRunIDsAndName(ctx, sqlc.GetSpansByRunIDsAndNameParams{
+		RunIds: runIDs,
+		Name:   name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*db.SpanRow, len(rows))
+	for i, r := range rows {
+		out[i] = &db.SpanRow{
+			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
+			StartTime: toTime(r.SpanStartTime), EndTime: toTime(r.SpanEndTime), ParentSpanID: r.ParentSpanID,
 			SpanFragments: r.SpanFragments,
 		}
 	}

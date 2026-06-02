@@ -12,6 +12,7 @@ import {
 import { Header } from '@inngest/components/Header/Header';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
+  useBooleanSearchParam,
   useStringArraySearchParam,
   useValidatedArraySearchParam,
   useValidatedSearchParam,
@@ -70,6 +71,7 @@ function RunsComponent() {
     'timeField',
     isFunctionTimeField,
   );
+  const [excludeDeferred] = useBooleanSearchParam('excludeDeferred');
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
@@ -98,6 +100,7 @@ function RunsComponent() {
         timeField,
         celQuery: search,
         preview,
+        isDeferred: excludeDeferred ? false : null,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -125,6 +128,7 @@ function RunsComponent() {
       timeField,
       search,
       preview,
+      excludeDeferred,
     ],
   );
 
@@ -140,6 +144,7 @@ function RunsComponent() {
           timeField,
           search,
           preview,
+          excludeDeferred,
         },
       ],
       queryFn,
@@ -166,10 +171,20 @@ function RunsComponent() {
         status: filteredStatus,
         timeField,
         celQuery: search,
+        preview,
+        isDeferred: excludeDeferred ? false : null,
       });
       setTotalCount(data.runs.totalCount);
     })();
-  }, [calculatedStartTime, endTime, filteredStatus, timeField, search]);
+  }, [
+    calculatedStartTime,
+    endTime,
+    filteredStatus,
+    timeField,
+    search,
+    preview,
+    excludeDeferred,
+  ]);
 
   useEffect(() => {
     getTotalCount();
@@ -239,6 +254,7 @@ function RunsComponent() {
           history: Number.MAX_SAFE_INTEGER,
           tracesPreview: tracesPreviewEnabled,
           runDetailsV4: v4Enabled,
+          isDeferred: true,
         }}
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}

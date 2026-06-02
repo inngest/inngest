@@ -12,3 +12,15 @@ func EnsureJSON(v json.RawMessage) json.RawMessage {
 	}
 	return v
 }
+
+// IsJSONObject reports whether it's a JSON object. This is a best effort check
+// which assumes valid JSON.
+func IsJSONObject(r json.RawMessage) bool {
+	for _, b := range r {
+		if b == ' ' || b == '\t' || b == '\r' || b == '\n' {
+			continue
+		}
+		return b == '{'
+	}
+	return false
+}

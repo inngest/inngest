@@ -68,6 +68,14 @@ func (r *Resolver) EventV2() generated.EventV2Resolver {
 	return &eventV2Resolver{r}
 }
 
+func (r *Resolver) RunDefer() generated.RunDeferResolver {
+	return &runDeferResolver{r}
+}
+
+func (r *Resolver) RunDeferredFrom() generated.RunDeferredFromResolver {
+	return &runDeferredFromResolver{r}
+}
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
@@ -81,5 +89,7 @@ type functionResolver struct{ *Resolver }
 type streamItemResolver struct{ *Resolver }
 type runsV2ConnResolver struct{ *Resolver }
 type eventsConnectionResolver struct{ *Resolver }
+type runDeferResolver struct{ *Resolver }
+type runDeferredFromResolver struct{ *Resolver }
 
 type eventV2Resolver struct{ *Resolver }

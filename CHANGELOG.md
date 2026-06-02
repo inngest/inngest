@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.24.0] - 2026-06-01
+
+### 🚀 Features
+
+- Surface deferred runs in run details (#4290)
+
+### 🐛 Bug Fixes
+
+- *(queue)* Quarantine deleted account partitions (#4281)
+- Properly calculate discover step (#4280)
+- Prevent duplicate function.finished on overlapping finalize (#4242)
+- Validate dispatch generation on async checkpoints (#4140)
+
+### 🚜 Refactor
+
+- *(queue)* Introduce queue roles (#4289)
+
 ## [v1.23.0] - 2026-05-28
 
 ### 🚀 Features
@@ -24,6 +41,7 @@ All notable changes to this project will be documented in this file.
 
 - Update go sdk (#4264)
 - Improve agentic api cli help  (#4245)
+- *(release)* V1.23.0 (#4258)
 
 ### ◀️ Revert
 
