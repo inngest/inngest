@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
-	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -144,13 +143,13 @@ func TestExtractAIMetadata_TotalTokens(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		attrs []*v1.KeyValue
+		attrs []*commonv1.KeyValue
 		want  *int64
 	}{
 		{
 			// We should be using the provider's total, even if it differs from our calcs
 			name: "provider total preserved when it differs from sum",
-			attrs: []*v1.KeyValue{
+			attrs: []*commonv1.KeyValue{
 				intAttr("gen_ai.usage.input_tokens", 17),
 				intAttr("gen_ai.usage.output_tokens", 44),
 				// 100 != 17 + 44
@@ -160,14 +159,14 @@ func TestExtractAIMetadata_TotalTokens(t *testing.T) {
 		},
 		{
 			name: "computed from input only when total absent",
-			attrs: []*v1.KeyValue{
+			attrs: []*commonv1.KeyValue{
 				intAttr("gen_ai.usage.input_tokens", 10),
 			},
 			want: util.ToPtr[int64](10),
 		},
 		{
 			name: "computed from input+output when total absent",
-			attrs: []*v1.KeyValue{
+			attrs: []*commonv1.KeyValue{
 				intAttr("gen_ai.usage.input_tokens", 56),
 				intAttr("gen_ai.usage.output_tokens", 30),
 			},
