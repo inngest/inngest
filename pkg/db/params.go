@@ -120,7 +120,7 @@ type GetFunctionRunsTimeboundParams struct {
 type GetRunsParams struct {
 	EventID       ulid.ULID
 	Limit         int64
-	Offset        int64
+	Cursor        ulid.ULID
 	IncludeOutput bool
 }
 

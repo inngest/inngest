@@ -52,10 +52,10 @@ func TestGetRuns(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, conn.Close()) })
 
 	rows, err := sqlc.New(conn).GetRuns(context.Background(), sqlc.GetRunsParams{
-		EventID:    eventID[:],
-		RunIds:     [][]byte{runID[:]},
-		OffsetRows: 0,
-		LimitRows:  1,
+		EventID:     eventID[:],
+		RunIds:      [][]byte{runID[:]},
+		CursorRunID: ulid.Zero[:],
+		LimitRows:   1,
 	})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
@@ -174,9 +174,9 @@ func TestGetRunsErrors(t *testing.T) {
 			t.Cleanup(func() { require.NoError(t, conn.Close()) })
 
 			_, err = sqlc.New(conn).GetRuns(context.Background(), sqlc.GetRunsParams{
-				EventID:    eventID[:],
-				OffsetRows: 0,
-				LimitRows:  1,
+				EventID:     eventID[:],
+				CursorRunID: ulid.Zero[:],
+				LimitRows:   1,
 			})
 			require.Error(t, err)
 		})

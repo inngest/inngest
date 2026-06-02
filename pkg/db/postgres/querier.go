@@ -408,10 +408,10 @@ func (pq *pgQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.R
 	}
 
 	rows, err := pq.q.GetRuns(ctx, sqlc.GetRunsParams{
-		EventID:    arg.EventID[:],
-		RunIds:     runIDs,
-		OffsetRows: int32(arg.Offset),
-		LimitRows:  int32(arg.Limit),
+		EventID:     arg.EventID[:],
+		RunIds:      runIDs,
+		CursorRunID: arg.Cursor[:],
+		LimitRows:   int32(arg.Limit),
 	})
 	if err != nil {
 		return nil, err
