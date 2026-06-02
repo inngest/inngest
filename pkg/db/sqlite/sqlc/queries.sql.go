@@ -1266,16 +1266,19 @@ LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
 LEFT JOIN trace_runs ON trace_runs.run_id = function_runs.run_id
 LEFT JOIN event_batches ON event_batches.run_id = function_runs.run_id
 	AND INSTR(CAST(event_batches.event_ids AS TEXT), ?1) > 0
-WHERE function_runs.event_id = ?2
-	OR event_batches.run_id IS NOT NULL
+WHERE (
+		function_runs.event_id = ?2
+		OR event_batches.run_id IS NOT NULL
+	)
+	AND function_runs.run_id > ?3
 ORDER BY function_runs.run_id
-LIMIT ?4 OFFSET ?3
+LIMIT ?4
 `
 
 type GetRunsParams struct {
 	EventIDText string
 	EventID     ulid.ULID
-	OffsetRows  int64
+	CursorRunID ulid.ULID
 	LimitRows   int64
 }
 
@@ -1294,7 +1297,7 @@ func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow
 	rows, err := q.db.QueryContext(ctx, getRuns,
 		arg.EventIDText,
 		arg.EventID,
-		arg.OffsetRows,
+		arg.CursorRunID,
 		arg.LimitRows,
 	)
 	if err != nil {

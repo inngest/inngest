@@ -1247,17 +1247,20 @@ FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL
 LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
-WHERE function_runs.event_id = $1::BYTEA
-    OR function_runs.run_id IN (SELECT UNNEST($2::BYTEA[]))
+WHERE (
+        function_runs.event_id = $1::BYTEA
+        OR function_runs.run_id IN (SELECT UNNEST($2::BYTEA[]))
+    )
+    AND function_runs.run_id > $3::BYTEA
 ORDER BY function_runs.run_id
-LIMIT $4 OFFSET $3
+LIMIT $4
 `
 
 type GetRunsParams struct {
-	EventID    []byte
-	RunIds     [][]byte
-	OffsetRows int32
-	LimitRows  int32
+	EventID     []byte
+	RunIds      [][]byte
+	CursorRunID []byte
+	LimitRows   int32
 }
 
 type GetRunsRow struct {
@@ -1277,7 +1280,7 @@ func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow
 	rows, err := q.db.QueryContext(ctx, getRuns,
 		arg.EventID,
 		pq.Array(arg.RunIds),
-		arg.OffsetRows,
+		arg.CursorRunID,
 		arg.LimitRows,
 	)
 	if err != nil {

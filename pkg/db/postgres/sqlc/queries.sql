@@ -208,10 +208,13 @@ FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL
 LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
-WHERE function_runs.event_id = sqlc.arg('event_id')::BYTEA
-    OR function_runs.run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::BYTEA[]))
+WHERE (
+        function_runs.event_id = sqlc.arg('event_id')::BYTEA
+        OR function_runs.run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::BYTEA[]))
+    )
+    AND function_runs.run_id > sqlc.arg('cursor_run_id')::BYTEA
 ORDER BY function_runs.run_id
-LIMIT @limit_rows OFFSET @offset_rows;
+LIMIT @limit_rows;
 
 -- name: GetTraceRunOutputs :many
 SELECT run_id, COALESCE(output, ''::bytea) AS output

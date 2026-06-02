@@ -188,10 +188,13 @@ LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
 LEFT JOIN trace_runs ON trace_runs.run_id = function_runs.run_id
 LEFT JOIN event_batches ON event_batches.run_id = function_runs.run_id
 	AND INSTR(CAST(event_batches.event_ids AS TEXT), @event_id_text) > 0
-WHERE function_runs.event_id = @event_id
-	OR event_batches.run_id IS NOT NULL
+WHERE (
+		function_runs.event_id = @event_id
+		OR event_batches.run_id IS NOT NULL
+	)
+	AND function_runs.run_id > @cursor_run_id
 ORDER BY function_runs.run_id
-LIMIT @limit_rows OFFSET @offset_rows;
+LIMIT @limit_rows;
 
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));

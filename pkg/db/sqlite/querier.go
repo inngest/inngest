@@ -337,7 +337,7 @@ func (sq *sqliteQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*
 	rows, err := sq.q.GetRuns(ctx, sqlc.GetRunsParams{
 		EventIDText: arg.EventID.String(),
 		EventID:     arg.EventID,
-		OffsetRows:  arg.Offset,
+		CursorRunID: arg.Cursor,
 		LimitRows:   arg.Limit,
 	})
 	if err != nil {
