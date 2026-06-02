@@ -1315,6 +1315,7 @@ func (e *executor) schedule(
 	}
 	functionName := req.Function.Name
 	functionSlug := req.Function.GetSlug()
+	appName := req.AppName
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1326,6 +1327,7 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
 			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
+			meta.Attr(meta.Attrs.AppName, &appName),
 			meta.Attr(meta.Attrs.FunctionName, &functionName),
 			meta.Attr(meta.Attrs.FunctionSlug, &functionSlug),
 		),
