@@ -486,7 +486,7 @@ CREATE INDEX idx_spans_run_dynamic_endtime_status ON public.spans USING btree (r
 -- Name: idx_spans_run_inner_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_spans_run_inner_lookup ON public.spans USING btree (account_id, env_id, start_time DESC, dynamic_span_id) INCLUDE (app_id, function_id, run_id) WHERE ((name = 'executor.run'::text) AND (debug_run_id IS NULL) AND ((status IS NULL) OR (status <> 'Skipped'::text)));
+CREATE INDEX idx_spans_run_inner_lookup ON public.spans USING btree (account_id, env_id, start_time DESC, run_id) INCLUDE (dynamic_span_id, app_id, function_id) WHERE ((name = 'executor.run'::text) AND (debug_run_id IS NULL) AND ((status IS NULL) OR (status <> 'Skipped'::text)));
 
 --
 -- Name: idx_spans_run_status; Type: INDEX; Schema: public; Owner: -
