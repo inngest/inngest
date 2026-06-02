@@ -57,6 +57,8 @@ const (
 	V2CreateWebhookProcedure = "/api.v2.V2/CreateWebhook"
 	// V2ListWebhooksProcedure is the fully-qualified name of the V2's ListWebhooks RPC.
 	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
+	// V2UpdateWebhookProcedure is the fully-qualified name of the V2's UpdateWebhook RPC.
+	V2UpdateWebhookProcedure = "/api.v2.V2/UpdateWebhook"
 	// V2PatchEnvProcedure is the fully-qualified name of the V2's PatchEnv RPC.
 	V2PatchEnvProcedure = "/api.v2.V2/PatchEnv"
 	// V2GetFunctionRunProcedure is the fully-qualified name of the V2's GetFunctionRun RPC.
@@ -94,6 +96,7 @@ type V2Client interface {
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	UpdateWebhook(context.Context, *connect.Request[v2.UpdateWebhookRequest]) (*connect.Response[v2.UpdateWebhookResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
@@ -182,6 +185,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 			connect.WithClientOptions(opts...),
 		),
+		updateWebhook: connect.NewClient[v2.UpdateWebhookRequest, v2.UpdateWebhookResponse](
+			httpClient,
+			baseURL+V2UpdateWebhookProcedure,
+			connect.WithSchema(v2Methods.ByName("UpdateWebhook")),
+			connect.WithClientOptions(opts...),
+		),
 		patchEnv: connect.NewClient[v2.PatchEnvRequest, v2.PatchEnvsResponse](
 			httpClient,
 			baseURL+V2PatchEnvProcedure,
@@ -252,6 +261,7 @@ type v2Client struct {
 	fetchAccountSigningKeys  *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
 	createWebhook            *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
 	listWebhooks             *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
+	updateWebhook            *connect.Client[v2.UpdateWebhookRequest, v2.UpdateWebhookResponse]
 	patchEnv                 *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
 	getFunctionRun           *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
 	syncApp                  *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
@@ -318,6 +328,11 @@ func (c *v2Client) ListWebhooks(ctx context.Context, req *connect.Request[v2.Lis
 	return c.listWebhooks.CallUnary(ctx, req)
 }
 
+// UpdateWebhook calls api.v2.V2.UpdateWebhook.
+func (c *v2Client) UpdateWebhook(ctx context.Context, req *connect.Request[v2.UpdateWebhookRequest]) (*connect.Response[v2.UpdateWebhookResponse], error) {
+	return c.updateWebhook.CallUnary(ctx, req)
+}
+
 // PatchEnv calls api.v2.V2.PatchEnv.
 func (c *v2Client) PatchEnv(ctx context.Context, req *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {
 	return c.patchEnv.CallUnary(ctx, req)
@@ -379,6 +394,7 @@ type V2Handler interface {
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	UpdateWebhook(context.Context, *connect.Request[v2.UpdateWebhookRequest]) (*connect.Response[v2.UpdateWebhookResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
@@ -463,6 +479,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2UpdateWebhookHandler := connect.NewUnaryHandler(
+		V2UpdateWebhookProcedure,
+		svc.UpdateWebhook,
+		connect.WithSchema(v2Methods.ByName("UpdateWebhook")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2PatchEnvHandler := connect.NewUnaryHandler(
 		V2PatchEnvProcedure,
 		svc.PatchEnv,
@@ -541,6 +563,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2CreateWebhookHandler.ServeHTTP(w, r)
 		case V2ListWebhooksProcedure:
 			v2ListWebhooksHandler.ServeHTTP(w, r)
+		case V2UpdateWebhookProcedure:
+			v2UpdateWebhookHandler.ServeHTTP(w, r)
 		case V2PatchEnvProcedure:
 			v2PatchEnvHandler.ServeHTTP(w, r)
 		case V2GetFunctionRunProcedure:
@@ -610,6 +634,10 @@ func (UnimplementedV2Handler) CreateWebhook(context.Context, *connect.Request[v2
 
 func (UnimplementedV2Handler) ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListWebhooks is not implemented"))
+}
+
+func (UnimplementedV2Handler) UpdateWebhook(context.Context, *connect.Request[v2.UpdateWebhookRequest]) (*connect.Response[v2.UpdateWebhookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.UpdateWebhook is not implemented"))
 }
 
 func (UnimplementedV2Handler) PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {

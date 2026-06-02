@@ -30,6 +30,7 @@ const (
 	V2_FetchAccountSigningKeys_FullMethodName  = "/api.v2.V2/FetchAccountSigningKeys"
 	V2_CreateWebhook_FullMethodName            = "/api.v2.V2/CreateWebhook"
 	V2_ListWebhooks_FullMethodName             = "/api.v2.V2/ListWebhooks"
+	V2_UpdateWebhook_FullMethodName            = "/api.v2.V2/UpdateWebhook"
 	V2_PatchEnv_FullMethodName                 = "/api.v2.V2/PatchEnv"
 	V2_GetFunctionRun_FullMethodName           = "/api.v2.V2/GetFunctionRun"
 	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
@@ -59,6 +60,7 @@ type V2Client interface {
 	FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
+	UpdateWebhook(ctx context.Context, in *UpdateWebhookRequest, opts ...grpc.CallOption) (*UpdateWebhookResponse, error)
 	PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error)
 	GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
@@ -188,6 +190,16 @@ func (c *v2Client) ListWebhooks(ctx context.Context, in *ListWebhooksRequest, op
 	return out, nil
 }
 
+func (c *v2Client) UpdateWebhook(ctx context.Context, in *UpdateWebhookRequest, opts ...grpc.CallOption) (*UpdateWebhookResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateWebhookResponse)
+	err := c.cc.Invoke(ctx, V2_UpdateWebhook_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PatchEnvsResponse)
@@ -296,6 +308,7 @@ type V2Server interface {
 	FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
+	UpdateWebhook(context.Context, *UpdateWebhookRequest) (*UpdateWebhookResponse, error)
 	PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error)
 	GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
@@ -347,6 +360,9 @@ func (UnimplementedV2Server) CreateWebhook(context.Context, *CreateWebhookReques
 }
 func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWebhooks not implemented")
+}
+func (UnimplementedV2Server) UpdateWebhook(context.Context, *UpdateWebhookRequest) (*UpdateWebhookResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateWebhook not implemented")
 }
 func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PatchEnv not implemented")
@@ -594,6 +610,24 @@ func _V2_ListWebhooks_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_UpdateWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateWebhookRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).UpdateWebhook(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_UpdateWebhook_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).UpdateWebhook(ctx, req.(*UpdateWebhookRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_PatchEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PatchEnvRequest)
 	if err := dec(in); err != nil {
@@ -806,6 +840,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWebhooks",
 			Handler:    _V2_ListWebhooks_Handler,
+		},
+		{
+			MethodName: "UpdateWebhook",
+			Handler:    _V2_UpdateWebhook_Handler,
 		},
 		{
 			MethodName: "PatchEnv",

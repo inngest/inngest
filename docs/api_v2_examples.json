@@ -129,6 +129,28 @@
       }
     }
   },
+  "/env/webhooks/{id}": {
+    "put": {
+      "200": {
+        "// TODO": "Add example data for put /env/webhooks/{id} 200"
+      },
+      "400": {
+        "// TODO": "Add example data for put /env/webhooks/{id} 400"
+      },
+      "401": {
+        "// TODO": "Add example data for put /env/webhooks/{id} 401"
+      },
+      "403": {
+        "// TODO": "Add example data for put /env/webhooks/{id} 403"
+      },
+      "404": {
+        "// TODO": "Add example data for put /env/webhooks/{id} 404"
+      },
+      "500": {
+        "// TODO": "Add example data for put /env/webhooks/{id} 500"
+      }
+    }
+  },
   "/env/{id}": {
     "patch": {
       "200": {
@@ -281,6 +303,88 @@
             "message": "Something went wrong"
           }
         ]
+      }
+    }
+  },
+  "/insights/events/schemas": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /insights/events/schemas 200"
+      },
+      "400": {
+        "// TODO": "Add example data for get /insights/events/schemas 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /insights/events/schemas 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /insights/events/schemas 403"
+      },
+      "500": {
+        "// TODO": "Add example data for get /insights/events/schemas 500"
+      }
+    }
+  },
+  "/insights/query": {
+    "post": {
+      "200": {
+        "// TODO": "Add example data for post /insights/query 200"
+      },
+      "400": {
+        "// TODO": "Add example data for post /insights/query 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /insights/query 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /insights/query 403"
+      },
+      "404": {
+        "// TODO": "Add example data for post /insights/query 404"
+      },
+      "422": {
+        "// TODO": "Add example data for post /insights/query 422"
+      },
+      "500": {
+        "// TODO": "Add example data for post /insights/query 500"
+      }
+    }
+  },
+  "/insights/query/prompt": {
+    "post": {
+      "200": {
+        "// TODO": "Add example data for post /insights/query/prompt 200"
+      },
+      "400": {
+        "// TODO": "Add example data for post /insights/query/prompt 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /insights/query/prompt 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /insights/query/prompt 403"
+      },
+      "422": {
+        "// TODO": "Add example data for post /insights/query/prompt 422"
+      },
+      "500": {
+        "// TODO": "Add example data for post /insights/query/prompt 500"
+      }
+    }
+  },
+  "/insights/tables": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /insights/tables 200"
+      },
+      "401": {
+        "// TODO": "Add example data for get /insights/tables 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /insights/tables 403"
+      },
+      "500": {
+        "// TODO": "Add example data for get /insights/tables 500"
       }
     }
   },
