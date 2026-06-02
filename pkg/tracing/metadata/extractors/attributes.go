@@ -108,7 +108,7 @@ type parsedAttr struct {
 }
 
 // compareByRank computes the overall ordering of two parsedAttrs.
-// We order first by convention and berak ties with keyRank.
+// We order first by convention and break ties with keyRank.
 func compareByRank(a, b parsedAttr) int {
 	return cmp.Or(
 		cmp.Compare(a.convention, b.convention),
