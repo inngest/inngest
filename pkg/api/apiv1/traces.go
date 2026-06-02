@@ -62,21 +62,6 @@ type ExtendedTraceCapChecker func(ctx context.Context, accountID uuid.UUID, requ
 // the handler has successfully parsed it but before returning 429.
 type ExtendedTraceRejectedRecorder func(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest, rawBody []byte, decision ExtendedTraceCapDecision) error
 
-// ExtendedTraceAcceptedSpan is the per-span usage record for a span that was
-// successfully committed by the userland trace endpoint.
-type ExtendedTraceAcceptedSpan struct {
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-	Bytes       int64
-}
-
-// ExtendedTraceAcceptedRecorder records ingested userland-trace usage after a
-// payload is accepted (under cap) and sent. Cloud uses this as the single
-// source of truth for the ingested byte/span metrics, computed only from spans
-// that were successfully committed. Nil hook is a no-op (self-host).
-type ExtendedTraceAcceptedRecorder func(ctx context.Context, auth apiv1auth.V1Auth, spans []ExtendedTraceAcceptedSpan) error
-
 // userlandSpanBytes sums the OTLP wire size of every span in the request. This
 // is the ingress quantity the extended-trace cap reserves before attempting to
 // write spans.
@@ -168,13 +153,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acceptedSpans, rejectedSpans := a.convertOTLPAndSend(r.Context(), auth, req)
-
-	if a.opts.ExtendedTraceAcceptedRecorder != nil {
-		if err := a.opts.ExtendedTraceAcceptedRecorder(ctx, auth, acceptedSpans); err != nil {
-			logger.StdlibLogger(ctx).Warn("failed to record accepted extended-trace payload", "err", err, "account_id", auth.AccountID())
-		}
-	}
+	rejectedSpans := a.convertOTLPAndSend(r.Context(), auth, req)
 
 	resp := &collecttrace.ExportTraceServiceResponse{}
 	if rejectedSpans > 0 {
@@ -220,12 +199,10 @@ func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) 
 	_, _ = w.Write(data)
 }
 
-func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) ([]ExtendedTraceAcceptedSpan, int64) {
+func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) int64 {
 	var (
-		acceptedMu    sync.Mutex
-		acceptedSpans []ExtendedTraceAcceptedSpan
-		errs          atomic.Int64
-		wg            sync.WaitGroup
+		errs atomic.Int64
+		wg   sync.WaitGroup
 	)
 
 	l := logger.StdlibLogger(ctx).With(
@@ -250,18 +227,13 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 						}
 					}()
 
-					acceptedSpan, err := a.commitSpan(ctx, l, auth, res, ss.Scope, s)
-					if err != nil {
+					if err := a.commitSpan(ctx, l, auth, res, ss.Scope, s); err != nil {
 						if !strings.Contains(err.Error(), "failed to get traceref") {
 							l.Error("failed to commit span", "error", err)
 						}
 						errs.Add(1)
 						return
 					}
-
-					acceptedMu.Lock()
-					acceptedSpans = append(acceptedSpans, acceptedSpan)
-					acceptedMu.Unlock()
 				}()
 			}
 		}
@@ -269,16 +241,16 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 
 	wg.Wait()
 
-	return acceptedSpans, errs.Load()
+	return errs.Load()
 }
 
-func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.V1Auth, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) (ExtendedTraceAcceptedSpan, error) {
+func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.V1Auth, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
 	// To be valid, each span must have an "inngest.traceref" attribute
 	tr, err := getInngestTraceRef(s)
 	if err != nil {
 		// If we can't find the traceref, we can't create a span. So let's
 		// skip it.
-		return ExtendedTraceAcceptedSpan{}, fmt.Errorf("failed to get traceref: %w", err)
+		return fmt.Errorf("failed to get traceref: %w", err)
 	}
 
 	attrs := convertAttributes(s.Attributes)
@@ -302,12 +274,12 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		case consts.OtelAttrSDKRunID:
 			runID, err = ulid.Parse(kv.Value.AsString())
 			if err != nil {
-				return ExtendedTraceAcceptedSpan{}, fmt.Errorf("failed to parse run ID from attributes: %w", err)
+				return fmt.Errorf("failed to parse run ID from attributes: %w", err)
 			}
 		case consts.OtelSysFunctionID:
 			functionID, err = uuid.Parse(kv.Value.AsString())
 			if err != nil {
-				return ExtendedTraceAcceptedSpan{}, fmt.Errorf("failed to parse function ID from attributes: %w", err)
+				return fmt.Errorf("failed to parse function ID from attributes: %w", err)
 			}
 		}
 	}
@@ -316,11 +288,11 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 	// instead we fetch the function anyways and then validate that the workspace IDs match.
 	fn, err := a.opts.FunctionReader.GetFunctionByInternalUUID(ctx, functionID)
 	if err != nil {
-		return ExtendedTraceAcceptedSpan{}, fmt.Errorf("function not found: %w", err)
+		return fmt.Errorf("function not found: %w", err)
 	} else if fn.EnvID != uuid.Nil && fn.EnvID != auth.WorkspaceID() {
-		return ExtendedTraceAcceptedSpan{}, fmt.Errorf("mismatched workspace ID")
+		return fmt.Errorf("mismatched workspace ID")
 	} else if fn.IsArchived() {
-		return ExtendedTraceAcceptedSpan{}, fmt.Errorf("function is archived: %s", functionID)
+		return fmt.Errorf("function is archived: %s", functionID)
 	}
 
 	spanID := trace.SpanID(s.SpanId).String()
@@ -345,7 +317,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		// lineage they're passing us.
 		parent, err = tr.SetParentSpanID(trace.SpanID(s.ParentSpanId))
 		if err != nil {
-			return ExtendedTraceAcceptedSpan{}, fmt.Errorf("failed to set parent span ID: %w", err)
+			return fmt.Errorf("failed to set parent span ID: %w", err)
 		}
 	}
 
@@ -367,7 +339,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 			if sidErr == nil {
 				parent, err = tr.SetParentSpanID(sid)
 				if err != nil {
-					return ExtendedTraceAcceptedSpan{}, fmt.Errorf("failed to set step parent span ID: %w", err)
+					return fmt.Errorf("failed to set step parent span ID: %w", err)
 				}
 			}
 		case "inngest.step.id":
@@ -414,7 +386,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		SpanID:             trace.SpanID(s.SpanId),
 	})
 	if err != nil {
-		return ExtendedTraceAcceptedSpan{}, fmt.Errorf("failed to create span: %w", err)
+		return fmt.Errorf("failed to create span: %w", err)
 	}
 
 	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
@@ -450,12 +422,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		}
 	}
 
-	return ExtendedTraceAcceptedSpan{
-		WorkspaceID: auth.WorkspaceID(),
-		AppID:       fn.AppID,
-		FunctionID:  functionID,
-		Bytes:       int64(proto.Size(s)),
-	}, nil
+	return nil
 }
 
 func getInngestTraceRef(s *tracev1.Span) (*meta.SpanReference, error) {

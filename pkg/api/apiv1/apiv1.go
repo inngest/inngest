@@ -65,11 +65,6 @@ type Opts struct {
 	// record customer_execution_metrics and Redis overage counters without
 	// writing rejected spans to ClickHouse/Kafka. Nil hook is a no-op.
 	ExtendedTraceRejectedRecorder ExtendedTraceRejectedRecorder
-	// ExtendedTraceAcceptedRecorder is called after an under-cap payload is
-	// accepted and sent. Cloud uses this as the single source of truth for the
-	// ingested byte/span metrics, computed only from spans that were
-	// successfully committed. Nil hook is a no-op (self-host).
-	ExtendedTraceAcceptedRecorder ExtendedTraceAcceptedRecorder
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator
