@@ -61,6 +61,7 @@ func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
 	require.Contains(t, invoke.Description, "--prod")
 	require.Contains(t, invoke.Description, "INNGEST_API_KEY")
 	require.Contains(t, invoke.Description, "INNGEST_ENV")
+	require.Contains(t, invoke.Description, "/v2")
 }
 
 func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
@@ -381,6 +382,55 @@ func TestResolveBaseURLCustomTargetOverridesProd(t *testing.T) {
 	require.Equal(t, "http://localhost:1/api/v2", baseURL)
 }
 
+func TestResolveBaseURLAppliesAPIPortToURLHostWithoutPort(t *testing.T) {
+	var baseURL string
+	cmd := Command()
+	cmd.Commands = []*cli.Command{
+		{
+			Name: "capture",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				var err error
+				baseURL, err = resolveBaseURL(ctx, cmd)
+				return err
+			},
+		},
+	}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "http://127.0.0.1",
+		"--api-port", "8090",
+		"capture",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "http://127.0.0.1:8090/api/v2", baseURL)
+}
+
+func TestResolveBaseURLDoesNotApplyDefaultPortToURLHost(t *testing.T) {
+	var baseURL string
+	cmd := Command()
+	cmd.Commands = []*cli.Command{
+		{
+			Name: "capture",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				var err error
+				baseURL, err = resolveBaseURL(ctx, cmd)
+				return err
+			},
+		},
+	}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "https://inngest.example.com",
+		"capture",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "https://inngest.example.com/api/v2", baseURL)
+}
+
 func TestResolveBaseURLAPIPortOverridesProd(t *testing.T) {
 	var baseURL string
 	cmd := Command()
@@ -486,6 +536,11 @@ func TestNormalizeAPIURL(t *testing.T) {
 			expected: "https://inngest.example.com/v2",
 		},
 		{
+			name:     "existing api v2 path is preserved",
+			rawURL:   "https://inngest.example.com/api/v2",
+			expected: "https://inngest.example.com/api/v2",
+		},
+		{
 			name:     "existing api path is completed",
 			rawURL:   "https://inngest.example.com/api",
 			expected: "https://inngest.example.com/api/v2",
@@ -531,6 +586,18 @@ func TestNormalizeAPIHostTarget(t *testing.T) {
 			rawURL:   "http://127.0.0.1:9999",
 			port:     8288,
 			expected: "http://127.0.0.1:9999/api/v2",
+		},
+		{
+			name:     "url host without port uses api port",
+			rawURL:   "http://127.0.0.1",
+			port:     8090,
+			expected: "http://127.0.0.1:8090/api/v2",
+		},
+		{
+			name:     "url host with explicit path and missing port uses api port",
+			rawURL:   "http://127.0.0.1/v2",
+			port:     8090,
+			expected: "http://127.0.0.1:8090/v2",
 		},
 	}
 

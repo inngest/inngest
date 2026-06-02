@@ -153,9 +153,11 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	}
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Strip /api/v2 prefix and forward to gateway
+		// Strip supported v2 prefixes and forward to gateway
 		originalPath := req.URL.Path
 		if after, ok := strings.CutPrefix(req.URL.Path, "/api/v2"); ok {
+			req.URL.Path = after
+		} else if after, ok := strings.CutPrefix(req.URL.Path, "/v2"); ok {
 			req.URL.Path = after
 		}
 

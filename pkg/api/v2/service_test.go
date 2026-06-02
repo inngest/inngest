@@ -138,6 +138,21 @@ func TestNewHTTPHandler(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, rec.Code)
 	})
+
+	t.Run("strips /v2 prefix correctly", func(t *testing.T) {
+		opts := HTTPHandlerOptions{}
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
+
+		require.NoError(t, err)
+		require.NotNil(t, handler)
+
+		req := httptest.NewRequest(http.MethodGet, "/v2/health", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+	})
 }
 
 func TestService_HealthResponse_Structure(t *testing.T) {
