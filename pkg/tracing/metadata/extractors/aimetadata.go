@@ -16,7 +16,7 @@ func NewAIMetadataExtractor() *AIMetadataExtractor {
 func (e *AIMetadataExtractor) ExtractSpanMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
 	aiMetadata, ok := e.extractAIMetadata(span)
 	if !ok {
-		return nil, nil // TODO: should this be an explicit "nah, didn't find any" return?
+		return []metadata.Structured{}, nil
 	}
 	return []metadata.Structured{aiMetadata}, nil
 }
