@@ -235,19 +235,27 @@ func (q *queueProcessor) setRoleLease(ctx context.Context, roleName string, leas
 	nextActive := leaseID != nil && ulid.Time(leaseID.Time()).After(q.Clock().Now())
 
 	if !previousActive && nextActive {
+		logger.StdlibLogger(ctx).Debug(
+			"acquired queue role lease",
+			"role", roleName,
+			"queue_shard", shard.Name(),
+			"lease_expires_at", ulid.Time(leaseID.Time()),
+		)
+
 		switch roleName {
 		case QueueRoleSequential:
 			metrics.IncrQueueSequentialLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		case QueueRoleInstrumentation:
-			logger.StdlibLogger(ctx).Debug("claimed instrumentation lease")
 			metrics.IncrInstrumentationLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		}
 	}
 
-	// Instrumentation has explicit claim/loss logs because it is expected to be
-	// a singleton per shard and is useful when debugging missing queue metrics.
-	if previousActive && !nextActive && roleName == QueueRoleInstrumentation {
-		logger.StdlibLogger(ctx).Debug("lost instrumentation lease")
+	if previousActive && !nextActive {
+		logger.StdlibLogger(ctx).Debug(
+			"lost queue role lease",
+			"role", roleName,
+			"queue_shard", shard.Name(),
+		)
 	}
 
 	// Store the latest lease value, including nil when contention or errors mean
