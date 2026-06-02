@@ -29,6 +29,8 @@ var Attrs = struct {
 	EventsInput         attr[*string]
 	TriggeringEventName attr[*string]
 	FunctionID          attr[*uuid.UUID]
+	FunctionName        attr[*string]
+	FunctionSlug        attr[*string]
 	FunctionVersion     attr[*int]
 	RunID               attr[*ulid.ULID]
 	ReplayOriginalRunID attr[*ulid.ULID]
@@ -193,6 +195,8 @@ var Attrs = struct {
 	EventsInput:                        StringAttr("events.input"),
 	TriggeringEventName:                StringAttr("event.trigger.name"),
 	FunctionID:                         UUIDAttr("function.id"),
+	FunctionName:                       StringAttr("function.name"),
+	FunctionSlug:                       StringAttr("function.slug"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),
 	IsDurableEndpointRun:               BoolAttr("run.is_durable_endpoint"),

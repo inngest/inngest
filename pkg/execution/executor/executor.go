@@ -1313,6 +1313,8 @@ func (e *executor) schedule(
 	if req.ScheduleType != enums.ScheduleTypeUnknown {
 		scheduleTypePtr = &req.ScheduleType
 	}
+	functionName := req.Function.Name
+	functionSlug := req.Function.GetSlug()
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1324,6 +1326,8 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
 			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
+			meta.Attr(meta.Attrs.FunctionName, &functionName),
+			meta.Attr(meta.Attrs.FunctionSlug, &functionSlug),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}

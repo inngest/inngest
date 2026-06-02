@@ -30,6 +30,8 @@ type ExtractedValues struct {
 	EventsInput *string
 	TriggeringEventName *string
 	FunctionID *uuid.UUID
+	FunctionName *string
+	FunctionSlug *string
 	FunctionVersion *int
 	RunID *ulid.ULID
 	ReplayOriginalRunID *ulid.ULID
