@@ -524,6 +524,8 @@ type executor struct {
 	clock             clockwork.Clock
 
 	conditionalTracer itrace.ConditionalTracer
+
+	pauseTimeoutSystemQueue func(ctx context.Context, accountID, envID, functionID uuid.UUID) bool
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -3290,9 +3292,16 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(queue.QueueManager); ok {
+			// Previously we enqueued pause timeouts to the user queue, never a system queue.
+			// We are changing this below, creating per-function timeout partitions.
+			var queueName *string
+			if e.pauseTimeoutSystemQueue != nil && e.pauseTimeoutSystemQueue(ctx, md.ID.Tenant.AccountID, md.ID.Tenant.EnvID, md.ID.FunctionID) {
+				queueName = util.StrPtr(fmt.Sprintf("%s:%s", queue.KindPause, md.ID.FunctionID))
+			}
+
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
-			shard, err := e.shards.Resolve(ctx, md.ID.Tenant.AccountID, nil)
+			shard, err := e.shards.Resolve(ctx, md.ID.Tenant.AccountID, queueName)
 			if err != nil {
 				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
 			}
@@ -4732,7 +4741,12 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		return fmt.Errorf("unable to parse signal expires: %w", err)
 	}
 
-	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
+	md := runCtx.Metadata()
+	accountID := md.ID.Tenant.AccountID
+	envID := md.ID.Tenant.EnvID
+	fnID := md.ID.FunctionID
+
+	pauseID := inngest.DeterministicSha1UUID(md.ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
 	now := e.now()
 
@@ -4751,7 +4765,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	pause := state.Pause{
 		ID:                      pauseID,
-		WorkspaceID:             runCtx.Metadata().ID.Tenant.EnvID,
+		WorkspaceID:             envID,
 		Identifier:              sv2.NewPauseIdentifier(runCtx.Metadata().ID),
 		GroupID:                 runCtx.GroupID(),
 		Outgoing:                gen.ID,
@@ -4768,6 +4782,13 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		},
 		ParallelMode: gen.ParallelMode(),
 		CreatedAt:    now,
+	}
+
+	// Previously we enqueued pause timeouts to the user queue, never a system queue.
+	// We are changing this below, creating per-function timeout partitions.
+	var queueName *string
+	if e.pauseTimeoutSystemQueue != nil && e.pauseTimeoutSystemQueue(ctx, accountID, envID, fnID) {
+		queueName = util.StrPtr(fmt.Sprintf("%s:%s", queue.KindPause, fnID))
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -4787,6 +4808,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		},
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
+		QueueName:    queueName,
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
