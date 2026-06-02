@@ -1776,6 +1776,39 @@ func (w wrapper) InsertTraceRun(ctx context.Context, run *cqrs.TraceRun) error {
 	return w.q.InsertTraceRun(ctx, params)
 }
 
+func traceRunStatusFromDB(status int64) enums.RunStatus {
+	if decoded := enums.RunCodeToStatus(status); decoded != enums.RunStatusUnknown {
+		return decoded
+	}
+	raw := enums.RunStatus(status)
+	if raw.IsARunStatus() {
+		return raw
+	}
+	return enums.RunStatusUnknown
+}
+
+func runStatusFromSpanStatus(status *string) (enums.RunStatus, bool) {
+	if status == nil || *status == "" {
+		return enums.RunStatusUnknown, false
+	}
+	if stepStatus, err := enums.StepStatusString(*status); err == nil && stepStatus != enums.StepStatusUnknown {
+		return enums.StepStatusToRunStatus(stepStatus), true
+	}
+	if runStatus, err := enums.RunStatusString(*status); err == nil && runStatus != enums.RunStatusUnknown {
+		return runStatus, true
+	}
+	return enums.RunStatusUnknown, false
+}
+
+func traceRunStatusDBValues(status enums.RunStatus) []int64 {
+	values := []int64{status.ToCode()}
+	raw := int64(status)
+	if raw != values[0] {
+		values = append(values, raw)
+	}
+	return values
+}
+
 type traceRunCursorFilter struct {
 	ID    string
 	Value int64
@@ -1912,7 +1945,7 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 			SourceID:     run.SourceID,
 			TriggerIDs:   triggerIDS,
 			Output:       run.Output,
-			Status:       enums.RunCodeToStatus(run.Status),
+			Status:       traceRunStatusFromDB(run.Status),
 			BatchID:      batchID,
 			IsBatch:      isBatch,
 			CronSchedule: cron,
@@ -1961,14 +1994,126 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		SourceID:     run.SourceID,
 		TriggerIDs:   triggerIDS,
 		Output:       run.Output,
-		Status:       enums.RunCodeToStatus(run.Status),
+		Status:       traceRunStatusFromDB(run.Status),
 		BatchID:      batchID,
 		IsBatch:      isBatch,
 		CronSchedule: cron,
 		HasAI:        run.HasAi,
 	}
 
+	if err := w.applySpanDetailsToTraceRuns(ctx, []*cqrs.TraceRun{&trun}); err != nil {
+		return nil, err
+	}
+
 	return &trun, nil
+}
+
+type traceRunSpanDetail struct {
+	endedAt *time.Time
+	status  *enums.RunStatus
+}
+
+func (w wrapper) applySpanDetailsToTraceRuns(ctx context.Context, runs []*cqrs.TraceRun) error {
+	runIDs := make([]string, 0, len(runs))
+	for _, run := range runs {
+		if run != nil && run.RunID != "" {
+			runIDs = append(runIDs, run.RunID)
+		}
+	}
+	if len(runIDs) == 0 {
+		return nil
+	}
+
+	details, err := w.loadTraceRunSpanDetails(ctx, runIDs)
+	if err != nil {
+		return err
+	}
+	for _, run := range runs {
+		detail, ok := details[run.RunID]
+		if !ok {
+			continue
+		}
+		if detail.status != nil {
+			run.Status = *detail.status
+		}
+		if detail.endedAt != nil {
+			run.EndedAt = *detail.endedAt
+			run.Duration = run.EndedAt.Sub(run.StartedAt)
+		}
+	}
+	return nil
+}
+
+func (w wrapper) loadTraceRunSpanDetails(ctx context.Context, runIDs []string) (map[string]traceRunSpanDetail, error) {
+	l := logger.StdlibLogger(ctx)
+	h := w.helpers()
+
+	q := sq.Dialect(h.GoquDialect()).
+		From("spans").
+		Select(
+			"run_id",
+			sq.L(`(SELECT s2.end_time FROM spans s2
+				WHERE s2.run_id = spans.run_id
+					AND s2.dynamic_span_id = spans.dynamic_span_id
+					AND s2.debug_run_id IS NULL
+					AND (s2.status IS NULL OR s2.status <> ?)
+				ORDER BY s2.end_time DESC NULLS LAST, s2.span_id DESC LIMIT 1)`, enums.RunStatusSkipped.String()).As("end_time"),
+			sq.L(`(SELECT s2.status FROM spans s2
+				WHERE s2.run_id = spans.run_id
+					AND s2.dynamic_span_id = spans.dynamic_span_id
+					AND s2.debug_run_id IS NULL
+					AND (s2.status IS NULL OR s2.status <> ?)
+				ORDER BY s2.end_time DESC NULLS LAST, s2.span_id DESC LIMIT 1)`, enums.RunStatusSkipped.String()).As("status"),
+		).
+		Where(
+			sq.C("run_id").In(runIDs),
+			sq.C("name").Eq(meta.SpanNameRun),
+			sq.C("debug_run_id").IsNull(),
+			sq.Or(
+				sq.C("status").IsNull(),
+				sq.C("status").Neq(enums.RunStatusSkipped.String()),
+			),
+		)
+
+	sqlQuery, args, err := q.ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	l.Debug("GetTraceRun span details query", "sql", sqlQuery, "args", args)
+
+	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	details := map[string]traceRunSpanDetail{}
+	for rows.Next() {
+		var runID string
+		var endTime, status *string
+		if err := rows.Scan(&runID, &endTime, &status); err != nil {
+			return nil, err
+		}
+
+		detail := traceRunSpanDetail{}
+		if endTime != nil && *endTime != "" {
+			if parsed, err := h.ParseTime(*endTime); err == nil {
+				detail.endedAt = &parsed
+			}
+		}
+		if status != nil && *status != "" {
+			if parsed, ok := runStatusFromSpanStatus(status); ok {
+				detail.status = &parsed
+			}
+		}
+		details[runID] = detail
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return details, nil
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
@@ -2163,12 +2308,14 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 			case enums.RunStatusUnknown, enums.RunStatusOverflowed:
 				continue
 			}
-			status = append(status, s.ToCode())
+			status = append(status, traceRunStatusDBValues(s)...)
 		}
 		filter = append(filter, sq.C("status").In(status))
 	}
 	// Skipped runs should only be visible in event-scoped queries, not the runs list
-	filter = append(filter, sq.C("status").Neq(enums.RunStatusSkipped.ToCode()))
+	for _, skipped := range traceRunStatusDBValues(enums.RunStatusSkipped) {
+		filter = append(filter, sq.C("status").Neq(skipped))
+	}
 	tsfield := strings.ToLower(opt.Filter.TimeField.String())
 	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UnixMilli()))
 
@@ -2274,13 +2421,16 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 }
 
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
-	// explicitly set it to zero so it would not attempt to paginate
+	opt.Cursor = ""
 	opt.Items = 0
-	if opt.Preview {
+	if opt.Preview && !canReadEndedAtFromTraceRuns(opt) {
 		return w.getSpanRunsCount(ctx, opt)
 	}
+	if opt.Filter.CEL == "" {
+		return w.countTraceRunsFromTable(ctx, opt)
+	}
 
-	res, err := w.GetTraceRuns(ctx, opt)
+	res, err := w.getTraceRunsFromTable(ctx, opt)
 	if err != nil {
 		return 0, err
 	}
@@ -2289,10 +2439,42 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
-	if opt.Preview {
+	if opt.Preview && !canReadEndedAtFromTraceRuns(opt) {
 		return w.GetSpanRuns(ctx, opt)
 	}
 
+	return w.getTraceRunsFromTable(ctx, opt)
+}
+
+// trace_runs is complete for ended runs and avoids span aggregation.
+func canReadEndedAtFromTraceRuns(opt cqrs.GetTraceRunOpt) bool {
+	return opt.Filter.TimeField == enums.TraceRunTimeEndedAt && opt.Filter.CEL == ""
+}
+
+func (w wrapper) countTraceRunsFromTable(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	l := logger.StdlibLogger(ctx)
+	builder := newRunsQueryBuilder(ctx, opt)
+
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("trace_runs").
+		Select(sq.COUNT("*").As("count")).
+		Where(builder.filter...).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	l.Debug("GetTraceRunsCount query", "sql", sql, "args", args)
+
+	var count int
+	if err := w.adapter.Conn().QueryRowContext(ctx, sql, args...).Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (w wrapper) getTraceRunsFromTable(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	l := logger.StdlibLogger(ctx)
 
 	// use evtIDs as post query filter
@@ -2319,14 +2501,11 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	reqcursor := builder.cursor
 	resCursorLayout := builder.cursorLayout
 
-	// read from database
-	// TODO:
-	// change this to a continuous loop with limits instead of just attempting to grab everything.
-	// might not matter though since this is primarily meant for local
-	// development
-	sql, args, err := sq.Dialect(w.dialect()).
+	q := sq.Dialect(w.dialect()).
 		From("trace_runs").
 		Select(
+			"account_id",
+			"workspace_id",
 			"app_id",
 			"function_id",
 			"trace_id",
@@ -2344,8 +2523,12 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			"has_ai",
 		).
 		Where(filter...).
-		Order(order...).
-		ToSQL()
+		Order(order...)
+	if opt.Items > 0 && !expHandler.HasEventFilters() && !expHandler.HasOutputFilters() {
+		q = q.Limit(opt.Items + 1)
+	}
+
+	sql, args, err := q.ToSQL()
 	if err != nil {
 		return nil, err
 	}
@@ -2354,12 +2537,15 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.TraceRun{}
 	var count uint
 	for rows.Next() {
 		data := dbpkg.TraceRun{}
 		err := rows.Scan(
+			&data.AccountID,
+			&data.WorkspaceID,
 			&data.AppID,
 			&data.FunctionID,
 			&data.TraceID,
@@ -2442,6 +2628,8 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		}
 
 		res = append(res, &cqrs.TraceRun{
+			AccountID:    data.AccountID,
+			WorkspaceID:  data.WorkspaceID,
 			AppID:        data.AppID,
 			FunctionID:   data.FunctionID,
 			TraceID:      string(data.TraceID),
@@ -2453,7 +2641,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			TriggerIDs:   data.EventIDs(),
 			Triggers:     [][]byte{},
 			Output:       data.Output,
-			Status:       enums.RunCodeToStatus(data.Status),
+			Status:       traceRunStatusFromDB(data.Status),
 			IsBatch:      isBatch,
 			BatchID:      batchID,
 			IsDebounce:   data.IsDebounce,
@@ -2465,6 +2653,15 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		// enough items, don't need to proceed anymore
 		if opt.Items > 0 && count >= opt.Items {
 			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if opt.Preview && canReadEndedAtFromTraceRuns(opt) {
+		if err := w.applySpanDetailsToTraceRuns(ctx, res); err != nil {
+			return nil, err
 		}
 	}
 

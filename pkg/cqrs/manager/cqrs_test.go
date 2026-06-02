@@ -16,6 +16,7 @@ import (
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -1397,6 +1398,13 @@ func TestCQRSUpdateFunctionConfig(t *testing.T) {
 // Trace Run Tests
 //
 
+func TestTraceRunStatusFromDB(t *testing.T) {
+	assert.Equal(t, enums.RunStatusCompleted, traceRunStatusFromDB(enums.RunStatusCompleted.ToCode()))
+	assert.Equal(t, enums.RunStatusCompleted, traceRunStatusFromDB(int64(enums.RunStatusCompleted)))
+	assert.Equal(t, enums.RunStatusScheduled, traceRunStatusFromDB(int64(enums.RunStatusScheduled)))
+	assert.ElementsMatch(t, []int64{enums.RunStatusCompleted.ToCode(), int64(enums.RunStatusCompleted)}, traceRunStatusDBValues(enums.RunStatusCompleted))
+}
+
 func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -1858,6 +1866,121 @@ func TestCQRSGetTraceRunsNonPreviewScopesTenant(t *testing.T) {
 	count, err := cm.GetTraceRunsCount(ctx, opt)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
+}
+
+func TestCQRSGetTraceRunsPreviewEndedAtUsesTraceRuns(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	otherAccountID := uuid.New()
+	otherWorkspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	runIDs := make([]string, 2)
+	for i := range runIDs {
+		runIDs[i] = ulid.MustNew(ulid.Now(), rand.Reader).String()
+		status := enums.RunStatusCompleted
+		if i == 1 {
+			status = enums.RunStatusRunning
+		}
+		err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     fmt.Sprintf("trace-ended-%d", i),
+			RunID:       runIDs[i],
+			QueuedAt:    baseTime,
+			StartedAt:   baseTime,
+			EndedAt:     baseTime.Add(time.Duration(i+1) * time.Second),
+			Status:      status,
+		})
+		require.NoError(t, err)
+	}
+
+	for _, span := range []testSpanFields{
+		{
+			RunID:         runIDs[1],
+			DynamicSpanID: "ended-stale-root",
+			Name:          meta.SpanNameRun,
+			Status:        enums.RunStatusRunning.String(),
+			StartTime:     baseTime,
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		},
+		{
+			RunID:         runIDs[1],
+			DynamicSpanID: "ended-stale-root",
+			Name:          meta.SpanNameRun,
+			Status:        enums.RunStatusCompleted.String(),
+			StartTime:     baseTime.Add(2 * time.Second),
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		},
+	} {
+		insertTestSpan(t, cm, span)
+	}
+
+	err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+		AccountID:   otherAccountID,
+		WorkspaceID: otherWorkspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-other-ended",
+		RunID:       ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		QueuedAt:    baseTime,
+		StartedAt:   baseTime,
+		EndedAt:     baseTime.Add(3 * time.Second),
+		Status:      enums.RunStatusCompleted,
+	})
+	require.NoError(t, err)
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeEndedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeEndedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Items:   1,
+		Preview: true,
+	}
+
+	firstPage, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+	assert.Equal(t, runIDs[1], firstPage[0].RunID)
+	assert.Equal(t, accountID, firstPage[0].AccountID)
+	assert.Equal(t, workspaceID, firstPage[0].WorkspaceID)
+	assert.Equal(t, enums.RunStatusCompleted, firstPage[0].Status)
+
+	countOpt := opt
+	countOpt.Cursor = firstPage[0].Cursor
+	count, err := cm.GetTraceRunsCount(ctx, countOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	secondOpt := opt
+	secondOpt.Cursor = firstPage[0].Cursor
+	secondPage, err := cm.GetTraceRuns(ctx, secondOpt)
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, runIDs[0], secondPage[0].RunID)
 }
 
 // Root-page results must derive end_time/status from EXTEND spans.
