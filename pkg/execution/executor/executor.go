@@ -464,6 +464,13 @@ func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 	}
 }
 
+func WithEnablePauseTimeoutSystemQueue(flag func(ctx context.Context, accountID, envID, fnID uuid.UUID) bool) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).pauseTimeoutSystemQueue = flag
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
