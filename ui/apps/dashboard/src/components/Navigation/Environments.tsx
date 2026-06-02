@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-
 import { Listbox } from '@headlessui/react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import {
@@ -130,15 +128,9 @@ export default function EnvironmentSelectMenu({
 }: EnvironmentSelectMenuProps) {
   const navigate = useNavigate();
   type ListboxValue = Environment | null | 'view_all' | 'sync_branch';
-  const [selected, setSelected] = useState<ListboxValue>(null);
+  const selected: ListboxValue = activeEnv ?? null;
   const nextPathname = useSwitchablePathname();
   const [{ data: envs = [], error }] = useEnvironments();
-
-  //
-  // Sync selected state with activeEnv from route
-  useEffect(() => {
-    setSelected(activeEnv || null);
-  }, [activeEnv]);
 
   if (error) {
     console.error('error fetching envs', error);
