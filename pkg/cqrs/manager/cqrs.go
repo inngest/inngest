@@ -3247,7 +3247,7 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 		return []*cqrs.TraceRun{}, nil
 	}
 
-	if err := w.enrichSpanRunPage(ctx, opt, h, pageRows); err != nil {
+	if err := w.loadSpanRunPageDetails(ctx, opt, h, pageRows); err != nil {
 		return nil, err
 	}
 
@@ -3268,8 +3268,8 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 	return res, nil
 }
 
-// enrichSpanRunPage overlays final end_time/status for the root-selected page.
-func (w wrapper) enrichSpanRunPage(
+// loadSpanRunPageDetails fills in end_time and status for the selected roots.
+func (w wrapper) loadSpanRunPageDetails(
 	ctx context.Context,
 	opt cqrs.GetTraceRunOpt,
 	h driverhelp.DialectHelpers,
@@ -3380,13 +3380,13 @@ func spanRunCELFilters(
 }
 
 func spanRunRootPredicates(opt cqrs.GetTraceRunOpt) []sq.Expression {
-	// The root subquery is bounded by Until (an executor.run always precedes
-	// any EXTEND sharing its dynamic_span_id). For start_time-based windows we
-	// also apply the From floor so the inner scan stops growing O(total
-	// executor.run history) as the system ages — at the cost of excluding runs
-	// whose root started before From but had EXTEND activity inside the
-	// window. For end_time-based windows we skip the floor: a run that ended
-	// in-window can legitimately have started arbitrarily earlier.
+	// the root subquery is bounded by Until (an executor.run always exists,
+	// before any EXTEND that adds finalization, etc.)
+	//
+	// for start_time-based windows we also apply the From rnage so the
+	// inner scan stops growing O(total executor.run history) as runs grow...
+	// at the cost of excluding runs whose root started before From but
+	// was EXTENDed inside the window.  that's fine, given start time shit.
 	preds := []sq.Expression{
 		sq.C("name").Eq(meta.SpanNameRun),
 		sq.C("debug_run_id").IsNull(),
