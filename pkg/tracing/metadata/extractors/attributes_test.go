@@ -21,17 +21,6 @@ func intAttr(key string, value int64) *v1.KeyValue {
 	}
 }
 
-func strArrAttr(key string, values ...string) *v1.KeyValue {
-	vals := make([]*v1.AnyValue, len(values))
-	for i, v := range values {
-		vals[i] = &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: v}}
-	}
-	return &v1.KeyValue{
-		Key:   key,
-		Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: vals}}},
-	}
-}
-
 // TestCanonicalKeysHaveFieldSetters guards against drift between
 // canonicalKeyMapping and metadataFieldSetters: every canonical key referenced
 // by a mapping must have a setter, otherwise the attribute is silently dropped.
