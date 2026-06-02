@@ -29,7 +29,7 @@ import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
 import type { Trace } from './types';
-import { traceToTimelineData } from './utils/traceConversion';
+import { traceRollup, traceToTimelineData } from './utils/traceConversion';
 
 // Residual poll interval for userland traces
 const RESIDUAL_POLL_INTERVAL = 6000;
@@ -85,6 +85,12 @@ function TimelineV4Wrapper({
     });
     return map;
   }, [trace]);
+
+  const rolledUpTrace = useMemo(
+    // Roll up the trace to hide (new) request spans and group step attempts.
+    () => traceRollup(trace),
+    [trace, runID, orgName, functionSlug]
+  );
 
   // Convert V3 trace to V4 TimelineData
   const timelineData = useMemo(

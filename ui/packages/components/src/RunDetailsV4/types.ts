@@ -15,6 +15,7 @@ export type Trace = {
   queuedAt: string;
   spanID: string;
   stepID?: string | null;
+  groupID?: string | null;
   startedAt: string | null;
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | StepInfoSignal | null;
