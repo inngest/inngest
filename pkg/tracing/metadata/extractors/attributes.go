@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/inngest/inngest/pkg/util"
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
@@ -38,6 +39,10 @@ var keyFieldMap = map[string]attrMapping{
 		field:      "outputTokens",
 		convention: semconv,
 	},
+	"gen_ai.usage.total_tokens": {
+		field:      "totalTokens",
+		convention: semconv,
+	},
 	"gen_ai.request.model": {
 		field:      "model",
 		convention: semconv,
@@ -69,6 +74,10 @@ var keyFieldMap = map[string]attrMapping{
 		field:      "outputTokens",
 		convention: openinference,
 	},
+	"llm.token_count.total": {
+		field:      "totalTokens",
+		convention: openinference,
+	},
 	"llm.model_name": {
 		field:      "model",
 		convention: openinference,
@@ -87,6 +96,9 @@ var metadataFieldSetters = map[string]func(v *v1.AnyValue, md *AIMetadata){
 	},
 	"outputTokens": func(v *v1.AnyValue, md *AIMetadata) {
 		md.OutputTokens = v.GetIntValue()
+	},
+	"totalTokens": func(v *v1.AnyValue, md *AIMetadata) {
+		md.TotalTokens = util.ToPtr(v.GetIntValue())
 	},
 	"model": func(v *v1.AnyValue, md *AIMetadata) {
 		md.Model = v.GetStringValue()
