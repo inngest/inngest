@@ -2,9 +2,11 @@ package queue
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -12,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type PartitionConstraintConfig struct {
@@ -64,12 +67,42 @@ type PartitionConcurrency struct {
 }
 
 type BacklogRefillConstraintCheckResult struct {
-	ItemsToRefill        []string
-	ItemCapacityLeases   []CapacityLease
-	LimitingConstraint   enums.QueueConstraint
-	SkipConstraintChecks bool
+	ItemsToRefill      []string
+	ItemCapacityLeases []CapacityLease
+	LimitingConstraint enums.QueueConstraint
 
 	RetryAfter time.Time
+}
+
+// enqueuedAtTime returns the wall-clock enqueue time for a queue item, or the
+// zero value when the item predates the EnqueuedAt schema field. Returning
+// zero is important: the constraint cache treats a zero RequestTime as
+// unanchored and falls back to its default behavior, so legacy items behave
+// the same as before.
+func enqueuedAtTime(item *QueueItem) time.Time {
+	if item == nil || item.EnqueuedAt == 0 {
+		return time.Time{}
+	}
+	return time.UnixMilli(item.EnqueuedAt)
+}
+
+// earliestEnqueuedAt returns the oldest EnqueuedAt across the items, used as
+// RequestTime on batched Acquire calls. Items already waiting in the queue
+// when the constraint cache populated an "exhausted" entry must bypass that
+// stale entry once capacity is freed; the cache compares cache addedAt
+// against RequestTime and only bypasses when RequestTime is older.
+func earliestEnqueuedAt(items []*QueueItem) time.Time {
+	var earliest time.Time
+	for _, item := range items {
+		t := enqueuedAtTime(item)
+		if t.IsZero() {
+			continue
+		}
+		if earliest.IsZero() || t.Before(earliest) {
+			earliest = t
+		}
+	}
+	return earliest
 }
 
 func ConvertLimitingConstraint(
@@ -116,6 +149,11 @@ func ConvertLimitingConstraint(
 		case
 			c.Kind == constraintapi.ConstraintKindThrottle:
 			constraint = enums.QueueConstraintThrottle
+
+		// Semaphore
+		case
+			c.Kind == constraintapi.ConstraintKindSemaphore:
+			constraint = enums.QueueConstraintSemaphore
 		}
 	}
 
@@ -131,15 +169,6 @@ type ItemLeaseConstraintCheckResult struct {
 	// limitingConstraint returns the most limiting constraint in case
 	// no capacity was available.
 	LimitingConstraint enums.QueueConstraint
-
-	// skipConstraintChecks determines whether subsequent operations
-	// should check and enforce constraints, and whether constraint state
-	// should be updated while processing a queue item.
-	//
-	// When enrolled to the Constraint API and holding a valid capacity lease,
-	// constraint checks _and_ updates may be skipped, as state is maintained within
-	// the Constraint API.
-	SkipConstraintChecks bool
 
 	RetryAfter time.Time
 }
@@ -198,7 +227,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		itemRunIDs[item.ID] = item.Data.Identifier.RunID
 	}
 
-	if q.CapacityManager == nil || q.UseConstraintAPI == nil {
+	if q.CapacityManager == nil {
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
@@ -216,9 +245,8 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
-	if !q.AcquireCapacityLeaseOnBacklogRefill || !useAPI {
-		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
+	if !q.AcquireCapacityLeaseOnBacklogRefill {
+		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return &BacklogRefillConstraintCheckResult{
@@ -226,15 +254,34 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
+	// Build constraint items and config.
+	// NOTE: Semaphores are NOT included in the batch Acquire... they come directly
+	// from queue items.
+	constraintsToCheck := constraintItemsFromBacklog(backlog, constraints)
+	if len(constraintsToCheck) == 0 {
+		return &BacklogRefillConstraintCheckResult{
+			ItemsToRefill: itemIDs,
+		}, nil
+	}
+
+	var appID uuid.UUID
+	if len(items) > 0 {
+		appID = items[0].Data.Identifier.AppID
+	}
+
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-		AccountID:            *shadowPart.AccountID,
-		EnvID:                *shadowPart.EnvID,
-		IdempotencyKey:       operationIdempotencyKey,
-		FunctionID:           *shadowPart.FunctionID,
-		CurrentTime:          now,
+		AccountID: *shadowPart.AccountID,
+		EnvID:     *shadowPart.EnvID,
+		// TODO: Make appID available to backlog
+		AppID:          appID,
+		IdempotencyKey: operationIdempotencyKey,
+		FunctionID:     *shadowPart.FunctionID,
+		CurrentTime:    now,
+		// NOTE: We cannot skip caching for older queue items as this will massively increase load on the Constraint API, leading to latency spikes
+		// RequestTime:          earliestEnqueuedAt(items),
 		Duration:             QueueLeaseDuration,
+		Constraints:          constraintsToCheck,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
-		Constraints:          constraintItemsFromBacklog(shadowPart, backlog, constraints),
 		Amount:               len(items),
 		LeaseIdempotencyKeys: itemIDs,
 		LeaseRunIDs:          itemRunIDs,
@@ -272,7 +319,8 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		// NOTE: This works because idempotency key == queue item ID
 		itemsToRefill[i] = l.IdempotencyKey
 		itemCapacityLeases[i] = CapacityLease{
-			LeaseID: l.LeaseID,
+			LeaseID:    l.LeaseID,
+			IssuedAtMS: now.UnixMilli(),
 		}
 	}
 
@@ -280,8 +328,6 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		ItemsToRefill:      itemsToRefill,
 		ItemCapacityLeases: itemCapacityLeases,
 		LimitingConstraint: constraint,
-		// NOTE: We've enforced constraints, so BacklogRefill can skip GCRA, etc.
-		SkipConstraintChecks: true,
 	}, nil
 }
 
@@ -308,9 +354,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	// Disable lease checks for system queues
 	// NOTE: This also disables constraint updates during processing, for consistency.
 	if shadowPart.SystemQueueName != nil {
-		return ItemLeaseConstraintCheckResult{
-			SkipConstraintChecks: true,
-		}, nil
+		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
 	if shadowPart.AccountID == nil ||
@@ -322,76 +366,104 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	if q.CapacityManager == nil ||
-		q.UseConstraintAPI == nil {
+	if q.CapacityManager == nil {
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIUninitialized.String(), metrics.CounterOpt{
 			PkgName: pkgName,
 		})
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI := q.UseConstraintAPI(ctx, *shadowPart.AccountID)
-	if !useAPI {
-		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonFeatureFlagDisabled.String(), metrics.CounterOpt{
-			PkgName: pkgName,
-		})
-		return ItemLeaseConstraintCheckResult{}, nil
-	}
+	ctx, span := q.Options().ConditionalTracer.NewSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	defer span.End()
 
 	idempotencyKey := item.ID
 
-	// If capacity lease is still valid for the forseeable future, use it
-	if item.CapacityLease != nil {
-		expiry := item.CapacityLease.LeaseID.Timestamp()
-		hasValidLease := expiry.After(now.Add(2 * time.Second))
+	var (
+		// a container for constraints that we'll check
+		constraintItems []constraintapi.ConstraintItem
+		config          = constraintapi.ConstraintConfig{
+			FunctionVersion: constraints.FunctionVersion,
+		}
+	)
 
-		ttl := expiry.Sub(now)
-		expired := ttl <= 0
-
+	switch hasValidCapacityLease(item, now) {
+	case true:
+		// in this case, key queues claimed a bunch of constraints up front and we already have some
+		// capacity claimed.
+		//
+		// run some metrics.
+		ttl := item.CapacityLease.LeaseID.Timestamp().Sub(now)
 		metrics.HistogramConstraintAPIQueueItemLeaseTTL(ctx, ttl, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"expired": expired,
-				"kq":      item.RefilledAt != 0,
+				"kq": item.RefilledAt != 0,
 			},
 		})
 
-		// Lease is still valid, return immediately
-		if hasValidLease {
+		if len(item.Data.Semaphores) == 0 {
+			// backlog lease covers everything, no semaphores — skip Acquire entirely.
+			span.SetAttributes(attribute.Bool("valid_lease", true))
 			return ItemLeaseConstraintCheckResult{
 				CapacityLease: item.CapacityLease,
-				// Skip any constraint checks and subsequent updates,
-				// as constraint state is maintained in the Constraint API.
-				SkipConstraintChecks: true,
 			}, nil
 		}
-
-		// Lease is invalid or not valid long enough, optimistically return capacity
-		// without blocking critical path operations
-		service.Go(func() {
-			_, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-				AccountID:      *shadowPart.AccountID,
-				IdempotencyKey: idempotencyKey,
-				LeaseID:        item.CapacityLease.LeaseID,
-				Source: constraintapi.LeaseSource{
-					Location:          constraintapi.CallerLocationItemLease,
-					Service:           constraintapi.ServiceExecutor,
-					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
+	case false:
+		// release expired/near-expiring lease in the background so that capacity
+		// is freed promptly.  this is safe to call even if the lease scavenger has
+		// already released this lease... the release Lua script checks whether the
+		// lease details still exist as an idempotency key, so both ops do not
+		// conflict.  see release.lua L48-54.
+		if item.CapacityLease != nil {
+			expiredLease := item.CapacityLease
+			service.Go(func() {
+				_, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+					AccountID:      *shadowPart.AccountID,
+					IdempotencyKey: idempotencyKey,
+					LeaseID:        expiredLease.LeaseID,
+					Source: constraintapi.LeaseSource{
+						Location:          constraintapi.CallerLocationItemLease,
+						Service:           constraintapi.ServiceExecutor,
+						RunProcessingMode: constraintapi.RunProcessingModeBackground,
+					},
+					LeaseIssuedAt: time.UnixMilli(expiredLease.IssuedAtMS),
+				})
+				if err != nil {
+					l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
+						"account_id":  shadowPart.AccountID.String(),
+						"lease_id":    expiredLease.LeaseID.String(),
+						"function_id": shadowPart.FunctionID.String(),
+					}))
+				}
 			})
-			if err != nil {
-				l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
-					"account_id":  shadowPart.AccountID.String(),
-					"lease_id":    item.CapacityLease.LeaseID.String(),
-					"function_id": shadowPart.FunctionID.String(),
-				}))
-			}
+		}
+
+		// claim everything from the constraint api: concurrency, keys, throttles, etc.
+		constraintItems = constraintItemsFromBacklog(backlog, constraints)
+		config = ConstraintConfigFromConstraints(constraints)
+	}
+
+	// always add semaphores to each check, as this must be done per queue item.
+	for _, sem := range item.Data.Semaphores {
+		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
+			Kind: constraintapi.ConstraintKindSemaphore,
+			Semaphore: &constraintapi.SemaphoreConstraint{
+				ID:         sem.ID,
+				UsageValue: sem.UsageValue,
+				Weight:     sem.Weight,
+				Release:    sem.Release,
+			},
 		})
+		config.Semaphores = append(config.Semaphores, sem)
+	}
+
+	if len(constraintItems) == 0 {
+		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID: *shadowPart.AccountID,
 		EnvID:     *shadowPart.EnvID,
+		AppID:     item.Data.Identifier.AppID,
 		// TODO: Double check if the item ID works for idempotency:
 		// - Consistent across the same attempt
 		// - Do we need to re-evaluate per retry?
@@ -400,11 +472,13 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		LeaseRunIDs: map[string]ulid.ULID{
 			idempotencyKey: item.Data.Identifier.RunID,
 		},
-		FunctionID:      *shadowPart.FunctionID,
-		CurrentTime:     now,
+		FunctionID:  *shadowPart.FunctionID,
+		CurrentTime: now,
+		// NOTE: We cannot skip caching for older queue items as this will massively increase load on the Constraint API, leading to latency spikes
+		// RequestTime:     enqueuedAtTime(item),
 		Duration:        QueueLeaseDuration,
-		Configuration:   ConstraintConfigFromConstraints(constraints),
-		Constraints:     constraintItemsFromBacklog(shadowPart, backlog, constraints),
+		Constraints:     constraintItems,
+		Configuration:   config,
 		Amount:          1,
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
@@ -414,6 +488,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
+		span.RecordError(err)
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -421,12 +496,22 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 	}
 
+	// Attach entire response
+	if span.IsRecording() {
+		resJSON, _ := json.Marshal(res)
+		span.SetAttributes(attribute.String("acquire_response", string(resJSON)))
+	}
+
 	constraint := enums.QueueConstraintNotLimited
 	if len(res.ExhaustedConstraints) > 0 {
 		constraint = ConvertLimitingConstraint(constraints, res.ExhaustedConstraints)
 	}
 
+	span.SetAttributes(attribute.String("limiting_constraint", constraint.String()))
+
 	if len(res.Leases) == 0 {
+		span.SetAttributes(attribute.Bool("constrained", true))
+
 		return ItemLeaseConstraintCheckResult{
 			LimitingConstraint: constraint,
 			RetryAfter:         res.RetryAfter,
@@ -435,34 +520,47 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 	capacityLeaseID := res.Leases[0].LeaseID
 
+	span.SetAttributes(attribute.String("capacity_lease_id", capacityLeaseID.String()))
+
 	return ItemLeaseConstraintCheckResult{
 		CapacityLease: &CapacityLease{
-			LeaseID: capacityLeaseID,
+			LeaseID:    capacityLeaseID,
+			IssuedAtMS: now.UnixMilli(),
 		},
-		// Skip any constraint checks and subsequent updates,
-		// as constraint state is maintained in the Constraint API.
-		SkipConstraintChecks: true,
 	}, nil
 }
 
-func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
-	constraints := []constraintapi.ConstraintItem{
-		// Account concurrency (always set)
-		{
-			Kind: constraintapi.ConstraintKindConcurrency,
-			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeAccount,
+func hasValidCapacityLease(item *QueueItem, now time.Time) bool {
+	return item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
+}
+
+func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
+	constraints := []constraintapi.ConstraintItem{}
+
+	// Account concurrency
+	if latestConstraints.Concurrency.AccountConcurrency != NoConcurrencyLimit {
+		constraints = append(constraints,
+			constraintapi.ConstraintItem{
+				Kind: constraintapi.ConstraintKindConcurrency,
+				Concurrency: &constraintapi.ConcurrencyConstraint{
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeAccount,
+				},
 			},
-		},
-		// Function concurrency (always set - falls back to account concurrency)
-		{
-			Kind: constraintapi.ConstraintKindConcurrency,
-			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeFn,
+		)
+	}
+
+	// Function concurrency
+	if latestConstraints.Concurrency.FunctionConcurrency != NoConcurrencyLimit {
+		constraints = append(constraints,
+			constraintapi.ConstraintItem{
+				Kind: constraintapi.ConstraintKindConcurrency,
+				Concurrency: &constraintapi.ConcurrencyConstraint{
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
+				},
 			},
-		},
+		)
 	}
 
 	if backlog.Throttle != nil && latestConstraints.Throttle != nil && backlog.Throttle.ThrottleKeyExpressionHash == latestConstraints.Throttle.ThrottleKeyExpressionHash {

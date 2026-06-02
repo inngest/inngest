@@ -1,6 +1,7 @@
 import { Pill } from "@inngest/components/Pill";
 import { ClientOnly } from "@tanstack/react-router";
 import type { PillKind } from "@inngest/components/Pill/Pill";
+import { cn } from "@inngest/components/utils/classNames";
 
 type StatusBadgeProps = {
   status: string;
@@ -17,7 +18,7 @@ type PriorityBadgeProps = {
  * Badge component for displaying ticket status
  * Uses Pill component with "secondary" for open status and "primary" for completed status
  */
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, size = "sm" }: StatusBadgeProps) {
   const statusStr = status ? String(status).toLowerCase() : "";
 
   // Map status to Pill kind and label
@@ -31,7 +32,11 @@ export function StatusBadge({ status }: StatusBadgeProps) {
 
   return (
     <ClientOnly>
-      <Pill kind={pillKind} appearance="solid">
+      <Pill
+        kind={pillKind}
+        appearance="solid"
+        className={cn(size == "md" && "text-md px-4 h-8")}
+      >
         {label}
       </Pill>
     </ClientOnly>

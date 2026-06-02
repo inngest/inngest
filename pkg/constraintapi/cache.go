@@ -3,6 +3,7 @@ package constraintapi
 import (
 	"context"
 	"crypto/rand"
+	mrand "math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,6 +32,8 @@ type constraintCache struct {
 	clock   clockwork.Clock
 
 	cache                                *ccache.Cache[*constraintCacheItem]
+	maxSize                              int64
+	itemsToPrune                         uint32
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableConstraintCacheFn
 	shouldCache                          ShouldCacheConstraintFn
@@ -39,6 +42,12 @@ type constraintCache struct {
 type constraintCacheItem struct {
 	constraint ConstraintItem
 	retryAfter time.Time
+	// addedAt records the wall-clock time at which this cache entry was created.
+	// Callers can pass CapacityAcquireRequest.RequestTime to bypass entries that
+	// were added after the underlying work was originally received, allowing the
+	// capacity manager's idempotency handling to take effect even when the
+	// in-process cache is deployed.
+	addedAt time.Time
 }
 
 type ConstraintCacheOption func(c *constraintCache)
@@ -73,6 +82,18 @@ func WithConstraintCacheShouldCache(fn ShouldCacheConstraintFn) ConstraintCacheO
 	}
 }
 
+func WithConstraintCacheMaxSize(maxSize int64) ConstraintCacheOption {
+	return func(c *constraintCache) {
+		c.maxSize = maxSize
+	}
+}
+
+func WithConstraintCacheItemsToPrune(itemsToPrune uint32) ConstraintCacheOption {
+	return func(c *constraintCache) {
+		c.itemsToPrune = itemsToPrune
+	}
+}
+
 // Acquire implements CapacityManager.
 func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	if l.enableCache == nil {
@@ -82,6 +103,13 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	enableCache, minTTL, maxTTL := l.enableCache(ctx, req.AccountID, req.EnvID, req.FunctionID)
 	if !enableCache {
 		return l.manager.Acquire(ctx, req)
+	}
+
+	// Report cache size gauge on ~1% of Acquire calls to avoid ItemCount() lock overhead at high volume.
+	if mrand.Float64() < 0.01 {
+		metrics.GaugeConstraintAPICacheSize(ctx, int64(l.cache.ItemCount()), metrics.GaugeOpt{
+			PkgName: pkgName,
+		})
 	}
 
 	// Check if any constraint is cached as exhausted
@@ -109,6 +137,28 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 
 		// Cache hit - this constraint is exhausted
 		val := item.Value()
+
+		// Skip the cache when the caller's request was originally received before
+		// this cache entry was added. This lets the capacity manager's idempotency
+		// handling take effect even when the in-process cache is deployed: a retry
+		// of work received at T0 falls through to the manager rather than being
+		// answered by a cache entry populated at T1 > T0.
+		if !req.RequestTime.IsZero() && val.addedAt.After(req.RequestTime) {
+			tags := map[string]any{
+				"op":              "skipped_stale",
+				"source_location": req.Source.Location.String(),
+				"source_service":  req.Source.Service.String(),
+				"constraint":      ci.MetricsIdentifier(),
+			}
+			if l.enableHighCardinalityInstrumentation != nil && l.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+				tags["function_id"] = req.FunctionID
+			}
+			metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, item.TTL(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+			continue
+		}
 
 		recentlyLimited = append(recentlyLimited, ci)
 		if val.retryAfter.After(retryAfter) {
@@ -201,6 +251,7 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			&constraintCacheItem{
 				retryAfter: res.RetryAfter,
 				constraint: ci,
+				addedAt:    l.clock.Now(),
 			},
 			cacheTTL,
 		)
@@ -239,16 +290,41 @@ func NewConstraintCache(
 	options ...ConstraintCacheOption,
 ) *constraintCache {
 	cache := &constraintCache{
-		cache: ccache.New(
-			ccache.Configure[*constraintCacheItem]().
-				MaxSize(10_000).
-				ItemsToPrune(500),
-		),
+		maxSize:      10_000,
+		itemsToPrune: 500,
 	}
 
 	for _, opt := range options {
 		opt(cache)
 	}
+
+	cache.cache = ccache.New(
+		ccache.Configure[*constraintCacheItem]().
+			MaxSize(cache.maxSize).
+			ItemsToPrune(cache.itemsToPrune).
+			OnDelete(func(item *ccache.Item[*constraintCacheItem]) {
+				// Track cache evictions to detect thrashing (cache size too small).
+				// OnDelete fires on the ccache worker goroutine for both LRU evictions
+				// and explicit deletions. We use context.Background() since there's no
+				// request context available here; OTEL SDK buffers these internally.
+				expired := item.Expired()
+				metrics.IncrConstraintAPICacheEvictedCounter(context.Background(), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"expired": expired,
+					},
+				})
+				if !expired {
+					remainingTTL := item.TTL()
+					if remainingTTL < 0 {
+						remainingTTL = 0
+					}
+					metrics.HistogramConstraintAPICacheEvictedRemainingTTL(context.Background(), remainingTTL, metrics.HistogramOpt{
+						PkgName: pkgName,
+					})
+				}
+			}),
+	)
 
 	if cache.clock == nil {
 		cache.clock = clockwork.NewRealClock()

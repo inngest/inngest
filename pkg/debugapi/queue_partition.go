@@ -35,7 +35,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		return nil, status.Error(codes.Unknown, fmt.Errorf("error retrieving function: %w", err).Error())
 	}
 
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, fmt.Errorf("error finding shard: %w", err).Error())
 	}
@@ -47,7 +47,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 
 	var cronSchedules []*pb.CronSchedule
 	for _, cronExpr := range conf.ScheduleExpressions() {
-		if healthCheckStatus, err := d.croner.HealthCheck(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
+		if healthCheckStatus, err := d.croner.HealthCheck(ctx, consts.DevServerAccountID, consts.DevServerEnvID, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
 			cronSchedules = append(cronSchedules, &pb.CronSchedule{
 				Next:      timestamppb.New(healthCheckStatus.Next),
 				JobId:     healthCheckStatus.JobID,
@@ -80,12 +80,19 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		queueName = &req.Id
 	}
 
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, queueName)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, queueName)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard for GetPartition: %w", err)
 	}
 
-	pt, err := d.queue.PartitionByID(ctx, shard, req.GetId())
+	scope := queue.Scope{
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
+	}
+	if fnID, parseErr := uuid.Parse(req.GetId()); parseErr == nil {
+		scope.FunctionID = fnID
+	}
+	pt, err := d.queue.PartitionByID(ctx, shard, scope, req.GetId())
 	if err != nil {
 		if errors.Is(err, queue.ErrPartitionNotFound) {
 			return nil, status.Error(codes.NotFound, queue.ErrPartitionNotFound.Error())
@@ -99,11 +106,9 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		Paused:  pt.Paused,
 		Migrate: pt.Migrate,
 
-		AccountActive:     int64(pt.AccountActive),
 		AccountInProgress: int64(pt.AccountInProgress),
 		Ready:             int64(pt.Ready),
 		InProgress:        int64(pt.InProgress),
-		Active:            int64(pt.Active),
 		Future:            int64(pt.Future),
 		Backlogs:          int64(pt.Backlogs),
 	}, nil

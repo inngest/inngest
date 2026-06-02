@@ -184,6 +184,10 @@ type CheckpointNewRunResponse struct {
 	RunID string `json:"run_id"`
 	// Token is the token that can be used to view the run output for redirects.
 	Token string `json:"token,omitempty"`
+
+	// RealtimeToken is a short-lived JWT that the DurableEndpoint's client can
+	// use to subscribe to the stream after the run goes async.
+	RealtimeToken string `json:"realtime_token,omitempty"`
 }
 
 // runEvent creates a new event.Event from the CheckpointNewRunRequest.  This allows us to
@@ -218,10 +222,17 @@ type checkpointAsyncSteps struct {
 	FnID  uuid.UUID `json:"fn_id"`
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
-	QueueItemRef string                  `json:"qi_id"`
-	Steps        []state.GeneratorOpcode `json:"steps"`
+	QueueItemRef string `json:"qi_id"`
+	// RequestID is the deterministic ULID the SDK received in its dispatch
+	// payload. The API rejects mismatches against the queue item's current
+	// dispatch as stale (HTTP 409).
+	RequestID string                  `json:"request_id"`
+	Steps     []state.GeneratorOpcode `json:"steps"`
 	// Timestamp is the unix-millisecond epoch when the request was created.
 	Timestamp int `json:"ts"`
+	// RequestStartedAt is the unix-millisecond epoch the SDK captured when it
+	// began processing the dispatched request. Optional; older SDKs omit it.
+	RequestStartedAt int64 `json:"request_started_at"`
 }
 
 // TrackLatency tracks how long it took for us to receive the async checkpoint

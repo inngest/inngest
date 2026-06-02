@@ -18,6 +18,11 @@ var (
 	FeintStyle   = TextStyle.Copy().Foreground(Feint)
 	BoldStyle    = TextStyle.Copy().Bold(true)
 	WarningStyle = TextStyle.Copy().Foreground(Orange)
+
+	UpdateNoticeStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(Orange).
+				Padding(0, 1)
 )
 
 // RenderError returns a formatted error string.

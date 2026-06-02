@@ -5,15 +5,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/redis/rueidis"
 )
+
+const releaseFinalizationClaimLua = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+	return redis.call("DEL", KEYS[1])
+end
+return 0
+`
+
+var releaseFinalizationClaimScript = NewClusterLuaScript(releaseFinalizationClaimLua)
 
 func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
 	o := &mgrV2Opts{}
@@ -83,6 +95,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			ReplayID:              s.Metadata.Config.ReplayID,
 			PriorityFactor:        s.Metadata.Config.PriorityFactor,
 			CustomConcurrencyKeys: s.Metadata.Config.CustomConcurrencyKeys,
+			Semaphores:            s.Metadata.Config.Semaphores,
 			BatchID:               s.Metadata.Config.BatchID,
 		},
 		EventBatchData: batchData,
@@ -113,9 +126,15 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			},
 		)
 		if err != nil {
-			return state.State{}, err
+			// If the run already completed and was GC'd, we still know the
+			// identifier exists.  Return ErrIdentifierExists with whatever
+			// metadata we have (the run ID was already extracted above).
+			return state.State{Metadata: s.Metadata}, statev1.ErrIdentifierExists
 		}
 		return st, statev1.ErrIdentifierExists
+	case statev1.ErrIdentifierTombstone:
+		s.Metadata.ID.RunID = st.RunID()
+		return state.State{Metadata: s.Metadata}, statev1.ErrIdentifierTombstone
 	default:
 		return state.State{}, err
 	}
@@ -166,6 +185,9 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			"account_id": s.Metadata.ID.Tenant.AccountID,
 		},
 	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(stateSize), metrics.HistogramOpt{
+		PkgName: "redis_state",
+	})
 
 	steps := make(map[string]json.RawMessage)
 	for _, step := range s.Steps {
@@ -189,8 +211,68 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 	})
 }
 
+// ClaimFinalization claims finish-effect emission for a run using Redis SET NX.
+// The Redis key layout is intentionally kept inside this adapter so the
+// executor depends only on the state/v2 finalization-claim contract.
+func (v v2) ClaimFinalization(ctx context.Context, md state.Metadata) (state.FinalizationClaim, error) {
+	r, key := v.finalizationClaimHandle(ctx, md)
+	claimToken := uuid.NewString()
+
+	res, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().
+			Set().
+			Key(key).
+			Value(claimToken).
+			Nx().
+			Ex(consts.FunctionIdempotencyPeriod).
+			Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return state.NewFinalizationClaim(false, nil), nil
+	}
+	if err != nil {
+		return state.NewFinalizationClaim(false, nil), fmt.Errorf("error claiming finalization: %w", err)
+	}
+
+	if res != "OK" {
+		return state.NewFinalizationClaim(false, nil), nil
+	}
+
+	return state.NewFinalizationClaim(true, func(ctx context.Context) error {
+		if err := releaseFinalizationClaimScript.Exec(ctx, r, []string{key}, []string{claimToken}).Error(); err != nil {
+			return fmt.Errorf("error releasing finalization claim: %w", err)
+		}
+		return nil
+	}), nil
+}
+
+func (v v2) finalizationClaimHandle(ctx context.Context, md state.Metadata) (RetriableClient, string) {
+	fnRunState := v.mgr.s.FunctionRunState()
+	v1id := statev1.Identifier{
+		RunID:       md.ID.RunID,
+		WorkflowID:  md.ID.FunctionID,
+		AccountID:   md.ID.Tenant.AccountID,
+		WorkspaceID: md.ID.Tenant.EnvID,
+		AppID:       md.ID.Tenant.AppID,
+		Key:         md.Config.Idempotency,
+	}
+
+	r, isSharded := fnRunState.Client(ctx, v1id.AccountID, v1id.RunID)
+	baseKey := fnRunState.kg.Idempotency(ctx, isSharded, v1id)
+
+	return r, fmt.Sprintf("%s:finalize", baseKey)
+}
+
 func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {
 	return v.mgr.Exists(ctx, id.Tenant.AccountID, id.RunID)
+}
+
+func (v v2) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer, error) {
+	return v.mgr.LoadDefers(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+func (v v2) LoadDefersMeta(ctx context.Context, id state.ID) (map[string]state.DeferMeta, error) {
+	return v.mgr.LoadDefersMeta(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // LoadEvents returns all events for a run.
@@ -238,9 +320,16 @@ func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
 	return state, nil
 }
 
-// StreamState returns all state without loading in-memory
-func (v v2) StreamState(ctx context.Context, id state.ID) (io.Reader, error) {
-	return nil, fmt.Errorf("not implemented")
+func (v v2) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
+	return v.mgr.SaveDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, d)
+}
+
+func (v v2) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
+	return v.mgr.SetDeferStatus(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hashedID, status)
+}
+
+func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
+	return v.mgr.SaveRejectedDefer(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, fnSlug, hashedID)
 }
 
 // Metadata returns metadata for a given run
@@ -282,15 +371,18 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 			OriginalRunID:         md.Identifier.OriginalRunID,
 			PriorityFactor:        md.Identifier.PriorityFactor,
 			CustomConcurrencyKeys: md.Identifier.CustomConcurrencyKeys,
+			Semaphores:            md.Identifier.Semaphores,
 			Context:               md.Context,
 			ForceStepPlan:         md.DisableImmediateExecution,
 			HasAI:                 md.HasAI,
 		}),
 		Stack: stack,
 		Metrics: state.RunMetrics{
-			EventSize: md.EventSize,
-			StateSize: md.StateSize,
-			StepCount: md.StepCount,
+			EventSize:          md.EventSize,
+			StateSize:          md.StateSize,
+			StepCount:          md.StepCount,
+			MetadataSize:       md.MetadataSize,
+			MetadataSizeLoaded: md.MetadataSize,
 		},
 	}
 
@@ -385,6 +477,9 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 			"account_id": id.Tenant.AccountID,
 		},
 	})
+	metrics.HistogramStateWrittenCounter(ctx, int64(len(data)), metrics.HistogramOpt{
+		PkgName: "redis_state",
+	})
 
 	return hasPending, err
 }
@@ -416,13 +511,19 @@ func (v v2) ConsumePause(ctx context.Context, p statev1.Pause, opts statev1.Cons
 		ctx,
 		"state.ConsumePause",
 		func(ctx context.Context) (statev1.ConsumePauseResult, error) {
-			res,  err := v.mgr.ConsumePause(ctx, p, opts)
+			res, err := v.mgr.ConsumePause(ctx, p, opts)
 			return res, err
 		},
 		v.retryPolicy(),
 	)
 
 	return r, err
+}
+
+// IncrementMetadataSize atomically increments the cumulative metadata size
+// counter for a run via HINCRBY.
+func (v v2) IncrementMetadataSize(ctx context.Context, id state.ID, delta int) error {
+	return v.mgr.IncrementMetadataSize(ctx, id.Tenant.AccountID, id.RunID, delta)
 }
 
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {

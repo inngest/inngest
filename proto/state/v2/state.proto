@@ -36,6 +36,10 @@ message Config {
   bool                              force_step_plan  = 14;
   google.protobuf.Struct            context          = 15;
   bool                              has_ai           = 16;
+  // semaphores_json stores semaphore constraints as a JSON-encoded string.
+  // This avoids a proto schema change while ensuring semaphores survive
+  // the state proxy round-trip.
+  string                            semaphores_json  = 17;
 }
 
 message ConcurrencyKey {
@@ -148,6 +152,67 @@ message LoadStateResponse {
   map<string, bytes> steps    = 3;
 }
 
+// DeferStatus mirrors enums.DeferStatus
+enum DeferStatus {
+  DEFER_STATUS_UNKNOWN   = 0;
+  DEFER_STATUS_SCHEDULED = 1;
+  DEFER_STATUS_AFTER_RUN = 2;
+  DEFER_STATUS_ABORTED   = 3;
+  DEFER_STATUS_REJECTED  = 4;
+}
+
+message Defer {
+  string      fn_slug         = 1;
+  string      hashed_id       = 2;
+  DeferStatus schedule_status = 3;
+  bytes       input           = 4;
+}
+
+message DeferMeta {
+  string      fn_slug         = 1;
+  string      hashed_id       = 2;
+  DeferStatus schedule_status = 3;
+}
+
+message SaveDeferRequest {
+  ID    id    = 1;
+  Defer defer = 2;
+}
+
+message SaveDeferResponse {}
+
+message SetDeferStatusRequest {
+  ID          id        = 1;
+  string      hashed_id = 2;
+  DeferStatus status    = 3;
+}
+
+message SetDeferStatusResponse {}
+
+message SaveRejectedDeferRequest {
+  ID     id        = 1;
+  string fn_slug   = 2;
+  string hashed_id = 3;
+}
+
+message SaveRejectedDeferResponse {}
+
+message LoadDefersRequest {
+  ID id = 1;
+}
+
+message LoadDefersResponse {
+  map<string, Defer> defers = 1;
+}
+
+message LoadDefersMetaRequest {
+  ID id = 1;
+}
+
+message LoadDefersMetaResponse {
+  map<string, DeferMeta> defers = 1;
+}
+
 message PauseIdentifier {
   string run_id      = 1;
   string function_id = 2;
@@ -164,8 +229,8 @@ message Pause {
 }
 
 message ConsumePauseOpts {
-  string idempotency_key = 1;
-  bytes  data            = 2;
+  reserved 1; // removed: idempotency_key
+  bytes data = 2;
 }
 
 message ConsumePauseResult {
@@ -191,8 +256,14 @@ service RunService {
   rpc SavePending(SavePendingRequest) returns (SavePendingResponse) {}
   rpc ConsumePause(ConsumePauseRequest) returns (ConsumePauseResponse) {}
 
+  rpc SaveDefer(SaveDeferRequest) returns (SaveDeferResponse) {}
+  rpc SetDeferStatus(SetDeferStatusRequest) returns (SetDeferStatusResponse) {}
+  rpc SaveRejectedDefer(SaveRejectedDeferRequest) returns (SaveRejectedDeferResponse) {}
+
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
   rpc LoadSteps(LoadStepsRequest) returns (LoadStepsResponse) {}
   rpc LoadState(LoadStateRequest) returns (LoadStateResponse) {}
+  rpc LoadDefers(LoadDefersRequest) returns (LoadDefersResponse) {}
+  rpc LoadDefersMeta(LoadDefersMetaRequest) returns (LoadDefersMetaResponse) {}
 }

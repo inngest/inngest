@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -55,13 +55,13 @@ func (fs FS) Crypto() ([]Crypto, error) {
 	path := fs.proc.Path("crypto")
 	b, err := util.ReadFileNoStat(path)
 	if err != nil {
-		return nil, fmt.Errorf("%s: Cannot read file %v: %w", ErrFileRead, b, err)
+		return nil, fmt.Errorf("%w: Cannot read file %v: %w", ErrFileRead, b, err)
 
 	}
 
 	crypto, err := parseCrypto(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse %v: %w", ErrFileParse, crypto, err)
+		return nil, fmt.Errorf("%w: Cannot parse %v: %w", ErrFileParse, crypto, err)
 	}
 
 	return crypto, nil
@@ -84,7 +84,7 @@ func parseCrypto(r io.Reader) ([]Crypto, error) {
 
 		kv := strings.Split(text, ":")
 		if len(kv) != 2 {
-			return nil, fmt.Errorf("%w: Cannot parae line: %q", ErrFileParse, text)
+			return nil, fmt.Errorf("%w: Cannot parse line: %q", ErrFileParse, text)
 		}
 
 		k := strings.TrimSpace(kv[0])

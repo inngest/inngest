@@ -93,6 +93,26 @@ models:
         resolver: true
       trace:
         resolver: true
+      defers:
+        resolver: true
+      siblingDefers:
+        resolver: true
+      deferredFrom:
+        resolver: true
+  RunDefer:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunDefer
+    fields:
+      function:
+        resolver: true
+      run:
+        resolver: true
+  RunDeferredFrom:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunDeferredFrom
+    fields:
+      function:
+        resolver: true
+      run:
+        resolver: true
   ConnectV1WorkerConnection:
     fields:
       app:
@@ -135,6 +155,8 @@ models:
     model: github.com/inngest/inngest/pkg/enums.MetadataScope
   SpanMetadataValues:
     model: github.com/inngest/inngest/pkg/tracing/metadata.Values
+  HTTPHeaders:
+    model: github.com/inngest/inngest/pkg/headers.Compact
   StreamItem:
     fields:
       inBatch:

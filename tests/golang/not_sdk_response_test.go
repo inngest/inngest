@@ -97,16 +97,15 @@ func TestNotSDKResponse(t *testing.T) {
 				runs, err := c.RunsByEventID(ctx, eventID)
 				require.NoError(t, err)
 				require.Len(t, runs, 1)
-				run = c.WaitForRunStatus(ctx, t, "FAILED", &runs[0].ID)
+				run = c.WaitForRunStatus(ctx, t, "FAILED", runs[0].ID)
 			}, 20*time.Second, time.Second)
 
 			if statusCode == http.StatusOK {
 				// Function output includes the HTML response.
 				r.Equal("<html>hi</html>", run.Output)
 			} else {
-				// Step output is empty. We should probably change this in the
-				// future.
-				r.Equal("", run.Output)
+				// 206 with a non-JSON body surfaces a parse error.
+				r.Contains(run.Output, "error reading generator opcode response")
 			}
 		})
 	}

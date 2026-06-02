@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -69,7 +69,7 @@ func readSockstat(name string) (*NetSockstat, error) {
 
 	stat, err := parseSockstat(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("%s: sockstats from %q: %w", ErrFileRead, name, err)
+		return nil, fmt.Errorf("%w: sockstats from %q: %w", ErrFileRead, name, err)
 	}
 
 	return stat, nil
@@ -89,7 +89,7 @@ func parseSockstat(r io.Reader) (*NetSockstat, error) {
 		// The remaining fields are key/value pairs.
 		kvs, err := parseSockstatKVs(fields[1:])
 		if err != nil {
-			return nil, fmt.Errorf("%s: sockstat key/value pairs from %q: %w", ErrFileParse, s.Text(), err)
+			return nil, fmt.Errorf("%w: sockstat key/value pairs from %q: %w", ErrFileParse, s.Text(), err)
 		}
 
 		// The first field is the protocol. We must trim its colon suffix.
@@ -139,9 +139,6 @@ func parseSockstatKVs(kvs []string) (map[string]int, error) {
 func parseSockstatProtocol(kvs map[string]int) NetSockstatProtocol {
 	var nsp NetSockstatProtocol
 	for k, v := range kvs {
-		// Capture the range variable to ensure we get unique pointers for
-		// each of the optional fields.
-		v := v
 		switch k {
 		case "inuse":
 			nsp.InUse = v

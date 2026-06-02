@@ -161,6 +161,41 @@ func TestIdempotencyCheck(t *testing.T) {
 			require.Nil(t, runID)
 			require.ErrorIs(t, err, state.ErrInvalidIdentifier)
 		})
+
+		t.Run("returns tombstone error with run ID when tombstone has valid ULID", func(t *testing.T) {
+			r.FlushAll()
+
+			originalRunID := ulid.MustNew(ulid.Now(), rand.Reader)
+			tombstoneVal := string(consts.FunctionIdempotencyTombstone) + originalRunID.String()
+			require.NoError(t, r.Set(key, tombstoneVal))
+
+			result, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.ErrorIs(t, err, state.ErrIdentifierTombstone)
+			require.NotNil(t, result)
+			require.Equal(t, originalRunID, *result)
+		})
+
+		t.Run("returns tombstone error without run ID when tombstone has invalid ULID", func(t *testing.T) {
+			r.FlushAll()
+
+			tombstoneVal := string(consts.FunctionIdempotencyTombstone) + "not-a-valid-ulid"
+			require.NoError(t, r.Set(key, tombstoneVal))
+
+			result, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.ErrorIs(t, err, state.ErrIdentifierTombstone)
+			require.Nil(t, result)
+		})
+
+		t.Run("returns tombstone error without run ID when tombstone is just the marker", func(t *testing.T) {
+			r.FlushAll()
+
+			tombstoneVal := string(consts.FunctionIdempotencyTombstone)
+			require.NoError(t, r.Set(key, tombstoneVal))
+
+			result, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.ErrorIs(t, err, state.ErrIdentifierTombstone)
+			require.Nil(t, result)
+		})
 	})
 
 	t.Run("with idempotency key not defined in identifier", func(t *testing.T) {

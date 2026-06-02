@@ -43,7 +43,7 @@ e2e-golang: ## Run Go SDK e2e tests
 .PHONY: gen
 gen: ## Run all code generators
 	go generate ./...
-	make gql queries constraintapi-snapshots tygo
+	make gql schema-dump queries constraintapi-snapshots tygo
 
 .PHONY: protobuf
 protobuf: ## Generate protobuf files
@@ -53,16 +53,21 @@ protobuf: ## Generate protobuf files
 	buf generate --path proto/debug/v1 --template proto/debug/v1/buf.gen.yaml
 	buf generate --path proto/state/v2 --template proto/state/v2/buf.gen.yaml
 	buf generate --path proto/constraintapi/v1 --template proto/constraintapi/v1/buf.gen.yaml
+	go generate ./...
+	go mod tidy
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
 queries: ## Generate sqlc queries
-	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-	sqlc generate
+	nix develop --command sqlc generate
+
+.PHONY: schema-dump
+schema-dump: ## Dump SQLite and Postgres schema files from migrations
+	go run ./tools/schema-dump
 
 .PHONY: snapshot
 snapshot: ## Build release snapshot
-	goreleaser release --snapshot --skip publish --clean
+	goreleaser release --snapshot --skip=publish --clean
 
 .PHONY: build-ui
 build-ui: ## Build dev server UI
@@ -80,7 +85,7 @@ docs: ## Generate OpenAPI documentation
 	cd proto && protoc --proto_path=. --proto_path=third_party \
 		--openapiv2_out=../docs/openapi/v2 \
 		--openapiv2_opt=allow_delete_body=true \
-		--openapiv2_opt=json_names_for_fields=false \
+		--openapiv2_opt=json_names_for_fields=true \
 		api/v2/service.proto
 	@echo "Converting OpenAPI v2 to v3..."
 	go run ./tools/convert-openapi docs/openapi/v2 docs/openapi/v3
@@ -96,7 +101,7 @@ gql: ## Generate GraphQL code
 .PHONY: tygo
 tygo: ## Generate TypeScript types from Go structs
 	go run github.com/gzuidhof/tygo@latest generate
-	cd ui && pnpx prettier@2.8.8 --write --no-config --single-quote "packages/components/src/generated/**/*.ts"
+	cd ui && pnpx prettier@2.8.8 --write --no-config --single-quote --print-width 100 "packages/components/src/generated/**/*.ts"
 
 .PHONY: constraintapi-snapshots
 constraintapi-snapshots: ## Regenerate constraint API Lua snapshots

@@ -47,7 +47,7 @@ func TestQueueExtendLease(t *testing.T) {
 		p := osqueue.ItemPartition(ctx, item)
 
 		now := clock.Now()
-		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -67,9 +67,9 @@ func TestQueueExtendLease(t *testing.T) {
 		require.EqualValues(t, nextID, item.LeaseID)
 		require.WithinDuration(t, now.Add(10*time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
-		t.Run("It extends the score of the partition concurrency queue", func(t *testing.T) {
+		t.Run("It extends the score of the partition scavenge index", func(t *testing.T) {
 			at := ulid.Time(nextID.Time())
-			scores := concurrencyQueueScores(t, r, partitionConcurrencyKey(p, kg), clock.Now())
+			scores := concurrencyQueueScores(t, r, kg.PartitionScavengerIndex(p.ID), clock.Now())
 			require.Len(t, scores, 1)
 			// Ensure that the score matches the lease.
 			require.Equal(t, at, scores[item.ID], "%s not extended\n%s", partitionConcurrencyKey(p, kg), r.Dump())
@@ -158,36 +158,23 @@ func TestQueueExtendLease(t *testing.T) {
 		require.NotEmpty(t, fnPart.ID)
 
 		// Lease the item.
-		id, err := shard.Lease(ctx, item, time.Second, clock.Now(), nil)
+		id, err := shard.Lease(ctx, item, time.Second, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, id)
 
 		backlog := osqueue.ItemBacklog(ctx, item)
 
-		score0, err := r.ZMScore(partitionConcurrencyKey(fnPart, kg), item.ID)
-		require.NoError(t, err)
-		score1, err := r.ZMScore(backlogCustomKeyInProgress(backlog, kg, 1), item.ID)
-		require.NoError(t, err)
-		require.Equal(t, score0[0], score1[0], "Partition scores should match after leasing")
+		require.False(t, r.Exists(partitionConcurrencyKey(fnPart, kg)))
+		require.False(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
 
-		t.Run("extending the lease should extend both items in all partition's concurrency queues", func(t *testing.T) {
+		t.Run("extending the lease should not extend both items in all partition's concurrency queues", func(t *testing.T) {
 			id, err = shard.ExtendLease(ctx, item, *id, 98712*time.Millisecond)
 			require.NoError(t, err)
 			require.NotNil(t, id)
 
-			newScore0, err := r.ZMScore(partitionConcurrencyKey(fnPart, kg), item.ID)
-			require.NoError(t, err)
-			newScore1, err := r.ZMScore(backlogCustomKeyInProgress(backlog, kg, 1), item.ID)
-			require.NoError(t, err)
-
-			require.Equal(t, newScore0, newScore1, "Partition scores should match after leasing")
-			require.NotEqual(t, int(score0[0]), int(newScore0[0]), "Partition scores should not have been updated: %v", newScore0)
-			require.NotEqual(t, score1, newScore1, "Partition scores should have been updated")
-
-			// And, the account-level concurrency queue is updated
-			acctScore, err := r.ZMScore(kg.Concurrency("account", item.Data.Identifier.AccountID.String()), item.ID)
-			require.NoError(t, err)
-			require.EqualValues(t, acctScore[0], newScore0[0])
+			require.False(t, r.Exists(partitionConcurrencyKey(fnPart, kg)))
+			require.False(t, r.Exists(backlogCustomKeyInProgress(backlog, kg, 1)))
+			require.False(t, r.Exists(kg.Concurrency("account", item.Data.Identifier.AccountID.String())))
 		})
 
 		t.Run("Scavenge queue is updated", func(t *testing.T) {
@@ -256,7 +243,7 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	// Lease item in new mode (skip checks)
-	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
+	leaseID, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
 	require.NoError(t, err)
 	require.NotNil(t, leaseID)
 
@@ -264,7 +251,7 @@ func TestQueueExtendLeaseWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 
-	newLeaseID, err := shard.ExtendLease(ctx, item, *leaseID, 10*time.Second, osqueue.ExtendLeaseOptionDisableConstraintUpdates(true))
+	newLeaseID, err := shard.ExtendLease(ctx, item, *leaseID, 10*time.Second)
 	require.NoError(t, err)
 	require.NotNil(t, newLeaseID)
 	require.NotEqual(t, *leaseID, *newLeaseID)

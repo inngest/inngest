@@ -4,6 +4,7 @@ import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
+  useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
 } from '@inngest/components/hooks/useSearchParams';
@@ -79,6 +80,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
+  const [excludeDeferred = false] = useBooleanSearchParam('excludeDeferred');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -104,6 +106,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       status: filteredStatus.length > 0 ? filteredStatus : null,
       timeField,
       celQuery: search,
+      isDeferred: excludeDeferred ? false : null,
     }),
     [
       appIDs,
@@ -114,6 +117,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       filteredStatus,
       timeField,
       search,
+      excludeDeferred,
     ],
   );
 
@@ -172,6 +176,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         history: features.data?.history ?? 7,
         tracesPreview: tracePreviewEnabled,
         runDetailsV4: v4Enabled,
+        isDeferred: true,
       }}
       hasMore={hasNextPage}
       isLoadingInitial={isLoadingInitial}

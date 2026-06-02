@@ -3,157 +3,577 @@ package checkpoint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/interval"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-// TestCheckpointAsyncSteps_ThreeStepRuns asserts that checkpointing three separate steps attempts
-// to save state and traces with the right data (via mock providers).
-func TestCheckpointAsyncSteps_ThreeStepRuns(t *testing.T) {
+func requestIDForGeneration(runID ulid.ULID, generationID int) string {
+	return driver.DispatchRequestID(time.Now(), runID, generationID).String()
+}
+
+func TestCheckpointAsyncSteps(t *testing.T) {
+	t.Run("three step runs", func(t *testing.T) {
+		// Checkpointing three separate steps attempts to save state and
+		// traces with the right data (via mock providers).
+		ctx := context.Background()
+		require := require.New(t)
+
+		now := time.Now()
+		ops := make([]state.GeneratorOpcode, 3)
+		for i := range 3 {
+			ops[i] = state.GeneratorOpcode{
+				ID:     fmt.Sprintf("step-%d", i+1),
+				Op:     enums.OpcodeStepRun,
+				Data:   json.RawMessage(fmt.Sprintf(`{"result": "step %d output"}`, i+1)),
+				Name:   fmt.Sprintf("Step %d", i+1),
+				Timing: interval.New(now.Add(time.Duration(i*100)*time.Millisecond), now.Add(time.Duration((i+1)*100)*time.Millisecond)),
+			}
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, ops...)
+
+		// Expect SaveStep to be called for each step when checkpointing.
+		for _, op := range ops {
+			switch op.Op {
+			case enums.OpcodeStepRun:
+				expectedData := map[string]any{
+					"data": json.RawMessage(op.Data),
+				}
+				expectedOutputBytes, _ := json.Marshal(expectedData)
+				mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedOutputBytes).Return(false, nil)
+			}
+		}
+
+		// Expect CreateSpan to be called for each step
+		mocks.tracer.
+			On(
+				"CreateSpan",
+				mock.AnythingOfType("*context.valueCtx"),
+				meta.SpanNameStep,
+				mock.AnythingOfType("*tracing.CreateSpanOptions"),
+			).
+			Return(&meta.SpanReference{}, nil).
+			Times(3)
+
+		// Expect queue reset to be called with the job ID and shard info.
+		// Without this, a failed queue item that becomes successful will
+		// have an attempt count > 0 on the next retry.
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		// Verify traces are created correctly
+		require.Len(mocks.tracer.createdSpans, 3, "Expected exactly 3 spans to be created")
+		for i, capture := range mocks.tracer.createdSpans {
+			require.Equal(meta.SpanNameStep, capture.name, "Span %d should have correct name", i+1)
+			require.NotNil(capture.options, "Span %d should have options", i+1)
+			require.NotNil(capture.options.StartTime, "Span %d should have start time", i+1)
+			require.NotNil(capture.options.EndTime, "Span %d should have end time", i+1)
+			require.NotNil(capture.attributes, "Span %d should have attributes", i+1)
+
+			// Assert that the completed attribute is set in tracing.
+			require.NotNil(capture.attributes.Get(meta.Attrs.DynamicStatus.Key()))
+			require.EqualValues("Completed", capture.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
+		}
+
+		mocks.queue.AssertCalled(t, "ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123")
+
+		mocks.state.AssertExpectations(t)
+		mocks.tracer.AssertExpectations(t)
+		mocks.queue.AssertExpectations(t)
+	})
+
+	t.Run("with sleep fails", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		mocks, testData := setupAsyncCheckpointTest(
+			t, state.GeneratorOpcode{
+				ID: "sleep",
+				Op: enums.OpcodeSleep,
+				// This will fail on the Op.
+			},
+			state.GeneratorOpcode{
+				ID:   "step-run",
+				Op:   enums.OpcodeStepRun,
+				Data: json.RawMessage(`{"result": "step rund output"}`),
+			})
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.Error(err, "cannot checkpoint async steps")
+
+		require.Len(mocks.tracer.createdSpans, 0, "Expected exactly 3 spans to be created")
+		mocks.state.AssertNotCalled(t, "SaveStep")
+		mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+
+		mocks.state.AssertExpectations(t)
+		mocks.tracer.AssertExpectations(t)
+		mocks.queue.AssertExpectations(t)
+	})
+
+	t.Run("step with metadata creates spans", func(t *testing.T) {
+		// Async checkpoint with metadata-bearing opcodes creates both
+		// step and metadata spans when AllowStepMetadata returns true.
+		ctx := context.Background()
+		require := require.New(t)
+
+		now := time.Now()
+		ops := []state.GeneratorOpcode{
+			{
+				ID:     "step-1",
+				Op:     enums.OpcodeStepRun,
+				Data:   json.RawMessage(`{"result": "step 1 output"}`),
+				Name:   "Step 1",
+				Timing: interval.New(now, now.Add(100*time.Millisecond)),
+				Metadata: []metadata.ScopedUpdate{
+					{
+						Scope: enums.MetadataScopeRun,
+						Update: metadata.Update{
+							RawUpdate: metadata.RawUpdate{
+								Kind:   "userland.test",
+								Op:     enums.MetadataOpcodeMerge,
+								Values: metadata.Values{"key": json.RawMessage(`"value"`)},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, ops...)
+
+		// Replace checkpointer with AllowStepMetadata enabled
+		testData.checkpointer = New(Opts{
+			State:           mocks.state,
+			TracerProvider:  mocks.tracer,
+			Queue:           mocks.queue,
+			MetricsProvider: mocks.metrics,
+			AllowStepMetadata: executor.AllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		})
+
+		expectedData := map[string]any{"data": json.RawMessage(`{"result": "step 1 output"}`)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-1", expectedOutputBytes).Return(false, nil)
+
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
+
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		require.Len(mocks.tracer.createdSpans, 2, "Expected 1 step span + 1 metadata span")
+		var hasStep, hasMetadata bool
+		for _, s := range mocks.tracer.createdSpans {
+			if s.name == meta.SpanNameStep {
+				hasStep = true
+			}
+			if s.name == meta.SpanNameMetadata {
+				hasMetadata = true
+			}
+		}
+		require.True(hasStep, "Expected a step span")
+		require.True(hasMetadata, "Expected a metadata span")
+	})
+
+	t.Run("StepPlanned then StepRun share the same span seed", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		now := time.Now()
+		planned := state.GeneratorOpcode{
+			ID:     "step-1",
+			Op:     enums.OpcodeStepPlanned,
+			Name:   "work",
+			Timing: interval.New(now, time.Time{}),
+		}
+		run := state.GeneratorOpcode{
+			ID:     "step-1",
+			Op:     enums.OpcodeStepRun,
+			Data:   json.RawMessage(`{"result":"ok"}`),
+			Name:   "work",
+			Timing: interval.New(now, now.Add(time.Second)),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, planned, run)
+
+		expectedData := map[string]any{"data": json.RawMessage(run.Data)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-1", expectedOutputBytes).Return(false, nil)
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil).
+			Twice()
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		require.Len(mocks.tracer.createdSpans, 2)
+		leadingEdgeSpan := mocks.tracer.createdSpans[0]
+		completionArmSpan := mocks.tracer.createdSpans[1]
+
+		completionSeed := completionArmSpan.options.Seed
+		require.NotEmpty(completionSeed, "completion arm should still use Seed")
+		expectedDynID := tracing.DeterministicSpanConfig(completionSeed).SpanID.String()
+
+		require.Empty(leadingEdgeSpan.options.Seed, "leading edge should still not use Seed")
+		require.Equal(expectedDynID, leadingEdgeSpan.options.DynamicSpanIDOverride,
+			"leading-edge DynamicSpanIDOverride must equal DeterministicSpanConfig(completion.Seed).SpanID")
+
+		require.EqualValues("Running",
+			leadingEdgeSpan.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
+		require.Nil(leadingEdgeSpan.attributes.Get(meta.Attrs.EndedAt.Key()))
+
+		require.EqualValues("Completed",
+			completionArmSpan.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
+		require.NotNil(completionArmSpan.attributes.Get(meta.Attrs.EndedAt.Key()))
+	})
+
+	t.Run("StepPlanned span creation failure does not fail the request", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:     "step-flaky",
+			Op:     enums.OpcodeStepPlanned,
+			Name:   "work",
+			Timing: interval.New(time.Now(), time.Time{}),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, fmt.Errorf("simulated tracer outage")).
+			Once()
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err, "best-effort: tracer failure must not surface to caller")
+
+		mocks.state.AssertNotCalled(t, "SaveStep")
+		mocks.tracer.AssertExpectations(t)
+		mocks.queue.AssertExpectations(t)
+	})
+
+	t.Run("defer add", func(t *testing.T) {
+		// Async path handles OpcodeDeferAdd the same way the sync path
+		// does: persist a Defer record. SDK-side memoization is carried
+		// by the SDKRequest `Defers` map, not the steps map, so no
+		// SaveStep is expected.
+		//
+		// Note: there's intentionally no async equivalent of the sync
+		// path's "bundled with RunComplete" test. Async checkpoints
+		// can't bundle RunComplete — checkpointAsyncSteps's switch
+		// returns "cannot checkpoint opcode" for OpcodeRunComplete.
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID: "step-defer",
+			Op: enums.OpcodeDeferAdd,
+			Opts: map[string]any{
+				"fn_slug": "onDefer-score",
+				"input":   map[string]any{"user_id": "u_123"},
+			},
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
+			return d.FnSlug == "onDefer-score" &&
+				d.HashedID == "step-defer" &&
+				d.ScheduleStatus == enums.DeferStatusAfterRun &&
+				string(d.Input) == `{"user_id":"u_123"}`
+		})).Return(nil)
+		// defers.SaveFromOp emits an executor.defer span on the accepted
+		// DeferAdd so the run's defer list is visible before finalize.
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		mocks.state.AssertExpectations(t)
+		mocks.tracer.AssertExpectations(t)
+		mocks.queue.AssertExpectations(t)
+	})
+
+	t.Run("defer abort", func(t *testing.T) {
+		// Async abort path: flip the target defer to Aborted. SDK-side
+		// memoization is carried by the SDKRequest `Defers` map, not
+		// the steps map, so no SaveStep is expected.
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID: "step-abort",
+			Op: enums.OpcodeDeferAbort,
+			Opts: map[string]any{
+				"target_hashed_id": "step-defer",
+			},
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
+		// defers.AbortFromOp updates the existing defer span to status=Aborted.
+		mocks.tracer.
+			On("UpdateSpan", mock.Anything, mock.AnythingOfType("*tracing.UpdateSpanOptions")).
+			Return(nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		mocks.state.AssertExpectations(t)
+		mocks.tracer.AssertExpectations(t)
+		mocks.queue.AssertExpectations(t)
+	})
+
+	t.Run("step output too large", func(t *testing.T) {
+		// A single step whose output exceeds MaxStepOutputSize causes
+		// CheckpointAsyncSteps to return ErrStepOutputTooLarge without
+		// attempting to save state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		// A JSON string of MaxStepOutputSize 'x' characters: when wrapped in
+		// {"data": ...} the total output exceeds the 4 MiB per-step limit.
+		largeData := json.RawMessage(`"` + strings.Repeat("x", consts.MaxStepOutputSize) + `"`)
+		op := state.GeneratorOpcode{
+			ID:   "big-step",
+			Op:   enums.OpcodeStepRun,
+			Data: largeData,
+			Name: "Big Step",
+		}
+
+		_, testData := setupAsyncCheckpointTest(t, op)
+
+		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStepOutputTooLarge)
+	})
+
+	t.Run("cumulative state overflow", func(t *testing.T) {
+		// When accumulated state already equals the 32 MiB limit, any
+		// additional step output causes CheckpointAsyncSteps to return
+		// ErrStateOverflowed before saving state.
+		ctx := context.Background()
+		require := require.New(t)
+
+		runID := ulid.MustNew(ulid.Now(), nil)
+		fnID := uuid.New()
+		accountID := uuid.New()
+		envID := uuid.New()
+
+		md := state.Metadata{
+			ID: state.ID{
+				RunID:      runID,
+				FunctionID: fnID,
+				Tenant: state.Tenant{
+					AccountID: accountID,
+					EnvID:     envID,
+				},
+			},
+			Metrics: state.RunMetrics{
+				StateSize: consts.DefaultMaxStateSizeLimit,
+			},
+		}
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`"small"`),
+			Name: "Step 1",
+		}
+
+		qRef := queueref.QueueRef{"job-x", "shard-x"}
+		asyncCheckpoint := AsyncCheckpoint{
+			RunID:        runID,
+			FnID:         fnID,
+			Steps:        []state.GeneratorOpcode{op},
+			QueueItemRef: qRef.String(),
+			AccountID:    accountID,
+			EnvID:        envID,
+		}
+
+		stateMock := &mockRunService{}
+		stateMock.On("LoadMetadata", ctx, asyncCheckpoint.ID()).Return(md, nil)
+
+		checkpointer := New(Opts{
+			State:           stateMock,
+			TracerProvider:  &mockTracerProvider{},
+			Queue:           &mockQueue{},
+			MetricsProvider: &mockMetricsProvider{},
+		})
+
+		err := checkpointer.CheckpointAsyncSteps(ctx, asyncCheckpoint)
+		require.ErrorIs(err, sv1.ErrStateOverflowed)
+
+		stateMock.AssertNotCalled(t, "SaveStep")
+	})
+}
+
+func TestCheckpointAsyncSteps_RequestStartedAtGate(t *testing.T) {
+	cases := []struct {
+		name        string
+		ageOffset   time.Duration
+		expectLoad  bool
+		expectStale bool
+	}{
+		{"fresh dispatch skips load", -time.Second, false, false},
+		{"stale RequestStartedAt forces queue load", -time.Hour, true, false},
+		{"future-dated dispatch falls through to load", time.Hour, true, false},
+		{"stale generation rejects", -time.Hour, true, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			require := require.New(t)
+
+			op := state.GeneratorOpcode{
+				ID:   "step-1",
+				Op:   enums.OpcodeStepRun,
+				Data: json.RawMessage(`{"result":"ok"}`),
+			}
+			mocks, testData := setupAsyncCheckpointTest(t, op)
+
+			testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 4)
+			testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(tc.ageOffset).UnixMilli()
+
+			if tc.expectLoad {
+				loadedGenerationID := 4
+				if tc.expectStale {
+					loadedGenerationID = 7
+				}
+				mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
+					ID:           "job-123",
+					GenerationID: loadedGenerationID,
+				}, nil)
+			}
+
+			if !tc.expectStale {
+				expectedData, err := json.Marshal(map[string]any{
+					"data": json.RawMessage(`{"result":"ok"}`),
+				})
+				require.NoError(err)
+				mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+				mocks.tracer.
+					On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+					Return(&meta.SpanReference{}, nil)
+				mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+			}
+
+			err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+			if tc.expectStale {
+				require.Error(err)
+				require.True(errors.Is(err, ErrStaleDispatch))
+				mocks.state.AssertNotCalled(t, "SaveStep")
+				mocks.tracer.AssertNotCalled(t, "CreateSpan")
+				mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+			} else {
+				require.NoError(err)
+			}
+
+			if tc.expectLoad {
+				mocks.queue.AssertCalled(t, "LoadQueueItem", ctx, "shard-1", "job-123")
+			} else {
+				mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+			}
+			mocks.state.AssertExpectations(t)
+			mocks.tracer.AssertExpectations(t)
+			mocks.queue.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCheckpointAsyncSteps_ValidationDisabledBypassesGate(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
-	// We'll be checkpointing 3 step run ops.
-	now := time.Now()
-	ops := make([]state.GeneratorOpcode, 3)
-	for i := range 3 {
-		ops[i] = state.GeneratorOpcode{
-			ID:     fmt.Sprintf("step-%d", i+1),
-			Op:     enums.OpcodeStepRun,
-			Data:   json.RawMessage(fmt.Sprintf(`{"result": "step %d output"}`, i+1)),
-			Name:   fmt.Sprintf("Step %d", i+1),
-			Timing: interval.New(now.Add(time.Duration(i*100)*time.Millisecond), now.Add(time.Duration((i+1)*100)*time.Millisecond)),
-		}
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
 	}
+	mocks, testData := setupAsyncCheckpointTestWithValidation(t, false, op)
 
-	// Setup test data and mocks
-	mocks, testData := setupAsyncCheckpointTest(t, ops...)
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
+	testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(-time.Hour).UnixMilli()
 
-	//
-	// Create mock assertions prior to checkpointing.
-	//
-
-	// Expect SaveStep to be called for each step when checkpointing.
-	for _, op := range ops {
-		switch op.Op {
-		case enums.OpcodeStepRun:
-			expectedData := map[string]any{
-				"data": json.RawMessage(op.Data),
-			}
-			expectedOutputBytes, _ := json.Marshal(expectedData)
-			mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedOutputBytes).Return(false, nil)
-		}
-	}
-
-	// Expect CreateSpan to be called for each step
+	expectedData, err := json.Marshal(map[string]any{
+		"data": json.RawMessage(`{"result":"ok"}`),
+	})
+	require.NoError(err)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
 	mocks.tracer.
-		On(
-			"CreateSpan",
-			mock.AnythingOfType("*context.valueCtx"),
-			meta.SpanNameStep,
-			mock.AnythingOfType("*tracing.CreateSpanOptions"),
-		).
-		Return(&meta.SpanReference{}, nil).
-		Times(3)
+		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
-	// Expect queue reset to be called with the job ID and shard info.
-	//
-	// Without this, a failed queue item that becomes successful will have an attempt count > 0 on the next
-	// retry.
-	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", "job-123").Return(nil)
-
-	//
-	// Execute the async checkpoint
-	//
-	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
 	require.NoError(err)
 
-	//
-	// Other Assertions
-	//
-
-	// Verify traces are created correctly
-	require.Len(mocks.tracer.createdSpans, 3, "Expected exactly 3 spans to be created")
-	for i, capture := range mocks.tracer.createdSpans {
-		require.Equal(meta.SpanNameStep, capture.name, "Span %d should have correct name", i+1)
-		require.NotNil(capture.options, "Span %d should have options", i+1)
-		require.NotNil(capture.options.StartTime, "Span %d should have start time", i+1)
-		require.NotNil(capture.options.EndTime, "Span %d should have end time", i+1)
-		require.NotNil(capture.attributes, "Span %d should have attributes", i+1)
-
-		// Assert that the completed attribute is set in tracing.
-		require.NotNil(capture.attributes.Get(meta.Attrs.DynamicStatus.Key()))
-		require.EqualValues("Completed", capture.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
-	}
-
-	// ASSERTIONS: Verify queue reset is called
-	mocks.queue.AssertCalled(t, "ResetAttemptsByJobID", ctx, "shard-1", "job-123")
-
-	// Verify all mocks were satisfied
+	// LoadQueueItem is the validator's first call; it must not have fired.
+	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
 	mocks.state.AssertExpectations(t)
 	mocks.tracer.AssertExpectations(t)
 	mocks.queue.AssertExpectations(t)
 }
 
-func TestCheckpointAsyncSteps_WithSleepFails(t *testing.T) {
+func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 
-	// We'll be checkpointing 3 step run ops.
-	now := time.Now()
-	ops := make([]state.GeneratorOpcode, 3)
-	for i := range 3 {
-		ops[i] = state.GeneratorOpcode{
-			ID:     fmt.Sprintf("step-%d", i+1),
-			Op:     enums.OpcodeStepRun,
-			Data:   json.RawMessage(fmt.Sprintf(`{"result": "step %d output"}`, i+1)),
-			Name:   fmt.Sprintf("Step %d", i+1),
-			Timing: interval.New(now.Add(time.Duration(i*100)*time.Millisecond), now.Add(time.Duration((i+1)*100)*time.Millisecond)),
-		}
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
 	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	// Setup test data and mocks
-	mocks, testData := setupAsyncCheckpointTest(
-		t, state.GeneratorOpcode{
-			ID: "sleep",
-			Op: enums.OpcodeSleep,
-			// This will fail on the Op.
-		},
-		state.GeneratorOpcode{
-			ID:   "step-run",
-			Op:   enums.OpcodeStepRun,
-			Data: json.RawMessage(`{"result": "step rund output"}`),
-		})
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
+	// Nil-from-HGET means the dispatch the SDK is serving no longer exists,
+	// which is exactly the stale case.
+	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(nil, queue.ErrQueueItemNotFound)
 
-	// Execute the async checkpoint
 	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
-	require.Error(err, "cannot checkpoint async steps")
+	require.Error(err)
+	require.True(errors.Is(err, ErrStaleDispatch))
 
-	// ASSERTIONS: Verify traces are created correctly
-	require.Len(mocks.tracer.createdSpans, 0, "Expected exactly 3 spans to be created")
-
-	// ASSERTIONS: Verify SaveStep calls are made correctly
 	mocks.state.AssertNotCalled(t, "SaveStep")
-
-	// ASSERTIONS: Verify queue reset is called
+	mocks.tracer.AssertNotCalled(t, "CreateSpan")
 	mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
-
-	// Verify all mocks were satisfied
 	mocks.state.AssertExpectations(t)
-	mocks.tracer.AssertExpectations(t)
 	mocks.queue.AssertExpectations(t)
 }
 
@@ -163,8 +583,14 @@ func TestCheckpointAsyncSteps_WithSleepFails(t *testing.T) {
 //
 //
 
-// setupAsyncCheckpointTest creates new mocks, asserting that
+// setupAsyncCheckpointTest creates new mocks with dispatch validation enabled.
 func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testMocks, *testData) {
+	return setupAsyncCheckpointTestWithValidation(t, true, ops...)
+}
+
+// setupAsyncCheckpointTestWithValidation creates new mocks and lets the caller
+// toggle the AllowAsyncDispatchValidation gate.
+func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool, ops ...state.GeneratorOpcode) (*testMocks, *testData) {
 	ctx := context.Background()
 
 	// Create mock dependencies
@@ -183,6 +609,11 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 	appID := uuid.New()
 
 	// Create test metadata
+	scope := queue.Scope{
+		AccountID:  accountID,
+		EnvID:      envID,
+		FunctionID: fnID,
+	}
 	testMetadata := state.Metadata{
 		ID: state.ID{
 			RunID:      runID,
@@ -215,10 +646,14 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 		TracerProvider:  mocks.tracer,
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
+		AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
+			return validationEnabled
+		},
 	})
 
 	return mocks, &testData{
 		metadata:        testMetadata,
+		scope:           scope,
 		stepOpcodes:     ops,
 		asyncCheckpoint: asyncCheckpoint,
 		checkpointer:    checkpointer,
@@ -248,6 +683,34 @@ func (m *mockRunService) SaveStep(ctx context.Context, id state.ID, stepID strin
 
 func (m *mockRunService) UpdateMetadata(ctx context.Context, id state.ID, config state.MutableConfig) error {
 	args := m.Called(ctx, id, config)
+	return args.Error(0)
+}
+
+func (m *mockRunService) SaveDefer(ctx context.Context, id state.ID, d state.Defer) error {
+	args := m.Called(ctx, id, d)
+	return args.Error(0)
+}
+
+func (m *mockRunService) LoadDefers(ctx context.Context, id state.ID) (map[string]state.Defer, error) {
+	args := m.Called(ctx, id)
+	var defers map[string]state.Defer
+	if v := args.Get(0); v != nil {
+		defers = v.(map[string]state.Defer)
+	}
+	return defers, args.Error(1)
+}
+
+func (m *mockRunService) LoadDefersMeta(ctx context.Context, id state.ID) (map[string]state.DeferMeta, error) {
+	args := m.Called(ctx, id)
+	var defers map[string]state.DeferMeta
+	if v := args.Get(0); v != nil {
+		defers = v.(map[string]state.DeferMeta)
+	}
+	return defers, args.Error(1)
+}
+
+func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashedID string, status enums.DeferStatus) error {
+	args := m.Called(ctx, id, hashedID, status)
 	return args.Error(0)
 }
 
@@ -310,9 +773,15 @@ type mockQueue struct {
 	mock.Mock
 }
 
-func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID, jobID string) error {
-	args := m.Called(ctx, shardID, jobID)
+func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID string, scope queue.Scope, jobID string) error {
+	args := m.Called(ctx, shardID, scope, jobID)
 	return args.Error(0)
+}
+
+func (m *mockQueue) LoadQueueItem(ctx context.Context, shardID, jobID string) (*queue.QueueItem, error) {
+	args := m.Called(ctx, shardID, jobID)
+	item, _ := args.Get(0).(*queue.QueueItem)
+	return item, args.Error(1)
 }
 
 func (m *mockQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {
@@ -348,6 +817,7 @@ type testMocks struct {
 
 type testData struct {
 	metadata        state.Metadata
+	scope           queue.Scope
 	stepOpcodes     []state.GeneratorOpcode
 	asyncCheckpoint AsyncCheckpoint
 	checkpointer    Checkpointer

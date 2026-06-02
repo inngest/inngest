@@ -273,10 +273,14 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 
 	logger.StdlibLogger(ctx).Trace("grpc message forwarded to connect gateway", "reply", reply, "err", err)
 
-	success := err == nil
+	success := err == nil && reply != nil && reply.Success
 	metrics.IncrConnectGatewayGRPCForwardCounter(ctx, 1, metrics.CounterOpt{
 		Tags: map[string]any{"success": success},
 	})
+
+	if err == nil && reply != nil && !reply.Success {
+		return fmt.Errorf("gateway could not forward to connection %s: connection not available", connectionID.String())
+	}
 
 	return err
 }

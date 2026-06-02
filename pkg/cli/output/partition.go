@@ -101,7 +101,7 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 	return w.Flush()
 }
 
-func TextQueueItem(item *queue.QueueItem) error {
+func TextQueueItem(item *queue.QueueItem, shardName ...string) error {
 	if item == nil {
 		fmt.Println("no item found")
 		return nil
@@ -111,11 +111,11 @@ func TextQueueItem(item *queue.QueueItem) error {
 
 	data := item.Data
 
-	if err := w.WriteOrdered(OrderedData(
+	fields := []any{
 		"ID", item.ID,
 		"EarliestPeekTime", item.EarliestPeekTime,
 		"At", time.UnixMilli(item.AtMS).Format(time.RFC3339),
-		"WallTime", time.Duration(item.WallTimeMS)*time.Millisecond,
+		"WallTime", time.Duration(item.WallTimeMS) * time.Millisecond,
 		"WorkspaceID", item.WorkspaceID,
 		"FunctionID", item.FunctionID,
 		"LeaseID", item.LeaseID,
@@ -147,7 +147,12 @@ func TextQueueItem(item *queue.QueueItem) error {
 			"Metadata", data.Metadata,
 			"ParallelMode", data.ParallelMode,
 		),
-	), WithTextOptLeadSpace(true)); err != nil {
+	}
+	if len(shardName) > 0 && shardName[0] != "" {
+		fields = append([]any{"QueueShard", shardName[0]}, fields...)
+	}
+
+	if err := w.WriteOrdered(OrderedData(fields...), WithTextOptLeadSpace(true)); err != nil {
 		return err
 	}
 

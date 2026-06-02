@@ -94,6 +94,15 @@ func IncrQueuePartitionProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueDeletedAccountPartitionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_deleted_account_partition_total",
+		Description: "The total number of queue partitions found for deleted accounts",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrPartitionGoneCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -180,6 +189,15 @@ func IncrSpanExportDataLoss(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "span_export_data_loss_total",
 		Description: "Total number of data loss detected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrSpanExportMissingRunID(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_export_missing_run_id_total",
+		Description: "Total number of spans exported without a run_id, keyed by fallback identifier",
 		Tags:        opts.Tags,
 	})
 }
@@ -582,33 +600,6 @@ func IncrHTTPAPIRequestsCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-func IncrQueueActiveCheckInvalidItemsFoundCounter(ctx context.Context, val int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, val, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_invalid_items_found_total",
-		Description: "The total number of invalid items found during an active check",
-		Tags:        opts.Tags,
-	})
-}
-
-func IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx context.Context, val int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, val, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_invalid_items_removed_total",
-		Description: "The total number of invalid items removed during an active check",
-		Tags:        opts.Tags,
-	})
-}
-
-func IncrQueueActiveCheckAccountScannedCounter(ctx context.Context, opts CounterOpt) {
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_account_scanned_total",
-		Description: "The total number of times an account was scanned during an active check",
-		Tags:        opts.Tags,
-	})
-}
-
 func ActiveBacklogNormalizeCount(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -632,6 +623,15 @@ func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "http_api_cache_miss",
 		Description: "The number of times a HTTP API request is not served from cache",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrTLSSessionCacheLookup(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "tls_session_cache_lookup_total",
+		Description: "The number of TLS session cache lookups",
 		Tags:        opts.Tags,
 	})
 }
@@ -840,15 +840,6 @@ func IncrPausesExpiredDeletedCounter(ctx context.Context, count int64, opts Coun
 	})
 }
 
-func IncrPausesOrphanedIndexCleanupCounter(ctx context.Context, opts CounterOpt) {
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "pauses_orphaned_index_cleanup_total",
-		Description: "Total number of orphaned pause IDs removed from index",
-		Tags:        opts.Tags,
-	})
-}
-
 func IncrBacklogRefillConstraintCheckCounter(ctx context.Context, reason string, opts CounterOpt) {
 	if opts.Tags == nil {
 		opts.Tags = map[string]any{}
@@ -917,6 +908,87 @@ func IncrConstraintAPIIssuedLeaseCounter(ctx context.Context, count int64, opts 
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_issued_lease_counter",
 		Description: "Total number of leases issued for the given location",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPICacheEvictedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_cache_evicted_total",
+		Description: "Total number of constraint cache items evicted, tagged by whether the item was expired",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIAcquireCacheCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_acquire_cache_total",
+		Description: "Total number of centralized Redis acquire cache hits and misses",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrExecutorHandleGeneratorCount(ctx context.Context, op string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	opts.Tags["op"] = op
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_handle_generator_total",
+		Description: "Total number of executor handle generator calls",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectProxyLeaseExpiredCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.lease_expired_total",
+		Description: "Total number of expired leases",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPISemaphoreCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_semaphore_total",
+		Description: "Total semaphore manager operations",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrDefersFinalizedCounter(ctx context.Context, status string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_finalized_total",
+		Description: "Total number of defers seen at run finalize, tagged by outcome status",
+		Tags:        opts.Tags,
+	})
+}
+
+// IncrDefersRejectedCounter records a soft-rejected defer. Reason is one
+// of "per_defer_size", "aggregate_size", "per_run_count", "invalid_opts".
+func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["reason"] = reason
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "defers_rejected_total",
+		Description: "Total number of defers soft-rejected at write time, tagged by reason",
 		Tags:        opts.Tags,
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
@@ -33,7 +34,7 @@ type CronSyncer interface {
 
 type CronHealthChecker interface {
 	// HealthCheck checks if a "cron" queue item exists in the system queue for the next expected schedule time
-	HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error)
+	HealthCheck(ctx context.Context, accountID, envID, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error)
 
 	// Enqueues the next periodic global cron-health-check system job
 	EnqueueNextHealthCheck(ctx context.Context) error
@@ -82,6 +83,20 @@ type CronItem struct {
 // SyncID is used for the jobID when enqueueing non processing types
 func (i CronItem) SyncID() string {
 	return fmt.Sprintf("%s:sync", i.ID)
+}
+
+// DeterministicJitter returns a stable jitter duration in [min, max) derived from
+// the given seed string using xxhash. The same seed always produces the same result.
+func DeterministicJitter(seed string, min, max time.Duration) time.Duration {
+	if max <= 0 || max <= min {
+		return min
+	}
+
+	rangeNs := uint64((max - min) / time.Nanosecond)
+	if rangeNs == 0 {
+		return min
+	}
+	return min + time.Duration(xxhash.Sum64String(seed)%rangeNs)
 }
 
 type CronHealthCheckStatus struct {

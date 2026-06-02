@@ -17,6 +17,8 @@ type (
 	Request = jsonrpc2.Request
 	// Response is a JSON-RPC response.
 	Response = jsonrpc2.Response
+	// Error is a structured error in a JSON-RPC response.
+	Error = jsonrpc2.WireError
 )
 
 // MakeID coerces the given Go value to an ID. The value should be the
@@ -37,3 +39,18 @@ func EncodeMessage(msg Message) ([]byte, error) {
 func DecodeMessage(data []byte) (Message, error) {
 	return jsonrpc2.DecodeMessage(data)
 }
+
+// Standard JSON-RPC 2.0 error codes.
+// See https://www.jsonrpc.org/specification#error_object
+const (
+	// CodeParseError indicates invalid JSON was received by the server.
+	CodeParseError = -32700
+	// CodeInvalidRequest indicates the JSON sent is not a valid Request object.
+	CodeInvalidRequest = -32600
+	// CodeMethodNotFound indicates the method does not exist or is not available.
+	CodeMethodNotFound = -32601
+	// CodeInvalidParams indicates invalid method parameter(s).
+	CodeInvalidParams = -32602
+	// CodeInternalError indicates an internal JSON-RPC error.
+	CodeInternalError = -32603
+)

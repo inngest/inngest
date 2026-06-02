@@ -22,17 +22,19 @@ if status == batchStatusStarted then
   return 1
 end
 
+-- Abort before writing any state if batch metadata doesn't exist.
+-- This must be checked before the pointer update to avoid corrupting
+-- state when the batch lives on a different cluster during migration.
+if is_status_empty(batchMetadataKey) then
+  return -1
+end
+
 -- Only update the pointer if it currently points to this batch.
 -- This prevents overwriting the pointer when bulk_append has already
 -- created an overflow batch and updated the pointer to it.
 local currentPointer = redis.call("GET", batchPointerKey)
 if is_empty(batchID) or is_empty(currentPointer) or currentPointer == batchID then
   update_pointer(batchPointerKey, newBatchID)
-end
-
-if is_status_empty(batchMetadataKey) then
-  -- status doesn't exist, something is wrong, abort
-  return -1
 end
 
 set_batch_status(batchMetadataKey, batchStatusStarted)

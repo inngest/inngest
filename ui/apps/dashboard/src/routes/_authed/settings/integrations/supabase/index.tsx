@@ -13,22 +13,22 @@ export const Route = createFileRoute(
   component: SupabasePage,
   loader: async () => {
     const postgresIntegrations = await PostgresIntegrations();
-    const conn = postgresIntegrations.find(
+    const conns = postgresIntegrations.filter(
       (connection) => connection.slug === 'supabase',
     );
 
-    if (!conn) {
+    if (conns.length === 0) {
       throw redirect({
         to: '/settings/integrations/supabase/connect',
       });
     }
 
-    return { conn };
+    return { conns };
   },
 });
 
 function SupabasePage() {
-  const { conn } = Route.useLoaderData();
+  const { conns } = Route.useLoaderData();
 
   const handleDelete = async (id: string) => {
     try {
@@ -45,7 +45,7 @@ function SupabasePage() {
 
   return (
     <IntegrationsPage
-      publications={[conn]}
+      publications={conns}
       content={integrationPageContent}
       onDelete={handleDelete}
     />

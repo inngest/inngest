@@ -7,14 +7,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -30,9 +35,11 @@ const (
 func WithConstraints[T any](
 	ctx context.Context,
 	now time.Time,
+	requestTime time.Time,
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
+	conditionalTracer trace.ConditionalTracer,
 	idempotencyKey string,
 	fn func(
 		ctx context.Context,
@@ -100,11 +107,13 @@ func WithConstraints[T any](
 	checkResult, err := CheckConstraints(
 		ctx,
 		now,
+		requestTime,
 		capacityManager,
 		useConstraintAPI,
 		req,
 		idempotencyKey,
 		constraints,
+		conditionalTracer,
 	)
 	if err != nil {
 		l.Error("failed to check constraints", "err", err)
@@ -189,12 +198,13 @@ func WithConstraints[T any](
 			// is generated. This means idempotency can be used for graceful retries.
 			operationIempotencyKey := lID.String()
 
-			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+			res, err := capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
 				IdempotencyKey: operationIempotencyKey,
 				AccountID:      req.AccountID,
 				LeaseID:        lID,
 				Duration:       ScheduleLeaseDuration,
 				Source:         source,
+				LeaseIssuedAt:  now,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err, "leaseID", lID, "req", req)
@@ -235,6 +245,7 @@ func WithConstraints[T any](
 					LeaseID:        lID,
 					IdempotencyKey: operationIdempotencyKey,
 					Source:         source,
+					LeaseIssuedAt:  now,
 				})
 				if internalErr != nil {
 					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{
@@ -260,6 +271,68 @@ type checkResult struct {
 	leaseID *ulid.ULID
 }
 
+// stepSemaphores returns the auto-release semaphores from run metadata that should
+// be added to every step queue item (not just the start job). This is used for
+// worker concurrency where each step independently acquires and releases a slot.
+func stepSemaphores(md sv2.Metadata) []constraintapi.Semaphore {
+	return constraintapi.AutoReleaseSemaphores(md.Config.Semaphores)
+}
+
+// evaluateFnConcurrency evaluates function concurrency limits against event data
+// and returns the corresponding semaphore entries to store in run metadata.
+func (e *executor) evaluateFnConcurrency(
+	ctx context.Context,
+	accountID, functionID uuid.UUID,
+	fnLimits []inngest.FnConcurrency,
+	evtMap map[string]any,
+) []constraintapi.Semaphore {
+	if len(fnLimits) == 0 {
+		return nil
+	}
+
+	semaphores := make([]constraintapi.Semaphore, 0, len(fnLimits))
+	for _, fc := range fnLimits {
+		scope := fc.EffectiveScope()
+
+		sem := constraintapi.Semaphore{
+			Weight: 1,
+		}
+
+		// Scope determines the semaphore ID and release mode
+		switch scope {
+		case inngest.FnConcurrencyScopeApp:
+			// App-scoped: auto-release per step, ID set during registration
+			sem.ID = fc.ID
+			sem.Weight = 1
+			sem.Release = constraintapi.SemaphoreReleaseAuto
+		default:
+			// Fn-scoped (default): manual release on finalization
+			sem.Release = constraintapi.SemaphoreReleaseManual
+			if fc.Key != nil {
+				sem.ID = constraintapi.SemaphoreIDFnKey(functionID, *fc.Key)
+				evaluated := ""
+				if val, err := expressions.Evaluate(ctx, *fc.Key, map[string]any{"event": evtMap}); err == nil {
+					evaluated = fmt.Sprintf("%v", val)
+				} else {
+					logger.StdlibLogger(ctx).Warn(
+						"failed to evaluate fn concurrency key expression, all runs will share one semaphore bucket",
+						"error", err,
+						"expression", *fc.Key,
+						"function_id", functionID,
+					)
+				}
+				sem.UsageValue = util.XXHash(evaluated)
+			} else {
+				sem.ID = constraintapi.SemaphoreIDFn(functionID)
+			}
+		}
+
+		semaphores = append(semaphores, sem)
+	}
+
+	return semaphores
+}
+
 func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) ([]constraintapi.ConstraintItem, error) {
 	var requests []constraintapi.ConstraintItem
 
@@ -279,14 +352,14 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 
 		var rateLimitKeyExpr string
 		if req.Function.RateLimit.Key != nil {
-			rateLimitKeyExpr = *req.Function.RateLimit.Key
+			rateLimitKeyExpr = util.XXHash(*req.Function.RateLimit.Key)
 		}
 
 		requests = append(requests, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindRateLimit,
 			RateLimit: &constraintapi.RateLimitConstraint{
 				Scope:             enums.RateLimitScopeFn,
-				KeyExpressionHash: util.XXHash(rateLimitKeyExpr),
+				KeyExpressionHash: rateLimitKeyExpr,
 				EvaluatedKeyHash:  rateLimitKey,
 			},
 		})
@@ -298,12 +371,17 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 func CheckConstraints(
 	ctx context.Context,
 	now time.Time,
+	requestTime time.Time,
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
 	idempotencyKey string,
 	constraints []constraintapi.ConstraintItem,
+	conditionalTracer trace.ConditionalTracer,
 ) (checkResult, error) {
+	ctx, span := conditionalTracer.NewSpan(ctx, "executor.CheckConstraints", req.AccountID, req.WorkspaceID, req.Function.ID)
+	defer span.End()
+
 	l := logger.StdlibLogger(ctx)
 
 	// NOTE: Schedule may be called from within new-runs or the API
@@ -328,7 +406,7 @@ func CheckConstraints(
 		return checkResult{}, fmt.Errorf("could not create configuration for acquire: %w", err)
 	}
 
-	res, internalErr := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+	res, err := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            req.AccountID,
 		IdempotencyKey:       idempotencyKey,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
@@ -338,19 +416,22 @@ func CheckConstraints(
 		// the create state call within schedule().
 		// LeaseRunIDs: []ulid.ULID,
 		EnvID:             req.WorkspaceID,
+		AppID:             req.AppID,
 		FunctionID:        req.Function.ID,
 		Configuration:     configuration,
 		Constraints:       constraints,
 		Amount:            1,
 		CurrentTime:       now,
+		RequestTime:       requestTime,
 		Duration:          ScheduleLeaseDuration,
 		MaximumLifetime:   5 * time.Minute, // This lease should be short!
 		Source:            source,
 		BlockingThreshold: 0, // Disable this for now
 	})
-	if internalErr != nil {
-		l.Error("acquiring capacity lease failed", "err", internalErr, "method", "CheckConstraints", "req", req)
-		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
+	if err != nil {
+		l.Error("acquiring capacity lease failed", "err", err, "method", "CheckConstraints", "req", req)
+		span.RecordError(err)
+		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", err)
 	}
 
 	// Rate limited

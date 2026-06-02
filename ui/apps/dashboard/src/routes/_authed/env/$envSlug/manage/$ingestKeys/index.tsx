@@ -1,7 +1,7 @@
 import useManagePageTerminology from '@/components/Manage/useManagePageTerminology';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { EnvironmentType } from '@/utils/environments';
 import { createFileRoute } from '@tanstack/react-router';
-import { Route as OrgActiveRoute } from '@/routes/_authed';
 import { Alert } from '@inngest/components/Alert';
 
 export const Route = createFileRoute(
@@ -12,7 +12,7 @@ export const Route = createFileRoute(
 
 function KeysComponent() {
   const currentContent = useManagePageTerminology();
-  const { env } = OrgActiveRoute?.useLoaderData() ?? {};
+  const env = useEnvironment();
 
   const shouldShowAlert =
     currentContent?.param === 'keys' &&

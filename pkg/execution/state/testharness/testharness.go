@@ -82,17 +82,14 @@ func CheckState(t *testing.T, gen Generator) {
 	t.Helper()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
-		"New":                     checkNew,
-		"Exists":                  checkExists,
-		"New/StepData":            checkNew_stepdata,
-		"UpdateMetadata":          checkUpdateMetadata,
-		"SaveResponse/Output":     checkSaveResponse_output,
-		"SaveResponse/Stack":      checkSaveResponse_stack,
-		"Idempotency":             checkIdempotency,
-		"SetStatus":               checkSetStatus,
-		"Cancel":                  checkCancel,
-		"Cancel/AlreadyCompleted": checkCancel_completed,
-		"Cancel/AlreadyCancelled": checkCancel_cancelled,
+		"New":                 checkNew,
+		"Exists":              checkExists,
+		"New/StepData":        checkNew_stepdata,
+		"UpdateMetadata":      checkUpdateMetadata,
+		"SaveResponse/Output": checkSaveResponse_output,
+		"SaveResponse/Stack":  checkSaveResponse_stack,
+		"Idempotency":         checkIdempotency,
+		"SetStatus":           checkSetStatus,
 	}
 	for name, f := range funcs {
 		t.Run(name, func(t *testing.T) {
@@ -583,8 +580,7 @@ func checkConsumePause(t *testing.T, m state.Manager, pm state.PauseManager) {
 		<-time.After(time.Millisecond)
 		// Consuming the pause should work.
 		res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           nil,
+			Data: nil,
 		})
 		require.NoError(t, err)
 		require.True(t, res.DidConsume)
@@ -617,8 +613,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager, pm state.PauseMana
 
 	// Consuming the pause should work.
 	_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           pauseData,
+		Data: pauseData,
 	})
 	require.NoError(t, err)
 
@@ -653,8 +648,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager, pm state.Paus
 
 		// Consuming the pause should work.
 		_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           nil,
+			Data: nil,
 		})
 		require.NoError(t, err)
 
@@ -698,8 +692,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager, pm state.Paus
 
 		// Consuming the pause should work.
 		_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           data,
+			Data: data,
 		})
 		require.NoError(t, err)
 
@@ -723,8 +716,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager, pm state.Paus
 	// exist in a different datasotre (block storage), so we assume that the pause
 	// data written is valid.
 	res, err := m.ConsumePause(ctx, state.Pause{ID: uuid.New()}, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.Nil(t, err)
 	require.True(t, res.DidConsume, "got: %#v", res)
@@ -747,8 +739,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager, pm state.Paus
 
 	// Consuming the pause should work.
 	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.NoError(t, err)
 	require.True(t, res.DidConsume)
@@ -784,8 +775,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager, pm state.P
 
 	// Consuming the pause should work.
 	res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           pauseData,
+		Data: pauseData,
 	})
 	require.NoError(t, err)
 	require.True(t, res.DidConsume)
@@ -818,30 +808,26 @@ func checkConsumePauseIdempotency(t *testing.T, m state.Manager, pm state.PauseM
 	_, err := pm.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	key := uuid.NewString()
 	// consuming the pause for the first time
 	res, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: key,
-		Data:           pauseData,
+		Data: pauseData,
 	})
 	require.NoError(t, err)
 	require.True(t, res.DidConsume)
 
-	// consuming with another idempotency key will fail
+	// consuming with the same data is an idempotent retry
 	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           pauseData,
+		Data: pauseData,
+	})
+	require.NoError(t, err)
+	require.True(t, res.DidConsume)
+
+	// consuming with different data is rejected
+	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		Data: map[string]any{"different": "data"},
 	})
 	require.NoError(t, err)
 	require.False(t, res.DidConsume)
-
-	// attempt to consume again with the same idempotency key should work
-	res, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: key,
-		Data:           pauseData,
-	})
-	require.NoError(t, err)
-	require.True(t, res.DidConsume)
 }
 
 func checkPausesByEvent_empty(t *testing.T, m state.Manager, pm state.PauseManager) {
@@ -1177,8 +1163,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager, pm state.PauseMa
 	// Consume the first pause, and assert that it doesn't show up in
 	// an iterator.
 	_, err = m.ConsumePause(ctx, pauses[0], state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.NoError(t, err)
 
@@ -1265,8 +1250,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager, pm state.PauseMa
 		require.Equal(t, 2, n)
 
 		_, err = m.ConsumePause(ctx, p1, state.ConsumePauseOpts{
-			IdempotencyKey: uuid.NewString(),
-			Data:           map[string]any{"ok": true},
+			Data: map[string]any{"ok": true},
 		})
 		require.NoError(t, err)
 
@@ -1324,8 +1308,7 @@ func checkPauseByID(t *testing.T, m state.Manager, pm state.PauseManager) {
 
 	// Consume.
 	_, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: uuid.NewString(),
-		Data:           nil,
+		Data: nil,
 	})
 	require.Nil(t, err, "Consuming an expired pause should work")
 
@@ -1417,103 +1400,6 @@ func checkSetStatus(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusOverflowed, reloaded.Metadata().Status, "Status is not Overflowed")
-}
-
-func checkCancel(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-	id := state.Identifier{
-		WorkflowID: w.ID,
-		RunID:      runID,
-		Key:        runID.String(),
-	}
-
-	init := state.Input{
-		Identifier:     id,
-		EventBatchData: []map[string]any{input.Map()},
-	}
-
-	s, err := m.New(ctx, init)
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.NoError(t, err)
-
-	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
-}
-
-func checkCancel_cancelled(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-	id := state.Identifier{
-		WorkflowID: w.ID,
-		RunID:      runID,
-		Key:        runID.String(),
-	}
-	init := state.Input{
-		Identifier:     id,
-		EventBatchData: []map[string]any{input.Map()},
-	}
-
-	s, err := m.New(ctx, init)
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.NoError(t, err)
-	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.Equal(t, err, state.ErrFunctionCancelled)
-}
-
-func checkCancel_completed(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-	id := state.Identifier{
-		WorkflowID: w.ID,
-		RunID:      runID,
-		Key:        runID.String(),
-	}
-	init := state.Input{
-		Identifier:     id,
-		EventBatchData: []map[string]any{input.Map()},
-	}
-
-	s, err := m.New(ctx, init)
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusScheduled, s.Metadata().Status, "Status is not Scheduled")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.SetStatus(ctx, s.Identifier(), enums.RunStatusCompleted)
-	require.NoError(t, err)
-
-	s, err = m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
-
-	// Add time so that the history ticks a millisecond
-	<-time.After(time.Millisecond)
-
-	err = m.Cancel(ctx, s.Identifier())
-	require.Equal(t, err, state.ErrFunctionComplete)
-
-	s, err = m.Load(ctx, s.Identifier().AccountID, s.RunID())
-	require.NoError(t, err)
-	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 }
 
 func setup(t *testing.T, m state.Manager) state.State {

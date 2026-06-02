@@ -12,6 +12,7 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
+import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -29,6 +30,7 @@ type Props = {
   run: Lazy<Run>;
   runID: string;
   result?: TraceResult;
+  isDurableEndpoint?: boolean;
 };
 
 type Run = {
@@ -54,7 +56,14 @@ type Run = {
   hasAI: boolean;
 };
 
-export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Props) => {
+export const RunInfo = ({
+  initialRunData,
+  run,
+  runID,
+  standalone,
+  result,
+  isDurableEndpoint,
+}: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
@@ -90,6 +99,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
             runID={runID}
             fnID={isLazyDone(run) ? run.fn.id : undefined}
             allowCancel={allowCancel}
+            isDurableEndpoint={isDurableEndpoint}
           />
         </div>
       </div>
@@ -97,7 +107,13 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
       {expanded && (
         <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4">
           <ElementWrapper label="Run ID">
-            <IDElement>{runID}</IDElement>
+            {standalone ? (
+              <IDElement>{runID}</IDElement>
+            ) : (
+              <Link href={pathCreator.runPopout({ runID })} className="font-mono">
+                {runID}
+              </Link>
+            )}
           </ElementWrapper>
 
           <OptimisticElementWrapper

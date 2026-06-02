@@ -89,7 +89,7 @@ func (m *mockConnectGatewayServer) Ping(ctx context.Context, req *connectpb.Ping
 
 func (m *mockConnectGatewayServer) Forward(ctx context.Context, req *connectpb.ForwardRequest) (*connectpb.ForwardResponse, error) {
 	m.forwardCount++
-	return &connectpb.ForwardResponse{}, nil
+	return &connectpb.ForwardResponse{Success: true}, nil
 }
 
 func (m *mockConnectGatewayServer) Ack(ctx context.Context, req *connectpb.AckMessage) (*connectpb.AckResponse, error) {

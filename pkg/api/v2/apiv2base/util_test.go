@@ -250,6 +250,7 @@ func TestGRPCToHTTPStatus(t *testing.T) {
 		httpStatus int
 	}{
 		{"InvalidArgument", codes.InvalidArgument, 400},
+		{"FailedPrecondition", codes.FailedPrecondition, 422},
 		{"Unauthenticated", codes.Unauthenticated, 401},
 		{"PermissionDenied", codes.PermissionDenied, 403},
 		{"NotFound", codes.NotFound, 404},

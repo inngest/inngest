@@ -202,20 +202,15 @@ func (c *Client) WaitForRunStatus(
 	ctx context.Context,
 	t require.TestingT,
 	expectedStatus string,
-	runID *string,
+	runID string,
 	opts ...WaitForRunStatusOpts,
 ) Run {
-	// Wait for non-nil run ID. This is a weird fn...
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		require.NotNil(t, runID)
-	}, 15*time.Second, 500*time.Millisecond)
-
 	var o WaitForRunStatusOpts
 	if len(opts) > 0 {
 		o = opts[0]
 	}
 
-	timeout := 10 * time.Second
+	timeout := 20 * time.Second
 	if o.Timeout > 0 {
 		timeout = o.Timeout
 	}
@@ -223,18 +218,7 @@ func (c *Client) WaitForRunStatus(
 	start := time.Now()
 	var run Run
 	for {
-
-		// It looks as though this original code may mutate the run ID
-		// passed in as a pointer while this loop runs?  This feels like
-		// a strange pattern and a bit of a code smell
-		if runID == nil {
-			c.Fatalf("runID pointer is nil")
-		}
-		if *runID == "" {
-			continue
-		}
-
-		run = c.Run(ctx, *runID)
+		run = c.Run(ctx, runID)
 		if run.Status == expectedStatus {
 			return run
 		}
@@ -245,8 +229,7 @@ func (c *Client) WaitForRunStatus(
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	require.NotEmpty(t, runID, "Expected non-nil run id: %s", runID)
-	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s", expectedStatus, run.Status)
+	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s (runID: %s)", expectedStatus, run.Status, runID)
 	return run
 }
 
@@ -268,7 +251,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 			return
 		}
 
-		run, err := c.RunTraces(ctx, *runID)
+		run, err := c.RunTraces(ctx, *runID, opts.NewTraces)
 		if !a.NoError(err) {
 			return
 		}
@@ -292,14 +275,15 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 }
 
 type WaitForRunTracesOptions struct {
-	Status   models.FunctionStatus
-	Timeout  time.Duration
-	Interval time.Duration
+	Status    models.FunctionStatus
+	Timeout   time.Duration
+	Interval  time.Duration
+	NewTraces bool
 
 	ChildSpanCount int
 }
 
-func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
+func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
@@ -307,7 +291,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	}
 
 	query := `
-		query GetTraceRun($runID: String!) {
+	  query GetTraceRun($runID: String!, $preview: Boolean) {
 	  	run(runID: $runID) {
 				status
 				traceID
@@ -316,7 +300,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 				cronSchedule
         endedAt
 
-				trace {
+				trace(preview: $preview) {
 					...TraceDetails
 					childrenSpans {
 						...TraceDetails
@@ -370,7 +354,8 @@ func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
-			"runID": runID,
+			"runID":   runID,
+			"preview": newTraces,
 		},
 	})
 	if err != nil {

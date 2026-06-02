@@ -20,6 +20,11 @@ import { createTicket, getCustomerTierByEmail } from "@/data/plain";
 import { getAccountPlanInfo } from "@/data/inngest";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
 import { SlackChannelUpsell } from "@/components/Support/SlackChannelUpsell";
+import {
+  AttachmentUploadField,
+  useAttachmentUpload,
+} from "@/components/Support/AttachmentUploadField";
+import { Main } from "@/components/Main";
 
 export const Route = createFileRoute("/_authed/new")({
   component: NewTicketPage,
@@ -40,11 +45,11 @@ function NewTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
 
-  // Fetch customer tier information from Plain API
+  // Fetch customer tier information from Plain API (email derived server-side from auth)
   const userEmail = user?.primaryEmailAddress?.emailAddress;
   const { data: plainTierInfo } = useQuery({
     queryKey: ["customerTier", userEmail],
-    queryFn: () => getCustomerTierFn({ data: { email: userEmail! } }),
+    queryFn: () => getCustomerTierFn(),
     enabled: !!userEmail,
   });
 
@@ -97,6 +102,24 @@ function NewTicketPage() {
     () => severitySelectOptions.find((opt) => opt.id === bugSeverity) || null,
     [bugSeverity, severitySelectOptions],
   );
+  const {
+    attachments,
+    isUploading,
+    uploadedAttachmentIds,
+    fileInputRef,
+    handleFileSelect,
+    removeAttachment,
+    openFilePicker,
+    clearAttachments,
+  } = useAttachmentUpload({
+    userEmail: user?.primaryEmailAddress?.emailAddress,
+    context: "customEntry",
+    onError: (message) => {
+      if (message) {
+        setResult({ ok: false, message });
+      }
+    },
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -126,6 +149,10 @@ function NewTicketPage() {
             type: ticketType,
             body: body.trim(),
             severity: ticketType === "bug" ? bugSeverity : undefined,
+            attachmentIds:
+              uploadedAttachmentIds.length > 0
+                ? uploadedAttachmentIds
+                : undefined,
           },
         },
       });
@@ -139,6 +166,7 @@ function NewTicketPage() {
         setTicketType(null);
         setBody("");
         setBugSeverity(DEFAULT_BUG_SEVERITY_LEVEL);
+        clearAttachments();
         // Navigate to home after a short delay
         setTimeout(() => {
           navigate({ to: "/" });
@@ -164,7 +192,7 @@ function NewTicketPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <Main className="min-h-screen max-w-2xl">
       {/* Back button */}
       <Link
         to="/"
@@ -174,7 +202,7 @@ function NewTicketPage() {
         Back to tickets
       </Link>
 
-      <div className="mx-auto max-w-2xl mb-8">
+      <div className="mb-8">
         <div className="mb-8">
           <h1 className="text-basis mb-2 text-2xl font-bold">
             Create Support Ticket
@@ -226,6 +254,23 @@ function NewTicketPage() {
             />
           </div>
 
+          {/* Attachments */}
+          <div className="flex flex-col gap-2">
+            <label className="text-basis text-sm font-medium">
+              Attach files (optional)
+            </label>
+            <AttachmentUploadField
+              attachments={attachments}
+              isUploading={isUploading}
+              isSubmitting={isSubmitting}
+              fileInputRef={fileInputRef}
+              onFileSelect={handleFileSelect}
+              onRemoveAttachment={removeAttachment}
+              onAddClick={openFilePicker}
+              variant="default"
+            />
+          </div>
+
           {/* Severity (only for bugs) */}
           {ticketType === "bug" && (
             <div className="flex flex-col gap-2">
@@ -261,7 +306,9 @@ function NewTicketPage() {
             type="submit"
             kind="primary"
             label={isSubmitting ? "Creating..." : "Create Support Ticket"}
-            disabled={isSubmitting || !ticketType || !body.trim()}
+            disabled={
+              isSubmitting || isUploading || !ticketType || !body.trim()
+            }
             className="w-full"
           />
 
@@ -286,6 +333,6 @@ function NewTicketPage() {
           <CommunityChannels />
         </div>
       </div>
-    </div>
+    </Main>
   );
 }

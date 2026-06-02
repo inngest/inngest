@@ -1,6 +1,7 @@
 package constraintapi
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,6 +27,15 @@ const (
 
 var enableDebugLogs = false
 
+// EnableAcquireCacheFn controls centralized Redis caching per constraint.
+// It receives the account, env, function IDs and the specific constraint item,
+// allowing granular control over which constraints (or entire accounts/envs/functions) are cached.
+type EnableAcquireCacheFn func(ctx context.Context, accountID, envID, functionID uuid.UUID, ci ConstraintItem) (enable bool)
+
+// AcquireCacheTTLFn returns the min and max cache TTL for a given account/env/function.
+// This allows dynamic TTL configuration per user.
+type AcquireCacheTTLFn func(ctx context.Context, accountID, envID, functionID uuid.UUID) (minTTL, maxTTL time.Duration)
+
 type redisCapacityManager struct {
 	// Constraint state is stored in Redis-compatible scavengerShards for the time being.
 	// In the future, we will move to another data store like FoundationDB.
@@ -36,6 +46,8 @@ type redisCapacityManager struct {
 
 	enableDebugLogs                      bool
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
+	enableAcquireCache                   EnableAcquireCacheFn
+	acquireCacheTTL                      AcquireCacheTTLFn
 
 	lifecycles []ConstraintAPILifecycleHooks
 
@@ -100,6 +112,18 @@ func WithCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	}
 }
 
+func WithEnableAcquireCache(fn EnableAcquireCacheFn) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.enableAcquireCache = fn
+	}
+}
+
+func WithAcquireCacheTTL(fn AcquireCacheTTLFn) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.acquireCacheTTL = fn
+	}
+}
+
 func NewRedisCapacityManager(
 	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
@@ -160,4 +184,14 @@ func (r *redisCapacityManager) keyConstraintCheckIdempotency(accountID uuid.UUID
 // keyLeaseDetails returns the key to the hash including the lease idempotency key, lease run ID, and operation idempotency key
 func (r *redisCapacityManager) keyLeaseDetails(accountID uuid.UUID, leaseID ulid.ULID) string {
 	return fmt.Sprintf("{cs}:%s:ld:%s", accountScope(accountID), leaseID)
+}
+
+// keyConstraintCache returns the Redis key for a centralized constraint exhaustion cache entry.
+// This uses the same CacheKey logic as the in-memory cache but stores in Redis for cross-instance sharing.
+func (r *redisCapacityManager) keyConstraintCache(accountID, envID, functionID uuid.UUID, ci ConstraintItem) string {
+	cacheKey := ci.CacheKey(accountID, envID, functionID)
+	if cacheKey == "" {
+		return ""
+	}
+	return fmt.Sprintf("{cs}:%s:cache:%s", accountScope(accountID), cacheKey)
 }

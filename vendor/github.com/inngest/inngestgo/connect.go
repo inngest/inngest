@@ -7,12 +7,14 @@ import (
 
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo/connect"
-	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
-	"github.com/inngest/inngestgo/pkg/env"
+	"github.com/inngest/inngestgo/middleware"
 )
 
+// ConnectOpts
 type ConnectOpts struct {
+	// Apps represents the apps being served by Connect.  Each app is defined by clients;
+	// to create an app, create a new Client via [NewClient].
 	Apps []Client
 
 	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
@@ -30,14 +32,18 @@ type ConnectOpts struct {
 	MaxWorkerConcurrency *int64
 
 	// MessageReadLimit sets the max number of bytes to read for a single WebSocket message.
-	// By default (nil or 0), the connection has a message read limit of 32768 bytes (32KB).
+	// By default (nil or 0), the connection has a message read limit of 10MB.
 	// Set to -1 to disable the limit.
 	// Set to any positive value to use a custom limit.
 	MessageReadLimit *int64
+
+	// MissedGatewayHeartbeatTolerance is the number of gateway heartbeat periods
+	// that may pass without a gateway heartbeat before reconnecting.
+	// Defaults to 3. Negative values use the default.
+	MissedGatewayHeartbeatTolerance *int
 }
 
 func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, error) {
-
 	connectPlaceholder := url.URL{
 		Scheme: "ws",
 		Host:   "connect",
@@ -99,21 +105,21 @@ func Connect(ctx context.Context, opts ConnectOpts) (connect.WorkerConnection, e
 	}
 
 	return connect.Connect(ctx, connect.Opts{
-		Apps:                     apps,
-		Env:                      defaultClient.Env,
-		Capabilities:             capabilities,
-		HashedSigningKey:         hashedKey,
-		HashedSigningKeyFallback: hashedFallbackKey,
-		MaxWorkerConcurrency:     opts.MaxWorkerConcurrency,
-		MessageReadLimit:         opts.MessageReadLimit,
-		APIBaseUrl:               defaultClient.h.GetAPIBaseURL(),
-		IsDev:                    defaultClient.h.isDev(),
-		DevServerUrl:             env.DevServerURL(),
-		InstanceID:               opts.InstanceID,
-		Platform:                 Ptr(platform()),
-		SDKVersion:               SDKVersion,
-		SDKLanguage:              SDKLanguage,
-		RewriteGatewayEndpoint:   opts.RewriteGatewayEndpoint,
+		Apps:                            apps,
+		Env:                             defaultClient.Env,
+		Capabilities:                    capabilities,
+		HashedSigningKey:                hashedKey,
+		HashedSigningKeyFallback:        hashedFallbackKey,
+		MaxWorkerConcurrency:            opts.MaxWorkerConcurrency,
+		MessageReadLimit:                opts.MessageReadLimit,
+		MissedGatewayHeartbeatTolerance: opts.MissedGatewayHeartbeatTolerance,
+		APIBaseURL:                      defaultClient.h.GetAPIBaseURL(),
+		IsDev:                           defaultClient.h.isDev(),
+		InstanceID:                      opts.InstanceID,
+		Platform:                        Ptr(platform()),
+		SDKVersion:                      SDKVersion,
+		SDKLanguage:                     SDKLanguage,
+		RewriteGatewayEndpoint:          opts.RewriteGatewayEndpoint,
 	}, invokers, defaultClient.Logger)
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
@@ -42,8 +43,11 @@ func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.Func
 	}
 	pending, _ := r.Queue.OutstandingJobCount(
 		ctx,
-		md.Identifier.WorkspaceID,
-		md.Identifier.WorkflowID,
+		queue.Scope{
+			AccountID:  md.Identifier.AccountID,
+			EnvID:      md.Identifier.WorkspaceID,
+			FunctionID: md.Identifier.WorkflowID,
+		},
 		md.Identifier.RunID,
 	)
 	return &pending, nil
@@ -338,7 +342,7 @@ func (r *mutationResolver) Rerun(
 		originalRunID = fnrun.OriginalRunID
 	}
 
-	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
+	newRunID, _, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
 		AppID:    fnCQRS.AppID,
 		Events: []event.TrackedEvent{
@@ -369,5 +373,5 @@ func (r *mutationResolver) Rerun(
 		return ulid.Zero, err
 	}
 
-	return identifier.ID.RunID, nil
+	return *newRunID, nil
 }

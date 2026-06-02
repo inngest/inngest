@@ -1,6 +1,7 @@
 package devserver
 
 import (
+	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/urfave/cli/v3"
 )
@@ -36,10 +37,10 @@ func Command() *cli.Command {
 				Name:  "host",
 				Usage: "Inngest server host",
 			},
-			&cli.StringFlag{
+			&cli.IntFlag{
 				Name:    "port",
 				Aliases: []string{"p"},
-				Value:   "8288",
+				Value:   api.DefaultAPIPort,
 				Usage:   "Inngest server port",
 			},
 

@@ -27,6 +27,7 @@ export type GetRunData = {
   trace: Trace;
   hasAI: boolean;
   status: string;
+  isDurableEndpoint?: boolean;
 };
 
 export type GetRunResult = {

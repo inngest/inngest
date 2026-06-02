@@ -121,6 +121,8 @@ func ConstraintKindToProto(kind ConstraintKind) pb.ConstraintApiConstraintKind {
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY
 	case ConstraintKindThrottle:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE
+	case ConstraintKindSemaphore:
+		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE
 	default:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED
 	}
@@ -134,8 +136,32 @@ func ConstraintKindFromProto(kind pb.ConstraintApiConstraintKind) ConstraintKind
 		return ConstraintKindConcurrency
 	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE:
 		return ConstraintKindThrottle
+	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_SEMAPHORE:
+		return ConstraintKindSemaphore
 	default:
 		return ConstraintKind("")
+	}
+}
+
+func SemaphoreReleaseModeToProto(mode SemaphoreReleaseMode) pb.ConstraintApiSemaphoreReleaseMode {
+	switch mode {
+	case SemaphoreReleaseAuto:
+		return pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_AUTO
+	case SemaphoreReleaseManual:
+		return pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_MANUAL
+	default:
+		return pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_UNSPECIFIED
+	}
+}
+
+func SemaphoreReleaseModeFromProto(mode pb.ConstraintApiSemaphoreReleaseMode) SemaphoreReleaseMode {
+	switch mode {
+	case pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_AUTO:
+		return SemaphoreReleaseAuto
+	case pb.ConstraintApiSemaphoreReleaseMode_CONSTRAINT_API_SEMAPHORE_RELEASE_MODE_MANUAL:
+		return SemaphoreReleaseManual
+	default:
+		return SemaphoreReleaseAuto
 	}
 }
 
@@ -343,11 +369,20 @@ func ConstraintConfigToProto(config ConstraintConfig) *pb.ConstraintConfig {
 		throttles[i] = ThrottleConfigToProto(th)
 	}
 
+	var semaphores []*pb.Semaphore
+	if len(config.Semaphores) > 0 {
+		semaphores = make([]*pb.Semaphore, len(config.Semaphores))
+		for i, s := range config.Semaphores {
+			semaphores[i] = SemaphoreToProto(s)
+		}
+	}
+
 	return &pb.ConstraintConfig{
 		FunctionVersion: int32(config.FunctionVersion),
 		RateLimit:       rateLimits,
 		Concurrency:     ConcurrencyConfigToProto(config.Concurrency),
 		Throttle:        throttles,
+		Semaphores:      semaphores,
 	}
 }
 
@@ -366,11 +401,20 @@ func ConstraintConfigFromProto(pbConfig *pb.ConstraintConfig) ConstraintConfig {
 		throttles[i] = ThrottleConfigFromProto(th)
 	}
 
+	var semaphores []Semaphore
+	if len(pbConfig.Semaphores) > 0 {
+		semaphores = make([]Semaphore, len(pbConfig.Semaphores))
+		for i, s := range pbConfig.Semaphores {
+			semaphores[i] = SemaphoreFromProto(s)
+		}
+	}
+
 	return ConstraintConfig{
 		FunctionVersion: int(pbConfig.FunctionVersion),
 		RateLimit:       rateLimits,
 		Concurrency:     ConcurrencyConfigFromProto(pbConfig.Concurrency),
 		Throttle:        throttles,
+		Semaphores:      semaphores,
 	}
 }
 
@@ -434,6 +478,48 @@ func ThrottleConstraintFromProto(pbConstraint *pb.ThrottleConstraint) ThrottleCo
 	}
 }
 
+func SemaphoreToProto(s Semaphore) *pb.Semaphore {
+	return &pb.Semaphore{
+		Id:         s.ID,
+		UsageValue: s.UsageValue,
+		Weight:     s.Weight,
+		Release:    SemaphoreReleaseModeToProto(s.Release),
+	}
+}
+
+func SemaphoreFromProto(pbSem *pb.Semaphore) Semaphore {
+	if pbSem == nil {
+		return Semaphore{}
+	}
+	return Semaphore{
+		ID:         pbSem.Id,
+		UsageValue: pbSem.UsageValue,
+		Weight:     pbSem.Weight,
+		Release:    SemaphoreReleaseModeFromProto(pbSem.Release),
+	}
+}
+
+func SemaphoreConstraintToProto(constraint SemaphoreConstraint) *pb.SemaphoreConstraint {
+	return &pb.SemaphoreConstraint{
+		Id:         constraint.ID,
+		UsageValue: constraint.UsageValue,
+		Weight:     constraint.Weight,
+		Release:    SemaphoreReleaseModeToProto(constraint.Release),
+	}
+}
+
+func SemaphoreConstraintFromProto(pbConstraint *pb.SemaphoreConstraint) SemaphoreConstraint {
+	if pbConstraint == nil {
+		return SemaphoreConstraint{}
+	}
+	return SemaphoreConstraint{
+		ID:         pbConstraint.Id,
+		UsageValue: pbConstraint.UsageValue,
+		Weight:     pbConstraint.Weight,
+		Release:    SemaphoreReleaseModeFromProto(pbConstraint.Release),
+	}
+}
+
 func ConstraintItemToProto(item ConstraintItem) *pb.ConstraintItem {
 	kind := ConstraintKindToProto(item.Kind)
 
@@ -451,6 +537,10 @@ func ConstraintItemToProto(item ConstraintItem) *pb.ConstraintItem {
 
 	if item.RateLimit != nil {
 		pbItem.RateLimit = RateLimitConstraintToProto(*item.RateLimit)
+	}
+
+	if item.Semaphore != nil {
+		pbItem.Semaphore = SemaphoreConstraintToProto(*item.Semaphore)
 	}
 
 	return pbItem
@@ -478,6 +568,11 @@ func ConstraintItemFromProto(pbItem *pb.ConstraintItem) ConstraintItem {
 	if pbItem.RateLimit != nil {
 		rateLimit := RateLimitConstraintFromProto(pbItem.RateLimit)
 		item.RateLimit = &rateLimit
+	}
+
+	if pbItem.Semaphore != nil {
+		semaphore := SemaphoreConstraintFromProto(pbItem.Semaphore)
+		item.Semaphore = &semaphore
 	}
 
 	return item
@@ -689,6 +784,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		IdempotencyKey:       req.IdempotencyKey,
 		AccountId:            req.AccountID.String(),
 		EnvId:                req.EnvID.String(),
+		AppId:                req.AppID.String(),
 		FunctionId:           req.FunctionID.String(),
 		Configuration:        ConstraintConfigToProto(req.Configuration),
 		Constraints:          constraints,
@@ -701,6 +797,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
 		RequestAttempt:       uint32(req.RequestAttempt),
+		RequestTime:          timestamppb.New(req.RequestTime),
 	}
 }
 
@@ -719,6 +816,14 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		return nil, fmt.Errorf("invalid env ID: %w", err)
 	}
 
+	var appID uuid.UUID
+	if pbReq.AppId != "" {
+		appID, err = uuid.Parse(pbReq.AppId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid app ID: %w", err)
+		}
+	}
+
 	functionID, err := uuid.Parse(pbReq.FunctionId)
 	if err != nil {
 		return nil, fmt.Errorf("invalid function ID: %w", err)
@@ -732,6 +837,11 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 	var currentTime time.Time
 	if pbReq.CurrentTime != nil {
 		currentTime = pbReq.CurrentTime.AsTime()
+	}
+
+	var requestTime time.Time
+	if pbReq.RequestTime != nil {
+		requestTime = pbReq.RequestTime.AsTime()
 	}
 
 	var duration time.Duration
@@ -762,6 +872,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		IdempotencyKey:       pbReq.IdempotencyKey,
 		AccountID:            accountID,
 		EnvID:                envID,
+		AppID:                appID,
 		FunctionID:           functionID,
 		Configuration:        ConstraintConfigFromProto(pbReq.Configuration),
 		Constraints:          constraints,
@@ -774,6 +885,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt:       int(pbReq.RequestAttempt),
+		RequestTime:          requestTime,
 	}, nil
 }
 
@@ -848,6 +960,12 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 	if req == nil {
 		return nil
 	}
+
+	var leaseIssuedAt *timestamppb.Timestamp
+	if !req.LeaseIssuedAt.IsZero() {
+		leaseIssuedAt = timestamppb.New(req.LeaseIssuedAt)
+	}
+
 	return &pb.CapacityExtendLeaseRequest{
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
@@ -855,6 +973,7 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		Duration:       durationpb.New(req.Duration),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}
 }
 
@@ -878,6 +997,11 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		duration = pbReq.Duration.AsDuration()
 	}
 
+	var leaseIssuedAt time.Time
+	if pbReq.LeaseIssuedAt != nil {
+		leaseIssuedAt = pbReq.LeaseIssuedAt.AsTime()
+	}
+
 	return &CapacityExtendLeaseRequest{
 		IdempotencyKey: pbReq.IdempotencyKey,
 		AccountID:      accountID,
@@ -885,6 +1009,7 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		Duration:       duration,
 		Source:         LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt: int(pbReq.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}, nil
 }
 
@@ -927,12 +1052,19 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 	if req == nil {
 		return nil
 	}
+
+	var leaseIssuedAt *timestamppb.Timestamp
+	if !req.LeaseIssuedAt.IsZero() {
+		leaseIssuedAt = timestamppb.New(req.LeaseIssuedAt)
+	}
+
 	return &pb.CapacityReleaseRequest{
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Source:         LeaseSourceToProto(req.Source),
 		RequestAttempt: uint32(req.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}
 }
 
@@ -951,12 +1083,18 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		return nil, fmt.Errorf("invalid lease ID: %w", err)
 	}
 
+	var leaseIssuedAt time.Time
+	if pbReq.LeaseIssuedAt != nil {
+		leaseIssuedAt = pbReq.LeaseIssuedAt.AsTime()
+	}
+
 	return &CapacityReleaseRequest{
 		IdempotencyKey: pbReq.IdempotencyKey,
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 		Source:         LeaseSourceFromProto(pbReq.Source),
 		RequestAttempt: int(pbReq.RequestAttempt),
+		LeaseIssuedAt:  leaseIssuedAt,
 	}, nil
 }
 

@@ -62,7 +62,12 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			break
 		}
 
-		di, err := d.deb.GetDebounceItem(ctx, payload.DebounceID, payload.AccountID)
+		scope := queue.Scope{
+			AccountID:  payload.AccountID,
+			EnvID:      payload.WorkspaceID,
+			FunctionID: payload.FunctionID,
+		}
+		di, err := d.deb.GetDebounceItem(ctx, scope, payload.DebounceID)
 		if err != nil {
 			return fmt.Errorf("could not get debounce item: %w", err)
 		}
@@ -71,7 +76,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			break
 		}
 
-		err = d.deb.DeleteDebounceItem(ctx, payload.DebounceID, *di, di.AccountID)
+		err = d.deb.DeleteDebounceItem(ctx, scope, payload.DebounceID, *di)
 		if err != nil {
 			return fmt.Errorf("could not delete debounce item: %w", err)
 		}
@@ -112,7 +117,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 		partition = *item.QueueName
 	}
 
-	err := shard.RemoveQueueItem(ctx, partition, item.ID)
+	err := shard.RemoveQueueItem(ctx, queue.ScopeFromQueueItem(*item), partition, item.ID)
 	if err != nil {
 		return fmt.Errorf("could not remove queue item: %w", err)
 	}

@@ -137,3 +137,30 @@ func GaugeAggregatorPendingDeletes(ctx context.Context, value int64, opts GaugeO
 		Tags:        opts.Tags,
 	})
 }
+
+func GaugePartitionProcessorCapacity(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "partition_processor_capacity",
+		Description: "Available capacity in the partition processor pool",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugePartitionProcessorInFlight(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "partition_processor_in_flight",
+		Description: "Number of partitions currently being processed",
+		Tags:        opts.Tags,
+	})
+}
+
+func GaugeConstraintAPICacheSize(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_cache_size",
+		Description: "Current number of items in the constraint cache",
+		Tags:        opts.Tags,
+	})
+}

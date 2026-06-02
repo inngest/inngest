@@ -25,13 +25,13 @@ import (
 
 // getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
 func getItemIDsFromBacklog(ctx context.Context, mgr queue.ShardOperations, backlog *queue.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
-	items, _, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
+	res, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	itemIDs := make([]string, len(items))
-	for i, item := range items {
+	itemIDs := make([]string, len(res.Items))
+	for i, item := range res.Items {
 		itemIDs[i] = item.ID
 	}
 	return itemIDs, nil
@@ -129,16 +129,12 @@ func TestLuaCompatibility(t *testing.T) {
 				shard := setup(t)
 
 				// Initialize queue
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
 				q, err := queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					})
+					shardRegistry)
 				require.NoError(t, err)
 
 				// Test data setup
@@ -189,7 +185,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// - Lease item
 				leaseDuration := 30 * time.Second
-				leaseID, err := shard.Lease(ctx, enqueuedItem, leaseDuration, now, nil)
+				leaseID, err := shard.Lease(ctx, enqueuedItem, leaseDuration, now)
 				require.NoError(t, err, "Failed to lease item on %s", serverType)
 				require.NotNil(t, leaseID, "Lease ID should not be nil on %s", serverType)
 
@@ -244,16 +240,12 @@ func TestLuaCompatibility(t *testing.T) {
 				keyHash := util.XXHash(throttleKey)
 
 				// Initialize queue
-				_, err := queue.New(
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
+				_, err = queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					},
+					shardRegistry,
 					opts...,
 				)
 				require.NoError(t, err)
@@ -281,7 +273,7 @@ func TestLuaCompatibility(t *testing.T) {
 				qi, err := shard.EnqueueItem(ctx, queueItem, now, queue.EnqueueOpts{})
 				require.NoError(t, err)
 
-				leaseID, err := shard.Lease(ctx, qi, 5*time.Second, now, nil)
+				leaseID, err := shard.Lease(ctx, qi, 5*time.Second, now)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 			})
@@ -318,16 +310,12 @@ func TestLuaCompatibility(t *testing.T) {
 
 				shard := setup(t, opts...)
 
+				shardRegistry, err := queue.NewSingleShardRegistry(shard)
+				require.NoError(t, err)
 				q, err := queue.New(
 					context.Background(),
 					"test-queue",
-					shard,
-					map[string]queue.QueueShard{
-						shard.Name(): shard,
-					},
-					func(ctx context.Context, accountId uuid.UUID, queueName *string) (queue.QueueShard, error) {
-						return shard, nil
-					},
+					shardRegistry,
 					opts...,
 				)
 				require.NoError(t, err)
@@ -364,11 +352,10 @@ func TestLuaCompatibility(t *testing.T) {
 				refillItems, err := getItemIDsFromBacklog(ctx, shard, &backlog, refillUntil, 10)
 				require.NoError(t, err)
 
-				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
+				res, err := shard.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill, *res)
-				require.Equal(t, 1, res.Refilled)
+				require.Equal(t, 1, len(res.RefilledItems))
 
 				// Add second item with capacity lease
 				capacityLeaseID := ulid.MustNew(ulid.Timestamp(refillUntil.Add(5*time.Second)), rand.Reader)
@@ -405,20 +392,17 @@ func TestLuaCompatibility(t *testing.T) {
 					&sp,
 					refillUntil,
 					refillItems,
-					constraints,
-					queue.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
-					queue.WithBacklogRefillDisableConstraintChecks(true),
 					queue.WithBacklogRefillItemCapacityLeases([]queue.CapacityLease{{
 						LeaseID: capacityLeaseID,
 					}}),
 				)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, 1, res.Refill)
-				require.Equal(t, 1, res.Refilled)
+				require.Equal(t, 1, len(res.RefilledItems))
 
-				refilled, err := q.ItemByID(ctx, shard, qi2.ID)
+				refilled, err := q.LoadQueueItem(ctx, shard.Name(), qi2.ID)
 				require.NoError(t, err)
+				require.NotNil(t, refilled.CapacityLease)
 				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLease.LeaseID.String())
 			})
 
@@ -563,6 +547,89 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Equal(t, constraintapi.ServiceAPI, releaseResp.CreationSource.Service)
 				require.Equal(t, constraintapi.CallerLocationItemLease, releaseResp.CreationSource.Location)
 				require.Equal(t, constraintapi.RunProcessingModeDurableEndpoint, releaseResp.CreationSource.RunProcessingMode)
+			})
+
+			t.Run("acquire cache hit on exhausted constraint", func(t *testing.T) {
+				shard := setup(t)
+
+				rc := shard.Client().Client()
+
+				enableCache := func(_ context.Context, _, _, _ uuid.UUID, _ constraintapi.ConstraintItem) bool {
+					return true
+				}
+
+				cm, err := constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClock(clockwork.NewRealClock()),
+					constraintapi.WithEnableDebugLogs(true),
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
+					constraintapi.WithEnableAcquireCache(enableCache),
+					constraintapi.WithAcquireCacheTTL(func(_ context.Context, _, _, _ uuid.UUID) (time.Duration, time.Duration) {
+						return constraintapi.MinCacheTTL, constraintapi.MaxCacheTTL
+					}),
+				)
+				require.NoError(t, err)
+
+				config := constraintapi.ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: constraintapi.ConcurrencyConfig{
+						FunctionConcurrency: 1, // Single slot so we can exhaust easily
+					},
+				}
+
+				accountID := uuid.New()
+				envID := uuid.New()
+				functionID := uuid.New()
+
+				constraints := []constraintapi.ConstraintItem{
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope: enums.ConcurrencyScopeFn,
+							Mode:  enums.ConcurrencyModeStep,
+						},
+					},
+				}
+
+				makeReq := func(idempotencyKey string) *constraintapi.CapacityAcquireRequest {
+					return &constraintapi.CapacityAcquireRequest{
+						IdempotencyKey:       idempotencyKey,
+						AccountID:            accountID,
+						EnvID:                envID,
+						FunctionID:           functionID,
+						Configuration:        config,
+						Constraints:          constraints,
+						Amount:               1,
+						LeaseIdempotencyKeys: []string{"item-" + idempotencyKey},
+						CurrentTime:          time.Now(),
+						Duration:             30 * time.Second,
+						MaximumLifetime:      time.Hour,
+						Source: constraintapi.LeaseSource{
+							Service:           constraintapi.ServiceAPI,
+							Location:          constraintapi.CallerLocationItemLease,
+							RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+						},
+					}
+				}
+
+				// First acquire: fills the single concurrency slot, no cache exists yet
+				resp1, err := cm.Acquire(ctx, makeReq("fill-slot"))
+				require.NoError(t, err)
+				require.Len(t, resp1.Leases, 1, "first acquire should grant one lease")
+				// CacheHit is internal; verify behavior via lease count instead
+
+				// Second acquire: constraint is exhausted, Lua writes cache entry
+				resp2, err := cm.Acquire(ctx, makeReq("exhaust"))
+				require.NoError(t, err)
+				require.Empty(t, resp2.Leases, "second acquire should be denied — capacity exhausted")
+				require.NotEmpty(t, resp2.ExhaustedConstraints, "should report exhausted constraint")
+
+				// Third acquire: cache entry now exists, should short-circuit via cache
+				resp3, err := cm.Acquire(ctx, makeReq("cached"))
+				require.NoError(t, err)
+				require.Empty(t, resp3.Leases, "third acquire should be denied from cache")
+				require.NotEmpty(t, resp3.ExhaustedConstraints, "cached response should report exhausted constraint")
+				// CacheHit is internal; verified by empty leases + exhausted constraints above
 			})
 
 			t.Run("acquiring capacity when exhausted", func(t *testing.T) {

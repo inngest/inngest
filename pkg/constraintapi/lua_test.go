@@ -79,7 +79,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "eval-hash",
 				},
 			},
-			expected: `{"k":1,"r":{"b":10,"s":2,"h":"test-key-hash","eh":"eval-hash","k":"{cs}:a:12345678-1234-1234-1234-123456789abc:rl:a:eval-hash","l":100,"p":60000000000}}`,
+			expected: `{"k":1,"r":{"b":10,"s":2,"h":"test-key-hash","eh":"eval-hash","k":"{cs}:a:12345678-1234-1234-1234-123456789abc:rl:a:12345678-1234-1234-1234-123456789abc<test-key-hash:eval-hash>","l":100,"p":60000000000}}`,
 		},
 		{
 			name: "Concurrency constraint with custom key",
@@ -104,7 +104,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "throttle-key",
 				},
 			},
-			expected: `{"k":3,"t":{"h":"throttle-expr","eh":"throttle-key","l":200,"b":300,"p":60000,"k":"{cs}:a:12345678-1234-1234-1234-123456789abc:throttle:f:11111111-2222-3333-4444-555555555555:throttle-key"}}`,
+			expected: `{"k":3,"t":{"h":"throttle-expr","eh":"throttle-key","l":200,"b":300,"p":60000,"k":"{cs}:a:12345678-1234-1234-1234-123456789abc:throttle:f:11111111-2222-3333-4444-555555555555<throttle-expr:throttle-key>"}}`,
 		},
 		{
 			name: "Concurrency constraint with standard function step limit",

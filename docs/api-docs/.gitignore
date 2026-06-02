@@ -1,0 +1,6 @@
+.vercel
+node_modules
+dist
+.source
+.tanstack
+.env.local

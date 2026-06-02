@@ -3,6 +3,11 @@
 
 package types
 
+// From score.go
+const (
+	KindInngestScore = "inngest.score"
+)
+
 // From warning.go
 const (
 	KindInngestWarnings = "inngest.warnings"
@@ -29,6 +34,20 @@ type AIMetadata struct {
 	EstimatedCost	*float64	`json:"estimated_cost,omitempty"`
 }
 
+// From experiment.go
+const (
+	KindInngestExperiment = "inngest.experiment"
+)
+
+// From experiment.go
+type ExperimentMetadata struct {
+	ExperimentName		string			`json:"experiment_name"`
+	Variant			string			`json:"variant"`
+	SelectionStrategy	string			`json:"selection_strategy"`
+	AvailableVariants	[]string		`json:"available_variants,omitempty"`
+	VariantWeights		map[string]float64	`json:"variant_weights,omitempty"`
+}
+
 // From http.go
 const (
 	KindInngestHTTP = "inngest.http"
@@ -41,7 +60,7 @@ type HTTPMetadata struct {
 	Method			string	`json:"method"`
 	RequestSize		*int64	`json:"request_size,omitempty"`
 	ResponseSize		*int64	`json:"response_size,omitempty"`
-	ResponseStatus		int64	`json:"response_status"`
+	ResponseStatus		*int64	`json:"response_status,omitempty"`
 	Domain			*string	`json:"domain,omitempty"`
 	Path			*string	`json:"path,omitempty"`
 }
@@ -78,4 +97,27 @@ const (
 
 // From response_headers.go
 type ResponseHeaderMetadata map[string]string
+
+// From timing.go
+const (
+	KindInngestTiming = "inngest.timing"
+)
+
+// From timing.go
+// TimingMetadata contains high-level timing categories for a step execution:
+// queue delay, system processing overhead, and network total.
+//
+type TimingMetadata struct {
+	// QueueDelayMs is the sojourn delay caused by concurrency limits, throttle,
+	// or other user-defined concurrency constraints.
+	QueueDelayMs	*int64	`json:"queue_delay_ms,omitempty"`
+	// SystemLatencyMs is the processing delay excluding sojourn latency
+	// (time from queue lease to execution start).
+	SystemLatencyMs	*int64	`json:"system_latency_ms,omitempty"`
+	// NetworkTotalMs is the total HTTP request duration from httpstat,
+	// covering the full SDK call lifecycle.
+	NetworkTotalMs	*int64	`json:"network_total_ms,omitempty"`
+	// TotalInngestMs is the sum of Inngest-side overhead (queue delay + system latency).
+	TotalInngestMs	*int64	`json:"total_inngest_ms,omitempty"`
+}
 

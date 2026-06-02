@@ -27,11 +27,14 @@ export type MetricsFilters = {
   selectedFns?: string[];
   autoRefresh?: boolean;
   entities: EntityLookup;
+  functions: EntityLookup;
   scope: MetricsScope;
   concurrencyLimit?: number;
   isMarketplace: boolean;
 };
 
+// accountConcurrency is the unscoped account-level gauge, read directly as a single series.
+// This avoids the gauge stacking problem where per-function maxes are summed (SYS-722).
 const GetVolumeMetrics = graphql(`
   query VolumeMetrics(
     $workspaceId: ID!
@@ -324,7 +327,7 @@ export const MetricsVolume = ({
               isMarketplace={isMarketplace}
             />
             <AccountConcurrency
-              data={data?.accountConcurrency}
+              accountConcurrency={data?.accountConcurrency}
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />

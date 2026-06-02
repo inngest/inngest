@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -23,6 +22,9 @@ type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 
 // AccountPriorityFinder returns the priority for a given account.
 type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
+
+// AccountExists reports whether an account can still process queue partitions.
+type AccountExists func(ctx context.Context, accountID uuid.UUID) (bool, error)
 
 type PartitionPausedInfo struct {
 	Stale  bool
@@ -64,6 +66,14 @@ func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
 	}
 }
 
+func WithAccountExists(f AccountExists) QueueOpt {
+	return func(q *QueueOptions) {
+		if f != nil {
+			q.AccountExists = f
+		}
+	}
+}
+
 func WithIdempotencyTTL(t time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
 		q.IdempotencyTTL = t
@@ -87,6 +97,12 @@ func WithNumWorkers(n int32) QueueOpt {
 func WithShadowNumWorkers(n int32) QueueOpt {
 	return func(q *QueueOptions) {
 		q.numShadowWorkers = n
+	}
+}
+
+func WithNumPartitionWorkers(n int32) QueueOpt {
+	return func(q *QueueOptions) {
+		q.numPartitionWorkers = n
 	}
 }
 
@@ -155,48 +171,6 @@ func WithShadowPollTick(t time.Duration) QueueOpt {
 func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
 		q.backlogNormalizePollTick = t
-	}
-}
-
-// WithActiveCheckPollTick specifies the interval at which the queue will poll the backing store
-// for available backlogs to normalize.
-func WithActiveCheckPollTick(t time.Duration) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ActiveCheckTick = t
-	}
-}
-
-// WithActiveCheckAccountProbability specifies the probability of processing accounts vs. backlogs during an active check run.
-func WithActiveCheckAccountProbability(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ActiveCheckAccountProbability = p
-	}
-}
-
-// WithActiveCheckAccountConcurrency specifies the number of accounts to be peeked and processed by the active checker in parallel
-func WithActiveCheckAccountConcurrency(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		if p > 0 {
-			q.ActiveCheckAccountConcurrency = int64(p)
-		}
-	}
-}
-
-// WithActiveCheckBacklogConcurrency specifies the number of backlogs to be peeked and processed by the active checker in parallel
-func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		if p > 0 {
-			q.ActiveCheckBacklogConcurrency = int64(p)
-		}
-	}
-}
-
-// WithActiveCheckScanBatchSize specifies the batch size for iterating over active sets
-func WithActiveCheckScanBatchSize(p int) QueueOpt {
-	return func(q *QueueOptions) {
-		if p > 0 {
-			q.ActiveCheckScanBatchSize = int64(p)
-		}
 	}
 }
 
@@ -292,6 +266,12 @@ func WithRunMode(m QueueRunMode) QueueOpt {
 	}
 }
 
+func WithQueueRoles(roles ...QueueRole) QueueOpt {
+	return func(q *QueueOptions) {
+		q.roles = append(q.roles, roles...)
+	}
+}
+
 // WithClock allows replacing the queue's default (real) clock by a mock, for testing.
 func WithClock(c clockwork.Clock) QueueOpt {
 	return func(q *QueueOptions) {
@@ -352,9 +332,6 @@ type QueueRunMode struct {
 	// NormalizePartition enables the processing of partitions for normalization
 	NormalizePartition bool
 
-	// ActiveChecker enables background checking of active sets.
-	ActiveChecker bool
-
 	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
 	// This can be used to configure executors processing only a static subset of accounts.
 	ExclusiveAccounts []uuid.UUID
@@ -366,21 +343,13 @@ type QueueRunMode struct {
 type QueueOptions struct {
 	PartitionPriorityFinder PartitionPriorityFinder
 	AccountPriorityFinder   AccountPriorityFinder
+	AccountExists           AccountExists
 	PartitionPausedGetter   PartitionPausedGetter
 
 	lifecycles QueueLifecycleListeners
 
 	AllowKeyQueues                  AllowKeyQueues
 	PartitionConstraintConfigGetter PartitionConstraintConfigGetter
-
-	ActiveCheckTick               time.Duration
-	ActiveCheckAccountConcurrency int64
-	ActiveCheckBacklogConcurrency int64
-	ActiveCheckScanBatchSize      int64
-
-	ActiveCheckAccountProbability int
-	ActiveSpotCheckProbability    ActiveSpotChecksProbability
-	ReadOnlySpotChecks            ReadOnlySpotChecks
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
@@ -400,11 +369,15 @@ type QueueOptions struct {
 	numWorkers int32
 	// numShadowWorkers stores the number of workers available to concurrently scan partitions
 	numShadowWorkers int32
+	// numPartitionWorkers stores the number of goroutines available to concurrently process partitions.
+	numPartitionWorkers int32
 	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
 	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
 	PeekMin int64
 	PeekMax int64
+	// PeekSizeExponent is the exp. on the random skewed distribution
+	PeekSizeExponent float64
 	// usePeekEWMA specifies whether we should use EWMA for peeking.
 	usePeekEWMA bool
 	// peekCurrMultiplier is a multiplier used for calculating the dynamic peek size
@@ -443,6 +416,8 @@ type QueueOptions struct {
 	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode
 
+	roles []QueueRole
+
 	continuationLimit uint
 
 	shadowContinuationLimit uint
@@ -457,13 +432,12 @@ type QueueOptions struct {
 
 	enableJobPromotion bool
 
+	latencyPartition *LatencyPartitionOptions
+
 	CapacityManager                     constraintapi.CapacityManager
-	UseConstraintAPI                    constraintapi.UseConstraintAPIFn
 	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval         time.Duration
 	AcquireCapacityLeaseOnBacklogRefill bool
-
-	EnableThrottleInstrumentation EnableThrottleInstrumentationFn
 
 	ConditionalTracer trace.ConditionalTracer
 
@@ -473,10 +447,6 @@ type QueueOptions struct {
 	OnShardLeaseAcquired func(ctx context.Context, shardName string)
 	ShardLeaseKeySuffix  string
 }
-
-// ShardSelector returns a shard reference for the given queue item.
-// This allows applying a policy to enqueue items to different queue shards.
-type ShardSelector func(ctx context.Context, accountId uuid.UUID, queueName *string) (QueueShard, error)
 
 func WithShardAssignmentConfig(cfg ShardAssignmentConfig) QueueOpt {
 	return func(q *QueueOptions) {
@@ -550,23 +520,6 @@ func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	}
 }
 
-type (
-	ActiveSpotChecksProbability func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int)
-	ReadOnlySpotChecks          func(ctx context.Context, acctID uuid.UUID) bool
-)
-
-func WithActiveSpotCheckProbability(fn ActiveSpotChecksProbability) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ActiveSpotCheckProbability = fn
-	}
-}
-
-func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
-	return func(q *QueueOptions) {
-		q.ReadOnlySpotChecks = fn
-	}
-}
-
 type TenantInstrumentor func(ctx context.Context, partitionID string) error
 
 func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
@@ -595,12 +548,6 @@ func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt
 	}
 }
 
-func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
-	return func(q *QueueOptions) {
-		q.UseConstraintAPI = uca
-	}
-}
-
 func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityLeaseExtendInterval = interval
@@ -619,18 +566,43 @@ func WithAcquireCapacityLeaseOnBacklogRefill(acquire bool) QueueOpt {
 	}
 }
 
-type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID uuid.UUID) bool
-
-func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
-	return func(q *QueueOptions) {
-		q.EnableThrottleInstrumentation = fn
-	}
-}
-
 func WithConditionalTracer(tracer trace.ConditionalTracer) QueueOpt {
 	return func(q *QueueOptions) {
 		q.ConditionalTracer = tracer
 	}
+}
+
+func WithPeekSizeExponent(n float64) QueueOpt {
+	return func(q *QueueOptions) {
+		q.PeekSizeExponent = n
+	}
+}
+
+// WithLatencyPartition adds latency partition tracking jobs which enter the queue
+// without flow control, and when peeked and executed run the provided callback
+// to report enqueue-to-process delay E2E.
+func WithLatencyPartition(o LatencyPartitionOptions) QueueOpt {
+	return func(q *QueueOptions) {
+		// Only a single partition supported for now.
+		if o.Partitions != 1 {
+			o.Partitions = 1
+		}
+		if o.Interval <= 0 {
+			o.Interval = 5 * time.Second
+		}
+		q.latencyPartition = &o
+	}
+}
+
+// LatencyPartitionOptions sets latency tracking jobs in the queue.
+type LatencyPartitionOptions struct {
+	// Partitions is the number of unique partition IDs to create for job tracking.
+	Partitions int // will create eg. uuid.New("ffffffff-ffff-ffff-ffff-fffffffffff1"),
+	// Interval is the duration between tracking jobs
+	Interval time.Duration // time.Second*5
+	// Callback is called when the job executes, with the full RunInfo
+	// containing latency, sojourn delay, and other processing metadata.
+	Callback func(ctx context.Context, info RunInfo)
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -659,26 +631,14 @@ type ProcessItem struct {
 
 	CapacityLease *CapacityLease
 
-	// DisableConstraintUpdates determines whether ExtendLease, Requeue,
-	// and Dequeue should update constraint state.
-	//
-	// Disable constraint updates in case
-	// - we are processing an item for a system queue
-	// - we are holding an active capacity lease
-	//
-	// For system queues, we skip constraint checks + updates entirely,
-	// for regular functions we manage constraint checks + updates in the Constraint API,
-	// if enabled for the current account.
-	//
-	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
-	//
-	// NOTE: This value is set in itemLeaseConstraintCheck.
-	DisableConstraintUpdates bool
+	ConditionalTraceCtx context.Context
 }
 
 type capacityLease struct {
 	currentCapacityLeaseID *ulid.ULID
 	capacityLeaseLock      sync.Mutex
+
+	initialLeaseIssuedAt time.Time
 }
 
 func newCapacityLease(initialLease *CapacityLease) *capacityLease {
@@ -687,6 +647,7 @@ func newCapacityLease(initialLease *CapacityLease) *capacityLease {
 	}
 	if initialLease != nil {
 		cl.currentCapacityLeaseID = &initialLease.LeaseID
+		cl.initialLeaseIssuedAt = time.UnixMilli(initialLease.IssuedAtMS)
 	}
 
 	return cl
@@ -702,6 +663,10 @@ func (p *capacityLease) get() *ulid.ULID {
 	p.capacityLeaseLock.Lock()
 	defer p.capacityLeaseLock.Unlock()
 	return p.currentCapacityLeaseID
+}
+
+func (p *capacityLease) issuedAt() time.Time {
+	return p.initialLeaseIssuedAt
 }
 
 func (p *capacityLease) has() bool {
@@ -742,11 +707,15 @@ func NewQueueOptions(
 		AccountPriorityFinder: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
+		AccountExists: func(_ context.Context, _ uuid.UUID) (bool, error) {
+			return true, nil
+		},
 		PartitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
 			return PartitionPausedInfo{}
 		},
 		PeekMin:                     DefaultQueuePeekMin,
 		PeekMax:                     DefaultQueuePeekMax,
+		PeekSizeExponent:            7,
 		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
 		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
 		backlogRefillLimit:          BacklogRefillHardLimit,
@@ -765,11 +734,11 @@ func NewQueueOptions(
 		},
 		numWorkers:                     defaultNumWorkers,
 		numShadowWorkers:               defaultNumShadowWorkers,
+		numPartitionWorkers:            defaultNumPartitionWorkers,
 		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,
 		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
-		ActiveCheckTick:                defaultActiveCheckTick,
 		IdempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
@@ -802,24 +771,9 @@ func NewQueueOptions(
 		RefreshItemThrottle: func(ctx context.Context, item *QueueItem) (*Throttle, error) {
 			return nil, nil
 		},
-		ReadOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		},
-		ActiveSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
-			return 100, 100
-		},
-		ActiveCheckAccountProbability: 10,
-		ActiveCheckAccountConcurrency: ActiveCheckAccountConcurrency,
-		ActiveCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
-		ActiveCheckScanBatchSize:      ActiveCheckScanBatchSize,
-		CapacityLeaseExtendInterval:   QueueLeaseDuration / 2,
-		ConditionalTracer: trace.NewConditionalTracer(noop.Tracer{}, func(ctx context.Context, accountID, envID uuid.UUID) bool {
-			return false
-		}),
+		CapacityLeaseExtendInterval: QueueLeaseDuration / 2,
+		ConditionalTracer:           trace.NoopConditionalTracer(),
 		EnableCapacityLeaseInstrumentation: func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-			return false
-		},
-		UseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 			return false
 		},
 	}
@@ -827,5 +781,40 @@ func NewQueueOptions(
 	for _, qopt := range options {
 		qopt(o)
 	}
+
 	return o
+}
+
+func (q *queueProcessor) configureQueueRoles() {
+	q.roles = append(q.defaultQueueRoles(), q.roles...)
+	q.roles = filterQueueRoles(q.QueueOptions, q.roles)
+}
+
+func (q *queueProcessor) defaultQueueRoles() []QueueRole {
+	roles := []QueueRole{}
+	if includeSequentialRole(q.QueueOptions) {
+		roles = append(roles, NewSequentialRole())
+	}
+	if q.runMode.Scavenger {
+		roles = append(roles, NewScavengerRole())
+	}
+	roles = append(roles, newInstrumentationRole(q, WithRoleRunInterval(q.instrumentInterval)))
+	if q.latencyPartition != nil {
+		roles = append(roles, NewLatencyTrackerRole(*q.latencyPartition, WithRoleRunInterval(q.latencyPartition.Interval)))
+	}
+	return roles
+}
+
+func filterQueueRoles(o *QueueOptions, roles []QueueRole) []QueueRole {
+	filtered := make([]QueueRole, 0, len(roles))
+	for _, role := range roles {
+		if role == nil {
+			continue
+		}
+		if role.Name() == QueueRoleSequential && !includeSequentialRole(o) {
+			continue
+		}
+		filtered = append(filtered, role)
+	}
+	return filtered
 }

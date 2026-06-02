@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/require"
@@ -240,16 +241,18 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 
 	rr := &sdk.RegisterRequest{
 		URL:       "http://127.0.0.1:3000/api/inngest",
+		AppName:   "test-suite",
 		Functions: fns,
 	}
 
-	funcs, err := rr.Parse(context.Background())
+	result, err := registration.ProcessFunctions(context.Background(), *rr, registration.ProcessOpts{})
 	if err != nil {
 		return nil, err
 	}
 
 	found := false
-	for _, f := range funcs {
+	for _, df := range result.Functions {
+		f := &df.Function
 		for i := range f.Steps {
 			forceHTTPS := false
 			f.Steps[i].URI = util.NormalizeAppURL(f.Steps[i].URI, forceHTTPS)
@@ -259,7 +262,7 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 		}
 	}
 
-	response, _ := json.MarshalIndent(funcs, "", "  ")
+	response, _ := json.MarshalIndent(result.Functions, "", "  ")
 	if !found {
 		return nil, fmt.Errorf("Expected function not found:\n%s\n\nIntrospection:\n%s", test.ID, string(response))
 	}

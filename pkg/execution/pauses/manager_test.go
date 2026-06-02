@@ -8,6 +8,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -78,15 +79,17 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 
 	ctx := context.Background()
 
+	baseTime := time.Now()
+
 	// Test 1: Write fewer pauses than the block size limit - should not trigger flush
-	pauses := createTestPauses(2) // Less than lowBlockSize
+	pauses := createTestPauses(2, baseTime) // Less than lowBlockSize
 	count, err := manager.Write(ctx, index, pauses...)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
 	assert.EqualValues(t, 0, inProcessFlusher.counter, "No flush should happen when below limit")
 
 	// Test 2: Write more pauses to exceed the block size - should trigger flush
-	morePauses := createTestPauses(2) // This will make total 4 pauses, exceeding lowBlockSize
+	morePauses := createTestPauses(2, baseTime.Add(10*time.Second)) // This will make total 4 pauses, exceeding lowBlockSize
 	count, err = manager.Write(ctx, index, morePauses...)
 	require.NoError(t, err)
 	assert.Equal(t, 4, count)
@@ -168,8 +171,7 @@ func TestConsumePause(t *testing.T) {
 
 	// Test consuming a pause
 	result, cleanup, err := manager.ConsumePause(ctx, mockRunService, pause, state.ConsumePauseOpts{
-		IdempotencyKey: "test-key",
-		Data:           "test-data",
+		Data: "test-data",
 	})
 	require.NoError(t, err)
 	require.NoError(t, cleanup())
@@ -252,9 +254,8 @@ func TestDeletePauseByID(t *testing.T) {
 
 // Helper functions
 
-func createTestPauses(count int) []*state.Pause {
+func createTestPauses(count int, baseTime time.Time) []*state.Pause {
 	pauses := make([]*state.Pause, count)
-	baseTime := time.Now()
 	for i := 0; i < count; i++ {
 		eventName := "test.event"
 		pauses[i] = &state.Pause{
@@ -401,4 +402,20 @@ func (m *mockRunService) LoadStack(ctx context.Context, id statev2.ID) ([]string
 
 func (m *mockRunService) LoadState(ctx context.Context, id statev2.ID) (statev2.State, error) {
 	return statev2.State{}, nil
+}
+
+func (m *mockRunService) SaveDefer(ctx context.Context, id statev2.ID, d statev2.Defer) error {
+	return nil
+}
+func (m *mockRunService) SetDeferStatus(ctx context.Context, id statev2.ID, hashedID string, status enums.DeferStatus) error {
+	return nil
+}
+func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id statev2.ID, fnSlug string, hashedID string) error {
+	return nil
+}
+func (m *mockRunService) LoadDefers(ctx context.Context, id statev2.ID) (map[string]statev2.Defer, error) {
+	return nil, nil
+}
+func (m *mockRunService) LoadDefersMeta(ctx context.Context, id statev2.ID) (map[string]statev2.DeferMeta, error) {
+	return nil, nil
 }

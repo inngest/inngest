@@ -1,9 +1,14 @@
 import { fetchClerkAuth, jwtAuth } from '@/lib/auth';
-import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
+import { sanitizeRedirectUrl } from '@/lib/deepLinkUtils';
+import {
+  createFileRoute,
+  notFound,
+  Outlet,
+  useMatch,
+} from '@tanstack/react-router';
 
 import Layout from '@/components/Layout/Layout';
 import { navCollapsed } from '@/lib/nav';
-import { getEnvironment } from '@/queries/server/getEnvironment';
 import { getProfileDisplay } from '@/queries/server/profile';
 import NotFound from '@/components/Error/NotFound';
 
@@ -23,7 +28,7 @@ export const Route = createFileRoute('/_authed')({
 
     const { userId, token } = await fetchClerkAuth({
       data: {
-        redirectUrl: location.pathname,
+        redirectUrl: sanitizeRedirectUrl(location.href) ?? location.pathname,
       },
     });
 
@@ -33,15 +38,7 @@ export const Route = createFileRoute('/_authed')({
     };
   },
 
-  loader: async ({ params }: { params: { envSlug?: string } }) => {
-    const env = params.envSlug
-      ? await getEnvironment({ data: { environmentSlug: params.envSlug } })
-      : undefined;
-
-    if (params.envSlug && !env) {
-      throw notFound({ data: { error: 'Environment not found' } });
-    }
-
+  loader: async () => {
     const profile = await getProfileDisplay();
 
     if (!profile) {
@@ -49,7 +46,6 @@ export const Route = createFileRoute('/_authed')({
     }
 
     return {
-      env,
       profile,
       navCollapsed: await navCollapsed(),
     };
@@ -57,10 +53,15 @@ export const Route = createFileRoute('/_authed')({
 });
 
 function Authed() {
-  const { env, navCollapsed, profile } = Route.useLoaderData();
+  const { navCollapsed, profile } = Route.useLoaderData();
+  const activeEnv = useMatch({
+    from: '/_authed/env/$envSlug',
+    shouldThrow: false,
+    select: (match) => match.loaderData?.env,
+  });
 
   return (
-    <Layout collapsed={navCollapsed} activeEnv={env} profile={profile}>
+    <Layout collapsed={navCollapsed} activeEnv={activeEnv} profile={profile}>
       <Outlet />
     </Layout>
   );

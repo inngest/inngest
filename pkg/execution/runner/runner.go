@@ -164,7 +164,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	}
 
 	if s.state == nil {
-		s.state, err = s.config.State.Service.Concrete.SingleClusterManager(ctx)
+		s.state, err = s.config.State.Service.Concrete.SingleClusterManager(ctx, nil)
 		if err != nil {
 			return err
 		}
@@ -406,6 +406,10 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 	}
 
 	for _, fn := range fns {
+		// allow ID lookups.
+		if fn.ID.String() == fnID {
+			return &fn, nil
+		}
 		if fn.GetSlug() == fnID {
 			return &fn, nil
 		}
@@ -599,6 +603,11 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		appID = fn.AppID
 	}
 
+	// Ensure function version is set for Constraint API
+	if fn.FunctionVersion <= 0 {
+		fn.FunctionVersion = 1
+	}
+
 	if fn.IsBatchEnabled() {
 		bi := batch.BatchItem{
 			WorkspaceID:     wsID,
@@ -688,7 +697,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	}
 
 	// If this is a debounced function, run this through a debouncer.
-	md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
+	_, md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
 		WorkspaceID:    wsID,
 		AppID:          opts.appID,
 		Function:       fn,

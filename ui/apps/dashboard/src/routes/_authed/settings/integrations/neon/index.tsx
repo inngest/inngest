@@ -7,22 +7,22 @@ export const Route = createFileRoute('/_authed/settings/integrations/neon/')({
   component: NeonManagePage,
   loader: async () => {
     const postgresIntegrations = await PostgresIntegrations();
-    const neonConnection = postgresIntegrations.find(
+    const neonConnections = postgresIntegrations.filter(
       (connection) => connection.slug === 'neon',
     );
 
-    if (!neonConnection) {
+    if (neonConnections.length === 0) {
       throw redirect({
         to: '/settings/integrations/neon/connect',
       });
     }
 
-    return { neonConnection };
+    return { neonConnections };
   },
 });
 
 function NeonManagePage() {
-  const { neonConnection } = Route.useLoaderData();
+  const { neonConnections } = Route.useLoaderData();
 
-  return <Manage publication={neonConnection} />;
+  return <Manage publications={neonConnections} />;
 }

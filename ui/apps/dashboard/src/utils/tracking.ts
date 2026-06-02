@@ -32,7 +32,7 @@ export function useTrackingUser() {
 }
 
 export function trackEvent({ name, data, user, v }: TrackingEvent): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !window.inngest) return;
 
   const event = {
     name,

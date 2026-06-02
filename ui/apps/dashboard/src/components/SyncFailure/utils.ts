@@ -38,6 +38,8 @@ const messages = {
     'Signature verification failed. Is your app using the correct signing key?',
   signing_key_invalid: "The app's signing key is invalid.",
   signing_key_unspecified: 'The app is not using a signing key.',
+  sdk_version_denied:
+    'App sync was blocked because this app is using an SDK version with a known vulnerability. Upgrade the SDK and try again.',
   too_many_pings: 'Too many requests to register in a short time window.',
   unauthorized: 'Unauthorized response from URL.',
   unreachable: 'The URL is unreachable.',
@@ -47,6 +49,10 @@ const messages = {
 } as const satisfies { [key in Exclude<ErrorCode, 'unknown'>]: string };
 
 export function getMessage(error: CodedError) {
+  if (error.code === 'sdk_version_denied' && error.message) {
+    return error.message;
+  }
+
   if (isErrorCode(error.code) && error.code !== 'unknown') {
     return messages[error.code];
   }

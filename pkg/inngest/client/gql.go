@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -33,7 +32,7 @@ func (c httpClient) DoGQL(ctx context.Context, input Params) (*Response, error) 
 
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("invalid status code %d: %s", resp.StatusCode, string(body))
 	}
 

@@ -14,12 +14,13 @@ import {
 } from '../DetailsCard/Element';
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
+import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
 import { useShared } from '../SharedContext/SharedContext';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Time } from '../Time';
+import type { SpanMetadataKind } from '../generated';
 import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import { toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
@@ -29,10 +30,13 @@ import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
 import {
+  isExperimentMetadata,
+  isScoreMetadata,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
+  type SpanMetadataScope,
   type StepInfoInvoke,
   type StepInfoSignal,
   type StepInfoSleep,
@@ -167,11 +171,13 @@ export const StepInfo = ({
   pollInterval: initialPollInterval,
   tracesPreviewEnabled,
   debug = false,
+  isDurableEndpoint,
 }: {
   selectedStep: StepInfoType;
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
   debug?: boolean;
+  isDurableEndpoint?: boolean;
 }) => {
   const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
@@ -184,8 +190,7 @@ export const StepInfo = ({
     preview: tracesPreviewEnabled,
   });
 
-  const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const metadataIsEnabled = true;
 
   useEffect(() => {
     result && setPollInterval(undefined);
@@ -210,15 +215,65 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
+  const showRerunFromStep =
+    !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
 
   const responseHeaderMetadata = trace.metadata?.filter(
     (md) => md.kind === 'inngest.response_headers'
   );
-  const nonHeaderMetadata = metadataIsEnabled
-    ? trace.metadata?.filter((md) => md.kind !== 'inngest.response_headers')
-    : undefined;
 
-  const hasNoData = !prettyInput && !prettyOutput && !result?.error;
+  // TODO: remove metadata handling once all response header
+  // data in history uses the response field. (After 2026-06-03)
+  const responseHeaderData = responseHeaderMetadata?.length
+    ? responseHeaderMetadata
+    : trace.response
+    ? [
+        {
+          kind: 'inngest.response_headers' as SpanMetadataKind,
+          values: {
+            ...Object.fromEntries(
+              Object.entries(trace.response?.headers ?? {}).map(([k, v]) => [
+                k,
+                Array.isArray(v) ? v.join(', ') : v,
+              ])
+            ),
+            'Status Code': trace.response.statusCode.toString(),
+          },
+          updatedAt: trace.endedAt ?? trace.startedAt ?? trace.queuedAt,
+          scope: 'step_attempt' as SpanMetadataScope,
+        },
+      ]
+    : [];
+
+  const nonHeaderMetadata = metadataIsEnabled
+    ? trace.metadata?.filter(
+        (md) =>
+          md.kind !== 'inngest.response_headers' &&
+          !isScoreMetadata(md) &&
+          !isExperimentMetadata(md)
+      ) ?? []
+    : [];
+
+  const scoreMetadataList = trace.metadata?.filter(isScoreMetadata) ?? [];
+
+  const experimentMetadataList = metadataIsEnabled
+    ? trace.metadata?.filter(isExperimentMetadata) ?? []
+    : [];
+
+  const experimentMetadata = experimentMetadataList[0];
+  const hasHeadersTab = responseHeaderData.length > 0;
+  const hasExperimentTab = experimentMetadataList.length > 0;
+  const hasScoresTab = scoreMetadataList.length > 0;
+  const hasMetadataTab = nonHeaderMetadata.length > 0;
+
+  const hasNoData =
+    !prettyInput &&
+    !prettyOutput &&
+    !result?.error &&
+    !hasHeadersTab &&
+    !hasExperimentTab &&
+    !hasScoresTab &&
+    !hasMetadataTab;
 
   let emptyStateMessage = 'No output available';
   if (loading) {
@@ -229,7 +284,7 @@ export const StepInfo = ({
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
-      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
+      <div className="min-h-11 flex w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
@@ -241,19 +296,19 @@ export const StepInfo = ({
           />
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
-          {trace.attempts !== null && (trace.attempts > 0 || trace.status === 'FAILED') && (
+          {trace.attempts !== null && trace.attempts > 0 && (
             <span data-testid="retry-attempt-badge">
               <Pill
                 className={`${getStatusBackgroundClass(trace.status)} ${getStatusTextClass(
                   trace.status
                 )}`}
               >
-                Attempt {trace.attempts + 1}
+                {trace.attempts} {trace.attempts === 1 ? 'retry' : 'retries'}
               </Pill>
             </span>
           )}
         </div>
-        {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
+        {showRerunFromStep && (
           <>
             <Button
               kind="primary"
@@ -266,7 +321,7 @@ export const StepInfo = ({
               open={rerunModalOpen}
               setOpen={setRerunModalOpen}
               runID={runID}
-              stepID={trace.stepID}
+              stepID={trace.stepID!}
               input={prettyInput || result?.input || ''}
             />
           </>
@@ -315,6 +370,17 @@ export const StepInfo = ({
 
           {stepKindInfo}
 
+          {experimentMetadata && (
+            <>
+              <ElementWrapper label="Experiment name">
+                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+              </ElementWrapper>
+              <ElementWrapper label="Variant">
+                <TextElement>{experimentMetadata.values.variant}</TextElement>
+              </ElementWrapper>
+            </>
+          )}
+
           {debug && trace.debugRunID && (
             <ElementWrapper label="Debug Run ID">
               <IDElement>{trace.debugRunID}</IDElement>
@@ -335,16 +401,34 @@ export const StepInfo = ({
                 id: 'attributes',
                 node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
               },
-              ...(responseHeaderMetadata?.length
+              ...(hasHeadersTab
                 ? [
                     {
                       label: 'Headers',
                       id: 'headers',
-                      node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                      node: <MetadataAttrs metadata={responseHeaderData} />,
                     },
                   ]
                 : []),
-              ...(nonHeaderMetadata?.length
+              ...(hasExperimentTab
+                ? [
+                    {
+                      label: 'Experiment',
+                      id: 'experiment',
+                      node: <MetadataAttrs metadata={experimentMetadataList} />,
+                    },
+                  ]
+                : []),
+              ...(hasScoresTab
+                ? [
+                    {
+                      label: 'Scores',
+                      id: 'scores',
+                      node: <ScoresAttrs metadata={scoreMetadataList} />,
+                    },
+                  ]
+                : []),
+              ...(hasMetadataTab
                 ? [
                     {
                       label: 'Metadata',
@@ -366,7 +450,7 @@ export const StepInfo = ({
               </div>
             ) : (
               <Tabs
-                defaultActive={result?.error ? 'error' : 'output'}
+                defaultActive={result?.error ? 'error' : prettyOutput ? 'output' : ''}
                 tabs={[
                   ...(prettyInput
                     ? [
@@ -402,16 +486,34 @@ export const StepInfo = ({
                         },
                       ]
                     : []),
-                  ...(responseHeaderMetadata?.length
+                  ...(hasHeadersTab
                     ? [
                         {
                           label: 'Headers',
                           id: 'headers',
-                          node: <MetadataAttrs metadata={responseHeaderMetadata} />,
+                          node: <MetadataAttrs metadata={responseHeaderData} />,
                         },
                       ]
                     : []),
-                  ...(nonHeaderMetadata?.length
+                  ...(hasExperimentTab
+                    ? [
+                        {
+                          label: 'Experiment',
+                          id: 'experiment',
+                          node: <MetadataAttrs metadata={experimentMetadataList} />,
+                        },
+                      ]
+                    : []),
+                  ...(hasScoresTab
+                    ? [
+                        {
+                          label: 'Scores',
+                          id: 'scores',
+                          node: <ScoresAttrs metadata={scoreMetadataList} />,
+                        },
+                      ]
+                    : []),
+                  ...(hasMetadataTab
                     ? [
                         {
                           label: 'Metadata',

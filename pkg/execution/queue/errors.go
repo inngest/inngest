@@ -7,6 +7,10 @@ import (
 
 var ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
 
+// ErrDebounceNotFound is returned by DebounceOperations when the requested
+// debounce item or pointer is missing on the shard.
+var ErrDebounceNotFound = fmt.Errorf("debounce not found")
+
 func NewKeyError(err error, key string) error {
 	return KeyError{
 		cause: err,
@@ -50,8 +54,8 @@ var (
 	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
-	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
-	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
+	ErrRoleAlreadyLeased             = fmt.Errorf("role already leased")
+	ErrRoleLeaseExceedsLimits        = fmt.Errorf("role lease duration exceeds the maximum of %d seconds", int(RoleLeaseMax.Seconds()))
 
 	ErrAllShardsAlreadyLeased  = fmt.Errorf("all shards in the group are fully allocated")
 	ErrShardLeaseNotFound      = fmt.Errorf("shard lease not found")
@@ -67,6 +71,11 @@ var (
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
+
+	// ErrSemaphoreLimit represents a semaphore capacity limit for a specific queue item.
+	// Unlike partition/account limits, this is per-item (only start jobs carry semaphores),
+	// so the iterator should skip the item and continue scanning.
+	ErrSemaphoreLimit = fmt.Errorf("at semaphore capacity limit")
 )
 
 var (

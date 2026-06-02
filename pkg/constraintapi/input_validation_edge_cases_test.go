@@ -33,8 +33,8 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -81,8 +81,8 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeStep,
-					Scope:             enums.ConcurrencyScopeFn,
+					Mode:  enums.ConcurrencyModeStep,
+					Scope: enums.ConcurrencyScopeFn,
 				},
 			},
 		}
@@ -234,8 +234,8 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			},
 		})
 		require.Error(t, err)
-		require.ErrorContains(t, err, "idempotency key longer than 128 chars")
-		require.ErrorContains(t, err, "idempotency key 0 longer than 128 chars")
+		require.ErrorContains(t, err, "idempotency key longer than 256 chars")
+		require.ErrorContains(t, err, "idempotency key 0 longer than 256 chars")
 	})
 }
 

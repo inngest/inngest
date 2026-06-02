@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -51,7 +51,7 @@ func parseLoad(loadavgBytes []byte) (*LoadAvg, error) {
 	for i, load := range parts[0:3] {
 		loads[i], err = strconv.ParseFloat(load, 64)
 		if err != nil {
-			return nil, fmt.Errorf("%s: Cannot parse load: %f: %w", ErrFileParse, loads[i], err)
+			return nil, fmt.Errorf("%w: Cannot parse load: %f: %w", ErrFileParse, loads[i], err)
 		}
 	}
 	return &LoadAvg{

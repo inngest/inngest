@@ -123,49 +123,55 @@ func TestEndToEnd(t *testing.T) {
 		require.NoError(t, wc.Close())
 	})
 
-	// Connection is closed
-	t.Run("should fail without healthy connection", func(t *testing.T) {
-		// Reset counter
+	// Connection is closed — with worker semaphores, the function stays queued
+	// until a worker reconnects and restores semaphore capacity.
+	t.Run("should remain queued without a connection", func(t *testing.T) {
 		atomic.StoreInt32(&counter, 0)
 
-		eventId, err := inngestClient.Send(ctx, inngestgo.Event{
+		// Send event while no worker is connected
+		eventID, err := inngestClient.Send(ctx, inngestgo.Event{
 			Name: "test/connect",
 			Data: map[string]interface{}{},
 		})
 		require.NoError(t, err)
 
-		var failedRunId string
+		// Wait for the run to appear
+		var queuedRunID string
 		require.EventuallyWithT(t, func(a *assert.CollectT) {
-			runsForEvent, err := c.RunsByEventID(ctx, eventId)
+			runsForEvent, err := c.RunsByEventID(ctx, eventID)
 			if !assert.NoError(a, err) {
 				return
 			}
 			if !assert.Len(a, runsForEvent, 1) {
 				return
 			}
-
-			failedRunId = runsForEvent[0].ID
+			queuedRunID = runsForEvent[0].ID
 		}, 10*time.Second, 1*time.Second)
+		require.NotEmpty(t, queuedRunID)
+
+		// Assert the function has NOT executed for 5 seconds (blocked by semaphore)
+		time.Sleep(5 * time.Second)
 		require.EqualValues(t, 0, atomic.LoadInt32(&counter))
-		require.NotEmpty(t, failedRunId)
 
-		run := c.WaitForRunTraces(ctx, t, &failedRunId, client.WaitForRunTracesOptions{Status: models.FunctionStatusFailed})
+		// Verify the run is still queued
+		run := c.Run(ctx, queuedRunID)
+		require.Equal(t, "QUEUED", run.Status)
 
-		require.NotNil(t, run.Trace)
-		require.True(t, run.Trace.IsRoot)
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
-		require.Equal(t, 1, len(run.Trace.ChildSpans))
-		require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.ChildSpans[0].Status)
-		// output test
-		require.NotNil(t, run.Trace.OutputID)
-		output := c.RunSpanOutput(ctx, *run.Trace.OutputID)
+		// Reconnect the worker — semaphore capacity is restored
+		wc2, err := inngestgo.Connect(connectCtx, inngestgo.ConnectOpts{
+			InstanceID: inngestgo.StrPtr("my-worker-2"),
+			Apps:       []inngestgo.Client{inngestClient},
+		})
+		require.NoError(t, err)
+		defer wc2.Close()
 
-		errorMsg := "{\"error\":{\"error\":\"connect_no_healthy_connection: Could not find a healthy connection\",\"name\":\"connect_no_healthy_connection\",\"message\":\"Could not find a healthy connection\"}}"
+		// The queued function should now execute and complete
+		require.EventuallyWithT(t, func(a *assert.CollectT) {
+			assert.EqualValues(a, 1, atomic.LoadInt32(&counter))
+		}, 15*time.Second, 1*time.Second)
 
-		require.NotNil(t, output.Error.Stack)
-		require.Equal(t, errorMsg, *output.Error.Stack)
-
-		r2 := c.Run(ctx, failedRunId)
-		require.Equal(t, errorMsg, r2.Output)
+		// Verify the run completed
+		run = c.WaitForRunStatus(ctx, t, "COMPLETED", queuedRunID)
+		require.Equal(t, "COMPLETED", run.Status)
 	})
 }

@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@inngest/components/Header/Header";
 import { getProfileDisplay } from "@/data/profile";
 import { envQueryOptions } from "@/data/envs";
+import { Main } from "@/components/Main";
 
 export const Route = createFileRoute("/_authed/support/")({
   component: HomeComponent,
@@ -28,7 +29,7 @@ function HomeComponent() {
   });
 
   return (
-    <>
+    <Main className="max-w-6xl">
       <Header breadcrumb={[{ text: "Support" }]} />
       <div className="min-h-screen bg-canvasBase">
         <div className="mx-auto max-w-6xl px-6 py-8">
@@ -170,6 +171,6 @@ function HomeComponent() {
           </div>
         </div>
       </div>
-    </>
+    </Main>
   );
 }

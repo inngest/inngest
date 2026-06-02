@@ -23,7 +23,9 @@ const channelConfig: Record<
 
 export function ChannelBadge({ channel, showLabel }: ChannelBadgeProps) {
   if (!channel) return null;
-  const config = channelConfig[channel];
+  const normalizedChannel = channel.toUpperCase() as TicketChannel;
+  const config = channelConfig[normalizedChannel];
+  if (!config) return null;
 
   const Icon = config.icon;
   // If showLabel is explicitly set, use it. Otherwise, default to showing on desktop only (original behavior)

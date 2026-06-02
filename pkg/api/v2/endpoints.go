@@ -115,8 +115,7 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 		}
 	}
 
-	// For now, return all keys without pagination
-	// In a real implementation, you'd handle cursor-based pagination here
+	// XXX: In the future we can/should add pagination.
 
 	return &apiv2.FetchAccountEventKeysResponse{
 		Data: filteredKeys,
@@ -296,4 +295,23 @@ func (s *Service) UpdateWebhook(ctx context.Context, req *apiv2.UpdateWebhookReq
 
 func (s *Service) PatchEnv(ctx context.Context, req *apiv2.PatchEnvRequest) (*apiv2.PatchEnvsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
+}
+
+func (s *Service) SyncApp(ctx context.Context, req *apiv2.SyncAppRequest) (*apiv2.SyncAppResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "App sync not implemented in OSS")
+}
+func (s *Service) ListInsightsEventSchemas(ctx context.Context, req *apiv2.ListInsightsEventSchemasRequest) (*apiv2.ListInsightsEventSchemasResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
+}
+
+func (s *Service) ListInsightsTables(ctx context.Context, req *apiv2.ListInsightsTablesRequest) (*apiv2.ListInsightsTablesResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
+}
+
+func (s *Service) QueryInsightsPrompt(ctx context.Context, req *apiv2.QueryInsightsPromptRequest) (*apiv2.QueryInsightsPromptResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
+}
+
+func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (*apiv2.QueryInsightsResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
 }

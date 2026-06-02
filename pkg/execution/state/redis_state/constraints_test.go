@@ -99,9 +99,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -122,7 +119,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 
 		// No lease acquired
 		require.Nil(t, res.CapacityLease)
-		require.True(t, res.SkipConstraintChecks)
 
 		// Do not expect a call for the system queue
 		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
@@ -149,9 +145,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -174,7 +167,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 
 		// No lease acquired
 		require.Nil(t, res.CapacityLease)
-		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing identifiers
 		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
@@ -201,9 +193,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 			osqueue.WithLogger(l),
@@ -223,7 +212,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 
 		// No lease acquired
 		require.Nil(t, res.CapacityLease)
-		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing capacity manager
 		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
@@ -250,9 +238,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return false // disable flag
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -269,11 +254,12 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		res, err := q.ItemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now())
-		require.NoError(t, err)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "missing accountID")
+		require.ErrorContains(t, err, "missing envID")
 
 		// No lease acquired
 		require.Nil(t, res.CapacityLease)
-		require.False(t, res.SkipConstraintChecks) // Require checks
 
 		// Do not expect a ConstraintAPI call for disabled feature flag
 		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
@@ -290,9 +276,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -324,7 +307,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		service.Wait()
 
 		require.NotNil(t, res.CapacityLease)
-		require.True(t, res.SkipConstraintChecks)
 
 		// We do not expect any calls to the Constraint API - the valid lease is reused as-is
 		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
@@ -339,9 +321,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -386,7 +365,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		service.Wait()
 
 		require.NotNil(t, res2.CapacityLease)
-		require.True(t, res2.SkipConstraintChecks)
 
 		// Expect 2 acquire calls total (initial + after expiry), and 1 release call for the expired lease
 		require.Equal(t, 2, len(cmLifecycles.AcquireCalls))
@@ -407,9 +385,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -460,7 +435,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		service.Wait()
 
 		require.NotNil(t, res2.CapacityLease)
-		require.True(t, res2.SkipConstraintChecks)
 
 		// Expect 2 acquire calls total (initial + after near-expiry), and 1 release call
 		require.Equal(t, 2, len(cmLifecycles.AcquireCalls))
@@ -478,9 +452,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -502,7 +473,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, res.CapacityLease)
-		require.True(t, res.SkipConstraintChecks)
 
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
@@ -516,9 +486,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -540,7 +507,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 
 		// Leases were granted
 		require.NotNil(t, res.CapacityLease)
-		require.True(t, res.SkipConstraintChecks)
 
 		// CRITICAL: No limiting constraint should be set when leases are granted
 		require.Equal(t, enums.QueueConstraintNotLimited, res.LimitingConstraint)
@@ -570,9 +536,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -635,13 +598,11 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		res1, err := q.ItemLeaseConstraintCheck(ctx, &sp, &backlog, multiConstraints, &qi1, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, res1.CapacityLease)
-		require.True(t, res1.SkipConstraintChecks)
 
 		backlog2 := osqueue.ItemBacklog(ctx, qi2)
 		res2, err := q.ItemLeaseConstraintCheck(ctx, &sp, &backlog2, multiConstraints, &qi2, clock.Now())
 		require.NoError(t, err)
 		require.NotNil(t, res2.CapacityLease)
-		require.True(t, res2.SkipConstraintChecks)
 
 		// The second acquire should show function concurrency is exhausted
 		require.Equal(t, 2, len(cmLifecycles.AcquireCalls))
@@ -653,7 +614,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		res3, err := q.ItemLeaseConstraintCheck(ctx, &sp, &backlog3, multiConstraints, &qi3, clock.Now())
 		require.NoError(t, err)
 		require.Nil(t, res3.CapacityLease)
-		require.False(t, res3.SkipConstraintChecks)
 		require.Equal(t, enums.QueueConstraintFunctionConcurrency, res3.LimitingConstraint)
 
 		// Verify lifecycle captures exhausted constraint
@@ -674,9 +634,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -712,7 +669,6 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 
 		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.LimitingConstraint)
 		require.Nil(t, res.CapacityLease)
-		require.False(t, res.SkipConstraintChecks)
 
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
@@ -813,9 +769,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
@@ -856,9 +809,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 			osqueue.WithLogger(l),
@@ -880,7 +830,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 
 		// No lease acquired
 		require.Nil(t, res.ItemCapacityLeases)
-		require.False(t, res.SkipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing capacity manager
 		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
@@ -896,9 +845,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return false
 			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
@@ -920,12 +866,9 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
 		require.NoError(t, err)
 
-		// No lease acquired
-		require.Nil(t, res.ItemCapacityLeases)
-		require.False(t, res.SkipConstraintChecks)
+		require.NotNil(t, res.ItemCapacityLeases)
 
-		// Do not expect a ConstraintAPI call for missing capacity manager
-		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
@@ -937,9 +880,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -966,7 +906,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		require.Len(t, res.ItemCapacityLeases, 1)
 		require.Len(t, res.ItemsToRefill, 1)
 		require.Equal(t, qi.ID, res.ItemsToRefill[0])
-		require.True(t, res.SkipConstraintChecks)
 
 		// Expect exactly one acquire request
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
@@ -986,9 +925,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -1026,7 +962,6 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 
 		// Acquired lease and request to skip checks
 		require.Len(t, res.ItemCapacityLeases, 0)
-		require.False(t, res.SkipConstraintChecks)
 		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.LimitingConstraint)
 
 		// Expect exactly one acquire request

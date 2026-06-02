@@ -46,11 +46,11 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
         input: {
           url: inputUrl,
         },
-      });
+      }).unwrap();
       toast.success('The app was successfully added.');
       console.log('Created app:', response);
     } catch (error) {
-      toast.error('The app could not be created: ${error}.');
+      toast.error('The app could not be created.');
       console.error('Error creating app:', error);
     }
     onClose();

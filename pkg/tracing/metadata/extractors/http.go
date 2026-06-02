@@ -21,7 +21,7 @@ type HTTPMetadata struct {
 	Method              string  `json:"method"`
 	RequestSize         *int64  `json:"request_size,omitempty"`
 	ResponseSize        *int64  `json:"response_size,omitempty"`
-	ResponseStatus      int64   `json:"response_status"`
+	ResponseStatus      *int64  `json:"response_status,omitempty"`
 	Domain              *string `json:"domain,omitempty"`
 	Path                *string `json:"path,omitempty"`
 }
@@ -93,7 +93,7 @@ func (e *HTTPMetadataExtractor) extractHTTPMetadata(span *tracev1.Span) HTTPMeta
 		case "http.response.size":
 			metadata.ResponseSize = util.ToPtr(attr.Value.GetIntValue())
 		case "http.response.status_code":
-			metadata.ResponseStatus = attr.Value.GetIntValue()
+			metadata.ResponseStatus = util.ToPtr(attr.Value.GetIntValue())
 		case "url.domain":
 			metadata.Domain = util.ToPtr(attr.Value.GetStringValue())
 		case "server.address":

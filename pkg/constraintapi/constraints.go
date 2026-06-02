@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,10 +15,11 @@ const (
 	ConstraintKindRateLimit   ConstraintKind = "rate_limit"
 	ConstraintKindConcurrency ConstraintKind = "concurrency"
 	ConstraintKindThrottle    ConstraintKind = "throttle"
+	ConstraintKindSemaphore   ConstraintKind = "semaphore"
 )
 
 func (k ConstraintKind) IsQueueConstraint() bool {
-	return k == ConstraintKindConcurrency || k == ConstraintKindThrottle
+	return k == ConstraintKindConcurrency || k == ConstraintKindThrottle || k == ConstraintKindSemaphore
 }
 
 func (k ConstraintKind) PrettyString() string {
@@ -28,6 +30,8 @@ func (k ConstraintKind) PrettyString() string {
 		return "concurrency"
 	case ConstraintKindThrottle:
 		return "throttle"
+	case ConstraintKindSemaphore:
+		return "semaphore"
 	default:
 		return "unknown"
 	}
@@ -43,13 +47,18 @@ type RateLimitConstraint struct {
 
 // StateKey returns the fully-qualified Redis key pointing to the rate limit GCRA state
 func (r *RateLimitConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
+	var keyID string
+	if r.KeyExpressionHash != "" {
+		keyID = fmt.Sprintf("<%s:%s>", r.KeyExpressionHash, r.EvaluatedKeyHash)
+	}
+
 	switch r.Scope {
 	case enums.RateLimitScopeAccount:
-		return fmt.Sprintf("{cs}:%s:rl:a:%s", accountScope(accountID), r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:a:%s%s", accountScope(accountID), accountID, keyID)
 	case enums.RateLimitScopeEnv:
-		return fmt.Sprintf("{cs}:%s:rl:e:%s:%s", accountScope(accountID), envID, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:e:%s%s", accountScope(accountID), envID, keyID)
 	case enums.RateLimitScopeFn:
-		return fmt.Sprintf("{cs}:%s:rl:f:%s:%s", accountScope(accountID), fnID, r.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:rl:f:%s%s", accountScope(accountID), fnID, keyID)
 	default:
 		return ""
 	}
@@ -156,13 +165,18 @@ type ThrottleConstraint struct {
 
 // StateKey returns the fully-qualified Redis key pointing to the throttle GCRA state
 func (t *ThrottleConstraint) StateKey(accountID uuid.UUID, envID uuid.UUID, fnID uuid.UUID) string {
+	var keyID string
+	if t.KeyExpressionHash != "" {
+		keyID = fmt.Sprintf("<%s:%s>", t.KeyExpressionHash, t.EvaluatedKeyHash)
+	}
+
 	switch t.Scope {
 	case enums.ThrottleScopeAccount:
-		return fmt.Sprintf("{cs}:%s:throttle:a:%s", accountScope(accountID), t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:a:%s%s", accountScope(accountID), accountID, keyID)
 	case enums.ThrottleScopeEnv:
-		return fmt.Sprintf("{cs}:%s:throttle:e:%s:%s", accountScope(accountID), envID, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:e:%s%s", accountScope(accountID), envID, keyID)
 	case enums.ThrottleScopeFn:
-		return fmt.Sprintf("{cs}:%s:throttle:f:%s:%s", accountScope(accountID), fnID, t.EvaluatedKeyHash)
+		return fmt.Sprintf("{cs}:%s:throttle:f:%s%s", accountScope(accountID), fnID, keyID)
 	default:
 		return ""
 	}
@@ -190,6 +204,7 @@ type ConstraintItem struct {
 	Concurrency *ConcurrencyConstraint
 	Throttle    *ThrottleConstraint
 	RateLimit   *RateLimitConstraint
+	Semaphore   *SemaphoreConstraint
 }
 
 // IsFunctionLevelConstraint returns whether the constraint is on the function level
@@ -201,6 +216,11 @@ func (ci ConstraintItem) IsFunctionLevelConstraint() bool {
 		return ci.Throttle != nil && ci.Throttle.Scope == enums.ThrottleScopeFn
 	case ConstraintKindConcurrency:
 		return ci.Concurrency != nil && ci.Concurrency.Scope == enums.ConcurrencyScopeFn
+	case ConstraintKindSemaphore:
+		// XXX: Revisit when we add scopes to semaphores.
+		// For now, app-scoped semaphores (worker concurrency) are not function-level;
+		// all others (fn:, hash:) are.
+		return ci.Semaphore != nil && !strings.HasPrefix(ci.Semaphore.ID, "app:")
 	default:
 		return false
 	}
@@ -214,6 +234,8 @@ func (ci ConstraintItem) PrettyString() string {
 		return ci.RateLimit.PrettyString()
 	case ConstraintKindThrottle:
 		return ci.Throttle.PrettyString()
+	case ConstraintKindSemaphore:
+		return ci.Semaphore.PrettyString()
 	default:
 		return "unknown"
 	}
@@ -227,6 +249,8 @@ func (ci ConstraintItem) PrettyStringConfig(config ConstraintConfig) string {
 		return ci.RateLimit.PrettyStringConfig(config)
 	case ConstraintKindThrottle:
 		return ci.Throttle.PrettyStringConfig(config)
+	case ConstraintKindSemaphore:
+		return ci.Semaphore.PrettyStringConfig(config)
 	default:
 		return "unknown"
 	}
@@ -241,6 +265,8 @@ func (ci ConstraintItem) MetricsIdentifier() string {
 		if ci.Concurrency != nil {
 			return ci.Concurrency.Scope.String()
 		}
+		return ci.Kind.PrettyString()
+	case ConstraintKindSemaphore:
 		return ci.Kind.PrettyString()
 	default:
 		return ci.Kind.PrettyString()
@@ -344,6 +370,12 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 
 		// Account scope with no custom key
 		return fmt.Sprintf("%s:r:%s", accountID, scopeLetter)
+
+	case ConstraintKindSemaphore:
+		if ci.Semaphore == nil {
+			return ""
+		}
+		return fmt.Sprintf("%s:s:%s:%s", accountID, ci.Semaphore.ID, ci.Semaphore.UsageValue)
 
 	default:
 		return ""

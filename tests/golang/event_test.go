@@ -42,11 +42,13 @@ func TestEvent(t *testing.T) {
 		r.NoError(err)
 
 		var evt *models.EventV2
-		r.EventuallyWithT(func(t *assert.CollectT) {
+		r.EventuallyWithT(func(ct *assert.CollectT) {
 			var err error
 			evt, err = c.GetEvent(ctx, ulid.MustParse(eventID))
-			r.NoError(err)
+			assert.NoError(ct, err)
+			assert.NotNil(ct, evt)
 		}, time.Second*10, time.Second)
+		r.NotNil(evt, "event should have been fetched")
 
 		raw, err := json.Marshal(map[string]any{
 			"data": map[string]any{"msg": "hi"},
@@ -92,13 +94,14 @@ func TestEvent(t *testing.T) {
 		registerFuncs()
 
 		eventID, err := inngestClient.Send(ctx, &event.Event{Name: eventName})
+		r.NoError(err)
 
 		var evt *models.EventV2
-		r.EventuallyWithT(func(t *assert.CollectT) {
-			evt, err = c.GetEvent(ctx, ulid.MustParse(eventID))
-			r.NoError(err)
-			r.NotNil(evt) // TODO Delete once runs are completed
-			//r.Len(evt.Runs, 1)
+		r.EventuallyWithT(func(ct *assert.CollectT) {
+			var getErr error
+			evt, getErr = c.GetEvent(ctx, ulid.MustParse(eventID))
+			assert.NoError(ct, getErr)
+			assert.NotNil(ct, evt)
 		}, time.Second*10, time.Second*1)
 		//r.Equal("fn", evt.Runs[0].Function.Name)
 		//r.Equal(models.FunctionRunStatusCompleted, evt.Runs[0].Status)
@@ -121,11 +124,11 @@ func TestEvent(t *testing.T) {
 			r.NoError(err)
 
 			var raw string
-			r.EventuallyWithT(func(t *assert.CollectT) {
-				r := require.New(t)
+			r.EventuallyWithT(func(ct *assert.CollectT) {
 				res, err := c.GetEvent(ctx, ulid.MustParse(eventID))
-				r.NoError(err)
-
+				if !assert.NoError(ct, err) || !assert.NotNil(ct, res) {
+					return
+				}
 				raw = res.Raw
 			}, time.Second*10, time.Second*1)
 

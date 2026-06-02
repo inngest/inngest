@@ -3,11 +3,11 @@
 package meta
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -30,12 +30,23 @@ type ExtractedValues struct {
 	EventsInput *string
 	TriggeringEventName *string
 	FunctionID *uuid.UUID
+	FunctionName *string
+	FunctionSlug *string
 	FunctionVersion *int
 	RunID *ulid.ULID
+	ReplayOriginalRunID *ulid.ULID
+	RunScheduleType *enums.ScheduleType
 	SkipReason *enums.SkipReason
 	SkipExistingRunID *string
 	IsDurableEndpointRun *bool
 	DurableEndpointModeChangedAt *time.Time
+	DeferChildRunID *ulid.ULID
+	DeferFnSlug *string
+	DeferHashedID *string
+	DeferParentFnSlug *string
+	DeferParentRunIDs *[]string
+	DeferStatus *enums.DeferStatus
+	DeferUserlandID *string
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
 	DynamicTraceID *string
@@ -49,6 +60,7 @@ type ExtractedValues struct {
 	StepAttempt *int
 	StepMaxAttempts *int
 	StepCodeLocation *string
+	StepType *enums.StepType
 	StepInput *string
 	StepOutput *string
 	StepOutputRef *string
@@ -56,6 +68,9 @@ type ExtractedValues struct {
 	StepUserlandID *string
 	StepUserlandIndex *int
 	StepRunType *string
+	ExperimentName *string
+	ExperimentStepID *string
+	ExperimentVariant *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time
 	StepInvokeFunctionID *string
@@ -69,10 +84,13 @@ type ExtractedValues struct {
 	StepSignalName *string
 	StepGatewayResponseStatusCode *int
 	StepGatewayResponseOutputSizeBytes *int
+	RequestID *string
+	JobID *string
 	RequestURL *string
-	ResponseHeaders *http.Header
+	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	ResponseSteps *ResponseOps
 	IsCheckpoint *bool
 	IsUserland *bool
 	UserlandSpanID *string

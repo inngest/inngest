@@ -1,5 +1,11 @@
+import { useState } from 'react';
 import { Resizable } from '@inngest/components/Resizable/Resizable';
+import SegmentedControl from '@inngest/components/SegmentedControl/SegmentedControl';
 
+import { InsightsChartView } from '@/components/Insights/InsightsChart/InsightsChartView';
+import type { ChartViewMode } from '@/components/Insights/InsightsChart/types';
+import { useChartConfig } from '@/components/Insights/InsightsChart/useChartConfig';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import type { Tab } from '@/components/Insights/types';
 import { InsightsDataTable } from '../InsightsDataTable/InsightsDataTable';
 import { InsightsSQLEditor } from '../InsightsSQLEditor/InsightsSQLEditor';
@@ -27,8 +33,11 @@ export function InsightsTabPanel({
   isTemplatesTab,
   tab,
 }: InsightsTabPanelProps) {
-  const { status } = useInsightsStateMachineContext();
+  const { data, status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
+  const { value: chartsEnabled } = useBooleanFlag('insights-charts');
+  const [viewMode, setViewMode] = useState<ChartViewMode>('table');
+  const { config, dispatch } = useChartConfig(data);
 
   // TODO: Adjust home tab to AI panel
   if (isHomeTab) return <InsightsTabPanelTemplatesTab />;
@@ -64,6 +73,22 @@ export function InsightsTabPanel({
           <Section
             actions={
               <>
+                {chartsEnabled && (
+                  <SegmentedControl defaultValue="table">
+                    <SegmentedControl.Button
+                      value="table"
+                      onClick={() => setViewMode('table')}
+                    >
+                      Table
+                    </SegmentedControl.Button>
+                    <SegmentedControl.Button
+                      value="chart"
+                      onClick={() => setViewMode('chart')}
+                    >
+                      Chart
+                    </SegmentedControl.Button>
+                  </SegmentedControl>
+                )}
                 <InsightsSQLEditorDownloadCSVButton />
                 {isRunning && (
                   <span className="text-muted mr-3 text-xs">
@@ -77,7 +102,11 @@ export function InsightsTabPanel({
               <InsightsSQLEditorResultsTitle historyWindow={historyWindow} />
             }
           >
-            <InsightsDataTable />
+            {chartsEnabled && viewMode === 'chart' ? (
+              <InsightsChartView config={config} dispatch={dispatch} />
+            ) : (
+              <InsightsDataTable />
+            )}
           </Section>
         }
         splitKey="insights-tab-panel-split-vertical"

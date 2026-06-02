@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Resizable } from '@inngest/components/Resizable/Resizable';
-import {
-  AgentProvider,
-  createInMemorySessionTransport,
-} from '@inngest/use-agent';
+import { useUser } from '@clerk/tanstack-react-start';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -41,7 +38,6 @@ import {
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
-import { useUser } from '@clerk/tanstack-react-start';
 
 const TABS_STORAGE_KEY = 'insights-tabs-state';
 
@@ -88,6 +84,7 @@ export interface TabManagerActions {
 export interface UseInsightsTabManagerReturn {
   actions: TabManagerActions;
   activeTabId: string;
+  isHydrated: boolean;
   tabManager: JSX.Element;
   tabs: Tab[];
 }
@@ -107,6 +104,7 @@ export function useInsightsTabManager(
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
   const hasHydratedRef = useRef(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
   const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
@@ -137,6 +135,7 @@ export function useInsightsTabManager(
     }
 
     hasHydratedRef.current = true;
+    setIsHydrated(true);
   }, [props.isSavedQueriesFetching, props.deepLinkQueryId]);
 
   // Save tabs to local storage whenever they change (skip first render)
@@ -283,7 +282,7 @@ export function useInsightsTabManager(
     ],
   );
 
-  return { actions, activeTabId, tabManager, tabs };
+  return { actions, activeTabId, isHydrated, tabManager, tabs };
 }
 
 interface SingleTabRendererProps {
@@ -568,6 +567,7 @@ function InsightsTabManagerInternal({
     if (isInsightsAgentEnabled) {
       items.push({
         title: INSIGHTS_AI,
+        label: 'INSIGHTS AI',
         icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} />,
         action: () => handleSelectHelper(INSIGHTS_AI),
       });
@@ -584,6 +584,7 @@ function InsightsTabManagerInternal({
     if (isSchemaWidgetEnabled) {
       items.push({
         title: SCHEMA_EXPLORER,
+        label: 'SCHEMA EXPLORER',
         icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
         action: () => handleSelectHelper(SCHEMA_EXPLORER),
       });
@@ -591,13 +592,7 @@ function InsightsTabManagerInternal({
 
     return items;
   }, [handleSelectHelper, isInsightsAgentEnabled, isSchemaWidgetEnabled]);
-  // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
-  const transport = useMemo(
-    () =>
-      isInsightsAgentEnabled ? createInMemorySessionTransport() : undefined,
-    [isInsightsAgentEnabled],
-  );
 
   const tabsProps = {
     tabs,
@@ -620,20 +615,16 @@ function InsightsTabManagerInternal({
       />
       <div className="flex h-full w-full flex-1 overflow-hidden">
         {isInsightsAgentEnabled ? (
-          <AgentProvider
+          <InsightsChatProvider
             userId={user?.id || undefined}
             channelKey={user?.id ? `insights:${user.id}` : undefined}
-            transport={transport}
-            debug={false}
           >
-            <InsightsChatProvider>
-              <ActiveThreadBridge
-                activeTabId={activeTabId}
-                getAgentThreadIdForTab={getAgentThreadIdForTab}
-              />
-              <TabsWithAIHelper {...tabsProps} />
-            </InsightsChatProvider>
-          </AgentProvider>
+            <ActiveThreadBridge
+              activeTabId={activeTabId}
+              getAgentThreadIdForTab={getAgentThreadIdForTab}
+            />
+            <TabsWithAIHelper {...tabsProps} />
+          </InsightsChatProvider>
         ) : (
           <TabsRenderer {...tabsProps} />
         )}

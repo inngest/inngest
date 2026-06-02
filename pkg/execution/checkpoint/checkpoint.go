@@ -1,30 +1,40 @@
 package checkpoint
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/backoff"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
+	"github.com/inngest/inngest/pkg/execution/defers"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
+	"github.com/oklog/ulid/v2"
 )
 
 type Checkpointer interface {
@@ -44,6 +54,32 @@ type AsyncCheckpointer interface {
 	CheckpointAsyncSteps(context.Context, AsyncCheckpoint) error
 }
 
+const pkgName = "checkpoint"
+
+var ErrStaleDispatch = errors.New("stale dispatch")
+
+// AllowAsyncDispatchValidation gates the async dispatch validator per account
+// so it can ramp through a staged rollout. Returns true to run the validator;
+// nil or false leaves it off.
+type AllowAsyncDispatchValidation func(ctx context.Context, acctID uuid.UUID) bool
+
+func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.UUID) bool {
+	if a == nil {
+		return false
+	}
+	return a(ctx, acctID)
+}
+
+// Skip the queue-item load for dispatches younger than this window: a Requeue
+// cannot fire before the queue lease expires, so a fresh dispatch is
+// uncontested. The upper bound is the shortest plausible serverless timeout
+// (~10s) — longer windows let a fast-Requeue race slip past unfenced.
+const dispatchValidationSkipDuration = 10 * time.Second
+
+type queueItemLoader interface {
+	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
+}
+
 type Opts struct {
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
@@ -60,6 +96,13 @@ type Opts struct {
 	// BackoffFunc computes the retry time for a given attempt number.
 	// If nil, defaults to backoff.DefaultBackoff.
 	BackoffFunc backoff.BackoffFunc
+	// AllowStepMetadata controls whether step metadata is allowed for a given account.
+	AllowStepMetadata executor.AllowStepMetadata
+	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
+	// The default is to always enforce the limits.
+	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
+	// AllowAsyncDispatchValidation gates the dispatch validator per account.
+	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
 }
 
 func New(o Opts) Checkpointer {
@@ -68,6 +111,9 @@ func New(o Opts) Checkpointer {
 	}
 	if o.BackoffFunc == nil {
 		o.BackoffFunc = backoff.GetLinearBackoffFunc(5 * time.Second)
+	}
+	if o.EnforceStepSizeLimits == nil {
+		o.EnforceStepSizeLimits = func(ctx context.Context, accountID uuid.UUID) bool { return true }
 	}
 
 	return checkpointer{o}
@@ -79,6 +125,12 @@ type checkpointer struct {
 
 func (c checkpointer) Metrics() MetricsProvider {
 	return c.MetricsProvider
+}
+
+func sanitizeLogValue(v string) string {
+	v = strings.ReplaceAll(v, "\n", "")
+	v = strings.ReplaceAll(v, "\r", "")
+	return v
 }
 
 // CheckpointSyncSteps handles the checkpointing of new steps via sync, HTTP-based functions
@@ -118,10 +170,14 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		return s.Op == enums.OpcodeRunComplete
 	})
 
-	// When we have >1 steps (parallel mode), we need to set ForceStepPlan to disable
-	// immediate execution in the SDK. This ensures that parallel steps are properly
-	// planned rather than executed immediately.
-	if len(input.Steps) > 1 && !input.Metadata.Config.ForceStepPlan {
+	// >1 non-lazy steps means parallel mode — see enums.OpcodeIsLazy.
+	nonLazyCount := 0
+	for _, s := range input.Steps {
+		if !enums.OpcodeIsLazy(s.Op) {
+			nonLazyCount++
+		}
+	}
+	if nonLazyCount > 1 && !input.Metadata.Config.ForceStepPlan {
 		if err := c.State.UpdateMetadata(ctx, input.Metadata.ID, state.MutableConfig{
 			ForceStepPlan:  true,
 			RequestVersion: input.Metadata.Config.RequestVersion,
@@ -139,7 +195,32 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 	// at some point in the future.
 	onChangeToAsync := sync.OnceFunc(func() { c.updateSpanAsync(ctx, input) })
 
+	// Drain priority opcodes before the rest.
+	//
+	// NOTE: This assumes that ops are processed sequentially. If they aren't,
+	// then priority order would only decrease the chance of a race, but not
+	// eliminate it.
+	ordered := make([]state.GeneratorOpcode, 0, len(input.Steps))
 	for _, op := range input.Steps {
+		if enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+	for _, op := range input.Steps {
+		if !enums.OpcodeIsPriority(op.Op) {
+			ordered = append(ordered, op)
+		}
+	}
+
+	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
+
+	if !complete {
+		if enforceStepSizeLimits && input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
+			return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
+		}
+	}
+
+	for _, op := range ordered {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, input.Metadata.ID)
 
@@ -153,23 +234,31 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
+			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
+				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
+			}
+
 			if !complete {
 				// Checkpointing happens in this API when either the function finishes or we move to
 				// async.  Therefore, we onl want to save state if we don't have a complete opcode,
 				// as all complete functions will never re-enter.
 				_, err := c.State.SaveStep(ctx, input.Metadata.ID, op.ID, []byte(output))
+				stepName := sanitizeLogValue(op.UserDefinedName())
 				if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 					// Ignore.
-					l.Warn("duplicate checkpoint step", "id", input.Metadata.ID)
+					l.Warn("duplicate checkpoint step", "id", input.Metadata.ID, "name", stepName)
 					continue
 				}
 				if err != nil {
-					l.Error("error saving checkpointed step state", "error", err)
+					l.Error("error saving checkpointed step state", "name", stepName, "error", err)
+					return fmt.Errorf("failed to save step %s (%s): %w", op.ID, stepName, err)
 				}
 			}
 
+			// Create a deterministic executor.step span whose ID matches what the SDK
+			// generates, so userland spans are correctly parented underneath it.
 			max := fn.MaxAttempts()
-			_, err = c.TracerProvider.CreateSpan(
+			stepSpanRef, err := c.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier:  input.Metadata.ID,
 					Attempt:     runCtx.AttemptCount(),
@@ -178,6 +267,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncStep"},
+					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -188,6 +278,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				// We should never hit a blocker creating a span.  If so, warn loudly.
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
+
+			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncStep.metadata")
 
 			go c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
 				AccountID: input.AccountID,
@@ -213,6 +305,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncErr"},
+					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -224,29 +317,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error saving span for checkpoint step error op", "error", err)
 			}
 
-			// Create an execution span for the initial sync attempt (attempt 0) as a child
-			// of the step span. In async execution, the executor creates this in ExecutePre,
-			// but for the initial sync attempt we need to create it here.
-			if stepSpanRef != nil {
-				execStatus := enums.StepStatusFailed
-				_, _ = c.TracerProvider.CreateSpan(
-					tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-						Identifier:  input.Metadata.ID,
-						Attempt:     runCtx.AttemptCount(),
-						MaxAttempts: &max,
-					}),
-					meta.SpanNameExecution,
-					&tracing.CreateSpanOptions{
-						Debug:     &tracing.SpanDebugData{Location: "checkpoint.SyncExecErr"},
-						Parent:    stepSpanRef,
-						StartTime: op.Timing.Start(),
-						EndTime:   op.Timing.End(),
-						Attributes: meta.NewAttrSet(
-							meta.Attr(meta.Attrs.DynamicStatus, &execStatus),
-						).Merge(tracing.GeneratorAttrs(&op)),
-					},
-				)
-			}
+			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncErr.metadata")
 
 			err = c.Executor.HandleGenerator(ctx, runCtx, op)
 			if errors.Is(err, executor.ErrHandledStepError) {
@@ -288,9 +359,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		case enums.OpcodeRunComplete:
-			result := struct {
-				Data apiresult.APIResult `json:"data"`
-			}{}
+			result := apiresult.APIResult{}
 			if err := json.Unmarshal(op.Data, &result); err != nil {
 				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
 			}
@@ -303,8 +372,52 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}, enums.RunStatusCompleted)
 
 			// Call finalize and process the entire op.
-			if err := c.finalize(ctx, *input.Metadata, result.Data); err != nil {
+			if err := c.finalize(ctx, *input.Metadata, result); err != nil {
 				l.Error("error finalizing sync run", "error", err)
+			}
+
+			finishedResp := sv1.DriverResponse{
+				StatusCode: result.StatusCode,
+				Output:     result.Body,
+				Duration:   result.Duration,
+			}
+			if result.StatusCode < 200 || result.StatusCode > 299 {
+				errStr := fmt.Sprintf("invalid status code: %d", result.StatusCode)
+				finishedResp.Err = &errStr
+			}
+
+			c.Executor.RunFunctionFinishedLifecycle(
+				ctx,
+				*input.Metadata,
+				runCtx.LifecycleItem(),
+				runCtx.Events(),
+				finishedResp,
+			)
+
+		case enums.OpcodeDeferAdd:
+			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, l, input.Metadata, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer add in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", input.Metadata.ID.RunID.String(),
+				)
+			}
+
+		case enums.OpcodeDeferAbort:
+			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, l, input.Metadata, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer abort in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", input.Metadata.ID.RunID.String(),
+				)
 			}
 
 		default:
@@ -316,6 +429,14 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			if err := c.Executor.HandleGenerator(ctx, runCtx, op); err != nil {
 				l.Error("error handling generator in checkpoint", "error", err, "opcode", op.Op)
 			}
+		}
+	}
+
+	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
+	// requests (potentially on different instances) see the updated total.
+	if delta := input.Metadata.Metrics.MetadataSizeDelta(); delta > 0 {
+		if err := state.TryIncrementMetadataSize(ctx, c.State, input.Metadata.ID, delta); err != nil {
+			l.Warn("error persisting metadata size delta", "error", err, "delta", delta)
 		}
 	}
 
@@ -391,6 +512,18 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return fmt.Errorf("cannot checkpoint async steps")
 	}
 
+	if c.AllowAsyncDispatchValidation.Enabled(ctx, input.AccountID) {
+		if err := c.validateAsyncDispatch(ctx, input); err != nil {
+			return err
+		}
+	}
+
+	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
+
+	if enforceStepSizeLimits && md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
+		return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
+	}
+
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
 		tracing.AddMetadataTenantAttrs(attrs, md.ID)
@@ -404,6 +537,10 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
+			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
+				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
+			}
+
 			_, err = c.State.SaveStep(ctx, md.ID, op.ID, []byte(output))
 			if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 				// Ignore.
@@ -412,9 +549,10 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 			if err != nil {
 				l.Error("error saving checkpointed step state", "error", err)
+				return fmt.Errorf("failed to save step %s: %w", op.ID, err)
 			}
 
-			_, err = c.TracerProvider.CreateSpan(
+			stepSpanRef, err := c.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier: md.ID,
 					Attempt:    0,
@@ -423,7 +561,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.AsyncStep"},
-					Seed:       []byte(op.ID + op.Timing.String()),
+					Seed:       stepDynamicSeed(op, 0),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -434,10 +572,74 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				// We should never hit a blocker creating a span.  If so, warn loudly.
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
+
+			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
+
+		case enums.OpcodeStepPlanned:
+			// When the SDK announces a step is about to run, we open a Running
+			// executor.step span to show progress to the user.
+			_, err := c.TracerProvider.CreateSpan(
+				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+					Identifier: md.ID,
+					Attempt:    0,
+				}),
+				meta.SpanNameStep,
+				&tracing.CreateSpanOptions{
+					Debug: &tracing.SpanDebugData{Location: "checkpoint.AsyncStepPlanned"},
+
+					// Set the same dynamic span ID as the eventual completion arm.
+					// We use DynamicSpanIDOverride instead of Seed to avoid setting the same
+					// span ID.
+					DynamicSpanIDOverride: tracing.DeterministicSpanConfig(stepDynamicSeed(op, 0)).SpanID.String(),
+					Parent:                tracing.RunSpanRefFromMetadata(&md),
+					StartTime:             op.Timing.Start(),
+					Attributes:            stepPlannedAttrs(attrs, op, input.RunID),
+				},
+			)
+			if err != nil {
+				// Processing the leading-edge is best effort both in the executor and SDK.
+				// We'll eventually get the completion arm even if this fails.
+				l.Warn("error saving leading-edge span for StepPlanned", "error", err, "step_id", op.ID)
+			}
+
+		case enums.OpcodeDeferAdd:
+			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, l, &md, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer add in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", md.ID.RunID.String(),
+				)
+			}
+
+		case enums.OpcodeDeferAbort:
+			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, l, &md, op); err != nil {
+				// Log without returning the error: a bad defer must
+				// never fail its parent run. We may rethink this as
+				// the Defer feature matures.
+				l.Error(
+					"error handling defer abort in checkpoint",
+					"error", err,
+					"step_id", sanitizeLogValue(op.ID),
+					"run_id", md.ID.RunID.String(),
+				)
+			}
+
 		default:
 			// Return an error
 			l.Error("unimplemented checkpoint op", "op", op.Op)
 			return fmt.Errorf("cannot checkpoint opcode: %s", op.Op)
+		}
+	}
+
+	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
+	// requests (potentially on different instances) see the updated total.
+	if delta := md.Metrics.MetadataSizeDelta(); delta > 0 {
+		if err := state.TryIncrementMetadataSize(ctx, c.State, md.ID, delta); err != nil {
+			l.Warn("error persisting metadata size delta", "error", err, "delta", delta)
 		}
 	}
 
@@ -447,9 +649,105 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		return nil
 	}
 
-	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), ref.JobID()); err != nil {
+	if err := c.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), queue.Scope{
+		AccountID:  md.ID.Tenant.AccountID,
+		EnvID:      md.ID.Tenant.EnvID,
+		FunctionID: md.ID.FunctionID,
+	}, ref.JobID()); err != nil {
 		l.Error("error resetting queue item attempts", "error", err)
 		return err
+	}
+
+	return nil
+}
+
+// stepOutputSize returns the total byte size of all StepRun/Step outputs in ops.
+func stepOutputSize(ops []state.GeneratorOpcode) int {
+	total := 0
+	for _, op := range ops {
+		if op.Op == enums.OpcodeStepRun || op.Op == enums.OpcodeStep {
+			if out, err := op.Output(); err == nil {
+				total += len(out)
+			}
+		}
+	}
+	return total
+}
+
+func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) (err error) {
+	start := time.Now()
+	result := "passed"
+	defer func() {
+		if errors.Is(err, ErrStaleDispatch) {
+			result = "stale"
+		}
+		metrics.HistogramCheckpointAsyncDispatchValidationDuration(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"result": result},
+		})
+	}()
+	if input.RequestID == "" {
+		result = "no_request_id"
+		return nil
+	}
+
+	// Negative elapsed (future-dated stamp from clock skew or a buggy SDK)
+	// falls through to the full validation.
+	if input.RequestStartedAt != 0 {
+		elapsed := time.Since(time.UnixMilli(input.RequestStartedAt))
+		if elapsed >= 0 && elapsed < dispatchValidationSkipDuration {
+			result = "fresh"
+			return nil
+		}
+	}
+
+	parsed, err := ulid.Parse(input.RequestID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid request id %q: %v", ErrStaleDispatch, input.RequestID, err)
+	}
+
+	ref := queueref.Decode(input.QueueItemRef)
+	if ref.JobID() == "" || ref.ShardID() == "" {
+		result = "no_qi_ref"
+		return nil
+	}
+
+	loader, ok := c.Queue.(queueItemLoader)
+	if !ok {
+		// Fail open if the queue can't load items (e.g. mock or alt backend);
+		// the alternative is rejecting every fenced POST forever.
+		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
+			"run_id", input.RunID,
+		)
+		result = "no_loader"
+		return nil
+	}
+
+	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
+	if errors.Is(err, queue.ErrQueueItemNotFound) {
+		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
+	}
+	if err != nil {
+		// Fail open on transient load errors (e.g. Redis timeout). Rejecting
+		// here would surface as HTTP 400 and abort an otherwise-valid run.
+		logger.StdlibLogger(ctx).Warn("checkpoint: failed to load queue item for dispatch validation; skipping",
+			"error", err,
+			"run_id", input.RunID,
+		)
+		result = "load_error"
+		return nil
+	}
+	if item.GenerationID == 0 {
+		result = "no_generation"
+		return nil
+	}
+
+	// Compare only the entropy: it's the deterministic part bound to
+	// (runID, generationID). The ULID timestamp is incidental (it just
+	// gives RequestIDs chronological sort order) and isn't part of the
+	// fence.
+	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
+		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
 	}
 
 	return nil
@@ -505,4 +803,112 @@ func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function
 		return nil, fmt.Errorf("error loading function: %w", err)
 	}
 	return cfn.InngestFunction()
+}
+
+func (c checkpointer) processMetadata(
+	ctx context.Context,
+	l logger.Logger,
+	accountID uuid.UUID,
+	md *state.Metadata,
+	stepSpanRef *meta.SpanReference,
+	op state.GeneratorOpcode,
+	location string,
+) {
+	if !c.AllowStepMetadata.Enabled(ctx, accountID) {
+		return
+	}
+
+	// Extract experiment metadata from opts and merge into the list of
+	// metadata entries to process. The SDK spreads group.experiment()
+	// variant context onto a sub-step's opts; emitting the metadata span
+	// here (rather than requiring the SDK to call addMetadata()) means
+	// end users get experiment observability without an SDK upgrade and
+	// keeps the emission consistent across SDK languages.
+	metadataEntries := op.Metadata
+	if expMd, err := extractors.ExtractExperimentOptsMetadata(op.Opts); err != nil {
+		l.Warn("error extracting experiment opts metadata",
+			"error", err,
+			"run_id", md.ID.RunID,
+		)
+	} else if expMd != nil {
+		values, serializeErr := expMd.Serialize()
+		if serializeErr != nil {
+			l.Warn("error serializing experiment metadata",
+				"error", serializeErr,
+				"run_id", md.ID.RunID,
+			)
+		} else {
+			metadataEntries = append(metadataEntries, metadata.ScopedUpdate{
+				Scope: enums.MetadataScopeStep,
+				Update: metadata.Update{
+					RawUpdate: metadata.RawUpdate{
+						Kind:   expMd.Kind(),
+						Op:     expMd.Op(),
+						Values: values,
+					},
+				},
+			})
+		}
+	}
+
+	for _, spanMd := range metadataEntries {
+		if err := spanMd.ValidateAllowed(); err != nil {
+			l.Warn("invalid metadata in checkpoint step",
+				"error", err,
+				"run_id", md.ID.RunID,
+				"metadata_kind", spanMd.Kind(),
+			)
+			continue
+		}
+
+		values, err := spanMd.Serialize()
+		if err != nil {
+			l.Warn("failed to serialize metadata in checkpoint step",
+				"error", err,
+				"run_id", md.ID.RunID,
+				"metadata_kind", spanMd.Kind(),
+			)
+			continue
+		}
+
+		// Resolve the parent span based on metadata scope, matching the
+		// executor's behavior in createMetadataSpan.
+		var parent *meta.SpanReference
+		switch spanMd.Scope {
+		case enums.MetadataScopeRun:
+			parent = tracing.RunSpanRefFromMetadata(md)
+		case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
+			// Use the step span created just before this call.
+			// Fall back to the run span if the step span was not captured.
+			if stepSpanRef != nil {
+				parent = stepSpanRef
+			} else {
+				parent = tracing.RunSpanRefFromMetadata(md)
+			}
+		default:
+			parent = tracing.RunSpanRefFromMetadata(md)
+		}
+
+		_, err = tracing.CreateMetadataSpanFromValues(
+			ctx,
+			c.TracerProvider,
+			parent,
+			location,
+			"checkpoint",
+			md,
+			spanMd.Kind(),
+			spanMd.Op(),
+			values,
+			spanMd.Scope,
+		)
+		if err != nil {
+			l.Warn("error creating metadata span in checkpoint",
+				"error", err,
+				"run_id", md.ID.RunID,
+				"metadata_kind", spanMd.Kind(),
+				"metadata_size", values.Size(),
+				"cumulative_metadata_size", md.Metrics.MetadataSize,
+			)
+		}
+	}
 }

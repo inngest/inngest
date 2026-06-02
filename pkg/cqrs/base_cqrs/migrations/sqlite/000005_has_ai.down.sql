@@ -1,1 +1,0 @@
-ALTER TABLE trace_runs DROP COLUMN has_ai;

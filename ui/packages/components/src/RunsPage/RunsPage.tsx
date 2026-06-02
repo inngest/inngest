@@ -5,6 +5,7 @@ import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
@@ -25,6 +26,7 @@ import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
+  useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
   useValidatedArraySearchParam,
@@ -33,13 +35,14 @@ import {
 import type { Features } from '../types/features';
 import RunsStatusFilter from './RunsStatusFilter';
 import RunsTable from './RunsTable';
+import RunsTypeFilter from './RunsTypeFilter';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
 
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -55,6 +58,12 @@ type Props = {
   searchError?: Error;
   error?: Error | null;
   infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
+  // When set, the CEL search button is hidden once `totalCount` reaches this
+  // threshold (unless the user already has an active query, so they're not
+  // stranded without a "Hide search" toggle). Used by self-hosted deployments
+  // where CEL search against large result sets is prohibitively slow. Leave
+  // undefined to always show the button (cloud default).
+  searchLimit?: number;
 };
 
 export function RunsPage({
@@ -76,6 +85,7 @@ export function RunsPage({
   searchError,
   error,
   infiniteScrollTrigger,
+  searchLimit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -121,6 +131,9 @@ export function RunsPage({
     'timeField',
     isFunctionTimeField
   );
+
+  const [excludeDeferred = false, setExcludeDeferred, removeExcludeDeferred] =
+    useBooleanSearchParam('excludeDeferred');
 
   const [search, setSearch, removeSearch] = useSearchParam('search');
 
@@ -184,6 +197,18 @@ export function RunsPage({
       setTimeField(value);
     },
     [scrollToTop, setTimeField]
+  );
+
+  const onExcludeDeferredChange = useCallback(
+    (value: boolean) => {
+      scrollToTop();
+      if (value) {
+        setExcludeDeferred(true);
+      } else {
+        removeExcludeDeferred();
+      }
+    },
+    [removeExcludeDeferred, scrollToTop, setExcludeDeferred]
   );
 
   const onDaysChange = useCallback(
@@ -271,21 +296,36 @@ export function RunsPage({
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
         <div className="flex h-11 items-center justify-between gap-1.5 px-3">
           <div className="flex items-center gap-1.5">
-            <Button
-              icon={<RiSearchLine />}
-              size="small"
-              kind="secondary"
-              iconSide="left"
-              appearance="outlined"
-              label={showSearch ? 'Hide search' : 'Show search'}
-              onClick={() => setShowSearch((prev) => !prev)}
-              className={cn(
-                search
-                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                  : '',
-                'h-[26px] w-[103px] rounded'
-              )}
-            />
+            {/* CEL search scans the returned run set and gets prohibitively slow on large pages.
+                Callers can pass `searchLimit` to disable the button above that count. An active
+                query keeps the button enabled so users are never stranded without a "Hide search"
+                toggle. */}
+            <OptionalTooltip
+              tooltip={
+                !!searchLimit && totalCount !== undefined && totalCount >= searchLimit && !search
+                  ? `Search is limited to ${searchLimit} results`
+                  : undefined
+              }
+            >
+              <Button
+                icon={<RiSearchLine />}
+                size="small"
+                kind="secondary"
+                iconSide="left"
+                appearance="outlined"
+                disabled={
+                  !!searchLimit && totalCount !== undefined && totalCount >= searchLimit && !search
+                }
+                label={showSearch ? 'Hide search' : 'Show search'}
+                onClick={() => setShowSearch((prev) => !prev)}
+                className={cn(
+                  search
+                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                    : '',
+                  'h-[26px] w-[103px] rounded'
+                )}
+              />
+            </OptionalTooltip>
             <SelectGroup>
               <TimeFieldFilter
                 selectedTimeField={timeField}
@@ -333,6 +373,12 @@ export function RunsPage({
                 onFilterChange={onFunctionFilterChange}
                 selectedEntities={filteredFunction}
                 entities={functions}
+              />
+            )}
+            {features.isDeferred && (
+              <RunsTypeFilter
+                excludeDeferred={excludeDeferred}
+                onExcludeDeferredChange={onExcludeDeferredChange}
               />
             )}
           </div>

@@ -2,7 +2,9 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
@@ -91,10 +94,9 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: false,
-			CapacityLease:            nil,
+			I:             qi,
+			P:             p,
+			CapacityLease: nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			atomic.AddInt64(&counter, 1)
 			return osqueue.RunResult{}, nil
@@ -113,9 +115,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
@@ -130,10 +129,9 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: false,
-			CapacityLease:            nil,
+			I:             qi,
+			P:             p,
+			CapacityLease: nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			<-time.After(3 * time.Second)
 			atomic.AddInt64(&counter, 1)
@@ -153,9 +151,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
@@ -216,11 +211,11 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: true,
+			I: qi,
+			P: p,
 			CapacityLease: &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			go func() {
@@ -263,9 +258,6 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return true
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return true
 			}),
 			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
@@ -324,18 +316,18 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		require.Len(t, cmLifecycles.AcquireCalls, 1)
 
 		// Lease the queue item (required when queue item lease ticker fires)
-		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now(), nil, osqueue.LeaseOptionDisableConstraintChecks(true))
+		leaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now())
 		require.NoError(t, err)
 		qi.LeaseID = leaseID
 
 		var counter int64
 
 		err = q.ProcessItem(ctx, osqueue.ProcessItem{
-			I:                        qi,
-			P:                        p,
-			DisableConstraintUpdates: true,
+			I: qi,
+			P: p,
 			CapacityLease: &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			go func() {
@@ -373,6 +365,253 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		// Expect exactly 1 release call
 		require.Equal(t, 1, len(cmLifecycles.ReleaseCalls))
 	})
+
+	t.Run("with constraint api and valid lease and early release", func(t *testing.T) {
+		reset()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		p := osqueue.ItemPartition(ctx, qi)
+
+		// Acquire a lease
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			IdempotencyKey:       qi.ID,
+			FunctionID:           fnID,
+			LeaseIdempotencyKeys: []string{qi.ID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+			},
+			CurrentTime:     clock.Now(),
+			Duration:        10 * time.Second,
+			MaximumLifetime: time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		require.Len(t, cmLifecycles.AcquireCalls, 1)
+
+		var counter int64
+
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
+			I: qi,
+			P: p,
+			CapacityLease: &osqueue.CapacityLease{
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
+			},
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			released := make(chan struct{})
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-released:
+						return
+					case <-time.After(time.Second):
+						// Ensure we tick the extend at least once
+						clock.Advance(time.Second)
+					}
+				}
+			}()
+
+			<-time.After(3 * time.Second)
+
+			// Release the capacity early
+			require.NotNil(t, ri.CapacityLease)
+
+			err := ri.CapacityLease.Release()
+			require.NoError(t, err)
+			close(released) // stop clock advances after release
+
+			// Give the extend goroutine time to observe the cancelled context
+			<-time.After(50 * time.Millisecond)
+
+			// And do some more processing before returning
+			<-time.After(500 * time.Millisecond)
+			atomic.AddInt64(&counter, 1)
+			return osqueue.RunResult{}, nil
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, 1, int(counter))
+
+		service.Wait()
+
+		// Expect at least 1 extend call
+		require.Greater(t, len(cmLifecycles.ExtendCalls), 0)
+
+		// Expect exactly 2 release calls
+		require.Equal(t, 2, len(cmLifecycles.ReleaseCalls))
+	})
+}
+
+func TestQueueItemProcessCleanupUsesRenewedLease(t *testing.T) {
+	tests := []struct {
+		name    string
+		runErr  error
+		requeue bool
+	}{
+		{
+			name: "dequeue on success",
+		},
+		{
+			name:    "requeue on retryable error",
+			runErr:  errors.New("retryable"),
+			requeue: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			clock := clockwork.NewFakeClock()
+
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{
+				InitAddress:  []string{r.Addr()},
+				DisableCache: true,
+			})
+			require.NoError(t, err)
+			defer rc.Close()
+
+			q, shard := newQueue(
+				t,
+				rc,
+				osqueue.WithClock(clock),
+				osqueue.WithBackoffFunc(func(int) time.Time {
+					return clock.Now().Add(time.Minute)
+				}),
+			)
+
+			accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+			jobID := "lease-cleanup-" + tc.name
+			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+				ID:          jobID,
+				FunctionID:  fnID,
+				WorkspaceID: envID,
+				Data: osqueue.Item{
+					JobID:       &jobID,
+					WorkspaceID: envID,
+					Kind:        osqueue.KindStart,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: envID,
+						WorkflowID:  fnID,
+						RunID:       runID,
+					},
+				},
+			}, clock.Now(), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			leaseID, err := shard.Lease(ctx, item, osqueue.QueueLeaseDuration, clock.Now())
+			require.NoError(t, err)
+			item.LeaseID = leaseID
+			initialLease := *leaseID
+			initialGeneration := item.GenerationID
+
+			started := make(chan struct{})
+			done := make(chan error, 1)
+			go func() {
+				done <- q.ProcessItem(ctx, osqueue.ProcessItem{
+					P: osqueue.ItemPartition(ctx, item),
+					I: item,
+				}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+					close(started)
+					deadline := time.After(time.Second)
+					ticker := time.NewTicker(10 * time.Millisecond)
+					defer ticker.Stop()
+
+					for {
+						loaded, err := shard.LoadQueueItem(ctx, item.ID)
+						if err == nil && loaded.LeaseID != nil && *loaded.LeaseID != initialLease {
+							return osqueue.RunResult{}, tc.runErr
+						}
+
+						select {
+						case <-deadline:
+							return osqueue.RunResult{}, errors.New("timed out waiting for lease renewal")
+						case <-ticker.C:
+						case <-ctx.Done():
+							return osqueue.RunResult{}, ctx.Err()
+						}
+					}
+				})
+			}()
+
+			require.Eventually(t, func() bool {
+				select {
+				case <-started:
+					return true
+				default:
+					return false
+				}
+			}, time.Second, 10*time.Millisecond)
+
+			clock.Advance(osqueue.QueueLeaseDuration / 2)
+			r.SetTime(clock.Now())
+
+			select {
+			case err := <-done:
+				require.NoError(t, err)
+			case <-time.After(2 * time.Second):
+				t.Fatal("timed out waiting for ProcessItem to finish")
+			}
+
+			loaded, err := shard.LoadQueueItem(ctx, item.ID)
+			if !tc.requeue {
+				require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+				require.Nil(t, loaded)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Nil(t, loaded.LeaseID)
+			require.Equal(t, initialGeneration+1, loaded.GenerationID)
+			require.Equal(t, 1, loaded.Data.Attempt)
+		})
+	}
 }
 
 func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
@@ -425,7 +664,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 	start := clock.Now()
 
-	t.Run("without constraint api", func(t *testing.T) {
+	t.Run("with constraint api", func(t *testing.T) {
 		reset()
 
 		q, shard := newQueue(
@@ -434,13 +673,19 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return false
-			}),
 			osqueue.WithCapacityManager(cm),
 			// make lease extensions more frequent
 			osqueue.WithCapacityLeaseExtendInterval(time.Second),
 			osqueue.WithLogger(l),
+			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+				return osqueue.PartitionConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: osqueue.PartitionConcurrency{
+						AccountConcurrency:  10,
+						FunctionConcurrency: 5,
+					},
+				}
+			}),
 		)
 
 		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
@@ -453,7 +698,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -461,7 +705,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		err = iter.Process(ctx, &qi)
 		require.NoError(t, err)
 
-		require.Equal(t, 0, len(cmLifecycles.AcquireCalls))
+		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
 		require.Equal(t, 0, len(cmLifecycles.ExtendCalls))
 		require.Equal(t, 0, len(cmLifecycles.ReleaseCalls))
 	})
@@ -474,9 +718,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
 			}),
 			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
@@ -504,7 +745,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -525,9 +765,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
 			}),
 			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
@@ -586,7 +823,8 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 		// Set capacity lease ID
 		qi.CapacityLease = &osqueue.CapacityLease{
-			LeaseID: resp.Leases[0].LeaseID,
+			LeaseID:    resp.Leases[0].LeaseID,
+			IssuedAtMS: clock.Now().UnixMilli(),
 		}
 
 		p := osqueue.ItemPartition(ctx, qi)
@@ -596,7 +834,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -613,7 +850,6 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		item := <-q.Workers()
 		require.Equal(t, qi, item.I)
 		require.Equal(t, qi.CapacityLease, item.CapacityLease)
-		require.True(t, item.DisableConstraintUpdates)
 	})
 }
 
@@ -676,9 +912,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
 			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return false
-			}),
 			osqueue.WithCapacityManager(cm),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return osqueue.PartitionConstraintConfig{
@@ -716,7 +949,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			Items:                items,
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -736,13 +968,14 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		// we should requeue the item
 		require.True(t, iter.IsRequeuable())
 
+		require.Equal(t, 0, zcard(t, rc, partitionConcurrencyKey(p, kg)))
+
 		// the 2 items are in progress
-		require.Equal(t, 2, zcard(t, rc, partitionConcurrencyKey(p, kg)))
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // item should also be added to scavenger index
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
-		// expect no calls to constraintapi
-		require.Len(t, cmLifecycles.AcquireCalls, 0)
+		// expect calls to constraintapi
+		require.Len(t, cmLifecycles.AcquireCalls, 3)
 	})
 
 	t.Run("without constraintapi and no leases using processPartition", func(t *testing.T) {
@@ -752,9 +985,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
-				return false
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
 				return false
 			}),
 			osqueue.WithCapacityManager(cm),
@@ -790,15 +1020,16 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		err = q.ProcessPartition(ctx, &p, 0, false)
 		require.NoError(t, err)
 
+		require.Equal(t, 0, zcard(t, rc, partitionConcurrencyKey(p, kg)))
+
 		// first two items were successfully leased
-		require.Equal(t, 2, zcard(t, rc, partitionConcurrencyKey(p, kg)))
 		require.Equal(t, 2, zcard(t, rc, kg.PartitionScavengerIndex(p.ID))) // item should also be added to scavenger index
 
 		// remaining items are still in partition
 		require.Equal(t, 8, zcard(t, rc, partitionZsetKey(p, kg)))
 
 		// expect no calls to constraintapi
-		require.Len(t, cmLifecycles.AcquireCalls, 0)
+		require.Len(t, cmLifecycles.AcquireCalls, 3)
 
 		// partition was requeued
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
@@ -812,9 +1043,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true // acquire leases
 			}),
 			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 			osqueue.WithCapacityManager(cm),
@@ -854,7 +1082,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			Items:                items,
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			Denies:               osqueue.NewLeaseDenyList(),
 			StaticTime:           clock.Now(),
 			Parallel:             false,
 		}
@@ -895,9 +1122,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
-			}),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
 			}),
 			osqueue.WithCapacityManager(cm),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
@@ -960,9 +1184,6 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 				return false
 			}),
 			osqueue.WithLogger(l),
-			osqueue.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-				return true
-			}),
 			osqueue.WithCapacityManager(cm),
 			osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 				return osqueue.PartitionConstraintConfig{
@@ -1041,7 +1262,8 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 
 			// Set capacity lease ID on first item
 			item.CapacityLease = &osqueue.CapacityLease{
-				LeaseID: resp.Leases[0].LeaseID,
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
 			}
 			// Manually set ID for first item
 			item.ID = util.XXHash("item0")

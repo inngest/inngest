@@ -60,7 +60,7 @@ type Executor interface {
 	// Note that the executor does *not* handle rate limiting, debouncing, batching,
 	// expressions, etc.  Any Schedule request will immediately be scheduled for the
 	// given time. Filtering of events in any way must be handled prior scheduling.
-	Schedule(ctx context.Context, r ScheduleRequest) (*sv2.Metadata, error)
+	Schedule(ctx context.Context, r ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error)
 
 	// Execute runs the given function via the execution drivers.  If the
 	// from ID is "$trigger" this is treated as a new workflow invocation from the
@@ -117,6 +117,10 @@ type Executor interface {
 
 	Finalize(ctx context.Context, opts FinalizeOpts) error
 
+	// RunFunctionFinishedLifecycle fans OnFunctionFinished out to every
+	// registered LifecycleListener.
+	RunFunctionFinishedLifecycle(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage, resp state.DriverResponse)
+
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
@@ -162,6 +166,16 @@ type RunContext interface {
 	ShouldRetry() bool
 	IncrementAttempt()
 
+	// OnlyHasLazyOps reports whether the opcode batch being processed contains
+	// only lazy ops (DeferAdd, DeferAbort), i.e. no host op to drive forward
+	// progress. Lazy ops normally piggyback on a host (e.g. StepRun); the
+	// all-lazy case shouldn't happen, but lazy handlers fall back to enqueueing
+	// their own discovery step when it does. See enums.OpcodeIsLazy.
+	//
+	// In other words, this should always return false, but an SDK bug could
+	// make it true.
+	OnlyHasLazyOps() bool
+
 	// Queue item creation - provides the "template" data for new items
 	PriorityFactor() *int64
 	ConcurrencyKeys() []state.CustomConcurrency
@@ -176,6 +190,10 @@ type RunContext interface {
 	UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError)
 	UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage)
 	SetError(err error)
+
+	// ReleaseCapacityLease is a convenient wrapper over checking whether a capacity lease
+	// was set on the queue item and then invoking Release() in a non-blocking way.
+	ReleaseCapacityLease() error
 }
 
 type ResumeSignalResult struct {
@@ -224,11 +242,9 @@ type ScheduleRequest struct {
 	// RunID allows specifying a run ID for the scheduled run.  This is entirely
 	// optional, and allows clients to choose a run ID when scheduling.  We need this
 	// for run IDs with API-based checkpointing.
-	//
-	// Note that this should never be provided by the user, as that could welcome
-	// conflicts.
 	RunID *ulid.ULID
-	// URL is the URL that is being hit for REST-based sync functions.
+	// URL is the URL that is being hit for durable endpoints, and without this
+	// we cannot reenter and resume these durable endpoint runs.
 	//
 	// This is required because some URLs may contain IDs (/v1/users/:id).
 	// These URLs are *run specific* vs function specific;  we must always include
@@ -273,6 +289,8 @@ type ScheduleRequest struct {
 	DebugSessionID *ulid.ULID
 	// DebugRunID is the ID of the debugger run that this function is being scheduled from.
 	DebugRunID *ulid.ULID
+	// ScheduleType describes how this run was triggered.
+	ScheduleType enums.ScheduleType
 	// RequestVersion represents the executor request versioning/hashing style
 	// used to manage state.
 	//
@@ -283,6 +301,27 @@ type ScheduleRequest struct {
 	// if we're queuing a function as a result of a sync run going async, as
 	// the SDK has already been run at that point.
 	RequestVersion *int
+}
+
+// NewScheduleRequest creates an initial ScheduleRequest given a deployed
+// function, ensuring common fields are filled out.
+//
+// XXX: We should replace Function in ScheduleRequest with a DeployedFunction
+// to remove this method.
+func NewScheduleRequest(f inngest.DeployedFunction) ScheduleRequest {
+	req := ScheduleRequest{
+		Function:    f.Function,
+		AccountID:   f.AccountID,
+		WorkspaceID: f.EnvironmentID,
+		AppID:       f.AppID,
+	}
+	if !f.PausedAt.IsZero() {
+		req.FunctionPausedAt = &f.PausedAt
+	}
+	if !f.DrainedAt.IsZero() {
+		req.DrainedAt = &f.DrainedAt
+	}
+	return req
 }
 
 func (r ScheduleRequest) SkipReason() enums.SkipReason {

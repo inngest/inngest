@@ -1,11 +1,11 @@
 package meta
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -29,14 +29,27 @@ var Attrs = struct {
 	EventsInput         attr[*string]
 	TriggeringEventName attr[*string]
 	FunctionID          attr[*uuid.UUID]
+	FunctionName        attr[*string]
+	FunctionSlug        attr[*string]
 	FunctionVersion     attr[*int]
 	RunID               attr[*ulid.ULID]
+	ReplayOriginalRunID attr[*ulid.ULID]
+	RunScheduleType     attr[*enums.ScheduleType]
 	SkipReason          attr[*enums.SkipReason]
 	SkipExistingRunID   attr[*string]
 
 	// Durable endpoint attributes
 	IsDurableEndpointRun         attr[*bool]
 	DurableEndpointModeChangedAt attr[*time.Time]
+
+	// Defer attributes
+	DeferChildRunID   attr[*ulid.ULID]
+	DeferFnSlug       attr[*string]
+	DeferHashedID     attr[*string]
+	DeferParentFnSlug attr[*string]
+	DeferParentRunIDs attr[*[]string]
+	DeferStatus       attr[*enums.DeferStatus]
+	DeferUserlandID   attr[*string]
 
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
@@ -69,6 +82,7 @@ var Attrs = struct {
 	StepAttempt      attr[*int]
 	StepMaxAttempts  attr[*int]
 	StepCodeLocation attr[*string]
+	StepType         attr[*enums.StepType]
 	// StepInput is the data that has been explicitly captured as input for a
 	// step. This data may not be stored with the span when it hits a store,
 	// and instead may be removed to be stored separately.
@@ -90,6 +104,11 @@ var Attrs = struct {
 
 	// step.run attributes
 	StepRunType attr[*string]
+
+	// step.experiment attributes
+	ExperimentName    attr[*string]
+	ExperimentStepID  attr[*string]
+	ExperimentVariant attr[*string]
 
 	// Pause-related attributes
 	StepWaitExpired attr[*bool]
@@ -117,10 +136,13 @@ var Attrs = struct {
 	StepGatewayResponseOutputSizeBytes attr[*int]
 
 	// HTTP (serve) attributes
+	RequestID          attr[*string]
+	JobID              attr[*string]
 	RequestURL         attr[*string]
-	ResponseHeaders    attr[*http.Header]
+	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
+	ResponseSteps      attr[*ResponseOps]
 
 	IsCheckpoint attr[*bool]
 
@@ -156,6 +178,13 @@ var Attrs = struct {
 	BatchID:                            ULIDAttr("batch.id"),
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
+	DeferChildRunID:                    ULIDAttr("defer.child_run_id"),
+	DeferFnSlug:                        StringAttr("defer.fn_slug"),
+	DeferHashedID:                      StringAttr("defer.hashed_id"),
+	DeferParentFnSlug:                  StringAttr("defer.parent_fn_slug"),
+	DeferParentRunIDs:                  StringSliceAttr("defer.parent_run_ids"),
+	DeferStatus:                        TextAttr[enums.DeferStatus]("defer.status"),
+	DeferUserlandID:                    StringAttr("defer.userland_id"),
 	DropSpan:                           BoolAttr("executor.drop"),
 	DynamicTraceID:                     StringAttr("dynamic.trace.id"),
 	DynamicSpanID:                      StringAttr("dynamic.span.id"),
@@ -166,17 +195,24 @@ var Attrs = struct {
 	EventsInput:                        StringAttr("events.input"),
 	TriggeringEventName:                StringAttr("event.trigger.name"),
 	FunctionID:                         UUIDAttr("function.id"),
+	FunctionName:                       StringAttr("function.name"),
+	FunctionSlug:                       StringAttr("function.slug"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),
 	IsDurableEndpointRun:               BoolAttr("run.is_durable_endpoint"),
 	DurableEndpointModeChangedAt:       TimeAttr("run.durable_endpoint.mode_changed_at"),
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
+	RequestID:                          StringAttr("request.id"),
+	JobID:                              StringAttr("job.id"),
 	RequestURL:                         StringAttr("request.url"),
-	ResponseHeaders:                    JsonAttr[http.Header]("response.headers"),
+	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
 	ResponseStatusCode:                 IntAttr("response.status_code"),
+	ResponseSteps:                      JsonAttr[ResponseOps]("response.step.ops"),
 	RunID:                              ULIDAttr("run.id"),
+	ReplayOriginalRunID:                ULIDAttr("run.replay_original_run_id"),
+	RunScheduleType:                    TextAttr[enums.ScheduleType]("run.schedule_type"),
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
 	StartedAt:                          TimeAttr("started_at"),
@@ -192,15 +228,19 @@ var Attrs = struct {
 	StepInvokeRunID:                    ULIDAttr("step.invoke.run.id"),
 	StepInvokeTriggerEventID:           ULIDAttr("step.invoke.trigger.event.id"),
 	StepMaxAttempts:                    IntAttr("step.max_attempts"),
-	StepName:                           TruncatedStringAttr("step.name", 128),
+	StepName:                           TruncatedStringAttr("step.name", 256),
 	StepOp:                             StepOpAttr("step.op"),
 	StepInput:                          StringAttr("step.input"),
 	StepOutput:                         StringAttr("step.output"),
 	StepOutputRef:                      StringAttr("step.output_ref"),
 	StepRunType:                        StringAttr("step.run.type"),
+	StepType:                           TextAttr[enums.StepType]("step.type"),
+	ExperimentName:                     StringAttr("inngest.experiment.name"),
+	ExperimentStepID:                   StringAttr("inngest.experiment.step_id"),
+	ExperimentVariant:                  StringAttr("inngest.experiment.variant"),
 	StepSignalName:                     StringAttr("step.signal.name"),
 	StepSleepDuration:                  DurationAttr("step.sleep.duration"),
-	StepUserlandID:                     TruncatedStringAttr("step.userland.id", 128),
+	StepUserlandID:                     TruncatedStringAttr("step.userland.id", 256),
 	StepUserlandIndex:                  IntAttr("step.userland.index"),
 	StepWaitExpired:                    BoolAttr("step.wait.expired"),
 	StepWaitExpiry:                     TimeAttr("step.wait.expiry"),
@@ -223,4 +263,18 @@ var Attrs = struct {
 	MetadataKind:  StringishAttr[metadata.Kind]("metadata.kind"),
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
+}
+
+type ResponseOps []ResponseOp
+
+// ResponseOp is an op tracked for each HTTP response
+type ResponseOp struct {
+	// Op represents the type of operation invoked in the function.
+	Op enums.Opcode `json:"op"`
+	// ID represents a hashed unique ID for the operation.  This acts
+	// as the generated step ID for the state store.
+	ID string `json:"id"`
+	// Name represents the name of the step, or the sleep duration for
+	// sleeps.
+	Name string `json:"name"`
 }

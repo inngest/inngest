@@ -100,16 +100,18 @@ func TestPartitionByID(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			res, err := q.PartitionByID(ctx, shard, fnID.String())
+			res, err := q.PartitionByID(ctx, shard, osqueue.Scope{
+				AccountID:  acctId,
+				EnvID:      wsID,
+				FunctionID: fnID,
+			}, fnID.String())
 			require.NoError(t, err)
 
 			// fmt.Printf("RESULT: %#v\n", res)
 			require.Equal(t, tc.expected.Paused, res.Paused)
-			require.Equal(t, tc.expected.AccountActive, res.AccountActive)
 			require.Equal(t, tc.expected.AccountInProgress, res.AccountInProgress)
 			require.Equal(t, tc.expected.Ready, res.Ready)
 			require.Equal(t, tc.expected.InProgress, res.InProgress)
-			require.Equal(t, tc.expected.Active, res.Active)
 			require.Equal(t, tc.expected.Future, res.Future)
 			require.Equal(t, tc.expected.Backlogs, res.Backlogs)
 		})

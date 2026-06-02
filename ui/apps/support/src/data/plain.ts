@@ -1,9 +1,13 @@
-import { PlainClient } from "@team-plain/typescript-sdk/dist/index";
+import {
+  PlainClient,
+  AttachmentType,
+} from "@team-plain/typescript-sdk/dist/index";
 import { createServerFn } from "@tanstack/react-start";
 import type {
   PlainSDKError,
   ThreadPartsFragment,
 } from "@team-plain/typescript-sdk/dist/index";
+import { authMiddleware } from "@/data/clerk";
 
 // Initialize Plain client
 // The API key should be set in the environment variable PLAIN_API_KEY
@@ -19,6 +23,25 @@ type Err<TError> = {
   error: TError;
 };
 type Result<T, TError> = NonNullable<Data<T> | Err<TError>>;
+
+function hasMissingLabelTypeError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeErrorDetails = (
+    error as {
+      errorDetails?: {
+        fields?: Array<{ field?: string; type?: string }>;
+      };
+    }
+  ).errorDetails;
+
+  const fields = maybeErrorDetails?.fields;
+  if (!Array.isArray(fields)) return false;
+
+  return fields.some(
+    (field) => field.field === "labelTypeIds" && field.type === "NOT_FOUND",
+  );
+}
 
 export type TicketChannel = "EMAIL" | "SLACK" | "API" | "DISCORD";
 
@@ -61,12 +84,22 @@ export const getLabelForStatus = (status: string) => {
   }
 };
 
+export const TICKET_STATUS_ALL = "all" as const;
+export const TICKET_STATUS_OPEN = "open" as const;
+export const TICKET_STATUS_CLOSED = "closed" as const;
+
+export type TicketStatusFilter =
+  | typeof TICKET_STATUS_OPEN
+  | typeof TICKET_STATUS_CLOSED
+  | typeof TICKET_STATUS_ALL;
+
 export const getTicketsByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: { email: string }) => data)
-  .handler(async ({ data }): Promise<Array<TicketSummary>> => {
-    // TODO - Use Clerk auth here to get the customer email, and the metadata with their external id
+  .middleware([authMiddleware])
+  .inputValidator((data: { status?: TicketStatusFilter }) => data)
+  .handler(async ({ data, context }): Promise<Array<TicketSummary>> => {
     try {
-      const { email } = data;
+      const email = context.userEmail;
+      const { status } = data;
 
       // First, get or create the customer by email
       const customer = await plainClient.getCustomerByEmail({
@@ -126,6 +159,11 @@ export const getTicketsByEmail = createServerFn({ method: "GET" })
         variables: {
           filters: {
             customerIds: [customer.data.id],
+            ...(status === "open"
+              ? { statuses: ["TODO", "SNOOZED"] }
+              : status === "closed"
+              ? { statuses: ["DONE"] }
+              : {}),
           },
           first: 10,
           // after: null,
@@ -185,10 +223,12 @@ type ThreadsQueryResult = {
 };
 
 export const getTicketById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { ticketId: string }) => data)
-  .handler(async ({ data }): Promise<TicketDetail | null> => {
+  .handler(async ({ data, context }): Promise<TicketDetail | null> => {
     try {
       const { ticketId } = data;
+      const userEmail = context.userEmail;
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -227,6 +267,13 @@ export const getTicketById = createServerFn({ method: "GET" })
       }
 
       const thread = res.data.thread;
+
+      // Verify the authenticated user owns this ticket
+      if (
+        thread.customer.email.email.toLowerCase() !== userEmail.toLowerCase()
+      ) {
+        return null;
+      }
 
       return {
         id: thread.id,
@@ -298,6 +345,9 @@ type TimelineEntriesResponse = {
   thread: {
     customer: {
       fullName: string;
+      email: {
+        email: string;
+      };
     };
     timelineEntries: { edges: Array<TimeLineEntryEdge> };
   };
@@ -394,19 +444,26 @@ type SlackReplyEntry = {
   attachments: Array<Attachment>;
   lastEditedOnSlackAt: DateTime;
 };
-export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
-  .inputValidator((data: { ticketId: string }) => data)
-  .handler(async ({ data }): Promise<Array<TimeLineEntryEdge> | null> => {
-    try {
-      const { ticketId } = data;
 
-      const res = (await plainClient.rawRequest({
-        query: `
+export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .inputValidator((data: { ticketId: string }) => data)
+  .handler(
+    async ({ data, context }): Promise<Array<TimeLineEntryEdge> | null> => {
+      try {
+        const { ticketId } = data;
+        const userEmail = context.userEmail;
+
+        const res = (await plainClient.rawRequest({
+          query: `
           query GetTimelineEntries($threadId: ID!, $first: Int, $after: String, $last: Int, $before: String) {
             thread(threadId: $threadId) {
               id
               customer {
                 fullName
+                email {
+                  email
+                }
               }
               timelineEntries(first: $first, after: $after, last: $last, before: $before) {
                 edges {
@@ -500,67 +557,75 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
             }
           }
         `,
-        variables: {
-          threadId: ticketId,
-          first: 20,
-          after: null,
-          last: null,
-          before: null,
-        },
-      })) as unknown as Result<TimelineEntriesResponse, PlainSDKError>;
+          variables: {
+            threadId: ticketId,
+            first: 20,
+            after: null,
+            last: null,
+            before: null,
+          },
+        })) as unknown as Result<TimelineEntriesResponse, PlainSDKError>;
 
-      if (res.error) {
-        console.error("Failed to fetch timeline entries:", res.error);
-        return [];
-      }
+        if (res.error) {
+          console.error("Failed to fetch timeline entries:", res.error);
+          return [];
+        }
 
-      const customerName = res.data.thread.customer.fullName;
-      const entries = res.data.thread.timelineEntries.edges;
-      return entries
-        .filter((entry) => {
-          // Custom entries are created via the API
-          const typename = entry.node.entry.__typename;
-          return (
-            typename === "CustomEntry" ||
-            typename === "EmailEntry" ||
-            typename === "SlackMessageEntry" ||
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            typename === "SlackReplyEntry"
-          );
-        })
-        .sort(
-          (a, b) =>
-            new Date(a.node.timestamp.iso8601).getTime() -
-            new Date(b.node.timestamp.iso8601).getTime(),
-        )
-        .map((entry, idx) => {
-          // Map the first custom entry to the customer's name
-          // We create a ticket via the API so it's a "machine user"
-          if (idx === 0 && entry.node.entry.__typename === "CustomEntry") {
-            return {
-              ...entry,
-              node: {
-                ...entry.node,
-                actor: {
-                  __typename: "CustomerActor",
-                  customer: {
-                    fullName: customerName,
-                    avatarUrl: "",
-                    email: { email: "" },
+        // Verify the authenticated user owns this ticket
+        const customerEmail = res.data.thread.customer.email.email;
+        if (customerEmail.toLowerCase() !== userEmail.toLowerCase()) {
+          return null;
+        }
+
+        const customerName = res.data.thread.customer.fullName;
+        const entries = res.data.thread.timelineEntries.edges;
+        return entries
+          .filter((entry) => {
+            // Custom entries are created via the API
+            const typename = entry.node.entry.__typename;
+            return (
+              typename === "CustomEntry" ||
+              typename === "EmailEntry" ||
+              typename === "SlackMessageEntry" ||
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+              typename === "SlackReplyEntry"
+            );
+          })
+          .sort(
+            (a, b) =>
+              new Date(a.node.timestamp.iso8601).getTime() -
+              new Date(b.node.timestamp.iso8601).getTime(),
+          )
+          .map((entry, idx) => {
+            // Map the first custom entry to the customer's name
+            // We create a ticket via the API so it's a "machine user"
+            if (idx === 0 && entry.node.entry.__typename === "CustomEntry") {
+              return {
+                ...entry,
+                node: {
+                  ...entry.node,
+                  actor: {
+                    __typename: "CustomerActor",
+                    customer: {
+                      fullName: customerName,
+                      avatarUrl: "",
+                      email: { email: "" },
+                    },
                   },
                 },
-              },
-            };
-          }
-          return entry;
-        });
-    } catch (error) {
-      console.error("Error fetching timeline entries:", error);
-      return [];
-    }
-  });
+              };
+            }
+            return entry;
+          });
+      } catch (error) {
+        console.error("Error fetching timeline entries:", error);
+        return [];
+      }
+    },
+  );
 
 export const getAttachmentDownloadUrl = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
   .inputValidator((data: { attachmentId: string }) => data)
   .handler(async ({ data }): Promise<AttachmentDownloadUrl | null> => {
     try {
@@ -624,13 +689,15 @@ type AttachmentDownloadUrl = {
 export type CreateTicketInput = {
   user: {
     id: string;
-    email: string;
+    /** @deprecated No longer used - email is derived from authenticated session */
+    email?: string;
     name?: string;
   };
   ticket: {
     type: string;
     body: string;
     severity?: string;
+    attachmentIds?: string[];
   };
 };
 
@@ -641,9 +708,11 @@ export type CreateTicketResult = {
 };
 
 export const createTicket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: CreateTicketInput) => data)
-  .handler(async ({ data }): Promise<CreateTicketResult> => {
+  .handler(async ({ data, context }): Promise<CreateTicketResult> => {
     try {
+      const authEmail = context.userEmail;
       const { user, ticket } = data;
 
       // Import label type IDs dynamically to avoid issues with env vars
@@ -665,9 +734,9 @@ export const createTicket = createServerFn({ method: "POST" })
         question: "General question",
       };
 
-      // Get or create customer
+      // Get or create customer using the authenticated email
       const existingCustomer = await plainClient.getCustomerByEmail({
-        email: user.email,
+        email: authEmail,
       });
 
       let customerId = existingCustomer.data?.id;
@@ -675,13 +744,13 @@ export const createTicket = createServerFn({ method: "POST" })
       if (!customerId) {
         const upsertedCustomer = await plainClient.upsertCustomer({
           identifier: {
-            emailAddress: user.email,
+            emailAddress: authEmail,
           },
           onCreate: {
             externalId: user.id,
-            fullName: user.name || user.email,
+            fullName: user.name || authEmail,
             email: {
-              email: user.email,
+              email: authEmail,
               isVerified: true,
             },
           },
@@ -689,7 +758,7 @@ export const createTicket = createServerFn({ method: "POST" })
             externalId: { value: user.id },
             fullName: user.name ? { value: user.name } : undefined,
             email: {
-              email: user.email,
+              email: authEmail,
               isVerified: true,
             },
           },
@@ -711,6 +780,7 @@ export const createTicket = createServerFn({ method: "POST" })
         customerIdentifier: { customerId: string };
         labelTypeIds?: Array<string>;
         priority?: number;
+        attachmentIds?: Array<string>;
       } = {
         title: ticketTypeTitles[ticket.type] || "Support request",
         components: [
@@ -738,8 +808,22 @@ export const createTicket = createServerFn({ method: "POST" })
           threadInput.priority = severity;
         }
       }
+      if (ticket.attachmentIds && ticket.attachmentIds.length > 0) {
+        threadInput.attachmentIds = ticket.attachmentIds;
+      }
 
-      const threadRes = await plainClient.createThread(threadInput);
+      let threadRes = await plainClient.createThread(threadInput);
+
+      // Some environments can have stale/invalid label IDs. Retry once without
+      // labels so ticket creation still succeeds.
+      if (
+        threadRes.error &&
+        threadInput.labelTypeIds &&
+        hasMissingLabelTypeError(threadRes.error)
+      ) {
+        delete threadInput.labelTypeIds;
+        threadRes = await plainClient.createThread(threadInput);
+      }
 
       if (threadRes.error) {
         console.error(
@@ -795,10 +879,10 @@ type CustomerWithCompanyResponse = {
 };
 
 export const getCustomerTierByEmail = createServerFn({ method: "GET" })
-  .inputValidator((data: { email: string }) => data)
-  .handler(async ({ data }): Promise<CustomerTierInfo> => {
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<CustomerTierInfo> => {
     try {
-      const { email } = data;
+      const email = context.userEmail;
 
       const res = (await plainClient.rawRequest({
         query: `
@@ -877,12 +961,365 @@ export const getCustomerTierByEmail = createServerFn({ method: "GET" })
     }
   });
 
+// Close ticket (mark thread as done)
+export type CloseTicketResult = {
+  success: boolean;
+  error?: string;
+};
+
+export const closeTicket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator((data: { threadId: string }) => data)
+  .handler(async ({ data, context }): Promise<CloseTicketResult> => {
+    try {
+      const authEmail = context.userEmail;
+      const { threadId } = data;
+
+      // Get the thread to verify ownership and find customer ID for the note
+      const threadRes = (await plainClient.rawRequest({
+        query: `
+          query GetThreadCustomer($threadId: ID!) {
+            thread(threadId: $threadId) {
+              customer {
+                id
+                email {
+                  email
+                }
+              }
+            }
+          }
+        `,
+        variables: { threadId },
+      })) as {
+        data?: {
+          thread: { customer: { id: string; email: { email: string } } };
+        };
+        error?: PlainSDKError;
+      };
+
+      if (threadRes.error || !threadRes.data) {
+        console.error("Error fetching thread for note:", threadRes.error);
+        return {
+          success: false,
+          error: "Failed to fetch ticket details",
+        };
+      }
+
+      // Verify the authenticated user owns this thread
+      if (
+        threadRes.data.thread.customer.email.email.toLowerCase() !==
+        authEmail.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: "Not authorized to close this ticket",
+        };
+      }
+
+      const customerId = threadRes.data.thread.customer.id;
+
+      // Add a note to the thread before closing
+      const noteRes = (await plainClient.rawRequest({
+        query: `
+          mutation CreateNote($input: CreateNoteInput!) {
+            createNote(input: $input) {
+              note {
+                id
+              }
+              error {
+                message
+                type
+                code
+              }
+            }
+          }
+        `,
+        variables: {
+          input: {
+            threadId,
+            customerId,
+            text: "User closed the ticket",
+            markdown: "User closed the ticket",
+          },
+        },
+      })) as {
+        data?: {
+          createNote: {
+            note: { id: string } | null;
+            error: { message: string } | null;
+          };
+        };
+        error?: PlainSDKError;
+      };
+
+      if (noteRes.error) {
+        console.error("Error adding close note:", noteRes.error);
+        // Continue to close even if note fails — closing is the primary action
+      } else if (noteRes.data?.createNote.error) {
+        console.error(
+          "Error adding close note:",
+          noteRes.data.createNote.error,
+        );
+      }
+
+      // Mark the thread as done
+      const res = await plainClient.markThreadAsDone({ threadId });
+
+      if (res.error) {
+        console.error("Error closing ticket:", res.error);
+        return {
+          success: false,
+          error: res.error.message,
+        };
+      }
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error("Error closing ticket:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to close ticket",
+      };
+    }
+  });
+
+// --- Attachment upload ---
+
+// Allowed MIME types for attachment uploads
+const ALLOWED_MIME_TYPES = new Set([
+  // Images
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "image/bmp",
+  "image/tiff",
+  // Documents
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "text/markdown",
+  "application/rtf",
+  // Microsoft Office
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Archives
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/gzip",
+  // Video
+  "video/quicktime",
+]);
+
+// Blocked file extensions (double-check even if MIME looks safe)
+const BLOCKED_EXTENSIONS = new Set([
+  ".exe",
+  ".bat",
+  ".cmd",
+  ".com",
+  ".msi",
+  ".scr",
+  ".pif",
+  ".ps1",
+  ".vbs",
+  ".vbe",
+  ".js",
+  ".jse",
+  ".ws",
+  ".wsf",
+  ".wsc",
+  ".wsh",
+  ".sh",
+  ".bash",
+  ".csh",
+  ".ksh",
+  ".dll",
+  ".sys",
+  ".drv",
+  ".app",
+  ".dmg",
+  ".pkg",
+  ".deb",
+  ".rpm",
+  ".iso",
+  ".jar",
+  ".class",
+  ".php",
+  ".py",
+  ".rb",
+  ".pl",
+  ".cgi",
+  ".asp",
+  ".aspx",
+  ".reg",
+  ".inf",
+  ".lnk",
+  ".hta",
+  ".htm",
+  ".html",
+  ".svg", // allow svg via MIME but block raw .svg extension spoofing
+]);
+
+export const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_ATTACHMENTS = 5;
+
+/**
+ * Validates a file name and MIME type against the allow/block lists.
+ * Returns an error message if invalid, or null if valid.
+ */
+export function validateAttachment(
+  fileName: string,
+  mimeType: string,
+  fileSizeBytes: number,
+): string | null {
+  // Check file size
+  if (fileSizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+    return `File "${fileName}" exceeds the maximum size of 10 MB.`;
+  }
+
+  // Allow empty MIME (some browsers don't report it) and rely on extension check
+  if (mimeType && !ALLOWED_MIME_TYPES.has(mimeType)) {
+    return `File type "${mimeType}" is not allowed. Please upload a common document or image file.`;
+  }
+
+  // Check extension against blocklist
+  const ext =
+    fileName.lastIndexOf(".") !== -1
+      ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase()
+      : "";
+  if (ext && BLOCKED_EXTENSIONS.has(ext)) {
+    return `File extension "${ext}" is not allowed for security reasons.`;
+  }
+
+  return null;
+}
+
+// Accept string for the file input element
+export const ACCEPTED_FILE_TYPES = [
+  ".pdf",
+  ".txt",
+  ".csv",
+  ".md",
+  ".rtf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".zip",
+  ".gz",
+  ".mov",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".tiff",
+].join(",");
+
+export type AttachmentUploadUrlResult = {
+  success: boolean;
+  uploadFormUrl?: string;
+  uploadFormData?: Array<{ key: string; value: string }>;
+  attachmentId?: string;
+  error?: string;
+};
+
+export type AttachmentUploadContext = "emailEntry" | "customEntry";
+
+export const getUploadUrl = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(
+    (data: {
+      fileName: string;
+      fileSizeBytes: number;
+      context?: AttachmentUploadContext;
+    }) => data,
+  )
+  .handler(async ({ data, context }): Promise<AttachmentUploadUrlResult> => {
+    try {
+      const userEmail = context.userEmail;
+      const { fileName, fileSizeBytes } = data;
+      const uploadContext = data.context || "emailEntry";
+
+      // Server-side validation
+      // We use a generic MIME check based on extension since we don't have the real MIME here
+      const ext =
+        fileName.lastIndexOf(".") !== -1
+          ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase()
+          : "";
+      if (ext && BLOCKED_EXTENSIONS.has(ext)) {
+        return {
+          success: false,
+          error: `File extension "${ext}" is not allowed for security reasons.`,
+        };
+      }
+      if (fileSizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+        return {
+          success: false,
+          error: `File exceeds the maximum size of 10 MB.`,
+        };
+      }
+
+      // Get customer ID
+      const customer = await plainClient.getCustomerByEmail({
+        email: userEmail,
+      });
+      if (customer.error || !customer.data) {
+        return { success: false, error: "Could not find customer account." };
+      }
+
+      const attachmentType =
+        uploadContext === "customEntry"
+          ? AttachmentType.CustomTimelineEntry
+          : AttachmentType.Email;
+
+      const res = await plainClient.createAttachmentUploadUrl({
+        customerId: customer.data.id,
+        fileName,
+        fileSizeBytes,
+        attachmentType,
+      });
+
+      if (res.error) {
+        console.error("Error creating attachment upload URL:", res.error);
+        return { success: false, error: res.error.message };
+      }
+
+      return {
+        success: true,
+        uploadFormUrl: res.data.uploadFormUrl,
+        uploadFormData: res.data.uploadFormData,
+        attachmentId: res.data.attachment.id,
+      };
+    } catch (error) {
+      console.error("Error getting attachment upload URL:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to get upload URL",
+      };
+    }
+  });
+
 // Reply to thread types
 export type ReplyToThreadInput = {
   threadId: string;
   message: string;
-  /** The user's email address - used to impersonate the customer in Plain */
-  userEmail: string;
+  /** @deprecated No longer used - email is derived from authenticated session */
+  userEmail?: string;
+  /** Optional attachment IDs to include with the reply */
+  attachmentIds?: string[];
 };
 
 export type ReplyToThreadResult = {
@@ -891,17 +1328,52 @@ export type ReplyToThreadResult = {
 };
 
 export const replyToThread = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator((data: ReplyToThreadInput) => data)
-  .handler(async ({ data }): Promise<ReplyToThreadResult> => {
+  .handler(async ({ data, context }): Promise<ReplyToThreadResult> => {
     try {
-      const { threadId, message, userEmail } = data;
+      const { threadId, message, attachmentIds } = data;
+      const userEmail = context.userEmail;
 
-      // Build input with customer impersonation so the reply appears from the customer
+      // Verify the user owns this thread before allowing a reply
+      const threadRes = (await plainClient.rawRequest({
+        query: `
+          query GetThreadCustomer($threadId: ID!) {
+            thread(threadId: $threadId) {
+              customer {
+                email {
+                  email
+                }
+              }
+            }
+          }
+        `,
+        variables: { threadId },
+      })) as unknown as Result<
+        { thread: { customer: { email: { email: string } } } },
+        PlainSDKError
+      >;
+
+      if (threadRes.error) {
+        return { success: false, error: "Failed to verify thread ownership" };
+      }
+
+      if (
+        threadRes.data.thread.customer.email.email.toLowerCase() !==
+        userEmail.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: "Not authorized to reply to this thread",
+        };
+      }
+
       const input: {
         threadId: string;
         textContent: string;
         markdownContent: string;
-        impersonation?: {
+        attachmentIds?: string[];
+        impersonation: {
           asCustomer: {
             customerIdentifier: {
               emailAddress: string;
@@ -912,17 +1384,16 @@ export const replyToThread = createServerFn({ method: "POST" })
         threadId,
         textContent: message,
         markdownContent: message,
-      };
-
-      // Use impersonation to make the reply appear as from the customer
-      if (userEmail) {
-        input.impersonation = {
+        impersonation: {
           asCustomer: {
             customerIdentifier: {
               emailAddress: userEmail,
             },
           },
-        };
+        },
+      };
+      if (attachmentIds && attachmentIds.length > 0) {
+        input.attachmentIds = attachmentIds;
       }
 
       const res = (await plainClient.rawRequest({

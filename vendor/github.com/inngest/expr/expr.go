@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cockroachdb/pebble/vfs"
+	"github.com/cockroachdb/pebble/v2/vfs"
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/uuid"
 )
@@ -170,7 +170,11 @@ func NewAggregateEvaluator[T Evaluable](
 
 				return reflect.ValueOf(val).Elem().Interface().(T), err
 			},
-			FS: vfs.NewMem(),
+			// No FS specified: use in-memory storage with reduced settings since
+			// a block cache and bloom filters are pointless without disk reads.
+			FS:                 vfs.NewMem(),
+			BlockCacheSize:     8 << 20,
+			DisableBloomFilter: true,
 		}
 		// Attempt to unmarshal an empty byte slice, ensuring that we have
 		// a concrete type instead of an interface.
@@ -188,12 +192,14 @@ func NewAggregateEvaluator[T Evaluable](
 		eval:   opts.Eval,
 		parser: opts.Parser,
 		engines: map[EngineType]MatchingEngine{
-			EngineTypeStringHash: newStringEqualityMatcher(),
-			EngineTypeNullMatch:  newNullMatcher(),
-			EngineTypeBTree:      newNumberMatcher(),
+			EngineTypeStringHash:  newStringEqualityMatcher(),
+			EngineTypeNullMatch:   newNullMatcher(),
+			EngineTypeBTree:       newNumberMatcher(),
+			EngineTypeStringBTree: newStringBTreeMatcher(),
 		},
 		lock:            &sync.RWMutex{},
 		constants:       map[uuid.UUID]struct{}{},
+		alwaysTrue:      map[uuid.UUID]struct{}{},
 		mixed:           map[uuid.UUID]struct{}{},
 		stopGC:          make(chan struct{}),
 		concurrency:     opts.Concurrency,
@@ -239,6 +245,10 @@ type aggregator[T Evaluable] struct {
 	// the expression containing non-aggregateable clauses.
 	constants map[uuid.UUID]struct{}
 
+	// alwaysTrue tracks evaluable IDs whose expression is a constant true literal,
+	// meaning they always match without requiring CEL evaluation.
+	alwaysTrue map[uuid.UUID]struct{}
+
 	// deleted tracks evaluable IDs that have been soft-deleted.
 	// Remove operations mark items here instead of actually removing them,
 	// avoiding lock contention during evaluation.
@@ -261,7 +271,7 @@ type aggregator[T Evaluable] struct {
 func (a *aggregator[T]) Len() int {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	return int(atomic.LoadInt32(&a.fastLen)) + len(a.mixed) + len(a.constants)
+	return int(atomic.LoadInt32(&a.fastLen)) + len(a.mixed) + len(a.constants) + len(a.alwaysTrue)
 }
 
 // FastLen returns the number of expressions being matched by aggregated trees.
@@ -308,6 +318,22 @@ func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T,
 	napool := newErrPool(errPoolOpts{concurrency: a.concurrency})
 
 	a.lock.RLock()
+
+	// Always-true expressions match without CEL evaluation.
+	for uuid := range a.alwaysTrue {
+		if _, deleted := a.deleted.Load(uuid); deleted {
+			continue
+		}
+		item, err := a.kv.Get(uuid)
+		if err != nil {
+			continue
+		}
+		atomic.AddInt32(&matched, 1)
+		s.Lock()
+		result = append(result, item)
+		s.Unlock()
+	}
+
 	for uuid := range a.constants {
 		// Skip deleted items
 		if _, deleted := a.deleted.Load(uuid); deleted {
@@ -488,8 +514,27 @@ func (a *aggregator[T]) Add(ctx context.Context, eval T) (float64, error) {
 		return -1, err
 	}
 
+	// deduplicate evaluables, as engines do not expect duplicates and will cause false positives
+	if _, err := a.kv.Get(parsed.EvaluableID); err == nil {
+		return 0, nil
+	}
+
 	if err := a.kv.Set(eval); err != nil {
 		return -1, err
+	}
+
+	if parsed.LiteralBool != nil {
+		if !*parsed.LiteralBool {
+			// This is a constant false expression which never matches.
+			// Skip adding it entirely to avoid unnecessary evaluation.
+			return -1, nil
+		}
+		// This is a constant true expression which always matches.
+		// Add it to the always-true list for fast evaluation without CEL.
+		a.lock.Lock()
+		a.alwaysTrue[parsed.EvaluableID] = struct{}{}
+		a.lock.Unlock()
+		return -1, nil
 	}
 
 	if eval.GetExpression() == "" || parsed.HasMacros {
@@ -659,7 +704,7 @@ func (a *aggregator[T]) GC(ctx context.Context) bool {
 	parseDuration := time.Since(parseStart)
 
 	// Remove null and number engine parts first (small and fast, no timeout needed)
-	for _, et := range []EngineType{EngineTypeNullMatch, EngineTypeBTree} {
+	for _, et := range []EngineType{EngineTypeNullMatch, EngineTypeBTree, EngineTypeStringBTree} {
 		if parts := partsByEngine[et]; len(parts) > 0 {
 			if engine, ok := a.engines[et]; ok {
 				count, err := engine.Remove(context.Background(), parts)
@@ -739,6 +784,7 @@ func (a *aggregator[T]) GC(ctx context.Context) bool {
 		a.lock.Lock()
 		for _, id := range constantsToDelete {
 			delete(a.constants, id)
+			delete(a.alwaysTrue, id)
 		}
 		for _, id := range mixedToDelete {
 			delete(a.mixed, id)
@@ -962,8 +1008,11 @@ func engineType(p Predicate) EngineType {
 		// NOTE: operators.In acts as operators.Equals, but iterates over the given
 		// array to check each item.
 		if p.Operator == operators.In || p.Operator == operators.Equals || p.Operator == operators.NotEquals {
-			// StringHash is only used for matching on in/equality.
 			return EngineTypeStringHash
+		}
+		if p.Operator == operators.Greater || p.Operator == operators.GreaterEquals ||
+			p.Operator == operators.Less || p.Operator == operators.LessEquals {
+			return EngineTypeStringBTree
 		}
 	case nil:
 		// Only allow this if we're not comparing two idents.each element of the array and

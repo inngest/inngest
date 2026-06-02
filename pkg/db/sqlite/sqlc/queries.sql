@@ -1,0 +1,683 @@
+-- name: UpsertApp :one
+-- Placeholder-friendly upsert: keyed by id. The placeholder paths (-u
+-- startup, autodiscovery, UI add-by-URL) intentionally upsert with name=''
+-- to set/clear errors on a URL-derived id; they must not erase a real app's
+-- name when re-pinging the same id, so the name update is conditional.
+-- For the SDK /fn/register flow, use UpsertAppByName instead - it adopts an
+-- existing active row keyed by name regardless of how its id was minted.
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    name = CASE WHEN excluded.name = '' THEN apps.name ELSE excluded.name END,
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    archived_at = NULL,
+    "method" = excluded.method,
+    app_version = excluded.app_version,
+    url = excluded.url
+RETURNING *;
+
+-- name: UpsertAppByName :one
+-- For SDK /fn/register: the partial unique index apps_name_unique_key on
+-- (name) WHERE name <> '' is the conflict target. The predicate omits
+-- archived_at so a conflicting archived row is found by the arbiter; the
+-- DO UPDATE clears archived_at, so an SDK re-sync under the same name
+-- revives a previously-archived app in place. The existing row's id is
+-- preserved on conflict, so v1.13.x legacy rows keyed by sha1(URL) are
+-- adopted by name when an SDK re-syncs under v1.15+ (which derives ids
+-- from name) - no Go-side lookup required.
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (name) WHERE name <> '' DO UPDATE SET
+    sdk_language = excluded.sdk_language,
+    sdk_version = excluded.sdk_version,
+    framework = excluded.framework,
+    metadata = excluded.metadata,
+    status = excluded.status,
+    error = excluded.error,
+    checksum = excluded.checksum,
+    archived_at = NULL,
+    "method" = excluded.method,
+    app_version = excluded.app_version,
+    url = excluded.url
+RETURNING *;
+
+-- name: GetApp :one
+SELECT * FROM apps WHERE id = ?;
+
+-- name: GetApps :many
+SELECT * FROM apps WHERE archived_at IS NULL;
+
+-- name: GetAppByChecksum :one
+SELECT * FROM apps WHERE checksum = ? AND archived_at IS NULL LIMIT 1;
+
+-- name: GetAppByID :one
+SELECT * FROM apps WHERE id = ? LIMIT 1;
+
+-- name: GetAppByURL :one
+SELECT * FROM apps WHERE url = ? AND archived_at IS NULL LIMIT 1;
+
+-- name: GetAppByName :one
+SELECT * FROM apps WHERE name = ? AND archived_at IS NULL LIMIT 1;
+
+-- name: GetAllApps :many
+SELECT * FROM apps WHERE archived_at IS NULL;
+
+-- name: DeleteApp :exec
+UPDATE apps SET archived_at = datetime('now') WHERE id = ?;
+
+-- name: UpdateAppURL :one
+UPDATE apps SET url = ? WHERE id = ? RETURNING *;
+
+-- name: UpdateAppError :one
+UPDATE apps SET error = ? WHERE id = ? RETURNING *;
+
+
+--
+-- functions
+--
+
+
+-- note - this is very basic right now.
+-- name: UpsertFunction :one
+INSERT INTO functions
+	(id, app_id, name, slug, config, created_at) VALUES
+	(?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET
+	app_id = excluded.app_id,
+	name = excluded.name,
+	slug = excluded.slug,
+	config = excluded.config,
+	archived_at = NULL
+RETURNING *;
+
+-- name: GetFunctions :many
+SELECT functions.*
+FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE functions.archived_at IS NULL
+AND apps.archived_at IS NULL;
+
+-- name: GetAppFunctions :many
+SELECT * FROM functions WHERE app_id = ? AND archived_at IS NULL;
+
+-- name: GetAppFunctionsBySlug :many
+SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.archived_at IS NULL;
+
+-- name: GetFunctionByID :one
+SELECT * FROM functions WHERE id = ?;
+
+-- name: GetFunctionBySlug :one
+SELECT * FROM functions WHERE slug = ? AND archived_at IS NULL;
+
+-- name: GetFunctionByAppNameAndSlug :one
+-- Look up a function by the app's user-facing name, not its internal UUID.
+-- The dev server derives app UUIDs from different inputs at different sites
+-- (URL for placeholders, name post-sync), so a UUID-keyed lookup can miss the
+-- row even when the function exists. Joining on apps.name routes through the
+-- one identifier that's stable across both paths.
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = ?
+  AND functions.slug = ?
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL;
+
+-- name: UpdateFunctionConfig :one
+UPDATE functions SET config = ?, archived_at = NULL WHERE id = ? RETURNING *;
+
+-- name: DeleteFunctionsByAppID :exec
+UPDATE functions SET archived_at = datetime('now') WHERE app_id = ?;
+
+-- name: DeleteFunctionsByIDs :exec
+UPDATE functions SET archived_at = datetime('now') WHERE id IN (sqlc.slice('ids'));
+
+--
+-- function runs
+--
+
+-- name: InsertFunctionRun :exec
+INSERT INTO function_runs
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron, workspace_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: InsertFunctionFinish :exec
+INSERT INTO function_finishes
+	(run_id, status, output, completed_step_count, created_at) VALUES
+	(?, ?, ?, ?, ?);
+
+-- name: GetFunctionRun :one
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes)
+  FROM function_runs
+  LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+  WHERE function_runs.run_id = @run_id;
+
+-- name: GetFunctionRuns :many
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id;
+
+-- name: GetFunctionRunsTimebound :many
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE function_runs.run_started_at > @after AND function_runs.run_started_at <= @before
+ORDER BY function_runs.run_started_at DESC
+LIMIT ?;
+
+-- name: GetFunctionRunsFromEvents :many
+SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
+LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
+WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
+
+-- name: GetFunctionRunFinishesByRunIDs :many
+SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
+
+--
+-- Events
+--
+
+-- name: InsertEvent :exec
+INSERT INTO events
+	(internal_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: InsertEventBatch :exec
+INSERT INTO event_batches
+	(id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetEventByInternalID :one
+SELECT * FROM events WHERE internal_id = ?;
+
+-- name: GetEventsByInternalIDs :many
+SELECT * FROM events WHERE internal_id IN (sqlc.slice('ids'));
+
+-- name: GetEventBatchByRunID :one
+SELECT * FROM event_batches WHERE run_id = ?;
+
+-- name: GetEventBatchesByEventID :many
+SELECT * FROM event_batches WHERE INSTR(CAST(event_ids AS TEXT), ?) > 0;
+
+-- name: GetEventsIDbound :many
+SELECT DISTINCT e.*
+FROM events AS e
+LEFT OUTER JOIN function_runs AS r ON r.event_id = e.internal_id
+WHERE
+	e.internal_id > @after
+	AND e.internal_id < @before
+	AND (
+		-- Include internal events that triggered a run (e.g. an onFailure
+		-- handler)
+		r.run_id IS NOT NULL
+
+		-- Optionally include internal events that did not trigger a run. It'd
+		-- be better to use a boolean param instead of a string param but sqlc
+		-- keeps making @include_internal a string.
+		OR CASE WHEN e.event_name LIKE 'inngest/%' THEN 'true' ELSE 'false' END = @include_internal
+	)
+ORDER BY e.internal_id DESC
+LIMIT ?;
+
+
+--
+-- History
+--
+
+-- name: InsertHistory :exec
+INSERT INTO history
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetHistoryItem :one
+SELECT * FROM history WHERE id = ?;
+
+-- name: GetFunctionRunHistory :many
+SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;
+
+-- name: HistoryCountRuns :one
+SELECT COUNT(DISTINCT run_id) FROM history;
+
+
+--
+-- Traces
+--
+
+-- name: InsertTrace :exec
+INSERT INTO traces
+	(timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id)
+VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: InsertTraceRun :exec
+INSERT INTO trace_runs (
+    run_id, account_id, workspace_id, app_id, function_id, trace_id,
+    queued_at, started_at, ended_at, status, source_id, trigger_ids,
+    output, batch_id, is_debounce, cron_schedule, has_ai
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(run_id)
+DO UPDATE SET
+    account_id = excluded.account_id,
+    workspace_id = excluded.workspace_id,
+    app_id = excluded.app_id,
+    function_id = excluded.function_id,
+    trace_id = excluded.trace_id,
+    queued_at = excluded.queued_at,
+    started_at = excluded.started_at,
+    ended_at = excluded.ended_at,
+    status = excluded.status,
+    source_id = excluded.source_id,
+    trigger_ids = excluded.trigger_ids,
+    output = excluded.output,
+    batch_id = excluded.batch_id,
+    is_debounce = excluded.is_debounce,
+    cron_schedule = excluded.cron_schedule,
+    has_ai = CASE
+                 WHEN trace_runs.has_ai = 1 THEN 1
+                 ELSE excluded.has_ai
+             END;
+
+-- name: GetTraceRun :one
+SELECT * FROM trace_runs WHERE run_id = @run_id;
+
+-- name: GetTraceSpans :many
+SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;
+
+-- name: GetTraceSpanOutput :many
+select * from traces where trace_id = @trace_id AND span_id = @span_id ORDER BY timestamp_unix_ms DESC, duration DESC;
+
+-- name: GetTraceRunsByTriggerId :many
+SELECT * FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), @event_id) > 0;
+
+
+--
+-- Queue snapshots
+--
+
+-- name: GetQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = ?
+ORDER BY chunk_id ASC;
+
+-- name: GetLatestQueueSnapshotChunks :many
+SELECT chunk_id, data
+FROM queue_snapshot_chunks
+WHERE snapshot_id = (
+    SELECT MAX(snapshot_id) FROM queue_snapshot_chunks
+)
+ORDER BY chunk_id ASC;
+
+-- name: InsertQueueSnapshotChunk :exec
+INSERT INTO queue_snapshot_chunks (snapshot_id, chunk_id, data)
+VALUES
+	(?, ?, ?);
+
+-- name: DeleteOldQueueSnapshots :execrows
+DELETE FROM queue_snapshot_chunks
+WHERE snapshot_id NOT IN (
+    SELECT snapshot_id
+    FROM queue_snapshot_chunks
+    ORDER BY snapshot_id DESC
+    LIMIT ?
+);
+
+--
+-- Worker Connections
+--
+
+-- name: InsertWorkerConnection :exec
+INSERT INTO worker_connections (
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, max_worker_concurrency, connected_at, last_heartbeat_at, disconnected_at,
+    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id, app_name)
+DO UPDATE SET
+    account_id = excluded.account_id,
+    workspace_id = excluded.workspace_id,
+
+    app_name = excluded.app_name,
+    app_id = excluded.app_id,
+
+    id = excluded.id,
+    gateway_id = excluded.gateway_id,
+    instance_id = excluded.instance_id,
+    status = excluded.status,
+    worker_ip = excluded.worker_ip,
+    max_worker_concurrency = excluded.max_worker_concurrency,
+
+    connected_at = excluded.connected_at,
+    last_heartbeat_at = excluded.last_heartbeat_at,
+    disconnected_at = excluded.disconnected_at,
+    recorded_at = excluded.recorded_at,
+    inserted_at = excluded.inserted_at,
+
+    disconnect_reason = excluded.disconnect_reason,
+
+    group_hash = excluded.group_hash,
+    sdk_lang = excluded.sdk_lang,
+    sdk_version = excluded.sdk_version,
+    sdk_platform = excluded.sdk_platform,
+    sync_id = excluded.sync_id,
+    app_version = excluded.app_version,
+    function_count = excluded.function_count,
+
+    cpu_cores = excluded.cpu_cores,
+    mem_bytes = excluded.mem_bytes,
+    os = excluded.os
+;
+
+-- name: GetWorkerConnection :one
+SELECT * FROM worker_connections WHERE account_id = @account_id AND workspace_id = @workspace_id AND id = @connection_id;
+
+-- New
+
+-- name: InsertSpan :exec
+INSERT INTO spans (
+  span_id,
+  trace_id,
+  parent_span_id,
+  name,
+  start_time,
+  end_time,
+  run_id,
+  account_id,
+  app_id,
+  function_id,
+  env_id,
+  dynamic_span_id,
+  attributes,
+  links,
+  output,
+  input,
+  debug_run_id,
+  debug_session_id,
+  status,
+  event_ids,
+  is_deferred
+) VALUES (
+  sqlc.arg(span_id),
+  sqlc.arg(trace_id),
+  sqlc.narg(parent_span_id),
+  sqlc.arg(name),
+  sqlc.arg(start_time),
+  sqlc.arg(end_time),
+  sqlc.arg(run_id),
+  sqlc.arg(account_id),
+  sqlc.arg(app_id),
+  sqlc.arg(function_id),
+  sqlc.arg(env_id),
+  sqlc.narg(dynamic_span_id),
+  CAST(sqlc.narg(attributes) AS TEXT),
+  CAST(sqlc.narg(links) AS TEXT),
+  CAST(sqlc.narg(output) AS TEXT),
+  CAST(sqlc.narg(input) AS TEXT),
+  sqlc.narg(debug_run_id),
+  sqlc.narg(debug_session_id),
+  sqlc.narg(status),
+  CAST(sqlc.narg(event_ids) AS TEXT),
+  sqlc.narg(is_deferred)
+);
+
+-- name: GetSpansByRunID :many
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ?
+GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
+ORDER BY start_time;
+
+-- name: GetSpansByDebugRunID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_session_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_run_id = ?
+GROUP BY trace_id, run_id, debug_session_id, dynamic_span_id, parent_span_id
+ORDER BY start_time;
+
+-- name: GetSpansByDebugSessionID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_run_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_session_id = ?
+GROUP BY trace_id, run_id, debug_run_id, dynamic_span_id, parent_span_id
+ORDER BY start_time;
+
+-- name: GetSpanOutput :many
+SELECT
+  COALESCE(CAST(input AS TEXT), '') AS input,
+  COALESCE(CAST(output AS TEXT), '') AS output
+FROM spans
+WHERE span_id IN (sqlc.slice('ids'))
+LIMIT 2;
+
+-- name: GetRunSpanByRunID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM(name = 'executor.run') > 0
+ORDER BY start_time ASC
+LIMIT 1;
+
+-- name: GetStepSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE span_id IN (
+  SELECT
+    parent_span_id
+  FROM spans execSpans
+  WHERE execSpans.run_id = sqlc.arg(run_id) AND execSpans.account_id = sqlc.arg(account_id) AND name != 'userland'
+  GROUP BY dynamic_span_id, parent_span_id
+  HAVING
+    SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+    AND
+    SUM(name = 'executor.execution') > 0
+  ORDER BY MIN(start_time)
+  LIMIT 1
+) AND name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM(name = 'executor.step.discovery') > 0
+UNION ALL
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = sqlc.arg(run_id) AND account_id = sqlc.arg(account_id) AND name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  AND
+  SUM(name = 'executor.step') > 0
+ORDER BY start_time ASC
+LIMIT 1;
+
+-- name: GetExecutionSpanByStepIDAndAttempt :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ? AND name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = CAST(sqlc.arg(step_attempt) AS INTEGER)) > 0
+  AND
+  SUM(name IN ('executor.step', 'executor.execution')) > 0
+ORDER BY start_time ASC
+LIMIT 1;
+
+-- name: GetLatestExecutionSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans b
+WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id) AND b.name != 'userland'
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  AND
+  SUM(name IN ('executor.step', 'executor.execution')) > 0
+ORDER BY start_time DESC
+LIMIT 1;
+
+-- name: GetSpanBySpanID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND span_id = ? AND account_id = ?
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+ORDER BY start_time ASC
+LIMIT 1;
+
+
+-- name: GetSpansByRunIDsAndName :many
+-- Returns spans by name with their current attribute values, merging in any
+-- updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+-- up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+-- carry the span name and would otherwise be filtered out.
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_group_array(json_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = ?
+  AND m.run_id IN (sqlc.slice('run_ids'))
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time;

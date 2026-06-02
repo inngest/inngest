@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -18,6 +18,7 @@ func TestRedirect(t *testing.T) {
 
 	ctx := context.Background()
 	r := require.New(t)
+	c := client.New(t)
 
 	_ = os.Setenv("INNGEST_DEV", DEV_URL)
 
@@ -41,7 +42,7 @@ func TestRedirect(t *testing.T) {
 	r.NoError(err)
 	inngestClient.SetURL(u)
 
-	var runID string
+	rid := NewRunID()
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -50,7 +51,7 @@ func TestRedirect(t *testing.T) {
 		},
 		inngestgo.EventTrigger("my-event", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			runID = input.InputCtx.RunID
+			rid.Send(input.InputCtx.RunID)
 			return nil, nil
 		},
 	)
@@ -72,13 +73,6 @@ func TestRedirect(t *testing.T) {
 	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
-	r.Eventually(func() bool {
-		// Redirected during execution
-		if redirectCounter != 2 {
-			return false
-		}
-
-		// Function ran
-		return runID != ""
-	}, 10*time.Second, 50*time.Millisecond)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", rid.Wait(t))
+	r.GreaterOrEqual(redirectCounter, 2)
 }

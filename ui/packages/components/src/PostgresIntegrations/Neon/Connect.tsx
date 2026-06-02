@@ -122,7 +122,8 @@ export default function Connect({
         setError(error || 'Connection error.');
       }
     } catch (err) {
-      setError('An error occurred while connecting. Please try again.');
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(`An error occurred while connecting: ${message}`);
     } finally {
       setIsVerifying(false);
     }

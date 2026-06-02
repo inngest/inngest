@@ -10,9 +10,9 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal"
-	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/opcode"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
+	"github.com/inngest/inngestgo/middleware"
 	"github.com/inngest/inngestgo/pkg/interval"
 )
 

@@ -10,13 +10,16 @@
 
 import { memo, useMemo, useState, type CSSProperties } from 'react';
 import {
+  RiArrowRightFill,
   RiArrowRightLine,
   RiArrowRightSFill,
   RiBuilding2Line,
   RiCheckboxCircleFill,
   RiCloseCircleFill,
   RiFlashlightLine,
+  RiFlaskLine,
   RiFunctionLine,
+  RiInformationLine,
   RiMailLine,
   RiSettings3Line,
   RiStopCircleFill,
@@ -24,8 +27,11 @@ import {
 } from '@remixicon/react';
 import { format } from 'date-fns';
 
+import { formatVariantWeight } from '../Experiments/format';
+import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
-import { Tooltip, TooltipArrow, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
 import type {
   BarHeight,
@@ -35,6 +41,7 @@ import type {
   BarStyle,
   BarStyleKey,
   TimelineBarProps,
+  TimingDetail,
 } from './TimelineBar.types';
 import { formatDuration } from './runDetailsUtils';
 import { formatLabel } from './utils/formatting';
@@ -48,9 +55,10 @@ import { TIMELINE_CONSTANTS } from './utils/timing';
  * Consolidated style configurations for all bar types.
  * Each entry contains visual style, status-based coloring flag, icon, height, and pattern.
  */
-const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
+export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   root: {
     barColor: 'bg-status-completed',
+    barHeight: 'short',
     statusBased: true,
   },
   'step.run': {
@@ -58,18 +66,50 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     statusBased: true,
   },
   'step.sleep': {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
   },
   'step.waitForEvent': {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
   },
   'step.invoke': {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
   },
   'timing.inngest': {
-    barColor: 'bg-slate-300',
-    barHeight: 'tall',
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
     durationColor: 'text-basis',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.queue': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.concurrency': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.discovery': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    outlined: true,
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
+  'timing.inngest.finalization': {
+    barColor: 'bg-surfaceMuted',
+    barHeight: 'short',
+    outlined: true,
     labelFormat: 'default',
     textColor: 'text-light',
   },
@@ -83,44 +123,50 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     textColor: 'text-light',
   },
   'timing.connecting': {
-    barColor: 'bg-transparent',
+    barColor: 'bg-status-completed',
     pattern: 'dotted',
     labelFormat: 'uppercase',
-    barHeight: 'short',
+    barHeight: 'thin',
+    statusBased: true,
   },
   // HTTP timing phases (children of SERVER bar)
   'timing.http.dns': {
-    barColor: 'bg-sky-400',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.tcp': {
-    barColor: 'bg-cyan-400',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.tls': {
-    barColor: 'bg-teal-400',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.server': {
-    barColor: 'bg-emerald-400',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'tall',
+    pattern: 'barber-pole',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   'timing.http.transfer': {
-    barColor: 'bg-green-400',
-    barHeight: 'short',
+    barColor: 'bg-status-completed',
+    barHeight: 'thin',
+    pattern: 'dotted',
     labelFormat: 'uppercase',
     statusBased: true,
   },
   default: {
-    barColor: 'bg-slate-400',
+    barColor: 'bg-surfaceMuted',
     statusBased: true,
   },
 };
@@ -129,7 +175,7 @@ const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
  * CSS pattern definitions for bar fills.
  * Barber-pole uses semi-transparent white stripes to work on any background color.
  */
-const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
+export const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
   solid: {},
   'barber-pole': {
     backgroundImage: `repeating-linear-gradient(
@@ -140,9 +186,37 @@ const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
       rgba(255, 255, 255, 0.15) 8px
     )`,
   },
+  'vertical-lines': {
+    WebkitMaskImage: `repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      black 3px,
+      black 5px
+    )`,
+    maskImage: `repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      black 3px,
+      black 5px
+    )`,
+  },
   dotted: {
-    border: '2px dotted rgb(var(--color-primary-subtle))',
-    borderRadius: '2px',
+    WebkitMaskImage: `repeating-linear-gradient(
+      90deg,
+      black 0px,
+      black 3px,
+      transparent 3px,
+      transparent 7px
+    )`,
+    maskImage: `repeating-linear-gradient(
+      90deg,
+      black 0px,
+      black 3px,
+      transparent 3px,
+      transparent 7px
+    )`,
   },
 };
 
@@ -151,7 +225,7 @@ const BAR_PATTERNS: Record<BarPattern, CSSProperties> = {
  * Falls back to 'default' if the key is not found.
  */
 function getBarStyle(styleKey: BarStyleKey): BarStyle {
-  return BAR_STYLES[styleKey] ?? BAR_STYLES.default;
+  return BAR_STYLES[styleKey];
 }
 
 /**
@@ -246,6 +320,7 @@ const ICON_MAP: Record<BarIcon, React.ComponentType<{ className?: string }>> = {
   checkbox: RiCheckboxCircleFill,
   'close-circle': RiCloseCircleFill,
   'stop-circle': RiStopCircleFill,
+  experiment: RiFlaskLine,
   none: () => null,
 };
 
@@ -307,50 +382,77 @@ function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?
 }
 
 /**
- * Tooltip content for a timeline bar, showing duration/delay and start/end timestamps.
+ * Hover card content for a timeline bar, showing duration/delay and start/end timestamps.
  */
-function BarTooltipContent({
+function BarHoverCardContent({
   name,
   startTime,
   endTime,
   delayMs,
+  timingDetails,
+  styleLabel,
 }: {
   name: string;
   startTime: Date;
   endTime: Date | null;
   delayMs?: number;
+  timingDetails?: TimingDetail[];
+  styleLabel?: string;
 }) {
   const startTimestamp = format(startTime, 'yyyy-MM-dd HH:mm:ss.SSS');
   const endTimestamp = endTime ? format(endTime, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
 
   const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
+  const hasDetails = timingDetails && timingDetails.length > 0;
 
   return (
     <div className="whitespace-nowrap px-1 py-0.5 text-xs">
       <p className="text-basis mb-1.5 font-medium">{name}</p>
+      {styleLabel && <p className="text-light mb-1.5 font-mono text-[11px]">{styleLabel}</p>}
       <div className="flex flex-col gap-1">
-        <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
+        <div
+          className={cn(
+            'flex flex-col gap-1',
+            (hasDetails || delayMs != null) && 'border-subtle border-b pb-1.5'
+          )}
+        >
           <div className="flex justify-between gap-6">
-            <span className="text-light font-medium">Duration</span>
+            <span className="text-light font-mono uppercase">Duration</span>
             <span className="text-basis tabular-nums">
               {durationMs > 0 ? formatDuration(durationMs) : '-'}
             </span>
           </div>
           {delayMs != null && (
             <div className="flex justify-between gap-6">
-              <span className="text-light font-medium">Delay</span>
+              <span className="text-light font-mono uppercase">Delay</span>
               <span className="text-basis tabular-nums">
                 {delayMs > 0 ? formatDuration(delayMs) : '-'}
               </span>
             </div>
           )}
         </div>
-        <div className="mt-0.5 flex justify-between gap-6">
-          <span className="text-light font-medium">Start</span>
+
+        {hasDetails && (
+          <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
+            {timingDetails.map((detail) => (
+              <div key={detail.label} className="flex justify-between gap-6">
+                <span className="text-light font-mono uppercase">{detail.label}</span>
+                <span className="text-basis tabular-nums">
+                  {detail.durationMs > 0 ? formatDuration(detail.durationMs) : '-'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div
+          className={cn(!hasDetails && delayMs == null && 'mt-0.5', 'flex justify-between gap-6')}
+        >
+          <span className="text-light font-mono uppercase">Start</span>
           <span className="text-basis tabular-nums">{startTimestamp}</span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-light font-medium">End</span>
+          <span className="text-light font-mono uppercase">End</span>
           {endTimestamp !== null ? (
             <span className="text-basis tabular-nums">{endTimestamp}</span>
           ) : (
@@ -362,7 +464,126 @@ function BarTooltipContent({
   );
 }
 
-const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { short: 'h-2', tall: 'h-4' };
+/**
+ * Experiment badge shown beside a step that ran under an experiment. Renders
+ * the flask icon in the standard IconTile treatment (subtle bg + border, thin
+ * rounded) with a hover card, and links to the experiment page when a
+ * `pathCreator.experiment` is provided by the host app (cloud dashboard).
+ */
+function ExperimentBadge({ metadata }: { metadata?: TimelineBarProps['experimentMetadata'] }) {
+  const { pathCreator } = usePathCreator();
+  const href =
+    pathCreator.experiment && metadata?.experimentName && metadata?.functionSlug
+      ? pathCreator.experiment({
+          experimentName: metadata.experimentName,
+          functionSlug: metadata.functionSlug,
+        })
+      : null;
+
+  const badgeClass =
+    'bg-canvasSubtle border-subtle text-subtle hover:bg-canvasMuted inline-flex h-5 w-5 items-center justify-center rounded border transition-colors';
+
+  const badge = <RiFlaskLine className="h-3 w-3" />;
+
+  return (
+    <HoverCardRoot openDelay={200} closeDelay={0}>
+      <HoverCardTrigger asChild>
+        {href ? (
+          <a
+            href={href}
+            className={badgeClass}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {badge}
+          </a>
+        ) : (
+          <span
+            className={badgeClass}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {badge}
+          </span>
+        )}
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" className="border-muted max-w-none border">
+        <ExperimentHoverCardContent metadata={metadata} />
+      </HoverCardContent>
+    </HoverCardRoot>
+  );
+}
+
+/**
+ * Hover card content for the experiment badge, showing experiment name and variant weights.
+ * The selected variant is shown bold above the divider; other variants are shown lighter below.
+ */
+function ExperimentHoverCardContent({
+  metadata,
+}: {
+  metadata?: TimelineBarProps['experimentMetadata'];
+}) {
+  if (!metadata) {
+    return (
+      <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+        <p className="text-light">No experiment data</p>
+      </div>
+    );
+  }
+
+  const { experimentName, variantSelected, variantWeights } = metadata;
+  const availableVariants = metadata.availableVariants ?? [];
+
+  // Separate selected variant from the rest
+  const otherVariants = availableVariants.filter((v) => v !== variantSelected);
+
+  return (
+    <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+      <p className="text-light mb-0.5">Experiment name</p>
+      <p className="text-basis mb-2 font-medium">{experimentName}</p>
+
+      {(availableVariants.length > 0 || variantSelected) && (
+        <div>
+          {/* Header row */}
+          <div className="border-subtle flex justify-between gap-6 border-b pb-1">
+            <span className="text-light">Variant</span>
+            {variantWeights && <span className="text-light">Weight</span>}
+          </div>
+
+          {/* Selected variant — bold, above the darker divider */}
+          <div className="border-muted flex items-center justify-between gap-6 border-b py-1">
+            <span className="text-basis flex items-center gap-1 font-medium">
+              <RiArrowRightFill className="text-basis h-3 w-3 shrink-0" />
+              {variantSelected}
+            </span>
+            {variantWeights && variantWeights[variantSelected] != null && (
+              <span className="text-basis font-medium tabular-nums">
+                {formatVariantWeight(variantWeights[variantSelected]!)}
+              </span>
+            )}
+          </div>
+
+          {/* Other variants — lighter */}
+          {otherVariants.map((variant) => (
+            <div
+              key={variant}
+              className="border-subtle flex items-center justify-between gap-6 border-b py-1 last:border-b-0"
+            >
+              <span className="text-light ml-4">{variant}</span>
+              {variantWeights && variantWeights[variant] != null && (
+                <span className="text-light tabular-nums">
+                  {formatVariantWeight(variantWeights[variant]!)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
 
 /**
  * Renders the visual bar in the right panel.
@@ -374,18 +595,17 @@ const VisualBar = memo(function VisualBar({
   widthPercent,
   style,
   segments,
-  expanded,
   originalBarStart,
   originalBarWidth,
   viewStartOffset = 0,
   viewEndOffset = 100,
   status,
+  expanded,
 }: {
   startPercent: number;
   widthPercent: number;
   style: TimelineBarProps['style'];
   segments?: BarSegment[];
-  expanded?: boolean;
   /** Original bar start before transform (for segment calculation) */
   originalBarStart?: number;
   /** Original bar width before transform (for segment calculation) */
@@ -396,11 +616,12 @@ const VisualBar = memo(function VisualBar({
   viewEndOffset?: number;
   /** Run status for status-based coloring */
   status?: string;
+  /** Whether the parent row is expanded */
+  expanded?: boolean;
 }) {
   const barStyle = getBarStyle(style);
   const pattern = getBarPattern(barStyle.pattern);
   const heightClass = BAR_HEIGHT_CLASSES[barStyle.barHeight ?? 'tall'];
-  const opacityStyle = expanded ? { opacity: 0 } : {};
   const barColor = getBarColor(style, status);
 
   // Memoize segment transformation to avoid recalculating on every render
@@ -446,7 +667,7 @@ const VisualBar = memo(function VisualBar({
         style={{
           left: '0%',
           width: '100%',
-          ...opacityStyle,
+          opacity: expanded ? 0 : 1,
         }}
       >
         {transformedSegments.map((segment) => {
@@ -455,15 +676,22 @@ const VisualBar = memo(function VisualBar({
           const segmentPattern = getBarPattern(segmentStyle.pattern);
           const segmentHeightClass = BAR_HEIGHT_CLASSES[segmentStyle.barHeight ?? 'tall'];
           const segmentColor = getBarColor(segment.style, segment.status);
+          const isOutlined = segmentStyle.outlined;
           return (
             <div
               key={segment.id}
-              className={cn('absolute top-1/2 -translate-y-1/2', segmentHeightClass, segmentColor)}
+              className={cn(
+                'absolute top-1/2 -translate-y-1/2',
+                segmentHeightClass,
+                isOutlined ? 'bg-canvasBase' : segmentColor
+              )}
               style={{
                 left: `${segment.transformedStart}%`,
                 width: `${segment.transformedWidth}%`,
                 minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
-                ...segmentPattern,
+                ...(isOutlined
+                  ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+                  : segmentPattern),
               }}
             />
           );
@@ -473,16 +701,23 @@ const VisualBar = memo(function VisualBar({
   }
 
   // Render simple bar
+  const isOutlined = barStyle.outlined;
   return (
     <div
       data-testid="timeline-bar-visual"
-      className={cn('absolute top-1/2 -translate-y-1/2', heightClass, barColor)}
+      className={cn(
+        'absolute top-1/2 -translate-y-1/2',
+        heightClass,
+        isOutlined ? 'bg-canvasBase' : barColor
+      )}
       style={{
         left: `${startPercent}%`,
         width: `${widthPercent}%`,
         minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
-        ...pattern,
-        ...opacityStyle,
+        opacity: expanded ? 0 : 1,
+        ...(isOutlined
+          ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+          : pattern),
       }}
     />
   );
@@ -526,7 +761,14 @@ export function TimelineBar({
   startTime,
   endTime,
   delayMs,
+  actions,
+  timingDetails,
+  styleLabel,
+  hasExperiment,
+  insideExperiment,
+  experimentMetadata,
 }: TimelineBarProps): JSX.Element {
+  const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
 
@@ -551,9 +793,9 @@ export function TimelineBar({
     [startPercent, widthPercent, viewStartOffset, viewEndOffset]
   );
 
-  // Tooltip state — controlled so hover target (full right panel) is separate from anchor (bar position)
-  const showTooltip = !!startTime;
-  const [tooltipOpen, setTooltipOpen] = useState(false);
+  // Hover card state — controlled so hover target (full right panel) is separate from anchor (bar position)
+  const showHoverCard = !!startTime;
+  const [hoverCardOpen, setHoverCardOpen] = useState(false);
 
   return (
     <div data-testid="timeline-bar-container" className="relative">
@@ -570,42 +812,73 @@ export function TimelineBar({
         style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
       >
         {/* Selection / hover highlight - extends from indent to full width */}
-        {(selected || tooltipOpen) && (
+        {(selected || hoverCardOpen) && (
           <div
             className={cn(
               'pointer-events-none absolute inset-y-0 right-0 -z-10',
               selected ? 'bg-secondary-3xSubtle' : 'bg-canvasSubtle'
             )}
             style={{
-              left: `${indentPx - 4}px`,
+              left: `${indentPx - 24}px`,
             }}
           />
         )}
         {/* Left panel - name, icon, controls */}
         <div
           data-testid="timeline-bar-left"
-          className="flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-4"
+          className="relative flex h-full shrink-0 items-center gap-1.5 overflow-hidden pr-2"
           style={{
             width: `${leftWidth}%`,
             paddingLeft: `${indentPx}px`,
           }}
         >
-          {/* Expand toggle */}
-          {expandable && <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />}
+          {/* Expand toggle - absolutely positioned to sit on the parent's vertical line */}
+          {expandable && (
+            <div
+              className="absolute flex items-center justify-center"
+              style={{ left: `${indentPx - 20}px` }}
+            >
+              <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />
+            </div>
+          )}
 
           {/* Icon */}
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
 
-          {/* Name */}
-          <span
-            className={cn(
-              'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
-              barStyle.textColor ?? 'text-basis',
-              !expandable && !effectiveIcon && 'pl-1.5'
-            )}
-          >
-            {displayName}
-          </span>
+          {/* Name + actions wrapper */}
+          <div className="flex min-w-0 flex-1 items-center">
+            {/* Name */}
+            <span
+              className={cn(
+                'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
+                barStyle.textColor ?? 'text-basis',
+                !effectiveIcon && 'pl-1.5'
+              )}
+            >
+              {displayName}
+              {(style === 'timing.inngest' || style === 'timing.server') && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className=" ml-1 inline-flex shrink-0 cursor-help align-middle"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <RiInformationLine className="text-light h-3.5 w-3.5" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className=" max-w-xs text-xs shadow-lg">
+                    {style === 'timing.inngest'
+                      ? 'Time spent on queue delays, concurrency limits, processing delays, and related overhead'
+                      : 'Time spent on your server executing the function'}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </span>
+
+            {/* Actions slot */}
+            {actions}
+          </div>
 
           {/* Duration */}
           <span
@@ -618,16 +891,34 @@ export function TimelineBar({
           </span>
         </div>
 
-        {/* Right panel - visual bar with optional hover tooltip */}
+        {/* Experiment badge - centered between left panel and bars */}
+        <span className="inline-flex w-7 shrink-0 items-center justify-center">
+          {hasExperiment && <ExperimentBadge metadata={experimentMetadata} />}
+        </span>
+
+        {/* Right panel - visual bar with optional hover card */}
         <div
           data-testid="timeline-bar-right"
           className="relative h-full flex-1"
           style={{ width: `${100 - leftWidth}%` }}
-          onMouseEnter={showTooltip ? () => setTooltipOpen(true) : undefined}
-          onMouseLeave={showTooltip ? () => setTooltipOpen(false) : undefined}
+          onMouseEnter={showHoverCard ? () => setHoverCardOpen(true) : undefined}
+          onMouseLeave={showHoverCard ? () => setHoverCardOpen(false) : undefined}
         >
           {/* Center line */}
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
+
+          {/* Dotted background pattern for experiment steps and their children */}
+          {showExperimentBackground && (
+            <div
+              className="bg-canvasSubtle pointer-events-none absolute inset-0"
+              style={{
+                backgroundImage:
+                  'radial-gradient(circle, rgb(var(--color-border-muted)) 1px, transparent 1px)',
+                backgroundSize: '7px 7px',
+              }}
+            />
+          )}
+
           {/* Bar container, centered vertically */}
           <div className="absolute inset-y-0 flex w-full items-center">
             {transformed && (
@@ -637,16 +928,16 @@ export function TimelineBar({
                   widthPercent={transformed.widthPercent}
                   style={style}
                   segments={segments}
-                  expanded={!!(expandable && expanded)}
                   originalBarStart={startPercent}
                   originalBarWidth={widthPercent}
                   viewStartOffset={viewStartOffset}
                   viewEndOffset={viewEndOffset}
                   status={status}
+                  expanded={expandable && expanded}
                 />
-                {showTooltip && (
-                  <Tooltip open={tooltipOpen}>
-                    <TooltipTrigger asChild>
+                {showHoverCard && (
+                  <HoverCardRoot open={hoverCardOpen} closeDelay={0}>
+                    <HoverCardTrigger asChild>
                       <div
                         className="pointer-events-none absolute inset-y-0"
                         style={{
@@ -655,21 +946,18 @@ export function TimelineBar({
                           minWidth: '4px',
                         }}
                       />
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="top"
-                      hasArrow={false}
-                      className="bg-canvasBase text-basis border-muted max-w-none border shadow-lg"
-                    >
-                      <BarTooltipContent
+                    </HoverCardTrigger>
+                    <HoverCardContent side="top" className="border-muted max-w-none border">
+                      <BarHoverCardContent
                         name={displayName}
                         startTime={startTime!}
                         endTime={endTime ?? null}
                         delayMs={delayMs}
+                        timingDetails={timingDetails}
+                        styleLabel={styleLabel}
                       />
-                      <TooltipArrow className="fill-canvasBase" />
-                    </TooltipContent>
-                  </Tooltip>
+                    </HoverCardContent>
+                  </HoverCardRoot>
                 )}
               </>
             )}

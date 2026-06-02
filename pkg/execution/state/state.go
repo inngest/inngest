@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
@@ -102,6 +103,9 @@ type Identifier struct {
 	// the function, with cached expression results.
 	// Deprecated: use CustomConcurrencyKeys on item instead
 	CustomConcurrencyKeys []CustomConcurrency `json:"cck,omitempty"`
+	// Semaphores stores the semaphore constraints acquired by the start job.
+	// Persisted so that Finalize() can release manual-release semaphores.
+	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
 }
 
 type CustomConcurrency struct {
@@ -394,10 +398,6 @@ type Mutater interface {
 
 	// Delete removes state from the state store.
 	Delete(ctx context.Context, i Identifier) error
-
-	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
-	// future execution of steps.
-	Cancel(ctx context.Context, i Identifier) error
 
 	// SetStatus sets a status specifically.
 	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error

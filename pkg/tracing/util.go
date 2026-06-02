@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util/aigateway"
@@ -74,7 +75,7 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 
 // DriverResponseAttrs applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
-// exectution has completed.
+// execution has completed.
 func DriverResponseAttrs(
 	resp *state.DriverResponse,
 
@@ -128,7 +129,9 @@ func DriverResponseAttrs(
 		size = len(fnOutput)
 	}
 
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &resp.Header)
+	redactedHeaders := headers.Compact(headers.Redact(resp.Header))
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
 
@@ -137,6 +140,17 @@ func DriverResponseAttrs(
 	if op := resp.TraceVisibleStepExecution(); op != nil {
 		rawAttrs = rawAttrs.Merge(GeneratorAttrs(op))
 	}
+
+	// always add all steps received as a debugging attie
+	steps := make(meta.ResponseOps, len(resp.Generator))
+	for n, s := range resp.Generator {
+		steps[n] = meta.ResponseOp{
+			Op:   s.Op,
+			ID:   s.ID,
+			Name: s.Name,
+		}
+	}
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseSteps, &steps)
 
 	return rawAttrs
 }
@@ -169,6 +183,10 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	if op.Userland != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandID, &op.Userland.ID)
 		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandIndex, &op.Userland.Index)
+	}
+
+	if stepType := op.StepType(); stepType != enums.StepTypeUnknown {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepType, &stepType)
 	}
 
 	switch op.Op {
@@ -392,6 +410,27 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 		// NOTE: This is ALWAYS the root, so the prefix and suffix of 00 is fine.
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-0000000000000000-00", cfg.TraceID.String()),
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+	}
+}
+
+// DeferSpanSeed returns the deterministic seed used to identify the
+// executor.defer span.
+func DeferSpanSeed(parentRunID ulid.ULID, hashedDeferID string) []byte {
+	// "defer-span:" prefix namespaces the seed to prevent collisions with other
+	// `(perent, hashedID)` derived seeds.
+	return fmt.Appendf(nil, "defer-span:%s:%s", parentRunID, hashedDeferID)
+}
+
+// DeferSpanRef returns the deterministic SpanReference for the executor.defer
+// span on the parent run. This span is used to store defer metadata, like
+// status and child run ID.
+func DeferSpanRef(parentRunID ulid.ULID, hashedID string) *meta.SpanReference {
+	parentCfg := DeterministicSpanConfig(parentRunID[:])
+	deferSpanID := DeterministicSpanConfig(DeferSpanSeed(parentRunID, hashedID)).SpanID.String()
+	return &meta.SpanReference{
+		DynamicSpanID:          deferSpanID,
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", parentCfg.TraceID.String(), parentCfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", parentCfg.TraceID.String(), deferSpanID),
 	}
 }
 

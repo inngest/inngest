@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -18,17 +18,6 @@ type CreateState struct {
 	// StepInputs allows users to specify pre-defined step inputs to run
 	// workflows from arbitrary points.
 	StepInputs []state.MemoizedStep
-}
-
-type StateService interface {
-	RunService
-
-	// FunctionMetrics returns state metrics for a given function.
-	FunctionMetrics(ctx context.Context, fnID uuid.UUID) (RunMetrics, error)
-	// EnvMetrics returns state metrics grouped by environment.
-	EnvMetrics(ctx context.Context, envID uuid.UUID) (RunMetrics, error)
-	// AccountMetrics returns state metrics grouped by account.
-	AccountMetrics(ctx context.Context, accountID uuid.UUID) (RunMetrics, error)
 }
 
 type RunService interface {
@@ -57,6 +46,90 @@ type RunService interface {
 	// expected to wrap this call and handle any required pause cleanup. As a result,
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
+
+	SaveDefer(ctx context.Context, id ID, d Defer) error
+	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when
+	// no defer exists for hashedID. The Aborted transition also releases
+	// the Input from the aggregate budget; the meta entry stays.
+	SetDeferStatus(ctx context.Context, id ID, hashedID string, status enums.DeferStatus) error
+	// SaveRejectedDefer idempotently writes a Rejected meta sentinel.
+	// No-op if any defer already exists for hashedID. Returns
+	// ErrDeferLimitExceeded if no room.
+	SaveRejectedDefer(ctx context.Context, id ID, fnSlug string, hashedID string) error
+}
+
+// FinalizationClaim is a storage-neutral handle for a run's finish-effect
+// emission claim.  State backends own the underlying storage details: Redis can
+// use SET NX, Cassandra can use a conditional insert/update, and callers do not
+// depend on either implementation.
+type FinalizationClaim struct {
+	claimed bool
+	release func(context.Context) error
+}
+
+// NewFinalizationClaim constructs a finalization claim handle for a state
+// backend implementation.
+func NewFinalizationClaim(claimed bool, release func(context.Context) error) FinalizationClaim {
+	return FinalizationClaim{claimed: claimed, release: release}
+}
+
+// Claimed returns true only for the caller allowed to emit finish effects for
+// this run.  Duplicate finalizers should still clean up state, but must skip
+// externally-visible finish effects.
+func (c FinalizationClaim) Claimed() bool {
+	return c.claimed
+}
+
+// Release clears a previously-acquired finalization claim after a publish
+// failure so a later retry can emit finish effects.  Release is best effort and
+// is intentionally scoped to the backend-created handle instead of requiring
+// callers to know how the claim is addressed in storage.
+func (c FinalizationClaim) Release(ctx context.Context) error {
+	if c.release == nil {
+		return nil
+	}
+	return c.release(ctx)
+}
+
+// FinalizationClaimAdapter is an optional state-store adapter for claiming a
+// run's finish effects.  Implementations must provide first-writer-wins
+// semantics without assuming multi-key transactions; the claim should be safe
+// for non-transactional backends such as Cassandra.
+type FinalizationClaimAdapter interface {
+	// ClaimFinalization returns a backend-owned claim handle.  The handle's
+	// Claimed value decides whether finalize-time effects may be emitted.
+	ClaimFinalization(ctx context.Context, md Metadata) (FinalizationClaim, error)
+}
+
+// TryClaimFinalization asks the state backend to claim finish-effect emission.
+// Backends without a claim adapter preserve previous behavior and allow emit.
+func TryClaimFinalization(ctx context.Context, svc RunService, md Metadata) (FinalizationClaim, bool, error) {
+	claimant, ok := svc.(FinalizationClaimAdapter)
+	if !ok {
+		return NewFinalizationClaim(true, nil), false, nil
+	}
+
+	claim, err := claimant.ClaimFinalization(ctx, md)
+	return claim, true, err
+}
+
+// MetadataSizeIncrementer is an optional extension to RunService for
+// implementations that support atomic metadata size tracking. Callers should
+// use TryIncrementMetadataSize to safely attempt the operation.
+type MetadataSizeIncrementer interface {
+	// IncrementMetadataSize atomically increments the cumulative metadata size
+	// counter for a run. Used by the checkpoint handler to persist metadata
+	// size deltas that were tracked in-memory during span creation.
+	IncrementMetadataSize(ctx context.Context, id ID, delta int) error
+}
+
+// TryIncrementMetadataSize attempts to increment the metadata size counter
+// if the given RunService supports it. Returns nil if unsupported.
+func TryIncrementMetadataSize(ctx context.Context, svc RunService, id ID, delta int) error {
+	if inc, ok := svc.(MetadataSizeIncrementer); ok {
+		return inc.IncrementMetadataSize(ctx, id, delta)
+	}
+	return nil
 }
 
 // Staeloader defines an interface for loading the entire run state from the state store.
@@ -77,8 +150,11 @@ type StateLoader interface {
 	// LoadState returns all state for a run, including steps, events, and metadata.
 	LoadState(ctx context.Context, id ID) (State, error)
 
-	// StreamState returns all state without loading in-memory
-	// StreamState(ctx context.Context, id ID) (io.Reader, error)
+	LoadDefers(ctx context.Context, id ID) (map[string]Defer, error)
+
+	// LoadDefersMeta returns each defer's metadata without loading its Input.
+	// Prefer this when only FnSlug/HashedID/ScheduleStatus are needed.
+	LoadDefersMeta(ctx context.Context, id ID) (map[string]DeferMeta, error)
 }
 
 //
@@ -95,4 +171,8 @@ var (
 	ErrRunNotFound        = state.ErrRunNotFound
 	ErrIdempotentResponse = state.ErrIdempotentResponse
 	ErrDuplicateResponse  = state.ErrDuplicateResponse
+
+	// ErrDeferInputTooLarge re-exports the v1 error so v2 callers can match
+	// without importing v1.
+	ErrDeferInputTooLarge = state.ErrDeferInputTooLarge
 )

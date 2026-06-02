@@ -59,6 +59,10 @@ const traceDetailsFragment = graphql(`
         timedOut
       }
     }
+    response {
+      statusCode
+      headers
+    }
   }
 `);
 

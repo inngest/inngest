@@ -12,6 +12,7 @@ import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
+import { useGetRunLinkage } from '../SharedContext/useGetRunLinkage';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
@@ -23,6 +24,7 @@ import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 // Import V4 Timeline
 import { Timeline } from './Timeline';
+import { TimelineLegend } from './TimelineLegend';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
@@ -66,10 +68,12 @@ function TimelineV4Wrapper({
   runID,
   trace,
   orgName,
+  functionSlug,
 }: {
   runID: string;
   trace: Trace;
   orgName?: string;
+  functionSlug?: string;
 }) {
   const { selectStep } = useStepSelection({ runID });
 
@@ -84,8 +88,8 @@ function TimelineV4Wrapper({
 
   // Convert V3 trace to V4 TimelineData
   const timelineData = useMemo(
-    () => traceToTimelineData(trace, { runID, orgName }),
-    [trace, runID, orgName]
+    () => traceToTimelineData(trace, { runID, orgName, functionSlug }),
+    [trace, runID, orgName, functionSlug]
   );
 
   // Handle step selection - look up the trace and emit to global selection
@@ -209,6 +213,8 @@ export const RunDetailsV4 = ({
     refetchInterval: pollInterval,
   });
 
+  const { data: linkageData } = useGetRunLinkage({ runID });
+
   const outputID = runData?.trace?.outputID;
   const {
     data: resultData,
@@ -289,6 +295,7 @@ export const RunDetailsV4 = ({
               runID={runID}
               standalone={standalone}
               result={resultData}
+              isDurableEndpoint={runData?.isDurableEndpoint}
             />
             {showError && (
               <ErrorCard
@@ -300,12 +307,22 @@ export const RunDetailsV4 = ({
           <Tabs
             tabs={[
               {
-                label: 'Trace',
+                label: (
+                  <span className="flex items-center gap-0.5">
+                    Trace
+                    <TimelineLegend />
+                  </span>
+                ),
                 id: 'trace',
                 node: waiting ? (
                   <Waiting />
                 ) : traceReady ? (
-                  <TimelineV4Wrapper runID={runID} trace={runData.trace} orgName={orgName} />
+                  <TimelineV4Wrapper
+                    runID={runID}
+                    trace={runData.trace as unknown as Trace}
+                    orgName={orgName}
+                    functionSlug={runData.fn.slug}
+                  />
                 ) : null,
               },
             ]}
@@ -339,6 +356,7 @@ export const RunDetailsV4 = ({
               selectedStep={selectedStep}
               pollInterval={pollInterval}
               tracesPreviewEnabled={tracesPreviewEnabled}
+              isDurableEndpoint={runData?.isDurableEndpoint}
             />
           ) : (
             <TopInfo
@@ -346,7 +364,11 @@ export const RunDetailsV4 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
-              trace={runData?.trace}
+              trace={runData?.trace as unknown as Trace | undefined}
+              isDurableEndpoint={runData?.isDurableEndpoint}
+              defers={linkageData?.defers}
+              siblingDefers={linkageData?.siblingDefers ?? []}
+              deferredFrom={linkageData?.deferredFrom}
             />
           )}
         </div>

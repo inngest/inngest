@@ -12,6 +12,10 @@ message DebounceInfoRequest {
   // debounce_key is the optional evaluated debounce key suffix (from the key expression).
   // If empty, uses the function_id as the debounce key.
   string debounce_key = 2;
+  // account_id is the UUID of the account that owns the function.
+  string account_id = 3;
+  // env_id is the UUID of the environment that owns the function.
+  string env_id = 4;
 }
 
 // DebounceInfoResponse contains information about the current debounce.
@@ -41,6 +45,10 @@ message DeleteDebounceRequest {
   // debounce_key is the optional evaluated debounce key suffix (from the key expression).
   // If empty, uses the function_id as the debounce key.
   string debounce_key = 2;
+  // account_id is the UUID of the account that owns the function.
+  string account_id = 3;
+  // env_id is the UUID of the environment that owns the function.
+  string env_id = 4;
 }
 
 // DeleteDebounceResponse contains information about the deleted debounce.
@@ -60,6 +68,10 @@ message RunDebounceRequest {
   // debounce_key is the optional evaluated debounce key suffix (from the key expression).
   // If empty, uses the function_id as the debounce key.
   string debounce_key = 2;
+  // account_id is the UUID of the account that owns the function.
+  string account_id = 3;
+  // env_id is the UUID of the environment that owns the function.
+  string env_id = 4;
 }
 
 // RunDebounceResponse contains information about the scheduled debounce execution.
@@ -76,6 +88,12 @@ message RunDebounceResponse {
 message DeleteDebounceByIDRequest {
   // debounce_ids are the ULIDs of the debounces to delete. Max 20.
   repeated string debounce_ids = 1;
+  // account_id is the UUID of the account that owns the function.
+  string account_id = 2;
+  // env_id is the UUID of the environment that owns the function.
+  string env_id = 3;
+  // function_id is the UUID of the function.
+  string function_id = 4;
 }
 
 // DeleteDebounceByIDResponse contains information about the deleted debounces.

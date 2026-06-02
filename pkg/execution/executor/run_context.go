@@ -25,6 +25,8 @@ type runInstance struct {
 	resp       *state.DriverResponse
 	httpClient exechttp.RequestExecutor
 	stackIndex int
+	requestID  string
+	jobID      string
 
 	// If specified, this is the span reference that represents this execution:
 	// the current request outgoing to the user's SDK.
@@ -77,6 +79,26 @@ func (r *runInstance) AttemptCount() int {
 func (r *runInstance) MaxAttempts() *int {
 	max := r.item.GetMaxAttempts()
 	return &max
+}
+
+func (r *runInstance) OnlyHasLazyOps() bool {
+	if r.resp == nil {
+		return false
+	}
+	// "Only has lazy ops" requires at least one lazy op present and zero
+	// non-lazy ops. An empty generator (or a slice of nils) returns false —
+	// that's a different shape from "every op in the batch is lazy."
+	hasLazy := false
+	for _, op := range r.resp.Generator {
+		if op == nil {
+			continue
+		}
+		if !enums.OpcodeIsLazy(op.Op) {
+			return false
+		}
+		hasLazy = true
+	}
+	return hasLazy
 }
 
 func (r *runInstance) ShouldRetry() bool {
@@ -144,4 +166,17 @@ func (r *runInstance) trackLatencyHistogram(ctx context.Context, kind string, ta
 	})
 
 	r._next = r.c.Now()
+}
+
+func (r *runInstance) ReleaseCapacityLease() error {
+	runInfo := r.item.RunInfo
+	if runInfo == nil {
+		return nil
+	}
+
+	if runInfo.CapacityLease == nil {
+		return nil
+	}
+
+	return runInfo.CapacityLease.Release()
 }

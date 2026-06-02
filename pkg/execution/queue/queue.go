@@ -18,6 +18,7 @@ type Queue interface {
 	Migrator
 	Unpauser
 	AttemptResetter
+	RoleStatusReader
 }
 
 type RunInfo struct {
@@ -31,6 +32,7 @@ type RunInfo struct {
 	ContinueCount       uint
 	RefilledFromBacklog string
 	CapacityLease       *CapacityLease
+	ScavengeCount       int
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
@@ -54,7 +56,7 @@ type EnqueueOpts struct {
 	PassthroughJobId       bool
 	ForceQueueShardName    string
 	NormalizeFromBacklogID string
-	// IdempotencyPerioud allows customizing the idempotency period for this queue
+	// IdempotencyPeriod allows customizing the idempotency period for this queue
 	// item.  For example, after a debounce queue has been consumed we want to remove
 	// the idempotency key immediately;  the same debounce key should become available
 	// for another debounced function run.
@@ -79,24 +81,29 @@ type Consumer interface {
 	Run(context.Context, RunFunc) error
 }
 
+type RoleStatusReader interface {
+	// ActiveRoles returns the queue roles currently held by this worker.
+	ActiveRoles() []QueueRoleStatus
+}
+
 type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
 
 type Migrator interface {
 	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
 	// another queue shard
-	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error
+	SetFunctionMigrate(ctx context.Context, sourceShard string, scope Scope, migrateLockUntil *time.Time) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
-	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
+	Migrate(ctx context.Context, shard string, scope Scope, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
 }
 
 type Unpauser interface {
-	UnpauseFunction(ctx context.Context, shard string, acctID, envID, fnID uuid.UUID) error
+	UnpauseFunction(ctx context.Context, shard string, scope Scope) error
 }
 
 // AttemptResetter resets queue item attempts after a successful checkpoint.
 type AttemptResetter interface {
-	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
+	ResetAttemptsByJobID(ctx context.Context, shard string, scope Scope, jobID string) error
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries
@@ -226,22 +233,23 @@ type JobResponse struct {
 type JobQueueReader interface {
 	// OutstandingJobCount returns the number of jobs in progress
 	// or scheduled for a given run.
-	OutstandingJobCount(ctx context.Context, envID uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (int, error)
+	OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error)
 
 	// RunningCount returns the number of running (in-progress) jobs for a given function
-	RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error)
+	RunningCount(ctx context.Context, scope Scope) (int64, error)
 
 	// StatusCount returns the total number of items in the function
 	// status queue.
-	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
+	StatusCount(ctx context.Context, scope Scope, status string) (int64, error)
 
 	// RunJobs reads items in the queue for a specific run.
-	RunJobs(ctx context.Context, queueShardName string, workspaceID uuid.UUID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
+	RunJobs(ctx context.Context, queueShardName string, scope Scope, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
 
 // MigratePayload stores the information to be used when migrating a queue shard to another one
 type MigratePayload struct {
 	AccountID  uuid.UUID
+	EnvID      uuid.UUID
 	FunctionID uuid.UUID
 
 	// Source is the source queue where the migration will occur on
@@ -255,4 +263,12 @@ type MigratePayload struct {
 
 	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
 	Concurrency int
+}
+
+func (p MigratePayload) Scope() Scope {
+	return Scope{
+		AccountID:  p.AccountID,
+		EnvID:      p.EnvID,
+		FunctionID: p.FunctionID,
+	}
 }

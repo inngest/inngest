@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
@@ -14,12 +15,19 @@ import (
 )
 
 func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartitionRequest) (*pb.ShadowPartitionResponse, error) {
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
 
-	pt, err := d.queue.PartitionByID(ctx, shard, req.GetPartitionId())
+	scope := queue.Scope{
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
+	}
+	if fnID, parseErr := uuid.Parse(req.GetPartitionId()); parseErr == nil {
+		scope.FunctionID = fnID
+	}
+	pt, err := d.queue.PartitionByID(ctx, shard, scope, req.GetPartitionId())
 	if err != nil {
 		if errors.Is(err, queue.ErrPartitionNotFound) {
 			return nil, status.Error(codes.NotFound, queue.ErrPartitionNotFound.Error())
@@ -57,7 +65,7 @@ func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartiti
 }
 
 func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*pb.BacklogsResponse, error) {
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
@@ -92,7 +100,7 @@ func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*p
 }
 
 func (d *debugAPI) GetBacklogSize(ctx context.Context, req *pb.BacklogSizeRequest) (*pb.BacklogSizeResponse, error) {
-	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}

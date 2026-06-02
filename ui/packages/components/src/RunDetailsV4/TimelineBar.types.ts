@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 /**
  * Available fill patterns for bars.
  */
-export type BarPattern = 'solid' | 'barber-pole' | 'dotted';
+export type BarPattern = 'solid' | 'barber-pole' | 'vertical-lines' | 'dotted';
 
 /**
  * Available icons for bars.
@@ -28,6 +28,7 @@ export type BarIcon =
   | 'checkbox' // root run (completed)
   | 'close-circle' // root run (failed)
   | 'stop-circle' // root run (cancelled)
+  | 'experiment' // experiment badge for steps with experiment metadata
   | 'none';
 
 /**
@@ -44,7 +45,11 @@ export type BarStyleKey =
   | 'step.waitForEvent'
   | 'step.invoke'
   // Timing categories
-  | 'timing.inngest' // Queue time (short, gray)
+  | 'timing.inngest' // Queue/delay time (short, gray)
+  | 'timing.inngest.queue' // Run queue delay (short, solid gray)
+  | 'timing.inngest.concurrency' // Concurrency delay (short, crosshatch gray)
+  | 'timing.inngest.discovery' // Discovery (short, barber-pole-light gray)
+  | 'timing.inngest.finalization' // Finalization / system latency (short, barber-pole-dark gray)
   | 'timing.server' // Execution time (tall, barber-pole, status color)
   | 'timing.connecting' // Connection time (short, dotted border, status color)
   // HTTP timing phases (nested under server execution)
@@ -59,7 +64,7 @@ export type BarStyleKey =
 /**
  * Bar height variants.
  */
-export type BarHeight = 'short' | 'tall';
+export type BarHeight = 'thin' | 'short' | 'tall';
 
 /**
  * Visual style configuration for a bar type.
@@ -79,6 +84,9 @@ export interface BarStyle {
 
   /** Fill pattern for the bar */
   pattern?: BarPattern;
+
+  /** Whether this bar renders as outlined (transparent bg + 1px inset border) instead of solid fill */
+  outlined?: boolean;
 
   /** Label format (for timing bars) */
   labelFormat?: 'uppercase' | 'titlecase' | 'default';
@@ -194,6 +202,38 @@ export interface TimelineBarProps {
 
   /** Queue delay in milliseconds (startedAt - queuedAt) for tooltip display */
   delayMs?: number;
+
+  /** Optional actions to render in the left panel between the name and duration */
+  actions?: ReactNode;
+
+  /** Timing breakdown rows shown in the hover tooltip */
+  timingDetails?: TimingDetail[];
+
+  /** Human-readable type label shown in the hover tooltip subtitle (e.g., "step.sleep") */
+  styleLabel?: string;
+
+  /** Whether this step has experiment metadata (shows badge + dotted background) */
+  hasExperiment?: boolean;
+
+  /** Whether this step is inside an experiment (shows dotted background but no badge) */
+  insideExperiment?: boolean;
+
+  /** Experiment metadata for hover card display on experiment badge */
+  experimentMetadata?: {
+    experimentName: string;
+    variantSelected: string;
+    availableVariants?: string[];
+    variantWeights?: Record<string, number>;
+    functionSlug?: string;
+  };
+}
+
+/**
+ * A single row in the hover tooltip timing breakdown.
+ */
+export interface TimingDetail {
+  label: string;
+  durationMs: number;
 }
 
 // ============================================================================
@@ -246,6 +286,12 @@ export interface TimelineBarData {
   /** HTTP timing breakdown (for steps with HTTP timing metadata) */
   httpTimingBreakdown?: HTTPTimingBreakdownData;
 
+  /** Per-step Inngest overhead breakdown (discovery, concurrency delay, system latency) */
+  inngestBreakdown?: InngestBreakdownData;
+
+  /** Run-level Inngest overhead breakdown (run queue delay, finalization) */
+  runInngestBreakdown?: RunInngestBreakdownData;
+
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;
 
@@ -254,19 +300,64 @@ export interface TimelineBarData {
 
   /** Queue delay in milliseconds (startedAt - queuedAt) */
   delayMs?: number;
+
+  /** Whether this bar has experiment metadata attached */
+  hasExperiment?: boolean;
+
+  /** Experiment metadata for hover card display */
+  experimentMetadata?: {
+    experimentName: string;
+    variantSelected: string;
+    availableVariants?: string[];
+    variantWeights?: Record<string, number>;
+    functionSlug?: string;
+  };
 }
 
 /**
  * Timing breakdown for a step bar.
  */
 export interface TimingBreakdownData {
-  /** Queue time (INNGEST) */
-  queueMs: number;
+  /** Total Inngest-side overhead (queue delay + system latency) */
+  inngestMs: number;
 
   /** Execution time (SERVER) */
   executionMs: number;
 
   /** Total duration */
+  totalMs: number;
+}
+
+/**
+ * Inngest overhead breakdown for the Inngest timing bar.
+ * Per-step-attempt breakdown combining metadata and timestamp-derived phases.
+ */
+export interface InngestBreakdownData {
+  /** Discovery time: SDK executing user code until it discovers this step (previous step end → step.queuedAt) */
+  discoveryMs: number;
+
+  /** Sojourn delay from concurrency limits, throttle, or other constraints (from metadata) */
+  queueDelayMs: number;
+
+  /** System processing overhead: queue lease to execution start (from metadata) */
+  systemLatencyMs: number;
+
+  /** Total Inngest overhead */
+  totalMs: number;
+}
+
+/**
+ * Run-level Inngest overhead breakdown.
+ * Covers overhead not attributable to any single step.
+ */
+export interface RunInngestBreakdownData {
+  /** Time the run waited in queue before Inngest picked it up (run.queuedAt → run.startedAt) */
+  runQueueDelayMs: number;
+
+  /** Time after the last step completed until the run ended (lastStep.endedAt → run.endedAt) */
+  finalizationMs: number;
+
+  /** Total run-level Inngest overhead */
   totalMs: number;
 }
 

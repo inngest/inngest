@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/inngest/inngest/cmd/debug/debugflags"
 	"github.com/inngest/inngest/pkg/cli/output"
 	debugpkg "github.com/inngest/inngest/pkg/debug"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -28,6 +29,15 @@ func ItemCommand() *cli.Command {
 				Name:  "run-id",
 				Usage: "run ID to reference (does not work with --id)",
 			},
+			&cli.StringFlag{
+				Name:  "account-id",
+				Usage: "Account UUID for run ID lookups",
+			},
+			&cli.StringFlag{
+				Name:  "env-id",
+				Usage: "Environment UUID for run ID lookups",
+			},
+			debugflags.FunctionFlag(),
 			&cli.StringFlag{
 				Name:    "queue-shard",
 				Aliases: []string{"qs"},
@@ -58,7 +68,19 @@ func ItemCommand() *cli.Command {
 			if itemID != "" {
 				req.ItemId = itemID
 			} else {
+				accountID, envID, err := debugflags.AccountEnv(cmd)
+				if err != nil {
+					return err
+				}
+				functionID, err := debugflags.RequiredUUID(cmd, "function-id")
+				if err != nil {
+					return err
+				}
+
 				req.RunId = runID
+				req.AccountId = accountID
+				req.EnvId = envID
+				req.FunctionId = functionID
 			}
 
 			resp, err := dbgCtx.Client.GetQueueItem(ctx, &req)
@@ -82,7 +104,7 @@ func ItemCommand() *cli.Command {
 				return fmt.Errorf("error unmarshalling item: %w", err)
 			}
 
-			return output.TextQueueItem(&item)
+			return output.TextQueueItem(&item, resp.GetQueueShard())
 		},
 	}
 }

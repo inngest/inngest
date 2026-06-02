@@ -56,12 +56,12 @@ export function Pagination(props: PaginationProps) {
 
   const variant = propVariant ?? autoVariant;
 
-  if (totalPages === 0) return null;
-
   const pages = useMemo(
     () => getVisiblePages({ current: currentPage, total: totalPages, variant }),
     [currentPage, totalPages, variant]
   );
+
+  if (totalPages === 0) return null;
 
   return (
     <div ref={outerRef} className={cn('flex w-full justify-center', className)}>

@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
@@ -29,10 +30,13 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	inngestversion "github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/update"
+	"github.com/inngest/inngest/pkg/util"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/mattn/go-isatty"
 	"github.com/redis/rueidis"
@@ -83,13 +87,14 @@ type devserver struct {
 	stateSizeLimitOverrides map[string]int
 
 	// Runner stores the Runner
-	Runner      runner.Runner
-	State       state.Manager
-	Queue       queue.Queue
-	Executor    execution.Executor
-	publisher   pubsub.Publisher
-	CronSyncer  cron.CronSyncer
-	redisClient rueidis.Client
+	Runner           runner.Runner
+	State            state.Manager
+	Queue            queue.Queue
+	Executor         execution.Executor
+	SemaphoreManager constraintapi.SemaphoreManager
+	publisher        pubsub.Publisher
+	CronSyncer       cron.CronSyncer
+	redisClient      rueidis.Client
 
 	Apiservice service.Service
 
@@ -219,6 +224,8 @@ func (d *devserver) Run(ctx context.Context) error {
 					fmt.Println(cli.WarningStyle.Render("\tWARNING: No event keys provided. Events will not be accepted.\n\t\t Add event keys with a flag, environment variable, or config file.\n"))
 				}
 			}
+
+			update.Notify(os.Stderr, inngestversion.Version)
 		}()
 	}
 
@@ -301,6 +308,11 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		if !strings.Contains(url, "://") {
 			url = "http://" + url
 		}
+
+		// Normalize the URL so that default ports (e.g. :80, :443) are
+		// stripped and localhost variants are unified before deriving the
+		// placeholder app ID.
+		url = util.NormalizeAppURL(url, false)
 
 		// Create a new app which holds the error message.
 		params := cqrs.UpsertAppParams{
@@ -748,7 +760,7 @@ func upsertErroredApp(
 				String: pingError.Error(),
 				Valid:  true,
 			},
-			ID:  inngest.DeterministicAppUUID(appURL),
+			ID:  inngest.DeterministicAppUUID(util.NormalizeAppURL(appURL, false)),
 			Url: appURL,
 		})
 		if err != nil {

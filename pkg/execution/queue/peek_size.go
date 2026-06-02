@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"time"
 )
@@ -15,40 +16,41 @@ func (q *queueProcessor) peekSize(ctx context.Context, p *QueuePartition) int64 
 		return peekSize
 	}
 	if q.usePeekEWMA {
-		return q.ewmaPeekSize(ctx, p)
+		size, _ := q.peekSizeCache.Fetch(p.Queue(), 10*time.Second, func() (int64, error) {
+			size := q.ewmaPeekSize(ctx, p)
+			return size, nil
+		})
+		return size.Value()
 	}
-	return q.peekSizeRandom(ctx, p)
+	return q.peekSizeWeightedDistribution(ctx, p, q.PeekSizeExponent)
 }
 
-func (q *queueProcessor) peekSizeRandom(_ context.Context, _ *QueuePartition) int64 {
-	// set ranges
-	pmin := q.PeekMin
-	if pmin == 0 {
-		pmin = q.PeekMin
+// SkewedRand returns a random number in [min, max] following
+// the distribution: min + (max-min) * r^n, where r ~ Uniform(0,1).
+// Higher n values skew more heavily toward min.
+func (q *queueProcessor) peekSizeWeightedDistribution(_ context.Context, _ *QueuePartition, n float64) int64 {
+	r := rand.Float64()
+
+	min := float64(q.PeekMin)
+	if min == 0 {
+		min = float64(DefaultQueuePeekMin)
 	}
-	pmax := q.PeekMax
-	if pmax == 0 {
-		pmax = q.PeekMax
+	max := float64(q.PeekMax)
+	if max == 0 {
+		max = float64(DefaultQueuePeekMax)
 	}
 
-	// Take a random amount between our range.
-	size := int64(rand.Intn(int(pmax-pmin))) + pmin
-	// Limit to capacity
-	cap := q.capacity()
-	if size > cap {
-		size = cap
-	}
-	return size
+	return int64(min + (max-min)*math.Pow(r, n))
 }
 
-//nolint:unused // this code remains to be enabled on demand
 func (q *queueProcessor) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
 	if p.FunctionID == nil {
 		return q.PeekMin
 	}
+	shard := q.Shard()
 
 	// retrieve the EWMA value
-	ewma, err := q.primaryQueueShard.PeekEWMA(ctx, *p.FunctionID)
+	ewma, err := shard.PeekEWMA(ctx, *p.FunctionID)
 	if err != nil {
 		// return the minimum if there's an error
 		return q.PeekMin
@@ -80,7 +82,11 @@ func (q *queueProcessor) ewmaPeekSize(ctx context.Context, p *QueuePartition) in
 	}
 
 	dur := time.Hour * 24
-	qsize, _ := q.primaryQueueShard.PartitionSize(ctx, p.ID, q.Clock().Now().Add(dur))
+	qsize, _ := shard.PartitionSize(ctx, Scope{
+		AccountID:  p.AccountID,
+		EnvID:      *p.EnvID,
+		FunctionID: *p.FunctionID,
+	}, p.ID, q.Clock().Now().Add(dur))
 	if qsize > size {
 		size = qsize
 	}

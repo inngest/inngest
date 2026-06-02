@@ -15,18 +15,18 @@ import (
 )
 
 func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (*pb.QueueItemResponse, error) {
-	shardName := consts.DefaultQueueShardName
-	if req.QueueShard != "" {
-		shardName = req.QueueShard
-	}
-
-	shard, ok := d.shards[shardName]
-	if !ok {
-		return nil, fmt.Errorf("could not find queue shard %q", shardName)
-	}
-
 	if itemID := req.GetItemId(); itemID != "" {
-		queueItem, err := d.queue.ItemByID(ctx, shard, itemID)
+		shardName := consts.DefaultQueueShardName
+		if req.QueueShard != "" {
+			shardName = req.QueueShard
+		}
+
+		shard, err := d.shards.ByName(shardName)
+		if err != nil {
+			return nil, fmt.Errorf("could not find queue shard %q", shardName)
+		}
+
+		queueItem, err := d.queue.LoadQueueItem(ctx, shard.Name(), itemID)
 		if err != nil {
 			if errors.Is(err, queue.ErrQueueItemNotFound) {
 				return nil, status.Error(codes.NotFound, "no item found with id")
@@ -39,7 +39,10 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 			return nil, status.Error(codes.Internal, fmt.Errorf("error marshalling queue item: %w", err).Error())
 		}
 
-		return &pb.QueueItemResponse{Data: byt}, nil
+		return &pb.QueueItemResponse{
+			Data:       byt,
+			QueueShard: shard.Name(),
+		}, nil
 	}
 
 	// use runID
@@ -51,7 +54,26 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 		}
 		runID = id
 	}
-	items, err := d.queue.ItemsByRunID(ctx, shard, runID)
+
+	scope, err := debugScope(req.GetFunctionId(), req.GetAccountId(), req.GetEnvId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	var shard queue.QueueShard
+	if req.QueueShard != "" {
+		shard, err = d.shards.ByName(req.QueueShard)
+		if err != nil {
+			return nil, fmt.Errorf("could not find queue shard %q", req.QueueShard)
+		}
+	} else {
+		shard, err = d.shards.Resolve(ctx, scope.AccountID, nil)
+		if err != nil {
+			return nil, fmt.Errorf("could not resolve queue shard for account %q: %w", scope.AccountID, err)
+		}
+	}
+
+	items, err := d.queue.ItemsByRunID(ctx, shard, scope, runID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Errorf("error retrieving queue items by runID: %w", err).Error())
 	}
@@ -67,6 +89,7 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 	}
 
 	return &pb.QueueItemResponse{
-		Data: byt,
+		Data:       byt,
+		QueueShard: shard.Name(),
 	}, nil
 }

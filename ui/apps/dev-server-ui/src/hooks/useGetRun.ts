@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import type { GetRunPayload } from '@inngest/components/SharedContext/useGetRun';
 
 import { client } from '@/store/baseApi';
-import { GetRunDocument, type GetRunQuery } from '@/store/generated';
+import { AppMethod, GetRunDocument, type GetRunQuery } from '@/store/generated';
 
 export function useGetRun() {
   const [loading, setLoading] = useState(false);
@@ -11,7 +11,10 @@ export function useGetRun() {
   return useCallback(async ({ runID, preview }: GetRunPayload) => {
     setLoading(true);
     setError(undefined);
-    const data: GetRunQuery = await client.request(GetRunDocument, { runID, preview });
+    const data: GetRunQuery = await client.request(GetRunDocument, {
+      runID,
+      preview,
+    });
     const run = data.run;
 
     if (!run) {
@@ -37,6 +40,7 @@ export function useGetRun() {
         id: runID,
         fn,
         trace,
+        isDurableEndpoint: fn.app?.method === AppMethod.Api,
       },
       loading,
       error,

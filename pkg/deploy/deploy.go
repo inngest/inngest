@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo"
+	"golang.org/x/mod/semver"
 )
 
 var (
@@ -28,6 +28,7 @@ var (
 	DeployErrNoSigningKey        = fmt.Errorf("missing_signing_key")
 	DeployErrNoServerSigningKey  = fmt.Errorf("missing_server_signing_key")
 	DeployErrInvalidFunction     = fmt.Errorf("invalid_function")
+	DeployErrBlockedSDKVersion   = fmt.Errorf("sdk_version_denied")
 	DeployErrNoFunctions         = fmt.Errorf("no_functions")
 	DeployErrUnreachable         = fmt.Errorf("unreachable")
 	DeployErrUnsupportedProtocol = fmt.Errorf("unsupported_protocol")
@@ -127,6 +128,41 @@ func Ping(ctx context.Context, url string, serverKind string, signingKey string,
 	return pingResult{IsSDK: isSDK}
 }
 
+func HasBlockedSDKVersion(language, version string) bool {
+	if !isJavaScriptSDK(language) {
+		return false
+	}
+
+	version = normalizeSemver(version)
+	if !semver.IsValid(version) {
+		return false
+	}
+
+	return semver.Compare(version, "v3.22.0") >= 0 && semver.Compare(version, "v3.53.1") <= 0
+}
+
+func BlockedSDKVersionMessage() string {
+	return "App sync was blocked because this application is using an Inngest JavaScript SDK with a known security vulnerability. Please upgrade to v3.54.0 or later. See more information: https://www.inngest.com/blog/cve-2026-42047"
+}
+
+func isJavaScriptSDK(language string) bool {
+	language = strings.TrimPrefix(strings.TrimSpace(language), "inngest-")
+	return language == "js"
+}
+
+func normalizeSemver(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return ""
+	}
+
+	if !strings.HasPrefix(version, "v") {
+		return "v" + version
+	}
+
+	return version
+}
+
 func handlePingError(err error) error {
 	if strings.Contains(err.Error(), "server gave HTTP response to HTTPS") {
 		return DeployErrUnsupportedProtocol
@@ -142,7 +178,7 @@ func handlePingError(err error) error {
 func GetDeployError(resp *http.Response) error {
 	if resp.StatusCode == http.StatusBadRequest {
 		// 400s usually contain SDK error messages that we want to pass through
-		byt, _ := ioutil.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+		byt, _ := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		type result struct {
 			Message string `json:"message"`
 		}

@@ -34,8 +34,10 @@ const (
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
+	PartitionSemaphoreLimitRequeueExtension   = 1 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
 	PartitionPausedRequeueExtension           = 5 * time.Minute
+	PartitionDeletedAccountRequeueExtension   = 7 * 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
@@ -53,8 +55,8 @@ const (
 	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
 	QueuePeekEWMALen        int   = 10
 	QueueLeaseDuration            = 30 * time.Second
-	ConfigLeaseDuration           = 10 * time.Second
-	ConfigLeaseMax                = 20 * time.Second
+	RoleLeaseDuration             = 10 * time.Second
+	RoleLeaseMax                  = 20 * time.Second
 	ShardLeaseDuration            = 10 * time.Second
 	ShardLeaseMax                 = 20 * time.Second
 
@@ -83,21 +85,6 @@ const (
 )
 
 const (
-	// ActiveCheckBacklogConcurrency determines how many accounts are peeked and processed in parallel
-	ActiveCheckAccountConcurrency = 30
-
-	// ActiveCheckBacklogConcurrency determines how many backlogs are peeked and processed in parallel
-	ActiveCheckBacklogConcurrency = 30
-
-	// ActiveCheckScanBatchSize determines how many queue items are scanned in each loop.
-	// More queue items will slow down the active checker but yield faster iteration over the set. Tune carefully.
-	ActiveCheckScanBatchSize = 25
-
-	BacklogActiveCheckCooldownDuration = 1 * time.Minute
-	AccountActiveCheckCooldownDuration = 1 * time.Minute
-)
-
-const (
 	// NormalizeAccountPeekMax sets the maximum number of accounts that can be peeked from the global normalization index.
 	NormalizeAccountPeekMax = int64(30)
 	// NormalizePartitionPeekMax sets the maximum number of backlogs that can be peeked from the shadow partition.
@@ -113,17 +100,17 @@ const (
 )
 
 const (
-	defaultNumWorkers                  = 100
-	defaultNumShadowWorkers            = 100
-	defaultBacklogNormalizationWorkers = 10
-	defaultBacklogNormalizeConcurrency = int64(20)
+	defaultNumWorkers                        = 100
+	defaultNumShadowWorkers                  = 100
+	defaultNumPartitionWorkers         int32 = 50
+	defaultBacklogNormalizationWorkers       = 10
+	defaultBacklogNormalizeConcurrency       = int64(20)
 )
 
 const (
 	defaultPollTick                 = 10 * time.Millisecond
 	defaultShadowPollTick           = 100 * time.Millisecond
 	defaultBacklogNormalizePollTick = 250 * time.Millisecond
-	defaultActiveCheckTick          = 10 * time.Second
 
 	defaultIdempotencyTTL = 12 * time.Hour
 	DefaultConcurrency    = 1000 // TODO: add function to override.

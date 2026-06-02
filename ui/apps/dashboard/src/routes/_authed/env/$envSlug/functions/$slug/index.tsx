@@ -2,7 +2,6 @@ import FunctionRunRateLimitChart from '@/components/Functions/FunctionRateLimitC
 import type { UsageMetrics } from '@/components/Functions/FunctionRunsChart';
 import FunctionRunsChart from '@/components/Functions/FunctionRunsChart';
 import FunctionThroughputChart from '@/components/Functions/FunctionThroughputChart';
-import LatestFailedFunctionRuns from '@/components/Functions/LatestFailedFunctionRuns';
 import SDKRequestThroughputChart from '@/components/Functions/SDKRequestThroughput';
 import StepBacklogChart from '@/components/Functions/StepBacklogChart';
 import StepsRunningChart from '@/components/Functions/StepsRunningChart';
@@ -101,19 +100,22 @@ function RouteComponent() {
   const usageMetrics: UsageMetrics | undefined = usage?.reduce(
     (acc, u) => {
       acc.totalRuns += u.values.totalRuns;
+      acc.totalFinished += u.values.totalFinished;
       acc.totalFailures += u.values.failures;
       return acc;
     },
     {
       totalRuns: 0,
+      totalFinished: 0,
       totalFailures: 0,
     },
   );
 
-  const failureRate = !usageMetrics?.totalRuns
+  const failureRate = !usageMetrics?.totalFinished
     ? '0.00'
     : (
-        ((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) *
+        ((usageMetrics.totalFailures || 0) /
+          (usageMetrics.totalFinished || 0)) *
         100
       ).toFixed(2);
 
@@ -206,12 +208,6 @@ function RouteComponent() {
             startTime={calculatedStartTime.toISOString()}
             endTime={endTime ?? currentTime.toISOString()}
           />
-          <div className="my-4 px-6">
-            <LatestFailedFunctionRuns
-              environmentSlug={envSlug}
-              functionSlug={functionSlug}
-            />
-          </div>
         </main>
         <aside className="border-subtle bg-canvasSubtle overflow-y-auto">
           <Sentry.ErrorBoundary

@@ -15,17 +15,20 @@ import {
 } from '../DetailsCard/Element';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
-import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
+import { ScoresAttrs, collectScoreMetadata } from '../RunDetails/ScoresAttrs';
+import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
+import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
+import { LinkedRuns } from './LinkedRuns';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
-import type { Trace } from './types';
+import { isScoreMetadata, type Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
@@ -34,6 +37,10 @@ type TopInfoProps = {
   runID: string;
   resultLoading?: boolean;
   trace?: Trace;
+  isDurableEndpoint?: boolean;
+  defers?: RunDeferSummary[];
+  siblingDefers?: RunDeferSummary[];
+  deferredFrom?: RunDeferredFromSummary[];
 };
 
 export type Trigger = {
@@ -91,6 +98,10 @@ export const TopInfo = ({
   result,
   resultLoading,
   trace,
+  isDurableEndpoint,
+  defers,
+  siblingDefers,
+  deferredFrom,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
@@ -110,8 +121,10 @@ export const TopInfo = ({
     retry: 3,
   });
 
-  const { booleanFlag } = useBooleanFlag();
-  const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
+  const metadataIsEnabled = true;
+  const scoreMetadata = useMemo(() => collectScoreMetadata(trace), [trace]);
+  const nonScoreMetadata = trace?.metadata?.filter((md) => !isScoreMetadata(md)) ?? [];
+  const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   const prettyPayload = useMemo(() => {
     try {
@@ -123,8 +136,23 @@ export const TopInfo = ({
     }
   }, [trigger?.payloads]);
 
+  const cronMetadata = useMemo(
+    () => getCronTriggerMetadata(trigger?.payloads),
+    [trigger?.payloads]
+  );
+
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
+
+  const hasLinkedRuns =
+    (deferredFrom?.length ?? 0) > 0 ||
+    (siblingDefers?.length ?? 0) > 0 ||
+    (defers?.length ?? 0) > 0;
+
+  // Fall back through the linkage/trigger names and finally to the run/function
+  // name so the header title is never blank (e.g. a deferred run with
+  // incomplete linkage and no invoke or trigger name).
+  const headerLabel = trigger?.eventName ?? trace?.name ?? 'Run';
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -159,41 +187,45 @@ export const TopInfo = ({
           {isPending ? (
             <SkeletonElement />
           ) : (
-            <span className="text-basis text-sm font-normal">{trigger.eventName}</span>
+            <span className="text-basis text-sm font-normal">{headerLabel}</span>
           )}
         </div>
 
-        <Button
-          kind="primary"
-          appearance="outlined"
-          size="medium"
-          iconSide="right"
-          label="Invoke"
-          loading={invokeLoading}
-          disabled={invokeLoading}
-          onClick={() => {
-            setInvokeOpen(true);
-          }}
-        />
+        {!isDurableEndpoint && (
+          <>
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              iconSide="right"
+              label="Invoke"
+              loading={invokeLoading}
+              disabled={invokeLoading}
+              onClick={() => {
+                setInvokeOpen(true);
+              }}
+            />
 
-        {invokeError && <Alert severity="error">{invokeError.message}</Alert>}
-        <InvokeModal
-          doesFunctionAcceptPayload={true}
-          isOpen={invokeOpen}
-          onCancel={() => setInvokeOpen(false)}
-          onConfirm={async ({ data, user }) => {
-            const res = await invoke({
-              functionSlug: slug || '',
-              data,
-              user,
-            });
+            {invokeError && <Alert severity="error">{invokeError.message}</Alert>}
+            <InvokeModal
+              doesFunctionAcceptPayload={true}
+              isOpen={invokeOpen}
+              onCancel={() => setInvokeOpen(false)}
+              onConfirm={async ({ data, user }) => {
+                const res = await invoke({
+                  functionSlug: slug || '',
+                  data,
+                  user,
+                });
 
-            if (res?.data) {
-              setInvokeOpen(false);
-              toast.success('Function invoked');
-            }
-          }}
-        />
+                if (res?.data) {
+                  setInvokeOpen(false);
+                  toast.success('Function invoked');
+                }
+              }}
+            />
+          </>
+        )}
       </div>
 
       {expanded && (
@@ -230,6 +262,20 @@ export const TopInfo = ({
                   <TimeElement date={new Date(trigger.timestamp)} />
                 )}
               </ElementWrapper>
+              {cronMetadata.scheduledAt && (
+                <ElementWrapper label="Scheduled for">
+                  {isPending ? (
+                    <SkeletonElement />
+                  ) : (
+                    <TimeElement date={cronMetadata.scheduledAt} />
+                  )}
+                </ElementWrapper>
+              )}
+              {cronMetadata.fireAt && (
+                <ElementWrapper label="Fired at">
+                  {isPending ? <SkeletonElement /> : <TimeElement date={cronMetadata.fireAt} />}
+                </ElementWrapper>
+              )}
             </>
           )}
           {type === 'BATCH' && (
@@ -258,7 +304,9 @@ export const TopInfo = ({
       {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
       <div className="flex-1">
         <Tabs
-          defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
+          defaultActive={
+            result?.error ? 'error' : prettyPayload ? 'input' : prettyOutput ? 'output' : ''
+          }
           tabs={[
             ...(prettyPayload
               ? [
@@ -303,12 +351,36 @@ export const TopInfo = ({
                   },
                 ]
               : []),
-            ...(metadataIsEnabled && trace?.metadata?.length
+            ...(scoreMetadata.length
+              ? [
+                  {
+                    label: 'Scores',
+                    id: 'scores',
+                    node: <ScoresAttrs metadata={scoreMetadata} />,
+                  },
+                ]
+              : []),
+            ...(hasMetadataTab
               ? [
                   {
                     label: 'Metadata',
                     id: 'metadata',
-                    node: <MetadataAttrs metadata={trace.metadata} />,
+                    node: <MetadataAttrs metadata={nonScoreMetadata} />,
+                  },
+                ]
+              : []),
+            ...(hasLinkedRuns
+              ? [
+                  {
+                    label: 'Linked runs',
+                    id: 'linked',
+                    node: (
+                      <LinkedRuns
+                        defers={defers}
+                        siblingDefers={siblingDefers}
+                        deferredFrom={deferredFrom}
+                      />
+                    ),
                   },
                 ]
               : []),

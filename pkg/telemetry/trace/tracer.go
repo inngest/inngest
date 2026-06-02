@@ -625,7 +625,9 @@ func ConnectTracer() oteltrace.Tracer {
 	return tracer
 }
 
-func QueueTracer() oteltrace.Tracer {
+type QueueTracerOpt func(oteltrace.Tracer) oteltrace.Tracer
+
+func QueueTracer(opts ...QueueTracerOpt) oteltrace.Tracer {
 	l := logger.StdlibLogger(context.Background())
 
 	systemTracer := SystemTracer()
@@ -641,6 +643,10 @@ func QueueTracer() oteltrace.Tracer {
 	tracer := provider.Tracer("queue")
 	if tracer == nil {
 		l.Error("queue tracer is nil")
+	}
+
+	for _, opt := range opts {
+		tracer = opt(tracer)
 	}
 
 	return tracer

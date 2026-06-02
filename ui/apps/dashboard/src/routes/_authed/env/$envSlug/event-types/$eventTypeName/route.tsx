@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { CopyButton } from '@inngest/components/CopyButton';
 import { Header } from '@inngest/components/Header/Header';
+import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 import { ActionsMenu } from '@/components/Events/ActionsMenu';
@@ -17,6 +19,7 @@ function EventTypeLayout() {
   const { envSlug, eventTypeName } = Route.useParams();
   const eventName = decodeURIComponent(eventTypeName);
   const [showArchive, setShowArchive] = useState(false);
+  const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   return (
     <>
@@ -28,6 +31,15 @@ function EventTypeLayout() {
             href: pathCreator.eventType({ envSlug, eventName }),
           },
         ]}
+        infoIcon={
+          <CopyButton
+            code={eventName}
+            iconOnly
+            size="small"
+            isCopying={isCopying}
+            handleCopyClick={handleCopyClick}
+          />
+        }
         tabs={[
           {
             href: pathCreator.eventType({ envSlug, eventName }),

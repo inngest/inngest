@@ -13,6 +13,21 @@ import { useInsightsSQLEditorOnMountCallback } from './hooks/useInsightsSQLEdito
 import { useSQLCompletionConfig } from './hooks/useSQLCompletionConfig';
 import { useEffect, useState } from 'react';
 
+function diagnosticSeverityToMonacoSeverity(
+  severity: 'error' | 'warning' | 'info' | 'none',
+): number {
+  switch (severity) {
+    case 'error':
+      return 8;
+    case 'warning':
+      return 4;
+    case 'info':
+      return 2;
+    default:
+      return 1; // Default to hint
+  }
+}
+
 export function InsightsSQLEditor() {
   const { onChange, query, runQuery, data } = useInsightsStateMachineContext();
   const { onMount } = useInsightsSQLEditorOnMountCallback();
@@ -135,7 +150,7 @@ export function InsightsSQLEditor() {
           startLineNumber: startPos.lineNumber,
           endColumn: endPos.column,
           endLineNumber: endPos.lineNumber,
-          severity: diag.severity === 'error' ? 8 : 4,
+          severity: diagnosticSeverityToMonacoSeverity(diag.severity),
           code: {
             // TODO: add docs links based on diagnostic code
             target: monaco.Uri.parse('http://example.com'),

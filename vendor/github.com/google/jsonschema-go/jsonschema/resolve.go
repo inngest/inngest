@@ -22,18 +22,41 @@ import (
 // (the $ref and $dynamicRef keywords) have been resolved to their referenced Schemas.
 // Call [Schema.Resolve] to obtain a Resolved from a Schema.
 type Resolved struct {
-	root *Schema
+	root  *Schema
+	draft draft
 	// map from $ids to their schemas
 	resolvedURIs map[string]*Schema
 	// map from schemas to additional info computed during resolution
 	resolvedInfos map[*Schema]*resolvedInfo
 }
 
+type draft int
+
+const (
+	draft7 = iota
+	draft2020
+)
+
 func newResolved(s *Schema) *Resolved {
 	return &Resolved{
 		root:          s,
+		draft:         detectDraft(s),
 		resolvedURIs:  map[string]*Schema{},
 		resolvedInfos: map[*Schema]*resolvedInfo{},
+	}
+}
+
+// detectDraft inspects the raw JSON to determine the schema version.
+func detectDraft(s *Schema) draft {
+	// Check explicit $schema declaration
+	switch s.Schema {
+	case draft7SchemaVersion, draft7SecSchemaVersion:
+		return draft7
+	case draft202012SchemaVersion:
+		return draft2020
+	default:
+		// If nothing matches default to the latest supported version.
+		return draft2020
 	}
 }
 
@@ -312,7 +335,7 @@ func (s *Schema) checkLocal(report func(error), infos map[*Schema]*resolvedInfo)
 	// validate them.
 	// Currently, it's just the $vocabulary property.
 	// As a special case, we can validate the 2020-12 meta-schema.
-	if s.Vocabulary != nil && s.Schema != draft202012 {
+	if s.Vocabulary != nil && s.Schema != draft202012SchemaVersion {
 		addf("cannot validate a schema with $vocabulary")
 	}
 
@@ -383,6 +406,21 @@ func (s *Schema) checkLocal(report func(error), infos map[*Schema]*resolvedInfo)
 //	allOf/2        http://a.com/root.json (inherited from parent)
 //	allOf/2/not    http://a.com/root.json (inherited from parent)
 func resolveURIs(rs *Resolved, baseURI *url.URL) error {
+	// Anchors and dynamic anchors are URI fragments that are scoped to their base.
+	// We treat them as keys in a map stored within the schema.
+	setAnchor := func(s *Schema, baseInfo *resolvedInfo, anchor string, dynamic bool) error {
+		if anchor != "" {
+			if _, ok := baseInfo.anchors[anchor]; ok {
+				return fmt.Errorf("duplicate anchor %q in %s", anchor, baseInfo.uri)
+			}
+			if baseInfo.anchors == nil {
+				baseInfo.anchors = map[string]anchorInfo{}
+			}
+			baseInfo.anchors[anchor] = anchorInfo{s, dynamic}
+		}
+		return nil
+	}
+
 	var resolve func(s, base *Schema) error
 	resolve = func(s, base *Schema) error {
 		info := rs.resolvedInfos[s]
@@ -390,42 +428,41 @@ func resolveURIs(rs *Resolved, baseURI *url.URL) error {
 
 		// ids are scoped to the root.
 		if s.ID != "" {
-			// A non-empty ID establishes a new base.
-			idURI, err := url.Parse(s.ID)
-			if err != nil {
-				return err
+			// draft-7 specific
+			// https://json-schema.org/draft-07/draft-handrews-json-schema-01#rfc.section.8.3
+			// "All other properties in a "$ref" object MUST be ignored."
+			ignore := rs.draft == draft7 && s.Ref != ""
+			if !ignore {
+				// A non-empty ID establishes a new base.
+				idURI, err := url.Parse(s.ID)
+				if err != nil {
+					return err
+				}
+				if rs.draft == draft2020 && idURI.Fragment != "" {
+					return fmt.Errorf("$id %s must not have a fragment", s.ID)
+				}
+				if rs.draft == draft7 && idURI.Fragment != "" {
+					// anchor did not exist in draft 7, id was used for base uri and document navigation
+					// https://json-schema.org/draft-07/draft-handrews-json-schema-01#id-keyword
+					anchorName := strings.TrimPrefix(s.ID, "#")
+					setAnchor(s, baseInfo, anchorName, false)
+				} else {
+					// The base URI for this schema is its $id resolved against the parent base.
+					info.uri = baseInfo.uri.ResolveReference(idURI)
+					if !info.uri.IsAbs() {
+						return fmt.Errorf("$id %s does not resolve to an absolute URI (base is %q)", s.ID, baseInfo.uri)
+					}
+					rs.resolvedURIs[info.uri.String()] = s
+					base = s // needed for anchors
+					baseInfo = rs.resolvedInfos[base]
+				}
 			}
-			if idURI.Fragment != "" {
-				return fmt.Errorf("$id %s must not have a fragment", s.ID)
-			}
-			// The base URI for this schema is its $id resolved against the parent base.
-			info.uri = baseInfo.uri.ResolveReference(idURI)
-			if !info.uri.IsAbs() {
-				return fmt.Errorf("$id %s does not resolve to an absolute URI (base is %q)", s.ID, baseInfo.uri)
-			}
-			rs.resolvedURIs[info.uri.String()] = s
-			base = s // needed for anchors
-			baseInfo = rs.resolvedInfos[base]
 		}
 		info.base = base
-
-		// Anchors and dynamic anchors are URI fragments that are scoped to their base.
-		// We treat them as keys in a map stored within the schema.
-		setAnchor := func(anchor string, dynamic bool) error {
-			if anchor != "" {
-				if _, ok := baseInfo.anchors[anchor]; ok {
-					return fmt.Errorf("duplicate anchor %q in %s", anchor, baseInfo.uri)
-				}
-				if baseInfo.anchors == nil {
-					baseInfo.anchors = map[string]anchorInfo{}
-				}
-				baseInfo.anchors[anchor] = anchorInfo{s, dynamic}
-			}
-			return nil
+		if rs.draft == draft2020 {
+			setAnchor(s, baseInfo, s.Anchor, false)
+			setAnchor(s, baseInfo, s.DynamicAnchor, true)
 		}
-
-		setAnchor(s.Anchor, false)
-		setAnchor(s.DynamicAnchor, true)
 
 		for c := range s.children() {
 			if err := resolve(c, base); err != nil {
@@ -508,6 +545,10 @@ func (r *resolver) resolveRef(rs *Resolved, s *Schema, ref string) (_ *Schema, d
 			ls, err := r.opts.Loader(fraglessRefURI)
 			if err != nil {
 				return nil, "", fmt.Errorf("loading %s: %w", fraglessRefURI, err)
+			}
+			// Check if referenced schema has $schema defined. If not it should inherit the resolved
+			if ls.Schema == "" {
+				ls.Schema = s.Schema
 			}
 			lrs, err := r.resolve(ls, fraglessRefURI)
 			if err != nil {

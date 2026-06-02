@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useUser } from "@clerk/tanstack-react-start";
 import {
@@ -12,17 +13,23 @@ import { Button } from "@inngest/components/Button";
 import { formatDistanceToNow } from "date-fns";
 import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
 import { Image } from "@unpic/react";
-import type { TimeLineEntryEdge } from "@/data/plain";
+import type { TicketDetail, TimeLineEntryEdge } from "@/data/plain";
 import {
   getTicketById,
   getTimelineEntriesForTicket,
   replyToThread,
+  closeTicket,
 } from "@/data/plain";
+import { Main } from "@/components/Main";
 import { Markdown } from "@/components/Markdown/Markdown";
 import { PriorityBadge, StatusBadge } from "@/components/Support/TicketBadges";
 import { ChannelBadge } from "@/components/Support/ChannelBadge";
 import { formatTimestamp } from "@/utils/ticket";
 import { Attachment } from "@/components/Support/Attachment";
+import {
+  AttachmentUploadField,
+  useAttachmentUpload,
+} from "@/components/Support/AttachmentUploadField";
 
 export const Route = createFileRoute("/_authed/case/$ticketId")({
   component: TicketDetailPage,
@@ -39,10 +46,34 @@ export const Route = createFileRoute("/_authed/case/$ticketId")({
 });
 
 function TicketDetailPage() {
-  const { ticket, timelineEntries } = Route.useLoaderData();
-  const router = useRouter();
+  const { ticket, timelineEntries: initialTimelineEntries } =
+    Route.useLoaderData();
+  const params = Route.useParams();
   const { user } = useUser();
   const timelineEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: serverEntries, refetch: refetchTimeline } = useQuery({
+    queryKey: ["timeline", params.ticketId],
+    queryFn: () =>
+      getTimelineEntriesForTicket({ data: { ticketId: params.ticketId } }),
+    initialData: initialTimelineEntries,
+    staleTime: 30_000,
+  });
+
+  const [pendingEntries, setPendingEntries] = useState<TimeLineEntryEdge[]>([]);
+
+  const timelineEntries = useMemo(() => {
+    const real = serverEntries ?? [];
+    const pending = pendingEntries.filter((pending) => {
+      const pendingTime = new Date(pending.node.timestamp.iso8601).getTime();
+      return !real.some(
+        (real) =>
+          real.node.actor.__typename === "CustomerActor" &&
+          new Date(real.node.timestamp.iso8601).getTime() >= pendingTime,
+      );
+    });
+    return [...real, ...pending];
+  }, [serverEntries, pendingEntries]);
 
   if (!ticket || !timelineEntries) {
     return <div>Error loading ticket</div>;
@@ -53,10 +84,9 @@ function TicketDetailPage() {
   const userEmail = user?.primaryEmailAddress?.emailAddress;
 
   const scrollToBottom = () => {
-    // Wait for the DOM to update after invalidation, then scroll
     setTimeout(() => {
       timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 500);
+    }, 100);
   };
 
   // Find the first Slack message link for the "Reply in Slack" button
@@ -73,152 +103,246 @@ function TicketDetailPage() {
       : undefined;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Back button */}
-      <Link
-        to="/"
-        className="text-muted hover:text-basis mb-6 inline-flex items-center gap-2 text-sm font-medium transition-colors"
-      >
-        <RiArrowLeftLine className="h-4 w-4" />
-        Back to tickets
-      </Link>
+    <Main className="min-h-screen lg:max-w-6xl">
+      <div className="mb-4 lg:`mb-8 max-w-4xl">
+        {/* Back button */}
+        <Link
+          to="/"
+          className="text-muted hover:text-basis mb-6 inline-flex items-center gap-2 text-sm font-medium transition-colors"
+        >
+          <RiArrowLeftLine className="h-4 w-4" />
+          Back to tickets
+        </Link>
 
-      {/* Ticket header */}
-      <div className="mb-8 flex flex-col gap-2 pb-2 pt-2 text-sm md:text-base">
         {/* Title and Status */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-basis font-medium leading-4">{ticket.title}</h1>
-          <StatusBadge status={ticket.status} />
-        </div>
-
-        {/* Metadata */}
-        <div className="flex flex-col gap-2">
-          {/* Ticket number */}
-          <div className="flex items-start gap-1 leading-4">
-            <span className="text-muted">Ticket number:</span>
-            <span className="text-basis font-mono">{ticket.ref}</span>
-          </div>
-
-          {/* Priority */}
-          <div className="flex items-center gap-2 leading-4">
-            <span className="text-muted">Priority:</span>
-            <PriorityBadge priority={ticket.priority} />
-          </div>
-
-          {/* Source */}
-          {ticket.channel && (
-            <div className="flex items-center gap-2 leading-4">
-              <span className="text-muted">Source:</span>
-              <ChannelBadge channel={ticket.channel} showLabel={true} />
-            </div>
-          )}
-
-          {/* Created */}
-          <div className="flex items-center gap-2 leading-4">
-            <span className="text-muted">Created:</span>
-            <span className="text-muted leading-4">
-              {formatTimestamp(ticket.createdAt)}
-            </span>
-          </div>
-
-          {/* Updated */}
-          <div className="flex items-center gap-2 leading-4">
-            <span className="text-muted">Updated:</span>
-            <span className="text-muted leading-4">
-              {formatTimestamp(ticket.updatedAt)}
-            </span>
-          </div>
-        </div>
+        <header className="flex items-center justify-between">
+          <h1 className="text-basis font-medium text-lg leading-4">
+            {ticket.title}
+          </h1>
+          <StatusBadge status={ticket.status} size="md" />
+        </header>
       </div>
 
-      {/* Conversation timeline */}
-      <div className="flex-1 space-y-8">
-        {timelineEntries.length === 0 ? (
-          <div className="bg-canvasSubtle border-subtle rounded-xl border p-12 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-canvasMuted">
-              <svg
-                className="text-muted h-8 w-8"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
+      <div className="flex flex-col flex-grow h-full lg:flex-row gap-10">
+        <div className="flex flex-col flex-grow max-w-4xl">
+          {/* Ticket header */}
+          <div className="mb-8 flex flex-col gap-2 pb-2 pt-2 text-sm md:text-base lg:hidden">
+            <Metadata ticket={ticket} />
+          </div>
+
+          {/* Conversation timeline */}
+          <div className="flex-1 space-y-8">
+            {timelineEntries.length === 0 ? (
+              <div className="bg-canvasSubtle border-subtle rounded-xl border p-12 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-canvasMuted">
+                  <svg
+                    className="text-muted h-8 w-8"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-basis mb-1 text-lg font-medium">
+                  No messages yet
+                </p>
+                <p className="text-muted text-sm">
+                  The conversation will appear here once messages are exchanged.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0">
+                {" "}
+                {/* To support threading, we handle spacing in the element */}
+                {timelineEntries.map((entry, idx, arr) => {
+                  // If multiple messages are send from Slack within 2 minutes of each, thread them together
+                  const entryTypename = entry.node.entry.__typename;
+                  const isSlackMessage =
+                    entryTypename === "SlackMessageEntry" ||
+                    entryTypename === "SlackReplyEntry";
+                  const previousEntry = arr[idx - 1] as
+                    | typeof entry
+                    | undefined;
+                  const prevTypename = previousEntry?.node.entry.__typename;
+                  const isPreviousSlackMessage = prevTypename
+                    ? prevTypename === "SlackMessageEntry" ||
+                      prevTypename === "SlackReplyEntry"
+                    : false;
+                  const shouldThread =
+                    isSlackMessage &&
+                    isPreviousSlackMessage &&
+                    previousEntry !== undefined &&
+                    new Date(entry.node.timestamp.iso8601).getTime() -
+                      new Date(previousEntry.node.timestamp.iso8601).getTime() <
+                      2 * 60 * 1000;
+                  return (
+                    <TimelineEntry
+                      key={entry.node.id}
+                      entry={entry}
+                      idx={idx}
+                      shouldThread={shouldThread}
+                    />
+                  );
+                })}
+                {/* Scroll target for after sending a message */}
+                <div ref={timelineEndRef} />
+              </div>
+            )}
+          </div>
+
+          {/* Reply form or Slack button */}
+          {isSlackChannel && slackMessageLink ? (
+            <div className="sticky bottom-0 border-t border-muted bg-canvasBase py-2">
+              <Button
+                kind="primary"
+                appearance="outlined"
+                href={slackMessageLink}
+                target="_blank"
+                label="Reply in Slack"
+                icon={<RiSlackLine className="h-4 w-4" />}
+                iconSide="left"
+              />
             </div>
-            <p className="text-basis mb-1 text-lg font-medium">
-              No messages yet
-            </p>
-            <p className="text-muted text-sm">
-              The conversation will appear here once messages are exchanged.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-0">
-            {" "}
-            {/* To support threading, we handle spacing in the element */}
-            {timelineEntries.map((entry, idx, arr) => {
-              // If multiple messages are send from Slack within 2 minutes of each, thread them together
-              const entryTypename = entry.node.entry.__typename;
-              const isSlackMessage =
-                entryTypename === "SlackMessageEntry" ||
-                entryTypename === "SlackReplyEntry";
-              const previousEntry = arr[idx - 1] as typeof entry | undefined;
-              const prevTypename = previousEntry?.node.entry.__typename;
-              const isPreviousSlackMessage = prevTypename
-                ? prevTypename === "SlackMessageEntry" ||
-                  prevTypename === "SlackReplyEntry"
-                : false;
-              const shouldThread =
-                isSlackMessage &&
-                isPreviousSlackMessage &&
-                previousEntry !== undefined &&
-                new Date(entry.node.timestamp.iso8601).getTime() -
-                  new Date(previousEntry.node.timestamp.iso8601).getTime() <
-                  2 * 60 * 1000;
-              return (
-                <TimelineEntry
-                  key={entry.node.id}
-                  entry={entry}
-                  idx={idx}
-                  shouldThread={shouldThread}
-                />
-              );
-            })}
-            {/* Scroll target for after sending a message */}
-            <div ref={timelineEndRef} />
-          </div>
-        )}
+          ) : userEmail ? (
+            <ReplyForm
+              ticketId={ticket.id}
+              userEmail={userEmail}
+              onSuccess={(sentMessage: string) => {
+                const now = new Date().toISOString();
+                const optimistic: TimeLineEntryEdge = {
+                  cursor: `pending-${Date.now()}`,
+                  node: {
+                    id: `pending-${Date.now()}`,
+                    timestamp: { __typename: "DateTime", iso8601: now },
+                    actor: {
+                      __typename: "CustomerActor",
+                      customer: {
+                        fullName: user?.fullName || userEmail || "You",
+                        avatarUrl: user?.imageUrl || "",
+                        email: { email: userEmail || "" },
+                      },
+                    },
+                    entry: {
+                      __typename: "EmailEntry",
+                      emailId: `pending-${Date.now()}`,
+                      subject: "",
+                      textContent: sentMessage,
+                      markdownContent: sentMessage,
+                      hasMoreMarkdownContent: false,
+                      fullMarkdownContent: sentMessage,
+                      sentAt: {
+                        unixTimestamp: String(Math.floor(Date.now() / 1000)),
+                        iso8601: now,
+                      },
+                      attachments: [],
+                    },
+                  },
+                };
+                setPendingEntries((prev) => [...prev, optimistic]);
+                scrollToBottom();
+                setTimeout(() => refetchTimeline(), 3000);
+                setTimeout(() => refetchTimeline(), 8000);
+              }}
+            />
+          ) : null}
+        </div>
+        <div className="hidden lg:block">
+          <Metadata ticket={ticket} />
+        </div>
+      </div>
+    </Main>
+  );
+}
+
+function Metadata({ ticket }: { ticket: TicketDetail }) {
+  const router = useRouter();
+  const [isClosing, setIsClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const closeTicketFn = useServerFn(closeTicket);
+
+  async function handleCloseTicket() {
+    if (!ticket) return;
+    setIsClosing(true);
+    setCloseError(null);
+    try {
+      const result = await closeTicketFn({
+        data: { threadId: ticket.id },
+      });
+      if (result.success) {
+        await router.invalidate();
+      } else {
+        setCloseError(result.error || "Failed to close ticket");
+      }
+    } catch (err) {
+      console.error("Error closing ticket:", err);
+      setCloseError("Failed to close ticket. Please try again.");
+    } finally {
+      setIsClosing(false);
+    }
+  }
+
+  const isOpen = ticket.status.toLowerCase() !== "done";
+  return (
+    <aside className="flex flex-col gap-2 lg:gap-4">
+      {/* Ticket number */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Ticket number:</span>
+        <span className="text-basis font-mono">{ticket.ref}</span>
       </div>
 
-      {/* Reply form or Slack button */}
-      {isSlackChannel && slackMessageLink ? (
-        <div className="sticky bottom-0 border-t border-muted bg-canvasBase py-2">
+      {/* Priority */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Priority:</span>
+        <PriorityBadge priority={ticket.priority} />
+      </div>
+
+      {/* Source */}
+      {ticket.channel && (
+        <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+          <span className="text-muted text-sm">Source:</span>
+          <ChannelBadge channel={ticket.channel} showLabel={true} />
+        </div>
+      )}
+
+      {/* Created */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Created:</span>
+        <span className="text-basis leading-4">
+          {formatTimestamp(ticket.createdAt)}
+        </span>
+      </div>
+
+      {/* Updated */}
+      <div className="flex md:flex-col items-center md:items-start gap-2 leading-4">
+        <span className="text-muted text-sm">Updated:</span>
+        <span className="text-basis leading-4">
+          {formatTimestamp(ticket.updatedAt)}
+        </span>
+      </div>
+
+      {/* Close Ticket */}
+      {isOpen && (
+        <div className="flex items-center gap-2 pt-2">
           <Button
-            kind="primary"
+            kind="danger"
             appearance="outlined"
-            href={slackMessageLink}
-            target="_blank"
-            label="Reply in Slack"
-            icon={<RiSlackLine className="h-4 w-4" />}
-            iconSide="left"
+            size="small"
+            label={isClosing ? "Closing..." : "Close ticket"}
+            disabled={isClosing}
+            onClick={handleCloseTicket}
           />
+          {closeError && (
+            <span className="text-sm text-red-500">{closeError}</span>
+          )}
         </div>
-      ) : userEmail ? (
-        <ReplyForm
-          ticketId={ticket.id}
-          userEmail={userEmail}
-          onSuccess={async () => {
-            await router.invalidate();
-            scrollToBottom();
-          }}
-        />
-      ) : null}
-    </div>
+      )}
+    </aside>
   );
 }
 
@@ -229,19 +353,40 @@ function ReplyForm({
 }: {
   ticketId: string;
   userEmail: string;
-  onSuccess: () => void;
+  onSuccess: (message: string) => void;
 }) {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const replyToThreadFn = useServerFn(replyToThread);
+  const {
+    attachments,
+    isUploading,
+    uploadedAttachmentIds,
+    fileInputRef,
+    handleFileSelect,
+    removeAttachment,
+    openFilePicker,
+    clearAttachments,
+  } = useAttachmentUpload({
+    userEmail,
+    onError: setError,
+  });
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [message]);
+
+  const hasContent =
+    message.trim().length > 0 || uploadedAttachmentIds.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!message.trim()) {
-      return;
-    }
+    if (!hasContent) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -252,12 +397,18 @@ function ReplyForm({
           threadId: ticketId,
           message: message.trim(),
           userEmail,
+          attachmentIds:
+            uploadedAttachmentIds.length > 0
+              ? uploadedAttachmentIds
+              : undefined,
         },
       });
 
       if (result.success) {
+        const sentMessage = message.trim();
         setMessage("");
-        onSuccess();
+        clearAttachments();
+        onSuccess(sentMessage);
       } else {
         setError(result.error || "Failed to send message");
       }
@@ -274,38 +425,48 @@ function ReplyForm({
       <form onSubmit={handleSubmit}>
         <div className="border-muted bg-canvasBase flex flex-col gap-2 rounded-lg border px-4 py-3 shadow-sm">
           <textarea
+            ref={textareaRef}
             placeholder="Add new message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={1}
-            className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
+            className="text-basis placeholder:text-disabled min-h-[21px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-5 outline-none focus:ring-0"
             disabled={isSubmitting}
           />
+
           <div className="flex items-center justify-between">
-            <div>{/* TODO - Add attachment support */}</div>
-            {/* <button
-              type="button"
-              className="text-muted hover:text-basis flex h-6 w-5 items-center justify-center"
-              disabled
-              title="Attachments coming soon"
-            >
-              <RiAttachmentLine className="h-4 w-4" />
-            </button> */}
+            <div>
+              <AttachmentUploadField
+                attachments={attachments}
+                isUploading={isUploading}
+                isSubmitting={isSubmitting}
+                fileInputRef={fileInputRef}
+                onFileSelect={handleFileSelect}
+                onRemoveAttachment={removeAttachment}
+                onAddClick={openFilePicker}
+                variant="compact"
+                showHelpText={false}
+              />
+            </div>
             <div>
               <Button
                 type="submit"
                 kind="primary"
                 appearance="solid"
                 size="small"
-                label="Submit"
+                label={isSubmitting ? "Sending..." : "Submit"}
                 icon={<RiArrowRightUpLine className="h-4 w-4" />}
-                disabled={isSubmitting || !message.trim()}
+                disabled={isSubmitting || isUploading || !hasContent}
                 className="h-6 px-2 text-xs"
               />
             </div>
           </div>
         </div>
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        <p className="text-muted mt-1 text-xs">
+          Max 5 files, 10 MB each. PDF, images, and common document types
+          accepted.
+        </p>
       </form>
     </div>
   );
@@ -323,11 +484,17 @@ function TimelineEntry({
   const actorTypename = entry.node.actor.__typename;
   const isStaff =
     actorTypename === "UserActor" || actorTypename === "MachineUserActor";
+  const staffName =
+    actorTypename === "UserActor"
+      ? entry.node.actor.user.fullName
+      : actorTypename === "MachineUserActor"
+      ? entry.node.actor.machineUser.fullName
+      : "";
   const actorName =
     actorTypename === "CustomerActor"
       ? entry.node.actor.customer.fullName || "Customer"
       : isStaff
-      ? "Inngest Support Team"
+      ? staffName || "Inngest Support Team"
       : "Unknown";
 
   const timeAgo = formatDistanceToNow(new Date(entry.node.timestamp.iso8601), {
@@ -419,7 +586,7 @@ function TimelineEntry({
           entry.node.entry.attachments.length > 0 && (
             <div className="flex flex-row flex-wrap gap-1">
               {entry.node.entry.attachments.map((attachment) => (
-                <Attachment attachmentId={attachment.id} />
+                <Attachment key={attachment.id} attachmentId={attachment.id} />
               ))}
             </div>
           )}

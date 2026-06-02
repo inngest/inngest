@@ -77,7 +77,7 @@ func TestStepPauseDeadlockRegression(t *testing.T) {
 
 	// Wait a moment for runID to be populated
 	<-time.After(2 * time.Second)
-	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
+	c.WaitForRunStatus(ctx, t, "FAILED", runID)
 	r.Exactly(int32(1), afterStepAttempts, "after step should have been attempted exactly once")
 	r.True(reachedAfter)
 }

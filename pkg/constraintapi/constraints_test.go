@@ -26,7 +26,7 @@ func TestConstraintEnforcement(t *testing.T) {
 
 	type deps struct {
 		cm    *redisCapacityManager
-		clock clockwork.FakeClock
+		clock *clockwork.FakeClock
 		r     *miniredis.Miniredis
 		rc    rueidis.Client
 
@@ -1420,6 +1420,50 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Equal(t, 0, resp.AvailableCapacity)
 			},
 		},
+
+		{
+			name: "semaphore auto release",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Semaphores: []Semaphore{
+					{ID: "app:test-sem", Weight: 1, Release: SemaphoreReleaseAuto},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindSemaphore,
+					Semaphore: &SemaphoreConstraint{
+						ID:      "app:test-sem",
+						Weight:  1,
+						Release: SemaphoreReleaseAuto,
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set semaphore capacity to 5
+				sem := deps.constraints[0].Semaphore
+				capKey := sem.CapacityKey(accountID)
+				require.NoError(t, deps.r.Set(capKey, "5"))
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// Semaphore usage should be 1
+				sem := deps.constraints[0].Semaphore
+				usageKey := sem.UsageKey(accountID)
+				val, err := deps.r.Get(usageKey)
+				require.NoError(t, err)
+				require.Equal(t, "1", val)
+			},
+			afterRelease: func(t *testing.T, deps *deps, resp *CapacityReleaseResponse) {
+				// After release, semaphore usage should be decremented (auto-release)
+				sem := deps.constraints[0].Semaphore
+				usageKey := sem.UsageKey(accountID)
+				val, err := deps.r.Get(usageKey)
+				require.NoError(t, err)
+				require.Equal(t, "0", val)
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -1547,6 +1591,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					LeaseID:        lease.LeaseID,
 					AccountID:      accountID,
 					Duration:       5 * time.Second,
+					LeaseIssuedAt:  clock.Now(),
 				})
 				require.NoError(t, err)
 
@@ -1558,6 +1603,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					AccountID:      accountID,
 					IdempotencyKey: "release",
 					LeaseID:        *extendResp.LeaseID,
+					LeaseIssuedAt:  clock.Now(),
 				})
 				require.NoError(t, err)
 
@@ -1662,6 +1708,20 @@ func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 			functionID:  functionID,
 			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
 			description: "empty KeyExpressionHash should not append keyID suffix",
+		},
+		{
+			name: "empty expression hash with non-empty evaluated key should omit key suffix",
+			constraint: ConcurrencyConstraint{
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             enums.ConcurrencyScopeFn,
+				KeyExpressionHash: "",
+				EvaluatedKeyHash:  "should-be-ignored",
+			},
+			accountID:   accountID,
+			envID:       envID,
+			functionID:  functionID,
+			expected:    "{cs}:a:550e8400-e29b-41d4-a716-446655440001:concurrency:f:550e8400-e29b-41d4-a716-446655440003",
+			description: "empty KeyExpressionHash should omit key suffix even when EvaluatedKeyHash is set",
 		},
 		{
 			name: "with custom key hash",
@@ -2011,8 +2071,8 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeAccount,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:abcd1234hash",
-			description: "account scope should generate account-specific key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:11111111-2222-3333-4444-555555555555",
+			description: "account scope without key expression should use account ID only",
 		},
 		{
 			name: "environment scope rate limit",
@@ -2020,8 +2080,8 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeEnv,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa:abcd1234hash",
-			description: "environment scope should generate environment-specific key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa",
+			description: "environment scope without key expression should use env ID only",
 		},
 		{
 			name: "function scope rate limit",
@@ -2029,17 +2089,18 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeFn,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:abcd1234hash",
-			description: "function scope should generate function-specific key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			description: "function scope without key expression should use function ID only",
 		},
 		{
-			name: "function scope with different key hash",
+			name: "function scope with different key hash and expression",
 			constraint: &RateLimitConstraint{
-				Scope:            enums.RateLimitScopeFn,
-				EvaluatedKeyHash: "xyz789different",
+				Scope:             enums.RateLimitScopeFn,
+				KeyExpressionHash: "expr1",
+				EvaluatedKeyHash:  "xyz789different",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:xyz789different",
-			description: "function scope key should vary with different evaluated key hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee<expr1:xyz789different>",
+			description: "function scope key should vary with different evaluated key hash when expression is set",
 		},
 		{
 			name: "account scope with empty key hash",
@@ -2047,8 +2108,8 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeAccount,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:",
-			description: "empty key hash should still generate valid key structure",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:11111111-2222-3333-4444-555555555555",
+			description: "empty key hash without expression should use account ID only",
 		},
 		{
 			name: "environment scope with empty key hash",
@@ -2056,8 +2117,8 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeEnv,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa:",
-			description: "empty key hash should still generate valid key structure",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:e:66666666-7777-8888-9999-aaaaaaaaaaaa",
+			description: "empty key hash without expression should use env ID only",
 		},
 		{
 			name: "function scope with empty key hash",
@@ -2065,8 +2126,8 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				Scope:            enums.RateLimitScopeFn,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:",
-			description: "function scope with empty hash should generate key with function ID",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			description: "function scope without expression should use function ID only",
 		},
 		{
 			name: "account scope with key expression hash",
@@ -2075,8 +2136,18 @@ func TestRateLimitConstraint_StateKey(t *testing.T) {
 				KeyExpressionHash: "expr123",
 				EvaluatedKeyHash:  evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:abcd1234hash",
-			description: "key expression hash should not affect state key generation",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:a:11111111-2222-3333-4444-555555555555<expr123:abcd1234hash>",
+			description: "key expression hash should be included in state key",
+		},
+		{
+			name: "empty expression hash with non-empty evaluated key should omit key suffix",
+			constraint: &RateLimitConstraint{
+				Scope:             enums.RateLimitScopeFn,
+				KeyExpressionHash: "",
+				EvaluatedKeyHash:  "should-be-ignored",
+			},
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:rl:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			description: "empty key expression hash should omit key suffix even when evaluated key hash is set",
 		},
 		{
 			name: "invalid scope should return empty string",
@@ -2135,13 +2206,19 @@ func TestRateLimitConstraint_StateKey_Uniqueness(t *testing.T) {
 	key6 := fnConstraint.StateKey(accountID1, envID1, fnID2)
 	assert.NotEqual(t, key5, key6, "Different function IDs should produce different keys")
 
-	// Test that different evaluated key hashes produce different keys
-	constraint2 := &RateLimitConstraint{
-		Scope:            enums.RateLimitScopeAccount,
-		EvaluatedKeyHash: "differenthash",
+	// Test that different evaluated key hashes produce different keys (requires KeyExpressionHash)
+	constraintWithExpr1 := &RateLimitConstraint{
+		Scope:             enums.RateLimitScopeAccount,
+		KeyExpressionHash: "expr",
+		EvaluatedKeyHash:  evaluatedKeyHash,
 	}
-	key7 := constraint.StateKey(accountID1, envID1, fnID1)
-	key8 := constraint2.StateKey(accountID1, envID1, fnID1)
+	constraintWithExpr2 := &RateLimitConstraint{
+		Scope:             enums.RateLimitScopeAccount,
+		KeyExpressionHash: "expr",
+		EvaluatedKeyHash:  "differenthash",
+	}
+	key7 := constraintWithExpr1.StateKey(accountID1, envID1, fnID1)
+	key8 := constraintWithExpr2.StateKey(accountID1, envID1, fnID1)
 	assert.NotEqual(t, key7, key8, "Different evaluated key hashes should produce different keys")
 }
 
@@ -2163,8 +2240,8 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeAccount,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:xyz456hash",
-			description: "account scope should generate account-specific throttle key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:11111111-2222-3333-4444-555555555555",
+			description: "account scope without key expression should use account ID only",
 		},
 		{
 			name: "environment scope throttle",
@@ -2172,8 +2249,8 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeEnv,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa:xyz456hash",
-			description: "environment scope should generate environment-specific throttle key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa",
+			description: "environment scope without key expression should use env ID only",
 		},
 		{
 			name: "function scope throttle",
@@ -2181,17 +2258,18 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeFn,
 				EvaluatedKeyHash: evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:xyz456hash",
-			description: "function scope should generate function-specific throttle key",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			description: "function scope without key expression should use function ID only",
 		},
 		{
-			name: "function scope with different key hash",
+			name: "function scope with different key hash and expression",
 			constraint: &ThrottleConstraint{
-				Scope:            enums.ThrottleScopeFn,
-				EvaluatedKeyHash: "different123",
+				Scope:             enums.ThrottleScopeFn,
+				KeyExpressionHash: "expr1",
+				EvaluatedKeyHash:  "different123",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:different123",
-			description: "function scope key should vary with different evaluated key hash",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee<expr1:different123>",
+			description: "function scope key should vary with different evaluated key hash when expression is set",
 		},
 		{
 			name: "account scope with empty key hash",
@@ -2199,8 +2277,8 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeAccount,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:",
-			description: "empty key hash should still generate valid throttle key structure",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:11111111-2222-3333-4444-555555555555",
+			description: "empty key hash without expression should use account ID only",
 		},
 		{
 			name: "environment scope with empty key hash",
@@ -2208,8 +2286,8 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeEnv,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa:",
-			description: "empty key hash should still generate valid throttle key structure",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:e:66666666-7777-8888-9999-aaaaaaaaaaaa",
+			description: "empty key hash without expression should use env ID only",
 		},
 		{
 			name: "function scope with empty key hash",
@@ -2217,8 +2295,8 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				Scope:            enums.ThrottleScopeFn,
 				EvaluatedKeyHash: "",
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:",
-			description: "function scope with empty hash should generate key with function ID",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			description: "function scope without expression should use function ID only",
 		},
 		{
 			name: "account scope with key expression hash",
@@ -2227,8 +2305,18 @@ func TestThrottleConstraint_StateKey(t *testing.T) {
 				KeyExpressionHash: "expr456",
 				EvaluatedKeyHash:  evaluatedKeyHash,
 			},
-			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:xyz456hash",
-			description: "key expression hash should not affect throttle state key generation",
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:a:11111111-2222-3333-4444-555555555555<expr456:xyz456hash>",
+			description: "key expression hash should be included in throttle state key",
+		},
+		{
+			name: "empty expression hash with non-empty evaluated key should omit key suffix",
+			constraint: &ThrottleConstraint{
+				Scope:             enums.ThrottleScopeFn,
+				KeyExpressionHash: "",
+				EvaluatedKeyHash:  "should-be-ignored",
+			},
+			expectedKey: "{cs}:a:11111111-2222-3333-4444-555555555555:throttle:f:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			description: "empty key expression hash should omit key suffix even when evaluated key hash is set",
 		},
 		{
 			name: "invalid scope should return empty string",
@@ -2287,13 +2375,19 @@ func TestThrottleConstraint_StateKey_Uniqueness(t *testing.T) {
 	key6 := fnConstraint.StateKey(accountID1, envID1, fnID2)
 	assert.NotEqual(t, key5, key6, "Different function IDs should produce different throttle keys")
 
-	// Test that different evaluated key hashes produce different keys
-	constraint2 := &ThrottleConstraint{
-		Scope:            enums.ThrottleScopeAccount,
-		EvaluatedKeyHash: "anotherhash",
+	// Test that different evaluated key hashes produce different keys (requires KeyExpressionHash)
+	throttleWithExpr1 := &ThrottleConstraint{
+		Scope:             enums.ThrottleScopeAccount,
+		KeyExpressionHash: "expr",
+		EvaluatedKeyHash:  evaluatedKeyHash,
 	}
-	key7 := constraint.StateKey(accountID1, envID1, fnID1)
-	key8 := constraint2.StateKey(accountID1, envID1, fnID1)
+	throttleWithExpr2 := &ThrottleConstraint{
+		Scope:             enums.ThrottleScopeAccount,
+		KeyExpressionHash: "expr",
+		EvaluatedKeyHash:  "anotherhash",
+	}
+	key7 := throttleWithExpr1.StateKey(accountID1, envID1, fnID1)
+	key8 := throttleWithExpr2.StateKey(accountID1, envID1, fnID1)
 	assert.NotEqual(t, key7, key8, "Different evaluated key hashes should produce different throttle keys")
 
 	// Test that throttle and rate limit keys are different for same parameters

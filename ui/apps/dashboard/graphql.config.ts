@@ -60,6 +60,7 @@ const graphqlConfig = {
               SpanMetadataScope:
                 '@inngest/components/RunDetailsV3/types#SpanMetadataScope',
               SpanMetadataValues: 'Record<string, any>',
+              HTTPHeaders: 'Record<string, string|string[]>',
               Time: 'string',
               Timerange: 'unknown',
               ULID: 'string',

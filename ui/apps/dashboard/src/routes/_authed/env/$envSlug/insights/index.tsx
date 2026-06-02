@@ -20,15 +20,16 @@ import { useDeepLinkHandler } from '@/components/Insights/useDeepLinkHandler';
 
 export type InsightsSearchParams = {
   query_id?: string;
+  sql?: string;
 };
 
 export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
   component: InsightsComponent,
-  validateSearch: (search: Record<string, unknown>): InsightsSearchParams => {
-    return {
-      query_id: search?.query_id as string | undefined,
-    };
-  },
+  validateSearch: (search: Record<string, unknown>): InsightsSearchParams => ({
+    query_id:
+      typeof search?.query_id === 'string' ? search.query_id : undefined,
+    sql: typeof search?.sql === 'string' ? search.sql : undefined,
+  }),
 });
 
 // Initial placeholder actions used before real actions are available from useInsightsTabManager
@@ -94,13 +95,14 @@ function InsightsWithTabManager({
 }: InsightsWithTabManagerProps) {
   const { isSavedQueriesFetching } = useStoredQueries();
 
-  const { actions, activeTabId, tabManager, tabs } = useInsightsTabManager({
-    historyWindow,
-    isQueryHelperPanelVisible,
-    onToggleQueryHelperPanelVisibility,
-    isSavedQueriesFetching,
-    deepLinkQueryId,
-  });
+  const { actions, activeTabId, isHydrated, tabManager, tabs } =
+    useInsightsTabManager({
+      historyWindow,
+      isQueryHelperPanelVisible,
+      onToggleQueryHelperPanelVisibility,
+      isSavedQueriesFetching,
+      deepLinkQueryId,
+    });
 
   // Update the ref with real actions so StoredQueriesProvider can use them
   actionsRef.current = actions;
@@ -122,6 +124,7 @@ function InsightsWithTabManager({
           <InsightsContentWithDeepLink
             isQueryHelperPanelVisible={isQueryHelperPanelVisible}
             activeSavedQueryId={activeSavedQueryId}
+            isHydrated={isHydrated}
             tabManager={tabManager}
             actions={actions}
           />
@@ -134,11 +137,13 @@ function InsightsWithTabManager({
 function InsightsContentWithDeepLink({
   isQueryHelperPanelVisible,
   activeSavedQueryId,
+  isHydrated,
   tabManager,
   actions,
 }: {
   isQueryHelperPanelVisible: boolean;
   activeSavedQueryId: string | undefined;
+  isHydrated: boolean;
   tabManager: JSX.Element;
   actions: TabManagerActions;
 }) {
@@ -149,6 +154,7 @@ function InsightsContentWithDeepLink({
   useDeepLinkHandler({
     actions,
     activeSavedQueryId,
+    isHydrated,
     navigate,
     search,
   });

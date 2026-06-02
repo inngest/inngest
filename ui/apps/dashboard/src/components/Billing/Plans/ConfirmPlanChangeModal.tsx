@@ -66,7 +66,7 @@ function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
 }
@@ -254,10 +254,6 @@ export default function ConfirmPlanChangeModal({
                   Once {isCancellation ? 'canceled' : 'downgraded'}, you will
                   lose access to your current plan and its features{' '}
                   <b>immediately</b>.
-                </li>
-                <li>
-                  You will be credited for any unused time from your current
-                  plan, calculated on a prorated basis.
                 </li>
               </ul>
             </>

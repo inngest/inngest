@@ -1,3 +1,4 @@
+import { Alert } from '@inngest/components/Alert/Alert';
 import { Link } from '@inngest/components/Link';
 import { type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
@@ -21,8 +22,12 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       ? 'No functions found'
       : null;
 
+  const isBlockedSDKVersion = app.error === 'sdk_version_denied';
+
   const footerHeaderTitle = !app.connected ? (
-    app.error === 'unreachable' ? (
+    isBlockedSDKVersion ? (
+      'App sync was blocked.'
+    ) : app.error === 'unreachable' ? (
       `The Inngest Server can't find your application.`
     ) : (
       `Error: ${app.error}`
@@ -44,14 +49,29 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
     ) : null;
 
   const footerContent = !app.connected ? (
-    <>
-      <p className="text-subtle pb-4">
-        Ensure your full URL is correct, including the port. Inngest
-        automatically scans <span className="text-basis">multiple ports</span>{' '}
-        by default.
-      </p>
-      <UpdateApp app={app} />
-    </>
+    isBlockedSDKVersion ? (
+      <Alert severity="error">
+        App sync was blocked because this application is using an Inngest
+        JavaScript SDK with a known security vulnerability. Please upgrade to
+        v3.54.0 or later and review the advisory for more information.{' '}
+        <Alert.Link
+          href="https://www.inngest.com/blog/cve-2026-42047"
+          severity="error"
+          target="_blank"
+        >
+          See more information
+        </Alert.Link>
+      </Alert>
+    ) : (
+      <>
+        <p className="text-subtle pb-4">
+          Ensure your full URL is correct, including the port. Inngest
+          automatically scans <span className="text-basis">multiple ports</span>{' '}
+          by default.
+        </p>
+        <UpdateApp app={app} />
+      </>
+    )
   ) : app.functionCount === 0 ? (
     <>
       <p className="text-subtle pb-4">

@@ -16,13 +16,25 @@ func NewSSESubscription(
 	ctx context.Context,
 	w http.ResponseWriter,
 ) *subSSE {
-	// Ensure SSE headers are sent.
-	sseHeaders(w)
-
 	return &subSSE{
-		id: uuid.New(),
-		w:  w,
+		id:    uuid.New(),
+		w:     w,
+		ready: make(chan struct{}),
 	}
+}
+
+// WriteHeaders sends the SSE response headers and flushes them to the client.
+// This should be called only after the subscription has been successfully
+// registered with the broadcaster so that errors can still be reported with
+// proper HTTP status codes.  It also unblocks any pending writes (e.g.
+// keepalives) that were waiting for headers to be committed.
+func (s *subSSE) WriteHeaders() {
+	sseHeaders(s.w)
+	s.w.WriteHeader(http.StatusOK)
+	if f, ok := s.w.(http.Flusher); ok {
+		f.Flush()
+	}
+	close(s.ready)
 }
 
 func sseHeaders(w http.ResponseWriter) {
@@ -34,9 +46,11 @@ func sseHeaders(w http.ResponseWriter) {
 }
 
 type subSSE struct {
-	id uuid.UUID
-	w  http.ResponseWriter
-	mu sync.Mutex // Protects concurrent writes to http.ResponseWriter
+	id     uuid.UUID
+	w      http.ResponseWriter
+	ready  chan struct{} // Closed by WriteHeaders; write blocks until headers are committed or the sub is closed.
+	mu     sync.Mutex    // Protects concurrent writes to http.ResponseWriter
+	closed bool          // Set when the handler is returning; prevents writes after the response is finalized
 }
 
 // ID returns a unique ID for the given subscription
@@ -95,26 +109,36 @@ func (s *subSSE) WriteChunk(c Chunk) error {
 	return s.writeSSE(byt)
 }
 
-// Closer closes the current subscription immediately, terminating any active connections.
+// Close marks the subscription as closed and forcefully terminates the
+// underlying connection by hijacking it from the HTTP server.  This is
+// needed during broadcaster shutdown to unblock handler goroutines that
+// are waiting in a select.
 func (s *subSSE) Close() error {
-	// Close must also acquire the lock
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Writer is a reguler http.ResponseWriter.  This is usually handled and closed
-	// by the http server.  However, when Close is called we can attempt to hijack this
-	// conn and call Close directly.
+	if !s.closed {
+		s.closed = true
+		// Unblock any writes waiting on ready so they can see
+		// closed==true and return immediately.
+		select {
+		case <-s.ready:
+			// Already closed by WriteHeaders.
+		default:
+			close(s.ready)
+		}
+	}
+
 	hj, ok := s.w.(http.Hijacker)
 	if !ok {
 		return nil
 	}
 	conn, bufrw, err := hj.Hijack()
 	if err != nil {
-		return fmt.Errorf("error hijacking sse sub: %w", err)
+		// Already closed or finalized by the HTTP server — not an error.
+		return nil
 	}
-	if err := bufrw.Flush(); err != nil {
-		return fmt.Errorf("error flushing hijacked sse sub: %w", err)
-	}
+	_ = bufrw.Flush()
 	return conn.Close()
 }
 
@@ -126,8 +150,17 @@ func (s *subSSE) writeSSE(data []byte) error {
 }
 
 func (s *subSSE) write(b []byte) error {
+	// Wait for headers to be committed (WriteHeaders) or the sub to be
+	// closed before writing.  This prevents keepalives from implicitly
+	// committing headers before the handler has a chance to set them.
+	<-s.ready
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.closed {
+		return nil
+	}
 
 	if _, err := s.w.Write(b); err != nil {
 		return err
