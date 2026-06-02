@@ -19,8 +19,8 @@ export function IDCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-mono')}>{children}</p>;
 }
 
-export function TextCell({ children }: React.PropsWithChildren) {
-  return <p className={cn(cellStyles, 'truncate font-medium')}>{children}</p>;
+export function TextCell({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return <p className={cn(cellStyles, 'truncate font-medium', className)}>{children}</p>;
 }
 
 export function AICell({ children }: React.PropsWithChildren) {
@@ -41,7 +41,9 @@ export function PillCell({
   children,
   type,
   appearance = 'outlined',
-}: PillContentProps & { appearance?: PillAppearance }) {
+}: PillContentProps & {
+  appearance?: PillAppearance;
+}) {
   return (
     <Pill appearance={appearance}>
       <PillContent type={type}>{children}</PillContent>

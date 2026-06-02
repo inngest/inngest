@@ -6,6 +6,7 @@ import {
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useCancelRun } from '@/queries/useCancelRun';
 import { useGetRun } from '@/queries/useGetRun';
+import { useGetRunLinkage } from '@/queries/useGetRunLinkage';
 import { useGetTraceResult } from '@/queries/useGetTraceResult';
 import { useInvokeRun } from '@/queries/useInvokeRun';
 import { useRerun } from '@/queries/useRerun';
@@ -24,6 +25,7 @@ export const SharedContextProvider = ({
   const cancelRun = useCancelRun();
   const pathCreator = usePathCreator();
   const getRun = useGetRun();
+  const getRunLinkage = useGetRunLinkage();
   const getTraceResult = useGetTraceResult();
   const status = useSystemStatus();
 
@@ -36,6 +38,7 @@ export const SharedContextProvider = ({
     booleanFlag: useBooleanFlag,
     pathCreator,
     getRun,
+    getRunLinkage,
     getTraceResult,
     inngestStatus: status,
   };

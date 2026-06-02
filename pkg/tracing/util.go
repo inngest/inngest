@@ -413,6 +413,27 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 	}
 }
 
+// DeferSpanSeed returns the deterministic seed used to identify the
+// executor.defer span.
+func DeferSpanSeed(parentRunID ulid.ULID, hashedDeferID string) []byte {
+	// "defer-span:" prefix namespaces the seed to prevent collisions with other
+	// `(perent, hashedID)` derived seeds.
+	return fmt.Appendf(nil, "defer-span:%s:%s", parentRunID, hashedDeferID)
+}
+
+// DeferSpanRef returns the deterministic SpanReference for the executor.defer
+// span on the parent run. This span is used to store defer metadata, like
+// status and child run ID.
+func DeferSpanRef(parentRunID ulid.ULID, hashedID string) *meta.SpanReference {
+	parentCfg := DeterministicSpanConfig(parentRunID[:])
+	deferSpanID := DeterministicSpanConfig(DeferSpanSeed(parentRunID, hashedID)).SpanID.String()
+	return &meta.SpanReference{
+		DynamicSpanID:          deferSpanID,
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", parentCfg.TraceID.String(), parentCfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", parentCfg.TraceID.String(), deferSpanID),
+	}
+}
+
 func spanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
 	if m == nil {
 		return trace.SpanContext{}

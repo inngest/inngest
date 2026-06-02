@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
-import { Route as OrgActiveRoute } from '@/routes/_authed';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import ChildEmptyState from '@/components/Manage/ChildEmptyState';
 import { ManageHeader } from '@/components/Manage/Header';
 
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authed/env/$envSlug/manage')({
 });
 
 function ManageLayoutComponent() {
-  const { env } = OrgActiveRoute?.useLoaderData() ?? {};
+  const env = useEnvironment();
 
   if (env?.hasParent) {
     return <ChildEmptyState />;

@@ -239,6 +239,11 @@ func TestCheckpointSyncSteps(t *testing.T) {
 				d.ScheduleStatus == enums.DeferStatusAfterRun &&
 				string(d.Input) == `{"user_id":"u_123"}`
 		})).Return(nil)
+		// defers.SaveFromOp emits an executor.defer span on the accepted
+		// DeferAdd so the UI shows pending defers before finalize.
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
 
 		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 		require.NoError(err)
@@ -285,6 +290,9 @@ func TestCheckpointSyncSteps(t *testing.T) {
 		mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
 			return d.HashedID == "step-defer" && d.FnSlug == "onDefer-score"
 		})).Return(nil)
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
 
 		// Finalize must be called for this run with the RunComplete response type.
 		mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
@@ -344,6 +352,9 @@ func TestCheckpointSyncSteps(t *testing.T) {
 			calls++
 			saveDeferAt = calls
 		}).Return(nil)
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
 
 		mocks.executor.On("Finalize", ctx, mock.MatchedBy(func(opts execution.FinalizeOpts) bool {
 			return opts.Metadata.ID == testData.metadata.ID &&
@@ -385,12 +396,15 @@ func TestCheckpointSyncSteps(t *testing.T) {
 		mocks, testData := setupSyncCheckpointTest(t, op)
 
 		mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
+		// defers.AbortFromOp updates the existing defer span on success.
+		mocks.tracer.
+			On("UpdateSpan", mock.Anything, mock.AnythingOfType("*tracing.UpdateSpanOptions")).
+			Return(nil)
 
 		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 		require.NoError(err)
 
 		mocks.queue.AssertNotCalled(t, "Enqueue")
-		mocks.tracer.AssertNotCalled(t, "UpdateSpan")
 
 		mocks.state.AssertExpectations(t)
 		mocks.tracer.AssertExpectations(t)

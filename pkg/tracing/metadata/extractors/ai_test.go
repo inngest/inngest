@@ -132,7 +132,7 @@ func TestAIMetadataExtractor_NonAISpan(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.Nil(t, metadata, "Non-AI span should not produce metadata")
+	assert.Empty(t, metadata, "Non-AI span should not produce metadata")
 }
 
 func TestExtractAIOutputMetadata_VercelAISDK(t *testing.T) {

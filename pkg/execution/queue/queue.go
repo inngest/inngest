@@ -18,6 +18,7 @@ type Queue interface {
 	Migrator
 	Unpauser
 	AttemptResetter
+	RoleStatusReader
 }
 
 type RunInfo struct {
@@ -78,6 +79,11 @@ type Consumer interface {
 	// re-enqueued if Retryable() returns true.  For all other errors, the
 	// job will automatically be retried.
 	Run(context.Context, RunFunc) error
+}
+
+type RoleStatusReader interface {
+	// ActiveRoles returns the queue roles currently held by this worker.
+	ActiveRoles() []QueueRoleStatus
 }
 
 type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error

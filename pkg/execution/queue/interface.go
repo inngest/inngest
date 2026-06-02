@@ -130,7 +130,6 @@ type QueueProcessor interface {
 	Semaphore() util.TrackingSemaphore
 	Options() *QueueOptions
 	Workers() chan ProcessItem
-	SequentialLease() *ulid.ULID
 
 	ShadowPartitionWorkers() chan ShadowPartitionChanMsg
 	AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint)
@@ -340,7 +339,7 @@ type ShardOperations interface {
 
 	PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error)
 
-	ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
+	RoleLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 	ShardLease(ctx context.Context, key string, duration time.Duration, maxLeases int, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error)
 	ReleaseShardLease(ctx context.Context, key string, existingLeaseID ulid.ULID) error
 

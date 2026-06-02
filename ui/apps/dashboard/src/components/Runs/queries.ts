@@ -12,6 +12,7 @@ export const GetRunsDocument = graphql(`
     $functionRunCursor: String = null
     $celQuery: String = null
     $preview: Boolean = false
+    $isDeferred: Boolean = null
   ) {
     environment: workspace(id: $environmentID) {
       runs(
@@ -23,6 +24,7 @@ export const GetRunsDocument = graphql(`
           timeField: $timeField
           fnSlug: $functionSlug
           query: $celQuery
+          isDeferred: $isDeferred
         }
         orderBy: [{ field: $timeField, direction: DESC }]
         after: $functionRunCursor
@@ -40,7 +42,15 @@ export const GetRunsDocument = graphql(`
               name
               slug
             }
+            deferredFrom {
+              runID
+              function {
+                name
+                slug
+              }
+            }
             id
+            isDeferred
             isBatch
             queuedAt
             endedAt
@@ -70,6 +80,7 @@ export const CountRunsDocument = graphql(`
     $timeField: RunsOrderByField!
     $functionSlug: String
     $celQuery: String = null
+    $isDeferred: Boolean = null
   ) {
     environment: workspace(id: $environmentID) {
       runs(
@@ -81,6 +92,7 @@ export const CountRunsDocument = graphql(`
           timeField: $timeField
           fnSlug: $functionSlug
           query: $celQuery
+          isDeferred: $isDeferred
         }
         orderBy: [{ field: $timeField, direction: DESC }]
       ) {

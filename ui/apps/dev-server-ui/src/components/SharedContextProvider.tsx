@@ -9,6 +9,7 @@ import { useCreateDebugSession } from '@/hooks/useCreateDebugSession';
 import { useGetDebugRun } from '@/hooks/useGetDebugRun';
 import { useGetDebugSession } from '@/hooks/useGetDebugSession';
 import { useGetRun } from '@/hooks/useGetRun';
+import { useGetRunLinkage } from '@/hooks/useGetRunLinkage';
 import { useGetRunTrace } from '@/hooks/useGetRunTrace';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useInvokeRun } from '@/hooks/useInvokeRun';
@@ -26,6 +27,7 @@ export const SharedContextProvider = ({
   const rerun = useRerun();
   const cancelRun = useCancelRun();
   const getRun = useGetRun();
+  const getRunLinkage = useGetRunLinkage();
   const getRunTrace = useGetRunTrace();
   const getTraceResult = useGetTraceResult();
   const createDebugSession = useCreateDebugSession();
@@ -41,6 +43,7 @@ export const SharedContextProvider = ({
     booleanFlag: useBooleanFlag,
     cloud: false,
     getRun,
+    getRunLinkage,
     getRunTrace,
     inngestStatus: null,
     getTraceResult,

@@ -24,7 +24,6 @@ type mockQueueProcessor struct {
 	sem                  util.TrackingSemaphore
 	opts                 *QueueOptions
 	workers              chan ProcessItem
-	seqLease             *ulid.ULID
 	shadowCh             chan ShadowPartitionChanMsg
 	shadowMu             sync.Mutex
 	shadowMap            map[string]ShadowContinuation
@@ -37,7 +36,6 @@ func (m *mockQueueProcessor) Clock() clockwork.Clock                            
 func (m *mockQueueProcessor) Semaphore() util.TrackingSemaphore                   { return m.sem }
 func (m *mockQueueProcessor) Options() *QueueOptions                              { return m.opts }
 func (m *mockQueueProcessor) Workers() chan ProcessItem                           { return m.workers }
-func (m *mockQueueProcessor) SequentialLease() *ulid.ULID                         { return m.seqLease }
 func (m *mockQueueProcessor) ShadowPartitionWorkers() chan ShadowPartitionChanMsg { return m.shadowCh }
 func (m *mockQueueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
 }
@@ -177,7 +175,7 @@ func (m *mockShardForIterator) PartitionSize(ctx context.Context, scope Scope, p
 	return 0, nil
 }
 
-func (m *mockShardForIterator) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+func (m *mockShardForIterator) RoleLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
 	return nil, nil
 }
 

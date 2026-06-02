@@ -93,6 +93,26 @@ models:
         resolver: true
       trace:
         resolver: true
+      defers:
+        resolver: true
+      siblingDefers:
+        resolver: true
+      deferredFrom:
+        resolver: true
+  RunDefer:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunDefer
+    fields:
+      function:
+        resolver: true
+      run:
+        resolver: true
+  RunDeferredFrom:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunDeferredFrom
+    fields:
+      function:
+        resolver: true
+      run:
+        resolver: true
   ConnectV1WorkerConnection:
     fields:
       app:
