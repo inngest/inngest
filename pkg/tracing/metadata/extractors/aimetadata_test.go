@@ -425,6 +425,77 @@ func TestAIMetadataExtractor_CapturedFixtures(t *testing.T) {
 				Model: "text-embedding-3-small",
 			},
 		},
+
+		// LangSmith (langsmith wrapOpenAI + OTel mode)
+		//
+		// Unlike Langfuse, LangSmith spans carry a standard gen_ai.* set alongside
+		// its langsmith.* keys, so extraction works through the semconv mappings
+		// with no LangSmith-specific convention. Model is the requested alias
+		// (gen_ai.request.model); the dated model lands in ResponseModel.
+		//
+		// gen_ai.response.finish_reasons arrives as a scalar string (not the
+		// semconv array); the setter's scalar fallback wraps it.
+		//
+		// Missing variants (documented gaps in the capture app): wrapOpenAI wraps
+		// neither embeddings.create nor streaming chat completions (langsmith
+		// 0.7.3), so there are no embeddings/stream_chat fixtures. The Responses
+		// API variants (basic/reasoning) omit finish_reasons entirely.
+		{
+			fixture: "openai_langsmith_otel/basic_responses.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:         "gpt-5.4-nano",
+				System:        "openai",
+				OperationName: "chat",
+				ResponseModel: "gpt-5.4-nano-2026-03-17",
+				ResponseID:    "resp_076af25434275e80006a1f60fe34c081989e65e074eb0213b3",
+				FinishReasons: nil,
+				InputTokens:   17,
+				OutputTokens:  35,
+				TotalTokens:   util.ToPtr[int64](52),
+			},
+		},
+		{
+			fixture: "openai_langsmith_otel/params_chat.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:         "gpt-4.1-nano",
+				System:        "openai",
+				OperationName: "chat",
+				ResponseModel: "gpt-4.1-nano-2025-04-14",
+				ResponseID:    "chatcmpl-DmSPnK1FqD0W1V6k55vnLKTyNV9cH",
+				FinishReasons: []string{"stop"},
+				InputTokens:   22,
+				OutputTokens:  6,
+				TotalTokens:   util.ToPtr[int64](28),
+			},
+		},
+		{
+			fixture: "openai_langsmith_otel/tools_chat.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:         "gpt-4.1-nano",
+				System:        "openai",
+				OperationName: "chat",
+				ResponseModel: "gpt-4.1-nano-2025-04-14",
+				ResponseID:    "chatcmpl-DmSPog8FUcyXw3C6bUGF0WZZDZw1k",
+				FinishReasons: []string{"tool_calls"},
+				InputTokens:   56,
+				OutputTokens:  30,
+				TotalTokens:   util.ToPtr[int64](86),
+			},
+		},
+		{
+			fixture: "openai_langsmith_otel/reasoning_responses.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:         "gpt-5.4-nano",
+				System:        "openai",
+				OperationName: "chat",
+				ResponseModel: "gpt-5.4-nano-2026-03-17",
+				ResponseID:    "resp_0c58250a28f29e7f006a1f61028f248199962f6ae9f6dcec2f",
+				FinishReasons: nil,
+				InputTokens:   17,
+				OutputTokens:  12,
+				TotalTokens:   util.ToPtr[int64](29),
+			},
+		},
 	}
 
 	for _, tc := range cases {
