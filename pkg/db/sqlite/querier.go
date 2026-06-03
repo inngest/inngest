@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"time"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db"
@@ -17,8 +17,7 @@ import (
 var _ db.Querier = (*sqliteQuerier)(nil)
 
 type sqliteQuerier struct {
-	db sqlc.DBTX
-	q  sqlc.Querier
+	q sqlc.Querier
 }
 
 // bytesToNullString preserves nil-vs-empty semantics while adapting db-layer
@@ -338,115 +337,52 @@ func (sq *sqliteQuerier) GetFunctionRunsFromEvents(ctx context.Context, eventIds
 }
 
 func (sq *sqliteQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
-	rows, err := sq.db.QueryContext(ctx, `
-SELECT
-	run_id,
-	function_id,
-	app_id,
-	start_time,
-	end_time,
-	COALESCE(status, '') AS status,
-	COALESCE(CAST(output AS TEXT), '') AS output,
-	COALESCE(json_extract(attributes, ?), '') AS function_slug,
-	COALESCE(json_extract(attributes, ?), '') AS function_name,
-	COALESCE(json_extract(attributes, ?), '') AS app_name,
-	COALESCE(json_extract(attributes, ?), '') AS batch_id,
-	COALESCE(json_extract(attributes, ?), '') AS cron_schedule
-FROM spans
-WHERE name = ?
-	AND debug_run_id IS NULL
-	AND run_id > ?
-	AND EXISTS (
-		SELECT 1
-		FROM json_each(NULLIF(spans.event_ids, '')) AS eid
-		WHERE eid.value = ?
-	)
-ORDER BY run_id
-LIMIT ?;
-`,
-		sqliteJSONAttrPath(meta.Attrs.FunctionSlug.Key()),
-		sqliteJSONAttrPath(meta.Attrs.FunctionName.Key()),
-		sqliteJSONAttrPath(meta.Attrs.AppName.Key()),
-		sqliteJSONAttrPath(meta.Attrs.BatchID.Key()),
-		sqliteJSONAttrPath(meta.Attrs.CronSchedule.Key()),
-		meta.SpanNameRun,
-		arg.Cursor.String(),
-		arg.EventID.String(),
-		arg.Limit,
-	)
+	rows, err := sq.q.GetRuns(ctx, sqlc.GetRunsParams{
+		Name:        meta.SpanNameRun,
+		CursorRunID: arg.Cursor.String(),
+		EventID:     arg.EventID.String(),
+		LimitRows:   arg.Limit,
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	return scanSpanRunListRows(rows, arg)
 }
 
-func sqliteJSONAttrPath(key string) string {
-	return `$."` + key + `"`
-}
-
-func scanSpanRunListRows(rows *sql.Rows, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
-	out := []*db.RunListItemRow{}
-	for rows.Next() {
-		var (
-			runID        string
-			functionID   string
-			appID        string
-			startedAt    time.Time
-			endedAt      time.Time
-			statusText   string
-			outputText   string
-			functionSlug string
-			functionName string
-			appName      string
-			batchIDText  string
-			cronSchedule string
-		)
-
-		if err := rows.Scan(
-			&runID,
-			&functionID,
-			&appID,
-			&startedAt,
-			&endedAt,
-			&statusText,
-			&outputText,
-			&functionSlug,
-			&functionName,
-			&appName,
-			&batchIDText,
-			&cronSchedule,
-		); err != nil {
-			return nil, err
-		}
-
-		parsedRunID, err := ulid.Parse(runID)
+func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
+	out := make([]*db.RunListItemRow, 0, len(rows))
+	for _, r := range rows {
+		parsedRunID, err := ulid.Parse(r.RunID)
 		if err != nil {
 			return nil, err
 		}
-		parsedFunctionID, err := uuid.Parse(functionID)
+		parsedFunctionID, err := uuid.Parse(r.FunctionID)
 		if err != nil {
 			return nil, err
 		}
-		parsedAppID, err := uuid.Parse(appID)
+		parsedAppID, err := uuid.Parse(r.AppID)
 		if err != nil {
 			return nil, err
 		}
 
 		status := enums.RunStatusRunning
+		statusText := r.Status
 		if statusText != "" {
 			if stepStatus, err := enums.StepStatusString(statusText); err == nil && stepStatus != enums.StepStatusUnknown {
 				status = enums.StepStatusToRunStatus(stepStatus)
 			}
 		}
 
+		batchIDText := valueString(r.BatchID)
 		var batchID ulid.ULID
 		if batchIDText != "" {
 			batchID, _ = ulid.Parse(batchIDText)
 		}
 
+		cronSchedule := valueString(r.CronSchedule)
 		var output []byte
+		outputText := valueString(r.Output)
 		if arg.IncludeOutput && outputText != "" {
 			output = []byte(outputText)
 		}
@@ -454,7 +390,7 @@ func scanSpanRunListRows(rows *sql.Rows, arg db.GetRunsParams) ([]*db.RunListIte
 		out = append(out, &db.RunListItemRow{
 			FunctionRun: db.FunctionRun{
 				RunID:        parsedRunID,
-				RunStartedAt: startedAt,
+				RunStartedAt: r.StartTime,
 				FunctionID:   parsedFunctionID,
 				TriggerType:  "event",
 				EventID:      arg.EventID,
@@ -465,21 +401,31 @@ func scanSpanRunListRows(rows *sql.Rows, arg db.GetRunsParams) ([]*db.RunListIte
 				RunID:              parsedRunID,
 				Status:             sql.NullString{String: status.String(), Valid: statusText != ""},
 				CompletedStepCount: sql.NullInt64{Int64: 1, Valid: true},
-				CreatedAt:          sql.NullTime{Time: endedAt, Valid: enums.RunStatusEnded(status)},
+				CreatedAt:          sql.NullTime{Time: r.EndTime, Valid: enums.RunStatusEnded(status)},
 			},
 			Output:         output,
-			FunctionSlug:   functionSlug,
-			FunctionName:   functionName,
+			FunctionSlug:   valueString(r.FunctionSlug),
+			FunctionName:   valueString(r.FunctionName),
 			FunctionConfig: "{}",
 			FunctionAppID:  parsedAppID,
-			AppName:        appName,
+			AppName:        valueString(r.AppName),
 		})
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
 	return out, nil
+}
+
+func valueString(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case []byte:
+		return string(val)
+	default:
+		return fmt.Sprint(val)
+	}
 }
 
 func (sq *sqliteQuerier) GetFunctionRunsTimebound(ctx context.Context, arg db.GetFunctionRunsTimeboundParams) ([]*db.FunctionRunRow, error) {

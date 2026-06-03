@@ -26,7 +26,7 @@ type Adapter struct {
 func New(conn *sql.DB) *Adapter {
 	return &Adapter{
 		conn: conn,
-		q:    &sqliteQuerier{db: conn, q: sqlc.New(conn)},
+		q:    &sqliteQuerier{q: sqlc.New(conn)},
 		h:    &helpers{},
 	}
 }
@@ -45,7 +45,7 @@ func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	return &TxAdapter{
 		Adapter: Adapter{
 			conn: a.conn,
-			q:    &sqliteQuerier{db: tx, q: sqlc.New(tx)},
+			q:    &sqliteQuerier{q: sqlc.New(tx)},
 			h:    a.h,
 		},
 		tx: tx,
