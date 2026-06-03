@@ -3,7 +3,7 @@
  * Feature: 001-composable-timeline-bar
  */
 
-import { maybeDateToString, toMaybeDate } from '@inngest/components/utils/date';
+import { toMaybeDate } from '@inngest/components/utils/date';
 import { max, min } from 'date-fns';
 
 import { KindInngestExperiment } from '../../generated';

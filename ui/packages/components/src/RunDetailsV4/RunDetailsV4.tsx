@@ -94,8 +94,8 @@ function TimelineV4Wrapper({
 
   // Convert V3 trace to V4 TimelineData
   const timelineData = useMemo(
-    () => traceToTimelineData(trace, { runID, orgName, functionSlug }),
-    [trace, runID, orgName, functionSlug]
+    () => traceToTimelineData(rolledUpTrace, { runID, orgName, functionSlug }),
+    [rolledUpTrace, runID, orgName, functionSlug]
   );
 
   // Handle step selection - look up the trace and emit to global selection
