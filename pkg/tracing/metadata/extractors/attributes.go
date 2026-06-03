@@ -16,6 +16,7 @@ type convention int
 const (
 	semconv       convention = 1
 	openinference convention = 2
+	vercel        convention = 3
 )
 
 // attrMapping records the canonical field a source attribute key maps to, the
@@ -105,6 +106,59 @@ var keyFieldMap = map[string]attrMapping{
 	"llm.finish_reason": {
 		field:      "finishReasons",
 		convention: openinference,
+	},
+
+	// ---------------------------------------------------------------------------
+	// Vercel AI SDK (native telemetry, `ai.*`)
+	// ---------------------------------------------------------------------------
+	// The AI SDK emits its own spans. A call produces a parent ai.<op> span
+	// (ai.* only) plus a child ai.<op>.do<Op> span that ALSO carries a partial
+	// gen_ai.* set. vercel ranks below semconv/openinference so gen_ai.* stays
+	// authoritative on the child where both are present (their values agree);
+	// these mappings are what make the ai.*-only parent and embeddings spans
+	// extractable, and they supply ai.usage.totalTokens (gen_ai omits a total).
+	"ai.model.id": {
+		field:      "model",
+		convention: vercel,
+	},
+	// ai.model.provider is the provider + API surface, e.g. "openai.responses"
+	// (not bare "openai"); stored faithfully, no normalization.
+	"ai.model.provider": {
+		field:      "providerName",
+		convention: vercel,
+	},
+	"ai.usage.inputTokens": {
+		field:      "inputTokens",
+		convention: vercel,
+	},
+	"ai.usage.outputTokens": {
+		field:      "outputTokens",
+		convention: vercel,
+	},
+	"ai.usage.totalTokens": {
+		field:      "totalTokens",
+		convention: vercel,
+	},
+	// Embeddings spans emit only a single ai.usage.tokens count (no input/output
+	// split, no gen_ai.*). Map it to inputTokens so the total derives, matching
+	// the official-OTel embeddings case.
+	"ai.usage.tokens": {
+		field:      "inputTokens",
+		convention: vercel,
+	},
+	"ai.response.model": {
+		field:      "responseModel",
+		convention: vercel,
+	},
+	"ai.response.id": {
+		field:      "responseId",
+		convention: vercel,
+	},
+	// ai.response.finishReason is a single scalar string (like OpenInference);
+	// the finishReasons setter already handles the scalar case.
+	"ai.response.finishReason": {
+		field:      "finishReasons",
+		convention: vercel,
 	},
 }
 

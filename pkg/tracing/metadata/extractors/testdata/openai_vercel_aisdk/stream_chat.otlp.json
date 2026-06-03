@@ -1,0 +1,403 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "unknown_service:node"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.7.1"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "86ad0e32f8b26362a2abbdb974c8245d",
+              "spanId": "ca90fc393d731f06",
+              "parentSpanId": "509f73aacf02b9ab",
+              "name": "ai.streamText.doStream",
+              "kind": 1,
+              "startTimeUnixNano": "1780439005452000000",
+              "endTimeUnixNano": "1780439005814374208",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.streamText.doStream"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.streamText.doStream"
+                  }
+                },
+                {
+                  "key": "ai.model.provider",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "ai.model.id",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": 2
+                  }
+                },
+                {
+                  "key": "ai.prompt.messages",
+                  "value": {
+                    "stringValue": "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Count to five.\"}]}]"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano"
+                  }
+                },
+                {
+                  "key": "ai.response.msToFirstChunk",
+                  "value": {
+                    "doubleValue": 255.30229199999985
+                  }
+                },
+                {
+                  "key": "ai.response.msToFinish",
+                  "value": {
+                    "doubleValue": 361.19070899999997
+                  }
+                },
+                {
+                  "key": "ai.response.avgOutputTokensPerSecond",
+                  "value": {
+                    "doubleValue": 27.686204962708498
+                  }
+                },
+                {
+                  "key": "ai.response.finishReason",
+                  "value": {
+                    "stringValue": "stop"
+                  }
+                },
+                {
+                  "key": "ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-DmRo58DlkgVkA2eN9sgElNFLVmm97"
+                  }
+                },
+                {
+                  "key": "ai.response.model",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano-2025-04-14"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-06-02T22:23:25.000Z"
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokens",
+                  "value": {
+                    "intValue": 11
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.noCacheTokens",
+                  "value": {
+                    "intValue": 11
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.cacheReadTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokens",
+                  "value": {
+                    "intValue": 10
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.textTokens",
+                  "value": {
+                    "intValue": 10
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.totalTokens",
+                  "value": {
+                    "intValue": 21
+                  }
+                },
+                {
+                  "key": "ai.usage.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.cachedInputTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-DmRo58DlkgVkA2eN9sgElNFLVmm97"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano-2025-04-14"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": 11
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": 10
+                  }
+                },
+                {
+                  "key": "ai.response.text",
+                  "value": {
+                    "stringValue": "One, two, three, four, five."
+                  }
+                },
+                {
+                  "key": "ai.response.providerMetadata",
+                  "value": {
+                    "stringValue": "{\"openai\":{\"acceptedPredictionTokens\":0,\"rejectedPredictionTokens\":0}}"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [
+                {
+                  "attributes": [
+                    {
+                      "key": "ai.response.msToFirstChunk",
+                      "value": {
+                        "doubleValue": 255.30229199999985
+                      }
+                    }
+                  ],
+                  "name": "ai.stream.firstChunk",
+                  "timeUnixNano": "1780439005707539625",
+                  "droppedAttributesCount": 0
+                },
+                {
+                  "attributes": [],
+                  "name": "ai.stream.finish",
+                  "timeUnixNano": "1780439005813300666",
+                  "droppedAttributesCount": 0
+                }
+              ],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 0
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            },
+            {
+              "traceId": "86ad0e32f8b26362a2abbdb974c8245d",
+              "spanId": "509f73aacf02b9ab",
+              "name": "ai.streamText",
+              "kind": 1,
+              "startTimeUnixNano": "1780439005449000000",
+              "endTimeUnixNano": "1780439005814908417",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.streamText"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.streamText"
+                  }
+                },
+                {
+                  "key": "ai.model.provider",
+                  "value": {
+                    "stringValue": "openai.chat"
+                  }
+                },
+                {
+                  "key": "ai.model.id",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": 2
+                  }
+                },
+                {
+                  "key": "ai.prompt",
+                  "value": {
+                    "stringValue": "{\"prompt\":\"Count to five.\"}"
+                  }
+                },
+                {
+                  "key": "ai.response.finishReason",
+                  "value": {
+                    "stringValue": "stop"
+                  }
+                },
+                {
+                  "key": "ai.response.text",
+                  "value": {
+                    "stringValue": "One, two, three, four, five."
+                  }
+                },
+                {
+                  "key": "ai.response.providerMetadata",
+                  "value": {
+                    "stringValue": "{\"openai\":{\"acceptedPredictionTokens\":0,\"rejectedPredictionTokens\":0}}"
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokens",
+                  "value": {
+                    "intValue": 11
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.noCacheTokens",
+                  "value": {
+                    "intValue": 11
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.cacheReadTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokens",
+                  "value": {
+                    "intValue": 10
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.textTokens",
+                  "value": {
+                    "intValue": 10
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.totalTokens",
+                  "value": {
+                    "intValue": 21
+                  }
+                },
+                {
+                  "key": "ai.usage.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.cachedInputTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 0
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
