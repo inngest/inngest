@@ -73,6 +73,32 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 	return rawAttrs
 }
 
+func DriverResponseOutputAttrs(resp *state.DriverResponse) *meta.SerializableAttrs {
+	rawAttrs := meta.NewAttrSet()
+
+	fnOutput, err := resp.GetTraceFunctionOutput()
+	if err != nil {
+		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
+	} else if fnOutput != "" {
+		isFunctionOutput := true
+		meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, &isFunctionOutput)
+		meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &fnOutput)
+	}
+
+	if resp.Retryable() {
+		meta.AddAttr(rawAttrs, meta.Attrs.Retryable, inngestgo.Ptr(true))
+	}
+
+	size := resp.OutputSize
+	if size == 0 && fnOutput != "" {
+		size = len(fnOutput)
+	}
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
+
+	return rawAttrs
+}
+
 // DriverResponseAttrs applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
 // execution has completed.
@@ -85,6 +111,22 @@ func DriverResponseAttrs(
 	outputSpanRef *meta.SpanReference,
 ) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
+
+	redactedHeaders := headers.Compact(headers.Redact(resp.Header))
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
+
+	// always add all steps received as a debugging attie
+	steps := make(meta.ResponseOps, len(resp.Generator))
+	for n, s := range resp.Generator {
+		steps[n] = meta.ResponseOp{
+			Op:   s.Op,
+			ID:   s.ID,
+			Name: s.Name,
+		}
+	}
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseSteps, &steps)
 
 	if resp.IsDiscoveryResponse() && !resp.IsGatewayRequest() {
 		// We ignore discovery responses and rely on other spans to show steps
@@ -100,57 +142,23 @@ func DriverResponseAttrs(
 		// to collect as much data as it can.
 		dropSpan := true
 		meta.AddAttr(rawAttrs, meta.Attrs.DropSpan, &dropSpan)
+		return rawAttrs
 	}
 
-	fnOutput, err := resp.GetTraceFunctionOutput()
-	if err != nil {
-		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
-	} else if fnOutput != "" {
-		isFunctionOutput := true
-		meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, &isFunctionOutput)
-
-		if outputSpanRef != nil {
-			if outputSpanRef.DynamicSpanID == "" {
-				rawAttrs.AddErr(fmt.Errorf("output span reference is missing dynamic span ID"))
-			} else {
-				meta.AddAttr(rawAttrs, meta.Attrs.StepOutputRef, &outputSpanRef.DynamicSpanID)
-			}
-		} else {
-			meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &fnOutput)
-		}
-	}
-
-	if resp.Retryable() {
-		meta.AddAttr(rawAttrs, meta.Attrs.Retryable, inngestgo.Ptr(true))
-	}
-
-	size := resp.OutputSize
-	if size == 0 && fnOutput != "" {
-		size = len(fnOutput)
-	}
-
-	redactedHeaders := headers.Compact(headers.Redact(resp.Header))
-
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
+	// NOTE: we should make this not emit output if we also emit a step span.
+	// We're emitting both for now to be safe and ensu re we don't lose data,
+	// but ideally the step span should be the one emitting output if it's present,
+	// and this span should not emit output in that case. This is because the step span
+	// is the one that will be visible to users, and we don't want to have duplicate output
+	// attributes on both spans. The step span will also have more context about the step,
+	// so it makes more sense for it to have the output.
+	rawAttrs.Merge(DriverResponseOutputAttrs(resp))
 
 	// If we have a single op to process, also add any generator data to the
 	// span and overwrite any clashes
 	if op := resp.TraceVisibleStepExecution(); op != nil {
 		rawAttrs = rawAttrs.Merge(GeneratorAttrs(op))
 	}
-
-	// always add all steps received as a debugging attie
-	steps := make(meta.ResponseOps, len(resp.Generator))
-	for n, s := range resp.Generator {
-		steps[n] = meta.ResponseOp{
-			Op:   s.Op,
-			ID:   s.ID,
-			Name: s.Name,
-		}
-	}
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseSteps, &steps)
 
 	return rawAttrs
 }
@@ -258,6 +266,8 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	case enums.OpcodeStepPlanned:
 		{
 			// Nothing yet (there are defaults above)
+			status := enums.StepStatusQueued
+			meta.AddAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 		}
 
 	case enums.OpcodeWaitForEvent:
@@ -393,7 +403,7 @@ func SpanRefFromPause(p *state.Pause) *meta.SpanReference {
 // _userland_) this step should be under.
 //
 // A single exception is maybe the very first execution, but also with that we
-// shoud have the run span inside the queue item's metadata.
+// should have the run span inside the queue item's metadata.
 func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 	if md == nil {
 		return nil
@@ -411,6 +421,58 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-0000000000000000-00", cfg.TraceID.String()),
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
 	}
+}
+
+// FinalizedStepDynamicSeed returns the deterministic seed used to derive an
+// executor.step row's dynamic_span_id for a finalized step.
+func FinalizedStepDynamicSeed(stepID string) []byte {
+	return []byte(stepID)
+}
+
+func FinalizedStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string) *meta.SpanReference {
+	if md == nil {
+		return nil
+	}
+
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	stepSpanID := DeterministicSpanConfig(FinalizedStepDynamicSeed(stepID)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID: stepSpanID.String(),
+		// TODO: validate that -00 is ok
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// RetryStepDynamicSeed returns the deterministic seed used to derive an
+// executor.step row's dynamic_span_id for a retry attempt.
+func RetryStepDynamicSeed(stepID string, attempt int) []byte {
+	return fmt.Appendf(nil, "%s:%d", stepID, attempt)
+}
+
+func RetryStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string, attempt int) *meta.SpanReference {
+	if md == nil {
+		return nil
+	}
+
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	stepSpanID := DeterministicSpanConfig(RetryStepDynamicSeed(stepID, attempt)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID: stepSpanID.String(),
+		// TODO: validate that -00 is ok
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// RetryNonStepDynamicSeed returns the deterministic seed used to derive a dynamic span ID for non-step spans
+// execution (previously called Finalization).
+func RetryNonStepDynamicSeed(item queue.Item) []byte {
+	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
+}
+
+func FinalizedNonStepDynamicSeed(item queue.Item) []byte {
+	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
 }
 
 // DeferSpanSeed returns the deterministic seed used to identify the

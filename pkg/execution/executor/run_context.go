@@ -12,6 +12,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/jonboulle/clockwork"
 )
@@ -79,6 +80,10 @@ func (r *runInstance) AttemptCount() int {
 func (r *runInstance) MaxAttempts() *int {
 	max := r.item.GetMaxAttempts()
 	return &max
+}
+
+func (r *runInstance) RequestID() string {
+	return r.requestID
 }
 
 func (r *runInstance) OnlyHasLazyOps() bool {
@@ -153,6 +158,14 @@ func (r *runInstance) ExecutionSpan() *meta.SpanReference {
 
 func (r *runInstance) ParentSpan() *meta.SpanReference {
 	return r.parentSpan
+}
+
+func (r *runInstance) RootSpan() *meta.SpanReference {
+	return tracing.RunSpanRefFromMetadata(&r.md)
+}
+
+func (r *runInstance) StartTime() time.Time {
+	return r.start
 }
 
 func (r *runInstance) trackLatencyHistogram(ctx context.Context, kind string, tags map[string]any) {
