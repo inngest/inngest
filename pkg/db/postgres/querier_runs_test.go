@@ -6,13 +6,12 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -21,36 +20,25 @@ func TestQuerierGetRuns(t *testing.T) {
 	runID := ulid.Make()
 	eventID := ulid.Make()
 	batchID := ulid.Make()
-	originalRunID := ulid.Make()
 	functionID := uuid.New()
 	appID := uuid.New()
 	startedAt := time.Now().UTC().Truncate(time.Millisecond)
-	finishedAt := startedAt.Add(time.Second)
+	endedAt := startedAt.Add(time.Second)
 
 	sql.Register("postgres-get-runs", &getRunsDriver{
 		rows: [][]driver.Value{{
 			runID.String(),
-			startedAt,
 			functionID.String(),
-			int64(1),
-			"event",
-			eventID.String(),
-			batchID.String(),
-			originalRunID.String(),
-			nil,
-			"completed",
-			"",
-			int64(1),
-			finishedAt,
-			"event-runs-app-event-runs-function",
-			"Event Runs Function",
-			`{"name":"Event Runs Function","slug":"event-runs-function"}`,
 			appID.String(),
+			startedAt,
+			endedAt,
+			enums.StepStatusCompleted.String(),
+			`{"data":{"ok":true}}`,
+			"event-runs-function",
+			"Event Runs Function",
 			"event-runs-app",
-		}},
-		outputRows: [][]driver.Value{{
-			runID.String(),
-			[]byte(`{"data":{"ok":true}}`),
+			batchID.String(),
+			"*/5 * * * *",
 		}},
 	})
 
@@ -66,198 +54,70 @@ func TestQuerierGetRuns(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, runID, rows[0].FunctionRun.RunID)
-	require.Equal(t, "completed", rows[0].FunctionFinish.Status.String)
+	require.Equal(t, eventID, rows[0].FunctionRun.EventID)
+	require.Equal(t, batchID, rows[0].FunctionRun.BatchID)
+	require.Equal(t, "*/5 * * * *", rows[0].FunctionRun.Cron.String)
+	require.Equal(t, "Completed", rows[0].FunctionFinish.Status.String)
+	require.True(t, rows[0].FunctionFinish.CreatedAt.Valid)
+	require.Equal(t, "event-runs-function", rows[0].FunctionSlug)
+	require.Equal(t, "Event Runs Function", rows[0].FunctionName)
 	require.Equal(t, "event-runs-app", rows[0].AppName)
 	require.JSONEq(t, `{"data":{"ok":true}}`, string(rows[0].Output))
 }
 
-func TestQuerierGetRunsSkipsOutputQuery(t *testing.T) {
+func TestQuerierGetRunsSkipsOutput(t *testing.T) {
 	runID := ulid.Make()
-	eventID := ulid.Make()
 	functionID := uuid.New()
 	appID := uuid.New()
 	startedAt := time.Now().UTC().Truncate(time.Millisecond)
 
-	driver := &getRunsDriver{
+	sql.Register("postgres-get-runs-no-output", &getRunsDriver{
 		rows: [][]driver.Value{{
 			runID.String(),
-			startedAt,
 			functionID.String(),
-			int64(1),
-			"event",
-			eventID.String(),
-			nil,
-			nil,
-			nil,
-			"completed",
-			"",
-			int64(1),
-			startedAt.Add(time.Second),
-			"event-runs-app-event-runs-function",
-			"Event Runs Function",
-			`{"name":"Event Runs Function","slug":"event-runs-function"}`,
 			appID.String(),
+			startedAt,
+			startedAt.Add(time.Second),
+			enums.StepStatusCompleted.String(),
+			`{"data":{"ok":true}}`,
+			"event-runs-function",
+			"Event Runs Function",
 			"event-runs-app",
+			"",
+			"",
 		}},
-		outputRows: [][]driver.Value{{
-			runID.String(),
-			[]byte(`{"data":{"ok":true}}`),
-		}},
-	}
-	sql.Register("postgres-get-runs-no-output", driver)
+	})
 
 	conn, err := sql.Open("postgres-get-runs-no-output", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, conn.Close()) })
 
 	rows, err := New(conn).Q().GetRuns(context.Background(), db.GetRunsParams{
-		EventID: eventID,
+		EventID: ulid.Make(),
 		Limit:   1,
 	})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Empty(t, rows[0].Output)
-	require.Zero(t, driver.outputQueries())
-}
-
-func TestQuerierGetRunsIncludesBatchRunIDs(t *testing.T) {
-	runID := ulid.Make()
-	eventID := ulid.Make()
-	batchID := ulid.Make()
-	functionID := uuid.New()
-	appID := uuid.New()
-	startedAt := time.Now().UTC().Truncate(time.Millisecond)
-
-	driver := &getRunsDriver{
-		batchRows: [][]driver.Value{{
-			batchID.String(),
-			uuid.New().String(),
-			uuid.New().String(),
-			appID.String(),
-			functionID.String(),
-			runID.String(),
-			startedAt,
-			startedAt.Add(time.Second),
-			[]byte(eventID.String()),
-		}},
-		rows: [][]driver.Value{{
-			runID.String(),
-			startedAt,
-			functionID.String(),
-			int64(1),
-			"event",
-			ulid.Make().String(),
-			batchID.String(),
-			nil,
-			nil,
-			"completed",
-			"",
-			int64(1),
-			startedAt.Add(time.Second),
-			"event-runs-app-event-runs-function",
-			"Event Runs Function",
-			`{"name":"Event Runs Function","slug":"event-runs-function"}`,
-			appID.String(),
-			"event-runs-app",
-		}},
-	}
-	sql.Register("postgres-get-runs-batch", driver)
-
-	conn, err := sql.Open("postgres-get-runs-batch", "")
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, conn.Close()) })
-
-	rows, err := New(conn).Q().GetRuns(context.Background(), db.GetRunsParams{
-		EventID: eventID,
-		Limit:   1,
-	})
-	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	require.Equal(t, runID, rows[0].FunctionRun.RunID)
 }
 
 func TestQuerierGetRunsError(t *testing.T) {
-	eventID := ulid.Make()
+	sql.Register("postgres-get-runs-error", &getRunsDriver{queryErr: errors.New("query failed")})
 
-	tests := []struct {
-		name   string
-		driver *getRunsDriver
-	}{
-		{
-			name: "batch lookup error",
-			driver: &getRunsDriver{
-				batchQueryErr: errors.New("batch query failed"),
-			},
-		},
-		{
-			name: "runs query error",
-			driver: &getRunsDriver{
-				queryErr: errors.New("query failed"),
-			},
-		},
-		{
-			name: "output query error",
-			driver: &getRunsDriver{
-				rows: [][]driver.Value{{
-					ulid.Make().String(),
-					time.Now().UTC(),
-					uuid.New().String(),
-					int64(1),
-					"event",
-					eventID.String(),
-					nil,
-					nil,
-					nil,
-					"completed",
-					"",
-					int64(1),
-					time.Now().UTC(),
-					"event-runs-app-event-runs-function",
-					"Event Runs Function",
-					`{"name":"Event Runs Function","slug":"event-runs-function"}`,
-					uuid.New().String(),
-					"event-runs-app",
-				}},
-				outputQueryErr: errors.New("output query failed"),
-			},
-		},
-	}
+	conn, err := sql.Open("postgres-get-runs-error", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, conn.Close()) })
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			driverName := "postgres-get-runs-error-" + strings.ReplaceAll(test.name, " ", "-")
-			sql.Register(driverName, test.driver)
-
-			conn, err := sql.Open(driverName, "")
-			require.NoError(t, err)
-			t.Cleanup(func() { require.NoError(t, conn.Close()) })
-
-			_, err = New(conn).Q().GetRuns(context.Background(), db.GetRunsParams{
-				EventID:       eventID,
-				Limit:         1,
-				IncludeOutput: test.name == "output query error",
-			})
-			require.Error(t, err)
-		})
-	}
+	_, err = New(conn).Q().GetRuns(context.Background(), db.GetRunsParams{
+		EventID: ulid.Make(),
+		Limit:   1,
+	})
+	require.Error(t, err)
 }
 
 type getRunsDriver struct {
-	mu             sync.Mutex
-	batchRows      [][]driver.Value
-	rows           [][]driver.Value
-	outputRows     [][]driver.Value
-	batchQueryErr  error
-	queryErr       error
-	outputQueryErr error
-	outputQueryN   int
-}
-
-func (d *getRunsDriver) outputQueries() int {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	return d.outputQueryN
+	rows     [][]driver.Value
+	queryErr error
 }
 
 func (d *getRunsDriver) Open(name string) (driver.Conn, error) {
@@ -273,80 +133,49 @@ func (c getRunsConn) Close() error                              { return nil }
 func (c getRunsConn) Begin() (driver.Tx, error)                 { return nil, nil }
 
 func (c getRunsConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	if strings.Contains(query, "FROM event_batches") {
-		if c.driver.batchQueryErr != nil {
-			return nil, c.driver.batchQueryErr
-		}
-
-		return &getRunsRows{
-			columns: []string{"id", "account_id", "workspace_id", "app_id", "workflow_id", "run_id", "started_at", "executed_at", "event_ids"},
-			rows:    c.driver.batchRows,
-		}, nil
-	}
-
-	if strings.Contains(query, "FROM trace_runs") {
-		c.driver.mu.Lock()
-		c.driver.outputQueryN++
-		c.driver.mu.Unlock()
-
-		if c.driver.outputQueryErr != nil {
-			return nil, c.driver.outputQueryErr
-		}
-
-		return &getRunsRows{
-			columns: []string{"run_id", "output"},
-			rows:    c.driver.outputRows,
-		}, nil
-	}
-
 	if c.driver.queryErr != nil {
 		return nil, c.driver.queryErr
 	}
+	return &getRunsRows{
+		columns: []string{
+			"run_id",
+			"function_id",
+			"app_id",
+			"start_time",
+			"end_time",
+			"status",
+			"output",
+			"function_slug",
+			"function_name",
+			"app_name",
+			"batch_id",
+			"cron_schedule",
+		},
+		rows: c.driver.rows,
+	}, nil
+}
 
-	return &getRunsRows{columns: getRunsColumns(), rows: c.driver.rows}, nil
+func (c getRunsConn) CheckNamedValue(value *driver.NamedValue) error {
+	return nil
 }
 
 type getRunsRows struct {
 	columns []string
 	rows    [][]driver.Value
-	pos     int
+	idx     int
 }
 
-func (r *getRunsRows) Columns() []string {
-	return r.columns
-}
-
-func getRunsColumns() []string {
-	return []string{
-		"run_id",
-		"run_started_at",
-		"function_id",
-		"function_version",
-		"trigger_type",
-		"event_id",
-		"batch_id",
-		"original_run_id",
-		"cron",
-		"finish_status",
-		"finish_output",
-		"finish_completed_step_count",
-		"finish_created_at",
-		"function_slug",
-		"function_name",
-		"function_config",
-		"function_app_id",
-		"app_name",
-	}
-}
-
-func (r *getRunsRows) Close() error { return nil }
+func (r *getRunsRows) Columns() []string { return r.columns }
+func (r *getRunsRows) Close() error      { return nil }
 
 func (r *getRunsRows) Next(dest []driver.Value) error {
-	if r.pos >= len(r.rows) {
+	if r.idx >= len(r.rows) {
 		return io.EOF
 	}
-
-	copy(dest, r.rows[r.pos])
-	r.pos++
+	copy(dest, r.rows[r.idx])
+	r.idx++
 	return nil
 }
+
+var _ driver.QueryerContext = getRunsConn{}
+var _ driver.NamedValueChecker = getRunsConn{}

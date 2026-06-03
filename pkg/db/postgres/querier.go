@@ -10,6 +10,8 @@ import (
 	"github.com/inngest/inngest/pkg/db"
 	sqlc "github.com/inngest/inngest/pkg/db/postgres/sqlc"
 	"github.com/inngest/inngest/pkg/db/postgres/sqltypes"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -398,67 +400,142 @@ func (pq *pgQuerier) GetFunctionRunsFromEvents(ctx context.Context, eventIds []u
 }
 
 func (pq *pgQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
-	batchRunIDs, err := pq.q.GetEventBatchesByEventID(ctx, arg.EventID.String())
+	rows, err := pq.db.QueryContext(ctx, `
+SELECT
+	run_id,
+	function_id,
+	app_id,
+	start_time,
+	end_time,
+	COALESCE(status, '') AS status,
+	COALESCE(output::text, '') AS output,
+	COALESCE(attributes->>$5, '') AS function_slug,
+	COALESCE(attributes->>$6, '') AS function_name,
+	COALESCE(attributes->>$7, '') AS app_name,
+	COALESCE(attributes->>$8, '') AS batch_id,
+	COALESCE(attributes->>$9, '') AS cron_schedule
+FROM spans
+WHERE name = $1
+	AND debug_run_id IS NULL
+	AND run_id > $2
+	AND EXISTS (
+		SELECT 1
+		FROM jsonb_array_elements_text(NULLIF(spans.event_ids#>>'{}', '')::jsonb) AS eid(event_id)
+		WHERE eid.event_id = $4
+	)
+ORDER BY run_id
+LIMIT $3;
+`,
+		meta.SpanNameRun,
+		arg.Cursor.String(),
+		arg.Limit,
+		arg.EventID.String(),
+		meta.Attrs.FunctionSlug.Key(),
+		meta.Attrs.FunctionName.Key(),
+		meta.Attrs.AppName.Key(),
+		meta.Attrs.BatchID.Key(),
+		meta.Attrs.CronSchedule.Key(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	runIDs := make([][]byte, 0, len(batchRunIDs))
-	for _, batch := range batchRunIDs {
-		runIDs = append(runIDs, batch.RunID[:])
-	}
+	defer rows.Close()
 
-	rows, err := pq.q.GetRuns(ctx, sqlc.GetRunsParams{
-		EventID:     arg.EventID[:],
-		RunIds:      runIDs,
-		CursorRunID: arg.Cursor[:],
-		LimitRows:   int32(arg.Limit),
-	})
-	if err != nil {
-		return nil, err
-	}
+	return scanSpanRunListRows(rows, arg)
+}
 
-	outputs := map[ulid.ULID][]byte{}
-	if arg.IncludeOutput && len(rows) > 0 {
-		runIDs := make([]string, len(rows))
-		for i, r := range rows {
-			runIDs[i] = r.FunctionRun.RunID.String()
+func scanSpanRunListRows(rows *sql.Rows, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
+	out := []*db.RunListItemRow{}
+	for rows.Next() {
+		var (
+			runID        string
+			functionID   string
+			appID        string
+			startedAt    time.Time
+			endedAt      time.Time
+			statusText   string
+			outputText   string
+			functionSlug string
+			functionName string
+			appName      string
+			batchIDText  string
+			cronSchedule string
+		)
+
+		if err := rows.Scan(
+			&runID,
+			&functionID,
+			&appID,
+			&startedAt,
+			&endedAt,
+			&statusText,
+			&outputText,
+			&functionSlug,
+			&functionName,
+			&appName,
+			&batchIDText,
+			&cronSchedule,
+		); err != nil {
+			return nil, err
 		}
 
-		// we store function_runs.run_id as bytea and trace_runs.run_id as CHAR(26),
-		// so we batch fetch outputs after sqlc decodes the run IDs to canonical strings.
-		// TODO: Make run IDs use matching types so this can be a normal join.
-		outputRows, err := pq.q.GetTraceRunOutputs(ctx, runIDs)
+		parsedRunID, err := ulid.Parse(runID)
 		if err != nil {
 			return nil, err
 		}
-		for _, r := range outputRows {
-			outputs[r.RunID] = r.Output
+		parsedFunctionID, err := uuid.Parse(functionID)
+		if err != nil {
+			return nil, err
 		}
-	}
+		parsedAppID, err := uuid.Parse(appID)
+		if err != nil {
+			return nil, err
+		}
 
-	out := make([]*db.RunListItemRow, len(rows))
-	for i, r := range rows {
+		status := enums.RunStatusRunning
+		if statusText != "" {
+			if stepStatus, err := enums.StepStatusString(statusText); err == nil && stepStatus != enums.StepStatusUnknown {
+				status = enums.StepStatusToRunStatus(stepStatus)
+			}
+		}
+
+		var batchID ulid.ULID
+		if batchIDText != "" {
+			batchID, _ = ulid.Parse(batchIDText)
+		}
+
 		var output []byte
-		if traceOutput, ok := outputs[r.FunctionRun.RunID]; ok {
-			output = traceOutput
+		if arg.IncludeOutput && outputText != "" {
+			output = []byte(outputText)
 		}
 
-		out[i] = &db.RunListItemRow{
-			FunctionRun: *functionRunFromPG(&r.FunctionRun),
+		out = append(out, &db.RunListItemRow{
+			FunctionRun: db.FunctionRun{
+				RunID:        parsedRunID,
+				RunStartedAt: startedAt,
+				FunctionID:   parsedFunctionID,
+				TriggerType:  "event",
+				EventID:      arg.EventID,
+				BatchID:      batchID,
+				Cron:         sql.NullString{String: cronSchedule, Valid: cronSchedule != ""},
+			},
 			FunctionFinish: db.FunctionFinish{
-				RunID:              r.FunctionRun.RunID,
-				Status:             sql.NullString{String: r.FinishStatus, Valid: r.FinishStatus != ""},
-				Output:             sql.NullString{String: r.FinishOutput, Valid: r.FinishOutput != ""},
-				CompletedStepCount: sql.NullInt64{Int64: int64(r.FinishCompletedStepCount), Valid: true},
-				CreatedAt:          sql.NullTime{Time: r.FinishCreatedAt, Valid: !r.FinishCreatedAt.IsZero()},
+				RunID:              parsedRunID,
+				Status:             sql.NullString{String: status.String(), Valid: statusText != ""},
+				CompletedStepCount: sql.NullInt64{Int64: 1, Valid: true},
+				CreatedAt:          sql.NullTime{Time: endedAt, Valid: enums.RunStatusEnded(status)},
 			},
 			Output:         output,
-			FunctionSlug:   r.FunctionSlug,
-			FunctionName:   r.FunctionName,
-			FunctionConfig: r.FunctionConfig,
-			FunctionAppID:  r.FunctionAppID,
-			AppName:        r.AppName,
-		}
+			FunctionSlug:   functionSlug,
+			FunctionName:   functionName,
+			FunctionConfig: "{}",
+			FunctionAppID:  parsedAppID,
+			AppName:        appName,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

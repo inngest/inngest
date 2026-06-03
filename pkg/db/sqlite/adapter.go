@@ -5,9 +5,9 @@ import (
 	"context"
 	"database/sql"
 
-	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
+	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
 )
 
 var (
@@ -26,16 +26,16 @@ type Adapter struct {
 func New(conn *sql.DB) *Adapter {
 	return &Adapter{
 		conn: conn,
-		q:    &sqliteQuerier{q: sqlc.New(conn)},
+		q:    &sqliteQuerier{db: conn, q: sqlc.New(conn)},
 		h:    &helpers{},
 	}
 }
 
 func (a *Adapter) Dialect() db.Dialect                { return db.DialectSQLite }
 func (a *Adapter) Q() db.Querier                      { return a.q }
-func (a *Adapter) Helpers() driverhelp.DialectHelpers  { return a.h }
-func (a *Adapter) Conn() *sql.DB                       { return a.conn }
-func (a *Adapter) Close() error                        { return a.conn.Close() }
+func (a *Adapter) Helpers() driverhelp.DialectHelpers { return a.h }
+func (a *Adapter) Conn() *sql.DB                      { return a.conn }
+func (a *Adapter) Close() error                       { return a.conn.Close() }
 
 func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	tx, err := a.conn.BeginTx(ctx, nil)
@@ -45,7 +45,7 @@ func (a *Adapter) WithTx(ctx context.Context) (db.TxAdapter, error) {
 	return &TxAdapter{
 		Adapter: Adapter{
 			conn: a.conn,
-			q:    &sqliteQuerier{q: sqlc.New(tx)},
+			q:    &sqliteQuerier{db: tx, q: sqlc.New(tx)},
 			h:    a.h,
 		},
 		tx: tx,
