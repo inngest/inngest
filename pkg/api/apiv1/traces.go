@@ -60,7 +60,7 @@ type ExtendedTraceCapChecker func(ctx context.Context, accountID uuid.UUID, requ
 
 // ExtendedTraceRejectedRecorder records metrics for an over-cap payload after
 // the handler has successfully parsed it but before returning 429.
-type ExtendedTraceRejectedRecorder func(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest, rawBody []byte, decision ExtendedTraceCapDecision) error
+type ExtendedTraceRejectedRecorder func(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest, decision ExtendedTraceCapDecision) error
 
 // userlandSpanBytes sums the OTLP wire size of every span in the request. This
 // is the ingress quantity the extended-trace cap reserves before attempting to
@@ -133,7 +133,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 
 	if capDecision.OverCap {
 		if a.opts.ExtendedTraceRejectedRecorder != nil {
-			if err := a.opts.ExtendedTraceRejectedRecorder(ctx, auth, req, body, capDecision); err != nil {
+			if err := a.opts.ExtendedTraceRejectedRecorder(ctx, auth, req, capDecision); err != nil {
 				logger.StdlibLogger(ctx).Warn("failed to record rejected extended-trace payload", "err", err, "account_id", auth.AccountID())
 			}
 		}
