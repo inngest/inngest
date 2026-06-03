@@ -408,7 +408,7 @@ func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.R
 			FunctionName:   valueString(r.FunctionName),
 			FunctionConfig: "{}",
 			FunctionAppID:  parsedAppID,
-			AppName:        valueString(r.AppName),
+			AppName:        r.AppName,
 		})
 	}
 
