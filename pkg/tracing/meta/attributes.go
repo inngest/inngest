@@ -20,6 +20,7 @@ var Attrs = struct {
 	// Run attributes
 	AccountID           attr[*uuid.UUID]
 	AppID               attr[*uuid.UUID]
+	AppName             attr[*string]
 	BatchID             attr[*ulid.ULID]
 	BatchTimestamp      attr[*time.Time]
 	CronSchedule        attr[*string]
@@ -138,6 +139,7 @@ var Attrs = struct {
 	// HTTP (serve) attributes
 	RequestID          attr[*string]
 	JobID              attr[*string]
+	GroupID            attr[*string]
 	RequestURL         attr[*string]
 	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
@@ -175,6 +177,7 @@ var Attrs = struct {
 	AIResponseMetadata:                 JsonAttr[aigateway.ParsedInferenceResponse]("ai.response"),
 	AccountID:                          UUIDAttr("account.id"),
 	AppID:                              UUIDAttr("app.id"),
+	AppName:                            StringAttr("app.name"),
 	BatchID:                            ULIDAttr("batch.id"),
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
@@ -205,6 +208,7 @@ var Attrs = struct {
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestID:                          StringAttr("request.id"),
 	JobID:                              StringAttr("job.id"),
+	GroupID:                            StringAttr("job.group.id"),
 	RequestURL:                         StringAttr("request.url"),
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),

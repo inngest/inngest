@@ -229,6 +229,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	gqlSpan := &models.RunTraceSpan{
 		AppID:          span.GetAppID(),
 		Attempts:       &attempts,
+		GroupID:        span.Attributes.GroupID,
 		EndedAt:        span.GetEndedAtTime(),
 		FunctionID:     span.GetFunctionID(),
 		IsRoot:         span.GetIsRoot(),

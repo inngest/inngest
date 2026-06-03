@@ -613,6 +613,7 @@ type RunTraceSpan {
   # Internal
   spanID: String! # internal span ID, or a virtual span ID
   traceID: String! # the internal ID of the trace this span belongs to
+  groupID: String # the group ID of this span, used for grouping spans together in the UI, e.g. retries
   # Required
   name: String! # the name of the span
   status: RunTraceSpanStatus! # the status of the span

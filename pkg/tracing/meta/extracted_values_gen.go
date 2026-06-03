@@ -21,6 +21,7 @@ type ExtractedValues struct {
 	EndedAt *time.Time
 	AccountID *uuid.UUID
 	AppID *uuid.UUID
+	AppName *string
 	BatchID *ulid.ULID
 	BatchTimestamp *time.Time
 	CronSchedule *string
@@ -86,6 +87,7 @@ type ExtractedValues struct {
 	StepGatewayResponseOutputSizeBytes *int
 	RequestID *string
 	JobID *string
+	GroupID *string
 	RequestURL *string
 	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int
