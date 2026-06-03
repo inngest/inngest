@@ -330,7 +330,7 @@ func (b *broadcaster) CloseSubscription(ctx context.Context, subscriptionID uuid
 	}
 
 	if err := as.Close(); err != nil {
-		return fmt.Errorf("error closing subscription: %w", err)
+		logger.StdlibLogger(ctx).Warn("error closing subscription", "error", err, "sub_id", subscriptionID)
 	}
 
 	// Delete all subscriptions from the topic lookup
