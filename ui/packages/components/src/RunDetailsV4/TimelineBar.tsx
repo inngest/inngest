@@ -852,7 +852,12 @@ export function TimelineBar({
               className="absolute flex items-center justify-center"
               style={{ left: `${indentPx - 20}px` }}
             >
-              <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />
+              <ExpandToggle
+                expanded={expanded ?? false}
+                onCollapse={onToggle}
+                selected={selected}
+                hoverCardOpen={hoverCardOpen}
+              />
             </div>
           )}
 
