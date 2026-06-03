@@ -496,6 +496,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				AccountID:        di.AccountID,
 				WorkspaceID:      di.WorkspaceID,
 				AppID:            di.AppID,
+				AppName:          di.AppName,
 				Events:           []event.TrackedEvent{di},
 				PreventDebounce:  true,
 				PreventRateLimit: true, // Rate limit was already enforced for this

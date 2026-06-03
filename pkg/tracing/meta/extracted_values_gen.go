@@ -21,6 +21,7 @@ type ExtractedValues struct {
 	EndedAt *time.Time
 	AccountID *uuid.UUID
 	AppID *uuid.UUID
+	AppName *string
 	BatchID *ulid.ULID
 	BatchTimestamp *time.Time
 	CronSchedule *string

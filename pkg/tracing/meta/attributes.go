@@ -20,6 +20,7 @@ var Attrs = struct {
 	// Run attributes
 	AccountID           attr[*uuid.UUID]
 	AppID               attr[*uuid.UUID]
+	AppName             attr[*string]
 	BatchID             attr[*ulid.ULID]
 	BatchTimestamp      attr[*time.Time]
 	CronSchedule        attr[*string]
@@ -175,6 +176,7 @@ var Attrs = struct {
 	AIResponseMetadata:                 JsonAttr[aigateway.ParsedInferenceResponse]("ai.response"),
 	AccountID:                          UUIDAttr("account.id"),
 	AppID:                              UUIDAttr("app.id"),
+	AppName:                            StringAttr("app.name"),
 	BatchID:                            ULIDAttr("batch.id"),
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
