@@ -363,7 +363,10 @@ function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?
     <div
       role={expanded ? 'button' : undefined}
       aria-label={expanded ? 'Collapse' : 'Expand'}
-      className={cn('flex items-center justify-center p-0', expanded && 'cursor-pointer')}
+      className={cn(
+        'bg-canvasBase flex items-center justify-center p-0',
+        expanded && 'cursor-pointer'
+      )}
       onClick={
         expanded
           ? (e) => {
@@ -374,7 +377,7 @@ function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?
       }
     >
       <RiArrowRightSFill
-        className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')}
+        className={cn('text-light h-4 w-4 transition-transform', expanded && 'rotate-90')}
         style={{ transitionDuration: `${TIMELINE_CONSTANTS.TRANSITION_MS}ms` }}
       />
     </div>
