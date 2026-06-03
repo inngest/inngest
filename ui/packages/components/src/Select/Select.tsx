@@ -58,7 +58,7 @@ export function Select({
           <Listbox.Label
             className={cn(
               !isLabelVisible && 'sr-only',
-              'rounded-l px-2 capitalize',
+              'whitespace-nowrap rounded-l px-2 capitalize',
               size === 'small' ? 'text-xs' : 'text-sm'
             )}
           >
