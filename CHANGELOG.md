@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.25.0] - 2026-06-03
+
+### 🚀 Features
+
+- EXE-1837: Add a few Open Inference attributes to Metadata (#4297)
+- EXE-1918: Parse total tokens from AI Metadata (#4307)
+- Add Group ID & Request ID attributes to most execution spans (#4304)
+- EXE-1918: Add Response Model, Response ID, and finish reasons to extracted AI Metadata (#4311)
+- Use queue item timestamps for traces (#4316)
+- Add event runs query for v2 api (#4282)
+- Add event runs v2 api contract and implementation (#4283)
+- EXE-1913: Add support for parsing span attribute data from Vercel's AI SDK (#4312)
+
+### 🐛 Bug Fixes
+
+- *(queue)* Log queue role acquire and loss (#4300)
+- *(realtime)* Websocket memory leak (#4309)
+- Add app name to run spans (#4314)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add function metadata to run spans (#4287)
+- Improve usability on deferred runs (#4320)
+
 ## [v1.24.0] - 2026-06-01
 
 ### 🚀 Features
@@ -18,6 +42,10 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - *(queue)* Introduce queue roles (#4289)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.24.0 (#4288)
 
 ## [v1.23.0] - 2026-05-28
 
