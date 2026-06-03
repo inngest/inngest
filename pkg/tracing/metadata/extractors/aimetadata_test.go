@@ -361,6 +361,70 @@ func TestAIMetadataExtractor_CapturedFixtures(t *testing.T) {
 				TotalTokens:   util.ToPtr[int64](57),
 			},
 		},
+
+		// Langfuse (@langfuse/openai + LangfuseSpanProcessor)
+		//
+		// Langfuse spans carry NO gen_ai.*/llm.* — extraction relies entirely on
+		// the langfuse.* mappings. Model is the dated response model (from
+		// langfuse.observation.model.name); tokens come from the usage_details
+		// JSON blob (input/output/total), exploded into scalar fields.
+		//
+		// Documented gaps (no Langfuse key emits them): System, OperationName,
+		// ResponseModel, ResponseID, FinishReasons are all empty.
+		{
+			fixture: "openai_langfuse_observe/basic_responses.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:        "gpt-5.4-nano-2026-03-17",
+				InputTokens:  17,
+				OutputTokens: 36,
+				TotalTokens:  util.ToPtr[int64](53),
+			},
+		},
+		{
+			fixture: "openai_langfuse_observe/params_chat.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:        "gpt-4.1-nano-2025-04-14",
+				InputTokens:  22,
+				OutputTokens: 6,
+				TotalTokens:  util.ToPtr[int64](28),
+			},
+		},
+		{
+			fixture: "openai_langfuse_observe/tools_chat.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:        "gpt-4.1-nano-2025-04-14",
+				InputTokens:  56,
+				OutputTokens: 30,
+				TotalTokens:  util.ToPtr[int64](86),
+			},
+		},
+		{
+			fixture: "openai_langfuse_observe/stream_chat.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:        "gpt-4.1-nano",
+				InputTokens:  11,
+				OutputTokens: 10,
+				TotalTokens:  util.ToPtr[int64](21),
+			},
+		},
+		{
+			fixture: "openai_langfuse_observe/reasoning_responses.otlp.json",
+			expected: extractors.AIMetadata{
+				Model:        "gpt-5.4-nano-2026-03-17",
+				InputTokens:  17,
+				OutputTokens: 13,
+				TotalTokens:  util.ToPtr[int64](30),
+			},
+		},
+		{
+			// Embeddings emit no usage_details, so token counts stay zero and
+			// TotalTokens is not derived (nil) — a documented gap, like the OI
+			// embeddings case.
+			fixture: "openai_langfuse_observe/embeddings.otlp.json",
+			expected: extractors.AIMetadata{
+				Model: "text-embedding-3-small",
+			},
+		},
 	}
 
 	for _, tc := range cases {

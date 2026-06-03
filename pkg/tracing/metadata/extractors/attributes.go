@@ -2,6 +2,7 @@ package extractors
 
 import (
 	"cmp"
+	"encoding/json"
 	"slices"
 
 	"github.com/inngest/inngest/pkg/util"
@@ -14,18 +15,32 @@ import (
 type convention int
 
 const (
-	semconv       convention = 1
-	openinference convention = 2
-	vercel        convention = 3
+	// langfuse ranks first: Langfuse states its langfuse.* keys always
+	// take precedence over the generic conventions on spans it instrumented.
+	langfuse      convention = 1
+	semconv       convention = 2
+	openinference convention = 3
+	vercel        convention = 4
 )
+
+// langfuseUsagePrefix namespaces the synthetic scalar keys that
+// expandLangfuseUsageDetails emits from the langfuse.observation.usage_details
+// JSON blob. The double underscore marks them as derived, not wire attributes.
+const langfuseUsagePrefix = "__langfuse.usage_details."
 
 // attrMapping records the canonical field a source attribute key maps to, the
 // convention it belongs to, and a keyRank tiebreak used to order keys within
 // the same convention (lower wins; 0 = default).
+//
+// A mapping is either scalar (field set, expand nil) or composite (expand set,
+// field empty): a composite mapping carries no value of its own — its expand
+// func explodes the attribute into synthetic child KeyValues that are matched
+// back through keyFieldMap like any other attribute.
 type attrMapping struct {
 	field      string
 	convention convention
 	keyRank    int
+	expand     func(v *v1.AnyValue) []*v1.KeyValue
 }
 
 var keyFieldMap = map[string]attrMapping{
@@ -160,6 +175,63 @@ var keyFieldMap = map[string]attrMapping{
 		field:      "finishReasons",
 		convention: vercel,
 	},
+
+	// ---------------------------------------------------------------------------
+	// Langfuse (`langfuse.*`, via @langfuse/openai + LangfuseSpanProcessor)
+	// ---------------------------------------------------------------------------
+	"langfuse.observation.model.name": {
+		field:      "model",
+		convention: langfuse,
+	},
+	// usage_details is a single JSON blob ({"input":N,"output":N,"total":N,...}).
+	// It carries no value of its own: expand explodes it into synthetic scalar
+	// children, which are matched back through keyFieldMap below.
+	"langfuse.observation.usage_details": {
+		convention: langfuse,
+		expand:     expandLangfuseUsageDetails,
+	},
+	langfuseUsagePrefix + "input": {
+		field:      "inputTokens",
+		convention: langfuse,
+	},
+	langfuseUsagePrefix + "output": {
+		field:      "outputTokens",
+		convention: langfuse,
+	},
+	langfuseUsagePrefix + "total": {
+		field:      "totalTokens",
+		convention: langfuse,
+	},
+}
+
+// expandLangfuseUsageDetails parses the langfuse.observation.usage_details JSON
+// blob and emits one synthetic scalar KeyValue per integer entry, keyed under
+// langfuseUsagePrefix. keyFieldMap does further processing on the keys emitted.
+// matching does.
+func expandLangfuseUsageDetails(v *v1.AnyValue) []*v1.KeyValue {
+	raw := v.GetStringValue()
+	if raw == "" {
+		return nil
+	}
+
+	var counts map[string]json.Number
+	if err := json.Unmarshal([]byte(raw), &counts); err != nil {
+		return nil
+	}
+
+	out := make([]*v1.KeyValue, 0, len(counts))
+	for k, num := range counts {
+		n, err := num.Int64()
+		if err != nil {
+			// non-integer entry (shouldn't happen for token counts); skip.
+			continue
+		}
+		out = append(out, &v1.KeyValue{
+			Key:   langfuseUsagePrefix + k,
+			Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: n}},
+		})
+	}
+	return out
 }
 
 var metadataFieldSetters = map[string]func(v *v1.AnyValue, md *AIMetadata){
@@ -223,17 +295,38 @@ func compareByRank(a, b parsedAttr) int {
 func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) (foundAny bool) {
 	potentialAttrs := map[string][]parsedAttr{}
 
+	// addAttr records a matched attribute as a candidate for its canonical field.
+	addAttr := func(m attrMapping, value *v1.AnyValue) {
+		potentialAttrs[m.field] = append(
+			potentialAttrs[m.field],
+			parsedAttr{
+				value:      value,
+				convention: m.convention,
+				keyRank:    m.keyRank,
+			},
+		)
+	}
+
 	for _, attr := range attributes {
-		if mapping, ok := keyFieldMap[attr.Key]; ok {
-			potentialAttrs[mapping.field] = append(
-				potentialAttrs[mapping.field],
-				parsedAttr{
-					value:      attr.Value,
-					convention: mapping.convention,
-					keyRank:    mapping.keyRank,
-				},
-			)
+		mapping, ok := keyFieldMap[attr.Key]
+		if !ok {
+			continue
 		}
+
+		// Composite mapping: explode the attribute into synthetic children and
+		// match each back through keyFieldMap, so they flow through the same
+		// per-field precedence as everything else. Children carry their own
+		// mapping's convention/keyRank, and unmapped children are ignored.
+		if mapping.expand != nil {
+			for _, child := range mapping.expand(attr.Value) {
+				if childMapping, ok := keyFieldMap[child.Key]; ok {
+					addAttr(childMapping, child.Value)
+				}
+			}
+			continue
+		}
+
+		addAttr(mapping, attr.Value)
 	}
 
 	if len(potentialAttrs) == 0 {
