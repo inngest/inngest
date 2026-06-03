@@ -195,28 +195,29 @@ WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[])
 
 -- name: GetRuns :many
 SELECT
-  run_id,
-  function_id,
-  app_id,
-  start_time,
-  end_time,
-  COALESCE(status, '') AS status,
-  COALESCE(output::text, '') AS output,
-  COALESCE((attributes#>>'{}')::json->>'_inngest.function.slug', '') AS function_slug,
-  COALESCE((attributes#>>'{}')::json->>'_inngest.function.name', '') AS function_name,
-  COALESCE((attributes#>>'{}')::json->>'_inngest.app.name', '') AS app_name,
-  COALESCE((attributes#>>'{}')::json->>'_inngest.batch.id', '') AS batch_id,
-  COALESCE((attributes#>>'{}')::json->>'_inngest.cron.schedule', '') AS cron_schedule
+  spans.run_id,
+  spans.function_id,
+  spans.app_id,
+  spans.start_time,
+  spans.end_time,
+  COALESCE(spans.status, '') AS status,
+  COALESCE(spans.output::text, '') AS output,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.slug', '') AS function_slug,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.name', '') AS function_name,
+  COALESCE(apps.name, '') AS app_name,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.batch.id', '') AS batch_id,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.cron.schedule', '') AS cron_schedule
 FROM spans
-WHERE name = sqlc.arg('name')
-  AND debug_run_id IS NULL
-  AND run_id > sqlc.arg('cursor_run_id')::TEXT
+LEFT JOIN apps ON apps.id::text = spans.app_id AND apps.archived_at IS NULL
+WHERE spans.name = sqlc.arg('name')
+  AND spans.debug_run_id IS NULL
+  AND spans.run_id > sqlc.arg('cursor_run_id')::TEXT
   AND EXISTS (
     SELECT 1
     FROM jsonb_array_elements_text(NULLIF(spans.event_ids#>>'{}', '')::jsonb) AS eid(event_id)
     WHERE eid.event_id = sqlc.arg('event_id')::TEXT
   )
-ORDER BY run_id
+ORDER BY spans.run_id
 LIMIT @limit_rows;
 
 -- name: GetFunctionRunFinishesByRunIDs :many

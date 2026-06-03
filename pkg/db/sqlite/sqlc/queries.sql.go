@@ -1253,24 +1253,25 @@ func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDPa
 
 const getRuns = `-- name: GetRuns :many
 SELECT
-  run_id,
-  function_id,
-  app_id,
-  start_time,
-  end_time,
-  COALESCE(status, '') AS status,
-  COALESCE(CAST(output AS TEXT), '') AS output,
-  COALESCE(attributes->>'$."_inngest.function.slug"', '') AS function_slug,
-  COALESCE(attributes->>'$."_inngest.function.name"', '') AS function_name,
-  COALESCE(attributes->>'$."_inngest.app.name"', '') AS app_name,
-  COALESCE(attributes->>'$."_inngest.batch.id"', '') AS batch_id,
-  COALESCE(attributes->>'$."_inngest.cron.schedule"', '') AS cron_schedule
+  spans.run_id,
+  spans.function_id,
+  spans.app_id,
+  spans.start_time,
+  spans.end_time,
+  COALESCE(spans.status, '') AS status,
+  COALESCE(CAST(spans.output AS TEXT), '') AS output,
+  COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
+  COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
+  COALESCE(apps.name, '') AS app_name,
+  COALESCE(spans.attributes->>'$."_inngest.batch.id"', '') AS batch_id,
+  COALESCE(spans.attributes->>'$."_inngest.cron.schedule"', '') AS cron_schedule
 FROM spans
-WHERE name = ?1
-  AND debug_run_id IS NULL
-  AND run_id > ?2
+LEFT JOIN apps ON apps.id = spans.app_id AND apps.archived_at IS NULL
+WHERE spans.name = ?1
+  AND spans.debug_run_id IS NULL
+  AND spans.run_id > ?2
   AND INSTR(CAST(spans.event_ids AS TEXT), ?3) > 0
-ORDER BY run_id
+ORDER BY spans.run_id
 LIMIT ?4
 `
 
@@ -1291,7 +1292,7 @@ type GetRunsRow struct {
 	Output       interface{}
 	FunctionSlug interface{}
 	FunctionName interface{}
-	AppName      interface{}
+	AppName      string
 	BatchID      interface{}
 	CronSchedule interface{}
 }

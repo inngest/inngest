@@ -223,13 +223,24 @@ func TestGetRuns(t *testing.T) {
 	batchID := ulid.Make()
 	runID := ulid.Make()
 	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "event-runs-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
 	require.NoError(t, insertRunListSpan(ctx, q, runListSpan{
 		RunID:        runID,
 		EventIDs:     []ulid.ULID{firstBatchEventID, eventID, thirdBatchEventID},
 		BatchID:      batchID,
 		AppID:        appID,
 		FunctionID:   fnID,
-		AppName:      "event-runs-app",
 		FunctionSlug: "event-runs-function",
 		FunctionName: "Event Runs Function",
 		Output:       []byte(`{"data":{"ok":true}}`),
@@ -272,7 +283,6 @@ type runListSpan struct {
 	BatchID      ulid.ULID
 	AppID        uuid.UUID
 	FunctionID   uuid.UUID
-	AppName      string
 	FunctionSlug string
 	FunctionName string
 	Output       []byte
@@ -284,7 +294,6 @@ type runListSpan struct {
 
 func insertRunListSpan(ctx context.Context, q db.Querier, span runListSpan) error {
 	attrs := map[string]any{
-		meta.Attrs.AppName.Key():      span.AppName,
 		meta.Attrs.FunctionSlug.Key(): span.FunctionSlug,
 		meta.Attrs.FunctionName.Key(): span.FunctionName,
 	}
