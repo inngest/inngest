@@ -365,7 +365,7 @@ function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?
       aria-label={expanded ? 'Collapse' : 'Expand'}
       className={cn(
         'bg-canvasBase flex items-center justify-center p-0',
-        expanded && 'cursor-pointer'
+        expanded && 'cursor-pointer bg-transparent'
       )}
       onClick={
         expanded
