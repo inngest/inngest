@@ -80,14 +80,6 @@ func userlandSpanBytes(req *collecttrace.ExportTraceServiceRequest) int64 {
 	return total
 }
 
-// maxUserlandTraceBodySize bounds the /v1/traces/userland request body. The
-// cap gate runs only after the body is read and parsed (it needs the parsed
-// spans to meter ingress bytes), so without this an over-cap or abusive account
-// would force unbounded read+parse on every request before the 429 — the
-// amplification the old pre-read cap gate prevented. Generous enough for a full
-// OTLP userland span batch; well below anything that would pressure the API.
-const maxUserlandTraceBodySize = 8 * 1024 * 1024 // 8MB
-
 func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Auth the app
 	auth, err := a.opts.AuthFinder(r.Context())
@@ -110,7 +102,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Bound the body before reading: the cap gate runs after parsing, so this
 	// is what stops an over-cap/abusive account from forcing unbounded
 	// read+parse on every request before the 429.
-	r.Body = http.MaxBytesReader(w, r.Body, maxUserlandTraceBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, consts.MaxUserlandTraceBodySize)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
