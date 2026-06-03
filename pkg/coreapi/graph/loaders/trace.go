@@ -240,6 +240,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		RunID:          span.GetRunID(),
 		SpanID:         span.GetSpanID(),
 		StartedAt:      span.GetStartedAtTime(),
+		ScheduledAt:    span.GetScheduledAtTime(),
 		Status:         status,
 		TraceID:        span.GetTraceID(),
 		DebugRunID:     debugRunID,

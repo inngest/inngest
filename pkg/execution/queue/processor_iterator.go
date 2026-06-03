@@ -141,6 +141,11 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		span.SetAttributes(attribute.String("job_id", *item.Data.JobID))
 	}
 
+	// Copy queue timestamps into the inner item for easier access during processing.
+	// We convert these to time.Time here so that we don't have to convert them multiple times during processing.
+	item.Data.At = time.UnixMilli(item.AtMS)
+	item.Data.EnqueuedAt = time.UnixMilli(item.EnqueuedAt)
+
 	if item.IsLeased(p.Queue.Clock().Now()) {
 		span.SetAttributes(attribute.String("skip_reason", "already_leased"))
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
