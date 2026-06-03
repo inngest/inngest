@@ -25,6 +25,9 @@ vi.mock('../SharedContext/usePathCreator', () => ({
 
 vi.mock('../Table/Cell', () => ({
   IDCell: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  LinkCell: ({ href, children }: { href?: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
   StatusCell: ({ status, label }: { status: string; label?: string }) => (
     <span>{label || status}</span>
   ),
