@@ -62,6 +62,18 @@ var keyFieldMap = map[string]attrMapping{
 		field:      "operationName",
 		convention: semconv,
 	},
+	"gen_ai.response.model": {
+		field:      "responseModel",
+		convention: semconv,
+	},
+	"gen_ai.response.id": {
+		field:      "responseId",
+		convention: semconv,
+	},
+	"gen_ai.response.finish_reasons": {
+		field:      "finishReasons",
+		convention: semconv,
+	},
 
 	// ---------------------------------------------------------------------------
 	// Open Inference
@@ -88,6 +100,12 @@ var keyFieldMap = map[string]attrMapping{
 		field:      "providerName",
 		convention: openinference,
 	},
+	// OpenInference emits a single scalar finish reason rather than the semconv
+	// gen_ai.response.finish_reasons array.
+	"llm.finish_reason": {
+		field:      "finishReasons",
+		convention: openinference,
+	},
 }
 
 var metadataFieldSetters = map[string]func(v *v1.AnyValue, md *AIMetadata){
@@ -108,6 +126,26 @@ var metadataFieldSetters = map[string]func(v *v1.AnyValue, md *AIMetadata){
 	},
 	"operationName": func(v *v1.AnyValue, md *AIMetadata) {
 		md.OperationName = v.GetStringValue()
+	},
+	"responseModel": func(v *v1.AnyValue, md *AIMetadata) {
+		md.ResponseModel = v.GetStringValue()
+	},
+	"responseId": func(v *v1.AnyValue, md *AIMetadata) {
+		md.ResponseID = v.GetStringValue()
+	},
+	"finishReasons": func(v *v1.AnyValue, md *AIMetadata) {
+		// semconv gen_ai.response.finish_reasons is an array (one per choice);
+		// OpenInference's llm.finish_reason is a single scalar string. Handle
+		// both and store the values raw (no tool_call/tool_calls normalization).
+		if arr := v.GetArrayValue(); arr != nil {
+			reasons := make([]string, 0, len(arr.GetValues()))
+			for _, val := range arr.GetValues() {
+				reasons = append(reasons, val.GetStringValue())
+			}
+			md.FinishReasons = reasons
+		} else if s := v.GetStringValue(); s != "" {
+			md.FinishReasons = []string{s}
+		}
 	},
 }
 

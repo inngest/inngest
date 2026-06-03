@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -57,6 +58,21 @@ func AddMetadataTenantAttrs(rawAttrs *meta.SerializableAttrs, id statev2.ID) {
 	meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &id.Tenant.AccountID)
 	meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &id.Tenant.EnvID)
 	meta.AddAttr(rawAttrs, meta.Attrs.AppID, &id.Tenant.AppID)
+}
+
+func AddQueueTimestampAttrs(rawAttrs *meta.SerializableAttrs, item queue.Item) {
+	if !item.EnqueuedAt.IsZero() {
+		meta.AddAttr(rawAttrs, meta.Attrs.QueuedAt, &item.EnqueuedAt)
+	}
+
+	if !item.At.IsZero() {
+		// Fudge the timestamp slightly in the case that At < EnqueuedAt
+		// which happens when a job is scheduled to run immediately
+		// (ie. At is now at the time of Enqueue(), but EnqueuedAt is created after that).
+		// This ensures that the ScheduledAt time is always >= QueuedAt time.
+		scheduledAt := slices.MaxFunc([]time.Time{item.EnqueuedAt, item.At}, time.Time.Compare)
+		meta.AddAttr(rawAttrs, meta.Attrs.ScheduledAt, &scheduledAt)
+	}
 }
 
 func getExecutionContext(ctx context.Context) *ExecutionContext {
