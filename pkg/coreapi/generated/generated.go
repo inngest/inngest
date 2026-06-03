@@ -480,6 +480,7 @@ type ComplexityRoot struct {
 		Duration          func(childComplexity int) int
 		EndedAt           func(childComplexity int) int
 		FunctionID        func(childComplexity int) int
+		GroupID           func(childComplexity int) int
 		IsRoot            func(childComplexity int) int
 		IsUserland        func(childComplexity int) int
 		Metadata          func(childComplexity int) int
@@ -2843,6 +2844,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.FunctionID(childComplexity), true
 
+	case "RunTraceSpan.groupID":
+		if e.complexity.RunTraceSpan.GroupID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.GroupID(childComplexity), true
+
 	case "RunTraceSpan.isRoot":
 		if e.complexity.RunTraceSpan.IsRoot == nil {
 			break
@@ -4319,6 +4327,7 @@ type RunTraceSpan {
   # Internal
   spanID: String! # internal span ID, or a virtual span ID
   traceID: String! # the internal ID of the trace this span belongs to
+  groupID: String # the group ID of this span, used for grouping spans together in the UI, e.g. retries
   # Required
   name: String! # the name of the span
   status: RunTraceSpanStatus! # the status of the span
@@ -7736,6 +7745,8 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -12647,6 +12658,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -15627,6 +15640,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -19072,6 +19087,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_traceID(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_groupID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_groupID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GroupID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_groupID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_name(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_name(ctx, field)
 	if err != nil {
@@ -19460,6 +19516,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -19817,6 +19875,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -29156,6 +29216,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "groupID":
+
+			out.Values[i] = ec._RunTraceSpan_groupID(ctx, field, obj)
+
 		case "name":
 
 			out.Values[i] = ec._RunTraceSpan_name(ctx, field, obj)

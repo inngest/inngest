@@ -139,6 +139,7 @@ var Attrs = struct {
 	// HTTP (serve) attributes
 	RequestID          attr[*string]
 	JobID              attr[*string]
+	GroupID            attr[*string]
 	RequestURL         attr[*string]
 	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
@@ -207,6 +208,7 @@ var Attrs = struct {
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestID:                          StringAttr("request.id"),
 	JobID:                              StringAttr("job.id"),
+	GroupID:                            StringAttr("job.group.id"),
 	RequestURL:                         StringAttr("request.url"),
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
