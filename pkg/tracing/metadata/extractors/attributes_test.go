@@ -44,6 +44,17 @@ func TestCanonicalKeysHaveFieldSetters(t *testing.T) {
 	}
 }
 
+func TestAttrMappings_FieldAndExpandAreExclusive(t *testing.T) {
+	t.Parallel()
+	for key, mapping := range keyFieldMap {
+		assert.Truef(
+			t,
+			(mapping.field != "") != (mapping.expand != nil),
+			"key %s cannot have both field and expand set", key,
+		)
+	}
+}
+
 // TestRankingPrefersProviderNameOverDeprecatedSystem verifies that when both
 // the deprecated gen_ai.system and its replacement gen_ai.provider.name are
 // present, the deprecated key's keyRank demotes it so the replacement wins,
