@@ -77,20 +77,20 @@ function TimelineV4Wrapper({
 }) {
   const { selectStep } = useStepSelection({ runID });
 
-  // Build a map of spanID -> Trace for looking up traces when clicked
-  const traceMap = useMemo(() => {
-    const map = new Map<string, Trace>();
-    traceWalk(trace, (t) => {
-      map.set(t.spanID, t);
-    });
-    return map;
-  }, [trace]);
-
   const rolledUpTrace = useMemo(
     // Roll up the trace to hide (new) request spans and group step attempts.
     () => traceRollup(trace),
     [trace, runID, orgName, functionSlug]
   );
+
+  // Build a map of spanID -> Trace for looking up traces when clicked
+  const traceMap = useMemo(() => {
+    const map = new Map<string, Trace>();
+    traceWalk(rolledUpTrace, (t) => {
+      map.set(t.spanID, t);
+    });
+    return map;
+  }, [rolledUpTrace]);
 
   // Convert V3 trace to V4 TimelineData
   const timelineData = useMemo(
